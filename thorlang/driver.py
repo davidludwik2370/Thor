@@ -14,9 +14,10 @@ import tempfile
 from .compiler import Source, ThorError, unquote
 from .diagnostics import Diagnostics, payload
 from .sourcemap import MappingBuilder
+from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 
 def frontend_binary(odin):
@@ -56,6 +57,9 @@ class Project:
         self.frontend = frontend
         self.flags = flags
         self.test = test
+        target = next((f[len("-target:"):] for f in flags if f.startswith("-target:")), "")
+        self.target = tuple(target.split("_")[:2]) if "_" in target else ()
+        self.default_collections = set()
         self.collections = {}
         for flag in flags:
             if flag.startswith("-collection:"):
@@ -74,9 +78,14 @@ class Project:
         for source in self.sources.values():
             source.project = self.packages
             source.collections = self.collections
+        self.resolver = Resolver(list(self.sources.values()))
+        self.resolver.prepare_contexts()
+        self.resolver.prepare_storage_checks()
 
     def discover(self, entry):
         entry = entry.resolve()
+        if any((directory / "thor-manifest.json").is_file() for directory in [entry, *entry.parents] if directory.is_dir()):
+            raise ThorError(f"generated Odin is not a Thor input; use the original source: {entry}")
         key = (entry, entry.is_file())
         if key in self._visited:
             return
@@ -89,7 +98,7 @@ class Project:
                 continue
             source = Source(path, self.frontend, thor=path.suffix == ".thor", package=entry.is_dir(),
                             test=self.test, project_name=self.entry.stem, mapping=self.mapping,
-                            raw=self.overlays.get(path))
+                            raw=self.overlays.get(path), target=self.target)
             self.sources[path] = source
             self.packages.setdefault(path.parent, []).append(source)
         for path in paths:
@@ -97,8 +106,11 @@ class Project:
             for imported in source.imports.values():
                 if ":" in imported:
                     name, relative = imported.split(":", 1)
-                    if name in {"core", "base", "vendor"}:
+                    if name in {"core", "base", "vendor"} and name not in self.collections:
                         continue
+                    if name == "thor" and name not in self.collections:
+                        self.collections[name] = ROOT / "runtime"
+                        self.default_collections.add(name)
                     base = self.collections.get(name)
                     if base is None:
                         source.error(f"unknown library collection {name!r}", 0, 0)
@@ -151,9 +163,10 @@ class Project:
             obsolete = (destination / relative).resolve()
             if destination in obsolete.parents and obsolete.is_file():
                 obsolete.unlink()
-        manifest = {"thor_version": VERSION, "entry": str(self.entry), "source_map_version": 1, "generated": sorted(generated)}
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
         self.destination = destination
+        manifest = {"thor_version": VERSION, "entry": str(self.entry), "source_map_version": 1,
+                    "generated": sorted(generated), "odin_flags": self.odin_flags()}
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
         return self.outputs[self.entry] if self.file_entry else destination / self.entry.relative_to(self.common)
 
     def odin_flags(self):
@@ -165,6 +178,11 @@ class Project:
                 result.append(f"-collection:{name}={mapped}")
             else:
                 result.append(flag)
+        for name in self.default_collections:
+            result.append(f"-collection:{name}={self.destination / self.collections[name].relative_to(self.common)}")
+        for source in self.sources.values():
+            for name, directory in source.asset_collections.items():
+                result.append(f"-collection:{name}={directory}")
         return result
 
 
@@ -174,7 +192,7 @@ def main(argv=None):
     if "--" in argv:
         boundary = argv.index("--")
         runtime_args, argv = argv[boundary + 1:], argv[:boundary]
-    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T06: compile additive Odin syntax to Odin.")
+    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T12: compile additive Odin syntax to Odin.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
     parser.add_argument("command", choices=["transpile", "check", "build", "run", "test"])
     parser.add_argument("source", help="a .thor/.odin file or package directory")
@@ -222,7 +240,8 @@ def main(argv=None):
                 overlays[Path(original).resolve()] = Path(replacement).read_bytes()
         diagnostics = Diagnostics(overlays=overlays)
         frontend, odin = frontend_binary(options.odin)
-        project = Project(options.source, frontend, flags, test=options.command == "test", overlays=overlays)
+        test_mode = options.command == "test" or "-build-mode:test" in flags
+        project = Project(options.source, frontend, flags, test=test_mode, overlays=overlays)
         destination = options.output_dir or Path.cwd() / ".thor-build" / project.entry.stem
         target = project.emit(destination)
         diagnostics = Diagnostics(project.sources, project.maps, project.generated)

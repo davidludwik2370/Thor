@@ -1,4 +1,4 @@
-"""Lower T01-T06 using ASTs from the adapted Odin tooling parser.
+"""Lower T01-T12 using ASTs from the adapted Odin tooling parser.
 
 Offsets are UTF-8 byte offsets, as in Odin. Unchanged source is copied verbatim;
 all transformations are attached to parsed nodes, never textual pattern matches.
@@ -76,7 +76,7 @@ class Hint:
 
 
 class Source:
-    def __init__(self, path: Path, frontend: Path, *, thor=True, package=False, test=False, project_name="", mapping=None, raw=None):
+    def __init__(self, path: Path, frontend: Path, *, thor=True, package=False, test=False, project_name="", mapping=None, raw=None, target=()):
         self.path = path.resolve()
         self.thor = thor
         self.raw = path.read_bytes() if raw is None else raw
@@ -87,6 +87,8 @@ class Source:
         if test:
             args.append("--test")
         args.append(f"--project-name={project_name}")
+        if target:
+            args.extend([f"--target-os={target[0]}", f"--target-arch={target[1]}"])
         args.append("--stdin")
         try:
             result = subprocess.run(args, input=self.raw, capture_output=True, timeout=30)
@@ -105,6 +107,10 @@ class Source:
         self.nodes = [Node(self, i, d) for i, d in enumerate(self.info["nodes"])]
         self.excluded = self.info.get("excluded", False)
         self.diagnostics = self.info.get("diagnostics") or []
+        immutable_starts = {span[0] for span in self.info.get("immutables") or []}
+        for n in self.nodes:
+            if n.kind == "Declaration":
+                n.data["immutable"] = n.start in immutable_starts
         if not self.nodes:
             self.nodes = [Node(self, 0, {"kind": "File", "start": 0, "end": len(self.raw), "parent": -1})]
         self.by_span: dict[tuple[int, int], list[Node]] = {}
@@ -124,6 +130,15 @@ class Source:
         self.needs_membership = False
         self.needs_default = False
         self.needs_intrinsics = False
+        self.error_messages = {}
+        self.hidden_namespaces = {}
+        self.asset_collections = {}
+        self.blocked = {}
+        self.guards = {}
+        self.block_guards = {}
+        self.converted_do_blocks = set()
+        self.guard_messages = {}
+        self.resolver = None
         self.selected = {}
         self.selected_origins = {}
         self.conditional_conflicts = set()
@@ -193,6 +208,9 @@ class Source:
         return next((a for a in n.ancestors() if self.is_scope(a)), self.root)
 
     def lookup(self, name, context):
+        if self.resolver:
+            symbol = self.resolver.lookup(name, context)
+            return symbol.declaration if symbol else None
         scopes = [a for a in context.ancestors() if self.is_scope(a)]
         if context.kind == "File":
             scopes = [context]
@@ -226,6 +244,8 @@ class Source:
     def declaration_for(self, expression):
         if expression is None:
             return None
+        if self.resolver:
+            return self.resolver.declaration_for(expression)
         if expression.kind == "Ident":
             local = expression.source.lookup(expression.text, expression)
             if local or expression.text not in self.selected:
@@ -256,6 +276,10 @@ class Source:
     def type_hint(self, expression, seen=None):
         if expression is None:
             return None
+        if self.resolver and expression.kind in {"Ident", "Selector", "Index", "Call", "Deref", "Paren"}:
+            shape = self.resolver.type_of(expression)
+            if shape.kind in {"array", "slice", "dynamic", "struct", "map", "pointer"}:
+                return Hint(expression.source, expression, f"type_of({expression.source.render(expression)})")
         seen = set() if seen is None else seen
         if expression in seen:
             return None
@@ -376,6 +400,12 @@ class Source:
 
     def struct_fields(self, hint):
         n = hint.node
+        if self.resolver:
+            shape = self.resolver.type_of(n)
+            if shape.kind == "struct":
+                fields = shape.node.role("fields")
+                return {name.text: Hint(f.source, f.role("type")) for f in fields.children if f.kind == "Field"
+                        for name in f.group("names")}
         if n.kind != "StructType":
             resolved = n.source.type_hint(n)
             if not resolved or resolved.node is n:
@@ -390,6 +420,10 @@ class Source:
         return result
 
     def signature(self, call):
+        if self.resolver:
+            plan = self.resolver.call_plans.get(call) or self.resolver.resolve_call(call)
+            if plan:
+                return plan.signature
         callee = call.role("callee")
         declaration = self.declaration_for(callee)
         if declaration:
@@ -415,7 +449,7 @@ class Source:
         opened = node.data.get("roles", {}).get("open", [-1])[0]
         return node.kind == "Compound" and opened >= 0 and self.raw[opened:opened+1] == b"["
 
-    def splice(self, n, replacements):
+    def splice(self, n, replacements, inserts=()):
         # AST children can include documentation outside their parent's code span.
         chosen = []
         for a, b, text in sorted(replacements, key=lambda x: (x[0], -x[1])):
@@ -424,6 +458,9 @@ class Source:
         for a, b, text in self.edits:
             if n.start <= a < b <= n.end and not any(x <= a and b <= y for x, y, _ in chosen):
                 chosen.append((a, b, self.mapping.wrap(text, self.path, a, b, "syntax")))
+        for offset, text in inserts:
+            if n.start <= offset <= n.end and not any(a < offset < b for a, b, _ in chosen):
+                chosen.append((offset, offset, text))
         output, cursor = [], n.start
         for a, b, text in sorted(chosen):
             if a < cursor:
@@ -438,7 +475,37 @@ class Source:
             return ""
         if n.source is not self:
             return n.source.render(n, expected, constant)
-        return self.mapping.wrap(self._render(n, expected, constant), self.path, n.start, n.end, n.kind)
+        if n in self.blocked:
+            token, message = self.blocked[n]
+            self.error_messages[token] = message
+            code = token
+        else:
+            code = self._render(n, expected, constant)
+        if n in self.guards:
+            code = self.guard_code(self.guards[n]) + code
+        return self.mapping.wrap(code, self.path, n.start, n.end, n.kind)
+
+    def guard_code(self, guards):
+        return "".join(self.mapping.wrap(f'#assert(!({condition}), {json.dumps(message)})\n', self.path,
+                                          origin.start, origin.end, "immutable")
+                       for condition, message, origin in guards)
+
+    def guard_block(self, block, condition, message, origin):
+        self.block_guards.setdefault(block, []).append((condition, message, origin))
+        if self.raw[block.start:block.start+1] != b"{" and block not in self.converted_do_blocks:
+            # The owned lexer identifies the actual `do` keyword, excluding
+            # comments/strings and nested expression syntax in the header.
+            tokens = [span for span in self.info.get("do_tokens") or []
+                      if block.parent.start <= span[0] < block.start]
+            if tokens:
+                a, b = tokens[-1]
+                self.edits.append((a, b, ""))
+                self.converted_do_blocks.add(block)
+
+    def namespace_code(self, namespace):
+        if namespace not in self.hidden_namespaces:
+            self.hidden_namespaces[namespace] = self.prefix + "import_" + str(len(self.hidden_namespaces))
+        return self.hidden_namespaces[namespace]
 
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
@@ -451,7 +518,8 @@ class Source:
                 or parent.kind in {"ImplicitSelector", "EnumType", "PolyType"}
             )
             if not binding and self.lookup(n.text, n) is None:
-                return self.selected[n.text]
+                namespace, member = self.selected[n.text].split(".", 1)
+                return self.namespace_code(namespace) + "." + member
         if kind == "Declaration":
             annotation = n.role("type")
             hint = Hint(self, annotation) if annotation else None
@@ -499,32 +567,63 @@ class Source:
             signature = self.signature(n)
             params = self.fields(signature.role("params")) if signature else []
             generic = signature and "$" in signature.role("params").text
+            method = n.role("callee").kind == "Selector" and n.role("callee").data.get("op") == "->"
             for index, arg in enumerate(n.group("args")):
                 param = None
-                param_index = index
+                param_index = index + int(method)
                 if arg.kind == "FieldValue":
                     for j, (name, annotation) in enumerate(params):
                         if name == arg.role("field").text:
                             param, param_index = annotation, j
                             break
-                elif index < len(params):
-                    param = params[index][1]
+                elif param_index < len(params):
+                    param = params[param_index][1]
                 hint = None
                 if param and not generic:
                     # Query Odin for the actual formal type instead of copying
                     # callee-local/private type names into the caller's scope.
                     callee_text = self.render(n.role("callee"))
+                    if method:
+                        selector = n.role("callee")
+                        callee_text = f'({self.render(selector.role("expr"))}).{self.render(selector.role("field"))}'
                     query = f"#type {self.prefix}meta.type_proc_parameter_type(type_of({callee_text}), {param_index})"
                     hint = Hint(param.source, param, query)
+                if self.resolver:
+                    hint = self.resolver.call_hint(n, arg, index) or hint
                 overrides[arg] = (hint, constant or n.role("callee").text in {"#assert", "#config"})
             callee = n.role("callee")
             args = n.group("args")
             if callee and callee.text in {"#load", "#load_hash", "#load_directory", "#exists"} and args and args[0].kind == "Literal":
                 path = unquote(args[0].text)
-                if not Path(path).is_absolute():
-                    replacement = json.dumps(str((self.path.parent / path).resolve()), ensure_ascii=False)
+                resource = None
+                if ":" in path and not Path(path).is_absolute():
+                    name, relative = path.split(":", 1)
+                    if name in self.collections:
+                        resource = (self.collections[name] / relative).resolve()
+                elif not Path(path).is_absolute():
+                    resource = (self.path.parent / path).resolve()
+                if resource is not None:
+                    replacement = json.dumps(str(resource), ensure_ascii=False)
                     children = [(c.start, c.end, replacement if c is args[0] else self.render(c, *overrides.get(c, (None, constant)))) for c in n.children]
                     return self.splice(n, children)
+        if kind == "ForeignImport":
+            replacements = []
+            for literal in n.group("paths"):
+                path = unquote(literal.text)
+                base = self.path.parent
+                if ":" in path:
+                    collection, relative = path.split(":", 1)
+                    if collection not in self.collections:
+                        continue  # e.g. system: and framework: retain native meaning.
+                    base, path = self.collections[collection], relative
+                if not Path(path).is_absolute():
+                    alias = next((name for name, directory in self.asset_collections.items() if directory == base), None)
+                    if alias is None:
+                        alias = self.prefix + "assets_" + str(len(self.asset_collections))
+                        self.asset_collections[alias] = base
+                    replacement = json.dumps(alias + ":" + path, ensure_ascii=False)
+                    replacements.append((literal.start, literal.end, self.mapping.wrap(replacement, self.path, literal.start, literal.end, "resource")))
+            return self.splice(n, replacements)
         if kind == "Compound" and not self.is_array(n):
             hint = self.type_hint(n.role("type")) or expected
             fields = self.struct_fields(hint) if hint else {}
@@ -596,7 +695,16 @@ class Source:
         for child in n.children:
             hint, const = overrides.get(child, (None, constant))
             replacements.append((child.start, child.end, self.render(child, hint, const)))
-        result = self.splice(n, replacements)
+        inserts = []
+        guards = self.block_guards.get(n)
+        real_block = kind == "Block" and self.raw[n.start:n.start+1] == b"{"
+        if guards and real_block:
+            inserts = [(n.start+1, self.guard_code(guards))]
+        result = self.splice(n, replacements, inserts)
+        if guards and not real_block:
+            result = "{" + self.guard_code(guards) + result + "}"
+        if self.resolver and kind == "Declaration":
+            result += self.resolver.declaration_support(n)
         if n in self.conditional_conflicts:
             result = '#panic("declaration conflicts with selective import")\n' + result
         return result
@@ -665,7 +773,7 @@ class Source:
             # Odin does not allow privacy attributes on every kind of alias.
             # Resolve file-local names in the AST and validate even unused imports
             # through local constant aliases in an otherwise empty private init.
-            checks = "\n".join(self.mapping.wrap(f"    checked_{i} :: {target}", self.path,
+            checks = "\n".join(self.mapping.wrap(f"    checked_{i} :: {self.namespace_code(target.split('.')[0])}.{name}", self.path,
                                 *self.selected_origins[name], "import") for i, (name, target) in enumerate(self.selected.items()))
             code += self.mapping.wrap(f'\n@(private="file", init)\n{self.prefix}validate_imports :: proc "contextless" () {{\n{checks}\n}}\n', self.path, *next(iter(self.selected_origins.values())), "support")
         if self.needs_default:
@@ -673,6 +781,9 @@ class Source:
         if self.needs_membership:
             operation = next(n for n in self.nodes if n.kind == "Binary" and n.data["op"] in {"in", "not_in"})
             code += self.mapping.wrap("\n" + membership_helpers(self.prefix), self.path, operation.start, operation.end, "membership-helper")
+        for namespace, alias in self.hidden_namespaces.items():
+            code += self.mapping.wrap(f'\nimport {alias} {json.dumps(self.imports[namespace])}\n',
+                                      self.path, 0, 0, "support")
         code, self.source_map = self.mapping.finish(code)
         return code
 

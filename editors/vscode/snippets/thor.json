@@ -31,5 +31,12 @@
       "}"
     ],
     "description": "Generic procedure with exact type membership"
+  },
+  "Immutable storage": {
+    "prefix": "imm",
+    "body": [
+      "${1:name} :> ${2:value}"
+    ],
+    "description": "Runtime-initialized immutable storage"
   }
 }

@@ -1,9 +1,9 @@
 {
   "name": "thor-language",
   "displayName": "Thor Language",
-  "description": "Thor T01-T06 syntax highlighting and the local TLS language server.",
+  "description": "Thor T01-T12 syntax highlighting and the local TLS language server.",
   "publisher": "thor-local",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"

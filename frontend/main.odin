@@ -1,10 +1,10 @@
-// Odin owns the grammar; this bridge exports source spans for Thor's lowerer.
+// Shared Thor frontend: export Odin-compatible AST roles and original byte spans.
 package main
 
 import "core:encoding/json"
 import "core:fmt"
 import "core:odin/ast"
-import "core:odin/tokenizer"
+import tokenizer "tokenizer"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -16,6 +16,7 @@ Info :: struct {
     start, end, parent: int,
     op, name: string,
     mutable: bool,
+    using_field: bool,
     roles: map[string]Span,
     lists: map[string][]Span,
 }
@@ -26,6 +27,8 @@ Output :: struct {
     selections: [dynamic]parser.Selection,
     comments: [dynamic]Span,
     diagnostics: []Parse_Error,
+    immutables: [dynamic][2]int,
+    do_tokens: [dynamic]Span,
 }
 Parse_Error :: struct {
     pos: tokenizer.Pos,
@@ -44,7 +47,7 @@ collect_warning :: proc(pos: tokenizer.Pos, message: string, args: ..any) {
     parse_errors[len(parse_errors)-1].type = "warning"
     parse_errors[len(parse_errors)-1].stage = "parser-warning"
 }
-filename_excluded :: proc(path: string) -> bool {
+filename_excluded :: proc(path: string, target: parser.Build_Target) -> bool {
     base := filepath.base(path)
     if strings.has_prefix(base, ".") { return true }
     stem := strings.trim_suffix(base, filepath.ext(base))
@@ -55,10 +58,10 @@ filename_excluded :: proc(path: string) -> bool {
     os2, _ := parser.get_build_os_from_string(previous)
     arch1 := parser.get_build_arch_from_string(last)
     arch2 := parser.get_build_arch_from_string(previous)
-    if os1 != .Unknown && arch2 != .Unknown { return os1 != ODIN_OS || arch2 != ODIN_ARCH }
-    if arch1 != .Unknown && os2 != .Unknown { return arch1 != ODIN_ARCH || os2 != ODIN_OS }
-    if os1 != .Unknown { return os1 != ODIN_OS }
-    if arch1 != .Unknown { return arch1 != ODIN_ARCH }
+    if os1 != .Unknown && arch2 != .Unknown { return os1 != target.os || arch2 != target.arch }
+    if arch1 != .Unknown && os2 != .Unknown { return arch1 != target.arch || os2 != target.os }
+    if os1 != .Unknown { return os1 != target.os }
+    if arch1 != .Unknown { return arch1 != target.arch }
     return false
 }
 Walk_State :: struct {out: ^Output, stack: [dynamic]int}
@@ -85,7 +88,9 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Ident: info.kind = "Ident"; info.name = n.name
     case ^ast.Basic_Lit: info.kind = "Literal"; info.op = tokenizer.to_string(n.tok.kind)
     case ^ast.Implicit_Selector_Expr: info.kind = "ImplicitSelector"
-    case ^ast.Poly_Type: info.kind = "PolyType"; info.name = n.type.name
+    case ^ast.Poly_Type:
+        info.kind = "PolyType"; info.name = n.type.name
+        info.roles["specialization"] = span(n.specialization)
     case ^ast.Comp_Lit:
         // The bracket position is exported; Python distinguishes Thor '[' from '{'.
         info.kind = "Compound"
@@ -99,11 +104,19 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "Unary"; info.op = n.op.text; info.roles["expr"] = span(n.expr)
     case ^ast.Paren_Expr: info.kind = "Paren"; info.roles["expr"] = span(n.expr)
     case ^ast.Selector_Expr:
-        info.kind = "Selector"; info.roles["expr"] = span(n.expr); info.roles["field"] = span(n.field)
+        info.kind = "Selector"; info.op = n.op.text
+        info.roles["expr"] = span(n.expr); info.roles["field"] = span(n.field)
     case ^ast.Call_Expr:
         info.kind = "Call"; info.roles["callee"] = span(n.expr); info.lists["args"] = spans(n.args)
-    case ^ast.Index_Expr: info.kind = "Index"; info.roles["expr"] = span(n.expr)
-    case ^ast.Slice_Expr: info.kind = "Slice"; info.roles["expr"] = span(n.expr)
+    case ^ast.Index_Expr: info.kind = "Index"; info.roles["expr"] = span(n.expr); info.roles["index"] = span(n.index)
+    case ^ast.Slice_Expr:
+        info.kind = "Slice"; info.roles["expr"] = span(n.expr)
+        info.roles["low"] = span(n.low); info.roles["high"] = span(n.high)
+    case ^ast.Deref_Expr: info.kind = "Deref"; info.roles["expr"] = span(n.expr)
+    case ^ast.Type_Cast:
+        info.kind = "Cast"; info.op = n.tok.text
+        info.roles["expr"] = span(n.expr); info.roles["type"] = span(n.type)
+    case ^ast.Proc_Group: info.kind = "ProcedureGroup"; info.lists["args"] = spans(n.args)
     case ^ast.Field_Value:
         info.kind = "FieldValue"; info.roles["field"] = span(n.field); info.roles["value"] = span(n.value)
     case ^ast.Ternary_If_Expr:
@@ -114,10 +127,12 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["x"] = span(n.x); info.roles["y"] = span(n.y)
     case ^ast.Value_Decl:
         info.kind = "Declaration"; info.mutable = n.is_mutable
+        info.using_field = n.is_using
         info.roles["type"] = span(n.type); info.lists["names"] = spans(n.names)
         info.lists["values"] = spans(n.values)
     case ^ast.Assign_Stmt:
-        info.kind = "Assignment"; info.lists["lhs"] = spans(n.lhs); info.lists["rhs"] = spans(n.rhs)
+        info.kind = "Assignment"; info.op = n.op.text
+        info.lists["lhs"] = spans(n.lhs); info.lists["rhs"] = spans(n.rhs)
     case ^ast.Proc_Lit:
         info.kind = "Procedure"; info.roles["type"] = span(n.type); info.roles["body"] = span(n.body)
         info.lists["where"] = spans(n.where_clauses)
@@ -127,6 +142,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Field:
         info.kind = "Field"; info.roles["type"] = span(n.type); info.lists["names"] = spans(n.names)
         info.roles["default"] = span(n.default_value)
+        info.using_field = .Using in n.flags
     case ^ast.Array_Type:
         info.kind = "ArrayType"; info.roles["elem"] = span(n.elem); info.roles["len"] = span(n.len)
     case ^ast.Dynamic_Array_Type:
@@ -134,28 +150,43 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Fixed_Capacity_Dynamic_Array_Type:
         info.kind = "DynamicArrayType"; info.roles["elem"] = span(n.elem)
     case ^ast.Struct_Type:
-        info.kind = "StructType"; info.roles["fields"] = span(n.fields); info.lists["where"] = spans(n.where_clauses)
+        info.kind = "StructType"; info.roles["fields"] = span(n.fields); info.roles["params"] = span(n.poly_params)
+        info.lists["where"] = spans(n.where_clauses)
     case ^ast.Union_Type: info.kind = "UnionType"; info.lists["where"] = spans(n.where_clauses)
     case ^ast.When_Stmt:
         info.kind = "When"; info.roles["cond"] = span(n.cond)
+        info.roles["body"] = span(n.body); info.roles["else"] = span(n.else_stmt)
     case ^ast.Return_Stmt: info.kind = "Return"; info.lists["values"] = spans(n.results)
     case ^ast.Block_Stmt: info.kind = "Block"
     case ^ast.Import_Decl:
         info.kind = "Import"; info.name = n.name.text; info.op = n.relpath.text
-    case ^ast.If_Stmt: info.kind = "If"
-    case ^ast.For_Stmt: info.kind = "For"
+    case ^ast.If_Stmt:
+        info.kind = "If"; info.roles["init"] = span(n.init); info.roles["cond"] = span(n.cond)
+        info.roles["body"] = span(n.body); info.roles["else"] = span(n.else_stmt)
+    case ^ast.For_Stmt:
+        info.kind = "For"; info.roles["init"] = span(n.init); info.roles["cond"] = span(n.cond)
+        info.roles["body"] = span(n.body); info.roles["post"] = span(n.post)
     case ^ast.Range_Stmt:
         info.kind = "Range"; info.lists["names"] = spans(n.vals)
+        info.roles["expr"] = span(n.expr); info.roles["body"] = span(n.body)
     case ^ast.Switch_Stmt: info.kind = "Switch"
-    case ^ast.Type_Switch_Stmt: info.kind = "TypeSwitch"
+    case ^ast.Type_Switch_Stmt:
+        info.kind = "TypeSwitch"
+        if n.tag != nil {
+            if assignment, ok := n.tag.derived.(^ast.Assign_Stmt); ok { info.lists["names"] = spans(assignment.lhs) }
+        }
+    case ^ast.Expr_Stmt: info.kind = "ExpressionStatement"; info.roles["expr"] = span(n.expr)
     case ^ast.Case_Clause: info.kind = "Case"
     case ^ast.Enum_Type: info.kind = "EnumType"
-    case ^ast.Pointer_Type: info.kind = "PointerType"
+    case ^ast.Pointer_Type: info.kind = "PointerType"; info.roles["elem"] = span(n.elem)
+    case ^ast.Multi_Pointer_Type: info.kind = "MultiPointerType"; info.roles["elem"] = span(n.elem)
     case ^ast.Typeid_Type: info.kind = "TypeidType"
-    case ^ast.Map_Type: info.kind = "MapType"
+    case ^ast.Map_Type: info.kind = "MapType"; info.roles["key"] = span(n.key); info.roles["value"] = span(n.value)
     case ^ast.Bit_Set_Type: info.kind = "BitSetType"
     case ^ast.Distinct_Type:
         info.kind = "DistinctType"; info.roles["type"] = span(n.type)
+    case ^ast.Using_Stmt: info.kind = "Using"; info.lists["values"] = spans(n.list)
+    case ^ast.Foreign_Import_Decl: info.kind = "ForeignImport"; info.lists["paths"] = spans(n.fullpaths)
     }
     index := len(state.out.nodes)
     append(&state.out.nodes, info)
@@ -187,14 +218,18 @@ main :: proc() {
     file.fullpath = os.args[1]
     package_mode, test_mode := false, false
     project_name := ""
+    target := parser.Build_Target{os=ODIN_OS, arch=ODIN_ARCH}
     thor := true
     for arg in os.args[2:] {
         if arg == "--package" { package_mode = true }
         if arg == "--test" { test_mode = true }
         if arg == "--odin" { thor = false }
         if strings.has_prefix(arg, "--project-name=") { project_name = strings.trim_prefix(arg, "--project-name=") }
+        if strings.has_prefix(arg, "--target-os=") { target.os, _ = parser.get_build_os_from_string(strings.trim_prefix(arg, "--target-os=")) }
+        if strings.has_prefix(arg, "--target-arch=") { target.arch = parser.get_build_arch_from_string(strings.trim_prefix(arg, "--target-arch=")) }
     }
-    excluded := package_mode && filename_excluded(os.args[1])
+    target.project_name = project_name
+    excluded := package_mode && filename_excluded(os.args[1], target)
     header: tokenizer.Tokenizer
     tokenizer.init(&header, file.src, file.fullpath, collect_error)
     for {
@@ -206,7 +241,7 @@ main :: proc() {
         }
     }
     tags := parser.parse_file_tags(file^)
-    if !parser.match_build_tags(tags, parser.Build_Target{os=ODIN_OS, arch=ODIN_ARCH, project_name=project_name}) {
+    if !parser.match_build_tags(tags, target) {
         excluded = true
     }
     if excluded { fmt.println("{\"excluded\":true,\"nodes\":[]}"); return }
@@ -221,7 +256,14 @@ main :: proc() {
         os.exit(1)
     }
     file.end.offset = len(data)
-    out := Output{edits=p.edits, selections=p.selections, diagnostics=parse_errors[:]}
+    out := Output{edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables}
+    lexer: tokenizer.Tokenizer
+    tokenizer.init(&lexer, file.src, file.fullpath, collect_error)
+    for {
+        token := tokenizer.scan(&lexer)
+        if token.kind == .EOF { break }
+        if token.kind == .Do { append(&out.do_tokens, Span{token.pos.offset, token.pos.offset+len(token.text)}) }
+    }
     for group in file.comments {
         for t in group.list { append(&out.comments, Span{t.pos.offset, t.pos.offset+len(t.text)}) }
     }

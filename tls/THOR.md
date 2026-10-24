@@ -3,8 +3,10 @@
 Upstream: https://github.com/DanielGavin/ols
 
 Pinned base: `0c9438faeba846232caaa22fe9f22b30c302dba2` (2026-10-10).
-The `thor-t01-t06` branch contains the local working changes. The upstream MIT
-license is retained. This is a local checkout; no remote GitHub fork was created.
+The upstream MIT license is retained. TLS sources are now vendored in Thor's
+root Git repository so compiler/editor batches can be committed together. The
+original local branch/history is preserved in this workspace at `.git/tls-upstream`
+(see `DEVELOPMENT.md`). No remote GitHub fork was created.
 
 This base builds with the installed Odin `dev-2026-10:8169255b9`. More recent
 upstream commits require `core:odin/tool-format`, absent from this installation.
@@ -23,7 +25,7 @@ python3 -m unittest discover -s tests -p test_tls.py -v
 
 The executable is `tls/bin/tls` (`tls.exe` on Windows). `THOR_ODIN` or `--odin`
 selects the compiler. Additional Odin flags are forwarded. TLS uses the same
-parser source as the transpiler through `-collection:thor=frontend`; it does not
+parser and owned lexer as the transpiler through `-collection:thor=frontend`; it does not
 have a second independently modified parser. Server symbols and diagnostics use
 the original source text, including unsaved document edits.
 
@@ -37,6 +39,12 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 - Discover mixed `.thor`/`.odin` packages and dependencies.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
+- Parse inferred/typed immutable runtime bindings. Hover explains immutable
+  storage, semantic tokens mark declarations/uses readonly, and shadowed mutable
+  bindings retain their ordinary behavior. Compiler checks enforce shallow
+  storage protection, including generic instantiations and implicit addresses.
+- Discover `thor:format` and `thor:sets` by default beside the compiler launcher.
+  Explicit collection configuration takes precedence.
 - Resolve selected import aliases with file privacy and local shadowing. Hover
   retains the imported declaration's signature; definitions follow the origin.
 - Infer common bracket-array types (including nested arrays), indexed element

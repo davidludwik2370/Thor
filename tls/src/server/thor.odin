@@ -40,6 +40,37 @@ thor_exprs :: proc(nodes: ..^ast.Expr) -> []^ast.Expr {
     return result
 }
 
+thor_is_immutable :: proc(attributes: []^ast.Attribute) -> bool {
+    for attr in attributes {
+        for elem in attr.elems {
+            if ident, ok := elem.derived.(^ast.Ident); ok && ident.name == "__thor_immutable" { return true }
+        }
+    }
+    return false
+}
+
+thor_mark_immutables :: proc(p: ^parser.Parser, file: ^ast.File) {
+    if len(p.immutables) == 0 { return }
+    State :: struct {starts: map[int]bool}
+    state := State{starts=make(map[int]bool)}
+    for span in p.immutables { state.starts[span[0]] = true }
+    visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
+        if node == nil { return v }
+        state := cast(^State)v.data
+        if declaration, ok := node.derived.(^ast.Value_Decl); ok && state.starts[node.pos.offset] {
+            attribute := ast.new(ast.Attribute, node.pos, node.pos)
+            attribute.elems = thor_exprs(thor_ident("__thor_immutable", node.pos))
+            append(&declaration.attributes, attribute)
+        }
+        return v
+    }
+    visitor := ast.Visitor{visit=visit, data=&state}
+    // TLS stores ast.File as a value; unlike ast.new(File), that does not set
+    // the root's derived union. Parsed declarations have valid derived nodes.
+    for declaration in file.decls { ast.walk(&visitor, declaration) }
+    delete(state.starts)
+}
+
 thor_is_import_alias :: proc(decl: ^ast.Value_Decl) -> bool {
     return thor_is_import_alias_attributes(decl.attributes[:])
 }

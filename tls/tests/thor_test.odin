@@ -37,6 +37,31 @@ main :: proc() { values := [1,2,3]; value{*}s }
 }
 
 @(test)
+thor_hover_immutable_runtime_storage :: proc(t: ^testing.T) {
+    source := thor_source(`package test
+make_value :: proc()->int {return 7}
+main :: proc(){ value :> make_value(); val{*}ue }
+`)
+    test.expect_hover_contains(t, &source, "immutable storage")
+}
+
+@(test)
+thor_hover_typed_immutable_array :: proc(t: ^testing.T) {
+    source := thor_source(`package test
+main :: proc(){ values: [2]int > [1,2]; val{*}ues }
+`)
+    test.expect_hover_contains(t, &source, "[2]int")
+}
+
+@(test)
+thor_immutable_shadowing_is_scoped :: proc(t: ^testing.T) {
+    source := thor_source(`package test
+main :: proc(){ value :> 1; {value := "mutable"; val{*}ue} }
+`)
+    test.expect_hover_contains(t, &source, "value: string")
+}
+
+@(test)
 thor_hover_typed_array :: proc(t: ^testing.T) {
     source := thor_source(`package test
 main :: proc() { values: [2]f64 = [1,2]; value{*}s }

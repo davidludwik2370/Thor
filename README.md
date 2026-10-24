@@ -1,7 +1,7 @@
 # Thor
 
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
-milestone implements **T01–T06** from the reference specification in
+milestone implements **T01–T12** from the reference specification in
 [thor.odin](thor.odin). It includes the parser and project support needed to make
 those features usable together.
 
@@ -16,7 +16,7 @@ caches the small Odin frontend automatically; no Python packages are required.
 
 [demo/main.thor](demo/main.thor) has a labeled section for every completed task,
 with assertions, ordinary Odin code, imported packages, and evaluation-order
-examples. It finishes with `All T01-T06 demos passed.`
+examples. It finishes with `All T01-T12 demos passed.`
 
 Select another compile-time branch with an ordinary Odin define:
 
@@ -40,7 +40,7 @@ Select another compile-time branch with an ordinary Odin define:
 ## VS Code and TLS
 
 The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
-support the current T01-T06 syntax. Build the server and extension from this repository:
+support the current T01-T12 syntax. Build the server and extension from this repository:
 
 ```sh
 python3 tools/build_tls.py
@@ -81,7 +81,12 @@ inputs can mix both extensions. Relative imported packages and explicitly passed
 `-collection:name=path` collections are mirrored into the generated tree. Odin's
 native file suffixes and build tags select active native sources. Resource paths
 in `#load`, `#load_hash`, `#load_directory`, and `#exists` remain relative to the
-original source file, including in ordinary Odin dependencies.
+original source file, including in ordinary Odin dependencies. Explicit collection
+resource paths and relative foreign objects/libraries use their original roots.
+The manifest records the forwarded native flags, including asset collections;
+assets are referenced in place, so retain the original project when compiling
+generated output. `thor:` defaults to this checkout's [runtime](runtime/README.md)
+collection and may be overridden with an explicit collection flag.
 
 Other Odin flags are forwarded. Use `--odin /path/to/odin`, or set `THOR_ODIN`, to
 select a compiler. Arguments after `--` are forwarded by `run` and `test`.
@@ -90,6 +95,9 @@ Generated files live under `.thor-build/`; the frontend binary is cached under
 `.thor-cache/`, keyed by its source and Odin version. Source files are never
 overwritten. A manifest allows stale generated sources to be removed on rebuild;
 Thor refuses to reuse an unrelated nonempty output directory.
+Generated trees are rejected as compiler inputs. File suffixes and build tags
+follow `-target:os_arch`, including when checking a target different from the host.
+`test` and `build -build-mode:test` include test-tagged files.
 
 ## Compiler diagnostics
 
@@ -140,6 +148,12 @@ Debugger mappings and runtime stack traces are outside this implementation.
 | T04 | `#if`, `#else if`, and `#else` lower to `when`; native `when` remains supported. |
 | T05 | `[1, 2, 3]` is an inferred fixed array; contextual types, empty typed arrays, nested arrays, arguments, returns, and assignments are supported. |
 | T06 | `in`/`not_in` for arrays, slices, dynamic arrays, native maps and bit sets; constant type/value membership in generic constraints. |
+| T07 | Caller-owned integer grouping and Unicode padding helpers in `thor:format`. |
+| T08 | Map-backed `Set(T)` library in `thor:sets`, including mathematical, in-place, clone, iteration, and cleanup operations. |
+| T09 | Shared Thor-owned lexer/parser and source emitter; native AST/token compatibility, comments, and byte spans retained. |
+| T10 | Mixed-source/import graphs, target/tag selection, collections, resource/foreign paths, managed output and CLI flag forwarding. |
+| T11 | Lexical symbols and shapes; contextual arrays through procedure aliases, overloads, generic specializations and private types. |
+| T12 | `x :> expr` and `x: Type > expr`: runtime initialization once, shallow immutable storage, scoped mutation/address checks. |
 
 ```odin
 import "core:math" / sin,
@@ -195,6 +209,36 @@ comparisons rather than runtime search. Parentheses, `not_in`, duplicate entries
 and empty type lists are supported. Named constant arrays can also be used for
 value membership when their length is statically determined by the frontend.
 
+```odin
+import f "thor:format"
+import sets "thor:sets"
+
+main :: proc() {
+    text := f.format(-1234567, grouping=true, width=14, align=.Center, fill='界')
+    defer delete(text) // returned formatting strings belong to the caller
+    names: sets.Set(string)
+    defer sets.destroy(names) // destroy each table once, including its aliases
+    sets.insert(&names, "apple")
+    for name in sets.entries(names) { assert(name == "apple") }
+
+    value :> len(text) // runtime value; direct writes and &value are rejected
+    data := [1, 2]
+    view :> data[:]
+    view[0] = value // shallow: referenced elements remain writable
+}
+```
+
+Immutable records and fixed arrays also protect directly stored subobjects.
+An existing pointer, slice, or dynamic-array view still permits writes to its
+pointee/elements. Taking an immutable header's mutable address is rejected.
+Native map entry assignment can change the map header, so it requires a mutable
+header (a mutable shallow copy may still access shared entries). Ordinary Odin
+copying and ownership rules apply; this feature does not add lifetime checking.
+Compile-time branches and generic shapes are checked by Odin after lowering, so
+inactive branches remain unchecked and reference views are distinguished from
+directly stored arrays. TLS marks immutable symbols readonly and explains them
+in hover; live compiler checks enforce mutations on unsaved text.
+
 ## Tests and rejection examples
 
 ```sh
@@ -219,32 +263,40 @@ directory includes `main.thor` and the expected diagnostic fragment:
 
 - [frontend/parser](frontend/parser) adapts Odin's real tooling parser and retains
   its original license. [frontend/main.odin](frontend/main.odin) exports AST spans
-  and roles as JSON, using the installed Odin AST and tokenizer packages.
+  and roles as JSON. [frontend/tokenizer](frontend/tokenizer) owns scanning while
+  retaining installed Odin token/AST types for TLS and formatter compatibility.
 - [thorlang/compiler.py](thorlang/compiler.py) performs AST-based,
   source-preserving lowering. It uses Odin type intrinsics for contextual array
   types rather than copying private callee type names into the caller.
 - [thorlang/driver.py](thorlang/driver.py) manages the CLI, frontend build cache,
   source/import graph, generated output, and Odin invocation.
+- [thorlang/semantics.py](thorlang/semantics.py) tracks lexical bindings, required
+  type shapes, call targets and storage protection. Native type witnesses resolve
+  exact contextual types in the declaration's scope, including private types.
 - [thorlang/sourcemap.py](thorlang/sourcemap.py) records composable emission
   mappings; [thorlang/diagnostics.py](thorlang/diagnostics.py) translates backend
   locations, ranges, and messages to original source.
 
 The implementation was verified with Odin `dev-2026-10:8169255b9` and Python
-3.11.6. An Odin AST/tokenizer API change may require refreshing the adapted parser.
-Full project/toolchain handling remains a later task: cross-target compilation,
-assembly/foreign-library asset mirroring, and the complete set of unusual Odin
-build flags are not claimed by this milestone. Toolchain/linker failures without
-source locations are reported as compiler-wide errors; unfamiliar backend wording
-may still need a dedicated Thor explanation.
+3.11.6. An Odin AST/token API change may require refreshing the shared frontend.
+Cross-target checking is covered; linking a foreign target still requires the
+ordinary Odin toolchain. Linker/toolchain failures without locations are reported
+as compiler-wide errors. The generated manifest records a rebuild command's
+native flags; it is not a standalone packaged SDK or asset bundle.
 
-Expected-type discovery covers directly resolved procedures, annotated procedure
-variables, record fields, returns, and assignments. It does not yet resolve every
-overload or generic specialization. At those call sites, a literal that relies
-solely on contextual typing (such as `[.Red, .Blue]`) can require explicit element
-types or ordinary Odin array syntax. Full target resolution belongs to T11.
+Thor resolves the type/procedure information its additions require and delegates
+ordinary assignability, overload validity, constraints, and code generation to
+Odin. It preserves unresolved/ambiguous calls for native checking rather than
+choosing arbitrarily. A call with insufficient information to determine a
+contextual literal's element type still needs an explicit type. TLS retains
+OLS's partial semantic resolver; compiler diagnostics use the complete backend.
+For an unconstrained generic receiver, immutable-field checks conservatively
+protect an implicitly promoted `using` field. Write the existing pointer member
+explicitly (`value.pointer.field`) to retain shallow mutation in that case;
+concrete and shape-constrained records resolve pointer promotion directly.
 
-Later syntax in the full spec—`fn`/`#run`, `#switch` and runtime switch expressions,
-immutable declarations, sets, f-strings, and negative-index normalization—is not
-implemented yet. Native Odin maps/bit sets work in T06; Thor sets arrive with
-T08/T15. The original root `thor.odin` remains the planning/reference file; the
-evaluation program is `demo/main.thor`.
+Later tasks cover f-strings (T13), `#switch`/switch expressions (T14), Set language
+syntax (T15), negative indices (T16), and `fn`/`#run` and compile-time execution.
+`fn` and `set` remain valid ordinary Odin identifiers. The root `thor.odin` is the
+reference specification; `demo/main.thor` is the evaluation program. Follow
+[DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.

@@ -423,9 +423,11 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 }
 
 visit_value_decl :: proc(value_decl: ast.Value_Decl, builder: ^SemanticTokenBuilder) {
-	modifiers: SemanticTokenModifiers = value_decl.is_mutable ? {} : {.ReadOnly}
+	modifiers: SemanticTokenModifiers = value_decl.is_mutable && !thor_is_immutable(value_decl.attributes[:]) ? {} : {.ReadOnly}
 
-	visit_nodes(value_decl.attributes[:], builder)
+	for attribute in value_decl.attributes {
+		if !thor_is_immutable([]^ast.Attribute{attribute}) { visit_node(attribute, builder) }
+	}
 
 	for name in value_decl.names {
 		ident := name.derived.(^ast.Ident) or_continue
@@ -553,7 +555,7 @@ visit_ident :: proc(
 		modifiers += {.DefaultLibrary}
 	}
 
-	if .Mutable not_in symbol.flags {
+	if .Mutable not_in symbol.flags || .Immutable in symbol.flags {
 		modifiers += {.ReadOnly}
 	}
 

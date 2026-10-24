@@ -61,13 +61,29 @@ async function run() {
         assert.equal(fs.readFileSync(testPath, 'utf8'), initial, 'Checking must use unsaved edits without saving them');
         await replace(initial);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const immutable = 'package main\nimport f "thor:format"\nmain::proc(){_="😀"; value:>7; value=9; text:=f.group_integer(value); delete(text)}\n';
+        await replace(immutable);
+        const immutableHover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', testDocument.uri,
+            testDocument.positionAt(immutable.indexOf('value:>') + 2)),
+            values => values?.some(value => value.contents.some(content => (content.value || '').includes('immutable storage'))));
+        assert.ok(immutableHover.length);
+        const immutableErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values => values.some(value => value.message.includes("immutable storage 'value'")));
+        const immutableError = immutableErrors.find(value => value.message.includes("immutable storage 'value'"));
+        assert.equal(testDocument.getText(immutableError.range), 'value');
+        const formatDefinition = await eventually(() => vscode.commands.executeCommand('vscode.executeDefinitionProvider', testDocument.uri,
+            testDocument.positionAt(immutable.indexOf('group_integer') + 2)), values => values?.length > 0);
+        assert.ok(formatDefinition.some(value => (value.targetUri || value.uri).path.includes('/runtime/format/')));
+        await replace(immutable.replace('value:>7', 'value:=7'));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
         await vscode.window.showTextDocument(document);
         await vscode.commands.executeCommand('tls.restart');
         await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)), values => values?.length > 0);
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
-            'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix', 'TLS restart'];
+            'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
+            'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

@@ -1,9 +1,9 @@
-// Modified for Thor T01-T06 from Odin dev-2026-10:8169255b9.
+// Modified for Thor T01-T12 from Odin dev-2026-10:8169255b9.
 // Original Odin tooling parser by Ginger Bill and contributors; see LICENSE.
 package thor_parser
 
 import "core:odin/ast"
-import "core:odin/tokenizer"
+import tokenizer "../tokenizer"
 
 import "core:fmt"
 
@@ -21,6 +21,7 @@ Parser :: struct {
 	thor: bool,
 	edits: [dynamic]Edit,
 	selections: [dynamic]Selection,
+	immutables: [dynamic][2]int,
 	file: ^ast.File,
 	tok: tokenizer.Tokenizer,
 
@@ -3846,13 +3847,20 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 
 parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Group) -> ^ast.Decl {
 	is_mutable := true
+	immutable := false
 
 	values: []^ast.Expr
-	type := parse_type_or_ident(p)
+	type: ^ast.Expr
+	if !(p.thor && p.curr_tok.kind == .Gt) { type = parse_type_or_ident(p) }
 
 	#partial switch p.curr_tok.kind {
-	case .Eq, .Colon:
+	case .Eq, .Colon, .Gt:
 		sep := advance_token(p)
+		if sep.kind == .Gt {
+			if !p.thor { error(p, sep.pos, "immutable storage syntax requires Thor source") }
+			immutable = true
+			append(&p.edits, Edit{sep.pos.offset, sep.pos.offset+len(sep.text), "="})
+		}
 		is_mutable = sep.kind != .Colon
 
 		values = parse_rhs_expr_list(p)
@@ -3907,6 +3915,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 	decl.type = type
 	decl.values = values
 	decl.is_mutable = is_mutable
+	if immutable { append(&p.immutables, [2]int{decl.pos.offset, decl.end.offset}) }
 	return decl
 }
 

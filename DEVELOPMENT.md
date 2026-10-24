@@ -47,3 +47,10 @@ The T07–T12 batch adds grouping/padding helpers (T07), the Set runtime library
 (T08), frontend/project/resolution infrastructure (T09–T11), and immutable storage
 (T12). Interpolated strings, switch expressions, Set language syntax, and negative
 indices remain their separately numbered T13–T16 tasks.
+
+T01–T12 now have implementations, editor integration and evaluation sections in
+`demo/main.thor`. The T07–T12 checkpoint passes 190 Python compiler/LSP tests,
+1,092 native TLS tests, 37 grammar tests, allocation-tracked runtime/lexer tests,
+and the isolated VS Code integration test. The compiler's resolution boundary
+and conservative generic `using` pointer case are documented in `README.md`;
+keep those limits visible while extending the resolver in later batches.

@@ -10,8 +10,13 @@ from .sourcemap import Origin, position
 
 class Diagnostics:
     def __init__(self, sources=None, maps=None, generated=None, overlays=None):
+        self.sources = {str(p): s for p, s in (sources or {}).items()}
         self.raw = {str(p): s.raw for p, s in (sources or {}).items()}
         self.prefixes = [s.prefix for s in (sources or {}).values()]
+        self.error_messages = {name: message for s in (sources or {}).values() for name, message in s.error_messages.items()}
+        self.namespace_aliases = {alias: name for s in (sources or {}).values() for name, alias in s.hidden_namespaces.items()}
+        self.guard_messages = {(str(path), start, end): message for path, s in (sources or {}).items()
+                               for (start, end), message in s.guard_messages.items()}
         self.raw.update({str(p): b for p, b in (overlays or {}).items()})
         self.maps = maps or {}
         self.generated = generated or {}
@@ -59,6 +64,10 @@ class Diagnostics:
         result, seen = [], set()
         for error in errors:
             msgs = list(error.get("msgs") or [])
+            for token, message in self.error_messages.items():
+                if any(token in m for m in msgs):
+                    msgs = [message]
+                    break
             pos = error.get("pos") or {}
             file = pos.get("file", "")
             origin = None
@@ -75,6 +84,43 @@ class Diagnostics:
                     token = re.match(r"\w+|.", raw[offset:].decode("utf-8", errors="replace"))
                     end = pos.get("end_offset", offset + (len(token[0].encode()) if token else 0))
                     origin = Origin(file, offset, end)
+            if origin and origin.kind == "immutable":
+                message = self.guard_messages.get((origin.file, origin.start, origin.end))
+                if message:
+                    msgs = [message, *[m for m in msgs if "instantiated as" in m or "Called within" in m]]
+            # These are public Thor support contracts, rather than an error in
+            # the library implementation. Native generic notes identify the
+            # actual use (including a call in an imported/unsaved file).
+            runtime = Path(__file__).resolve().parent.parent / "runtime"
+            contract = None
+            if origin and Path(origin.file) == runtime / "format" / "format.odin" and any(
+                "type_is_integer(T)" in m for m in msgs
+            ):
+                contract = "Integer grouping requires an integer value."
+            elif origin and Path(origin.file) == runtime / "sets" / "sets.odin" and any(
+                "type_is_valid_map_key(T)" in m or "Invalid type of a key for a map" in m for m in msgs
+            ):
+                contract = "Set elements must be valid Odin map keys."
+            if contract:
+                caller = None
+                for message in msgs:
+                    for reference_file, pattern in self.reference_patterns:
+                        for match in pattern.finditer(message):
+                            candidate = self.reference_origin(reference_file, *reference_coordinates(match)[:2])
+                            if not Path(candidate.file).is_relative_to(runtime):
+                                caller = candidate
+                                break
+                        if caller:
+                            break
+                    if caller:
+                        break
+                if caller:
+                    source = self.sources.get(caller.file)
+                    calls = [n for n in source.nodes if n.kind == "Call" and n.start <= caller.start < n.end] if source else []
+                    if calls:
+                        call = min(calls, key=lambda n: n.end - n.start)
+                        caller = Origin(caller.file, call.start, call.end)
+                    origin, msgs = caller, [contract]
             # An error in a generic support body belongs to its instantiation.
             if origin and origin.kind == "membership-helper":
                 for message in msgs:
@@ -111,6 +157,8 @@ class Diagnostics:
                         if generated_text and generated_text != original_text:
                             msgs = [m.replace(generated_text, original_text) for m in msgs]
                 # Generated implementation names never belong in user diagnostics.
+                for alias, name in self.namespace_aliases.items():
+                    msgs = [m.replace(alias, name) for m in msgs]
                 for prefix in self.prefixes:
                     msgs = [re.sub(re.escape(prefix) + r"[A-Za-z0-9_]+", "Thor expression", m) for m in msgs]
             # Rewrite locations embedded in overloads, declarations and generic notes.

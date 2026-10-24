@@ -960,6 +960,14 @@ Implement Thor in batches of T tasks. Each batch follows the same full loop:
 
 See DEVELOPMENT.md for the commands, repository layout, and batch checklist.
 Debugger mappings, stack traces, and a formatter remain separate work.
+
+Implementation checkpoint: 0.3.0 covers T01-T12, with demo sections and compiler,
+TLS, diagnostic and editor tests. T07/T08 expose thor:format and thor:sets support
+libraries; interpolation and Set language syntax remain T13/T15.
+Remaining T11/T12 refinement: an unconstrained generic receiver's implicitly
+promoted using-pointer field is conservatively protected. Explicit pointer-member
+access preserves shallow writes; concrete/shape-constrained records resolve the
+promotion. Keep this limitation visible until the resolver handles it directly.
 */
 
 main :: proc() {

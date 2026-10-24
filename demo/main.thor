@@ -9,6 +9,8 @@ import math "core:math" /
     cos,
     PI   // a selected constant; no trailing comma
 import "library" / Record, identity, overloaded
+import format "thor:format"
+import sets "thor:sets"
 
 Color :: enum {Red, Green, Blue}
 calls: int
@@ -40,6 +42,8 @@ sum_pair :: proc(values: [2]f64) -> f64 {
 make_pair :: proc() -> [2]f64 {
     return [3, 4]
 }
+
+last_color :: proc(values: [2]$T, hint: T) -> T { return values[1] }
 
 DEMO_MODE :: #config(DEMO_MODE, 2)
 #if DEMO_MODE == 1 {
@@ -146,5 +150,57 @@ main :: proc() {
     #assert(int in [int, f64])
     #assert(bool not_in [int, f64])
 
-    println("All T01-T06 demos passed.")
+    println("T07: owned integer grouping, padding, and Unicode fill")
+    grouped := format.group_integer(i64(-9223372036854775808))
+    padded := format.format(1234567, grouping=true, width=14, align=.Center, fill='界')
+    text := format.format("é😀", width=5)
+    assert(grouped == "-9,223,372,036,854,775,808")
+    assert(padded == "界界1,234,567界界界" && text == "é😀   ")
+    delete(grouped); delete(padded); delete(text)
+
+    println("T08: Set support library, independent results, and alias-safe operations")
+    names: sets.Set(string)
+    sets.insert(&names,"apple"); sets.insert(&names,"apple"); sets.insert(&names,"pear")
+    assert(sets.count(names)==2 && "pear" in sets.entries(names))
+    other_names := sets.clone(names)
+    sets.insert(&other_names,"plum")
+    added := sets.difference(other_names,names)
+    assert(sets.count(added)==1 && sets.contains(added,"plum") && sets.count(names)==2)
+    alias := other_names
+    sets.symmetric_difference_assign(&other_names,alias)
+    assert(sets.count(other_names)==0)
+    sets.destroy(added); sets.destroy(other_names); sets.destroy(names)
+
+    println("T09: shared Thor frontend and ordinary Odin compatibility")
+    fn := 3
+    set := 4 // these remain ordinary identifiers outside later Thor forms
+    assert(fn+set==7 && identity("ordinary Odin") == "ordinary Odin")
+
+    println("T10: native configuration, mixed packages, and original resource paths")
+    assert(support_value()==7 && DEMO_MODE in [1,2,3])
+    assert(#exists("assets/message.txt"))
+    assert(string(#load("assets/message.txt")) == "original project resource\n")
+
+    println("T11: overloaded/generic contexts and private types in imported packages")
+    assert(library.pick_color([.Red,.Blue], int(1)) == 1)
+    assert(library.accept_colors([.Red,.Blue]) == 1)
+    assert(last_color([.Red,.Blue], Color.Red) == .Blue)
+
+    println("T12: runtime-initialized immutable storage and shallow references")
+    calls, order = 0, 0
+    immutable :> mark(5)
+    typed_immutable: int > mark(6)
+    assert(immutable==5 && typed_immutable==6 && calls==2 && order==56)
+    frozen_record :> Record{number=3}
+    mutable_copy := frozen_record
+    mutable_copy.number=9
+    assert(frozen_record.number==3 && mutable_copy.number==9)
+    backing := [1,2]
+    view :> backing[:]
+    view[0]=8 // existing referenced data remains mutable; the header is fixed
+    assert(backing[0]==8)
+    // Rejections are separate executable fixtures under tests/fixtures/:
+    // immutable = 9; &frozen_record.number; frozen_array[:]
+
+    println("All T01-T12 demos passed.")
 }

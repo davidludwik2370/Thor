@@ -89,6 +89,7 @@ are_keyword_aliases :: proc(a, b: string) -> bool {
 GlobalFlags :: enum {
 	Mutable, // or constant
 	Variable, // or type
+	Immutable,
 }
 
 GlobalExpr :: struct {
@@ -112,8 +113,9 @@ parse_file :: proc (p: ^parser.Parser, file: ^ast.File, allocator := context.all
 	p.thor = strings.has_suffix(file.fullpath, ".thor")
 	clear(&p.selections)
 	clear(&p.edits)
+	clear(&p.immutables)
 	ok := parser.parse_file(p, file)
-	if p.thor { thor_add_import_aliases(p, file) }
+	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file) }
 	return ok
 }
 
@@ -454,6 +456,7 @@ collect_value_decl :: proc(
 	if value_decl.is_mutable {
 		global_expr.flags += {.Mutable}
 	}
+	if thor_is_immutable(value_decl.attributes[:]) { global_expr.flags += {.Immutable} }
 
 	for attribute in attributes {
 		for elem in attribute.elems {

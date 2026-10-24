@@ -2973,6 +2973,7 @@ resolve_local_identifier :: proc(
 	if .PolyType in local.flags {
 		symbol.flags |= {.PolyType}
 	}
+	if .Immutable in local.flags { symbol.flags |= {.Immutable} }
 
 	symbol.flags |= {.Local}
 	symbol.value_expr = local.value_expr
@@ -3011,6 +3012,7 @@ resolve_global_identifier :: proc(
 	if .Variable in global.flags {
 		symbol.flags |= {.Variable}
 	}
+	if .Immutable in global.flags { symbol.flags |= {.Immutable} }
 
 	// `is_variable_declaration` flags every `Call_Expr` as a variable,
 	// so a generic `Bar :: Foo(f32)` arrives here marked `.Variable`

@@ -1,6 +1,6 @@
 # Thor Language for VS Code
 
-Local Thor T01-T06 syntax highlighting and a client for the TLS fork in this
+Local Thor T01-T12 syntax highlighting and a client for the TLS fork in this
 repository. `.thor` files have their own language identity; existing Odin support
 continues to own `.odin` files.
 

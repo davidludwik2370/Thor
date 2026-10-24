@@ -226,6 +226,7 @@ SymbolFlag :: enum {
 	Anonymous, //Usually applied to structs that are defined inline inside another struct
 	Variable, // or type
 	Mutable, // or constant
+	Immutable, // Thor runtime storage, independent from compile-time constants
 	Local,
 	ObjC,
 	ObjCIsClassMethod, // should be set true only when ObjC is enabled

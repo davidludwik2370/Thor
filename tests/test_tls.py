@@ -170,6 +170,7 @@ class TLSTests(unittest.TestCase):
         text = (ROOT / 'demo' / 'main.thor').read_text()
         client, main = self.open(text, {
             'support.odin': (ROOT / 'demo' / 'support.odin').read_text(),
+            'assets/message.txt': (ROOT / 'demo' / 'assets' / 'message.txt').read_text(),
             'library/library.odin': (ROOT / 'demo' / 'library' / 'library.odin').read_text()})
         self.assertFalse(client.capabilities['documentFormattingProvider'])
         self.assertFalse(client.capabilities['renameProvider'])
@@ -293,6 +294,64 @@ class TLSTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1, errors)
         self.assertEqual(warnings[0]['severity'], 2)
         self.assertEqual(warnings[0]['range']['start'], self.position(text, 'field_align', 0))
+
+    def test_immutable_hover_definition_and_readonly_semantic_tokens(self):
+        text = 'package main\nmain :: proc(){ value :> 7; _ = value }\n'
+        client, main = self.open(text)
+        position = self.position(text, 'value }', 2)
+        hover = client.request('textDocument/hover', {'textDocument': {'uri': main.as_uri()}, 'position': position})
+        self.assertIn('immutable storage', hover['contents']['value'])
+        self.assertIn('value: int', hover['contents']['value'])
+        definitions = client.request('textDocument/definition', {'textDocument': {'uri': main.as_uri()}, 'position': position})
+        if isinstance(definitions, dict):
+            definitions = [definitions]
+        self.assertTrue(any(d['uri'] == main.as_uri() for d in definitions), definitions)
+        tokens = client.request('textDocument/semanticTokens/full', {'textDocument': {'uri': main.as_uri()}})['data']
+        readonly = client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        line = column = 0
+        occurrences = 0
+        for i in range(0, len(tokens), 5):
+            delta, character, length, _, modifiers = tokens[i:i+5]
+            line += delta
+            column = character if delta else column + character
+            if text.splitlines()[line][column:column+length] == 'value':
+                self.assertTrue(modifiers & (1 << readonly), tokens[i:i+5])
+                occurrences += 1
+        self.assertEqual(occurrences, 2)
+
+    def test_immutable_write_diagnostic_and_unsaved_mutable_fix(self):
+        text = 'package main\nmain :: proc(){ value :> 7; value = 9 }\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='immutable storage')
+        error = next(e for e in errors if 'immutable storage' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(text, 'value = 9', 0))
+        self.assertNotIn('__thor_', error['message'])
+        fixed = text.replace('value :> 7', 'value := 7')
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2}, 'contentChanges': [{'text': fixed}]})
+        self.assertEqual(client.diagnostic(main.as_uri(), empty=True), [])
+        hover = client.request('textDocument/hover', {'textDocument': {'uri': main.as_uri()}, 'position': self.position(fixed, 'value = 9', 2)})
+        self.assertNotIn('immutable storage', hover['contents']['value'])
+        self.assertEqual(main.read_text(), text)
+
+    def test_runtime_support_collection_resolves_in_editor(self):
+        text = 'package main\nimport f "thor:format"\nmain :: proc(){ text := f.group_integer(1234); delete(text) }\n'
+        client, main = self.open(text)
+        params = {'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, 'group_integer', 2)}
+        hover = client.request('textDocument/hover', params)
+        self.assertIn('string', hover['contents']['value'])
+        definitions = client.request('textDocument/definition', params)
+        if isinstance(definitions, dict):
+            definitions = [definitions]
+        self.assertTrue(any(d['uri'].endswith('/runtime/format/format.odin') for d in definitions), definitions)
+
+    def test_generic_immutable_error_is_mapped_to_operation(self):
+        text = 'package main\nf::proc(value:$T){x:>value; x[0]=3}\nmain::proc(){f([1,2])}\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='immutable storage')
+        error = next(e for e in errors if 'immutable storage' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(text, 'x[0]=3', 0))
+        self.assertNotIn('Thor expression', error['message'])
 
     def test_compiler_diagnostics_follow_unsaved_edits_and_clear(self):
         text = 'package main\nmain :: proc(){ _ = missing }\n'

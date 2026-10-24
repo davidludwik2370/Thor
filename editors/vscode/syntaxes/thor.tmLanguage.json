@@ -1,5 +1,5 @@
 {
-  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T06 additions. See THIRD_PARTY_NOTICES.md.",
+  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T12 additions. See THIRD_PARTY_NOTICES.md.",
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Thor",
   "patterns": [
@@ -78,6 +78,12 @@
           "include": "#distinct-type-assignment"
         },
         {
+          "include": "#immutable-assignment"
+        },
+        {
+          "include": "#immutable-type-assignment"
+        },
+        {
           "include": "#constant-assignment"
         },
         {
@@ -110,6 +116,12 @@
         },
         {
           "include": "#distinct-type-assignment"
+        },
+        {
+          "include": "#immutable-assignment"
+        },
+        {
+          "include": "#immutable-type-assignment"
         },
         {
           "include": "#constant-assignment"
@@ -1143,6 +1155,53 @@
     "punctuation": {
       "name": "punctuation.thor",
       "match": "\\(|\\)|\\{|\\}|;|\\[|\\]|\\.|,|\\\\"
+    },
+    "immutable-assignment": {
+      "name": "meta.definition.variable.immutable.thor",
+      "match": "(?:([A-Za-z_]\\w*)\\s*(,)\\s*)?(?:([A-Za-z_]\\w*)\\s*(,)\\s*)?([A-Za-z_]\\w*)\\s*(:\\s*>)",
+      "captures": {
+        "1": {
+          "name": "variable.other.readonly.thor"
+        },
+        "2": {
+          "name": "punctuation.thor"
+        },
+        "3": {
+          "name": "variable.other.readonly.thor"
+        },
+        "4": {
+          "name": "punctuation.thor"
+        },
+        "5": {
+          "name": "variable.other.readonly.thor"
+        },
+        "6": {
+          "name": "keyword.operator.assignment.immutable.thor"
+        }
+      }
+    },
+    "immutable-type-assignment": {
+      "name": "meta.type.annotation.immutable.thor",
+      "begin": "([A-Za-z_]\\w*)\\s*(:)(?=[^=\\n]*(?<!-)>(?!=))",
+      "beginCaptures": {
+        "1": {
+          "name": "variable.other.readonly.thor"
+        },
+        "2": {
+          "name": "keyword.operator.type.annotation.thor"
+        }
+      },
+      "end": "(?<!-)(>)(?!=)",
+      "endCaptures": {
+        "1": {
+          "name": "keyword.operator.assignment.immutable.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#type-declaration"
+        }
+      ]
     }
   },
   "scopeName": "source.thor"

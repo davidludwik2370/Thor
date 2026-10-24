@@ -41,6 +41,30 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_immutable_address_unicode_range_and_following_native_error(self):
+        source='package main\nmain::proc(){_="😀"; x:>[1,2]; _=&x[0]; _=missing}\n'
+        errors=self.at(source,'&x[0]',message='mutable address')
+        error=next(e for e in errors if 'mutable address' in e['msgs'][0])
+        self.assertEqual(error['pos']['end_offset']-error['pos']['offset'],len('&x[0]'))
+        self.assertTrue(any(e['pos']['offset']==source.encode().index(b'missing') for e in errors))
+
+    def test_generic_immutable_guard_keeps_call_notes_and_source(self):
+        source='package main\nf::proc(value:$T){x:>value; x[0]=7}\nmain::proc(){f([1,2])}\n'
+        errors=self.at(source,'x[0]',message="immutable storage 'x'")
+        self.assertTrue(any('main.thor(3:' in m for e in errors for m in e['msgs']))
+        self.assertNotIn('type_is_array',json.dumps(errors))
+
+    def test_support_contract_failures_point_to_calls_without_cascades(self):
+        source='package main\nimport f "thor:format"\nimport s "thor:sets"\nmain::proc(){_=f.group_integer(1.25); bad:s.Set([]int);_=bad}\n'
+        errors=self.at(source,'f.group_integer(1.25)',message='Integer grouping')
+        self.assertEqual(len(errors),2,errors)
+        self.assertTrue(any(e['pos']['offset']==source.index('s.Set([]int)') for e in errors))
+        self.assertNotIn('runtime/',json.dumps(errors))
+
+    def test_conditional_generic_guard_after_do_retains_source_columns(self):
+        source='package main\nf::proc(value:$T){x:>value; for i:=0;i<1;i+=1 do x[0]=7; _=missing}\nmain::proc(){f([1,2])}\n'
+        self.at(source,'missing',message='missing')
+
     def invoke(self, source, *, files=None, flags=(), command="check", overlays=None, success=False):
         temporary = tempfile.TemporaryDirectory(prefix="thor-diagnostics-")
         self.addCleanup(temporary.cleanup)

@@ -803,6 +803,10 @@ request_initialize :: proc(
 		ols_config_path := path.join(elems = {uri.path, "tls.json"}, allocator = context.temp_allocator)
 		read_ols_config(ols_config_path, config, uri)
 	}
+	if config.thor_command != "" && "thor" not_in config.collections {
+		runtime_path := path.join({filepath.dir(config.thor_command), "runtime"}, context.temp_allocator)
+		if os.is_dir(runtime_path) { config.collections[strings.clone("thor")] = strings.clone(runtime_path) }
+	}
 
 	for format in initialize_params.capabilities.textDocument.hover.contentFormat {
 		if format == "markdown" {

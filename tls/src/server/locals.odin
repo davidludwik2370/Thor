@@ -9,6 +9,7 @@ LocalFlag :: enum {
 	Mutable, // or constant
 	Variable, // or type
 	PolyType,
+	Immutable,
 }
 
 DocumentLocal :: struct {
@@ -393,6 +394,7 @@ get_locals_value_decl :: proc(file: ast.File, value_decl: ast.Value_Decl, ast_co
 			if value_decl.is_mutable {
 				flags |= {.Mutable}
 			}
+			if thor_is_immutable(value_decl.attributes[:]) { flags |= {.Immutable} }
 			value_expr: ^ast.Expr
 			if len(value_decl.values) > i {
 				if is_variable_declaration(value_decl.values[i]) {
@@ -466,6 +468,7 @@ get_locals_value_decl :: proc(file: ast.File, value_decl: ast.Value_Decl, ast_co
 		if value_decl.is_mutable {
 			flags |= {.Mutable}
 		}
+		if thor_is_immutable(value_decl.attributes[:]) { flags |= {.Immutable} }
 
 		store_local(
 			ast_context,

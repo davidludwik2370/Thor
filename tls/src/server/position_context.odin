@@ -3,7 +3,7 @@ package server
 import "core:log"
 import "core:odin/ast"
 import parser "thor:parser"
-import "core:odin/tokenizer"
+import tokenizer "thor:tokenizer"
 import "core:strings"
 import "core:unicode/utf8"
 
