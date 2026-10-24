@@ -273,7 +273,8 @@ V1 includes:
   execution of eligible calls, #run, and persistent result caching.
 
 Deferred:
-- OLS changes, a Thor formatter, polished diagnostics, and debugger source maps.
+- A Thor formatter and debugger source maps. TLS and source-mapped compiler
+  diagnostics are maintained as part of each implementation batch.
 - General ownership, borrow checking, or automatic cleanup in ordinary proc code.
 - Fixed-capacity maps/sets and implicit method syntax.
 - Maps, sets, and dynamic arrays as pure-function inputs or results. Dynamic
@@ -932,6 +933,34 @@ T23. Implement automatic known-argument fn evaluation, dependent evaluation roun
      Finish the cross-feature acceptance cases from section 14.
 */
 
+
+// DEVELOPMENT WORKFLOW
+/*
+Implement Thor in batches of T tasks. Each batch follows the same full loop:
+
+1. Commit the working baseline and read the relevant spec sections. Record the
+   batch's acceptance cases and prerequisites; keep later T tasks distinct.
+2. Implement the runtime support, shared frontend, and transpiler changes.
+   Preserve ordinary Odin behavior, evaluation order, source spans, and ownership.
+   Add real compile/run tests, rejection fixtures, and labeled demo sections.
+3. Update TLS and the VS Code extension for the same batch. Reuse the shared
+   parser; cover highlighting, hover/definitions/completion where relevant, and
+   live compiler checks against unsaved text. Do not maintain a second grammar
+   implementation in the language server.
+4. Review successful and failing examples as a Thor user. Map all generated
+   constructs back to original source, translate support-library failures into
+   useful messages, and test ranges, imported files, inactive branches, Unicode,
+   unsaved edits, and clearing errors after a fix.
+5. Run compiler/runtime, native TLS, protocol, highlighting, demo, and actual
+   VS Code integration checks appropriate to the changes. Build/install the local
+   editor package when it changes. Update implementation notes and limitations.
+6. Commit the verified batch with its tests, demos, docs, support code, and TLS
+   changes. A T task is complete only when its specified behavior and the relevant
+   editor/diagnostic support work together; explicitly record remaining work.
+
+See DEVELOPMENT.md for the commands, repository layout, and batch checklist.
+Debugger mappings, stack traces, and a formatter remain separate work.
+*/
 
 main :: proc() {
 
