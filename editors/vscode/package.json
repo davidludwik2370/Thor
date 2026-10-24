@@ -1,0 +1,114 @@
+{
+  "name": "thor-language",
+  "displayName": "Thor Language",
+  "description": "Thor T01-T06 syntax highlighting and the local TLS language server.",
+  "publisher": "thor-local",
+  "version": "0.2.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:thor"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Syntax highlighting is available; TLS runs only in trusted workspaces."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "thor",
+        "aliases": [
+          "Thor",
+          "thor"
+        ],
+        "extensions": [
+          ".thor"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "thor",
+        "scopeName": "source.thor",
+        "path": "./syntaxes/thor.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "thor",
+        "path": "./snippets/thor.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "tls.restart",
+        "title": "Thor: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "Thor",
+      "properties": {
+        "tls.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the local TLS language server."
+        },
+        "tls.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "TLS executable. Relative paths resolve against the workspace; defaults to tls/bin/tls in the workspace."
+        },
+        "tls.compiler.path": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Thor compiler launcher for live compiler diagnostics. Defaults to thor alongside the TLS checkout; relative paths resolve against the workspace."
+        },
+        "tls.odinRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Optional Odin root directory for core/base/vendor imports."
+        },
+        "tls.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace TLS protocol messages in the output panel."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[thor]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.formatOnSave": false
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "package": "vsce package --allow-missing-repository -o thor-language.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1",
+    "vscode-textmate": "^9.0.0",
+    "vscode-oniguruma": "^2.0.1"
+  }
+}

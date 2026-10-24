@@ -1,0 +1,35 @@
+{
+  "Conditional compilation": {
+    "prefix": "#if",
+    "body": [
+      "#if ${1:CONDITION} {",
+      "\t$2",
+      "} #else {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Thor compile-time branch"
+  },
+  "Selective import": {
+    "prefix": "importsel",
+    "body": "import \"${1:core:fmt}\" / ${2:println}",
+    "description": "File-local selected import"
+  },
+  "Multiline ternary": {
+    "prefix": "ternary",
+    "body": [
+      "${1:condition} ? ${2:first_value}",
+      "    : ${3:second_value}"
+    ],
+    "description": "Thor multiline ternary expression"
+  },
+  "Constrained generic procedure": {
+    "prefix": "procwhere",
+    "body": [
+      "${1:numeric} :: proc(x: \\$T) -> T where T in [${2:int, f64}] {",
+      "\t${0:return x}",
+      "}"
+    ],
+    "description": "Generic procedure with exact type membership"
+  }
+}

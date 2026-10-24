@@ -1,0 +1,10 @@
+.thor-cache/
+.thor-build/
+__pycache__/
+*.pyc
+editors/vscode/node_modules/
+editors/vscode/*.vsix
+tls/bin/
+.DS_Store
+.vscode/bin/
+*.dSYM/

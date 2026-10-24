@@ -1,0 +1,370 @@
+"""Exercise the TLS executable through its actual stdio LSP transport."""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import queue
+import shutil
+import subprocess
+import tempfile
+import threading
+import time
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
+
+
+class Client:
+    def __init__(self, directory, *, compiler=True):
+        self.directory = directory
+        self.messages = queue.Queue()
+        self.notifications = []
+        self.sequence = 0
+        self.log = tempfile.TemporaryFile()
+        self.process = subprocess.Popen([str(BINARY)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=self.log, cwd=directory,
+                                        env={**os.environ, 'OLS_BUILTIN_FOLDER': str(ROOT / 'tls' / 'builtin')})
+        self.reader = threading.Thread(target=self.read, daemon=True)
+        self.reader.start()
+        odin = os.environ.get('THOR_ODIN', 'odin')
+        odin_root = subprocess.check_output([odin, 'root'], text=True).strip()
+        self.capabilities = self.request('initialize', {
+            'processId': os.getpid(), 'rootUri': directory.as_uri(),
+            'workspaceFolders': [{'uri': directory.as_uri(), 'name': 'test'}],
+            'capabilities': {'textDocument': {'hover': {'contentFormat': ['markdown']},
+                            'completion': {'completionItem': {'snippetSupport': True}},
+                            'semanticTokens': {'requests': {'full': True}}}},
+            'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
+                'odin_command': odin, 'thor_command': str(ROOT / 'thor') if compiler else '',
+                'enable_parser_errors': True, 'enable_semantic_tokens': True,
+                'enable_unused_imports_reporting': False, 'enable_auto_import': False,
+                'enable_checker_workspace_diagnostics': False, 'thread_count': 1}
+        })['capabilities']
+        self.send('initialized', {})
+
+    def read(self):
+        try:
+            while True:
+                headers = {}
+                while True:
+                    line = self.process.stdout.readline()
+                    if not line:
+                        self.messages.put({'eof': True})
+                        return
+                    if line in (b'\r\n', b'\n'):
+                        break
+                    name, value = line.decode().split(':', 1)
+                    headers[name.lower()] = value.strip()
+                size = int(headers['content-length'])
+                payload = bytearray()
+                while len(payload) < size:
+                    part = self.process.stdout.read(size - len(payload))
+                    if not part:
+                        raise EOFError('incomplete LSP response')
+                    payload.extend(part)
+                self.messages.put(json.loads(payload))
+        except Exception as error:
+            self.messages.put({'reader_error': str(error)})
+
+    def send(self, method, params, identifier=None):
+        value = {'jsonrpc': '2.0', 'method': method, 'params': params}
+        if identifier is not None:
+            value['id'] = identifier
+        self.write(value)
+
+    def write(self, value):
+        data = json.dumps(value, ensure_ascii=False).encode()
+        self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode() + data)
+        self.process.stdin.flush()
+
+    def next(self, timeout=15):
+        value = self.messages.get(timeout=timeout)
+        if 'eof' in value or 'reader_error' in value:
+            self.log.seek(0)
+            raise AssertionError(f'TLS stopped: {value}\n{self.log.read().decode(errors="replace")}')
+        if 'method' in value and 'id' in value:
+            self.write({'jsonrpc': '2.0', 'id': value['id'], 'result': None})
+        else:
+            self.notifications.append(value)
+        return value
+
+    def request(self, method, params):
+        self.sequence += 1
+        identifier = self.sequence
+        self.send(method, params, identifier)
+        deadline = time.monotonic() + 15
+        while True:
+            value = self.next(max(0.01, deadline - time.monotonic()))
+            if value.get('id') == identifier and 'method' not in value:
+                if 'error' in value:
+                    raise AssertionError(value['error'])
+                return value.get('result')
+
+    def diagnostic(self, uri, *, empty=False, code=None, contains=None):
+        def matching(value):
+            return (value.get('method') == 'textDocument/publishDiagnostics'
+                    and value['params'].get('uri') == uri
+                    and (not empty or not value['params']['diagnostics'])
+                    and (code is None or any(d.get('code') == code for d in value['params']['diagnostics']))
+                    and (contains is None or any(contains in d['message'] for d in value['params']['diagnostics'])))
+        deadline = time.monotonic() + 15
+        while True:
+            for value in self.notifications:
+                if matching(value):
+                    self.notifications.remove(value)
+                    return value['params']['diagnostics']
+            self.next(max(0.01, deadline - time.monotonic()))
+
+    def close(self):
+        if self.process.poll() is None:
+            try:
+                self.request('shutdown', None)
+                self.send('exit', None)
+                self.process.wait(timeout=5)
+            except Exception:
+                self.process.kill()
+                self.process.wait(timeout=5)
+        self.process.stdin.close()
+        self.process.stdout.close()
+        self.reader.join(timeout=1)
+        self.log.close()
+
+
+class TLSTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not shutil.which(os.environ.get('THOR_ODIN', 'odin')):
+            raise unittest.SkipTest('Odin is required for TLS tests')
+        subprocess.run(['python3', str(ROOT / 'tools' / 'build_tls.py')], check=True,
+                       capture_output=True, timeout=90)
+
+    def open(self, text, files=None):
+        temporary = tempfile.TemporaryDirectory(prefix='tls-test-')
+        self.addCleanup(temporary.cleanup)
+        directory = Path(temporary.name).resolve()
+        main = directory / 'main.thor'
+        for name, content in {'main.thor': text, **(files or {})}.items():
+            destination = directory / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content)
+        client = Client(directory)
+        self.addCleanup(client.close)
+        client.send('textDocument/didOpen', {'textDocument': {
+            'uri': main.as_uri(), 'languageId': 'thor', 'version': 1, 'text': text}})
+        return client, main
+
+    @staticmethod
+    def position(text, word, offset=1):
+        index = text.index(word) + offset
+        preceding = text[:index]
+        return {'line': preceding.count('\n'),
+                'character': len(preceding.rsplit('\n', 1)[-1].encode('utf-16-le')) // 2}
+
+    def hover(self, client, main, text, word):
+        return client.request('textDocument/hover', {
+            'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, word)})
+
+    def test_capabilities_and_demo_have_no_parser_errors(self):
+        text = (ROOT / 'demo' / 'main.thor').read_text()
+        client, main = self.open(text, {
+            'support.odin': (ROOT / 'demo' / 'support.odin').read_text(),
+            'library/library.odin': (ROOT / 'demo' / 'library' / 'library.odin').read_text()})
+        self.assertFalse(client.capabilities['documentFormattingProvider'])
+        self.assertFalse(client.capabilities['renameProvider'])
+        client.request('textDocument/documentSymbol', {'textDocument': {'uri': main.as_uri()}})
+        diagnostics = [value['params']['diagnostics'] for value in client.notifications
+                       if value.get('method') == 'textDocument/publishDiagnostics']
+        self.assertTrue(all(not errors for errors in diagnostics), diagnostics)
+        self.assertIsNone(client.process.poll())
+
+    def test_hover_uses_unsaved_thor_text(self):
+        text = 'package main\nmain :: proc() { values := [1,2,3]; _ = values }\n'
+        client, main = self.open(text)
+        position = text.rfind('values') + 2
+        params = {'textDocument': {'uri': main.as_uri()}, 'position': {'line': 1, 'character': position - text.index('\n') - 1}}
+        self.assertIn('[3]int', client.request('textDocument/hover', params)['contents']['value'])
+        changed = text.replace('[1,2,3]', '[1.0,2.0]')
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2}, 'contentChanges': [{'text': changed}]})
+        position = changed.rfind('values') + 2
+        params['position']['character'] = position - changed.index('\n') - 1
+        self.assertIn('[2]f64', client.request('textDocument/hover', params)['contents']['value'])
+        self.assertEqual(main.read_text(), text)
+
+    def test_selected_import_hover_and_definition_in_closed_thor_package(self):
+        text = 'package main\nimport "library" / selected\nmain :: proc() { _ = selected(2) }\n'
+        client, main = self.open(text, {'library/main.thor': 'package library\nselected :: proc(value:int)->int {return value}\n'})
+        params = {'textDocument': {'uri': main.as_uri()}, 'position': {'line': 2, 'character': 26}}
+        hover = client.request('textDocument/hover', params)
+        self.assertIn('proc(value: int) -> int', hover['contents']['value'])
+        definitions = client.request('textDocument/definition', params)
+        if isinstance(definitions, dict):
+            definitions = [definitions]
+        self.assertTrue(any(item['uri'].endswith('/library/main.thor') for item in definitions), definitions)
+
+    def test_selected_completion_and_namespace(self):
+        text = 'package main\nimport "library" / selected\nmain :: proc() { sel }\n'
+        client, main = self.open(text, {'library/main.thor': 'package library\nselected :: proc() {}\n'})
+        result = client.request('textDocument/completion', {'textDocument': {'uri': main.as_uri()},
+                    'position': {'line': 2, 'character': 19}, 'context': {'triggerKind': 1}})
+        self.assertIn('selected', [item['label'] for item in result['items']])
+
+    def test_mixed_package_indexing(self):
+        text = 'package main\nmain :: proc() { _ = helper() }\n'
+        client, main = self.open(text, {'helper.thor': 'package main\nhelper :: proc()->int { return 2 in [1,2] ? 7 : 0 }\n'})
+        self.assertIn('proc() -> int', self.hover(client, main, text, 'helper')['contents']['value'])
+
+    def test_semantic_tokens_have_valid_original_source_ranges(self):
+        text = 'package main\nimport "library" / selected\nf :: proc(x:$T)->T where T in [int,f64] { return x }\nmain :: proc() { a := [1,2]; found := selected(2) in a; _ = found }\n'
+        client, main = self.open(text, {'library/main.thor': 'package library\nselected :: proc(x:int)->int {return x}\n'})
+        result = client.request('textDocument/semanticTokens/full', {'textDocument': {'uri': main.as_uri()}})
+        data = result['data']
+        self.assertGreater(len(data), 0)
+        self.assertEqual(len(data) % 5, 0)
+        lines = text.splitlines()
+        line, column, previous_end = 0, 0, 0
+        for i in range(0, len(data), 5):
+            delta, character, length, token_type, modifiers = data[i:i+5]
+            line += delta
+            column = character if delta else column + character
+            if delta:
+                previous_end = 0
+            self.assertLess(line, len(lines))
+            self.assertGreater(length, 0)
+            self.assertGreaterEqual(column, previous_end)
+            self.assertLessEqual(column + length, len(lines[line].encode('utf-16-le')) // 2)
+            previous_end = column + length
+
+    def test_import_paths_keep_string_coloring(self):
+        text = ('package main\n'
+                'import "core:fmt" / println\n'
+                'import math "core:math" / sin\n'
+                'import "library" / Record\n'
+                'main :: proc() { println("core:fmt library"); _ = math.PI; _ = Record{} }\n')
+        client, main = self.open(text, {'library/main.thor': 'package library\nRecord :: struct {}\n'})
+        result = client.request('textDocument/semanticTokens/full', {'textDocument': {'uri': main.as_uri()}})
+        data = result['data']
+        lines = text.splitlines()
+        namespace = client.capabilities['semanticTokensProvider']['legend']['tokenTypes'].index('namespace')
+        line, column = 0, 0
+        alias_highlighted = False
+        namespace_use_highlighted = False
+        for i in range(0, len(data), 5):
+            delta, character, length, token_type, _ = data[i:i+5]
+            line += delta
+            column = character if delta else column + character
+            if lines[line].startswith('import '):
+                start = lines[line].index('"')
+                end = lines[line].index('"', start + 1) + 1
+                self.assertFalse(column < end and start < column + length,
+                                 f'Semantic token overrides import string: {lines[line][column:column+length]!r}')
+            if token_type == namespace and lines[line][column:column+length] == 'math':
+                alias_highlighted |= line == 2
+                namespace_use_highlighted |= line == 4
+        self.assertTrue(alias_highlighted, 'Explicit import aliases should retain namespace coloring')
+        self.assertTrue(namespace_use_highlighted, 'Qualified namespace uses should retain namespace coloring')
+
+    def test_parser_diagnostics_clear_after_unsaved_fix(self):
+        text = 'package main\nmain :: proc() { values := [1, }\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri())
+        self.assertTrue(errors)
+        self.assertTrue(any(error['range']['start']['line'] == 1 for error in errors))
+        self.assertTrue(all(0 <= error['range']['start']['line'] <= 2 for error in errors))
+        fixed = 'package main\nmain :: proc() { values := [1,2]; _ = values }\n'
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2}, 'contentChanges': [{'text': fixed}]})
+        self.assertEqual(client.diagnostic(main.as_uri(), empty=True), [])
+
+    def test_live_compiler_type_error_maps_array_element(self):
+        text = 'package main\nmain :: proc(){ a := [1,"wrong"]; _ = a }\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='Cannot convert')
+        error = next(e for e in errors if e.get('code') == 'thor')
+        self.assertEqual(error['range']['start'], self.position(text, '"wrong"', 0))
+        self.assertEqual(error['range']['end']['character'] - error['range']['start']['character'], 7)
+        self.assertNotIn('__thor_', error['message'])
+
+    def test_compiler_warning_is_published_once_with_original_range(self):
+        text = 'package main\nS :: struct #field_align(4) {x:int}\nmain :: proc(){}\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='deprecated')
+        warnings = [e for e in errors if 'deprecated' in e['message']]
+        self.assertEqual(len(warnings), 1, errors)
+        self.assertEqual(warnings[0]['severity'], 2)
+        self.assertEqual(warnings[0]['range']['start'], self.position(text, 'field_align', 0))
+
+    def test_compiler_diagnostics_follow_unsaved_edits_and_clear(self):
+        text = 'package main\nmain :: proc(){ _ = missing }\n'
+        client, main = self.open(text)
+        client.diagnostic(main.as_uri(), code='thor', contains='missing')
+        changed = 'package main\nmain :: proc(){ a := [1,2]; _ = a\n _ = "😀"; _ = other_missing }\n'
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2}, 'contentChanges': [{'text': changed}]})
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='other_missing')
+        error = next(e for e in errors if 'other_missing' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(changed, 'other_missing', 0))
+        fixed = 'package main\nmain :: proc(){ a := [1,2]; _ = a }\n'
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 3}, 'contentChanges': [{'text': fixed}]})
+        self.assertEqual(client.diagnostic(main.as_uri(), empty=True), [])
+        self.assertEqual(main.read_text(), text)
+
+    def test_helper_diagnostic_points_to_membership(self):
+        text = 'package main\nmain :: proc(){ s := []int{1}; _ = s in [s] }\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='Membership requires')
+        error = next(e for e in errors if 'Membership requires' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(text, 's in [s]', 0))
+        self.assertNotIn('__thor_', error['message'])
+
+    def test_compiler_reports_imported_source_uri(self):
+        text = 'package main\nimport "lib"\nmain :: proc(){lib.f()}\n'
+        client, main = self.open(text, {'lib/lib.thor': 'package lib\nf :: proc(){ _ = missing }\n'})
+        uri = (main.parent / 'lib/lib.thor').as_uri()
+        errors = client.diagnostic(uri, code='thor', contains='missing')
+        self.assertEqual(errors[0]['range']['start']['line'], 1)
+
+    def test_rapid_edits_eventually_publish_latest_snapshot(self):
+        text = 'package main\nmain :: proc(){ _ = first_missing }\n'
+        client, main = self.open(text)
+        for version in range(2, 7):
+            changed = f'package main\nmain :: proc(){{ a := [1,2]; _ = a; _ = missing_{version} }}\n'
+            client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': version}, 'contentChanges': [{'text': changed}]})
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='missing_6')
+        self.assertTrue(all('missing_' not in e['message'] or 'missing_6' in e['message'] for e in errors), errors)
+
+    def test_compiler_diagnostics_preserve_symlinked_editor_uri(self):
+        temporary = tempfile.TemporaryDirectory(prefix='tls-symlink-')
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        real = root / 'real'
+        real.mkdir()
+        alias = root / 'alias'
+        alias.symlink_to(real, target_is_directory=True)
+        main = alias / 'main.thor'
+        text = 'package main\nmain :: proc(){_ = missing}\n'
+        main.write_text(text)
+        client = Client(alias)
+        self.addCleanup(client.close)
+        client.send('textDocument/didOpen', {'textDocument': {
+            'uri': main.as_uri(), 'languageId': 'thor', 'version': 1, 'text': text}})
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='missing')
+        self.assertEqual(errors[0]['range']['start'], self.position(text, 'missing', 0))
+
+    def test_new_file_buffer_can_be_checked_before_first_save(self):
+        temporary = tempfile.TemporaryDirectory(prefix='tls-new-file-')
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        main = root / 'main.thor'
+        text = 'package main\nmain :: proc(){a := [1,"wrong"]; _ = a}\n'
+        client = Client(root, compiler=False)
+        self.addCleanup(client.close)
+        client.send('textDocument/didOpen', {'textDocument': {
+            'uri': main.as_uri(), 'languageId': 'thor', 'version': 1, 'text': text}})
+        errors = client.diagnostic(main.as_uri(), code='thor', contains='Cannot convert')
+        self.assertEqual(errors[0]['range']['start'], self.position(text, '"wrong"', 0))
+        self.assertFalse(main.exists(), 'Checking a new buffer must not create its source file')
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-odin-debug",
+      "type": "shell",
+      "command": "mkdir -p \"${workspaceFolder}/.vscode/bin\" && odin build . -debug -o:none -out:\"${workspaceFolder}/.vscode/bin/debug\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build TLS",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/tools/build_tls.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Thor Demo",
+      "type": "process",
+      "command": "${workspaceFolder}/thor",
+      "args": [
+        "run",
+        "demo"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test Thor",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

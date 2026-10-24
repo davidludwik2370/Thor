@@ -1,0 +1,6 @@
+{
+  "files.associations": { "*.thor": "thor" },
+  "tls.server.path": "tls/bin/tls",
+  "tls.compiler.path": "./thor",
+  "[thor]": { "editor.formatOnSave": false }
+}

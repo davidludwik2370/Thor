@@ -1,0 +1,92 @@
+# TLS: the local Thor fork of OLS
+
+Upstream: https://github.com/DanielGavin/ols
+
+Pinned base: `0c9438faeba846232caaa22fe9f22b30c302dba2` (2026-10-10).
+The `thor-t01-t06` branch contains the local working changes. The upstream MIT
+license is retained. This is a local checkout; no remote GitHub fork was created.
+
+This base builds with the installed Odin `dev-2026-10:8169255b9`. More recent
+upstream commits require `core:odin/tool-format`, absent from this installation.
+Refreshing upstream is a deliberate future maintenance step.
+
+## Build and test
+
+From the Thor repository root:
+
+```sh
+python3 tools/build_tls.py
+python3 tools/build_tls.py check
+python3 tools/build_tls.py test
+python3 -m unittest discover -s tests -p test_tls.py -v
+```
+
+The executable is `tls/bin/tls` (`tls.exe` on Windows). `THOR_ODIN` or `--odin`
+selects the compiler. Additional Odin flags are forwarded. TLS uses the same
+parser source as the transpiler through `-collection:thor=frontend`; it does not
+have a second independently modified parser. Server symbols and diagnostics use
+the original source text, including unsaved document edits.
+
+The native suite retains upstream's regression tests and adds Thor hover,
+completion, privacy, inference, conditional-compilation, and incomplete-code
+tests. `tests/test_tls.py` also launches the real executable and checks stdio LSP
+messages, file discovery, semantic token ranges, unsaved changes, and diagnostics.
+
+## Current support
+
+- Discover mixed `.thor`/`.odin` packages and dependencies.
+- Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
+  bracket array literals, and membership in generic constraints.
+- Resolve selected import aliases with file privacy and local shadowing. Hover
+  retains the imported declaration's signature; definitions follow the origin.
+- Infer common bracket-array types (including nested arrays), indexed element
+  types, and membership's boolean type. Explicit declaration types continue to
+  supply contextual information through OLS.
+- Select `#if`/native `when` branches using the server's scalar constant folder,
+  including integer comparisons, inline-list membership, and `#config` defaults.
+- Provide OLS completion, hover, definitions, references, document symbols,
+  signature help, and semantic highlighting where the underlying resolver can
+  determine the symbol/type. Serve parser diagnostics at Thor source locations.
+
+Like OLS, this server has its own partial semantic resolver, not Odin's complete
+type checker. Complex overloads, generic specialization, and some nested expected
+type contexts remain limited. The conditional evaluator is also a subset of
+Odin's constant evaluator; it does not execute arbitrary procedures. It does not
+implement future Thor features such as pure functions or `#run`.
+
+For Thor packages, the checker invokes `thor check -json-errors` with snapshots
+of all open buffers. Thor lowers those buffers, checks the generated Odin, and
+maps diagnostics back to original files and UTF-16 source ranges. Checks run on
+open/change/save; superseded results are discarded and resolved diagnostics are
+cleared. Generated support errors point back to their Thor operations. The live
+parser continues to provide immediate syntax diagnostics without duplicating
+compiler parser errors for open documents.
+
+Set `thor_command` in `tls.json` or initialization options to the absolute Thor
+launcher path. The VS Code extension supplies this automatically from the local
+checkout, or from `tls.compiler.path`; `odin_command` selects the backend. TLS
+stores generated sources, source maps, and overlay files in its temporary checker
+directory. Source files are never saved by checking.
+
+Rename, formatting, automatic imports, and Thor code actions remain disabled
+because their edits need to preserve Thor syntax. References retain OLS's
+existing limitations and do not constitute a rename implementation.
+
+TLS reads `tls.json` instead of `ols.json`, using the existing OLS configuration
+schema. `OLS_BUILTIN_FOLDER` remains supported for the upstream builtin index.
+The extension sets this automatically to `tls/builtin`. Profiles and collection
+configuration can be provided in `tls.json` when needed.
+
+## VS Code
+
+The separate extension lives in `../editors/vscode`. Build its local VSIX, install
+it, and open a `.thor` file. The supplied workspace settings point to this local
+binary. A **Thor: Restart Language Server** command reloads a rebuilt executable.
+Existing Odin extensions continue to handle `.odin` files. TLS still indexes those
+files when they belong to a Thor package or an imported package.
+
+`python3 tools/test_vscode.py` runs an isolated Extension Development Host with a
+temporary profile. It checks language registration, actual server hover and
+definitions, live compiler errors on unsaved text, Unicode ranges, error clearing,
+restart, and preservation of the Odin file association. It requires a desktop
+VS Code installation; `--code` selects its CLI.

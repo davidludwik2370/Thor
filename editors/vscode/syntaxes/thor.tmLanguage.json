@@ -1,0 +1,1149 @@
+{
+  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T06 additions. See THIRD_PARTY_NOTICES.md.",
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Thor",
+  "patterns": [
+    {
+      "include": "#file-tags"
+    },
+    {
+      "include": "#package-name-declaration"
+    },
+    {
+      "include": "#import-declaration"
+    },
+    {
+      "include": "#statements"
+    }
+  ],
+  "repository": {
+    "file-tags": {
+      "name": "comment.line.double-slash.thor",
+      "begin": "#\\+[A-Za-z_][A-Za-z0-9_\\-]*",
+      "beginCaptures": {
+        "0": {
+          "name": "entity.name.tag.thor"
+        }
+      },
+      "patterns": [
+        {
+          "name": "punctuation.thor",
+          "match": ","
+        },
+        {
+          "name": "keyword.operator.logical.thor",
+          "match": "!"
+        },
+        {
+          "name": "entity.other.attribute-name.thor",
+          "match": "[A-Za-z_][A-Za-z0-9_\\-]*"
+        }
+      ],
+      "end": "\n"
+    },
+    "package-name-declaration": {
+      "match": "^\\s*(package)\\s+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.thor"
+        },
+        "2": {
+          "name": "entity.name.type.module.thor"
+        }
+      }
+    },
+    "import-declaration": {
+      "match": "\\b(import)\\b(?:\\s+([A-Za-z_]\\w*)(?=\\s+[\"`]))?",
+      "captures": {
+        "1": {
+          "name": "keyword.control.import.thor"
+        },
+        "2": {
+          "name": "entity.name.namespace.thor"
+        }
+      }
+    },
+    "statements": {
+      "patterns": [
+        {
+          "include": "#attribute"
+        },
+        {
+          "include": "#procedure-assignment"
+        },
+        {
+          "include": "#type-assignment"
+        },
+        {
+          "include": "#distinct-type-assignment"
+        },
+        {
+          "include": "#constant-assignment"
+        },
+        {
+          "include": "#variable-assignment"
+        },
+        {
+          "include": "#case-clause"
+        },
+        {
+          "include": "#block-label"
+        },
+        {
+          "include": "#type-annotation"
+        },
+        {
+          "include": "#block-definition"
+        },
+        {
+          "include": "#expressions"
+        }
+      ]
+    },
+    "assignments": {
+      "patterns": [
+        {
+          "include": "#procedure-assignment"
+        },
+        {
+          "include": "#type-assignment"
+        },
+        {
+          "include": "#distinct-type-assignment"
+        },
+        {
+          "include": "#constant-assignment"
+        },
+        {
+          "include": "#variable-assignment"
+        },
+        {
+          "include": "#type-annotation"
+        }
+      ]
+    },
+    "expressions": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#ternary"
+        },
+        {
+          "include": "#map-bitset"
+        },
+        {
+          "include": "#slice"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#type-parameter"
+        },
+        {
+          "include": "#basic-types"
+        },
+        {
+          "include": "#procedure-calls"
+        },
+        {
+          "include": "#property-access"
+        },
+        {
+          "include": "#union-member-access"
+        },
+        {
+          "include": "#union-non-nil-access"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#punctuation"
+        },
+        {
+          "include": "#variable-name"
+        }
+      ]
+    },
+    "attribute": {
+      "patterns": [
+        {
+          "name": "meta.attribute.thor",
+          "match": "(@)\\s*([A-Za-z_]\\w*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.attribute.thor"
+            },
+            "2": {
+              "name": "entity.other.attribute-name.thor"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.thor",
+          "begin": "(@)\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.attribute.thor"
+            },
+            "2": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b([A-Za-z_]\\w*)\\b",
+              "name": "entity.other.attribute-name.thor"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.thor"
+            },
+            {
+              "begin": "=",
+              "beginCaptures": {
+                "0": {
+                  "name": "keyword.operator.assignment.thor"
+                }
+              },
+              "end": "(?=,|\\))",
+              "patterns": [
+                {
+                  "include": "#expressions"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "procedure-assignment": {
+      "name": "meta.definition.variable.thor",
+      "begin": "\\b([A-Za-z_]\\w*)\\s*(:\\s*:|=)\\s*(#\\w+)?\\s*(?=proc\\b)",
+      "beginCaptures": {
+        "1": {
+          "name": "meta.definition.function.thor entity.name.function.thor"
+        },
+        "2": {
+          "name": "keyword.operator.assignment.thor"
+        },
+        "3": {
+          "name": "keyword.other.thor"
+        }
+      },
+      "end": "(?=^)|(?<=\\})",
+      "patterns": [
+        {
+          "include": "#type-declaration"
+        }
+      ]
+    },
+    "type-assignment": {
+      "name": "meta.definition.variable.thor",
+      "begin": "\\b([A-Za-z_]\\w*)\\s*(:\\s*:)\\s*(?=(struct|union|enum|bit_set|bit_field)\\b)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.type.thor"
+        },
+        "2": {
+          "name": "keyword.operator.assignment.thor"
+        },
+        "3": {
+          "name": "storage.type.thor"
+        }
+      },
+      "end": "(?=^)|(?<=\\})",
+      "patterns": [
+        {
+          "include": "#type-declaration"
+        }
+      ]
+    },
+    "distinct-type-assignment": {
+      "name": "meta.definition.variable.thor",
+      "begin": "\\b([A-Za-z_]\\w*)\\s*(:\\s*:)\\s*(?=(distinct)\\b)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.type.thor"
+        },
+        "2": {
+          "name": "keyword.operator.assignment.thor"
+        },
+        "3": {
+          "name": "storage.type.thor"
+        }
+      },
+      "end": "(?=^)|(?<=\\})",
+      "patterns": [
+        {
+          "include": "#type-declaration"
+        }
+      ]
+    },
+    "constant-assignment": {
+      "name": "meta.definition.variable.thor",
+      "match": "([A-Za-z_]\\w*)\\s*(:\\s*:)",
+      "captures": {
+        "1": {
+          "name": "variable.other.constant.thor"
+        },
+        "2": {
+          "name": "keyword.operator.assignment.thor"
+        }
+      }
+    },
+    "variable-assignment": {
+      "name": "meta.definition.variable.thor",
+      "match": "(?:([A-Za-z_]\\w*)\\s*(,)\\s*)?(?:([A-Za-z_]\\w*)\\s*(,)\\s*)?([A-Za-z_]\\w*)\\s*(:\\s*=)",
+      "captures": {
+        "1": {
+          "name": "variable.name.thor"
+        },
+        "2": {
+          "name": "punctuation.thor"
+        },
+        "3": {
+          "name": "variable.name.thor"
+        },
+        "4": {
+          "name": "punctuation.thor"
+        },
+        "5": {
+          "name": "variable.name.thor"
+        },
+        "6": {
+          "name": "keyword.operator.assignment.thor"
+        }
+      }
+    },
+    "type-annotation": {
+      "name": "meta.type.annotation.thor",
+      "begin": "(?:([A-Za-z_]\\w*)\\s*(,)\\s*)?(?:([A-Za-z_]\\w*)\\s*(,)\\s*)?([A-Za-z_]\\w*)\\s*(:)",
+      "beginCaptures": {
+        "1": {
+          "name": "variable.name.thor"
+        },
+        "2": {
+          "name": "punctuation.thor"
+        },
+        "3": {
+          "name": "variable.name.thor"
+        },
+        "4": {
+          "name": "punctuation.thor"
+        },
+        "5": {
+          "name": "variable.name.thor"
+        },
+        "6": {
+          "name": "keyword.operator.type.annotation.thor"
+        }
+      },
+      "end": "(?=^|,|;|\\)|=|:|for|switch|if|{)",
+      "patterns": [
+        {
+          "include": "#type-declaration"
+        }
+      ]
+    },
+    "object-definition": {
+      "name": "meta.object.type.thor",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.block.thor"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.block.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#statements"
+        }
+      ]
+    },
+    "block-definition": {
+      "name": "meta.block.thor",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.block.thor"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.block.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#statements"
+        }
+      ]
+    },
+    "block-label": {
+      "name": "meta.block.label.thor",
+      "match": "(\\w+)(:)\\s*(?=for|switch|if|{)",
+      "captures": {
+        "1": {
+          "name": "entity.name.label.thor"
+        },
+        "2": {
+          "name": "punctuation.definition.label.thor"
+        }
+      }
+    },
+    "type-declaration": {
+      "name": "meta.type.declaration.thor",
+      "patterns": [
+        {
+          "include": "#type-parameter"
+        },
+        {
+          "include": "#map-bitset"
+        },
+        {
+          "begin": "\\b(proc|struct|union|enum|bit_field)\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.thor"
+            }
+          },
+          "end": "(?=^|\\)|,|;)|(?<=})",
+          "patterns": [
+            {
+              "include": "#parameters"
+            },
+            {
+              "include": "#return-type-declaration"
+            },
+            {
+              "include": "#object-definition"
+            },
+            {
+              "include": "#expressions"
+            }
+          ]
+        },
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#block-definition"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#basic-types"
+        },
+        {
+          "include": "#slice"
+        },
+        {
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.typeparameters.begin.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.typeparameters.end.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type-declaration"
+            }
+          ]
+        },
+        {
+          "include": "#property-access"
+        },
+        {
+          "include": "#punctuation"
+        },
+        {
+          "include": "#type-name"
+        }
+      ]
+    },
+    "parameters": {
+      "name": "meta.parameters.thor",
+      "begin": "\\(",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.parameters.begin.thor"
+        }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.parameters.end.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#assignments"
+        },
+        {
+          "include": "#expressions"
+        }
+      ]
+    },
+    "return-type-declaration": {
+      "name": "meta.return.type.thor",
+      "begin": "->",
+      "beginCaptures": {
+        "0": {
+          "name": "storage.type.function.arrow.thor"
+        }
+      },
+      "end": "(?=^|\\)|,|;|{|where)",
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#basic-types"
+        },
+        {
+          "include": "#property-access"
+        },
+        {
+          "name": "meta.parameters.thor",
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.parameters.begin.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.parameters.end.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#assignments"
+            },
+            {
+              "include": "#keywords"
+            },
+            {
+              "include": "#basic-types"
+            },
+            {
+              "include": "#property-access"
+            },
+            {
+              "include": "#type-name"
+            },
+            {
+              "include": "#punctuation"
+            }
+          ]
+        },
+        {
+          "include": "#type-name"
+        }
+      ]
+    },
+    "map-bitset": {
+      "begin": "\\b(bit_set|map)\\b",
+      "beginCaptures": {
+        "0": {
+          "name": "storage.type.thor"
+        }
+      },
+      "end": "]",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.bracket.square.thor"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\[",
+          "name": "punctuation.definition.bracket.square.thor"
+        },
+        {
+          "include": "#type-declaration"
+        }
+      ]
+    },
+    "case-clause": {
+      "name": "meta.case-clause.expr.thor",
+      "begin": "\\b(case)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.case.thor"
+        }
+      },
+      "end": ":",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.section.case-statement.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expressions"
+        }
+      ]
+    },
+    "procedure-calls": {
+      "patterns": [
+        {
+          "name": "meta.function-call.thor",
+          "begin": "\\b(cast|transmute)\\b\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.function.thor"
+            },
+            "2": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type-declaration"
+            }
+          ]
+        },
+        {
+          "name": "meta.function-call.thor",
+          "begin": "\\b(size_of|align_of)\\b\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "support.function.builtin.thor"
+            },
+            "2": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type-declaration"
+            }
+          ]
+        },
+        {
+          "name": "meta.function-call.thor",
+          "begin": "\\b(len|cap|offset_of_selector|offset_of_member|offset_of|offset_of_by_string|type_of|type_info_of|typeid_of|swizzle|complex|quaternion|real|imag|jmag|kmag|conj|expand_values|min|max|abs|clamp|soa_zip|soa_unzip|make|new|new_clone|resize|reserve|append|delete|free|free_all|assert|panic)\\b\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "support.function.builtin.thor"
+            },
+            "2": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expressions"
+            }
+          ]
+        },
+        {
+          "name": "meta.function-call.thor",
+          "begin": "([A-Za-z_]\\w*)\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.function.thor"
+            },
+            "2": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expressions"
+            }
+          ]
+        }
+      ]
+    },
+    "ternary": {
+      "name": "meta.ternary.thor",
+      "begin": "\\?",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.operator.ternary.thor"
+        }
+      },
+      "end": ":",
+      "endCaptures": {
+        "0": {
+          "name": "keyword.operator.ternary.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expressions"
+        }
+      ]
+    },
+    "slice": {
+      "name": "meta.slice.thor",
+      "begin": "\\[",
+      "beginCaptures": {
+        "0": {
+          "name": "meta.brace.square.thor"
+        }
+      },
+      "end": "\\]",
+      "endCaptures": {
+        "0": {
+          "name": "meta.brace.square.thor"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\?",
+          "name": "keyword.operator.array.thor"
+        },
+        {
+          "match": ":",
+          "name": "keyword.operator.slice.thor"
+        },
+        {
+          "include": "#expressions"
+        }
+      ]
+    },
+    "property-access": {
+      "match": "([A-Za-z_]\\w*)\\s*(\\.)\\s*(?=[A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "variable.other.object.thor"
+        },
+        "2": {
+          "name": "punctuation.accessor.thor"
+        }
+      }
+    },
+    "union-member-access": {
+      "begin": "([A-Za-z_]\\w*)\\s*(\\.)\\s*(\\()",
+      "beginCaptures": {
+        "1": {
+          "name": "variable.other.object.thor"
+        },
+        "2": {
+          "name": "punctuation.accessor.thor"
+        },
+        "3": {
+          "name": "meta.brace.round.thor"
+        }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "meta.brace.round.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#type-declaration"
+        }
+      ]
+    },
+    "union-non-nil-access": {
+      "match": "([A-Za-z_]\\w*)\\s*(\\.)\\s*(\\?)",
+      "captures": {
+        "1": {
+          "name": "variable.other.object.thor"
+        },
+        "2": {
+          "name": "punctuation.accessor.thor"
+        },
+        "3": {
+          "name": "punctuation.accessor.optional.thor"
+        }
+      }
+    },
+    "comments": {
+      "patterns": [
+        {
+          "include": "#block-comment"
+        },
+        {
+          "name": "comment.line.double-slash.thor",
+          "begin": "//",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.thor"
+            }
+          },
+          "end": "\n"
+        },
+        {
+          "name": "comment.line.shebang.thor",
+          "begin": "#!",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.thor"
+            }
+          },
+          "end": "\n"
+        }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.thor",
+      "begin": "/\\*",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.begin.thor"
+        }
+      },
+      "end": "\\*/",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.end.thor"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "type-name": {
+      "name": "entity.name.type.thor",
+      "match": "\\b[A-Za-z_]\\w*\\b"
+    },
+    "type-parameter": {
+      "captures": {
+        "1": {
+          "name": "keyword.operator.thor"
+        },
+        "2": {
+          "name": "entity.name.type.parameter.thor"
+        }
+      },
+      "match": "(\\$)\\s*(\\b[A-Za-z_]\\w*\\b)"
+    },
+    "variable-name": {
+      "name": "variable.name.thor",
+      "match": "\\b[A-Za-z_]\\w*\\b"
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.conditional.thor",
+          "match": "#(?:if|else)\\b"
+        },
+        {
+          "name": "keyword.control.thor",
+          "match": "\\b(import|foreign|package)\\b"
+        },
+        {
+          "name": "keyword.control.thor",
+          "match": "\\b(if|else|or_else|when|where|for|in|not_in|defer|switch|return|or_return)\\b"
+        },
+        {
+          "match": "\\b(break|or_break|continue|or_continue)\\b\\s*(\\w+)?",
+          "captures": {
+            "1": {
+              "name": "keyword.control.thor"
+            },
+            "2": {
+              "name": "entity.name.label.thor"
+            }
+          }
+        },
+        {
+          "name": "keyword.control.thor",
+          "match": "\\b(fallthrough|case|dynamic)\\b"
+        },
+        {
+          "name": "keyword.control.thor",
+          "match": "\\b(do|force_inline|no_inline)\\b"
+        },
+        {
+          "name": "keyword.control.thor",
+          "match": "\\b(asm)\\b"
+        },
+        {
+          "name": "storage.modifier.thor",
+          "match": "\\b(auto_cast|distinct|using)\\b"
+        },
+        {
+          "name": "keyword.context.thor",
+          "match": "\\b(context)\\b"
+        },
+        {
+          "name": "variable.other.constant.thor",
+          "match": "\\b(ODIN_ARCH|ODIN_OS)\\b"
+        },
+        {
+          "name": "constant.language.thor",
+          "match": "\\b(nil|true|false)\\b"
+        },
+        {
+          "name": "constant.language.thor",
+          "match": "---"
+        },
+        {
+          "name": "constant.numeric.thor",
+          "match": "\\b(\\d(\\d|_)*(\\.\\d(\\d|_)*)?)((e|E)(\\+|-)?\\d+)?[ijk]?\\b"
+        },
+        {
+          "name": "constant.numeric.thor",
+          "match": "\\b((0b(0|1|_)+)|(0o(\\d|_)+)|(0d(\\d|_)+)|(0[xXh](\\h|_)+))[i]?\\b"
+        },
+        {
+          "name": "storage.type.thor",
+          "match": "\\b(struct|enum|union|map|bit_set|bit_field|matrix)\\b"
+        },
+        {
+          "name": "keyword.operator.assignment.compound.thor",
+          "match": "[+\\-*/%]=|%%="
+        },
+        {
+          "name": "keyword.operator.assignment.compound.bitwise.thor",
+          "match": "\\|=|~=|&~?=|<<=|>>="
+        },
+        {
+          "name": "keyword.operator.comparison.thor",
+          "match": "==|!="
+        },
+        {
+          "name": "keyword.operator.relational.thor",
+          "match": "[<>]=?"
+        },
+        {
+          "name": "keyword.operator.range.thor",
+          "match": "\\.\\.[<=]"
+        },
+        {
+          "name": "keyword.operator.spread.thor",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.assignment.thor",
+          "match": ":[:=]|="
+        },
+        {
+          "name": "keyword.operator.address.thor",
+          "match": "&"
+        },
+        {
+          "name": "keyword.operator.address.thor",
+          "match": "\\^"
+        },
+        {
+          "match": "->",
+          "name": "storage.type.function.arrow.thor"
+        },
+        {
+          "name": "keyword.operator.thor",
+          "match": "@|(\\||\\!|:|\\+|-|\\*|/|%|\\<\\<?|\\>\\>?|\\~)=?|=|: : ?|\\$"
+        },
+        {
+          "name": "entity.name.tag.thor",
+          "match": "#[A-Za-z_]\\w*"
+        }
+      ]
+    },
+    "basic-types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(i8|i16|i32|i64|i128|int)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(u8|u16|u32|u64|u128|uint|uintptr)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(u16le|u32le|u64le|u128le|i16le|i32le|i64le|i128le)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(i16be|i32be|i64be|i128be|u16be|u32be|u64be|u128be)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(f16|f32|f64)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(f16le|f32le|f64le)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(f16be|f32be|f64be)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(complex32|complex64|complex128)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(quaternion64|quaternion128|quaternion256)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(bool|b8|b16|b32|b64)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(string|cstring|rune)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(rawptr)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(any|typeid)\\b"
+        },
+        {
+          "name": "support.type.primitive.thor",
+          "match": "\\b(byte)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.thor",
+          "begin": "\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.thor"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#string-escaped-char"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.thor",
+          "begin": "'",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.thor"
+            }
+          },
+          "end": "'",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.thor"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#string-escaped-char"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.thor",
+          "begin": "`",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.thor"
+            }
+          },
+          "end": "`",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.thor"
+            }
+          }
+        }
+      ]
+    },
+    "string-escaped-char": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.ansi-color-sequence.thor",
+          "match": "\\\\(x1b|e|033)\\[[0-9;]*m"
+        },
+        {
+          "name": "constant.character.escape.thor",
+          "match": "\\\\(\\\\|[abefnrutv''\"]|x\\h{2}|u\\h{4}|U\\h{8}|[0-7]{3})"
+        },
+        {
+          "name": "constant.character.escape.placeholders.thor",
+          "match": "%(v|w|T|%|t|b|c|r|o|d|i|z|x|X|U|e|E|f|F|g|G|h|H|m|M|s|q|x|X|p|p|s)"
+        },
+        {
+          "name": "constant.character.escape.placeholders-floats.thor",
+          "match": "%(\\d*\\.?\\d*f)"
+        },
+        {
+          "name": "invalid.illegal.unknown-escape.thor",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "punctuation": {
+      "name": "punctuation.thor",
+      "match": "\\(|\\)|\\{|\\}|;|\\[|\\]|\\.|,|\\\\"
+    }
+  },
+  "scopeName": "source.thor"
+}
