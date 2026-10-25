@@ -8,6 +8,8 @@ package server
 
 import "core:odin/ast"
 import "core:odin/tokenizer"
+import "core:slice"
+import "core:strings"
 
 import "src:common"
 import "src:spall"
@@ -117,8 +119,15 @@ SemanticTokensResponseParams :: struct {
 SemanticTokenBuilder :: struct {
 	current_start: int,
 	tokens:        [dynamic]SemanticToken,
+	entries:       [dynamic]SemanticTokenEntry,
 	symbols:       SymbolAndNodeMap,
 	src:           string,
+}
+
+SemanticTokenEntry :: struct {
+	start, end: int,
+	type: SemanticTokenTypes,
+	modifiers: SemanticTokenModifiers,
 }
 
 semantic_tokens_to_response_params :: proc(tokens: []SemanticToken) -> SemanticTokensResponseParams {
@@ -143,6 +152,7 @@ get_semantic_tokens :: proc(
 
 	builder: SemanticTokenBuilder = {
 		tokens  = make([dynamic]SemanticToken, 0, 2000, context.temp_allocator),
+		entries = make([dynamic]SemanticTokenEntry, 0, 2000, context.temp_allocator),
 		symbols = symbols,
 		src     = ast_context.file.src,
 	}
@@ -156,28 +166,35 @@ get_semantic_tokens :: proc(
 		}
 	}
 
+	// Adapted switches revisit selectors and store arms out of source order.
+	// LSP deltas require source order; duplicated
+	// synthetic nodes must not shift highlighting onto unrelated source text.
+	slice.sort_by(builder.entries[:],proc(a,b:SemanticTokenEntry)->bool {
+		return a.start<b.start || a.start==b.start && a.end<b.end
+	})
+	previous_end := -1
+	for entry in builder.entries {
+		if entry.start<previous_end {continue}
+		position:=common.get_relative_token_position(entry.start,transmute([]u8)builder.src,builder.current_start)
+		length:=common.get_character_offset_u8_to_u16(entry.end-entry.start,transmute([]u8)builder.src[entry.start:entry.end])
+		append(&builder.tokens,SemanticToken{cast(u32)position.line,cast(u32)position.character,cast(u32)length,entry.type,entry.modifiers})
+		builder.current_start=entry.start
+		previous_end=entry.end
+	}
 	return builder.tokens[:]
 }
 
 write_semantic_at_pos :: proc(
 	builder: ^SemanticTokenBuilder,
 	pos: int,
-	len: int,
+	byte_length: int,
 	type: SemanticTokenTypes,
 	modifiers: SemanticTokenModifiers = {},
 ) {
-	position := common.get_relative_token_position(pos, transmute([]u8)builder.src, builder.current_start)
-	append(
-		&builder.tokens,
-		SemanticToken {
-			delta_line = cast(u32)position.line,
-			delta_char = cast(u32)position.character,
-			len = cast(u32)len,
-			type = type,
-			modifiers = modifiers,
-		},
-	)
-	builder.current_start = pos
+	if pos<0 || byte_length<=0 || pos+byte_length>len(builder.src) {return}
+	text:=builder.src[pos:pos+byte_length]
+	if strings.contains_any(text,"\r\n") {return}
+	append(&builder.entries,SemanticTokenEntry{pos,pos+byte_length,type,modifiers})
 }
 
 write_semantic_node :: proc(
@@ -191,7 +208,9 @@ write_semantic_node :: proc(
 		return
 	}
 
+	if node.pos.offset<0 || node.end.offset>len(builder.src) || node.end.offset<=node.pos.offset {return}
 	name := get_ast_node_string(node, builder.src)
+	if ident,ok:=node.derived.(^ast.Ident);ok && name!=ident.name {return}
 
 	write_semantic_at_pos(builder, node.pos.offset, len(name), type, modifiers)
 }

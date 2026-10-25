@@ -31,6 +31,10 @@ It also parses quoted/raw interpolation, runtime/compile-time switches and Set
 types/literals; fields and arms retain completion/hover/definition positions.
 The grammar highlights embedded expressions independently from string text,
 including nested quotes and braces. Negative indices use native expression scopes.
+TLS normalizes semantic token ranges before publishing them, preserving string
+and comment colors even around adapted switches and nested interpolation.
+Some contextual expected-type navigation remains incomplete: `.Red` in a
+switch-arm array can highlight correctly while lacking hover/definition.
 `fn` declarations and `#run` calls have highlighting and snippets. TLS hover
 explains declared purity and infers call results without executing procedures;
 the live compiler evaluates explicit and known-argument calls, including generic-dependent constants, and maps purity/evaluation failures.

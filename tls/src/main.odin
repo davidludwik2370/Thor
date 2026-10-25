@@ -63,7 +63,6 @@ run :: proc(reader: ^server.Reader, writer: ^server.Writer) {
 
 	context.logger = logger^
 	server.create_and_start_check_worker(writer)
-	defer server.stop_check_worker()
 
 
 	for common.config.running {
@@ -78,6 +77,9 @@ run :: proc(reader: ^server.Reader, writer: ^server.Writer) {
 
 		server.consume_requests(&common.config, writer)
 	}
+	// Join the checker before releasing the configuration and document state
+	// its current snapshot may still be using.
+	server.stop_check_worker()
 
 	for k, v in common.config.collections {
 		delete(k)

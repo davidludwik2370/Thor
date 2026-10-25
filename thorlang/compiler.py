@@ -152,6 +152,7 @@ class Source:
         self.purity = None
         self.run_values = {}
         self.evaluation_keep = None
+        self.evaluation_query_checks = {}
         from .expressions import Expressions
         self.expressions = Expressions(self)
         self.selected = {}
@@ -517,6 +518,8 @@ class Source:
             code = self._render(n, expected, constant)
         if n in self.guards:
             code = self.guard_code(self.guards[n]) + code
+        if n in self.evaluation_query_checks:
+            code=''.join('_ = '+self.render(query)+'\n' for query in self.evaluation_query_checks[n])+code
         return self.mapping.wrap(code, self.path, n.start, n.end, n.kind)
 
     def guard_code(self, guards):

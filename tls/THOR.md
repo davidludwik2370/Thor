@@ -84,14 +84,24 @@ type contexts remain limited. The conditional evaluator is also a subset of
 Odin's constant evaluator; it does not execute arbitrary procedures. It does not
 execute procedures to populate hover values or choose `#run`-dependent branches;
 the compiler checker performs explicit and automatic compile-time execution.
+One confirmed expected-type gap is `.Red` inside a contextual switch-arm array
+such as `choice:[2]Color=switch x{case 1:[.Red,.Blue];case:[.Blue,.Red]}`:
+highlighting and compilation work, but hover/definition do not resolve. The stdio
+suite records this as an expected failure. See [the audit](../AUDIT.md).
+
+Semantic tokens are collected in absolute original-source ranges, sorted and
+deduplicated before encoding UTF-16 LSP deltas. Adapted switch traversal order and
+synthetic nodes cannot shift later tokens onto strings, comments or partial names.
 
 For Thor packages, the checker invokes `thor check -json-errors` with snapshots
 of all open buffers. Thor lowers those buffers, checks the generated Odin, and
 maps diagnostics back to original files and UTF-16 source ranges. Checks run on
-open/change/save; superseded results are discarded and resolved diagnostics are
+open/change/save; superseded checks are cancelled and resolved diagnostics are
 cleared. Generated support errors point back to their Thor operations. The live
 parser continues to provide immediate syntax diagnostics without duplicating
-compiler parser errors for open documents.
+compiler parser errors for open documents. Parser errors use exact token ranges,
+including after Unicode text and at EOF. Closing the server terminates its active
+check before removing the overlay; Thor cancellation also unwinds native helpers.
 
 Set `thor_command` in `tls.json` or initialization options to the absolute Thor
 launcher path. The VS Code extension supplies this automatically from the local

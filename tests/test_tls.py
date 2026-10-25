@@ -17,7 +17,7 @@ BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True):
+    def __init__(self, directory, *, compiler=True, compiler_command=None):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
@@ -37,7 +37,7 @@ class Client:
                             'completion': {'completionItem': {'snippetSupport': True}},
                             'semanticTokens': {'requests': {'full': True}}}},
             'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
-                'odin_command': odin, 'thor_command': str(ROOT / 'thor') if compiler else '',
+                'odin_command': odin, 'thor_command': str(compiler_command or ROOT / 'thor') if compiler else '',
                 'enable_parser_errors': True, 'enable_semantic_tokens': True,
                 'enable_unused_imports_reporting': False, 'enable_auto_import': False,
                 'enable_checker_workspace_diagnostics': False, 'thread_count': 1}
@@ -165,6 +165,186 @@ class TLSTests(unittest.TestCase):
     def hover(self, client, main, text, word):
         return client.request('textDocument/hover', {
             'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, word)})
+
+    def semantic_spans(self,client,main,text):
+        result=client.request('textDocument/semanticTokens/full',{'textDocument':{'uri':main.as_uri()}})
+        legend=client.capabilities['semanticTokensProvider']['legend']['tokenTypes']
+        lines=text.splitlines(keepends=True);line=column=0;previous_end=0;out=[]
+        for delta,char,length,kind,modifiers in zip(*[iter(result['data'])]*5):
+            line+=delta;column=char if delta else column+char
+            if delta:previous_end=0
+            self.assertLess(line,len(lines))
+            self.assertGreater(length,0)
+            self.assertGreaterEqual(column,previous_end,'Overlapping semantic tokens')
+            encoded=lines[line].rstrip('\r\n').encode('utf-16-le')
+            self.assertLessEqual(2*(column+length),len(encoded))
+            prefix=encoded[:column*2].decode('utf-16-le')
+            token=encoded[column*2:(column+length)*2].decode('utf-16-le')
+            start=len(''.join(lines[:line]).encode())+len(prefix.encode())
+            out.append((start,start+len(token.encode()),legend[kind],token,modifiers))
+            previous_end=column+length
+        return out
+
+    def assert_original_identifier_tokens(self,main,text,spans):
+        # Ask the shared frontend for original identifier spans. Bounds alone
+        # cannot detect a token shifted onto a string, comment or half a name.
+        from thorlang.compiler import Source
+        from thorlang.driver import frontend_binary
+        source=Source(main,frontend_binary('odin')[0],raw=text.encode())
+        allowed={(n.start,n.end) for n in source.nodes if n.kind=='Ident' and n.text.isidentifier()}
+        for n in source.nodes:
+            if n.kind=='Import' and n.data.get('name'):
+                name=n.data['name'];start=n.start+len(n.text[:n.text.index(name)].encode())
+                allowed.add((start,start+len(name.encode())))
+        for start,end,kind,token,_ in spans:
+            self.assertIn((start,end),allowed,f'{kind} token overrides non-identifier source {token!r} at byte {start}')
+
+    def test_full_demo_semantic_tokens_match_original_identifiers(self):
+        text=(ROOT/'demo/main.thor').read_text()
+        client,main=self.open(text,{
+            'support.odin':(ROOT/'demo/support.odin').read_text(),
+            'library/library.odin':(ROOT/'demo/library/library.odin').read_text(),
+            'assets/message.txt':(ROOT/'demo/assets/message.txt').read_text()})
+        spans=self.semantic_spans(client,main,text)
+        self.assertGreater(len(spans),700)
+        self.assert_original_identifier_tokens(main,text,spans)
+        by_offset={a:(kind,token) for a,_,kind,token,_ in spans}
+        for text_before,name,kind in [
+            ('{mark(1)}','mark','function'),('{mark(2)}','mark','function'),
+            ('case 3..<5: [.Red','.Red','enumMember')]:
+            start=text.encode().index(text_before.encode())+text_before.index(name)+(1 if name.startswith('.') else 0)
+            self.assertEqual(by_offset.get(start),(kind,name.lstrip('.')))
+        for fragment in ['either := fruit ~ more_fruit','assert(len(combined) == 3 && len(either) == 2 && fruit != more_fruit)']:
+            line_start=text.encode().index(fragment.encode())
+            for name in ['fruit','more_fruit','combined','either']:
+                start=fragment.find(name)
+                if start>=0:self.assertEqual(by_offset.get(line_start+start),('variable',name))
+
+    def test_semantic_tokens_survive_reordered_switches_unicode_and_edits(self):
+        text='''package main
+Color::enum{Red,Blue}
+main::proc(){
+ café:=1;_=f"😀 {café}";_=f"outer {f"inner {café}"}"
+ choice:[2]Color=switch café{case 1,2:[.Red,.Blue];case:[.Blue,.Red]}
+ TEXT::#switch 2{case 1:"first";case 2:"second";case:"default"}
+ for i:=0;i<2;i+=café{café+=1;_=choice}
+ _=TEXT;_=café
+}
+'''
+        client,main=self.open(text)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        for version,changed in enumerate([text.replace('\n','\r\n'),text.replace('café','value').replace('😀','界😀')],2):
+            client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':version},'contentChanges':[{'text':changed}]})
+            self.assert_original_identifier_tokens(main,changed,self.semantic_spans(client,main,changed))
+
+    def test_parser_errors_use_exact_unicode_ranges_and_clear_after_fix(self):
+        text='package main\nmain::proc(){_="😀";value:=;_=value}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),code='Syntax')
+        error=next(e for e in errors if e['code']=='Syntax')
+        self.assertEqual(error['range']['start'],self.position(text,';_=value',0))
+        self.assertEqual(error['range']['end'],self.position(text,';_=value',1))
+        changed=text.replace('value:=;','value:=1;')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_parser_error_at_eof_has_a_valid_zero_width_range(self):
+        text='package main\nmain::proc(){_="😀";value:=1'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),code='Syntax')
+        eof={'line':1,'character':len(text.split('\n')[1].encode('utf-16-le'))//2}
+        self.assertTrue(any(e['range']=={'start':eof,'end':eof} for e in errors),errors)
+
+    def test_unicode_definitions_and_semantic_names_use_utf16(self):
+        text='package main\nmain::proc(){_="😀界";café:=3;_=café}\n'
+        client,main=self.open(text)
+        before=text[:text.rindex('café')]
+        position={'line':1,'character':len(before.split('\n')[-1].encode('utf-16-le'))//2+1}
+        result=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},'position':position})
+        self.assertEqual(result['range']['start'],self.position(text,'café',0))
+        self.assertEqual(result['range']['end'],self.position(text,'café',len('café')))
+        names=[token for *_,token,mods in self.semantic_spans(client,main,text)]
+        self.assertEqual(names.count('café'),2)
+
+    @unittest.expectedFailure
+    def test_known_gap_contextual_enum_navigation_in_switch_array_arm(self):
+        # The underlying OLS resolver does not propagate the array's expected
+        # element type through Thor switch arms. Color ranges remain correct.
+        text='package main\nColor::enum{Red,Blue}\nmain::proc(){x:=1;choice:[2]Color=switch x{case 1:[.Red,.Blue];case:[.Blue,.Red]};_=choice}\n'
+        client,main=self.open(text)
+        self.assertIsNotNone(self.hover(client,main,text,'.Red'))
+
+    def test_type_query_validation_failure_maps_unsaved_text_and_clears(self):
+        text='package main\nid::fn(n:int)->int{return n}\nmain::proc(){_="😀";text:="bad";N::id(size_of(text));_=N}\n'
+        client,main=self.open(text)
+        changed=text.replace('size_of(text)','size_of(cast(i32)text)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot cast')
+        error=next(e for e in errors if 'Cannot cast' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'text));',0))
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    @unittest.skipIf(os.name=='nt','Uses an executable Python test compiler')
+    def test_superseded_silent_check_is_cancelled_before_latest_snapshot(self):
+        temporary=tempfile.TemporaryDirectory(prefix='tls-slow-check-');self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name).resolve();main=root/'main.thor';compiler=root/'compiler.py'
+        text='package main\n// SLOW\nmain::proc(){}\n';main.write_text(text)
+        compiler.write_text('''#!/usr/bin/env python3
+import json,signal,sys,time
+from pathlib import Path
+root=Path(__file__).parent
+overlay=json.loads(Path(sys.argv[sys.argv.index('--overlay')+1]).read_text())['Replace']
+text=Path(overlay[str(root/'main.thor')]).read_text()
+if 'SLOW' in text:
+ def cancel(*args):
+  (root/'cancelled').write_text('yes');raise SystemExit(143)
+ signal.signal(signal.SIGTERM,cancel)
+ (root/'started').write_text('yes')
+ time.sleep(10)
+(root/'completed').write_text(text)
+print(json.dumps({'error_count':0,'errors':[]}),file=sys.stderr)
+''');compiler.chmod(0o755)
+        client=Client(root,compiler_command=compiler);self.addCleanup(client.close)
+        client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
+        deadline=time.monotonic()+5
+        while not (root/'started').exists() and time.monotonic()<deadline:time.sleep(.02)
+        self.assertTrue((root/'started').exists())
+        start=time.monotonic()
+        for version in range(2,26):
+            changed=f'package main\n// edit {version}\nmain::proc(){{}}\n'
+            client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':version},'contentChanges':[{'text':changed}]})
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if (root/'completed').exists() and (root/'completed').read_text()==changed:break
+            time.sleep(.02)
+        self.assertTrue((root/'cancelled').exists(),'Superseded check was not terminated')
+        self.assertEqual((root/'completed').read_text(),changed)
+        self.assertLess(time.monotonic()-start,5)
+
+    @unittest.skipIf(os.name=='nt','Uses an executable Python test compiler')
+    def test_shutdown_cancels_inflight_compiler_check(self):
+        temporary=tempfile.TemporaryDirectory(prefix='tls-close-check-');self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name).resolve();main=root/'main.thor';compiler=root/'compiler.py'
+        text='package main\nmain::proc(){}\n';main.write_text(text)
+        compiler.write_text('''#!/usr/bin/env python3
+import signal,time
+from pathlib import Path
+root=Path(__file__).parent
+def cancel(*args):
+ (root/'cancelled').write_text('yes');raise SystemExit(143)
+signal.signal(signal.SIGTERM,cancel)
+(root/'started').write_text('yes')
+time.sleep(10)
+''');compiler.chmod(0o755)
+        client=Client(root,compiler_command=compiler);self.addCleanup(client.close)
+        client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
+        deadline=time.monotonic()+5
+        while not (root/'started').exists() and time.monotonic()<deadline:time.sleep(.02)
+        self.assertTrue((root/'started').exists())
+        client.close()
+        self.assertTrue((root/'cancelled').exists(),'Closing TLS left its compiler check running')
 
     def test_capabilities_and_demo_have_no_parser_errors(self):
         text = (ROOT / 'demo' / 'main.thor').read_text()

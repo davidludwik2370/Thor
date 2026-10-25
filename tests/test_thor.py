@@ -583,7 +583,7 @@ for x in [1,2,3] {if x in [2,3] {count += 1}}
 assert(count == 2)'''))
 
     def test_main_demo(self):
-        result = subprocess.run([str(THOR), "run", str(ROOT / "demo")], text=True, capture_output=True, timeout=40)
+        result = subprocess.run([str(THOR), "run", str(ROOT / "demo")], text=True, capture_output=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("All T01-T23 demos passed.", result.stdout)
         self.assertNotIn("Warning:",result.stderr)

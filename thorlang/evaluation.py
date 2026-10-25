@@ -136,11 +136,23 @@ class Evaluator:
         saved=source.run_values.pop(call,None)
         keep=source.evaluation_keep;source.evaluation_keep=None
         queries={}
+        owner=None
+        for ancestor in call.ancestors():
+            if ancestor.kind=='Procedure':break
+            if ancestor.kind=='Declaration' and not ancestor.data.get('mutable',True):
+                owner=ancestor;break
         for node in descendants(call):
             query=self.type_query(node)
-            if query:
+            # Native constant declarations cannot name local runtime storage,
+            # even inside type queries. Preserve native validation separately
+            # before substituting those queries; all other witnesses retain
+            # the original expression and its type/bounds/arity checks.
+            local=any((symbol:=source.expressions.variable(child)) and symbol.scope.kind!='File'
+                      for child in descendants(node)) if query else False
+            if query and owner and owner.parent.kind in {'Block','Case'} and local:
                 queries[node]=source.run_values.get(node)
                 source.run_values[node]=query[0]
+                if not source.purity.eval_mode:source.evaluation_query_checks.setdefault(owner,{})[node]=None
         try:code=source._render(call)
         finally:
             source.evaluation_keep=keep
@@ -296,7 +308,8 @@ class Evaluator:
                     if (parent.data['op']=='&&' and not selected) or (parent.data['op']=='||' and selected):return False
             elif parent.kind in {'For','Range'} and n.kind!='Run':
                 body=parent.role('body')
-                if body and body.start<=n.start<n.end<=body.end:
+                post=parent.role('post') if parent.kind=='For' else None
+                if any(part and part.start<=n.start<n.end<=part.end for part in (body,post)):
                     cond=parent.role('cond') if parent.kind=='For' else None
                     if cond is None or not self.known(cond):return None
                     if not self.boolean(cond):return False
@@ -338,7 +351,7 @@ class Evaluator:
                 # operands still need their ordinary result type.
                 n.source.needs_default=True
                 typ=self.result_type(self.call(n))
-                value={'runtime':f'{typ}{{}}','constant':f'{typ}{{}}'}
+                value={'runtime':f'({typ}{{}})','constant':f'({typ}{{}})'}
                 self.register(n,value,self.specializations.relevant(n))
                 return None
             call=self.call(n)

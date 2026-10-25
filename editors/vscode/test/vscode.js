@@ -33,6 +33,26 @@ async function run() {
         const hover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)),
             values => values?.some(value => value.contents.some(content => (content.value || '').includes('[3]int'))));
         assert.ok(hover.length);
+        const legend=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend',document.uri),value=>value?.tokenTypes?.length>0);
+        const semantic=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',document.uri),value=>value?.data?.length>0);
+        let line=0,column=0,previousEnd=0;
+        const semanticByOffset=new Map();
+        for(let i=0;i<semantic.data.length;i+=5){
+            const [delta,char,length,kind]=semantic.data.slice(i,i+4);
+            line+=delta;column=delta?char:column+char;
+            if(delta)previousEnd=0;
+            assert.ok(column>=previousEnd,'Overlapping semantic token');
+            assert.ok(column+length<=document.lineAt(line).text.length,'Semantic token extends past source line');
+            const start=document.offsetAt(new vscode.Position(line,column));
+            const token=source.slice(start,start+length);
+            assert.match(token,/^[\p{L}_][\p{L}\p{N}_]*$/u,'Semantic token splits an identifier or covers punctuation');
+            semanticByOffset.set(start,{type:legend.tokenTypes[kind],token});
+            previousEnd=column+length;
+        }
+        for(const [fragment,name,type] of [['either := fruit ~ more_fruit','fruit','variable'],['case 3..<5: [.Red','.Red','enumMember']]){
+            const start=source.indexOf(fragment)+fragment.indexOf(name)+(name.startsWith('.')?1:0);
+            assert.deepEqual(semanticByOffset.get(start),{type,token:name.replace(/^\./,'')});
+        }
         const printOffset = source.indexOf('println("T01') + 2;
         const definition = await eventually(() => vscode.commands.executeCommand('vscode.executeDefinitionProvider', document.uri, document.positionAt(printOffset)),
             values => values?.length > 0);
@@ -167,7 +187,8 @@ async function run() {
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',
             'allocated #run result inference', 'mapped slice-constant diagnostic',
-            'automatic constants', 'generic-dependent evaluation', 'mapped unsaved generic diagnostic'];
+            'automatic constants', 'generic-dependent evaluation', 'mapped unsaved generic diagnostic',
+            'full demo semantic-token ranges and classifications'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

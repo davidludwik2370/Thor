@@ -9,6 +9,7 @@ import "core:log"
 import "core:mem/virtual"
 import "core:odin/ast"
 import parser "thor:parser"
+import lexer "thor:tokenizer"
 import "core:odin/tokenizer"
 import "core:path/filepath"
 import path "core:path/slashpath"
@@ -390,10 +391,7 @@ document_refresh :: proc(document: ^Document, config: ^common.Config, writer: ^W
 				.Syntax,
 				uri.uri,
 				Diagnostic {
-					range = common.Range {
-						start = common.Position{line = error.line - 1, character = 0},
-						end = common.Position{line = error.line, character = 0},
-					},
+					range = parser_error_range(document,error),
 					severity = DiagnosticSeverity.Error,
 					code = "Syntax",
 					message = error.message,
@@ -408,6 +406,24 @@ document_refresh :: proc(document: ^Document, config: ^common.Config, writer: ^W
 }
 
 current_errors: [dynamic]ParserError
+
+parser_error_range :: proc(document:^Document,error:ParserError)->common.Range {
+	// Rescanning an f-string may allocate interpolation parts. Keep those in
+	// request scratch, rather than adding a leak on each incomplete edit.
+	context.allocator=context.temp_allocator
+	text:=document.text[:document.used_text]
+	start:=clamp(error.offset,0,len(text))
+	end:=start
+	if start<len(text) {
+		scanner:lexer.Tokenizer
+		lexer.init(&scanner,string(text),document.fullpath,common.parser_warning_handler)
+		scanner.thor=filepath.ext(document.fullpath)==".thor"
+		lexer.seek(&scanner,start)
+		token:=lexer.scan(&scanner)
+		if token.pos.offset==start {end=min(len(text),start+len(token.text))}
+	}
+	return {start=common.get_relative_token_position(start,text,0),end=common.get_relative_token_position(end,text,0)}
+}
 
 parser_error_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
 	error := ParserError {

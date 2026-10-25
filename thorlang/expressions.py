@@ -59,6 +59,8 @@ class Expressions:
         if not symbol or symbol.scope.kind=='File':
             return None
         decl=symbol.declaration
+        if decl.kind=='Field' and any(name.kind=='PolyType' for name in decl.group('names')):
+            return None # Native constant parameters remain lexical constants.
         if decl.kind=='Declaration' and not decl.data.get('mutable',True):
             return None
         if decl.kind=='PolyType' or symbol.annotation and symbol.annotation.kind=='TypeidType':
@@ -318,12 +320,14 @@ class Expressions:
         base=n.role('expr')
         if not self.sequence_type(base): return None
         bounds=[n.role('index')] if n.kind=='Index' else [n.role('low'),n.role('high')]
-        # Positive constants and explicitly unsigned indices are unchanged.
+        # Positive constants and narrow unsigned indices stay native. Wide
+        # unsigned runtime indices need a check before Odin narrows to int.
         def needs(bound):
             if bound is None: return False
             value=s.constant_int(bound)
             if value is not None: return value<0
             typ=self.shape(bound)
+            if typ.kind=='scalar' and typ.name.startswith('u128'):return True
             return not (typ.kind=='scalar' and typ.name.startswith('u'))
         if not any(needs(bound) for bound in bounds): return None
         typ=self.shape(base)
@@ -340,7 +344,7 @@ class Expressions:
             def normalized(bound):
                 if bound is None: return ''
                 i=s.render(bound,constant=True)
-                if not needs(bound): return i
+                if not needs(bound) or self.shape(bound).name.startswith('u'): return i
                 return f'(i128(len({b}))+i128({i}) when i128({i}) < 0 else i128({i}))'
             # Every operand is required to be constant by the surrounding Odin
             # context; there are no duplicated runtime evaluations here.

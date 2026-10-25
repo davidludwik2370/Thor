@@ -156,3 +156,28 @@ rejection, generic `using` pointer case and compile-time resolution subset
 are documented in `README.md`; keep those limits visible while extending the
 resolver. Do not substitute a zero result for an unresolved active #run. Unknown
 native dependencies must not introduce unverified initializers into helpers.
+
+## Post-v1 audit: 0.7.1
+
+[AUDIT.md](AUDIT.md) records the findings, cross-feature coverage and remaining
+editor boundaries. This round fixes semantic token ordering/duplication and UTF-16
+lengths; precise live parser ranges; native validation lost inside folded type
+queries; lazy loop posts; generic constant capture in expression helpers; and
+wide unsigned sequence bounds. Superseded and closing checker processes are now
+cancelled and reaped, with Thor unwinding its native helper and scratch directory.
+
+The full Python discovery run exercised 418 tests with one documented expected
+failure. The subsequently added shutdown regression also passes, bringing the
+current inventory to 419 tests (418 passing, one expected failure). Native TLS
+passes all 1,109 tests; the grammar suite passes 60 tests, including color metadata
+checks. All four pure-runtime, one value-protocol and two lexer tests pass with
+allocation tracking. The actual VS Code Extension Development Host integration
+passes, including full-demo semantic token integrity and classifications. All
+three demo modes pass; the warm default demo reports 44 cache hits and zero misses.
+The 0.7.1 TLS executable and local VSIX are rebuilt, the extension is installed,
+and workspace settings were toggled and restored to trigger a server restart.
+
+The expected failure tracks missing hover/definition on contextual enum members
+inside switch-arm arrays. Compilation and coloring work. Keep this distinct from
+token-range corruption: tests must check original token identity as well as file
+bounds, and editor navigation needs its own expected-type regression cases.

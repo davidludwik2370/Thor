@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -17,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 
 
 def frontend_binary(odin):
@@ -188,7 +189,7 @@ class Project:
         return result
 
 
-def main(argv=None):
+def _main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     runtime_args = []
     if "--" in argv:
@@ -311,6 +312,19 @@ def main(argv=None):
         else:
             report([{"type": "error", "stage": "thor", "pos": None, "msgs": [str(exc)]}])
         return 1
+
+
+class CompilationCancelled(BaseException):pass
+
+
+def main(argv=None):
+    # TLS terminates superseded checks. Unwind subprocess.run and temporary
+    # directories so the current native helper is stopped and scratch removed.
+    def cancel(signum,frame):raise CompilationCancelled()
+    previous=signal.signal(signal.SIGTERM,cancel)
+    try:return _main(argv)
+    except CompilationCancelled:return 128+signal.SIGTERM
+    finally:signal.signal(signal.SIGTERM,previous)
 
 
 if __name__ == "__main__":

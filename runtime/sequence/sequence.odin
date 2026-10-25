@@ -14,6 +14,7 @@ normalize_signed :: proc "contextless"(length: int, index: $I) -> i128 where int
     return result
 }
 normalize_unsigned :: proc "contextless"(length: int, index: $I) -> I where intrinsics.type_is_integer(I) && intrinsics.type_is_unsigned(I) {
+    assert_contextless(u128(index)<=u128(length), "Bounds check failed: sequence bound is out of range")
     return index
 }
 normalize :: proc{normalize_signed,normalize_unsigned}

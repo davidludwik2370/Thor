@@ -6,16 +6,33 @@ const path = require('node:path');
 const textmate = require('vscode-textmate');
 const oniguruma = require('vscode-oniguruma');
 
-let grammar;
+let grammar, themedGrammar, colorMap;
 before(async () => {
     const wasm = fs.readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm'));
     await oniguruma.loadWASM(wasm.buffer.slice(wasm.byteOffset, wasm.byteOffset + wasm.byteLength));
+    const onigLib=Promise.resolve({createOnigScanner:sources=>new oniguruma.OnigScanner(sources),createOnigString:s=>new oniguruma.OnigString(s)});
     const registry = new textmate.Registry({
-        onigLib: Promise.resolve({ createOnigScanner: sources => new oniguruma.OnigScanner(sources), createOnigString: s => new oniguruma.OnigString(s) }),
+        onigLib,
         loadGrammar: async scope => scope === 'source.thor'
             ? JSON.parse(fs.readFileSync(path.join(__dirname, '../syntaxes/thor.tmLanguage.json'), 'utf8')) : null
     });
     grammar = await registry.loadGrammar('source.thor');
+    const themed = new textmate.Registry({
+        theme: {settings:[
+            {settings:{foreground:'#D4D4D4',background:'#1E1E1E'}},
+            {scope:'string',settings:{foreground:'#CE9178'}},
+            {scope:'comment',settings:{foreground:'#6A9955'}},
+            {scope:'meta.embedded',settings:{foreground:'#D4D4D4'}},
+            {scope:'variable',settings:{foreground:'#9CDCFE'}},
+            {scope:'entity.name.function',settings:{foreground:'#DCDCAA'}},
+            {scope:'storage.modifier',settings:{foreground:'#569CD6'}},
+            {scope:'constant.numeric',settings:{foreground:'#B5CEA8'}},
+        ]},
+        onigLib,
+        loadGrammar:async()=>JSON.parse(fs.readFileSync(path.join(__dirname,'../syntaxes/thor.tmLanguage.json'),'utf8')),
+    });
+    themedGrammar=await themed.loadGrammar('source.thor');
+    colorMap=themed.getColorMap();
 });
 
 function tokenize(source) {
@@ -127,6 +144,36 @@ test('main demo tokenizes without illegal or unclosed string/comment scopes', ()
     assert.ok(!all.some(t => t.scopes.some(s => s.startsWith('invalid.illegal'))));
     const last = lines.findLast(line => line.some(t => t.text.trim()));
     assert.ok(last.every(t => !t.scopes.some(s => s.startsWith('string.') || s.startsWith('comment.'))));
+});
+
+test('nested interpolations retain string colors and ordinary expression colors',()=>{
+    function colors(source){
+        const data=themedGrammar.tokenizeLine2(source).tokens;
+        const out=[];
+        for(let i=0;i<data.length;i+=2){
+            const color=colorMap[(data[i+1]>>>15)&511];
+            for(let at=data[i];at<(data[i+2]??source.length);at++)out[at]=color;
+        }
+        return out;
+    }
+    const source='text := f"outer {f"inner {mark(3)}"} {mark(1)} {mark(2)}"';
+    const actual=colors(source);
+    for(const [word,color] of [['outer ','#CE9178'],['inner ','#CE9178'],['mark','#DCDCAA'],['3','#B5CEA8'],['1','#B5CEA8'],['2','#B5CEA8']]){
+        const start=source.indexOf(word);
+        assert.ok(actual.slice(start,start+word.length).every(c=>c===color),`${word}: ${actual.slice(start,start+word.length)}`);
+    }
+    for(const source of ['assert(text == "{fields} 1 2 0001,234,567")','case 1: "first"','case: `raw {not_a_field}`']){
+        const actual=colors(source),start=source.search(/["`]/);
+        assert.ok(actual.slice(start,source.lastIndexOf(source[start])+1).every(c=>c==='#CE9178'));
+    }
+});
+
+test('demo regression expressions retain complete identifier and literal scopes',()=>{
+    check('case 3..<5: [.Red, .Blue]','Red','variable');
+    check('either := fruit ~ more_fruit','fruit','variable');
+    check('assert(len(combined) == 3 && len(either) == 2 && fruit != more_fruit)','combined','variable');
+    check('text := f"{{fields}} {mark(1)}"','fields','string.quoted');
+    check('text := f"{switch n{case 1:"first";case:"second"}}"','first','string.quoted');
 });
 
 test('manifest owns Thor without replacing Odin', () => {

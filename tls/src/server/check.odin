@@ -65,6 +65,7 @@ Checker :: struct {
 	odin_without_workspace: string,
 	overlay:                Check_Overlay,
 	generation:             int,
+	worker:                 ^thread.Thread,
 }
 
 Check_Overlay :: struct {
@@ -134,7 +135,10 @@ delete_check_buffers :: proc(buffers: []Check_Buffer) {
 }
 
 stop_check_worker :: proc() {
+	// Invalidate both the active snapshot and any queued work before joining.
+	intrinsics.atomic_add(&checker.generation, 1)
 	chan.close(checker.send)
+	thread.destroy(checker.worker)
 	if checker.overlay.dir != "" {
 		_ = os.remove_all(checker.overlay.dir)
 	}
@@ -149,7 +153,7 @@ create_and_start_check_worker :: proc(writer: ^Writer) {
 		send      = check_send,
 	}
 	check_recv := chan.as_recv(check_chan)
-	thread.create_and_start_with_poly_data(
+	checker.worker = thread.create_and_start_with_poly_data(
 		Consumer{logger = context.logger, ch = check_recv, w = writer},
 		run_check_consumer,
 	)
@@ -180,7 +184,9 @@ run_check_consumer :: proc(c: Consumer) {
 			generation = later.generation
 		}
 
-		check(request.check_mode, paths[:], buffers, request.config, generation)
+		if generation == intrinsics.atomic_load(&checker.generation) {
+			check(request.check_mode, paths[:], buffers, request.config, generation)
+		}
 
 		if generation == intrinsics.atomic_load(&checker.generation) { push_diagnostics(c.w) }
 		for path in paths {
@@ -274,6 +280,19 @@ CheckProcess :: struct {
 	reader:   ^os.File,
 	finished: bool,
 	buffer:   [dynamic]u8,
+}
+
+stop_check_processes :: proc(processes:[]CheckProcess) {
+	for &p in processes {
+		if p.finished {continue}
+		_ = os.process_terminate(p.process)
+		state,err:=os.process_wait(p.process,2*time.Second)
+		if err!=nil || !state.exited {
+			_ = os.process_kill(p.process)
+			_,_ = os.process_wait(p.process)
+		}
+		p.finished=true
+	}
 }
 
 check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, config: ^common.Config, generation: int) {
@@ -391,7 +410,8 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 	}
 
 	max_concurrent_checks := max(1, os.get_processor_core_count())
-	processes := make([dynamic]CheckProcess, 0, len(jobs))
+	processes := make([dynamic]CheckProcess, 0, len(jobs), context.temp_allocator)
+	defer {for p in processes {if p.reader!=nil {os.close(p.reader)}}}
 
 	errors := make([dynamic]Json_Errors, 0, len(jobs), context.temp_allocator)
 	lacks_workspace := false
@@ -406,6 +426,10 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 	}
 
 	for running_count > 0 || next_index < len(jobs) {
+		if generation!=intrinsics.atomic_load(&checker.generation) {
+			stop_check_processes(processes[:])
+			return
+		}
 		for running_count < max_concurrent_checks && next_index < len(jobs) {
 			p, ok := start_check_process(command, jobs[next_index], collections[:], overlay, config, buffers)
 			next_index += 1
@@ -418,13 +442,8 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 
 		if time.since(start) > deadline {
 			log.error("`odin check` timed out")
-			for &p in processes {
-				if !p.finished {
-					if err := os.process_kill(p.process); err != nil {
-						log.error("Failed to kill `odin check` process: %v", err)
-					}
-				}
-			}
+			stop_check_processes(processes[:])
+			append(&errors,Json_Errors{error_count=1,errors=[]Json_Error{{type="error",stage="toolchain",pos={file=check_paths[0],line=1,column=1,end_column=1},msgs=[]string{"Compiler check timed out; reduce compile-time work or check from the command line."}}}})
 			break
 		}
 
@@ -434,9 +453,9 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			}
 
 			buf: [1024]u8
-			n, _ := os.read(p.reader, buf[:])
-			if n > 0 {
-				_, _ = append(&p.buffer, ..buf[:n])
+			if ready,_:=os.pipe_has_data(p.reader);ready {
+				n,_:=os.read(p.reader,buf[:])
+				if n>0 {_,_=append(&p.buffer,..buf[:n])}
 			}
 
 			state, err := os.process_wait(p.process, 0)
@@ -452,6 +471,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			running_count -= 1
 
 			for {
+				if ready,_:=os.pipe_has_data(p.reader);!ready {break}
 				n, read_err := os.read(p.reader, buf[:])
 				if n > 0 {
 					_, _ = append(&p.buffer, ..buf[:n])
@@ -488,10 +508,6 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 		if running_count > 0 || next_index < len(jobs) {
 			time.sleep(1 * time.Millisecond)
 		}
-	}
-
-	for p in processes {
-		os.close(p.reader)
 	}
 
 	if lacks_workspace {
