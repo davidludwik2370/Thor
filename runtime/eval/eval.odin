@@ -15,6 +15,22 @@ hex :: proc(builder:^strings.Builder,bytes:[]u8) {
     }
 }
 
+// Metadata remains textual type identity, never a process address/typeid.
+emit_specialized :: proc(value:$T,names:[]string) {
+    builder:strings.Builder
+    strings.builder_init(&builder)
+    defer strings.builder_destroy(&builder)
+    strings.write_string(&builder,`{"thor_value":1,"value":{"kind":"specialized","types":[`)
+    for name,i in names {
+        if i>0 {strings.write_byte(&builder,',')}
+        write(&builder,name,0)
+    }
+    strings.write_string(&builder,`],"value":`)
+    write(&builder,value,0)
+    strings.write_string(&builder,`}}`)
+    fmt.println(strings.to_string(builder))
+}
+
 write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
     when Depth>32 {panic("Compile-time value nesting limit exceeded")}
     else when intrinsics.type_is_boolean(T) {

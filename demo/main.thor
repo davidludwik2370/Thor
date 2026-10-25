@@ -100,6 +100,20 @@ pure_local_view :: fn()->[]int {
 }
 PURE_LABEL :: #run pure_label(7) // a borrowed Odin string constant
 
+// T23: forward/dependent constants, generic bindings, selection and ownership.
+AUTO_LATER :: pure_square(AUTO_FIRST)
+AUTO_FIRST :: pure_square(3)
+AUTO_TEXT :: pure_label(23)
+pure_size :: fn($T:typeid)->int {return size_of(T)}
+pure_never :: fn()->bool {assert(false,"unselected evaluation");return false}
+generic_known :: proc(value:$T,$N:int)->int {
+    COUNT :: pure_square(N)
+    WIDTH :: #run pure_size(T)
+    buffer:[COUNT]int
+    return len(buffer)+WIDTH
+}
+#assert(AUTO_LATER==81)
+
 DEMO_MODE :: #config(DEMO_MODE, 2)
 #if DEMO_MODE == 1 {
     BRANCH :: "first"
@@ -407,7 +421,6 @@ main :: proc() {
     }
     assert(SELECTED == (DEMO_MODE == 1 ? 9 : 16))
     when false { UNUSED :: #run unselected() } // no helper executes this call
-    // Plain fn calls with known arguments remain runtime calls until T23.
 
     println("T21: persistent #run cache with transitive invalidation and controls")
     // Run ./thor run demo --cache-report twice: the second run reports hits.
@@ -434,5 +447,26 @@ main :: proc() {
     assert(local_view[0]==9) // copied after user defers, before local storage expires
     pure.destroy(local_view)
 
-    println("All T01-T22 demos passed.")
+    println("T23: automatic constants, dependencies, generic instances, and lazy paths")
+    auto_buffer:[AUTO_LATER]int
+    assert(len(auto_buffer)==81&&AUTO_FIRST==9&&AUTO_TEXT=="label 23")
+    #if AUTO_FIRST==9 {assert(true)} #else {intentionally_undefined()}
+    AUTO_CHOICE :: #switch {
+        case pure_square(2)==4: pure_square(4)
+        case pure_never(): 0
+        case: 1
+    }
+    AUTO_SELECTOR :: #switch pure_square(2) {case 4:pure_square(3);case:0}
+    assert(AUTO_CHOICE==16&&AUTO_SELECTOR==9)
+    small:=i32(1);large:=f64(1)
+    assert(generic_known(small,2)==8&&generic_known(large,3)==17)
+    unknown:=false
+    if unknown {assert(pure_never())} // unknown runtime paths stay lazy
+    auto_owned:=pure_owned("folded")
+    other_owned:=pure_owned("folded")
+    auto_owned.values[0]=99
+    assert(other_owned.values[0]==7&&raw_data(auto_owned.rows)!=raw_data(other_owned.rows))
+    pure.destroy(auto_owned);pure.destroy(other_owned)
+
+    println("All T01-T23 demos passed.")
 }

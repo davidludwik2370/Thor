@@ -1,7 +1,7 @@
 # Thor
 
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
-milestone implements **T01–T22** from the reference specification in
+milestone implements **T01–T23** from the reference specification in
 [thor.odin](thor.odin). It includes the parser and project support needed to make
 those features usable together.
 
@@ -16,7 +16,7 @@ caches the small Odin frontend automatically; no Python packages are required.
 
 [demo/main.thor](demo/main.thor) has a labeled section for every completed task,
 with assertions, ordinary Odin code, imported packages, and evaluation-order
-examples. It finishes with `All T01-T22 demos passed.`
+examples. It finishes with `All T01-T23 demos passed.`
 
 Select another compile-time branch with an ordinary Odin define:
 
@@ -40,7 +40,7 @@ Select another compile-time branch with an ordinary Odin define:
 ## VS Code and TLS
 
 The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
-support the current T01-T22 features. Build the server and extension from this repository:
+support the current T01-T23 features. Build the server and extension from this repository:
 
 ```sh
 python3 tools/build_tls.py
@@ -164,6 +164,7 @@ Debugger mappings and runtime stack traces are outside this implementation.
 | T20 | Explicit native `#run` execution, verified dependency closures, dependent constants, selected/lazy paths, mapped failures and bounded execution. |
 | T21 | Persistent contents-only result cache, transitive/configuration/toolchain/resource invalidation, atomic publication, corruption recovery and cache controls. |
 | T22 | Scratch cleanup and independently owned string/slice results, deep aggregate promotion, recursive cleanup and fresh runtime `#run` materialization. |
+| T23 | Automatic known-argument `fn` folding, forward/dependent constants, generic specialization scheduling, selected/lazy paths and fresh folded runtime results. |
 
 ```odin
 import "core:math" / sin,
@@ -397,27 +398,52 @@ protect an implicitly promoted `using` field. Write the existing pointer member
 explicitly (`value.pointer.field`) to retain shallow mutation in that case;
 concrete and shape-constrained records resolve pointer promotion directly.
 
-T23 remains: automatic known-argument `fn` folding and specialization-dependent
-evaluation scheduling. T21 caching and T22 independently owned allocated results
-are implemented.
+T01–T23 are implemented, including automatic constant evaluation, per-instance
+generic scheduling, persistent caching and independently owned allocated results.
 `fn` and `set` remain valid ordinary Odin identifiers. The root `thor.odin` is the
 reference specification; `demo/main.thor` is the evaluation program. Follow
 [DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.
 
-## Pure functions and explicit compile-time execution
+## Pure functions and compile-time execution
 
 ```odin
 square :: fn(value: $T) -> T { return value * value }
-SIZE :: #run square(4)
+SIZE :: square(4) // automatically evaluated: a genuine integer constant
 buffer: [SIZE]int
+NEXT :: #run eligible_proc(SIZE) // ordinary proc execution still needs #run
 ```
 
 `fn` is a contextual procedure spelling. It lowers to an Odin procedure with a
-purity contract. Runtime inputs remain runtime values. For this milestone, use
-`#run` explicitly to obtain a constant; plain known-argument calls are not folded.
+purity contract. Calls with known values/types are evaluated automatically;
+runtime inputs remain runtime calls. Literals, named constants, supported constant
+expressions, type queries and evaluated results qualify. Mutable variables and
+immutable runtime bindings (`:>`) do not become constants through propagation.
 `#run` also accepts an ordinary `proc` when its relevant transitive call graph
 passes the same checks. Recursion, concrete generic calls, local constants,
-overloads, named arguments and earlier `#run` results are supported.
+overloads, defaults, named arguments and forward/dependent results are supported.
+Explicit `#run` requires known inputs and reports a runtime argument as an error.
+
+Generic `$T`/`$N` bindings are scheduled separately for each resolved instantiation,
+including forwarding through imported procedures and inferred fixed-array counts.
+A normal parameter is still runtime storage inside a generic body. For example:
+
+```odin
+work :: proc($N:int, value:$T) -> int {
+    COUNT :: square(N)
+    WIDTH :: #run bytes(T)
+    data: [COUNT]int
+    return len(data) + WIDTH
+}
+bytes :: fn($T:typeid) -> int { return size_of(T) }
+```
+
+The scheduler follows selected `when`/`#if`, both `#switch` forms and known lazy
+conditions. Calls under unknown runtime branches/loop bodies remain runtime;
+this avoids executing a failing call on a path that may never be taken. Explicit
+`#run` remains a compile-time directive even in runtime code. Type queries inspect
+types without executing the queried expression. Invalid dependency cycles are
+reported separately from valid native recursion. Unresolved generic `#run` calls
+receive a source diagnostic rather than a fabricated result.
 
 Inputs may contain scalar values, enums, strings, slices, fixed arrays, records,
 bit sets and tagged unions. Borrowed contents are protected through aliases,
@@ -459,7 +485,7 @@ Arbitrary user procedure results and anonymous arguments remain manual Odin
 ownership. Eligible `proc "contextless"` targets cannot promote allocated returns;
 use `fn` or a contextful `proc` for those results.
 
-Runtime `x := #run work()` materializes fresh owned storage on every execution,
+Runtime `x := #run work()` and automatically folded calls materialize fresh owned storage on every execution,
 including loop iterations and cache hits. In constant contexts, strings and fixed
 aggregates containing strings become ordinary borrowed Odin constants. A
 slice-containing result needs a runtime binding (`:=`), or a pure consumer that
@@ -469,7 +495,7 @@ The value protocol preserves arbitrary string bytes, nil/non-nil empty slices,
 zero-sized slice elements, fields, active union variants and exact float bits. It
 serializes contents without padding or process addresses.
 
-Each ready explicit call is compiled in a temporary native helper containing only
+Each ready evaluation is compiled in a temporary native helper containing only
 its required declarations/imports. User entry points, unrelated runtime globals
 and package initializers are excluded; referenced runtime storage is rejected.
 Opaque native imports are restricted to `base:intrinsics`, `core:math`,
@@ -477,8 +503,8 @@ Opaque native imports are restricted to `base:intrinsics`, `core:math`,
 Native value reads are limited to explicitly approved `core:math` constants;
 an import name or a collection override does not confer purity.
 Helpers use the same native defines/configuration as the final build. Cross-target
-`#run` is rejected. Compilation errors map to original source; execution failures
-point to the `#run` expression. Helpers are deleted after use. Execution defaults
+evaluation is rejected. Compilation errors map to original source; execution failures
+point to the original call or `#run` expression. Helpers are deleted after use. Execution defaults
 to five seconds per helper; set `--run-timeout 10` to change it (maximum 300).
 Independent-call batching remains future work.
 
@@ -507,9 +533,11 @@ fields at compile time, so Thor supplies checked source field schemas. Unknown
 external record schemas, some `using`-promoted record shapes and raw unions are
 rejected; a record sharing a known raw union's field-name shape may also be
 rejected. Provenance joins can reject writes to a fresh buffer after it has shared
-a binding with borrowed storage. `#run` values that depend on enclosing generic
-bindings require T23's specialization scheduling and produce a clear diagnostic
-when selected. Enum-indexed array constants support declared keys and zeroed
+a binding with borrowed storage. Compile-time evaluation currently supports direct,
+resolved calls with one result; void/multiple-result `fn` calls retain their native
+runtime behavior. The scheduler uses Thor's partial resolver, so unsupported or
+ambiguous specializations may still need an explicit type or simpler wrapper.
+Enum-indexed array constants support declared keys and zeroed
 unnamed slots; nonzero unnamed slots fail rather than being changed on output.
 Source-location-dependent `#file`, `#directory` and `#line` values, including
 constants derived from them, are rejected in pure execution until their values

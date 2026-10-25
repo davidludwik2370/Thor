@@ -196,10 +196,10 @@ assert(VALUE==(MODE==1 ? 9 : 16))
         self.invoke(self.program('_=VALUE','spin::fn()->int{for{};return 0}\nVALUE::#run spin()\n'),command='check',flags=['--run-timeout','0.05'],fail='timeout')
 
     def test_failed_scratch_allocation_cannot_become_a_successful_result(self):
-        self.invoke(self.program('context.allocator={procedure=fail_allocate};_=work()', '''
+        self.invoke(self.program('context.allocator={procedure=fail_allocate};n:=5;_=work(n)', '''
 import "core:mem"
 fail_allocate::proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,old:rawptr,old_size:int,loc:=#caller_location)->([]byte,mem.Allocator_Error){return nil,.Out_Of_Memory}
-work::fn()->int{data:=make([]int,5);return len(data)}
+work::fn(n:int)->int{data:=make([]int,n);return len(data)}
 '''),fail='Pure scratch allocation failed')
 
     def test_run_cycles_cross_target_and_timeout_configuration(self):
@@ -305,7 +305,7 @@ bad::fn(using input:$T)->int{data[0]=9;return 0}
         self.invoke(self.program('_=bad()','import "library"\nbad::fn()->int{return library.global}\n'),
             files={'library/main.odin':'package library\nglobal:int\n'},command='check',fail='outside the function')
         self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{return len(os.args)}\n'),command='check',fail='unverified native package')
-        self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{using os;return len(args)}\n'),command='check',fail='unverified namespaces')
+        self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{using os;return len(args)}\n'),command='check',fail='unverified native package')
         self.invoke(self.program('assert(VALUE>3&&VALUE<4)','import "core:math"\nidentity::fn(value:f64)->f64{return value}\nVALUE::#run identity(math.PI)\n'))
 
     def test_opaque_native_packages_are_not_executed_by_run_helpers(self):
@@ -324,7 +324,7 @@ VALUE::#run work(7)
     def test_specialization_dependent_nested_run_is_diagnosed_when_selected(self):
         prefix='square::fn(value:int)->int{return value*value}\nwork::proc(value:$T)->int{when T==int{return #run square(value)}else{return 7}}\n'
         self.invoke(self.program('assert(work("text")==7)',prefix))
-        self.invoke(self.program('_=work(3)',prefix),command='check',fail='compile-time-known arguments and types at this source location')
+        self.invoke(self.program('_=work(3)',prefix),command='check',fail='runtime storage is not a constant')
 
     def test_special_floats_complex_quaternion_and_endian_values(self):
         self.invoke(self.program('''

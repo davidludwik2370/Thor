@@ -40,6 +40,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   spelling and explains purity; call results, including concrete generic results,
   retain type inference and completion through `#run`. Live compiler checks
   enforce purity/evaluation rules against unsaved source and dependencies.
+- Automatic calls retain normal return-type inference, completion and semantic
+  token positions. Hover explains known-argument folding and constant/runtime
+  ownership. Live compiler checks schedule automatic constants and generic-dependent
+  evaluations, map failures against unsaved/imported text, and clear after fixes.
 - Infer allocated string/slice and record results through `#run`; pure-function
   hover documents independent result ownership and `pure.destroy` cleanup.
   Unsaved imported contents invalidate cached evaluations. Slice-containing
@@ -79,7 +83,7 @@ type checker. Complex overloads, generic specialization, and some nested expecte
 type contexts remain limited. The conditional evaluator is also a subset of
 Odin's constant evaluator; it does not execute arbitrary procedures. It does not
 execute procedures to populate hover values or choose `#run`-dependent branches;
-the compiler checker performs explicit compile-time execution.
+the compiler checker performs explicit and automatic compile-time execution.
 
 For Thor packages, the checker invokes `thor check -json-errors` with snapshots
 of all open buffers. Thor lowers those buffers, checks the generated Odin, and

@@ -41,6 +41,20 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_automatic_failures_keep_original_unicode_ranges(self):
+        source='package main\nwork::fn(n:int)->int{_="😀";return missing}\nVALUE::work(3)\nmain::proc(){_=VALUE}\n'
+        errors=self.at(source,'missing',message='Undeclared name: missing')
+        self.assertNotIn('__thor_',json.dumps(errors))
+        self.assertNotIn('thor-run-',json.dumps(errors))
+        source='package main\nwork::fn()->int{assert(false);return 0}\nmain::proc(){_="😀";VALUE::work();_=VALUE}\n'
+        errors=self.at(source,'work()',message='Compile-time execution failed')
+        self.assertNotIn('thor-run-',json.dumps(errors))
+
+    def test_generic_run_unknown_argument_maps_to_its_expression(self):
+        source='package main\nsquare::fn(n:int)->int{return n*n}\nwork::proc(value:$T)->int{_="😀";VALUE::#run square(value);return VALUE}\nmain::proc(){a:=3;_=work(a)}\n'
+        errors=self.at(source,'value);return',message='runtime storage is not a constant')
+        self.assertNotIn('__thor_',json.dumps(errors))
+
     def test_allocated_results_preserve_error_locations_and_constant_context(self):
         source='package main\nwork::fn()->[]string{_="😀";return missing}\nmain::proc(){a:=work();_=a}\n'
         errors=self.at(source,'missing',message='Undeclared name: missing')

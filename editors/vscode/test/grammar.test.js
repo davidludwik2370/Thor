@@ -48,6 +48,8 @@ for (const [name, source, word, scope, line] of [
     ['explicit run', 'SIZE :: #run square(8)', '#run', 'keyword.control.conditional'],
     ['allocated pure return', 'names :: fn()->[]string{return nil}', 'fn', 'storage.type'],
     ['allocated run binding', 'names := #run names()', '#run', 'keyword.control.conditional'],
+    ['automatic constant call', 'SIZE :: square(8)', 'square', 'entity.name.function'],
+    ['generic dependent run', 'work :: proc($N:int){SIZE::#run square(N)}', '#run', 'keyword.control.conditional'],
     ['interpolation prefix', 's := f"hello {value}"', 'f', 'storage.modifier.interpolation'],
     ['interpolation field', 's := f"hello {value}"', 'value', 'variable'],
     ['nested interpolation string', 's := f"{echo("inner")}"', 'inner', 'string.quoted.double'],

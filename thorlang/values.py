@@ -20,6 +20,11 @@ def expression(value,typ,meta,depth=0):
     if depth>32 or not isinstance(value,dict):raise ValueErrorProtocol('Invalid nested compile-time value.')
     kind=value.get('kind')
     def child(v,t):return expression(v,t,meta,depth+1)
+    if kind=='specialized':
+        names=value.get('types')
+        if not isinstance(names,list) or not all(isinstance(v,dict) and v.get('kind')=='string' for v in names):raise ValueErrorProtocol('Invalid specialization metadata.')
+        for name in names:child(name,'string')
+        return child(value.get('value'),typ)
     if kind=='bool':
         if type(value.get('value')) is not bool:raise ValueErrorProtocol('Invalid boolean result.')
         return f'{typ}({str(value["value"]).lower()})'

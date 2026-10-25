@@ -22,7 +22,7 @@ def main():
                 '--disable-extensions', '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust',
                 f'--extensionDevelopmentPath={ROOT / "editors/vscode"}',
                 f'--extensionTestsPath={ROOT / "editors/vscode/test/vscode.js"}', str(ROOT)]
-        completed = subprocess.run(args, env={**os.environ, 'THOR_VSCODE_TEST_RESULT': str(result_file)}, timeout=90)
+        completed = subprocess.run(args, env={**os.environ, 'THOR_VSCODE_TEST_RESULT': str(result_file)}, timeout=180)
         if not result_file.exists():
             raise SystemExit(f'VS Code did not report test results (exit {completed.returncode})')
         result = json.loads(result_file.read_text())

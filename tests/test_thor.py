@@ -585,7 +585,7 @@ assert(count == 2)'''))
     def test_main_demo(self):
         result = subprocess.run([str(THOR), "run", str(ROOT / "demo")], text=True, capture_output=True, timeout=40)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("All T01-T22 demos passed.", result.stdout)
+        self.assertIn("All T01-T23 demos passed.", result.stdout)
         self.assertNotIn("Warning:",result.stderr)
 
     def test_checked_in_rejection_examples(self):

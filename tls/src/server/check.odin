@@ -399,6 +399,11 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 	next_index := 0
 	running_count := 0
 	start := time.now()
+	deadline := 20 * time.Second
+	// Thor may compile several native evaluation helpers before final checking.
+	for p in paths {
+		if is_thor_check(p,buffers) { deadline = 120 * time.Second; break }
+	}
 
 	for running_count > 0 || next_index < len(jobs) {
 		for running_count < max_concurrent_checks && next_index < len(jobs) {
@@ -411,7 +416,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			running_count += 1
 		}
 
-		if time.since(start) > 20 * time.Second {
+		if time.since(start) > deadline {
 			log.error("`odin check` timed out")
 			for &p in processes {
 				if !p.finished {

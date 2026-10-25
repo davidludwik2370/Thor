@@ -22,6 +22,7 @@ class Type:
     witness: object = None
     untyped: bool = False
     nominal: object = None
+    lexical: dict = field(default_factory=dict)
 
 
 @dataclass(eq=False)
@@ -75,6 +76,9 @@ class Resolver:
         self.using = {}
         self.active = set()
         self.call_plans = {}
+        self.bound_types = {}
+        self.bound_constants = {}
+        self.integer_active = set()
         self.wrappers = {}
         self.markers = {}
         for source in sources:
@@ -206,6 +210,11 @@ class Resolver:
             return Type(node=n)
         seen.add(key)
         kind = n.kind
+        if kind=='Call' and n.role('callee').text=='type_of' and self.symbol(n.role('callee')) is None and len(n.group('args'))==1:
+            return self.type_of(n.group('args')[0],seen)
+        symbol=self.symbol(n) if kind=='Ident' else None
+        bound=self.bound_types.get((n,n.data.get('name'))) if kind=='PolyType' else self.bound_types.get((symbol.declaration,symbol.name)) if symbol else None
+        if bound is not None:return bound
         if kind=='Run':return self.type_of(n.role('expr'),seen)
         if kind == 'SetType':
             return Type('set',node=n,elem=self.type_node(n.group('args')[0],substitutions,seen))
@@ -225,7 +234,7 @@ class Resolver:
                 return Type("slice", node=n, elem=self.type_node(n.role("elem"), substitutions, seen))
             count = substitutions.get(binding_name(length))
             if not isinstance(count, int):
-                count = n.source.constant_int(length)
+                count = self.constant_int(length)
             return Type("array", node=n, elem=self.type_node(n.role("elem"), substitutions, seen), length=count)
         if kind == "DynamicArrayType":
             return Type("dynamic", node=n, elem=self.type_node(n.role("elem"), substitutions, seen))
@@ -236,8 +245,20 @@ class Resolver:
         if kind == "DistinctType":
             return replace(self.type_node(n.role("type"), substitutions, seen), nominal=n)
         if kind in {"StructType", "UnionType", "EnumType", "BitSetType", "ProcedureType"}:
+            substitutions=dict(substitutions)
+            lexical={}
+            owners=set(n.ancestors())
+            for (declaration,name),bound in self.bound_types.items():
+                if any(owner in owners for owner in declaration.ancestors() if owner.kind=='Procedure'):
+                    substitutions.setdefault(name,bound)
+                    lexical[declaration,name]=(bound,None)
+            for (declaration,name),bound in self.bound_constants.items():
+                if any(owner in owners for owner in declaration.ancestors() if owner.kind=='Procedure'):
+                    if bound['kind']=='integer':substitutions.setdefault(name,int(bound['value']))
+                    symbol=self.by_decl.get((declaration,name))
+                    lexical[declaration,name]=(self.type_node(symbol.annotation) if symbol and symbol.annotation else Type('scalar','int'),bound)
             return Type({"StructType": "struct", "UnionType": "union", "EnumType": "enum",
-                         "BitSetType": "bitset", "ProcedureType": "procedure"}[kind], node=n, substitutions=substitutions)
+                         "BitSetType": "bitset", "ProcedureType": "procedure"}[kind], node=n, substitutions=substitutions,lexical=lexical)
         if kind == "Ident":
             if n.text in substitutions and isinstance(substitutions[n.text], Type):
                 return substitutions[n.text]
@@ -462,10 +483,10 @@ class Resolver:
             if not actual.untyped:
                 return -1000
             return 0
-        return 0 if actual.untyped else 5
+        return 2 if actual.untyped and expected.name and expected.name==actual.name else 0 if actual.untyped else 5
 
     def resolve_call(self, call):
-        if call in self.call_plans:
+        if not getattr(self,'evaluation_active',False) and not self.bound_types and not self.bound_constants and call in self.call_plans:
             return self.call_plans[call]
         key = (call, "call")
         if key in self.active:
@@ -493,7 +514,7 @@ class Resolver:
                             if generics[param[0]] == "typeid":
                                 substitutions[param[0]] = replace(self.type_node(arg), witness=("type", arg))
                             else:
-                                value = arg.source.constant_int(arg)
+                                value = self.constant_int(arg)
                                 if value is not None:
                                     substitutions[param[0]] = value
                         amount = self.unify(param[1], self.type_of(arg), substitutions)
@@ -509,6 +530,19 @@ class Resolver:
             return candidates[0]
         finally:
             self.active.remove(key)
+
+    def constant_int(self,n):
+        symbol=self.symbol(n)
+        key=(symbol.declaration,symbol.name) if symbol else (n,n.data.get('name')) if n else None
+        if key in self.bound_constants:
+            value=self.bound_constants[key]
+            if value['kind']=='integer':return int(value['value'])
+        value=n.source.constant_int(n) if n else None
+        if value is None and n and hasattr(self,'evaluated_integer') and n not in self.integer_active:
+            self.integer_active.add(n)
+            try:return self.evaluated_integer(n)
+            finally:self.integer_active.remove(n)
+        return value
 
     def protection(self, n):
         if n is None:

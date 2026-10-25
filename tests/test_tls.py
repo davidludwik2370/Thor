@@ -252,6 +252,41 @@ main::proc(){
         client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(main.read_text(),text)
 
+    def test_automatic_constants_and_generic_unsaved_diagnostics(self):
+        text='''package main
+square::fn(value:int)->int{return value*value}
+SIZE::square(3)
+work::proc($N:int)->int{VALUE::#run square(N);return VALUE}
+main::proc(){result:=square(SIZE);data:[SIZE]int;assert(work(3)==9);_=result;_=data}
+'''
+        client,main=self.open(text)
+        self.assertIn('Known-argument calls',self.hover(client,main,text,'square')['contents']['value'])
+        self.assertIn('result: int',self.hover(client,main,text,'result')['contents']['value'])
+        changed=text.replace('VALUE::#run square(N)','value:=N;VALUE::#run square(value)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='runtime storage is not a constant')
+        error=next(e for e in errors if 'runtime storage is not a constant' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'square(value)',len('square(')))
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_automatic_imported_failure_uses_unsaved_source(self):
+        text='package main\nimport "library"\nVALUE::library.work(3)\nmain::proc(){_=VALUE}\n'
+        original='package library\nwork::fn(n:int)->int{return n*n}\n'
+        client,main=self.open(text,{'library/main.thor':original})
+        library=main.parent/'library/main.thor'
+        changed=original.replace('return n*n','_="😀";return missing')
+        client.send('textDocument/didOpen',{'textDocument':{'uri':library.as_uri(),'languageId':'thor','version':1,'text':changed}})
+        errors=client.diagnostic(library.as_uri(),contains='missing')
+        error=next(e for e in errors if 'missing' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'missing',0))
+        self.assertNotIn('thor-run-',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':library.as_uri(),'version':2},'contentChanges':[{'text':original}]})
+        client.diagnostic(library.as_uri(),empty=True)
+        self.assertEqual(library.read_text(),original)
+
     def test_run_imported_unsaved_purity_error(self):
         text='package main\nimport "library" / square\nVALUE::#run square(3)\nmain::proc(){_=VALUE}\n'
         original='package library\nsquare::fn(value:int)->int{return value*value}\n'

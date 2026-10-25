@@ -33,6 +33,45 @@ main::proc(){result:=#run square(3);res{*}ult}
 }
 
 @(test)
+thor_hover_automatic_result :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+square::fn(value:int)->int{return value*value}
+SIZE::square(3)
+main::proc(){res{*}ult:=square(SIZE)}
+`)
+    test.expect_hover_contains(t,&source,"result: int")
+}
+
+@(test)
+thor_hover_automatic_contract :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+square::fn(value:int)->int{return value*value}
+main::proc(){squ{*}are(3)}
+`)
+    test.expect_hover_contains(t,&source,"Known-argument calls")
+}
+
+@(test)
+thor_automatic_record_completion :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Report::struct{value:int,title:string}
+report::fn(n:int)->Report{return {n,"ok"}}
+main::proc(){result:=report(3);result.{*}}
+`)
+    test.expect_completion_labels(t,&source,".",{"value","title"})
+}
+
+@(test)
+thor_generic_dependent_run_inference :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+square::fn(value:int)->int{return value*value}
+work::proc($N:int)->int{SIZE::#run square(N);res{*}ult:=square(SIZE);return result}
+main::proc(){_=work(3)}
+`)
+    test.expect_hover_contains(t,&source,"result: int")
+}
+
+@(test)
 thor_hover_allocated_pure_result :: proc(t:^testing.T) {
     source:=thor_source(`package test
 names::fn()->[]string{return nil}

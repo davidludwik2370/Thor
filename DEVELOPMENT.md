@@ -45,7 +45,7 @@ TLS Git history, including checkpoint `cb009c7`, is preserved at
 `git --git-dir=.git/tls-upstream --work-tree=tls log`. It is local history, not a
 dependency required to build a fresh checkout.
 
-T01–T22 now have implementations, editor integration and evaluation sections in
+T01–T23 now have implementations, editor integration and evaluation sections in
 `demo/main.thor`. The earlier 0.4.1 checkpoint covered interpolation (T13), runtime and
 compile-time switches (T14), Set syntax (T15), negative sequence accesses (T16),
 and expression-local lowering (T17), plus native xor/pointer compatibility,
@@ -74,9 +74,9 @@ resolver work remains deferred to the later T tasks.
 
 The 0.5.0 batch added declared `fn` contracts (T18), typed contents-only native
 serialization (T19), and explicit `#run` helpers (T20). The 0.6.0 batch completes
-T21 caching and T22 allocated results. T23 automatic folding and specialization
-scheduling remain future work. Helper build/run failures use the
-same diagnostic maps as final Odin checking; execution failures point to #run.
+T21 caching and T22 allocated results. The 0.7.0 batch completes T23 automatic
+folding and specialization scheduling. Helper build/run failures use the same
+diagnostic maps as final Odin checking; execution failures point to the call or #run.
 
 `thorlang/purity.py` tracks effects and transitive borrowed provenance. Native
 generic contracts check instantiated types and preserve inactive `when` behavior.
@@ -113,11 +113,46 @@ The 0.6.0 checkpoint passes 367 Python compiler/LSP tests, 1,105 native TLS test
 56 grammar tests, four allocation-tracked pure-runtime tests, the native value
 protocol and lexer memory checks, the actual VS Code integration test and all
 three demo define modes. A warm demo run reports 12 cache hits and zero misses.
-The local TLS executable and Thor 0.6.0 VSIX are rebuilt and installed. Generated
-binaries remain ignored; their source and build commands are tracked.
+That checkpoint's local TLS executable and Thor 0.6.0 VSIX were rebuilt and installed.
+Generated binaries remain ignored; their source and build commands are tracked.
+
+T23 uses the same native helper/cache/value pipeline for declared fn calls with
+known inputs and for explicit #run. Forward/dependent values are scheduled on
+demand; cycles have distinct diagnostics. Native when/#switch and known lazy
+conditions select work. Unknown runtime branches retain ordinary fn calls.
+Direct, resolved single-result calls form the compile-time subset; native
+void/multiple-result fn calls continue to work at runtime.
+
+`thorlang/specialization.py` binds generic symbols by lexical declaration, not
+spelling. It follows concrete calls, including nested forwarding and inferred
+array counts. Each instance gets a native conditional substitution; unresolved
+active #run paths fail rather than falling back to invented values. Helper-only
+bridges let generic libraries evaluate caller-defined types without introducing
+reverse imports into the actual program. Native metadata probes recover nominal
+identities in their defining scopes without running user code; local source
+offsets are translated through the source maps. Native test mode is retained.
+
+Result type witnesses use native procedure_of to preserve overload selection and
+private result types. Runtime materializers take the type at the original call
+site, avoiding nested generic signature reflection problems. Type queries extract
+types without pulling runtime initializers into helpers. Recheck these boundaries
+with cross-package/private/local types, generic recursion, constant dependencies,
+tracking allocators, Unicode diagnostics and unsaved buffers.
+
+TLS explains automatic folding and ownership in hover, retains normal result
+inference/completion, and checks generic-dependent constants through the compiler.
+Its partial resolver still does not execute procedures for hover values or its
+own branch selection. Thor checker requests allow up to 120 seconds for multiple
+native helpers; each evaluation retains the compiler's separate timeout.
+
+The 0.7.0 checkpoint passes 402 Python compiler/LSP tests, 1,109 native TLS tests,
+58 grammar tests, allocation-tracked pure/value-protocol/lexer tests, the real
+VS Code integration test and all three demo modes. A warm demo reports 44 cache
+hits and zero misses. The TLS executable and local Thor 0.7.0 VSIX are rebuilt
+and installed; the workspace server has been restarted.
 
 The compiler's resolution boundaries, conservative record schemas, raw-union
-rejection, generic `using` pointer case and specialization-dependent nested #run
+rejection, generic `using` pointer case and compile-time resolution subset
 are documented in `README.md`; keep those limits visible while extending the
 resolver. Do not substitute a zero result for an unresolved active #run. Unknown
 native dependencies must not introduce unverified initializers into helpers.

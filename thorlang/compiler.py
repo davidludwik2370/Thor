@@ -1,4 +1,4 @@
-"""Lower T01-T22 using ASTs from the adapted Odin tooling parser.
+"""Lower T01-T23 using ASTs from the adapted Odin tooling parser.
 
 Offsets are UTF-8 byte offsets, as in Odin. Unchanged source is copied verbatim;
 all transformations are attached to parsed nodes, never textual pattern matches.
@@ -546,10 +546,13 @@ class Source:
         kind = n.kind
         if n in self.run_values:
             value=self.run_values[n]
+            if callable(value):return value(expected,constant)
             return value['constant' if constant else 'runtime'] if isinstance(value,dict) else value
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code
+        if kind=='Ternary' and constant:
+            return '('+self.render(n.role('x'),expected,True)+' when ('+self.render(n.role('cond'),constant=True)+') else '+self.render(n.role('y'),expected,True)+')'
         extra = self.expressions.render(n, expected, constant)
         if extra is not None:
             return extra

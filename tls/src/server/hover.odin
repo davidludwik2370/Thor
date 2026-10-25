@@ -23,7 +23,7 @@ write_hover_content :: proc(
 	if .Immutable in symbol.flags { cat = append_first_line_comment(cat, "immutable storage", allocator) }
 	doc := construct_symbol_docs(symbol, allocator)
     if value,ok:=symbol.value.(SymbolProcedureValue);ok&&value.thor_pure {
-        doc=fmt.aprintf("%s\n\nString/slice results own independent storage. Use `pure.destroy` for recursive cleanup of nested results.",doc,allocator=allocator)
+        doc=fmt.aprintf("%s\n\nKnown-argument calls are evaluated at compile time; runtime inputs remain ordinary calls. String/slice results in runtime code own independent storage. Use `pure.destroy` for recursive cleanup of nested results. Constant strings and fixed aggregates use borrowed Odin storage.",doc,allocator=allocator)
     }
 
 	if ast_context.show_layout {

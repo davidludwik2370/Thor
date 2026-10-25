@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 
 async function eventually(action, predicate) {
-    const deadline = Date.now() + 20000;
+    const deadline = Date.now() + 60000;
     let result;
     do {
         result = await action();
@@ -131,6 +131,21 @@ async function run() {
         assert.ok(!allocatedError.message.includes('__thor_') && !allocatedError.message.includes('thor-run-'));
         await replace(allocated);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const automatic = 'package main\nsquare::fn(n:int)->int{return n*n}\nSIZE::square(3)\nwork::proc($N:int)->int{VALUE::#run square(N);return VALUE}\nmain::proc(){result:=square(SIZE);data:[SIZE]int;assert(work(3)==9);_=result;_=data}\n';
+        await replace(automatic);
+        await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', testDocument.uri,
+            testDocument.positionAt(automatic.indexOf('square') + 2)),
+            values => values?.some(value => value.contents.some(content => (content.value || '').includes('Known-argument calls'))));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const genericErrorText = automatic.replace('VALUE::#run square(N)', 'value:=N;VALUE::#run square(value)');
+        await replace(genericErrorText);
+        const genericErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values => values.some(value => value.message.includes('runtime storage is not a constant')));
+        const genericError = genericErrors.find(value => value.message.includes('runtime storage is not a constant'));
+        assert.equal(testDocument.getText(genericError.range), 'value');
+        assert.ok(!genericError.message.includes('__thor_') && !genericError.message.includes('thor-run-'));
+        await replace(automatic);
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         const borrowedView = hardened.replace('value:=1', '_="😀";view:=f"abc {1}"[1:];_=view;value:=1');
         await replace(borrowedView);
         const lifetimeErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
@@ -151,7 +166,8 @@ async function run() {
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',
-            'allocated #run result inference', 'mapped slice-constant diagnostic'];
+            'allocated #run result inference', 'mapped slice-constant diagnostic',
+            'automatic constants', 'generic-dependent evaluation', 'mapped unsaved generic diagnostic'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

@@ -1015,7 +1015,7 @@ Implement Thor in batches of T tasks. Each batch follows the same full loop:
 See DEVELOPMENT.md for the commands, repository layout, and batch checklist.
 Debugger mappings, stack traces, and a formatter remain separate work.
 
-Implementation checkpoint: 0.6.0 covers T01-T22, including quoted/raw interpolation,
+Implementation checkpoint: 0.7.0 covers T01-T23, including quoted/raw interpolation,
 runtime switch expressions, both #switch forms, Set syntax/operators, negative
 sequence accesses, and expression-local lowering. The demo has labeled sections
 for every implemented task. Compiler/runtime, TLS, diagnostic, grammar and actual
@@ -1037,10 +1037,13 @@ T22 completes independent string/slice/nested-aggregate results, promotion after
 user defers while locals live, scratch cleanup and recursive result destruction.
 Runtime #run results materialize fresh storage, including cache hits and loops.
 Slice-containing constants and allocated contextless returns remain diagnosed.
-T23 automatic known-argument folding and generic specialization scheduling remain
-deferred. In particular, a #run depending on
-enclosing generic bindings is diagnosed when selected rather than evaluated with
-invented types/values. Native record-schema and enum-array serialization limits
+T23 adds automatic known-argument fn folding, forward/dependent constants, lazy
+selection and per-instantiation generic type/constant scheduling. Folded runtime
+results materialize independent owned storage, including through caches/loops.
+Type queries never execute the inspected expression. Unknown runtime paths stay
+runtime; explicit #run still requires compile-time-known arguments. Direct,
+resolved single-result calls form the compile-time subset; void/multiple-result
+fn calls preserve their native runtime behavior. Native record-schema and enum-array serialization limits
 are documented in README.md. TLS infers call types but does not execute procedures
 for hover values or its own conditional resolver; live compiler checks do so.
 Remaining T11/T12 refinement: an unconstrained generic receiver's implicitly
