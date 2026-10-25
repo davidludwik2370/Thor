@@ -202,5 +202,109 @@ main :: proc() {
     // Rejections are separate executable fixtures under tests/fixtures/:
     // immutable = 9; &frozen_record.number; frozen_array[:]
 
-    println("All T01-T12 demos passed.")
+    println("T13: quoted/raw interpolation, braces, nested expressions, and formatting")
+    calls, order = 0, 0
+    interpolated := f"{{fields}} {mark(1)} {mark(2)} {1234567:0>12,}"
+    assert(interpolated == "{fields} 1 2 0001,234,567" && order == 12)
+    raw_interpolated := f`raw \n {"é😀":界^5}`
+    assert(raw_interpolated == `raw \n 界é😀界界`)
+    nested_interpolated := f"outer {f"inner {3}"}"
+    assert(nested_interpolated == "outer inner 3")
+    // Interpolation owns its result and formatting intermediates. A field's
+    // borrowed value remains yours. Delete each final allocated result once.
+    delete(interpolated); delete(raw_interpolated); delete(nested_interpolated)
+
+    println("T14: runtime and compile-time switches, with and without selectors")
+    calls, order = 0, 0
+    switched := switch mark(2) {
+        case 1: unselected()
+        case 2, 3: mark(4)
+        case: unselected()
+    }
+    assert(switched == 4 && calls == 2 && order == 24)
+    boolean_switched := switch {
+        case false: unselected()
+        case switched == 4: 7
+        case: unselected()
+    }
+    contextual: [2]Color = switch switched {
+        case 3..<5: [.Red, .Blue]
+        case: [.Green, .Green]
+    }
+    assert(boolean_switched == 7 && contextual[1] == .Blue)
+    COMPILED :: #switch DEMO_MODE {
+        case 1: "first"
+        case 2: "second"
+        case: "default"
+    }
+    COMPILED_BOOL :: #switch {
+        case false: undefined_unselected_expression
+        case true: 8
+        case: another_undefined_expression
+    }
+    #switch DEMO_MODE {
+        case 1, 2: SELECTED_DECLARATION :: 10
+        case: SELECTED_DECLARATION :: 20
+    }
+    #switch {
+        case COMPILED_BOOL == 8: SELECTED_BOOLEAN :: true
+        case: SELECTED_BOOLEAN :: false
+    }
+    assert(COMPILED == BRANCH && COMPILED_BOOL == 8 && SELECTED_BOOLEAN)
+    assert(SELECTED_DECLARATION == (DEMO_MODE == 3 ? 20 : 10))
+
+    println("T15: Set syntax, operators, iteration, equality, and explicit ownership")
+    fruit: set[string]
+    fruit += "apple"; fruit += "pear"; fruit += "apple"
+    more_fruit := set[string]{"pear", "plum"}
+    combined := fruit | more_fruit
+    common := fruit & more_fruit
+    only_first := fruit - more_fruit
+    either := fruit ^ more_fruit
+    assert(len(fruit) == 2 && "pear" in common && "apple" in only_first)
+    assert(len(combined) == 3 && len(either) == 2 && fruit != more_fruit)
+    visited := 0
+    for name in combined { assert(name in combined); visited += 1 }
+    assert(visited == 3)
+    fruit |= more_fruit; fruit &= combined; fruit -= "apple"
+    fruit -= common; fruit ^= either
+    assert("apple" in fruit && "plum" not_in fruit)
+    clear(fruit)
+    assert(len(fruit) == 0)
+    // Mathematical results have independent tables. Ordinary assignment is a
+    // shallow header copy; use sets.clone for an independently owned copy.
+    delete(fruit); delete(more_fruit); delete(combined)
+    delete(common); delete(only_first); delete(either)
+
+    println("T16: negative sequence indices, slices, writes, and ordinary map keys")
+    sequence := [10, 20, 30, 40]
+    last_index := -1
+    assert(sequence[last_index] == 40 && sequence[-2] == 30)
+    sequence[-1] += 2
+    last_pointer := &sequence[last_index]
+    last_pointer^ += 1
+    middle := sequence[1:-1]
+    tail := sequence[-2:]
+    assert(sequence[3] == 43 && len(middle) == 2 && tail[0] == 30)
+    growing[-1] = 9
+    assert(growing[-1] == 9 && "hello"[-1] == 'o' && "hello"[-3:] == "llo")
+    signed_keys: map[int]int
+    signed_keys[-1] = 5
+    assert(signed_keys[-1] == 5) // key -1 retains native map meaning
+    delete(signed_keys)
+
+    println("T17: generated work stays inside lazy branches and loop iterations")
+    calls, order = 0, 0
+    lazy := false && (switch {case mark(1) == 1: true; case: false})
+    assert(!lazy && calls == 0)
+    loop_index := 0
+    for (switch loop_index {case 0, 1: true; case: false}) {
+        loop_index += 1
+    }
+    assert(loop_index == 2)
+    combined_syntax := f"last: {switch sequence[-1] {case 43: "ok"; case: "bad"}}"
+    assert(combined_syntax == "last: ok")
+    delete(combined_syntax)
+
+    println("All T01-T17 demos passed.")
 }

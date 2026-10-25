@@ -1,4 +1,4 @@
-"""Lower T01-T12 using ASTs from the adapted Odin tooling parser.
+"""Lower T01-T17 using ASTs from the adapted Odin tooling parser.
 
 Offsets are UTF-8 byte offsets, as in Odin. Unchanged source is copied verbatim;
 all transformations are attached to parsed nodes, never textual pattern matches.
@@ -105,6 +105,12 @@ class Source:
         except ValueError as exc:
             raise ThorError(f"invalid frontend output for {path}") from exc
         self.nodes = [Node(self, i, d) for i, d in enumerate(self.info["nodes"])]
+        for feature in self.info.get("features") or []:
+            node = next((n for n in self.nodes if n.start == feature["start"] and n.end == feature["end"] and n.kind in {"Call", "Switch"}), None)
+            if node:
+                node.data.update(feature)
+                if feature["kind"] in {"SwitchExpr", "CompileSwitchExpr", "CompileSwitch"}:
+                    node.data.setdefault("roles", {})["selector"] = feature["selector"]
         self.excluded = self.info.get("excluded", False)
         self.diagnostics = self.info.get("diagnostics") or []
         immutable_starts = {span[0] for span in self.info.get("immutables") or []}
@@ -139,6 +145,8 @@ class Source:
         self.converted_do_blocks = set()
         self.guard_messages = {}
         self.resolver = None
+        from .expressions import Expressions
+        self.expressions = Expressions(self)
         self.selected = {}
         self.selected_origins = {}
         self.conditional_conflicts = set()
@@ -170,6 +178,13 @@ class Source:
                             self.conditional_conflicts.add(n)
                         else:
                             self.error(f"declaration conflicts with selective import: {name.text}", name.start, name.end)
+        # Discover support packages before emission so their dependencies and
+        # source maps participate in the same project graph.
+        for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
+                              ('sets',self.thor and any(n.kind in {'SetType','Binary','Call'} for n in self.nodes)),
+                              ('sequence',self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes))]:
+            if needed:
+                self.imports[self.prefix+module]='thor:'+module
 
     def error(self, message, start, end):
         raise ThorError(message, diagnostics=[{"type": "error", "stage": "thor", "pos": {
@@ -200,8 +215,10 @@ class Source:
 
     @staticmethod
     def is_scope(n):
-        if n.kind == "Block" and n.parent and n.parent.kind == "When":
+        if n.kind == "Block" and n.parent and n.parent.kind in {"When","CompileSwitch"}:
             return False  # Odin when branches do not introduce a scope.
+        if n.kind == 'Case' and n.parent and n.parent.parent and n.parent.parent.kind=='CompileSwitch':
+            return False
         return n.kind in {"Block", "Procedure", "File", "StructType", "For", "If", "Range", "Switch", "TypeSwitch", "Case"}
 
     def scope(self, n):
@@ -343,6 +360,9 @@ class Source:
         if expression is None or expression in seen:
             return None
         seen.add(expression)
+        if expression.kind=='Unary' and expression.data['op'] in {'+','-'}:
+            value=self.constant_int(expression.role('expr'),seen)
+            return (-value if expression.data['op']=='-' else value) if value is not None else None
         if expression.kind == "Literal":
             try:
                 text = expression.text.replace("_", "")
@@ -510,6 +530,9 @@ class Source:
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
         kind = n.kind
+        extra = self.expressions.render(n, expected, constant)
+        if extra is not None:
+            return extra
         if kind == "Ident" and n.text in self.selected:
             parent = n.parent
             binding = parent and (
@@ -707,6 +730,18 @@ class Source:
             result += self.resolver.declaration_support(n)
         if n in self.conditional_conflicts:
             result = '#panic("declaration conflicts with selective import")\n' + result
+        if kind=='Case':
+            declarations=self.expressions.declarations(n)
+            if declarations:
+                result=self.splice(n,replacements,[(n.data['roles']['colon'][1],declarations)])
+        if kind == "Block":
+            declarations = self.expressions.declarations(n)
+            if declarations:
+                if real_block:
+                    result = self.splice(n, replacements, [*inserts, (n.start+1,declarations)])
+                else:
+                    result = "{" + declarations + result + "}"
+                    self.expressions.convert_do(n)
         return result
 
     def render_array(self, n, expected=None, needle=None, constant=False):
@@ -765,6 +800,7 @@ class Source:
             code, self.source_map = self.mapping.finish(self.copy(0, len(self.raw)))
             return code
         code = self.render(self.root)
+        code += self.expressions.declarations(self.root)
         arrays = [n for n in self.nodes if self.is_array(n)]
         array_span = (arrays[0].start, arrays[0].end) if arrays else (0, 0)
         if self.needs_intrinsics:
@@ -780,15 +816,16 @@ class Source:
             code += self.mapping.wrap(f'\n@(private="file")\n{self.prefix}default_value :: proc "contextless" (value: $T) -> T {{ return value }}\n', self.path, *array_span, "support")
         if self.needs_membership:
             operation = next(n for n in self.nodes if n.kind == "Binary" and n.data["op"] in {"in", "not_in"})
-            code += self.mapping.wrap("\n" + membership_helpers(self.prefix), self.path, operation.start, operation.end, "membership-helper")
+            code += self.mapping.wrap("\n" + membership_helpers(self.prefix,self.expressions.module('sets')), self.path, operation.start, operation.end, "membership-helper")
         for namespace, alias in self.hidden_namespaces.items():
             code += self.mapping.wrap(f'\nimport {alias} {json.dumps(self.imports[namespace])}\n',
                                       self.path, 0, 0, "support")
+        code += self.expressions.imports()
         code, self.source_map = self.mapping.finish(code)
         return code
 
 
-def membership_helpers(prefix):
+def membership_helpers(prefix,sets):
     signatures = {
         "array": "$C/[$N]$E",
         "slice": "$C/[]$E",
@@ -809,5 +846,6 @@ def membership_helpers(prefix):
     return value in values
 }}
 ''')
-    parts.append(f'@(private="file")\n{prefix}contains :: proc{{' + ", ".join(prefix+n for n in [*signatures, "map", "bits"]) + "}\n")
+    parts.append(f'@(private="file")\n{prefix}set :: proc "contextless" (values: {sets}.Set($E), value: E) -> bool {{ return value in values.table }}\n')
+    parts.append(f'@(private="file")\n{prefix}contains :: proc{{' + ", ".join(prefix+n for n in [*signatures, "map", "bits", "set"]) + "}\n")
     return "\n".join(parts)

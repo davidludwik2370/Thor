@@ -299,7 +299,7 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_nodes(n.list, builder)
 		visit_nodes(n.body, builder)
 	case ^ast.Call_Expr:
-		visit_node(n.expr, builder)
+		if name,ok:=n.expr.derived.(^ast.Ident);!ok||name.pos.offset!=name.end.offset{visit_node(n.expr, builder)}
 		visit_nodes(n.args, builder)
 	case ^ast.Implicit_Selector_Expr:
 		write_semantic_node(builder, n.field, .EnumMember)
@@ -543,6 +543,7 @@ visit_ident :: proc(
 	modifiers: SemanticTokenModifiers,
 	builder: ^SemanticTokenBuilder,
 ) {
+	if ident.end.offset<=ident.pos.offset{return}
 	symbol_and_node, in_symbols := builder.symbols[cast(uintptr)symbol_ptr]
 	if !in_symbols {
 		return

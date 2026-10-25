@@ -980,6 +980,12 @@ write_symbol_type_information :: proc(sb: ^strings.Builder, ast_context: ^AstCon
 
 	append_type_pkg := false
 	pkg_name := get_pkg_name(ast_context, symbol.type_pkg)
+	if symbol.type_name=="Set"&&strings.has_prefix(pkg_name,"__thor_tls_sets"){
+		if value,ok:=symbol.value.(SymbolStructValue);ok&&len(value.poly_names)==1{
+			fmt.sbprintf(sb,"%sset[%s]",pointer_prefix,value.poly_names[0])
+			return true
+		}
+	}
 	if pkg_name != "" && pkg_name != "$builtin" {
 		if _, ok := keywords_docs[symbol.type_name]; !ok {
 			append_type_pkg = true

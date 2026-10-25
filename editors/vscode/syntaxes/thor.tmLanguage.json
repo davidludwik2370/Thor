@@ -1,5 +1,5 @@
 {
-  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T12 additions. See THIRD_PARTY_NOTICES.md.",
+  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T17 additions. See THIRD_PARTY_NOTICES.md.",
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Thor",
   "patterns": [
@@ -138,6 +138,12 @@
       "patterns": [
         {
           "include": "#comments"
+        },
+        {
+          "include": "#interpolated-strings"
+        },
+        {
+          "include": "#set-literal"
         },
         {
           "include": "#ternary"
@@ -363,6 +369,9 @@
       "end": "(?=^|,|;|\\)|=|:|for|switch|if|{)",
       "patterns": [
         {
+          "include": "#set-type"
+        },
+        {
           "include": "#type-declaration"
         }
       ]
@@ -422,6 +431,9 @@
     "type-declaration": {
       "name": "meta.type.declaration.thor",
       "patterns": [
+        {
+          "include": "#set-type"
+        },
         {
           "include": "#type-parameter"
         },
@@ -515,6 +527,9 @@
       },
       "patterns": [
         {
+          "include": "#set-type"
+        },
+        {
           "include": "#assignments"
         },
         {
@@ -532,6 +547,9 @@
       },
       "end": "(?=^|\\)|,|;|{|where)",
       "patterns": [
+        {
+          "include": "#set-type"
+        },
         {
           "include": "#comments"
         },
@@ -894,7 +912,11 @@
       "patterns": [
         {
           "name": "keyword.control.conditional.thor",
-          "match": "#(?:if|else)\\b"
+          "match": "#(?:if|else|switch)\\b"
+        },
+        {
+          "name": "keyword.operator.assignment.compound.bitwise.thor",
+          "match": "\\^="
         },
         {
           "name": "keyword.control.thor",
@@ -1072,6 +1094,9 @@
     "strings": {
       "patterns": [
         {
+          "include": "#interpolated-strings"
+        },
+        {
           "name": "string.quoted.double.thor",
           "begin": "\"",
           "beginCaptures": {
@@ -1200,6 +1225,181 @@
       "patterns": [
         {
           "include": "#type-declaration"
+        }
+      ]
+    },
+    "interpolated-strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.interpolated.thor",
+          "begin": "(f)(\")",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.modifier.interpolation.thor"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.thor"
+            }
+          },
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.brace.thor",
+              "match": "\\{\\{|\\}\\}"
+            },
+            {
+              "include": "#string-escaped-char"
+            },
+            {
+              "name": "meta.embedded.line.thor",
+              "begin": "\\{(?!\\{)",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.begin.thor"
+                }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.end.thor"
+                }
+              },
+              "patterns": [
+                {
+                  "include": "#comments"
+                },
+                {
+                  "begin": "\\(",
+                  "end": "\\)",
+                  "patterns": [
+                    {
+                      "include": "#expressions"
+                    }
+                  ]
+                },
+                {
+                  "begin": "\\{",
+                  "end": "\\}",
+                  "patterns": [
+                    {
+                      "include": "#expressions"
+                    }
+                  ]
+                },
+                {
+                  "name": "meta.interpolation.format.thor",
+                  "begin": ":(?:.[<>^])?",
+                  "end": "(?=\\})",
+                  "patterns": []
+                },
+                {
+                  "include": "#expressions"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.interpolated.thor",
+          "begin": "(f)(`)",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.modifier.interpolation.thor"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.thor"
+            }
+          },
+          "end": "`",
+          "patterns": [
+            {
+              "name": "constant.character.escape.brace.thor",
+              "match": "\\{\\{|\\}\\}"
+            },
+            {
+              "name": "meta.embedded.line.thor",
+              "begin": "\\{(?!\\{)",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.begin.thor"
+                }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.end.thor"
+                }
+              },
+              "patterns": [
+                {
+                  "include": "#comments"
+                },
+                {
+                  "begin": "\\(",
+                  "end": "\\)",
+                  "patterns": [
+                    {
+                      "include": "#expressions"
+                    }
+                  ]
+                },
+                {
+                  "begin": "\\{",
+                  "end": "\\}",
+                  "patterns": [
+                    {
+                      "include": "#expressions"
+                    }
+                  ]
+                },
+                {
+                  "name": "meta.interpolation.format.thor",
+                  "begin": ":(?:.[<>^])?",
+                  "end": "(?=\\})",
+                  "patterns": []
+                },
+                {
+                  "include": "#expressions"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "set-type": {
+      "name": "meta.type.set.thor",
+      "begin": "\\b(set)(\\[)",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.set.thor"
+        },
+        "2": {
+          "name": "meta.brace.square.thor"
+        }
+      },
+      "end": "\\]",
+      "patterns": [
+        {
+          "include": "#expressions"
+        }
+      ]
+    },
+    "set-literal": {
+      "name": "meta.type.set.thor",
+      "begin": "\\b(set)(\\[)(?=[^\\n;]*\\]\\s*\\{)",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.set.thor"
+        },
+        "2": {
+          "name": "meta.brace.square.thor"
+        }
+      },
+      "end": "\\]",
+      "patterns": [
+        {
+          "include": "#expressions"
         }
       ]
     }

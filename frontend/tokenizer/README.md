@@ -7,6 +7,11 @@ compatibility; scanning, keyword lookup and token helpers are owned here.
 Contextual syntax such as `:>` is recognized by the shared parser rather than
 reserving ordinary identifiers like `fn` or `set`.
 
+With `Tokenizer.thor` enabled, f-strings are single string tokens whose fields
+are recursively scanned using this same lexer. Nested quotes, expressions and
+interpolations retain original positions. Thor also recognizes `^=`. With Thor
+disabled the scanner preserves ordinary Odin tokenization.
+
 `tokenizer_test.odin` compares token text/kinds and byte/line/column positions
 against native Odin for comments, CRLF, Unicode, strings, generics and Thor's
 token combinations. Run `odin test frontend/tokenizer`.

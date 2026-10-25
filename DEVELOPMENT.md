@@ -43,14 +43,22 @@ TLS Git history, including checkpoint `cb009c7`, is preserved at
 `git --git-dir=.git/tls-upstream --work-tree=tls log`. It is local history, not a
 dependency required to build a fresh checkout.
 
-The T07–T12 batch adds grouping/padding helpers (T07), the Set runtime library
-(T08), frontend/project/resolution infrastructure (T09–T11), and immutable storage
-(T12). Interpolated strings, switch expressions, Set language syntax, and negative
-indices remain their separately numbered T13–T16 tasks.
+T01–T17 now have implementations, editor integration and evaluation sections in
+`demo/main.thor`. The 0.4.0 checkpoint covers interpolation (T13), runtime and
+compile-time switches (T14), Set syntax (T15), negative sequence accesses (T16),
+and expression-local lowering (T17). It passes 256 Python compiler/LSP tests,
+1,097 native TLS tests, 49 grammar tests, allocation-tracked runtime/lexer tests,
+and the isolated VS Code integration test. The demo passes all three define modes.
 
-T01–T12 now have implementations, editor integration and evaluation sections in
-`demo/main.thor`. The T07–T12 checkpoint passes 190 Python compiler/LSP tests,
-1,092 native TLS tests, 37 grammar tests, allocation-tracked runtime/lexer tests,
-and the isolated VS Code integration test. The compiler's resolution boundary
-and conservative generic `using` pointer case are documented in `README.md`;
-keep those limits visible while extending the resolver in later batches.
+`thorlang/expressions.py` emits named procedures with explicit lexical inputs;
+their calls remain in the original expression. Helpers instantiate lazily, so
+inactive native when/#switch expressions leave unused bodies unchecked. Writable
+array accesses retain storage; generic assignment branches preserve native map
+headers. Loop posts remain simple assignments. Native type witnesses resolve
+result/element types without executing expressions. TLS shares the parser's
+feature metadata and adapts only its editor AST, keeping original source spans.
+
+Later tasks T18–T23 cover purity, compile-time serialization/execution, caching,
+scratch allocation and automatic folding. The compiler's resolution boundary and
+conservative generic `using` pointer case are documented in `README.md`; keep
+those limits visible while extending the resolver in later batches.

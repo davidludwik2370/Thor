@@ -29,6 +29,7 @@ Output :: struct {
     diagnostics: []Parse_Error,
     immutables: [dynamic][2]int,
     do_tokens: [dynamic]Span,
+    features: []parser.Feature,
 }
 Parse_Error :: struct {
     pos: tokenizer.Pos,
@@ -176,7 +177,9 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
             if assignment, ok := n.tag.derived.(^ast.Assign_Stmt); ok { info.lists["names"] = spans(assignment.lhs) }
         }
     case ^ast.Expr_Stmt: info.kind = "ExpressionStatement"; info.roles["expr"] = span(n.expr)
-    case ^ast.Case_Clause: info.kind = "Case"
+    case ^ast.Case_Clause:
+        info.kind = "Case"
+        info.roles["colon"] = {n.terminator.pos.offset,n.terminator.pos.offset+1}
     case ^ast.Enum_Type: info.kind = "EnumType"
     case ^ast.Pointer_Type: info.kind = "PointerType"; info.roles["elem"] = span(n.elem)
     case ^ast.Multi_Pointer_Type: info.kind = "MultiPointerType"; info.roles["elem"] = span(n.elem)
@@ -256,9 +259,10 @@ main :: proc() {
         os.exit(1)
     }
     file.end.offset = len(data)
-    out := Output{edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables}
+    out := Output{edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
     lexer: tokenizer.Tokenizer
     tokenizer.init(&lexer, file.src, file.fullpath, collect_error)
+    lexer.thor = thor
     for {
         token := tokenizer.scan(&lexer)
         if token.kind == .EOF { break }

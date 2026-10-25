@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import hashlib
+from pathlib import Path
 
 
 @dataclass(eq=False)
@@ -113,7 +114,7 @@ class Resolver:
             for symbols in table.values():
                 for symbol in symbols:
                     symbol.candidates = symbols
-                if any(s.immutable for s in symbols) and any(any(a.kind == "When" for a in s.declaration.ancestors()) for s in symbols):
+                if any(s.immutable for s in symbols) and any(any(a.kind in {"When", "CompileSwitch"} for a in s.declaration.ancestors()) for s in symbols):
                     marker = symbols[0].node.source.prefix + "immutable_" + hashlib.sha256(
                         (symbols[0].name + str(symbols[0].scope.start)).encode()).hexdigest()[:12]
                     for symbol in symbols:
@@ -203,6 +204,8 @@ class Resolver:
             return Type(node=n)
         seen.add(key)
         kind = n.kind
+        if kind == 'SetType':
+            return Type('set',node=n,elem=self.type_node(n.group('args')[0],substitutions,seen))
         if kind == "Paren":
             return self.type_node(n.role("expr"), substitutions, seen)
         if kind == "PolyType":
@@ -259,6 +262,9 @@ class Resolver:
                 mapping = dict(substitutions)
                 for (name, _), arg in zip(parameters, n.group("args")):
                     mapping[name.lstrip("$")] = self.type_node(arg)
+                if (record.source.path == Path(__file__).resolve().parents[1]/'runtime'/'sets'/'sets.odin'
+                        and any(name.text=='Set' for name in declaration.group('names'))):
+                    return Type('set',node=n,elem=mapping.get('T',Type()))
                 return Type("struct", node=record, substitutions=mapping)
         return Type(node=n)
 
@@ -270,6 +276,15 @@ class Resolver:
             return Type(node=n)
         seen.add(n)
         kind = n.kind
+        if kind == 'Interpolation':
+            return Type('string','string',n,witness=n)
+        if kind=='CompileSwitchExpr':
+            # Only the selected arm determines the type. Let a native witness
+            # select it rather than borrowing an inactive arm's shape.
+            return Type(node=n,witness=n)
+        if kind=='SwitchExpr':
+            cases=n.data['cases']
+            return self.type_of(n.source.at(cases[0]['result'],n),seen) if cases else Type(node=n)
         if kind in {"Paren", "FieldValue"}:
             return self.type_of(n.role("expr") if kind == "Paren" else n.role("value"), seen)
         if kind == "Literal":
@@ -283,7 +298,7 @@ class Resolver:
                 owner, member = symbol.projection
                 result = self.field(self.type_of(owner, seen), member)
                 return result[0] if result else Type(node=n)
-            if len(symbol.candidates) > 1 and any(any(a.kind == "When" for a in s.declaration.ancestors()) for s in symbol.candidates):
+            if len(symbol.candidates) > 1 and any(any(a.kind in {"When", "CompileSwitch"} for a in s.declaration.ancestors()) for s in symbol.candidates):
                 return Type(node=n, witness=n)
             if symbol.annotation:
                 return replace(self.type_node(symbol.annotation), witness=n)
@@ -311,6 +326,11 @@ class Resolver:
                 return Type("array", node=n, elem=self.type_of(elements[0], seen) if elements else Type(), length=len(elements), witness=n)
         if kind == "Call":
             callee = n.role("callee")
+            if callee.kind=='Ident' and self.symbol(callee) is None and n.group('args'):
+                if callee.text=='make': return self.type_node(n.group('args')[0])
+                if callee.text=='new': return Type('pointer',node=n,elem=self.type_node(n.group('args')[0]))
+            if callee.kind=='Deref' and self.type_of(callee.role('expr'),seen).kind=='set':
+                return self.type_of(callee.role('expr'))
             # A named type conversion is checked by Odin; its shape is known.
             target = self.type_node(callee)
             if target.kind not in {"unknown", "procedure", "generic"}:
@@ -614,7 +634,7 @@ class Resolver:
             # contextual literals depend on source order rather than #config.
             for alternative in plan.symbol.candidates:
                 if alternative.declaration is plan.symbol.declaration or not any(
-                    a.kind == "When" for a in alternative.declaration.ancestors()
+                    a.kind in {"When", "CompileSwitch"} for a in alternative.declaration.ancestors()
                 ):
                     continue
                 value = alternative.value
@@ -678,6 +698,8 @@ class Resolver:
                     targets = [(n.role("expr"), n.role("expr"), "iterate by mutable reference over")]
                 elif n.kind == "Call" and n.role("callee").text in {"raw_data", "soa_unzip"} and n.group("args"):
                     targets = [(n, n.group("args")[0], "obtain a mutable data pointer to")]
+                elif n.kind=='Call' and n.role('callee').text=='clear' and self.symbol(n.role('callee')) is None and n.group('args') and self.type_of(n.group('args')[0]).kind in {'set','unknown','generic'}:
+                    targets=[(n,n.group('args')[0],'write')]
                 elif n.kind == "Call" and n.role("callee").kind == "Selector" and n.role("callee").data.get("op") == "->":
                     callee = n.role("callee")
                     receiver = callee.role("expr")
@@ -695,6 +717,8 @@ class Resolver:
                     protected = self.protection(target)
                     if not protected:
                         continue
+                    if n.kind=='Call' and n.role('callee').text=='clear' and self.type_of(target).kind in {'unknown','generic'}:
+                        protected.predicates.append(source.expressions.set_trait(source.render(target)))
                     if action == "take an implicit mutable address of" and self.type_of(target).kind in {"unknown", "generic"}:
                         code = source.render(target)
                         field = n.role("callee").role("field").text

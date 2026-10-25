@@ -15,6 +15,7 @@ Flag :: enum {
 Flags :: distinct bit_set[Flag; u32]
 
 Tokenizer :: struct {
+	thor: bool,
 	// Immutable data
 	path: string,
 	src:  string,
@@ -668,6 +669,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	pos := offset_to_pos(t, offset)
 
 	switch ch := t.ch; true {
+	case t.thor && ch == 'f' && (peek_rune(t, 0) == '"' || peek_rune(t, 0) == '`'):
+		kind = .String
+		lit, _ = scan_interpolated(t)
 	case is_letter(ch):
 		lit = scan_identifier(t)
 		kind = .Ident
@@ -749,7 +753,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '@': kind = .At
 		case '$': kind = .Dollar
 		case '?': kind = .Question
-		case '^': kind = .Pointer
+		case '^':
+			kind = .Pointer
+			if t.thor && t.ch == '=' { advance_rune(t); kind = .Xor_Eq }
 		case ';': kind = .Semicolon
 		case ',': kind = .Comma
 		case ':': kind = .Colon

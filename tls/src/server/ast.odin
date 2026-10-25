@@ -114,8 +114,9 @@ parse_file :: proc (p: ^parser.Parser, file: ^ast.File, allocator := context.all
 	clear(&p.selections)
 	clear(&p.edits)
 	clear(&p.immutables)
+	clear(&p.features)
 	ok := parser.parse_file(p, file)
-	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file) }
+	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file); thor_adapt_switches(p,file); thor_adapt_expressions(p,file) }
 	return ok
 }
 
@@ -1318,15 +1319,21 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 		build_string(n.expr, builder, remove_pointers)
 		strings.write_string(builder, ")")
 	case ^ast.Call_Expr:
-		build_string(n.expr, builder, remove_pointers)
-		strings.write_string(builder, "(")
+		thor_set:=false
+		if selector,ok:=n.expr.derived.(^ast.Selector_Expr);ok&&selector.field.name=="Set"{
+			if alias,ok:=selector.expr.derived.(^ast.Ident);ok&&alias.pos.offset==alias.end.offset&&strings.has_prefix(alias.name,"__thor_tls_sets"){thor_set=true}
+		}
+		if thor_set{strings.write_string(builder,"set[")}else{
+			build_string(n.expr, builder, remove_pointers)
+			strings.write_string(builder, "(")
+		}
 		for arg, i in n.args {
 			build_string(arg, builder, remove_pointers)
 			if len(n.args) - 1 != i {
 				strings.write_string(builder, ", ")
 			}
 		}
-		strings.write_string(builder, ")")
+		strings.write_string(builder, "]" if thor_set else ")")
 	case ^ast.Selector_Expr:
 		build_string(n.expr, builder, remove_pointers)
 		strings.write_string(builder, ".")

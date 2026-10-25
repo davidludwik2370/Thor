@@ -193,6 +193,69 @@ class TLSTests(unittest.TestCase):
         self.assertIn('[2]f64', client.request('textDocument/hover', params)['contents']['value'])
         self.assertEqual(main.read_text(), text)
 
+    def test_expression_string_switch_and_set_hovers(self):
+        text='''package main
+main::proc(){
+ name:="world"
+ message:=f"hello {name}"
+ choice:=switch 1 {case 1:2;case:3}
+ floating:=switch 1 {case 1:2;case:f64(3)}
+ names:=set[int]{1,2}
+ _=message;_=choice;_=names;_=floating
+ delete(message);delete(names)
+}
+'''
+        client,main=self.open(text)
+        for word,expected in [('message','string'),('choice','int'),('floating','f64'),('names','set[int]')]:
+            with self.subTest(word=word):
+                hover=self.hover(client,main,text,word)
+                self.assertIsNotNone(hover)
+                self.assertIn(expected,hover['contents']['value'])
+        hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'{name}',2)})
+        self.assertIn('string',hover['contents']['value'])
+        definition=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'{name}',2)})
+        self.assertTrue(definition)
+        target=definition[0] if isinstance(definition,list) else definition
+        self.assertEqual(target['range']['start'],self.position(text,'name:=',0))
+        for word,expected in [('message','string'),('choice','int'),('names','set[int]')]:
+            hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'_='+word,3)})
+            self.assertIn(expected,hover['contents']['value'])
+            self.assertNotIn('__thor_',hover['contents']['value'])
+
+    def test_compile_switch_globals_and_selected_expression_type(self):
+        text='''package main
+#switch 2 {case 1:GLOBAL::"wrong";case 2:GLOBAL::7;case:GLOBAL::false}
+SELECTED::#switch 2 {case 1:"wrong";case 2:7;case:false}
+main::proc(){_=GLOBAL;_=SELECTED}
+'''
+        client,main=self.open(text)
+        for word in ['_=GLOBAL','_=SELECTED']:
+            result=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,word,4)})
+            self.assertIsNotNone(result)
+            self.assertIn(':: 7',result['contents']['value'])
+
+    def test_interpolation_compiler_error_range_and_unsaved_fix(self):
+        text='package main\nmain::proc(){text:=f"😀 {missing_value}";delete(text)}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),code='thor',contains='missing_value')
+        error=next(d for d in errors if 'missing_value' in d['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'missing_value',0))
+        self.assertNotIn('__thor_',error['message'])
+        changed=text.replace('missing_value','7')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_new_syntax_semantic_tokens_have_original_ranges(self):
+        text='package main\nmain::proc(){x:>7;s:=f"value {x}";names:=set[int]{x};_=switch x{case 7:1;case:2};delete(s);delete(names)}\n'
+        client,main=self.open(text)
+        result=client.request('textDocument/semanticTokens/full',{'textDocument':{'uri':main.as_uri()}})
+        line=column=0
+        for a,b,length,kind,modifiers in zip(*[iter(result['data'])]*5):
+            line+=a;column=b if a else column+b
+            self.assertLess(line,len(text.splitlines()))
+            self.assertLessEqual(column+length,len(text.splitlines()[line].encode('utf-16-le'))//2)
+
     def test_selected_import_hover_and_definition_in_closed_thor_package(self):
         text = 'package main\nimport "library" / selected\nmain :: proc() { _ = selected(2) }\n'
         client, main = self.open(text, {'library/main.thor': 'package library\nselected :: proc(value:int)->int {return value}\n'})

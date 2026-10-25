@@ -15,6 +15,48 @@ thor_source :: proc(source: string) -> test.Source {
 }
 
 @(test)
+thor_hover_interpolated_string :: proc(t:^testing.T){
+    source:=thor_source(`package test
+main::proc(){name:="world";message:=f"hello {name}";mess{*}age}
+`)
+    test.expect_hover_contains(t,&source,"message: string")
+}
+
+@(test)
+thor_hover_runtime_switch_expression :: proc(t:^testing.T){
+    source:=thor_source(`package test
+main::proc(){choice:=switch 1{case 1:2;case:3};cho{*}ice}
+`)
+    test.expect_hover_contains(t,&source,"choice: int")
+}
+
+@(test)
+thor_hover_compile_switch_selected_expression :: proc(t:^testing.T){
+    source:=thor_source(`package test
+VALUE::#switch 2{case 1:"wrong";case 2:7;case:false}
+main::proc(){VAL{*}UE}
+`)
+    test.expect_hover_contains(t,&source,":: 7")
+}
+
+@(test)
+thor_hover_compile_switch_declaration :: proc(t:^testing.T){
+    source:=thor_source(`package test
+#switch 2{case 1:VALUE::"wrong";case 2:VALUE::7;case:VALUE::false}
+main::proc(){VAL{*}UE}
+`)
+    test.expect_hover_contains(t,&source,":: 7")
+}
+
+@(test)
+thor_hover_negative_array_index :: proc(t:^testing.T){
+    source:=thor_source(`package test
+main::proc(){data:=[1,2];last:=data[-1];la{*}st}
+`)
+    test.expect_hover_contains(t,&source,"last: int")
+}
+
+@(test)
 thor_parser_main_demo :: proc(t: ^testing.T) {
     context.allocator = context.temp_allocator
     data, err := os.read_entire_file("../demo/main.thor", context.temp_allocator)

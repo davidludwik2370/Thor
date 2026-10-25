@@ -189,6 +189,10 @@ get_generic_assignment :: proc(
 	case ^ast.Or_Branch_Expr:
 		get_generic_assignment(file, v.expr, ast_context, results, calls, flags, is_mutable)
 	case ^ast.Call_Expr:
+		if name,ok:=v.expr.derived.(^ast.Ident);ok&&name.pos.offset==name.end.offset{
+			append(results,value)
+			return
+		}
 
 		old_call := ast_context.call
 		ast_context.call = cast(^ast.Call_Expr)value

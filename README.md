@@ -1,7 +1,7 @@
 # Thor
 
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
-milestone implements **T01–T12** from the reference specification in
+milestone implements **T01–T17** from the reference specification in
 [thor.odin](thor.odin). It includes the parser and project support needed to make
 those features usable together.
 
@@ -16,7 +16,7 @@ caches the small Odin frontend automatically; no Python packages are required.
 
 [demo/main.thor](demo/main.thor) has a labeled section for every completed task,
 with assertions, ordinary Odin code, imported packages, and evaluation-order
-examples. It finishes with `All T01-T12 demos passed.`
+examples. It finishes with `All T01-T17 demos passed.`
 
 Select another compile-time branch with an ordinary Odin define:
 
@@ -40,7 +40,7 @@ Select another compile-time branch with an ordinary Odin define:
 ## VS Code and TLS
 
 The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
-support the current T01-T12 syntax. Build the server and extension from this repository:
+support the current T01-T17 syntax. Build the server and extension from this repository:
 
 ```sh
 python3 tools/build_tls.py
@@ -154,6 +154,11 @@ Debugger mappings and runtime stack traces are outside this implementation.
 | T10 | Mixed-source/import graphs, target/tag selection, collections, resource/foreign paths, managed output and CLI flag forwarding. |
 | T11 | Lexical symbols and shapes; contextual arrays through procedure aliases, overloads, generic specializations and private types. |
 | T12 | `x :> expr` and `x: Type > expr`: runtime initialization once, shallow immutable storage, scoped mutation/address checks. |
+| T13 | `f"hello {name}"` and raw f-strings; nested expressions, brace escaping, integer grouping, Unicode padding and owned output. |
+| T14 | Runtime switch expressions and compile-time `#switch` statements/expressions, with optional selectors, lazy matching and contextual results. |
+| T15 | `set[T]`, literals, mathematical/in-place operators, logical equality, membership, len, iteration, clear and delete. |
+| T16 | Negative signed sequence indices and slice bounds, including writable/addressable access; native map, enum-array and pointer behavior retained. |
+| T17 | Expression-local helpers preserve lazy branches, operand order, nested arguments, loop reevaluation and assignment storage. |
 
 ```odin
 import "core:math" / sin,
@@ -239,6 +244,72 @@ inactive branches remain unchecked and reference views are distinguished from
 directly stored arrays. TLS marks immutable symbols readonly and explains them
 in hover; live compiler checks enforce mutations on unsaved text.
 
+## Interpolation, switches, Sets and negative indices
+
+```odin
+main :: proc() {
+    names := set[string]{"apple", "pear", "apple"}
+    names += "plum"
+    assert(len(names) == 3 && "pear" in names)
+    for name in names { assert(name in names) }
+
+    data := [10, 20, 30]
+    data[-1] += 1
+    tail := data[-2:]
+    label := switch data[-1] {
+        case 30: "before"
+        case 31: "after"
+        case: "other"
+    }
+    value := switch { case len(tail) == 2: 1234567; case: 0 }
+    text := f"{{label}} {label}: {value:0>12,}"
+    assert(text == "{label} after: 0001,234,567")
+    delete(text)
+    delete(names)
+}
+```
+
+Interpolation accepts quoted or raw backtick literals. `{{` and `}}` escape
+literal braces. Fields contain real Thor expressions, including nested literals,
+switches and interpolations. Parenthesize a ternary before a format separator.
+The format grammar is `[[fill]align][width][,]`: align with `<`, `>` or `^`,
+use a literal decimal width, and add `,` for integer grouping. Width counts
+Unicode runes. Fields execute once, left to right. The final string is owned by
+the caller; internal formatting buffers and unambiguously owned nested
+interpolations (including parenthesized/conditional forms) are freed. Ordinary
+field values and mixed owned/borrowed conditionals keep their existing ownership:
+a procedure that
+returns allocated storage still needs an explicit lifetime chosen by the caller.
+
+Expression switches currently require a default arm and exactly one expression
+per arm. They support comma-separated cases and native ranges, check duplicate
+constant cases, evaluate the selector once, and execute only the first matching
+arm. Expected destination/argument/return types supply result context.
+`#switch` has the same selector forms in statement and expression positions;
+it uses native `when` semantics for constant selection, declaration visibility,
+control flow, and unchecked inactive arms. Later conditions, including those in
+a comma-separated case, stay unchecked after a match. Pure calls and `#run`
+remain T18–T23 work.
+
+Sets use `|`, `&`, `-`, `^`, `==` and `!=`, with `|=`, `&=`, `-=`, `^=`
+for in-place updates; `+=` inserts one element, while `-=` accepts an element
+or another Set. Binary mathematical results own independent tables. Assignment
+copies a shallow header, and no automatic operand/result cleanup is inferred.
+Name intermediate results and delete each owned table once. `clear(s)` keeps
+the table allocation; `delete(s)` releases it. Keys retain their ordinary shallow
+ownership. Native operations on other types keep their Odin meaning.
+
+Negative signed bounds normalize to `len(sequence) + bound`; unsigned bounds
+keep their type. Strings index UTF-8 bytes. Bounds are checked after normalization
+without clamping; excessively wide signed bounds are checked before machine-index
+conversion. The base and supplied bounds execute once in source order. Map keys,
+enumerated arrays, pointers and multi-pointers retain their native interpretation.
+
+The emitter uses named procedures with explicit lexical inputs, rather than
+closures (which Odin does not provide). Calls stay at the original expression
+site; declarations do no work. The same source maps cover helper bodies and their
+instantiations, so errors point back to fields, arms, elements and accesses.
+
 ## Tests and rejection examples
 
 ```sh
@@ -273,6 +344,8 @@ directory includes `main.thor` and the expected diagnostic fragment:
 - [thorlang/semantics.py](thorlang/semantics.py) tracks lexical bindings, required
   type shapes, call targets and storage protection. Native type witnesses resolve
   exact contextual types in the declaration's scope, including private types.
+- [thorlang/expressions.py](thorlang/expressions.py) lowers interpolation,
+  switches, Set operations and negative accesses using expression-local helpers.
 - [thorlang/sourcemap.py](thorlang/sourcemap.py) records composable emission
   mappings; [thorlang/diagnostics.py](thorlang/diagnostics.py) translates backend
   locations, ranges, and messages to original source.
@@ -295,8 +368,7 @@ protect an implicitly promoted `using` field. Write the existing pointer member
 explicitly (`value.pointer.field`) to retain shallow mutation in that case;
 concrete and shape-constrained records resolve pointer promotion directly.
 
-Later tasks cover f-strings (T13), `#switch`/switch expressions (T14), Set language
-syntax (T15), negative indices (T16), and `fn`/`#run` and compile-time execution.
+Later tasks T18–T23 cover purity, `fn`/`#run`, compile-time execution and caching.
 `fn` and `set` remain valid ordinary Odin identifiers. The root `thor.odin` is the
 reference specification; `demo/main.thor` is the evaluation program. Follow
 [DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.

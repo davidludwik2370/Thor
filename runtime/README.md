@@ -19,8 +19,9 @@ fill must be a Unicode scalar and width nonnegative. Formatting returns a fresh
 caller-owned string: `delete(result, allocator)`, using the selected allocator
 (default `context.allocator`). Intermediate formatting storage is released.
 
-Interpolation syntax and format-spec parsing are T13. These helpers do not yet
-make claims about pure-function execution or compile-time allocation.
+T13 interpolation uses these helpers and frees its own formatting buffers.
+Its final result is caller-owned; borrowed/user-returned field values retain
+their normal ownership. Pure execution and compile-time allocation are later tasks.
 
 ## Sets (T08)
 
@@ -49,5 +50,15 @@ are not independent sets or synchronized headers: resizing, clearing, or deletin
 through one alias has ordinary Odin consequences for the others. Use `clone` for
 an independent table and avoid duplicate destruction. Runtime tests cover
 mathematical results, duplicates/missing keys, and self/aliased operations with
-memory tracking enabled. Set syntax (`set[T]`, operators, builtin integration)
-belongs to T15.
+memory tracking enabled. T15 adds `set[T]`, literals, operators, and builtin
+integration over this same support type. `compiler.odin` contains generic dispatch
+that preserves native operations for non-Set instantiations, including contextless
+native arithmetic and iteration. These dispatch functions are compiler support.
+
+## Sequence bounds (T16)
+
+`thor:sequence` supplies contextless normalization and element type witnesses.
+Signed arithmetic widens to i128 before adding length, and checks the wide result
+before native machine-index conversion. Unsigned values retain their original
+type. The emitter applies this only to ordinary sequences, preserves storage for
+writes/addresses, and leaves map/pointer/enumerated-array indexing native.

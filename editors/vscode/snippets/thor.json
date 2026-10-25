@@ -38,5 +38,29 @@
       "${1:name} :> ${2:value}"
     ],
     "description": "Runtime-initialized immutable storage"
+  },
+  "Interpolated string": {
+    "prefix": "fstr",
+    "body": [
+      "f\"${1:text} {${2:value}}\""
+    ],
+    "description": "Caller-owned interpolated string"
+  },
+  "Switch expression": {
+    "prefix": "switchexpr",
+    "body": [
+      "switch ${1:value} {",
+      "\tcase ${2:match}: ${3:expression}",
+      "\tcase: ${4:default_expression}",
+      "}"
+    ],
+    "description": "Switch expression with a default result"
+  },
+  "Set literal": {
+    "prefix": "setlit",
+    "body": [
+      "set[${1:int}]{${2:elements}}"
+    ],
+    "description": "Caller-owned Set literal"
   }
 }

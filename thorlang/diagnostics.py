@@ -135,12 +135,39 @@ class Diagnostics:
                     if origin.kind != "membership-helper":
                         break
                 msgs = ["Membership requires comparable elements. " + msgs[0]]
+            compiler_support=origin and Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin'}
+            if compiler_support:
+                # Generic dispatch is part of language lowering. Its checker
+                # failures belong to the user's operation, not the support file.
+                caller=None
+                for message in msgs:
+                    for reference_file,pattern in self.reference_patterns:
+                        for match in pattern.finditer(message):
+                            candidate=self.reference_origin(reference_file,*reference_coordinates(match)[:2])
+                            if not Path(candidate.file).is_relative_to(runtime):
+                                caller=candidate
+                                break
+                        if caller: break
+                    if caller: break
+                if caller: origin=caller
+            msgs=[m for m in msgs if not ('instantiated as' in m and any(prefix in m for prefix in self.prefixes))]
+            if compiler_support:
+                msgs=[m for m in msgs if not re.search(r"instantiated as '(?:compiler_[a-z_]+|normalize_signed|normalize_unsigned)\(",m)]
             if any(prefix + "array_literal_needs_element_type" in m for m in msgs for prefix in self.prefixes):
                 msgs = ["An empty array literal needs an element type from its context."]
             elif msgs and any(f"procedure group '{prefix}contains'" in msgs[0] for prefix in self.prefixes):
                 types = [m.replace(" • value =", " • element =").replace(" • values =", " • container =")
                          for m in msgs[1:] if "Given argument types" in m or " • " in m]
                 msgs = ["Invalid operands for membership ('in' / 'not_in'): no matching operation.", *types]
+            elif msgs:
+                operations={'union':'|','intersection':'&','difference':'-','equal':'== / !=',
+                            'add_assign':'+=','sub_assign':'-=','union_assign':'|=',
+                            'intersection_assign':'&=','xor_assign':'^='}
+                for name,operator in operations.items():
+                    if any(f"procedure group '{prefix}sets.compiler_{name}'" in msgs[0] for prefix in self.prefixes):
+                        types=[m for m in msgs[1:] if 'Given argument types' in m or ' • ' in m]
+                        msgs=[f"Invalid operands for '{operator}': no matching operation.",*types]
+                        break
             if origin:
                 original = self.read(origin.file)[origin.start:origin.end].decode("utf-8", errors="replace")
                 if msgs and "'where' clause evaluated to false" in msgs[0] and origin.kind == "Binary":

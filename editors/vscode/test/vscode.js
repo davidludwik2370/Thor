@@ -76,6 +76,26 @@ async function run() {
         assert.ok(formatDefinition.some(value => (value.targetUri || value.uri).path.includes('/runtime/format/')));
         await replace(immutable.replace('value:>7', 'value:=7'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const expressions = 'package main\nmain::proc(){name:="world";message:=f"hello {name}";choice:=switch 1{case 1:2;case:3};names:=set[int]{1,2};data:=[1,2];_=data[-1];_=message;_=choice;_=names;delete(message);delete(names)}\n';
+        await replace(expressions);
+        for (const [name, type] of [['message', 'string'], ['choice', 'int'], ['names', 'set[int]']]) {
+            await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', testDocument.uri,
+                testDocument.positionAt(expressions.indexOf(name + ':=') + 2)),
+                values => values?.some(value => value.contents.some(content => (content.value || '').includes(type))));
+        }
+        const fieldDefinition = await eventually(() => vscode.commands.executeCommand('vscode.executeDefinitionProvider', testDocument.uri,
+            testDocument.positionAt(expressions.indexOf('{name}') + 2)), values => values?.length > 0);
+        assert.deepEqual((fieldDefinition[0].targetSelectionRange || fieldDefinition[0].range).start,
+            testDocument.positionAt(expressions.indexOf('name:=')));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        await replace(expressions.replace('{name}', '{missing_field}'));
+        const fieldErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values => values.some(value => value.message.includes('missing_field')));
+        const fieldError = fieldErrors.find(value => value.message.includes('missing_field'));
+        assert.equal(testDocument.getText(fieldError.range), 'missing_field');
+        assert.ok(!fieldError.message.includes('__thor_'));
+        await replace(expressions);
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
         await vscode.window.showTextDocument(document);
         await vscode.commands.executeCommand('tls.restart');
@@ -83,7 +103,8 @@ async function run() {
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
-            'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart'];
+            'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
+            'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

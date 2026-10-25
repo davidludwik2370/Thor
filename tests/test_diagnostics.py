@@ -41,6 +41,48 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_interpolation_field_errors_keep_unicode_source_ranges(self):
+        self.at('package main\nmain::proc(){_=f"😀 {missing_value}"}\n','missing_value')
+        errors=self.at('package main\nmain::proc(){_=f"😀 {1.25:,}"}\n','1.25',message='Integer grouping')
+        self.assertEqual(len(errors),1)
+        self.assertNotIn('runtime/',json.dumps(errors))
+
+    def test_switch_result_and_duplicate_cases_keep_original_locations(self):
+        self.at('package main\nmain::proc(){x:int=switch 1{case 1:"wrong";case:3};_=x}\n','"wrong"')
+        source='package main\nmain::proc(){_=switch 1{case 1:2;case 1:3;case:4}}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertEqual(errors[0]['pos']['offset'],source.index('case 1:3')+5)
+        self.assertIn('main.thor(2:30)',json.dumps(errors))
+        self.assertNotIn('__thor_',json.dumps(errors))
+
+    def test_set_literal_contract_and_element_errors(self):
+        errors=self.at('package main\nmain::proc(){_=set[[]int]{}}\n','set[[]int]',message='valid Odin map keys')
+        self.assertEqual(len(errors),1)
+        self.assertNotIn('runtime/',json.dumps(errors))
+        self.at('package main\nmain::proc(){_=set[int]{"wrong"}}\n','"wrong"')
+
+    def test_expression_lowering_imported_unsaved_buffer(self):
+        source='package main\nimport "library"\nmain::proc(){library.work()}\n'
+        library='package library\nwork::proc(){s:=f"😀 {missing_field}";delete(s)}\n'
+        entry,_,errors,_=self.invoke(source,files={'library/main.thor':'package library\nwork::proc(){}\n'},
+                                    overlays={'library/main.thor':library})
+        error=next(e for e in errors if 'missing_field' in e['msgs'][0])
+        self.assertEqual(error['pos']['file'],str(entry.parent/'library/main.thor'))
+        self.assertEqual(error['pos']['offset'],library.encode().index(b'missing_field'))
+        self.assertNotIn('__thor_',json.dumps(errors))
+
+    def test_negative_constant_reports_original_bound(self):
+        self.at('package main\nmain::proc(){a:=[1,2];_=a[-3]}\n','-3',message='index -3 is out of bounds for length 2')
+
+    def test_generic_dispatch_errors_belong_to_user_operation(self):
+        source='package main\nf::proc(a,b:$T)->T{return a|b}\nmain::proc(){_=f(f64(1),f64(2))}\n'
+        errors=self.at(source,'a|b')
+        self.assertNotIn('runtime/sets/compiler',json.dumps(errors))
+        self.assertNotIn('Thor expression',json.dumps(errors))
+        source='package main\nf::proc(a:$A,b:$B){_=a|b}\nmain::proc(){a:=set[int]{1};b:=set[string]{"x"};f(a,b)}\n'
+        errors=self.at(source,'a|b',message="Invalid operands for '|'")
+        self.assertNotIn('compiler_union',json.dumps(errors))
+
     def test_immutable_address_unicode_range_and_following_native_error(self):
         source='package main\nmain::proc(){_="😀"; x:>[1,2]; _=&x[0]; _=missing}\n'
         errors=self.at(source,'&x[0]',message='mutable address')

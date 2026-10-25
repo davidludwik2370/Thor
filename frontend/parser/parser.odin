@@ -1,4 +1,4 @@
-// Modified for Thor T01-T12 from Odin dev-2026-10:8169255b9.
+// Modified for Thor T01-T17 from Odin dev-2026-10:8169255b9.
 // Original Odin tooling parser by Ginger Bill and contributors; see LICENSE.
 package thor_parser
 
@@ -22,6 +22,7 @@ Parser :: struct {
 	edits: [dynamic]Edit,
 	selections: [dynamic]Selection,
 	immutables: [dynamic][2]int,
+	features: [dynamic]Feature,
 	file: ^ast.File,
 	tok: tokenizer.Tokenizer,
 
@@ -162,6 +163,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 
 	p.file = file
 	tokenizer.init(&p.tok, file.src, file.fullpath, p.err)
+	p.tok.thor = p.thor
 	if p.tok.ch <= 0 {
 		return true
 	}
@@ -315,7 +317,11 @@ next_token0 :: proc(p: ^Parser) -> bool {
 		old := p.tok
 		start := p.curr_tok.pos
 		t := tokenizer.scan(&p.tok)
-		if t.kind == .If || t.kind == .Else {
+		if t.kind == .Switch {
+			t.pos = start
+			t.text = "#switch"
+			p.curr_tok = t
+		} else if t.kind == .If || t.kind == .Else {
 			replacement := "when" if t.kind == .If else "else"
 			if !p.peeking { append(&p.edits, Edit{start.offset, t.pos.offset+len(t.text), replacement}) }
 			t.kind = .When if t.kind == .If else .Else
@@ -1430,7 +1436,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	case .If:      return parse_if_stmt(p)
 	case .When:    return parse_when_stmt(p)
 	case .For:     return parse_for_stmt(p)
-	case .Switch:  return parse_switch_stmt(p)
+	case .Switch:
+		if p.thor && p.curr_tok.text == "#switch" { return parse_compile_switch(p) }
+		return parse_switch_stmt(p)
 
 	case .Defer:
 		tok := advance_token(p)
@@ -1483,6 +1491,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			label = parse_ident(p)
 		}
 		s := ast.new(ast.Branch_Stmt, tok.pos, label)
+		if label == nil { s.end = end_pos(tok) }
 		s.tok = tok
 		s.label = label
 		expect_semicolon(p, s)
@@ -1642,6 +1651,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
+	if p.thor && kind == .Pointer { return 6 }
 	#partial switch kind {
 	case .Question, .If, .When, .Or_Else:
 		return 1
@@ -2370,7 +2380,10 @@ parse_inlining_or_tailing_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.
 parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	#partial switch p.curr_tok.kind {
 	case .Ident:
+		if p.thor && p.curr_tok.text == "set" && thor_set_type_follows(p) { return parse_set_type(p) }
 		return parse_ident(p)
+	case .Switch:
+		if p.thor { return parse_switch_expression(p) }
 
 	case .Undef:
 		tok := expect_token(p, .Undef)
@@ -2387,6 +2400,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Integer, .Float, .Imag,
 	     .Rune, .String:
 		tok := advance_token(p)
+		if p.thor && tok.kind == .String && len(tok.text) > 1 && tok.text[0] == 'f' { return parse_interpolation(p, tok) }
 		bl := ast.new(ast.Basic_Lit, tok.pos, end_pos(tok))
 		bl.tok = tok
 		return bl
@@ -3492,6 +3506,13 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			}
 
 		case .Pointer:
+			if p.thor {
+				next := peek_token(p)
+				if next.kind == .Ident || tokenizer.is_literal(next.kind) || next.kind == .Open_Brace || next.kind == .Switch {
+					loop = false
+					break
+				}
+			}
 			op := expect_token(p, .Pointer)
 			deref := ast.new(ast.Deref_Expr, operand.pos, end_pos(op))
 			deref.expr = operand

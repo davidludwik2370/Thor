@@ -17,7 +17,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 def frontend_binary(odin):
@@ -192,7 +192,7 @@ def main(argv=None):
     if "--" in argv:
         boundary = argv.index("--")
         runtime_args, argv = argv[boundary + 1:], argv[:boundary]
-    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T12: compile additive Odin syntax to Odin.")
+    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T17: compile additive Odin syntax to Odin.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
     parser.add_argument("command", choices=["transpile", "check", "build", "run", "test"])
     parser.add_argument("source", help="a .thor/.odin file or package directory")

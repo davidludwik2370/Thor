@@ -1685,8 +1685,17 @@ resolve_value_type_expression :: proc(ast_context: ^AstContext, expr: ^ast.Expr)
 		return resolve_value_type_expression(ast_context, v.expr)
 	case ^ast.Call_Expr:
 		callee := Symbol{}
+		if name,ok:=v.expr.derived.(^ast.Ident);ok&&name.pos.offset==name.end.offset{
+			ok:=internal_resolve_type_expression(ast_context,v,&callee)
+			return callee,ok
+		}
 		if !internal_resolve_type_expression(ast_context, v.expr, &callee) {
 			return {}, false
+		}
+		#partial switch _ in callee.value{
+		case SymbolStructValue,SymbolUnionValue,SymbolBasicValue:
+			ok:=internal_resolve_type_expression(ast_context,v,&callee)
+			return callee,ok
 		}
 		return_types := get_proc_return_types(ast_context, callee, v, true)
 		if len(return_types) != 1 {
@@ -2107,6 +2116,28 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 		return ok
 	case ^ast.Call_Expr:
 		old_call := ast_context.call
+		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
+			if name.name=="__thor_interpolation"{
+				ident:=new_type(ast.Ident,v.pos,v.end,context.temp_allocator)
+				ident.name="string"
+				out^=make_symbol_basic_type_from_ast(ast_context,ident)
+				return true
+			}
+			if strings.has_prefix(name.name,"__thor_switch_expression_"){
+				count,valid:=strconv.parse_int(name.name[len("__thor_switch_expression_"):])
+				found:=false
+				if valid{for arg in v.args[:min(count,len(v.args))]{
+					candidate:Symbol
+					if internal_resolve_type_expression(ast_context,arg,&candidate){
+						literal,untyped:=candidate.value.(SymbolUntypedValue)
+						if !untyped{out^=candidate;return true}
+						if !found||literal.type!=.Integer{out^=candidate;found=true}
+					}
+				}}
+				return found
+			}
+			if name.name=="__thor_switch_expression"&&len(v.args)>0{return internal_resolve_type_expression(ast_context,v.args[0],out)}
+		}
 		ast_context.call = cast(^ast.Call_Expr)node
 
 		defer {
@@ -2872,9 +2903,16 @@ resolve_identifier_expr :: proc(
 		ast_context.call = cast(^ast.Call_Expr)orig_expr
 		defer ast_context.call = old_call
 
-		if _, ok = v.expr.derived.(^ast.Basic_Directive); ok {
+		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
+			ok=internal_resolve_type_expression(ast_context,v,&symbol)
+		} else if _, ok = v.expr.derived.(^ast.Basic_Directive); ok {
 			symbol, ok = resolve_call_directive(ast_context, v)
 		} else if ok = internal_resolve_type_expression(ast_context, v.expr, &symbol); ok {
+			#partial switch _ in symbol.value {
+			case SymbolStructValue, SymbolUnionValue, SymbolBasicValue:
+				ok=internal_resolve_type_expression(ast_context,v,&symbol)
+				return symbol,ok
+			}
 			return_types := get_proc_return_types(ast_context, symbol, v, is_mutable)
 			if len(return_types) > 0 {
 				ok = internal_resolve_type_expression(ast_context, return_types[0], &symbol)

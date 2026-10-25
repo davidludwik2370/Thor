@@ -1,6 +1,6 @@
 # Thor Language for VS Code
 
-Local Thor T01-T12 syntax highlighting and a client for the TLS fork in this
+Local Thor T01-T17 syntax highlighting and a client for the TLS fork in this
 repository. `.thor` files have their own language identity; existing Odin support
 continues to own `.odin` files.
 
@@ -27,6 +27,10 @@ Use **Thor: Restart Language Server** after rebuilding the executable.
 
 TLS analyzes original source positions and supports the Thor parser extensions,
 file-local selected import aliases, inferred-array types, and sequence membership.
+It also parses quoted/raw interpolation, runtime/compile-time switches and Set
+types/literals; fields and arms retain completion/hover/definition positions.
+The grammar highlights embedded expressions independently from string text,
+including nested quotes and braces. Negative indices use native expression scopes.
 Live compiler diagnostics use source maps to report errors against original Thor
 files, including unsaved edits and imported buffers. Errors clear after a fix;
 generated helper names are replaced with messages about the Thor operation.

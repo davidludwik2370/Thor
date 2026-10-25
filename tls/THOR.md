@@ -37,6 +37,12 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 ## Current support
 
 - Discover mixed `.thor`/`.odin` packages and dependencies.
+- Parse T13–T17 interpolation, switch expressions, compile-time switches and Set
+  syntax. Infer interpolation's string type, runtime switch result types and
+  instantiated Set types; preserve definitions and semantic tokens inside fields
+  and arms. Display Set types as `set[T]`. Compile-time switch adaptation reuses
+  OLS's native `when` scope and constant-selection machinery. Negative indices
+  use the original native AST and normal element-type inference.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
 - Parse inferred/typed immutable runtime bindings. Hover explains immutable
