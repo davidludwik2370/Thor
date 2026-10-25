@@ -46,6 +46,8 @@ for (const [name, source, word, scope, line] of [
     ['pure function keyword', 'square :: fn(x:int)->int{return x*x}', 'fn', 'storage.type'],
     ['pure function name', 'square :: fn(x:int)->int{return x*x}', 'square', 'entity.name.function'],
     ['explicit run', 'SIZE :: #run square(8)', '#run', 'keyword.control.conditional'],
+    ['allocated pure return', 'names :: fn()->[]string{return nil}', 'fn', 'storage.type'],
+    ['allocated run binding', 'names := #run names()', '#run', 'keyword.control.conditional'],
     ['interpolation prefix', 's := f"hello {value}"', 'f', 'storage.modifier.interpolation'],
     ['interpolation field', 's := f"hello {value}"', 'value', 'variable'],
     ['nested interpolation string', 's := f"{echo("inner")}"', 'inner', 'string.quoted.double'],

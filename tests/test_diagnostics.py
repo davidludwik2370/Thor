@@ -41,12 +41,21 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_allocated_results_preserve_error_locations_and_constant_context(self):
+        source='package main\nwork::fn()->[]string{_="😀";return missing}\nmain::proc(){a:=work();_=a}\n'
+        errors=self.at(source,'missing',message='Undeclared name: missing')
+        self.assertNotIn('__thor_',json.dumps(errors))
+        source='package main\nwork::fn()->[]string{return nil}\nmain::proc(){_="😀";VALUE::#run work();_=VALUE}\n'
+        errors=self.at(source,'#run work()',message='slice-containing #run result needs a runtime binding')
+        self.assertEqual(len(errors),1,errors)
+        self.assertNotIn('thor-run-',json.dumps(errors))
+
     def test_pure_contract_and_borrow_errors_point_to_original_source(self):
         source='package main\nbad::fn(input:[]int)->int{_="😀";alias:=input;alias[0]=7;return 0}\nmain::proc(){a:=[1];_=bad(a[:])}\n'
         errors=self.at(source,'alias[0]=7',message='borrowed from an input')
         self.assertNotIn('runtime/',json.dumps(errors))
-        source='package main\nbad::fn()->string{return "text"}\nmain::proc(){_=bad()}\n'
-        errors=self.at(source,'fn()->string',message='Allocation-bearing pure results')
+        source='package main\nbad::fn()->^int{return nil}\nmain::proc(){_=bad()}\n'
+        errors=self.at(source,'fn()->^int',message='Unsupported pure value type')
         self.assertNotIn('runtime/',json.dumps(errors))
 
     def test_run_helper_errors_runtime_failure_and_unsaved_import(self):

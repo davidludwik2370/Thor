@@ -53,10 +53,11 @@ def expression(value,typ,meta,depth=0):
         return f'{typ}({kind}('+','.join(components)+'))'
     if kind=='sequence':
         items=value.get('values')
+        if value.get('storage','array') not in {'array','slice'}:raise ValueErrorProtocol('Invalid sequence storage.')
         if not isinstance(items,list) or type(value.get('nil')) is not bool:raise ValueErrorProtocol('Invalid sequence result.')
-        if value['nil']:
-            if items:raise ValueErrorProtocol('A nil sequence cannot have elements.')
+        if value['nil'] and not items:
             return f'{typ}(nil)'
+        if value['nil'] and value.get('zero_sized') is not True:raise ValueErrorProtocol('A nil sequence cannot have nonzero-sized elements.')
         element=f'{meta}.type_elem_type({typ})'
         return f'{typ}{{'+','.join(child(v,element) for v in items)+'}'
     if kind=='bitset':
@@ -82,3 +83,45 @@ def expression(value,typ,meta,depth=0):
         vt=f'{meta}.type_variant_type_of({typ},{index})'
         return f'{typ}('+child(value.get('value'),vt)+')'
     raise ValueErrorProtocol('Unsupported compile-time value kind.')
+
+
+def has_owned(value, *, slices_only=False):
+    kind=value['kind']
+    if kind=='string':return not slices_only
+    if kind=='sequence':
+        if value.get('storage')=='slice' or value.get('nil'):return True
+        return any(has_owned(v,slices_only=slices_only) for v in value['values'])
+    if kind in {'record','enum_array'}:return any(has_owned(v,slices_only=slices_only) for _,v in value['fields'])
+    if kind=='union' and value['variant']>=0:return has_owned(value['value'],slices_only=slices_only)
+    return False
+
+
+def materialize(value,typ,meta,module,prefix):
+    """Construct independent storage directly, without allocating templates."""
+    statements=[]
+    serial=0
+    def build(v,t):
+        nonlocal serial
+        if not has_owned(v):return expression(v,t,meta)
+        kind=v['kind']
+        if kind=='string':return f'{module}.clone({expression(v,t,meta)})'
+        if kind=='sequence':
+            elem=f'{meta}.type_elem_type({t})'
+            if v.get('storage')=='slice' or v['nil']:
+                serial+=1;name=prefix+str(serial)
+                statements.append(f'{name}:={module}.allocate_slice({t},{len(v["values"])},{str(not v["nil"]).lower()})')
+                for i,item in enumerate(v['values']):statements.append(f'{name}[{i}]={build(item,elem)}')
+                return name
+            return f'{t}{{'+','.join(build(item,elem) for item in v['values'])+'}'
+        if kind in {'record','enum_array'}:
+            parts=[]
+            for name,item in v['fields']:
+                field_type=f'type_of(({t}{{}}).{name})' if kind=='record' else f'{meta}.type_elem_type({t})'
+                parts.append(('' if kind=='record' else '.')+name+'='+build(item,field_type))
+            return ('#partial ' if kind=='enum_array' else '')+f'{t}{{'+','.join(parts)+'}'
+        if kind=='union':
+            variant=f'{meta}.type_variant_type_of({t},{v["variant"]})'
+            return f'{t}({build(v["value"],variant)})'
+        return expression(v,t,meta)
+    result=build(value,typ)
+    return '\n'.join([*statements,'return '+result])

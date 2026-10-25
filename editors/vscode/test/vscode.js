@@ -117,6 +117,20 @@ async function run() {
         assert.ok(!pureError.message.includes('__thor_') && !pureError.message.includes('thor-run-'));
         await replace(pure);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const allocated = 'package main\nimport pure "thor:pure"\nnames::fn()->[]string{result:=make([]string,1);result[0]="hello";return result}\nmain::proc(){result:=#run names();pure.destroy(result)}\n';
+        await replace(allocated);
+        await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', testDocument.uri,
+            testDocument.positionAt(allocated.indexOf('result:=#run') + 2)),
+            values => values?.some(value => value.contents.some(content => (content.value || '').includes('result: []string'))));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        await replace(allocated.replace('result:=#run names();pure.destroy(result)', 'result::#run names();_=result'));
+        const allocatedErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values => values.some(value => value.message.includes('slice-containing #run result')));
+        const allocatedError = allocatedErrors.find(value => value.message.includes('slice-containing #run result'));
+        assert.equal(testDocument.getText(allocatedError.range), '#run names()');
+        assert.ok(!allocatedError.message.includes('__thor_') && !allocatedError.message.includes('thor-run-'));
+        await replace(allocated);
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         const borrowedView = hardened.replace('value:=1', '_="😀";view:=f"abc {1}"[1:];_=view;value:=1');
         await replace(borrowedView);
         const lifetimeErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
@@ -136,7 +150,8 @@ async function run() {
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
-            'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics'];
+            'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',
+            'allocated #run result inference', 'mapped slice-constant diagnostic'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

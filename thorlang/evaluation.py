@@ -2,7 +2,7 @@
 
 Each helper is an isolated throw-away project with source maps. Only necessary
 declarations/imports enter it; user init/fini and entry points are never copied.
-No persistent result cache or automatic fn folding is implemented here.
+Successful contents may be cached. Automatic fn folding remains T23.
 """
 import json
 import platform
@@ -23,11 +23,12 @@ class Evaluator:
     # Other native collections must be inspectable project sources; an opaque
     # type-only import must not sneak unverified package initializers into #run.
     native_imports={'base:intrinsics','core:strings','core:slice','core:math'}
-    def __init__(self,project,odin,timeout=5):
+    def __init__(self,project,odin,timeout=5,cache=None):
         self.p=project;self.odin=odin;self.timeout=timeout
         self.results={};self.busy=set();self.guard_busy=set();self.skipped=set();self.unchecked=set()
         self.r=project.resolver;self.purity=project.purity
         self.root=Path(__file__).resolve().parents[1]
+        self.cache=cache
 
     def fail(self,n,message):n.source.error(message,n.start,n.end)
 
@@ -42,7 +43,16 @@ class Evaluator:
         typ=self.result_type(n.role('expr'))
         try:code=values.expression(data,typ,s.prefix+'meta')
         except (ValueError,TypeError,KeyError) as exc:self.fail(n,f'Invalid compile-time result: {exc}')
-        s.run_values[n]=s.mapping.wrap(code,s.path,n.start,n.end,'compile-time-result')
+        literal=s.mapping.wrap(code,s.path,n.start,n.end,'compile-time-result')
+        if values.has_owned(data):
+            module=self.p.purity.module(s)
+            def body(_):return values.materialize(data,typ,s.prefix+'meta',module,s.prefix+'materialized_'+str(n.start)+'_')
+            name,args=s.expressions.closed(n,body,result=typ,flavor='run_value')
+            runtime=f'{name}({", ".join(args)})'
+            constant=(s.expressions.error(n,'A slice-containing #run result needs a runtime binding (:=); use a pure consumer to compute a scalar constant.')
+                      if values.has_owned(data,slices_only=True) else literal)
+            s.run_values[n]={'runtime':runtime,'constant':constant}
+        else:s.run_values[n]=literal
 
     def result_type(self,call):
         r=call.source.resolver;plan=r.resolve_call(call)
@@ -314,6 +324,10 @@ class Evaluator:
         try:
             self.p=helper
             for old,data in self.results.items():
+                # Unused materializers must not enter this closure: their
+                # native result-type witnesses can reference pruned targets.
+                if not any(root.source is old.source and root.start<=old.start and old.end<=root.end
+                           for root in (*keep,*roots)):continue
                 new=node_copy(old)
                 if new:self.install(new,data)
         finally:self.p=old_p
@@ -335,7 +349,9 @@ class Evaluator:
             try:expr=source.render(site)
             finally:source.evaluation_keep=old
         alias=source.prefix+'evaluation'
-        output=f'{alias}.emit('+('true when ('+expr+') else false' if condition or condition_case is not None else expr)+')'
+        emitted='true when ('+expr+') else false' if condition or condition_case is not None else expr
+        result_name=source.prefix+'evaluation_result'
+        output=f'{result_name}:={emitted}\n{alias}.emit({result_name})\n{helper.purity.module(source)}.destroy({result_name})'
         inner=output
         for scope in n.ancestors():
             if scope.source.is_scope(scope) and scope.kind!='File':
@@ -343,7 +359,11 @@ class Evaluator:
                 try:declarations='\n'.join(source.render(d) for d in sorted(locals_by_scope.get(scope,[]),key=lambda d:d.start))
                 finally:source.evaluation_keep=old
                 inner='{\n'+source.expressions.declarations(node_copy(scope))+declarations+'\n'+inner+'\n}'
-        addition=f'\nimport {alias} "thor:eval"\nmain :: proc() {{\n{inner}\n}}\n'
+        module=helper.purity.module(source);scratch=source.prefix+'evaluation_scratch'
+        setup=(f'{scratch}:{module}.Scratch\n{module}.scratch_init(&{scratch})\n'
+               f'defer {module}.scratch_destroy(&{scratch})\ncontext.allocator={module}.scratch_allocator(&{scratch})\n'
+               'context.temp_allocator=context.allocator\n')
+        addition=f'\nimport {alias} "thor:eval"\nmain :: proc() {{\n{setup}{inner}\n}}\n'
         source.expressions.helpers[source.root,alias]=source.mapping.wrap(addition,source.path,n.start,n.end,'run-helper')
         # The helper root may be a library package; give its entry package an
         # executable name without changing import paths or user sources.
@@ -357,6 +377,9 @@ class Evaluator:
             target=helper.outputs[source.path].parent
             executable=directory/('helper.exe' if sys.platform=='win32' else 'helper')
             command=[self.odin,'build',str(target),*helper.odin_flags(),f'-out:{executable}','-json-errors']
+            key=self.cache.key(self.p,helper,target,self.odin,self.root) if self.cache else None
+            cached=self.cache.get(key) if self.cache else None
+            if cached is not None:return cached
             try:built=subprocess.run(command,capture_output=True,timeout=max(30,self.timeout))
             except subprocess.TimeoutExpired:self.fail(error_site,'#run helper compilation timed out.')
             diagnostics=Diagnostics(helper.sources,helper.maps,helper.generated)
@@ -373,5 +396,12 @@ class Evaluator:
                 detail=re.sub(r'^.*?((?:runtime )?(?:assertion|panic)(?: failure)?\s*:)',r'\1',detail,flags=re.I)
                 detail=re.sub(r'__thor_\w+','Thor expression',detail)
                 self.fail(error_site,f'#run execution failed (exit {result.returncode}).'+(' '+detail[:300] if detail else ''))
-            try:return values.decode(result.stdout)
+            try:
+                value=values.decode(result.stdout)
+                values.expression(value,'T','meta')
             except values.ValueErrorProtocol as exc:self.fail(error_site,str(exc))
+            if self.cache:
+                if key and self.cache.key(self.p,helper,target,self.odin,self.root)!=key:
+                    self.fail(error_site,'#run resource inputs changed during evaluation; compile again with stable inputs.')
+                self.cache.put(key,value)
+            return value

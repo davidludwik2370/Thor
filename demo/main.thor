@@ -1,6 +1,7 @@
 // Run: ./thor run demo
 // Inspect the generated Odin: ./thor transpile demo
 // Every section includes assertions so this is an evaluation program too.
+// T21 cache: run twice with --cache-report; --no-cache and --clear-cache control it.
 package main
 
 import "core:fmt" / println
@@ -11,6 +12,7 @@ import math "core:math" /
 import "library" / Record, identity, overloaded
 import format "thor:format"
 import sets "thor:sets"
+import pure "thor:pure"
 
 Color :: enum {Red, Green, Blue}
 calls: int
@@ -80,6 +82,23 @@ PURE_NEXT :: #run pure_square(PURE_SIZE)
 PURE_REPORT :: #run pure_report(7)
 PURE_ZERO :: #run pure_negative_zero()
 PURE_SUM :: #run known_sum()
+
+// T22: independent returned storage, including nested sequences and input views.
+Owned_Report :: struct {title:string, rows:[]string, values:[]int}
+pure_owned :: fn(text:string)->Owned_Report {
+    rows:=make([]string,2)
+    rows[0]=text; rows[1]=text
+    values:=make([]int,2)
+    values[0]=7; values[1]=8
+    return {f"report {text}",rows,values}
+}
+pure_label :: fn(value:int)->string {return f"label {value}"}
+pure_local_view :: fn()->[]int {
+    values:=[1,2]
+    defer values[0]=9
+    return values[:]
+}
+PURE_LABEL :: #run pure_label(7) // a borrowed Odin string constant
 
 DEMO_MODE :: #config(DEMO_MODE, 2)
 #if DEMO_MODE == 1 {
@@ -389,7 +408,31 @@ main :: proc() {
     assert(SELECTED == (DEMO_MODE == 1 ? 9 : 16))
     when false { UNUSED :: #run unselected() } // no helper executes this call
     // Plain fn calls with known arguments remain runtime calls until T23.
-    // String/slice returns are deliberately rejected by the initial result policy.
 
-    println("All T01-T20 demos passed.")
+    println("T21: persistent #run cache with transitive invalidation and controls")
+    // Run ./thor run demo --cache-report twice: the second run reports hits.
+    // Entry-package .thor-cache stores contents only. --no-cache recomputes;
+    // --clear-cache removes evaluation entries; --cache-dir chooses another root.
+    assert(PURE_LABEL=="label 7") // constants use ordinary Odin constant ownership
+
+    println("T22: owned strings/slices, deep results, scratch cleanup, and fresh #run values")
+    label:=pure_label(7)
+    assert(label==PURE_LABEL)
+    delete(label) // simple strings retain ordinary manual cleanup
+    owned:=pure_owned("input")
+    assert(owned.title=="report input"&&owned.rows[0]=="input")
+    assert(raw_data(owned.rows[0])!=raw_data(owned.rows[1]))
+    pure.destroy(owned) // recursively frees each owned field and element
+    for iteration in 0..<2 {
+        first:=#run pure_owned("cached")
+        second:=#run pure_owned("cached")
+        first.values[0]=iteration
+        assert(second.values[0]==7&&first.values[0]==iteration)
+        pure.destroy(first); pure.destroy(second)
+    }
+    local_view:=pure_local_view()
+    assert(local_view[0]==9) // copied after user defers, before local storage expires
+    pure.destroy(local_view)
+
+    println("All T01-T22 demos passed.")
 }

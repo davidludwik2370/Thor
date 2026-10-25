@@ -237,6 +237,21 @@ main::proc(){
         client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(main.read_text(),text)
 
+    def test_allocated_run_hover_and_unsaved_constant_diagnostic(self):
+        text='package main\nimport pure "thor:pure"\nnames::fn()->[]string{result:=make([]string,1);result[0]="hello";return result}\nmain::proc(){result:=#run names();pure.destroy(result)}\n'
+        client,main=self.open(text)
+        self.assertIn('result: []string',self.hover(client,main,text,'result:=#run')['contents']['value'])
+        self.assertIn('pure.destroy',self.hover(client,main,text,'names')['contents']['value'])
+        changed=text.replace('result:=#run names();pure.destroy(result)','result::#run names();_=result')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='slice-containing #run result')
+        error=next(e for e in errors if 'slice-containing #run result' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'#run names()',0))
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_run_imported_unsaved_purity_error(self):
         text='package main\nimport "library" / square\nVALUE::#run square(3)\nmain::proc(){_=VALUE}\n'
         original='package library\nsquare::fn(value:int)->int{return value*value}\n'
@@ -247,6 +262,22 @@ main::proc(){
         errors=client.diagnostic(library.as_uri(),contains='ambient context')
         error=next(e for e in errors if 'ambient context' in e['message'])
         self.assertEqual(error['range']['start'],self.position(changed,'context',0))
+        self.assertEqual(library.read_text(),original)
+
+    def test_cached_imported_result_changes_with_unsaved_contents(self):
+        text='package main\nimport "library"\nVALUE::#run library.work()\n#assert(VALUE=="old")\nmain::proc(){}\n'
+        original='package library\nwork::fn()->string{return "old"}\n'
+        client,main=self.open(text.replace('VALUE=="old"','VALUE=="wrong"'),{'library/main.thor':original})
+        client.diagnostic(main.as_uri(),contains='assertion')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        library=main.parent/'library/main.thor'
+        changed=original.replace('"old"','"new"')
+        client.send('textDocument/didOpen',{'textDocument':{'uri':library.as_uri(),'languageId':'thor','version':1,'text':changed}})
+        errors=client.diagnostic(main.as_uri(),contains='assertion')
+        self.assertTrue(any('assertion' in e['message'].lower() for e in errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':library.as_uri(),'version':2},'contentChanges':[{'text':original}]})
+        client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(library.read_text(),original)
 
     def test_expression_string_switch_and_set_hovers(self):

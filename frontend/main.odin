@@ -18,6 +18,7 @@ Info :: struct {
     calling_convention: string,
     mutable: bool,
     using_field: bool,
+    variadic: bool,
     roles: map[string]Span,
     lists: map[string][]Span,
 }
@@ -173,6 +174,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "Field"; info.roles["type"] = span(n.type); info.lists["names"] = spans(n.names)
         info.roles["default"] = span(n.default_value)
         info.using_field = .Using in n.flags
+        if n.type!=nil {_,info.variadic=n.type.derived.(^ast.Ellipsis)}
     case ^ast.Array_Type:
         info.kind = "ArrayType"; info.roles["elem"] = span(n.elem); info.roles["len"] = span(n.len)
     case ^ast.Dynamic_Array_Type:

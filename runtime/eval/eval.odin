@@ -49,9 +49,12 @@ write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
     } else when intrinsics.type_is_enumerated_array(T) {
         write_dynamic(builder,any(value),Depth)
     } else when intrinsics.type_is_array(T)||intrinsics.type_is_slice(T) {
-        strings.write_string(builder,`{"kind":"sequence","nil":`)
+        strings.write_string(builder,`{"kind":"sequence","storage":"`)
+        strings.write_string(builder,"slice" when intrinsics.type_is_slice(T) else "array")
+        strings.write_string(builder,`","nil":`)
         when intrinsics.type_is_slice(T) {fmt.sbprintf(builder,"%t",raw_data(value)==nil)}
         else {strings.write_string(builder,"false")}
+        when size_of(intrinsics.type_elem_type(T))==0 {strings.write_string(builder,`,"zero_sized":true`)}
         strings.write_string(builder,`,"values":[`)
         index:=0
         for item in value {
@@ -176,8 +179,13 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
             slice:=(cast(^runtime.Raw_Slice)value.data)^;count=slice.len;pointer=slice.data
             stride=item.elem_size;elem=item.elem;is_nil=pointer==nil
         }
-        strings.write_string(builder,`{"kind":"sequence","nil":`)
-        fmt.sbprintf(builder,"%t",is_nil);strings.write_string(builder,`,"values":[`)
+        strings.write_string(builder,`{"kind":"sequence","storage":"`)
+        storage:="array"
+        if _,ok:=info.variant.(runtime.Type_Info_Slice);ok {storage="slice"}
+        strings.write_string(builder,storage);strings.write_string(builder,`","nil":`)
+        fmt.sbprintf(builder,"%t",is_nil)
+        if stride==0 {strings.write_string(builder,`,"zero_sized":true`)}
+        strings.write_string(builder,`,"values":[`)
         for i in 0..<count {
             if i>0 {strings.write_byte(builder,',')}
             write_dynamic(builder,any{rawptr(uintptr(pointer)+uintptr(i*stride)),elem.id},depth+1)

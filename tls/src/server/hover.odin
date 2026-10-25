@@ -22,6 +22,9 @@ write_hover_content :: proc(
     }
 	if .Immutable in symbol.flags { cat = append_first_line_comment(cat, "immutable storage", allocator) }
 	doc := construct_symbol_docs(symbol, allocator)
+    if value,ok:=symbol.value.(SymbolProcedureValue);ok&&value.thor_pure {
+        doc=fmt.aprintf("%s\n\nString/slice results own independent storage. Use `pure.destroy` for recursive cleanup of nested results.",doc,allocator=allocator)
+    }
 
 	if ast_context.show_layout {
 		layout := layout

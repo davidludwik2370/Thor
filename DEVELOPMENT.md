@@ -45,7 +45,7 @@ TLS Git history, including checkpoint `cb009c7`, is preserved at
 `git --git-dir=.git/tls-upstream --work-tree=tls log`. It is local history, not a
 dependency required to build a fresh checkout.
 
-T01–T20 now have implementations, editor integration and evaluation sections in
+T01–T22 now have implementations, editor integration and evaluation sections in
 `demo/main.thor`. The earlier 0.4.1 checkpoint covered interpolation (T13), runtime and
 compile-time switches (T14), Set syntax (T15), negative sequence accesses (T16),
 and expression-local lowering (T17), plus native xor/pointer compatibility,
@@ -72,12 +72,10 @@ immediate reads carry the owner until the read finishes. Test new consumers with
 Odin's tracking allocator, including mixed branches and early exits. Broad TLS
 resolver work remains deferred to the later T tasks.
 
-The 0.5.0 batch adds declared `fn` contracts (T18), typed contents-only native
-serialization (T19), and explicit `#run` helpers (T20). It pulls forward the
-necessary T22 scratch lifetime support and takes the authorized result fallback:
-string/slice inputs and internal allocation work, but allocation-bearing returns
-are rejected recursively. T21 persistent caching and T23 automatic folding and
-specialization scheduling remain future work. Helper build/run failures use the
+The 0.5.0 batch added declared `fn` contracts (T18), typed contents-only native
+serialization (T19), and explicit `#run` helpers (T20). The 0.6.0 batch completes
+T21 caching and T22 allocated results. T23 automatic folding and specialization
+scheduling remain future work. Helper build/run failures use the
 same diagnostic maps as final Odin checking; execution failures point to #run.
 
 `thorlang/purity.py` tracks effects and transitive borrowed provenance. Native
@@ -88,11 +86,35 @@ bounds native execution. `thorlang/values.py` validates the versioned native val
 protocol and reconstructs typed constants. `runtime/pure` owns scratch lifetimes;
 `runtime/eval` serializes contents without padding or process addresses.
 
-The verified batch passes 335 Python compiler/LSP tests, 1,102 native TLS tests,
-54 grammar tests, allocation-tracked runtime/lexer checks, the actual VS Code
-integration test and the demo in all three define modes. The local TLS executable
-and Thor 0.5.0 VSIX are rebuilt and installed. Generated binaries remain ignored;
-their source and build/test commands are version-controlled.
+`thorlang/cache.py` caches successful typed contents with atomic replacement and
+conservative dependency/toolchain/resource fingerprints. It never caches helper
+executables. Eligibility and closure construction run before lookups. Cover warm
+backend skipping, corruption/concurrent publication, clear/bypass, defines,
+transitive source/types/constants, imported unsaved buffers and resource changes.
+
+Allocation-bearing procedures retain native named return behavior inside an
+isolated body. A first-installed defer promotes results into saved caller storage
+after user defers and while local arrays live; outer scratch cleanup follows.
+The ignored native return acknowledges temporary stack views with generated
+casts. Native or_return, result arity/missing-return checks and generic/variadic
+signatures remain intact. Deep copies give every sequence occurrence independent
+tree ownership. `pure.destroy` frees supported owned aggregates recursively;
+ordinary assignment and arbitrary proc ownership remain shallow/manual.
+
+Runtime #run materializers construct fresh buffers directly, without leaking an
+allocated template. Constant strings/fixed aggregates retain borrowed native
+ownership. Slice-containing constants and allocated contextless results have
+explicit diagnostics. Keep zero-sized element slice lengths and nil/non-nil
+descriptors intact, including through serialization and cache hits.
+
+The previous 0.5.0 checkpoint passed 335 Python compiler/LSP tests, 1,102 native
+TLS tests, 54 grammar tests and the runtime/lexer, actual VS Code and demo checks.
+The 0.6.0 checkpoint passes 367 Python compiler/LSP tests, 1,105 native TLS tests,
+56 grammar tests, four allocation-tracked pure-runtime tests, the native value
+protocol and lexer memory checks, the actual VS Code integration test and all
+three demo define modes. A warm demo run reports 12 cache hits and zero misses.
+The local TLS executable and Thor 0.6.0 VSIX are rebuilt and installed. Generated
+binaries remain ignored; their source and build commands are tracked.
 
 The compiler's resolution boundaries, conservative record schemas, raw-union
 rejection, generic `using` pointer case and specialization-dependent nested #run

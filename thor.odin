@@ -751,6 +751,15 @@ Allocation and results:
 - Apply copying recursively to supported allocation-bearing aggregate members.
   The support library must document cleanup of such results; shallow delete of
   an outer container alone must not be presented as recursive destruction.
+- T22 selects independent tree ownership: each string/slice occurrence gets its
+  own backing, even repeated aliases. Import pure "thor:pure" and call
+  pure.destroy(result) once to free a nested owned result recursively;
+  pure.clone(value) makes another owned deep copy in ordinary proc code.
+  Ordinary assignment still aliases buffers. Free an owned member
+  before replacing it, and do not destroy two shallow aliases of one result.
+- Preserve return-expression evaluation, named/multiple returns, native or_return,
+  and user defers. Promote after user defers while local arrays still live;
+  allocation failure must fail rather than silently produce an empty value.
 - Ordinary proc code still follows manual Odin allocation/cleanup rules.
 
 Explicitly authorized fallback:
@@ -763,6 +772,11 @@ Explicitly authorized fallback:
 - Document the selected result subset and reject unsupported results clearly.
   Allocation-bearing returns are an extension goal if this fallback is used,
   rather than a reason to weaken purity or delay all compile-time execution.
+
+Selected implementation: T22 implements allocated results for fn and verified
+contextful proc execution. Contextless compile-time proc targets retain the
+scalar/fixed-aggregate subset because they have no caller allocator. Ordinary
+contextless Odin procedures still pass through without a Thor purity contract.
 
 
 13. COMPILE-TIME FUNCTION EXECUTION AND #run
@@ -803,6 +817,10 @@ Examples:
 - Values used in :: declarations, array lengths, #if, or #switch must remain
   valid Odin constants after substitution. Diagnose unsuitable types, such as a
   non-integral array size. Runtime-initialized globals are not an equivalent.
+- T22 constant contexts support strings and fixed aggregates containing strings
+  as borrowed Odin constants. Slice-containing #run results require a runtime
+  binding (:=); alternatively consume them inside pure code and return a scalar
+  constant. Do not silently turn a required constant into a runtime allocation.
 - A cached result represents contents, not a runtime allocation. When folding a
   call in runtime code, preserve its normal type, ownership, and fresh-storage
   semantics. Materialize independent writable results when the result contract
@@ -822,6 +840,14 @@ Persistent cache:
   or reported failure, not silent generation of a different value.
 - Provide a way to clear/bypass the cache. Helper work directories must not be
   confused with persistent result entries or source files.
+- T21 uses conservative keys over normalized emitted helper code and referenced
+  inputs, so equivalent calls at different sites may miss. Include compiler
+  binary/version, installed base/core and Thor support sources, and static
+  resource contents/existence. Dynamic resource paths bypass caching.
+- Default storage is .thor-cache/eval-v1 beside the entry package. --cache-dir
+  overrides THOR_CACHE_DIR; --no-cache bypasses, --clear-cache clears owned
+  evaluation entries, and --cache-report prints opt-in JSON counters on stdout.
+  Storage failures may recompute; eligibility checks still precede cache lookup.
 
 
 14. VALIDATION AND COMPLETION CRITERIA
@@ -989,7 +1015,7 @@ Implement Thor in batches of T tasks. Each batch follows the same full loop:
 See DEVELOPMENT.md for the commands, repository layout, and batch checklist.
 Debugger mappings, stack traces, and a formatter remain separate work.
 
-Implementation checkpoint: 0.5.0 covers T01-T20, including quoted/raw interpolation,
+Implementation checkpoint: 0.6.0 covers T01-T22, including quoted/raw interpolation,
 runtime switch expressions, both #switch forms, Set syntax/operators, negative
 sequence accesses, and expression-local lowering. The demo has labeled sections
 for every implemented task. Compiler/runtime, TLS, diagnostic, grammar and actual
@@ -1005,11 +1031,14 @@ integers, float bits, strings/sequence descriptors, fields and union variants.
 T20 adds explicit native #run calls, verified ordinary-procedure dependency
 closures, earlier-result dependencies, selected/lazy scheduling, bounded execution
 and mapped helper diagnostics. User initializers/entry points are excluded.
-The initial result policy uses the authorized fallback: string/slice inputs and
-internal allocation work; allocation-bearing return types are rejected, including
-nested members. This pulls forward the required scratch part of T22.
-T21 persistent caching and T23 automatic known-argument folding and generic
-specialization scheduling remain deferred. In particular, a #run depending on
+T21 adds persistent contents-only caching, conservative transitive/toolchain/
+configuration/resource invalidation, atomic publication and cache controls.
+T22 completes independent string/slice/nested-aggregate results, promotion after
+user defers while locals live, scratch cleanup and recursive result destruction.
+Runtime #run results materialize fresh storage, including cache hits and loops.
+Slice-containing constants and allocated contextless returns remain diagnosed.
+T23 automatic known-argument folding and generic specialization scheduling remain
+deferred. In particular, a #run depending on
 enclosing generic bindings is diagnosed when selected rather than evaluated with
 invented types/values. Native record-schema and enum-array serialization limits
 are documented in README.md. TLS infers call types but does not execute procedures

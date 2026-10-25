@@ -1,0 +1,138 @@
+"""Atomic contents-only cache keyed by emitted dependencies and configuration.
+
+Keys are deliberately conservative: equivalent expressions can miss, whereas
+changes to transitive code, resources, toolchain or configuration cannot hit.
+"""
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import subprocess
+import tempfile
+from . import values
+from .compiler import unquote
+
+SCHEMA = 1
+MAX_PACKET = 16 * 1024 * 1024
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False).encode()
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''): digest.update(chunk)
+    return digest.hexdigest()
+
+class EvaluationCache:
+    def __init__(self, directory, *, enabled=True):
+        self.directory = Path(directory).resolve() / f'eval-v{SCHEMA}'
+        self.enabled = enabled
+        self.stats = dict(hits=0, misses=0, writes=0, corrupt=0, bypasses=0)
+        self.identities = {}
+
+    def clear(self):
+        """Preserve unrelated files, directories and symlinks."""
+        try:
+            if not self.directory.is_dir(): return
+            for path in self.directory.iterdir():
+                if re.fullmatch(r'[0-9a-f]{64}\.json', path.name) and path.is_file() and not path.is_symlink():
+                    path.unlink(missing_ok=True)
+        except OSError: pass
+
+    def identity(self, odin, root):
+        if odin in self.identities: return self.identities[odin]
+        digest = hashlib.sha256(canonical(dict(schema=SCHEMA, platform=os.sys.platform, machine=platform.machine())))
+        executable = Path(odin).resolve()
+        digest.update(canonical([str(executable),file_digest(executable)]))
+        for command in ['version', 'root']:
+            result = subprocess.run([odin, command], capture_output=True, check=True, timeout=15)
+            digest.update(canonical([command,result.stdout.hex()]))
+            if command == 'root': native_root = Path(result.stdout.decode().strip())
+        # Locally edited stdlib/compiler support invalidates unchanged binaries.
+        for tree in [root/'thorlang', root/'frontend', root/'runtime', native_root/'base', native_root/'core']:
+            for path in sorted(tree.rglob('*')):
+                if path.suffix in {'.odin', '.py'} and path.is_file():
+                    digest.update(canonical([str(path),file_digest(path)]))
+        self.identities[odin] = digest.hexdigest()
+        return self.identities[odin]
+
+    def resources(self, project):
+        """Dynamic resource paths bypass caching rather than guessing inputs."""
+        digest = hashlib.sha256()
+        for source in project.sources.values():
+            if source.excluded: continue
+            for node in source.nodes:
+                if node.kind != 'Call': continue
+                callee = node.role('callee')
+                if not callee or callee.text not in {'#load', '#load_hash', '#load_directory', '#exists'}: continue
+                args = node.group('args')
+                if not args or args[0].kind != 'Literal': return None
+                name = unquote(args[0].text)
+                path = source.import_dir(name) if ':' in name else (source.path.parent/name).resolve()
+                if path is None: return None
+                digest.update(canonical(str(path)))
+                if path.is_dir():
+                    digest.update(b'directory')
+                    # Native #load_directory loads immediate regular files;
+                    # subdirectories (including our own cache) are excluded.
+                    if callee.text=='#load_directory':
+                        for child in sorted(path.iterdir()):
+                            if child.is_file():
+                                digest.update(canonical([child.name,file_digest(child)]))
+                elif path.is_file(): digest.update(file_digest(path).encode())
+                else: digest.update(b'missing')
+        return digest.hexdigest()
+
+    def key(self, original, helper, target, odin, root):
+        if not self.enabled:
+            self.stats['bypasses'] += 1;return None
+        try:
+            resources = self.resources(original)
+            if resources is None:
+                self.stats['bypasses'] += 1;return None
+            normalize = lambda text: str(text).replace(str(helper.destination), '<helper>')
+            digest = hashlib.sha256(canonical(dict(identity=self.identity(odin, root), resources=resources,
+                flags=[normalize(flag) for flag in helper.odin_flags()], target=normalize(target))))
+            for path in sorted(helper.destination.rglob('*.odin')):
+                digest.update(canonical([str(path.relative_to(helper.destination)),normalize(path.read_text())]))
+            return digest.hexdigest()
+        except (OSError, ValueError, subprocess.SubprocessError):
+            self.stats['bypasses'] += 1;return None
+
+    def get(self, key):
+        if key is None: return None
+        path = self.directory/(key+'.json')
+        try:
+            if path.stat().st_size > MAX_PACKET+4096: raise ValueError('oversize cache entry')
+            packet = json.loads(path.read_bytes());value = packet['value']
+            if packet['schema'] != SCHEMA or packet['key'] != key: raise ValueError('cache schema/key')
+            if packet['checksum'] != hashlib.sha256(canonical(value)).hexdigest(): raise ValueError('cache checksum')
+            values.expression(value, 'T', 'meta')
+        except FileNotFoundError:
+            self.stats['misses'] += 1;return None
+        except (OSError, ValueError, TypeError, KeyError, RecursionError):
+            self.stats['corrupt'] += 1;self.stats['misses'] += 1;return None
+        self.stats['hits'] += 1
+        return value
+
+    def put(self, key, value):
+        if key is None: return
+        temporary = None
+        try:
+            values.expression(value, 'T', 'meta');contents = canonical(value)
+            if len(contents) > MAX_PACKET: return
+            packet = canonical(dict(schema=SCHEMA, key=key, value=value, checksum=hashlib.sha256(contents).hexdigest()))
+            self.directory.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=self.directory, prefix='.entry-', delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(packet);stream.flush();os.fsync(stream.fileno())
+            os.replace(temporary, self.directory/(key+'.json'));self.stats['writes'] += 1
+        except (OSError, ValueError, TypeError, KeyError, RecursionError):
+            pass # optional storage failure must not change compilation
+        finally:
+            if temporary is not None:
+                try: temporary.unlink(missing_ok=True)
+                except OSError: pass

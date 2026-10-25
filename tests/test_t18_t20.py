@@ -136,12 +136,12 @@ outer::fn(input:[]int)->int{return inner(input)}
         for prefix,message in cases:
             with self.subTest(prefix=prefix):self.invoke(self.program('_=bad()',prefix+'\n'),command='check',fail=message)
 
-    def test_result_fallback_rejects_strings_and_nested_slices(self):
+    def test_contextless_results_reject_strings_and_nested_slices(self):
         for prefix in [
-            'bad::fn()->string{return "hello"}',
-            'R::struct{data:[]int}\nbad::fn()->R{return {}}',
+            'bad::proc "contextless"()->string{return "hello"}',
+            'R::struct{data:[]int}\nbad::proc "contextless"()->R{return {}}',
         ]:
-            with self.subTest(prefix=prefix):self.invoke(self.program('_=bad()',prefix+'\n'),command='check',fail='Allocation-bearing pure results are deferred')
+            with self.subTest(prefix=prefix):self.invoke(self.program('_=VALUE',prefix+'\nVALUE::#run bad()\n'),command='check',fail='Contextless compile-time procedures cannot return strings/slices')
 
     def test_input_types_reject_pointers_and_any_recursively(self):
         for prefix,body in [
@@ -392,8 +392,8 @@ evaluation.emit(backing[:])
 ''','import evaluation "thor:eval"\n'))
         packets=[values.decode(line.encode()) for line in result.stdout.splitlines()]
         self.assertEqual(packets[0],{'kind':'string','bytes':'00ff225c'})
-        self.assertEqual(packets[1],{'kind':'sequence','nil':True,'values':[]})
-        self.assertEqual(packets[2],{'kind':'sequence','nil':False,'values':[]})
+        self.assertEqual(packets[1],{'kind':'sequence','storage':'slice','nil':True,'values':[]})
+        self.assertEqual(packets[2],{'kind':'sequence','storage':'slice','nil':False,'values':[]})
         self.assertEqual(packets[3]['values'],[{'kind':'integer','value':'7'}])
 
     def test_protocol_version_and_invalid_packets(self):

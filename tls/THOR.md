@@ -40,6 +40,11 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   spelling and explains purity; call results, including concrete generic results,
   retain type inference and completion through `#run`. Live compiler checks
   enforce purity/evaluation rules against unsaved source and dependencies.
+- Infer allocated string/slice and record results through `#run`; pure-function
+  hover documents independent result ownership and `pure.destroy` cleanup.
+  Unsaved imported contents invalidate cached evaluations. Slice-containing
+  constant results report their runtime-binding requirement at the original
+  `#run` expression and clear after correction.
 - Discover mixed `.thor`/`.odin` packages and dependencies.
 - Parse T13–T17 interpolation, switch expressions, compile-time switches and Set
   syntax. Infer interpolation's string type, runtime switch result types and

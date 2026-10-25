@@ -1,7 +1,7 @@
 # Thor
 
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
-milestone implements **T01–T20** from the reference specification in
+milestone implements **T01–T22** from the reference specification in
 [thor.odin](thor.odin). It includes the parser and project support needed to make
 those features usable together.
 
@@ -16,7 +16,7 @@ caches the small Odin frontend automatically; no Python packages are required.
 
 [demo/main.thor](demo/main.thor) has a labeled section for every completed task,
 with assertions, ordinary Odin code, imported packages, and evaluation-order
-examples. It finishes with `All T01-T20 demos passed.`
+examples. It finishes with `All T01-T22 demos passed.`
 
 Select another compile-time branch with an ordinary Odin define:
 
@@ -40,7 +40,7 @@ Select another compile-time branch with an ordinary Odin define:
 ## VS Code and TLS
 
 The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
-support the current T01-T20 syntax. Build the server and extension from this repository:
+support the current T01-T22 features. Build the server and extension from this repository:
 
 ```sh
 python3 tools/build_tls.py
@@ -162,6 +162,8 @@ Debugger mappings and runtime stack traces are outside this implementation.
 | T18 | Declared `fn` purity, transitive read-only inputs, verified direct calls, recursive/generic functions, and internal scratch allocation. |
 | T19 | Versioned contents-only value serialization and typed reconstruction, including wide integers, exact floats, enums, arrays, records and unions. |
 | T20 | Explicit native `#run` execution, verified dependency closures, dependent constants, selected/lazy paths, mapped failures and bounded execution. |
+| T21 | Persistent contents-only result cache, transitive/configuration/toolchain/resource invalidation, atomic publication, corruption recovery and cache controls. |
+| T22 | Scratch cleanup and independently owned string/slice results, deep aggregate promotion, recursive cleanup and fresh runtime `#run` materialization. |
 
 ```odin
 import "core:math" / sin,
@@ -395,10 +397,9 @@ protect an implicitly promoted `using` field. Write the existing pointer member
 explicitly (`value.pointer.field`) to retain shallow mutation in that case;
 concrete and shape-constrained records resolve pointer promotion directly.
 
-T21 adds persistent evaluation caching; T23 adds automatic known-argument `fn`
-folding and specialization-dependent evaluation scheduling. T22's scratch
-allocation prerequisite is already implemented; independently owned allocated
-results remain a later extension under the authorized fallback.
+T23 remains: automatic known-argument `fn` folding and specialization-dependent
+evaluation scheduling. T21 caching and T22 independently owned allocated results
+are implemented.
 `fn` and `set` remain valid ordinary Odin identifiers. The root `thor.odin` is the
 reference specification; `demo/main.thor` is the evaluation program. Follow
 [DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.
@@ -435,13 +436,38 @@ function uses private tracking scratch storage, including for interpolation;
 all outstanding internal allocations are released on every return. Ordinary
 `proc` allocation and f-string ownership retain their existing manual rules.
 
-This batch uses the agreed **result fallback**: strings, slices and aggregates
-containing them cannot be returned by pure/compile-time calls. Return scalars or
-pointer-free fixed aggregates. That avoids escaping scratch storage or silently
-changing allocation ownership. The value protocol already represents arbitrary
-string bytes and nil versus nonnil empty slice descriptors for later extensions.
-It serializes fields rather than padding or process addresses, and reconstructs
-floats with native hex literals, preserving negative zero, infinities and NaNs.
+String/slice results own independent backing storage, including input views and
+repeated aliases inside arrays, records and tagged unions. Promotion uses the
+saved caller allocator after user defers and before local/scratch storage expires.
+Nested calls allocate their returned copies in the receiving function's scratch.
+Temporary work is always released; visible runtime results are caller-managed:
+
+```odin
+import pure "thor:pure"
+message :: fn(n:int)->string { return f"value {n}" }
+text := message(7)
+defer delete(text)
+// For nested allocated fields/elements, call pure.destroy(result) once instead.
+```
+
+`pure.destroy` recursively frees owned strings/slices and their supported
+aggregate members. `pure.clone(value)` creates another deep owned copy. Both
+accept an explicit allocator outside pure code. Ordinary assignments remain
+shallow: destroy an owner once; free an owned field before overwriting it. Do not
+use recursive destruction on borrowed literals or shallow native containers.
+Arbitrary user procedure results and anonymous arguments remain manual Odin
+ownership. Eligible `proc "contextless"` targets cannot promote allocated returns;
+use `fn` or a contextful `proc` for those results.
+
+Runtime `x := #run work()` materializes fresh owned storage on every execution,
+including loop iterations and cache hits. In constant contexts, strings and fixed
+aggregates containing strings become ordinary borrowed Odin constants. A
+slice-containing result needs a runtime binding (`:=`), or a pure consumer that
+returns a scalar constant. Native slice constants are not implemented.
+
+The value protocol preserves arbitrary string bytes, nil/non-nil empty slices,
+zero-sized slice elements, fields, active union variants and exact float bits. It
+serializes contents without padding or process addresses.
 
 Each ready explicit call is compiled in a temporary native helper containing only
 its required declarations/imports. User entry points, unrelated runtime globals
@@ -454,7 +480,27 @@ Helpers use the same native defines/configuration as the final build. Cross-targ
 `#run` is rejected. Compilation errors map to original source; execution failures
 point to the `#run` expression. Helpers are deleted after use. Execution defaults
 to five seconds per helper; set `--run-timeout 10` to change it (maximum 300).
-There is no persistent result cache or independent-call batching yet.
+Independent-call batching remains future work.
+
+Successful helper results are cached in `.thor-cache/eval-v1` beside the entry
+package. Keys include emitted transitive code/types/constants/arguments, native
+flags/defines, compiler binary/version, Thor/frontend/runtime and installed
+base/core source contents, plus static resource contents/existence. Keys are
+conservative: equivalent calls at different sites or irrelevant source edits may
+miss. Dynamic resource paths bypass caching. Partial, corrupt or incompatible
+entries recompute; publication is atomic. Cache storage failures do not prevent
+compilation. Cached entries contain typed contents, never executables or addresses.
+
+```sh
+./thor run demo --cache-report # repeat to see warm hits
+./thor run demo --no-cache
+./thor run demo --clear-cache
+./thor check demo --cache-dir /tmp/thor-evaluations
+```
+
+`THOR_CACHE_DIR` supplies a default cache root; `--cache-dir` overrides it.
+`--cache-report` prints opt-in JSON counters on stdout, leaving compiler diagnostics
+on stderr. Eligibility checks still run before a cache lookup.
 
 Current conservative boundaries: the native compiler cannot reflect record
 fields at compile time, so Thor supplies checked source field schemas. Unknown

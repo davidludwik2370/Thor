@@ -6,6 +6,7 @@ pass tracks effects and provenance; it never treats contextless as purity.
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+from .compiler import Hint
 from .semantics import descendants
 
 
@@ -63,6 +64,7 @@ class Purity:
         self.rendering=set()
         self.active=set()
         self.contracts={}
+        self.inner_bodies=set()
         for source in self.r.sources:source.purity=self
 
     @staticmethod
@@ -151,15 +153,15 @@ class Purity:
             parts.append(f'#assert(!({matches}),"Raw-union storage cannot be proved pure")')
         for field in names:
             field=json.dumps(field)
-            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Depth+1)}}')
+            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Depth+1)}}')
         parts.extend(['}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
-                      f'when Result && {meta}.type_is_slice(T) {{#panic("Allocation-bearing pure results are deferred; return a scalar or pointer-free fixed aggregate")}}',
-                      f'else {{{name}({meta}.type_elem_type(T),Result,Depth+1)}}','}',
+                      f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc")}}',
+                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Depth+1)}}','}',
                       f'else when {meta}.type_is_union(T) {{',
-                      f'{name}_union(T,Result,Depth,0)','}',
-                      f'else {{{native}.validate(T,Result,Depth)}}'])
-        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Depth:int){{\n'+ '\n'.join(parts)+'\n}\n'
-        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Index:int){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Depth+1);{name}_union(T,Result,Depth,Index+1)}}\n}}\n'
+                      f'{name}_union(T,Result,Allow_Owned,Depth,0)','}',
+                      f'else {{{native}.validate(T,Result && !Allow_Owned,Depth)}}'])
+        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int){{\n'+ '\n'.join(parts)+'\n}\n'
+        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int,$Index:int){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Depth+1);{name}_union(T,Result,Allow_Owned,Depth,Index+1)}}\n}}\n'
         s.expressions.helpers[key]=s.mapping.wrap(code,s.path,0,0,'pure-type-validator')
         return name
 
@@ -217,7 +219,7 @@ class Purity:
                 return self.flow(args[0],env) if args else Flow()
             if self.library(n)==('core:slice','clone'):
                 return Flow(element=self.flow(args[0],env).item()) if args else Flow()
-            return Flow() # verified callees cannot return borrowed/allocated values
+            return Flow() # checked callees promote independent result storage
         return Flow()
 
     def copied(self,value,n):
@@ -372,6 +374,10 @@ class Purity:
                         self.problem(n,'Pure code cannot read unverified native package storage or values; only approved constants/helpers are eligible.')
             if n.kind=='Implicit':self.problem(n,'Pure code cannot access the ambient context or implicit runtime state.')
             if n.kind=='Unsafe':self.problem(n,'Assembly, uninitialized storage and unsafe operations are not permitted in pure code.')
+            if n.kind=='OrReturn' and self.wraps(proc):
+                results=self.r.fields(proc.role('type').role('results'))
+                if len(results)>1 and any(not name for name,_ in results):
+                    self.problem(n,'or_return in a procedure with multiple results requires named return values.')
             if n.kind=='Cast' and n.data['op']=='transmute':self.problem(n,'Pure code cannot transmute storage or observe pointer representations.')
             if n.kind=='Directive' and n.data['name'] not in {'assert','config','type','file','line','directory','procedure'}:
                 self.problem(n,'This directive is not permitted in pure code.')
@@ -431,6 +437,11 @@ class Purity:
         if n is proc.role('body') and proc in self.contracts:
             site,message=self.contracts[proc]
             return n.source.mapping.wrap('{#panic('+json.dumps(message)+')}',site.source.path,site.start,site.end,'pure-contract')
+        if n.kind=='Directive' and n.data['name']=='procedure' and proc in self.inner_bodies:
+            return n.source.prefix+'procedure_name_'+str(proc.start)
+        if (n.kind=='Ident' and n.text=='_' and n.parent and n.parent.kind=='Field'
+                and n.parent.parent is proc.role('type').role('params') and n in n.parent.group('names')):
+            return self.parameter_name(n)
         message=self.problems.get(n)
         if message:
             if n.kind=='Declaration' and not(n.parent and n.parent.role('init') is n):
@@ -440,6 +451,22 @@ class Purity:
                 finally:self.rendering.difference_update(added)
                 return code+'\n#panic('+json.dumps(message)+')\n'
             return n.source.expressions.error(n,message)
+        if n.kind=='Return' and proc in self.inner_bodies:
+            s=n.source;results=self.r.fields(proc.role('type').role('results'))
+            named=self.result_names(proc)
+            values_=n.group('values')
+            rhs=','.join(s.render(value,expected=s.type_hint(typ) or Hint(s,typ))
+                         for value,(_,typ) in zip(values_,results)) if values_ else ','.join(named)
+            # Preserve native arity errors, including a single multi-result call.
+            if len(values_)>len(results):rhs+=','+','.join(s.render(v) for v in values_[len(results):])
+            assignment=','.join(named)+'='+rhs+';' if values_ else ''
+            # The native return is ignored. A final defer promotes the named
+            # results while locals live. Explicit casts acknowledge those
+            # intentionally temporary stack views to Odin's escape checker.
+            code='{'+assignment+'return '+','.join(f'transmute(type_of({name})){name}' for name in named)+'}'
+            return s.mapping.wrap(code,s.path,n.start,n.end,'pure-return')
+        if n is proc.role('body') and proc not in self.inner_bodies and self.wraps(proc):
+            return self.wrapper(proc,n)
         if n.kind=='Call' and self.approved(n) and self.library(n)[0]=='thor:format' and n not in self.rendering:
             self.rendering.add(n)
             try:
@@ -470,9 +497,75 @@ class Purity:
             finally:self.rendering.remove(n)
         return None
 
+    @staticmethod
+    def parameter_name(name):
+        return name.source.prefix+'unused_'+str(name.start) if name.text=='_' else name.text.lstrip('$')
+
+    def owned_type(self,typ,seen=None):
+        seen=set() if seen is None else seen
+        key=typ.kind,typ.node
+        if key in seen:return True
+        seen.add(key)
+        if typ.kind in {'string','slice','generic','unknown'}:return True
+        if typ.elem:return self.owned_type(typ.elem,seen)
+        if typ.kind=='struct' and typ.node:
+            return any(self.owned_type(self.r.type_node(f.role('type'),typ.substitutions),seen.copy())
+                       for f in typ.node.role('fields').children if f.kind=='Field')
+        if typ.kind=='union' and typ.node:
+            return any(self.owned_type(self.r.type_node(v,typ.substitutions),seen.copy()) for v in typ.node.group('variants'))
+        return False
+
+    def wraps(self,proc):
+        return proc.role('type').data.get('calling_convention')!='contextless' and any(
+            self.owned_type(self.r.type_node(typ)) for _,typ in self.r.fields(proc.role('type').role('results')) if typ)
+
+    def result_names(self,proc):
+        return [name if name and name!='_' else proc.source.prefix+'result_'+str(proc.start)+'_'+str(i)
+                for i,(name,_) in enumerate(self.r.fields(proc.role('type').role('results')))]
+
+    def wrapper(self,proc,block):
+        s=block.source;prefix=s.prefix+'scratch_'+str(proc.start)
+        signature=proc.role('type');params=signature.role('params')
+        name=s.prefix+'body_'+str(proc.start)
+        hidden=s.prefix+'procedure_name_'+str(proc.start)
+        results=self.r.fields(signature.role('results'))
+        outputs=[s.prefix+'output_'+str(proc.start)+'_'+str(i) for i in range(len(results))]
+        extra=','.join(f'{slot}:^${slot}_T' for slot in outputs)+','+hidden+':string,'+prefix+'_caller:$'+prefix+'_Allocator'
+        parameter_code=s.splice(params,[(c.start,c.end,s.render(c)) for c in params.children],
+                                [(params.start,extra+(',' if self.r.fields(params) else ''))])
+        returns='->('+','.join(name+':'+s.render(typ,constant=True) for name,(_,typ) in zip(self.result_names(proc),results))+')'
+        header=s.splice(signature,[(params.start,params.end,parameter_code),(params.end+1,signature.end,returns)],
+                        [(params.start,extra)] if params.start==params.end else [])
+        clauses=proc.group('where')
+        if clauses:header+=' where '+', '.join(s.render(c,constant=True) for c in clauses)
+        self.inner_bodies.add(proc)
+        try:body=s._render(block)
+        finally:self.inner_bodies.remove(proc)
+        names=[s.prefix+'returned_'+str(proc.start)+'_'+str(i) for i in range(len(results))]
+        args=['&'+value for value in names]+['#procedure',prefix+'_caller']
+        for field in params.children:
+            if field.kind!='Field':continue
+            for param in field.group('names'):
+                arg=self.parameter_name(param)
+                if field.data.get('variadic'):arg='..'+arg
+                args.append(arg)
+        code=self.prologue(block)+f'\n{name}::{header} {body}\n'
+        code+='\n'.join(f'{value}:{s.render(typ,constant=True)}' for value,(_,typ) in zip(names,results))+'\n'
+        code+=f'{name}('+','.join(args)+')\n'
+        code+='return '+','.join(names)+'\n'
+        return '{'+code+'}'
+
     def prologue(self,block):
         proc=block.parent
         if not(proc and proc.kind=='Procedure' and proc.role('body') is block and self.checked(proc)):return ''
+        if proc in self.inner_bodies:
+            s=block.source;prefix=s.prefix+'scratch_'+str(proc.start)
+            outputs=[]
+            for i,name in enumerate(self.result_names(proc)):
+                slot=s.prefix+'output_'+str(proc.start)+'_'+str(i)+'^'
+                outputs.append(slot+'='+self.module(s)+'.clone('+name+','+prefix+'_caller)')
+            # First installed defer runs last, while local arrays still live.
+            return '\ndefer {'+';'.join(outputs)+'}\n'
         self.analyze(proc)
         s=block.source;module=self.module(s);prefix=s.prefix+'scratch_'+str(proc.start)
         code=[]
@@ -482,13 +575,14 @@ class Purity:
                 if name.kind=='PolyType':
                     annotation=field.role('type')
                     if annotation and (annotation.kind=='TypeidType' or annotation.text=='typeid'):
-                        code.append(f'{self.validator(s)}({name.text.lstrip("$")},false,0)')
+                        code.append(f'{self.validator(s)}({name.text.lstrip("$")},false,true,0)')
                     continue
-                code.append(f'{self.validator(s)}(type_of({name.text}),false,0)')
+                code.append(f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,0)')
         for _,typ in self.r.fields(proc.role('type').role('results')):
-            if typ:code.append(f'{self.validator(s)}({self.r.template(typ)},true,0)')
+            if typ:code.append(f'{self.validator(s)}({self.r.template(typ)},true,{str(proc.role("type").data.get("calling_convention")!="contextless").lower()},0)')
         if proc.role('type').data.get('calling_convention')=='contextless':
             return s.mapping.wrap('\n'+'\n'.join(code)+'\n',s.path,proc.start,proc.role('type').end,'pure-contract')
+        if self.wraps(proc):code.append(f'{prefix}_caller:=context.allocator')
         code += [f'{prefix}: {module}.Scratch',f'{module}.scratch_init(&{prefix})',
                  f'defer {module}.scratch_destroy(&{prefix})',
                  f'context.allocator = {module}.scratch_allocator(&{prefix})',

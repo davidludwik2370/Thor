@@ -33,6 +33,34 @@ main::proc(){result:=#run square(3);res{*}ult}
 }
 
 @(test)
+thor_hover_allocated_pure_result :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+names::fn()->[]string{return nil}
+main::proc(){result:=#run names();res{*}ult}
+`)
+    test.expect_hover_contains(t,&source,"result: []string")
+}
+
+@(test)
+thor_hover_pure_ownership_contract :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+names::fn()->[]string{return nil}
+main::proc(){na{*}mes()}
+`)
+    test.expect_hover_contains(t,&source,"pure.destroy")
+}
+
+@(test)
+thor_allocated_record_completion :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Report::struct{title:string,rows:[]string}
+report::fn()->Report{return {}}
+main::proc(){result:=#run report();result.{*}}
+`)
+    test.expect_completion_labels(t,&source,".",{"title","rows"})
+}
+
+@(test)
 thor_pure_generic_completion :: proc(t:^testing.T) {
     source:=thor_source(`package test
 Record::struct{value:int}

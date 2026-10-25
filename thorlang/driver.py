@@ -17,7 +17,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 
 
 def frontend_binary(odin):
@@ -194,7 +194,7 @@ def main(argv=None):
     if "--" in argv:
         boundary = argv.index("--")
         runtime_args, argv = argv[boundary + 1:], argv[:boundary]
-    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T20: compile additive Odin syntax to Odin.")
+    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T22: compile additive Odin syntax to Odin.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
     parser.add_argument("command", choices=["transpile", "check", "build", "run", "test"])
     parser.add_argument("source", help="a .thor/.odin file or package directory")
@@ -204,6 +204,10 @@ def main(argv=None):
     parser.add_argument("--overlay", type=Path, help="editor overlay JSON: {\"Replace\": {original: replacement_file}}")
     parser.add_argument("--raw-diagnostics", action="store_true", help="show unmodified Odin diagnostics for transpiler debugging")
     parser.add_argument("--run-timeout",type=float,default=5,help="maximum seconds for each native #run execution (default: 5)")
+    parser.add_argument('--cache-dir',type=Path,help='evaluation cache root (default: .thor-cache beside the entry package)')
+    parser.add_argument('--no-cache',action='store_true',help='bypass persistent compile-time evaluation caching')
+    parser.add_argument('--clear-cache',action='store_true',help='clear evaluation entries before compiling')
+    parser.add_argument('--cache-report',action='store_true',help='print evaluation cache counters as JSON on stdout')
     options, flags = parser.parse_known_args(argv)
     if not 0<options.run_timeout<=300:parser.error('--run-timeout must be greater than 0 and at most 300 seconds')
     if any(not flag.startswith("-") for flag in flags):
@@ -247,7 +251,13 @@ def main(argv=None):
         test_mode = options.command == "test" or "-build-mode:test" in flags
         project = Project(options.source, frontend, flags, test=test_mode, overlays=overlays)
         from .evaluation import Evaluator
-        Evaluator(project,odin,options.run_timeout).evaluate_all()
+        from .cache import EvaluationCache
+        cache_root=options.cache_dir or (Path(os.environ['THOR_CACHE_DIR']) if 'THOR_CACHE_DIR' in os.environ else None)
+        cache=EvaluationCache(cache_root or (project.entry.parent if project.file_entry else project.entry)/'.thor-cache',enabled=not options.no_cache)
+        if options.clear_cache:cache.clear()
+        try:Evaluator(project,odin,options.run_timeout,cache).evaluate_all()
+        finally:
+            if options.cache_report:print(json.dumps({'thor_cache':cache.stats}),flush=True)
         destination = options.output_dir or Path.cwd() / ".thor-build" / project.entry.stem
         target = project.emit(destination)
         diagnostics = Diagnostics(project.sources, project.maps, project.generated)
