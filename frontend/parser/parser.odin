@@ -1651,7 +1651,6 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
-	if p.thor && kind == .Pointer { return 6 }
 	#partial switch kind {
 	case .Question, .If, .When, .Or_Else:
 		return 1
@@ -3506,13 +3505,6 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			}
 
 		case .Pointer:
-			if p.thor {
-				next := peek_token(p)
-				if next.kind == .Ident || tokenizer.is_literal(next.kind) || next.kind == .Open_Brace || next.kind == .Switch {
-					loop = false
-					break
-				}
-			}
 			op := expect_token(p, .Pointer)
 			deref := ast.new(ast.Deref_Expr, operand.pos, end_pos(op))
 			deref.expr = operand
@@ -3546,7 +3538,17 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			operand = oe
 
 		case .Open_Brace:
-			if !is_lhs && is_literal_type(operand) && p.expr_level >= 0 {
+			// Unlike a bare identifier, set[T] unambiguously starts a literal
+			// here, including in an unparenthesized for/switch header.
+			set_literal := false
+			if p.thor {
+				if call, ok := ast.unparen_expr(operand).derived_expr.(^ast.Call_Expr); ok {
+					if ident, ok := call.expr.derived_expr.(^ast.Ident); ok && ident.pos.offset == ident.end.offset {
+						set_literal = ident.name == "__thor_set_type"
+					}
+				}
+			}
+			if !is_lhs && is_literal_type(operand) && (p.expr_level >= 0 || set_literal) {
 				operand = parse_literal_value(p, operand)
 			} else {
 				loop = false

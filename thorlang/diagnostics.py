@@ -160,9 +160,9 @@ class Diagnostics:
                          for m in msgs[1:] if "Given argument types" in m or " • " in m]
                 msgs = ["Invalid operands for membership ('in' / 'not_in'): no matching operation.", *types]
             elif msgs:
-                operations={'union':'|','intersection':'&','difference':'-','equal':'== / !=',
+                operations={'union':'|','intersection':'&','difference':'-','symmetric_difference':'~','equal':'== / !=',
                             'add_assign':'+=','sub_assign':'-=','union_assign':'|=',
-                            'intersection_assign':'&=','xor_assign':'^='}
+                            'intersection_assign':'&=','xor_assign':'~='}
                 for name,operator in operations.items():
                     if any(f"procedure group '{prefix}sets.compiler_{name}'" in msgs[0] for prefix in self.prefixes):
                         types=[m for m in msgs[1:] if 'Given argument types' in m or ' • ' in m]

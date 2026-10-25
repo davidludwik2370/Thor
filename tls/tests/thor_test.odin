@@ -15,6 +15,42 @@ thor_source :: proc(source: string) -> test.Source {
 }
 
 @(test)
+thor_parser_native_pointer_and_set_xor :: proc(t: ^testing.T) {
+    context.allocator = context.temp_allocator
+    source := `package test
+identity::proc(value:int)->int{return value}
+last::proc "c"(a:[]int,i:int)->int{return a[i]}
+main::proc(){
+ value:=1;p:=&value;p^=3;p^~=1
+ callable:=identity;pointer:=&callable;_=pointer^(4)
+ a:=set[int]{1};b:=set[int]{2};a~=b;_=a~(b)&a
+ outer:for item in set[int]{1,2}{_=item;break outer}
+ _=f"{(true ? f"inner {7}" : "borrowed")}"
+}
+`
+    file := ast.new(ast.File, tokenizer.Pos{}, tokenizer.Pos{})
+    file.src=source;file.fullpath="main.thor"
+    p:=parser.default_parser()
+    testing.expect(t,server.parse_file(&p,file))
+    testing.expect_value(t,file.syntax_error_count,0)
+}
+
+@(test)
+thor_hover_set_native_xor :: proc(t: ^testing.T) {
+    source:=thor_source(`package test
+main::proc(){a:=set[int]{1};b:=set[int]{2};result:=a~b;res{*}ult}
+`)
+    // The native test harness supplies indexed packages in memory; the stdio
+    // integration tests index the real runtime collection from disk.
+    source.collections=make(map[string]string)
+    source.collections["thor"]="test"
+    source.packages={{pkg="sets",source=`package sets
+Set::struct($T:typeid){table:map[T]struct{}}
+`}}
+    test.expect_hover_contains(t,&source,"set[int]")
+}
+
+@(test)
 thor_hover_interpolated_string :: proc(t:^testing.T){
     source:=thor_source(`package test
 main::proc(){name:="world";message:=f"hello {name}";mess{*}age}

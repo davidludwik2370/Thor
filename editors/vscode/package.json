@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor T01-T17 syntax highlighting and the local TLS language server.",
   "publisher": "thor-local",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"

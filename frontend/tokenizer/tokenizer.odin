@@ -753,9 +753,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '@': kind = .At
 		case '$': kind = .Dollar
 		case '?': kind = .Question
-		case '^':
-			kind = .Pointer
-			if t.thor && t.ch == '=' { advance_rune(t); kind = .Xor_Eq }
+		case '^': kind = .Pointer
 		case ';': kind = .Semicolon
 		case ',': kind = .Comma
 		case ':': kind = .Colon

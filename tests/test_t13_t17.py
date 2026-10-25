@@ -61,7 +61,7 @@ work::proc(a,b:$T)->T{x:=a|b;x-=a;return x}
 @(test) owned::proc(t:^testing.T){
  a:=set[string]{"a","b","a"};b:=set[string]{"b","c"}
  c:=work(a,b);testing.expect(t,len(c)==1&&"c" in c)
- a|=b;a&=b;a^=b;clear(a)
+ a|=b;a&=b;a~=b;clear(a)
  delete(a);delete(b);delete(c)
 }
 ''',command='test',flags=['-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'])
@@ -202,7 +202,7 @@ g::proc(value:$T)->T{return switch 1 {case 1:value;case:T{}}}
         self.invoke(self.program('''
 a:=set[int]{1,2,2}; b:=set[int]{2,3}
 assert(len(a)==2&&1 in a&&9 not_in a)
-u:=a|b;i:=a&b;d:=a-b;x:=a^b
+u:=a|b;i:=a&b;d:=a-b;x:=a~b
 assert(len(u)==3&&len(i)==1&&len(d)==1&&len(x)==2)
 copy:=set_copy(b);assert(i==copy);delete(copy)
 assert(a!=b)
@@ -220,7 +220,7 @@ a:=set[int]{1,2}; alias:=a
 a|=alias; a&=alias; assert(len(a)==2)
 a-=alias; assert(len(a)==0)
 a+=4; a-=4; a-=99; assert(len(a)==0)
-a+=1;a+=2;a^=a;assert(len(a)==0)
+a+=1;a+=2;a~=a;assert(len(a)==0)
 clear(&a);delete(a)
 '''))
 
@@ -233,7 +233,7 @@ delete(a);delete(b);delete(c)
 '''))
 
     def test_set_mutation_integrates_with_immutability(self):
-        for operation in ['a+=3','a|=b','a^=b','clear(a)','clear(&a)']:
+        for operation in ['a+=3','a|=b','a~=b','clear(a)','clear(&a)']:
             with self.subTest(operation=operation):
                 self.invoke(self.program('a:>set[int]{1};b:=set[int]{2};'+operation),command='check',fail='immutable storage')
 
@@ -391,9 +391,9 @@ assert(len(c)==2&&1 in c);delete(a);delete(b);delete(c)
     def test_symmetric_difference_parenthesized_and_switch_operands(self):
         self.invoke(self.program('''
 a:=set[int]{1,2};b:=set[int]{2,3}
-c:=xor(a,b);d:=a ^ switch 1{case 1:b;case:a}
+c:=xor(a,b);d:=a ~ switch 1{case 1:b;case:a}
 assert(c==d&&len(c)==2);delete(c);delete(d);delete(a);delete(b)
-''','xor::proc(a,b:$T)->T{return a ^ (b)}\n'))
+''','xor::proc(a,b:$T)->T{return a ~ (b)}\n'))
 
 
 if __name__=='__main__': unittest.main()

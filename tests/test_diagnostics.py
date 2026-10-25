@@ -41,6 +41,24 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_anonymous_view_and_pointer_errors_keep_unicode_ranges(self):
+        for expr in ['f"abc {1}"[1:]', 'raw_data(f"abc {1}")', '&f"abc {1}"[-1]']:
+            with self.subTest(expr=expr):
+                source='package main\nmain::proc(){_="😀";view:='+expr+';_=view}\n'
+                errors=self.at(source,expr,message='named owner')
+                self.assertEqual(len(errors),1,errors)
+                self.assertEqual(errors[0]['pos']['end_offset']-errors[0]['pos']['offset'],len(expr.encode()))
+                self.assertNotIn('runtime/',json.dumps(errors))
+
+    def test_hardened_generic_xor_error_names_the_user_operator(self):
+        source='package main\nf::proc(a:$A,b:$B){_=a~b}\nmain::proc(){a:=set[int]{1};b:=set[string]{"x"};f(a,b)}\n'
+        self.at(source,'a~b',message="Invalid operands for '~'")
+
+    def test_c_callback_allocation_without_context_reports_its_expression(self):
+        source='package main\nmessage::proc "c"(n:int)->string{return f"value {n}"}\nmain::proc(){_=message(7)}\n'
+        errors=self.at(source,'f"value {n}"',message='context')
+        self.assertNotIn('runtime/',json.dumps(errors))
+
     def test_interpolation_field_errors_keep_unicode_source_ranges(self):
         self.at('package main\nmain::proc(){_=f"😀 {missing_value}"}\n','missing_value')
         errors=self.at('package main\nmain::proc(){_=f"😀 {1.25:,}"}\n','1.25',message='Integer grouping')

@@ -275,11 +275,11 @@ switches and interpolations. Parenthesize a ternary before a format separator.
 The format grammar is `[[fill]align][width][,]`: align with `<`, `>` or `^`,
 use a literal decimal width, and add `,` for integer grouping. Width counts
 Unicode runes. Fields execute once, left to right. The final string is owned by
-the caller; internal formatting buffers and unambiguously owned nested
-interpolations (including parenthesized/conditional forms) are freed. Ordinary
-field values and mixed owned/borrowed conditionals keep their existing ownership:
-a procedure that
-returns allocated storage still needs an explicit lifetime chosen by the caller.
+the caller. Internal formatting buffers and owned nested interpolations are
+released after use, including mixed branches such as
+`f"{(flag ? f"value {n}" : borrowed)}"`: only the selected owned string is freed.
+Named field values keep their existing ownership. A procedure that returns
+allocated storage still needs an explicit lifetime chosen by the caller.
 
 Expression switches currently require a default arm and exactly one expression
 per arm. They support comma-separated cases and native ranges, check duplicate
@@ -291,13 +291,35 @@ control flow, and unchecked inactive arms. Later conditions, including those in
 a comma-separated case, stay unchecked after a match. Pure calls and `#run`
 remain T18–T23 work.
 
-Sets use `|`, `&`, `-`, `^`, `==` and `!=`, with `|=`, `&=`, `-=`, `^=`
+Sets use `|`, `&`, `-`, `~`, `==` and `!=`, with `|=`, `&=`, `-=`, `~=`
 for in-place updates; `+=` inserts one element, while `-=` accepts an element
 or another Set. Binary mathematical results own independent tables. Assignment
-copies a shallow header, and no automatic operand/result cleanup is inferred.
-Name intermediate results and delete each owned table once. `clear(s)` keeps
-the table allocation; `delete(s)` releases it. Keys retain their ordinary shallow
+copies a shallow header. Anonymous Thor intermediates are cleaned up automatically:
+`result := a | b | c` reuses one result table; only `result` needs deletion, and
+named operands remain untouched. `clear(s)` keeps the table allocation;
+`delete(s)` releases it. Keys retain their ordinary shallow
 ownership. Native operations on other types keep their Odin meaning.
+
+Automatic cleanup covers Thor-owned expressions consumed by operators, queries,
+formatting, indexing, iteration, unused expressions and blank destinations. Loop
+temporaries survive through the loop and are released on exit. Assigning or returning an owned result
+leaves cleanup to the caller. Arbitrary procedure arguments/results, aggregate
+fields and separately allocated Set keys retain Odin's manual ownership rules;
+this does not introduce a general ownership checker. Use named keys when their
+allocations need independent cleanup.
+
+A view that must survive its expression needs a named owner:
+
+```odin
+owner := f"value {n}"
+defer delete(owner)
+view := owner[1:]
+```
+
+Thor diagnoses `view := f"value {n}"[1:]` and equivalent temporary pointer/field
+views. Immediate reads such as `len(f"value {n}"[1:])` keep the owner alive until
+the read completes. Borrowed views through mixed branches are conservatively
+rejected when the owner cannot be carried safely.
 
 Negative signed bounds normalize to `len(sequence) + bound`; unsigned bounds
 keep their type. Strings index UTF-8 bytes. Bounds are checked after normalization
@@ -309,6 +331,8 @@ The emitter uses named procedures with explicit lexical inputs, rather than
 closures (which Odin does not provide). Calls stay at the original expression
 site; declarations do no work. The same source maps cover helper bodies and their
 instantiations, so errors point back to fields, arms, elements and accesses.
+Nonallocating helpers also work inside native C/system/contextless procedures;
+allocating features require a context, which such callbacks can assign explicitly.
 
 ## Tests and rejection examples
 

@@ -43,6 +43,9 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   and arms. Display Set types as `set[T]`. Compile-time switch adaptation reuses
   OLS's native `when` scope and constant-selection machinery. Negative indices
   use the original native AST and normal element-type inference.
+- Preserve native `~`/`~=` xor and pointer assignments/calls through the shared
+  parser. Parse direct Set literals in range headers. Live compiler checks also
+  report temporary-view lifetime errors at original unsaved source ranges.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
 - Parse inferred/typed immutable runtime bindings. Hover explains immutable

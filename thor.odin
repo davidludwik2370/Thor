@@ -585,18 +585,21 @@ Syntax:
   destroy resources referenced by elements such as separately allocated strings.
 - += inserts one element. |= takes another set and performs union; it does not
   insert a scalar element.
-- Support union (|), intersection (&), difference (-), symmetric difference (^),
+- Support union (|), intersection (&), difference (-), symmetric difference (~),
   and logical equality/inequality between sets of the same element type.
 - Non-mutating binary set operations produce an independent result table.
   Elements themselves retain Odin's ordinary shallow value-copy behavior.
-- Support |=, &=, ^=, and -= for the corresponding in-place set operations.
+- Support |=, &=, ~=, and -= for the corresponding in-place set operations.
   -= also removes an individual element when the operand has the element type.
 - Handle self-operations and aliased operands correctly. In particular, do not
   invalidate iteration while performing difference/intersection in place.
 - Ordinary set assignment follows Odin's reference-containing container copying;
   it is not an implicit deep clone or ownership transfer.
-- Newly allocated result tables are caller-managed. Do not automatically delete
-  operands, overwrite live storage with hidden cleanup, or infer ownership.
+- Named/returned result tables are caller-managed. Never automatically delete a
+  named operand or overwrite live storage with hidden cleanup. Anonymous tables
+  created by Thor literals/operators are released after their last known use.
+  Union chains may reuse an anonymous owned left result as the accumulator;
+  a | b | c requires only one result table, preserving operand evaluation order.
 - Preserve ordinary Odin operators on non-set operands.
 - Fixed-capacity sets/maps and pure-function set/map support are deferred.
 
@@ -659,8 +662,33 @@ Syntax:
   owns it under normal Odin cleanup rules. No implicit temp-allocator lifetime.
 - Release owned intermediate formatting buffers, or write directly into the final
   builder. Never delete borrowed field values merely because they were formatted.
+- Track ownership of nested interpolation through runtime/compile-time branches.
+  Release the selected owned inner string immediately after formatting it; never
+  release a selected borrowed string. All field expressions still execute once.
 - Pure-function use is limited to approved deterministic formatters; do not invoke
   arbitrary registered formatters or read mutable formatter/context state.
+
+Anonymous expression lifetimes (also applies to Set expressions):
+- Known language consumers release compiler-created anonymous owned inputs after
+  use: formatting, Set operators/updates, comparisons, membership, len, indexing,
+  iteration, unused expressions and blank destinations (including mixed
+  assignments). A loop's owned range survives until loop exit, including break,
+  continue and return paths.
+- Assignment to a name and return expose ownership to the caller. Ordinary proc
+  arguments/results retain Odin's explicit ownership conventions: arbitrary procs
+  may retain, consume or return their arguments, so do not infer their lifetimes.
+- Keep an anonymous owner alive through a scoped read of its borrowed view, then
+  release it. Reject escaping slices, field views, addresses and raw_data pointers
+  that need a surviving owner; request a named owner in the diagnostic. Conservative
+  rejection is allowed when a borrowed view cannot be proved safe through branches.
+- Container elements/aggregate fields retain shallow Odin ownership. Deleting a
+  Set table does not delete string keys. Name separately allocated keys when they
+  need independent cleanup; do not add recursive deletion or general lifetime
+  inference to arbitrary containers, conversions or user procedures.
+- Generated helpers use the surrounding implicit-context availability. Native
+  C/system/contextless callbacks can use nonallocating features without context;
+  allocation requires an explicit context in those callbacks. String defaults
+  containing convention names must not affect this decision.
 
 
 12. PURE FUNCTIONS AND ALLOCATION
@@ -961,12 +989,15 @@ Implement Thor in batches of T tasks. Each batch follows the same full loop:
 See DEVELOPMENT.md for the commands, repository layout, and batch checklist.
 Debugger mappings, stack traces, and a formatter remain separate work.
 
-Implementation checkpoint: 0.4.0 covers T01-T17, including quoted/raw interpolation,
+Implementation checkpoint: 0.4.1 covers T01-T17, including quoted/raw interpolation,
 runtime switch expressions, both #switch forms, Set syntax/operators, negative
 sequence accesses, and expression-local lowering. The demo has labeled sections
 for every implemented task. Compiler/runtime, TLS, diagnostic, grammar and actual
 VS Code integration tests accompany this checkpoint. Expression switches require
-a default arm in this implementation; ownership remains explicitly caller-managed.
+a default arm in this implementation. The hardening round restores native ~/~=
+xor and pointer parsing, tracks anonymous expression cleanup (including mixed
+owned/borrowed branches), reuses union-chain result tables, and supports helpers
+inside C/system/contextless callbacks. Named results remain caller-managed.
 Pure functions and compile-time execution/caching remain T18-T23.
 Remaining T11/T12 refinement: an unconstrained generic receiver's implicitly
 promoted using-pointer field is conservatively protected. Explicit pointer-member

@@ -329,8 +329,6 @@ class Resolver:
             if callee.kind=='Ident' and self.symbol(callee) is None and n.group('args'):
                 if callee.text=='make': return self.type_node(n.group('args')[0])
                 if callee.text=='new': return Type('pointer',node=n,elem=self.type_node(n.group('args')[0]))
-            if callee.kind=='Deref' and self.type_of(callee.role('expr'),seen).kind=='set':
-                return self.type_of(callee.role('expr'))
             # A named type conversion is checked by Odin; its shape is known.
             target = self.type_node(callee)
             if target.kind not in {"unknown", "procedure", "generic"}:

@@ -9,8 +9,9 @@ reserving ordinary identifiers like `fn` or `set`.
 
 With `Tokenizer.thor` enabled, f-strings are single string tokens whose fields
 are recursively scanned using this same lexer. Nested quotes, expressions and
-interpolations retain original positions. Thor also recognizes `^=`. With Thor
-disabled the scanner preserves ordinary Odin tokenization.
+interpolations retain original positions. Operators retain native Odin tokens:
+`~`/`~=` are xor, and `p^=value` is pointer dereference followed by assignment.
+With Thor disabled the scanner preserves ordinary Odin tokenization.
 
 `tokenizer_test.odin` compares token text/kinds and byte/line/column positions
 against native Odin for comments, CRLF, Unicode, strings, generics and Thor's

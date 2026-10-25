@@ -44,11 +44,13 @@ TLS Git history, including checkpoint `cb009c7`, is preserved at
 dependency required to build a fresh checkout.
 
 T01–T17 now have implementations, editor integration and evaluation sections in
-`demo/main.thor`. The 0.4.0 checkpoint covers interpolation (T13), runtime and
+`demo/main.thor`. The 0.4.1 checkpoint covers interpolation (T13), runtime and
 compile-time switches (T14), Set syntax (T15), negative sequence accesses (T16),
-and expression-local lowering (T17). It passes 256 Python compiler/LSP tests,
-1,097 native TLS tests, 49 grammar tests, allocation-tracked runtime/lexer tests,
-and the isolated VS Code integration test. The demo passes all three define modes.
+and expression-local lowering (T17), plus native xor/pointer compatibility,
+callback context handling and anonymous expression cleanup. It passes 289 Python
+compiler/LSP tests, 1,099 native TLS tests, 51 grammar tests, allocation-tracked
+runtime/lexer tests, and the isolated VS Code integration test. The demo passes
+all three define modes.
 
 `thorlang/expressions.py` emits named procedures with explicit lexical inputs;
 their calls remain in the original expression. Helpers instantiate lazily, so
@@ -57,6 +59,16 @@ array accesses retain storage; generic assignment branches preserve native map
 headers. Loop posts remain simple assignments. Native type witnesses resolve
 result/element types without executing expressions. TLS shares the parser's
 feature metadata and adapts only its editor AST, keeping original source spans.
+
+`thorlang/ownership.py` tracks only anonymous allocations from known Thor
+producers. Consumers release them after use; branch results carry an ownership
+flag, union chains reuse fresh left tables, and loop cleanup covers every exit.
+Unused expressions and blank destinations also release their owned results.
+Named results and arbitrary user procedure contracts remain manual. Set elements
+retain shallow ownership. Escaping temporary views require a named owner; safe
+immediate reads carry the owner until the read finishes. Test new consumers with
+Odin's tracking allocator, including mixed branches and early exits. Broad TLS
+resolver work remains deferred to the later T tasks.
 
 Later tasks T18–T23 cover purity, compile-time serialization/execution, caching,
 scratch allocation and automatic folding. The compiler's resolution boundary and

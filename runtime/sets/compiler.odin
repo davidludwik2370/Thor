@@ -24,10 +24,8 @@ compiler_equal_native :: proc "contextless"(value: $T, other: T) -> bool where !
 }
 compiler_equal :: proc{equal,compiler_equal_native}
 
-compiler_symmetric_difference :: proc(value: $T, other: T) -> T {
-    when (((T == Set(type_of(key_witness(value.table)))) when intrinsics.type_is_map(type_of(value.table)) else false) when intrinsics.type_has_field(T,"table") else false) { return symmetric_difference(value,other) }
-    else { #panic("Symmetric difference requires Set operands"); return {} }
-}
+compiler_xor_value :: proc "contextless"(value:$T,other:T)->T where !(((T == Set(type_of(key_witness(value.table)))) when intrinsics.type_is_map(type_of(value.table)) else false) when intrinsics.type_has_field(T,"table") else false) {return value ~ other}
+compiler_symmetric_difference :: proc{symmetric_difference,compiler_xor_value}
 
 compiler_add_set :: proc(target: ^Set($E), other: E) { insert(target,other) }
 compiler_add_native :: proc "contextless"(target: ^$T, other: T) where !(((T == Set(type_of(key_witness(target^.table)))) when intrinsics.type_is_map(type_of(target^.table)) else false) when intrinsics.type_has_field(T,"table") else false) {
@@ -49,7 +47,7 @@ compiler_intersection_assign :: proc{compiler_intersection_set,compiler_intersec
 
 compiler_xor_set :: proc(target: ^Set($E), other: Set(E)) { symmetric_difference_assign(target,other) }
 compiler_xor_native :: proc "contextless"(target: ^$T, other: T) where !(((T == Set(type_of(key_witness(target^.table)))) when intrinsics.type_is_map(type_of(target^.table)) else false) when intrinsics.type_has_field(T,"table") else false) {
-    #panic("Symmetric difference assignment requires Set operands")
+    target^ ~= other
 }
 compiler_xor_assign :: proc{compiler_xor_set,compiler_xor_native}
 

@@ -22,6 +22,8 @@ caller-owned string: `delete(result, allocator)`, using the selected allocator
 T13 interpolation uses these helpers and frees its own formatting buffers.
 Its final result is caller-owned; borrowed/user-returned field values retain
 their normal ownership. Pure execution and compile-time allocation are later tasks.
+The compiler releases anonymous nested interpolation results after formatting,
+including the selected allocated arm of a mixed owned/borrowed branch.
 
 ## Sets (T08)
 
@@ -54,6 +56,11 @@ memory tracking enabled. T15 adds `set[T]`, literals, operators, and builtin
 integration over this same support type. `compiler.odin` contains generic dispatch
 that preserves native operations for non-Set instantiations, including contextless
 native arithmetic and iteration. These dispatch functions are compiler support.
+Thor operators release their anonymous owned inputs after use and may reuse a
+fresh left union result, so `a | b | c` needs only one result table. Named inputs
+and caller-visible results retain explicit ownership. Element allocations remain
+shallow and require their own lifetime; the runtime APIs themselves do not infer
+ownership or automatically delete operands.
 
 ## Sequence bounds (T16)
 

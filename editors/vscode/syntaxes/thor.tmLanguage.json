@@ -915,10 +915,6 @@
           "match": "#(?:if|else|switch)\\b"
         },
         {
-          "name": "keyword.operator.assignment.compound.bitwise.thor",
-          "match": "\\^="
-        },
-        {
           "name": "keyword.control.thor",
           "match": "\\b(import|foreign|package)\\b"
         },

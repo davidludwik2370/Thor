@@ -96,6 +96,18 @@ async function run() {
         assert.ok(!fieldError.message.includes('__thor_'));
         await replace(expressions);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const hardened = 'package main\nlast::proc "c"(a:[]int,i:int)->int{return a[i]}\nmain::proc(){value:=1;p:=&value;p^=2;a:=set[int]{1};b:=set[int]{2};a~=b;_=len(a~b);_=f"{(true ? f"nested {7}" : "borrowed")}";for item in set[int]{1,2}{_=item};delete(a);delete(b)}\n';
+        await replace(hardened);
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const borrowedView = hardened.replace('value:=1', '_="😀";view:=f"abc {1}"[1:];_=view;value:=1');
+        await replace(borrowedView);
+        const lifetimeErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values => values.some(value => value.message.includes('named owner')));
+        const lifetimeError = lifetimeErrors.find(value => value.message.includes('named owner'));
+        assert.equal(testDocument.getText(lifetimeError.range), 'f"abc {1}"[1:]');
+        assert.ok(!lifetimeError.message.includes('__thor_'));
+        await replace(hardened);
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
         await vscode.window.showTextDocument(document);
         await vscode.commands.executeCommand('tls.restart');
@@ -104,7 +116,8 @@ async function run() {
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
-            'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics'];
+            'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
+            'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

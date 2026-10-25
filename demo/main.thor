@@ -44,6 +44,7 @@ make_pair :: proc() -> [2]f64 {
 }
 
 last_color :: proc(values: [2]$T, hint: T) -> T { return values[1] }
+callback_last :: proc "c"(values: []int, index: int) -> int { return values[index] }
 
 DEMO_MODE :: #config(DEMO_MODE, 2)
 #if DEMO_MODE == 1 {
@@ -260,14 +261,14 @@ main :: proc() {
     combined := fruit | more_fruit
     common := fruit & more_fruit
     only_first := fruit - more_fruit
-    either := fruit ^ more_fruit
+    either := fruit ~ more_fruit
     assert(len(fruit) == 2 && "pear" in common && "apple" in only_first)
     assert(len(combined) == 3 && len(either) == 2 && fruit != more_fruit)
     visited := 0
     for name in combined { assert(name in combined); visited += 1 }
     assert(visited == 3)
     fruit |= more_fruit; fruit &= combined; fruit -= "apple"
-    fruit -= common; fruit ^= either
+    fruit -= common; fruit ~= either
     assert("apple" in fruit && "plum" not_in fruit)
     clear(fruit)
     assert(len(fruit) == 0)
@@ -305,6 +306,32 @@ main :: proc() {
     combined_syntax := f"last: {switch sequence[-1] {case 43: "ok"; case: "bad"}}"
     assert(combined_syntax == "last: ok")
     delete(combined_syntax)
+
+    println("Hardening: anonymous temporaries, native xor, and C callbacks")
+    a := set[int]{1}; b := set[int]{2}; c := set[int]{3}
+    all := a | b | c // one result table; no hidden intermediate table to delete
+    defer delete(all)
+    assert(len(all) == 3 && len(a) == 1 && len(b) == 1 && len(c) == 1)
+    assert((a ~ b) == set[int]{1, 2}) // both anonymous tables are cleaned up
+    assert(len((a | b) & (b | c)) == 1)
+    a ~= b
+    assert(2 in a)
+    delete(a); delete(b); delete(c)
+    for allocated in [false, true] {
+        borrowed := "existing"
+        outer := f"{(allocated ? f"nested {7}" : borrowed)}"
+        assert(outer == (allocated ? "nested 7" : borrowed))
+        delete(outer) // only the selected allocated inner string is deleted
+    }
+    assert(len(f"text {7}"[1:]) == 5)
+    // Retain a named owner when a view needs to survive its expression.
+    owner := f"text {7}"
+    owner_view := owner[1:]
+    assert(owner_view == "ext 7")
+    delete(owner)
+    for item in set[int]{1, 2} { assert(item in [1, 2]) }
+    pointer_value := 1; pointer := &pointer_value; pointer^=3; pointer^~=1
+    assert(pointer^ == 2 && callback_last(sequence[:], -1) == 43)
 
     println("All T01-T17 demos passed.")
 }

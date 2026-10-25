@@ -15,6 +15,7 @@ Info :: struct {
     kind: string,
     start, end, parent: int,
     op, name: string,
+    calling_convention: string,
     mutable: bool,
     using_field: bool,
     roles: map[string]Span,
@@ -139,6 +140,17 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.lists["where"] = spans(n.where_clauses)
     case ^ast.Proc_Type:
         info.kind = "ProcedureType"; info.roles["params"] = span(n.params); info.roles["results"] = span(n.results)
+        if cc,ok:=n.calling_convention.(string);ok {info.calling_convention=strings.trim(cc,"\"`")}
+        else if n.calling_convention!=nil {info.calling_convention="foreign"}
+    case ^ast.Foreign_Block_Decl:
+        info.kind="ForeignBlock";info.calling_convention="c"
+        for attribute in n.attributes {for elem in attribute.elems {
+            field:=elem.derived.(^ast.Field_Value) or_continue
+            name:=field.field.derived.(^ast.Ident) or_continue
+            if name.name!="default_calling_convention"{continue}
+            value:=field.value.derived.(^ast.Basic_Lit) or_continue
+            info.calling_convention=strings.trim(value.tok.text,"\"`")
+        }}
     case ^ast.Field_List: info.kind = "Fields"
     case ^ast.Field:
         info.kind = "Field"; info.roles["type"] = span(n.type); info.lists["names"] = spans(n.names)
@@ -169,6 +181,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["body"] = span(n.body); info.roles["post"] = span(n.post)
     case ^ast.Range_Stmt:
         info.kind = "Range"; info.lists["names"] = spans(n.vals)
+        if n.label!=nil{info.start=n.label.pos.offset}
         info.roles["expr"] = span(n.expr); info.roles["body"] = span(n.body)
     case ^ast.Switch_Stmt: info.kind = "Switch"
     case ^ast.Type_Switch_Stmt:

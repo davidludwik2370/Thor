@@ -18,6 +18,8 @@ class Expressions:
         self.addresses = set()
         self.native_access = set()
         self.assigning = set()
+        from .ownership import Ownership
+        self.ownership = Ownership(self)
 
     def module(self, name, path=None):
         alias = self.source.prefix + name
@@ -100,14 +102,32 @@ class Expressions:
                 body=builder(Hint(s,node,s.prefix+'Result') if result is None else None)
             finally:
                 self.captures.pop()
-            owner=next((a for a in node.ancestors() if a.kind=='Procedure'),None)
-            contextless=owner and '"contextless"' in owner.role('type').text
-            convention=' "contextless"' if contextless else ''
+            convention=' "odin"' if self.has_context(node) else ' "contextless"'
             returns=' -> '+result_type if result_type else ''
             privacy='@(private="file")\n' if scope is s.root else ''
             self.helpers[key]=s.mapping.wrap(f'\n{privacy}{name} :: proc{convention}({", ".join(params)}){returns} {{\n{body}\n}}\n',
                                              s.path,node.start,node.end,'expression-helper')
         return name,args
+
+    def has_context(self,node):
+        """Use parsed conventions and lexical context initialization, not text.
+
+        Helpers use Odin/contextless ABI even inside foreign export blocks;
+        generic helper procedures cannot use a C ABI.
+        """
+        owner=next((a for a in node.ancestors() if a.kind=='Procedure'),None)
+        if owner is None: return True
+        cc=owner.role('type').data.get('calling_convention','')
+        if cc=='foreign':
+            foreign=next((a for a in owner.ancestors() if a.kind=='ForeignBlock'),None)
+            cc=foreign.data.get('calling_convention','c') if foreign else 'c'
+        if cc in {'','odin'}: return True
+        scopes={a for a in node.ancestors() if a.kind in {'Block','Case','Procedure'}}
+        for other in self.source.nodes:
+            if other.kind=='Assignment' and other.start<node.start and any(lhs.text=='context' for lhs in other.group('lhs')):
+                scope=next((a for a in other.ancestors() if a.kind in {'Block','Case','Procedure'}),None)
+                if scope in scopes: return True
+        return False
 
     def validation(self,node):
         """Ask Odin to check constant case matching without checking result arms.
@@ -184,6 +204,13 @@ class Expressions:
                         return aliases[key]
         if not s.thor:
             return None
+        code=self.ownership.discard(n)
+        if code is not None: return code
+        if n.kind=='Unary' and n.data['op']=='&' and not self.ownership.querying:
+            expr=n.role('expr')
+            base=expr.role('expr') if expr.kind=='Index' else expr
+            if self.ownership.may_own(base) or self.ownership.borrows_temporary(base):
+                return self.error(n,'An address into an anonymous allocation needs a named owner; bind the allocation before taking its address.')
         if n.kind=='Interpolation':
             return self.interpolation(n)
         if n.kind in {'SwitchExpr','CompileSwitchExpr','CompileSwitch'}:
@@ -192,9 +219,29 @@ class Expressions:
             return self.module('sets')+'.Set('+s.render(n.group('args')[0],constant=True)+')'
         if n.kind in {'Index','Slice'}:
             if n in self.native_access: return None
+            if n.kind=='Index':
+                code=self.ownership.index(n)
+                if code is not None: return code
+            elif not self.ownership.querying and self.ownership.borrows_temporary(n):
+                return self.error(n,'A view into an anonymous allocation needs a named owner; bind the allocation before slicing it.')
             return self.access(n,constant)
+        if n.kind=='Selector' and not self.ownership.querying and self.ownership.borrows_temporary(n):
+            return self.error(n,'A view into an anonymous allocation needs a named owner; bind the allocation before accessing its fields.')
         if n.kind=='Assignment' and n not in self.assigning:
             code=self.assignment(n,constant)
+            if code is not None: return code
+        if n.kind=='Call' and not self.ownership.querying:
+            callee=n.role('callee')
+            if callee.kind=='Ident' and callee.text=='raw_data' and s.resolver.symbol(callee) is None:
+                if any(self.ownership.may_own(arg) or self.ownership.borrows_temporary(arg) for arg in n.group('args')):
+                    return self.error(n,'A pointer into an anonymous allocation needs a named owner; bind the allocation before taking raw_data.')
+        if n.kind=='Binary' and not constant:
+            if n.data['op'] in {'in','not_in'}:
+                code=self.ownership.membership(n)
+            else: code=self.ownership.binary(n,expected,constant)
+            if code is not None: return code
+        if n.kind=='Range':
+            code=self.ownership.iterate(n)
             if code is not None: return code
         set_code=self.sets(n,expected,constant)
         if set_code is not None:
@@ -378,38 +425,42 @@ class Expressions:
             op=n.data['op']
             left,right=n.role('left'),n.role('right')
             lt,rt=self.shape(left),self.shape(right)
-            names={'|':'union_of','&':'intersection','-':'difference','^':'symmetric_difference','==':'equal','!=':'equal'}
+            names={'|':'union_of','&':'intersection','-':'difference','~':'symmetric_difference','==':'equal','!=':'equal'}
             if op in names and (lt.kind=='set' or rt.kind=='set'):
                 value=f'{self.module("sets")}.{names[op]}({s.render(left)},{s.render(right)})'
                 return f'(!{value})' if op=='!=' else value
             if (not constant and not s.denotes_type(left) and not s.denotes_type(right) and op in names
                     and lt.kind in {'generic','unknown'} and rt.kind in {'generic','unknown'}
                     and left.text!='nil' and right.text!='nil'):
-                name={'|':'union','&':'intersection','-':'difference','^':'symmetric_difference','==':'equal','!=':'equal'}[op]
+                name={'|':'union','&':'intersection','-':'difference','~':'symmetric_difference','==':'equal','!=':'equal'}[op]
                 value=f'{self.module("sets")}.compiler_{name}({s.render(left)},{s.render(right)})'
                 return f'(!{value})' if op=='!=' else value
         if n.kind=='Assignment' and len(n.group('lhs'))==1 and len(n.group('rhs'))==1:
             left,right=n.group('lhs')[0],n.group('rhs')[0]
             if self.shape(left).kind=='set':
-                name={'+=':'insert','-=':'subtract_assign','|=':'union_assign','&=':'intersection_assign','^=':'symmetric_difference_assign'}.get(n.data['op'])
+                name={'+=':'insert','-=':'subtract_assign','|=':'union_assign','&=':'intersection_assign','~=':'symmetric_difference_assign'}.get(n.data['op'])
                 if name:
+                    code=self.ownership.update(n,self.module('sets')+'.'+name)
+                    if code is not None: return code
                     return self.mutation(n,lambda:f'{self.module("sets")}.{name}(&({s.render(left)}),{s.render(right)})')
             if self.shape(left).kind in {'generic','unknown'} and left not in self.native_access:
-                name={'+=':'add','-=':'sub','|=':'union','&=':'intersection','^=':'xor'}.get(n.data['op'])
+                name={'+=':'add','-=':'sub','|=':'union','&=':'intersection','~=':'xor'}.get(n.data['op'])
                 if name:
+                    code=self.ownership.update(n,self.module('sets')+'.compiler_'+name+'_assign')
+                    if code is not None: return code
                     return self.mutation(n,lambda:f'{self.module("sets")}.compiler_{name}_assign(&({s.render(left)}),{s.render(right)})')
         if n.kind=='Call':
             callee=n.role('callee')
             args=n.group('args')
-            if callee.kind=='Deref' and self.shape(callee.role('expr')).kind=='set' and len(args)==1:
-                return f'{self.module("sets")}.symmetric_difference({s.render(callee.role("expr"))},{s.render(args[0])})'
-            if callee.kind=='Deref' and self.shape(callee.role('expr')).kind in {'generic','unknown'} and len(args)==1:
-                left,right=s.render(callee.role('expr')),s.render(args[0])
-                return f'({self.module("sets")}.symmetric_difference({left},{right}) when {self.set_trait(left)} else ({left})^({right}))'
             if callee.kind=='Ident' and s.resolver.symbol(callee) is None and len(args)==1:
                 typ=self.shape(args[0])
                 if callee.text=='len' and typ.kind in {'set','generic','unknown'}:
+                    code=self.ownership.query(n,args[0],lambda value:f'{self.module("sets")}.length({value})')
+                    if code is not None: return code
                     return f'{self.module("sets")}.length({s.render(args[0])})'
+                if callee.text=='len':
+                    code=self.ownership.query(n,args[0],lambda value:f'len({value})')
+                    if code is not None: return code
                 if callee.text=='delete' and typ.kind=='set':
                     return f'{self.module("sets")}.destroy({s.render(args[0])})'
                 if callee.text=='delete' and typ.kind in {'generic','unknown'}:
@@ -455,31 +506,34 @@ class Expressions:
                 if field is None:
                     code.append(f'{strings}.write_string(&{builder}, {literal})')
                 else:
-                    expression=s.render(field)
-                    if self.owned_interpolation(field):
-                        code.extend([f'{prefix}owned_{i} := {expression}',f'defer delete({prefix}owned_{i})'])
-                        expression=f'{prefix}owned_{i}'
+                    value=self.ownership.evaluate(field,code)
+                    expression=value.value
                     field_code='\n'.join([f'{prefix}field_{i} := {formatting}.format({expression}, {options})',
                                          f'{strings}.write_string(&{builder}, {prefix}field_{i})',f'delete({prefix}field_{i})'])
                     code.append(s.mapping.wrap(field_code,s.path,field.start,field.end,'interpolation-field'))
+                    self.ownership.release(value,code)
             code.append(f'return {strings}.clone({strings}.to_string({builder}))')
             return '\n'.join(code)
         name,args=self.closed(n,body)
         return f'{name}({", ".join(args)})'
 
-    def owned_interpolation(self,node):
-        """Only compiler-created, unambiguously owned string intermediates.
-
-        Named values and user procedure results retain ordinary ownership.
-        A mixed owned/borrowed conditional also needs a user-chosen lifetime.
-        """
-        if node.kind=='Interpolation': return True
-        if node.kind=='Paren': return self.owned_interpolation(node.role('expr'))
-        if node.kind in {'Ternary','WhenExpr'}:
-            return all(self.owned_interpolation(node.role(key)) for key in ['x','y'])
-        if node.kind in {'SwitchExpr','CompileSwitchExpr'}:
-            return all(self.owned_interpolation(node.source.at(case['result'],node)) for case in node.data['cases'])
-        return False
+    def switch_condition(self,n,case):
+        s=self.source
+        selector=n.role('selector')
+        if not case['matches']: return 'true'
+        values=[]
+        for span in case['matches']:
+            match=s.at(span,n)
+            value=s.render(match,constant=True)
+            if selector and match.kind=='Binary' and match.data['op'] in {'..','..<','..='}:
+                low,high=match.role('left'),match.role('right')
+                op='<=' if match.data['op']=='..=' else '<'
+                values.append(f'(({s.render(selector,constant=True)}) >= ({s.render(low,constant=True)}) && ({s.render(selector,constant=True)}) {op} ({s.render(high,constant=True)}))')
+            else:
+                values.append(f'(({s.render(selector,constant=True)}) == ({value}))' if selector else f'({value})')
+        result='false'
+        for value in reversed(values): result=f'(true when ({value}) else {result})'
+        return result
 
     def format_spec(self,text,origin):
         fill,align=' ', 'Default'
@@ -529,21 +583,7 @@ class Expressions:
                 return '\n'.join(code)
             name,args=self.closed(n,body,result=None,flavor='switch')
             return f'{name}({", ".join([*args,result])})'
-        def condition(case):
-            if not case['matches']: return 'true'
-            values=[]
-            for span in case['matches']:
-                match=at(span)
-                value=s.render(match,constant=True)
-                if selector and match.kind=='Binary' and match.data['op'] in {'..','..<','..='}:
-                    low,high=match.role('left'),match.role('right')
-                    op='<=' if match.data['op']=='..=' else '<'
-                    values.append(f'(({s.render(selector,constant=True)}) >= ({s.render(low,constant=True)}) && ({s.render(selector,constant=True)}) {op} ({s.render(high,constant=True)}))')
-                else:
-                    values.append(f'(({s.render(selector,constant=True)}) == ({value}))' if selector else f'({value})')
-            result='false'
-            for value in reversed(values): result=f'(true when ({value}) else {result})'
-            return result
+        def condition(case): return self.switch_condition(n,case)
         nondefault=[c for c in cases if c['matches']]
         validation=self.validation(n)
         if expression:

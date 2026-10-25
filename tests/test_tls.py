@@ -180,6 +180,32 @@ class TLSTests(unittest.TestCase):
         self.assertTrue(all(not errors for errors in diagnostics), diagnostics)
         self.assertIsNone(client.process.poll())
 
+    def test_hardening_pointer_xor_and_unsaved_lifetime_diagnostic(self):
+        text='''package main
+last::proc "c"(a:[]int,i:int)->int{return a[i]}
+main::proc(){
+ value:=1;p:=&value;p^=3;p^~=1
+ a:=set[int]{1};b:=set[int]{2};a~=b
+ result:=a~b
+ for item in set[int]{1,2}{_=item}
+ _=f"{(true ? f"inner {7}" : "borrowed")}"
+ delete(a);delete(b);delete(result)
+}
+'''
+        client,main=self.open(text)
+        hover=self.hover(client,main,text,'result')
+        self.assertIsNotNone(hover)
+        self.assertIn('set[int]',hover['contents']['value'])
+        changed=text.replace('value:=1','_="😀";view:=f"abc {1}"[1:];_=view;value:=1')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='named owner')
+        error=next(e for e in errors if 'named owner' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'f"abc {1}"[1:]',0))
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_hover_uses_unsaved_thor_text(self):
         text = 'package main\nmain :: proc() { values := [1,2,3]; _ = values }\n'
         client, main = self.open(text)
