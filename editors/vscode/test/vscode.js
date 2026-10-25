@@ -28,6 +28,8 @@ async function run() {
         const extension = vscode.extensions.getExtension('thor-local.thor-language');
         assert.ok(extension);
         await extension.activate();
+        assert.deepEqual(extension.packageJSON.contributes.semanticTokenScopes,
+            [{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
         const source = document.getText();
         const offset = source.indexOf('numbers :=') + 2;
         const hover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)),
@@ -116,6 +118,12 @@ async function run() {
         assert.ok(!fieldError.message.includes('__thor_'));
         await replace(expressions);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const implicitImports='package main\nimport "thor:format"\nimport "thor:sets"\nimport "thor:pure"\nmain::proc(){text:=format.group_integer(1234);delete(text);names:sets.Set(string);sets.insert(&names,"ok");sets.destroy(names);values:=pure.clone([]int{1,2});pure.destroy(values)}\n';
+        await replace(implicitImports);
+        const implicitDefinition=await eventually(()=>vscode.commands.executeCommand('vscode.executeDefinitionProvider',testDocument.uri,
+            testDocument.positionAt(implicitImports.indexOf('group_integer')+2)),values=>values?.length>0);
+        assert.ok(implicitDefinition.some(value=>(value.targetUri||value.uri).path.includes('/runtime/format/')));
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const hardened = 'package main\nlast::proc "c"(a:[]int,i:int)->int{return a[i]}\nmain::proc(){value:=1;p:=&value;p^=2;a:=set[int]{1};b:=set[int]{2};a~=b;_=len(a~b);_=f"{(true ? f"nested {7}" : "borrowed")}";for item in set[int]{1,2}{_=item};delete(a);delete(b)}\n';
         await replace(hardened);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
@@ -188,7 +196,8 @@ async function run() {
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',
             'allocated #run result inference', 'mapped slice-constant diagnostic',
             'automatic constants', 'generic-dependent evaluation', 'mapped unsaved generic diagnostic',
-            'full demo semantic-token ranges and classifications'];
+            'full demo semantic-token ranges and classifications',
+            'implicit runtime import names and namespace theme mapping'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

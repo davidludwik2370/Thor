@@ -15,8 +15,9 @@ npm run package
 ```
 
 Install `thor-language.vsix` with VS Code's **Extensions: Install from VSIX**
-command, then reload the window if requested. The grammar works independently
-of TLS. No Marketplace account or publication is needed.
+command, then run **Developer: Reload Window** after an update to load the new
+grammar and theme mappings. Restarting TLS only reloads the server. The grammar
+works independently of TLS. No Marketplace account or publication is needed.
 
 The client defaults to `tls/bin/tls` inside the workspace. To use this fork from
 another workspace, configure `tls.server.path` with the absolute executable path.
@@ -33,6 +34,11 @@ The grammar highlights embedded expressions independently from string text,
 including nested quotes and braces. Negative indices use native expression scopes.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
+Package names use variable-blue theme scopes, while `set[T]` uses the same keyword
+scope family as `map`. String scopes cover literal text and quotes; interpolation
+expressions, their prefixes and surrounding aggregate braces retain code metadata
+for bracket matching and coloring. Unaliased `import "thor:sets"` exposes `sets`;
+the analogous defaults are `format` and `pure`. Explicit aliases remain supported.
 Some contextual expected-type navigation remains incomplete: `.Red` in a
 switch-arm array can highlight correctly while lacking hover/definition.
 `fn` declarations and `#run` calls have highlighting and snippets. TLS hover

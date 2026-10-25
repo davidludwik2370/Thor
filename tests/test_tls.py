@@ -602,6 +602,26 @@ main::proc(){_=GLOBAL;_=SELECTED}
             self.assertLessEqual(column + length, len(lines[line].encode('utf-16-le')) // 2)
             previous_end = column + length
 
+    def test_runtime_import_default_names_resolve_and_keep_namespace_tokens(self):
+        text='''package main
+import "thor:format"
+import "thor:sets"
+import "thor:pure"
+main::proc(){
+ text:=format.group_integer(1234);delete(text)
+ names:sets.Set(string);sets.insert(&names,"ok");sets.destroy(names)
+ values:=pure.clone([]int{1,2});pure.destroy(values)
+}
+'''
+        client,main=self.open(text)
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        for namespace,member,directory in [('format','group_integer','format'),('sets','Set','sets'),('pure','clone','pure')]:
+            self.assertTrue(any(kind=='namespace' and token==namespace for _,_,kind,token,_ in spans),namespace)
+            self.assertIsNotNone(self.hover(client,main,text,namespace+'.'+member))
+            result=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,namespace+'.'+member,len(namespace)+2)})
+            self.assertIn('/runtime/'+directory+'/',result['uri'])
+
     def test_import_paths_keep_string_coloring(self):
         text = ('package main\n'
                 'import "core:fmt" / println\n'

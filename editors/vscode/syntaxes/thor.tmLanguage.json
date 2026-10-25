@@ -48,7 +48,7 @@
           "name": "keyword.control.thor"
         },
         "2": {
-          "name": "entity.name.type.module.thor"
+          "name": "variable.other.namespace.thor"
         }
       }
     },
@@ -59,7 +59,7 @@
           "name": "keyword.control.import.thor"
         },
         "2": {
-          "name": "entity.name.namespace.thor"
+          "name": "variable.other.namespace.thor"
         }
       }
     },
@@ -1227,14 +1227,14 @@
     "interpolated-strings": {
       "patterns": [
         {
-          "name": "string.quoted.double.interpolated.thor",
+          "name": "meta.interpolation.thor",
           "begin": "(f)(\")",
           "beginCaptures": {
             "1": {
               "name": "storage.modifier.interpolation.thor"
             },
             "2": {
-              "name": "punctuation.definition.string.begin.thor"
+              "name": "string.quoted.double.interpolated.thor punctuation.definition.string.begin.thor"
             }
           },
           "end": "\"",
@@ -1293,17 +1293,23 @@
                 }
               ]
             }
-          ]
+          ],
+          "contentName": "string.quoted.double.interpolated.thor",
+          "endCaptures": {
+            "0": {
+              "name": "string.quoted.double.interpolated.thor punctuation.definition.string.end.thor"
+            }
+          }
         },
         {
-          "name": "string.quoted.raw.interpolated.thor",
+          "name": "meta.interpolation.thor",
           "begin": "(f)(`)",
           "beginCaptures": {
             "1": {
               "name": "storage.modifier.interpolation.thor"
             },
             "2": {
-              "name": "punctuation.definition.string.begin.thor"
+              "name": "string.quoted.raw.interpolated.thor punctuation.definition.string.begin.thor"
             }
           },
           "end": "`",
@@ -1359,7 +1365,13 @@
                 }
               ]
             }
-          ]
+          ],
+          "contentName": "string.quoted.raw.interpolated.thor",
+          "endCaptures": {
+            "0": {
+              "name": "string.quoted.raw.interpolated.thor punctuation.definition.string.end.thor"
+            }
+          }
         }
       ]
     },

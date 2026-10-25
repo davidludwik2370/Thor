@@ -181,3 +181,17 @@ The expected failure tracks missing hover/definition on contextual enum members
 inside switch-arm arrays. Compilation and coloring work. Keep this distinct from
 token-range corruption: tests must check original token identity as well as file
 bounds, and editor navigation needs its own expected-type regression cases.
+
+The 0.7.2 editor follow-up gives namespaces a Thor-specific variable-color fallback
+instead of VS Code's type-colored namespace default. Interpolation now assigns
+string scopes to contents/quotes, keeping prefixes and surrounding code separate.
+The grammar suite checks the reported conditional nested f-string, aggregate
+return braces, escaped literal braces, package names and `set`/`map` colors,
+including their token/bracket metadata in the full demo context. Import regressions
+exercise default `format`/`sets`/`pure` names and explicit aliases through actual
+compiled programs and TLS resolution. Install updated grammars with a window
+reload; a server restart cannot replace an already loaded TextMate grammar.
+All 64 grammar tests, the four targeted compiler/LSP regressions (including
+allocation-tracked import examples), and the actual VS Code integration test
+pass. The 0.7.2 VSIX is installed locally; its grammar/theme contributions require
+**Developer: Reload Window** in an already open editor.

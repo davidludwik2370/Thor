@@ -24,14 +24,16 @@ before(async () => {
             {scope:'comment',settings:{foreground:'#6A9955'}},
             {scope:'meta.embedded',settings:{foreground:'#D4D4D4'}},
             {scope:'variable',settings:{foreground:'#9CDCFE'}},
+            {scope:['entity.name.namespace','entity.name.type','support.type'],settings:{foreground:'#4EC9B0'}},
             {scope:'entity.name.function',settings:{foreground:'#DCDCAA'}},
+            {scope:'storage.type',settings:{foreground:'#569CD6'}},
             {scope:'storage.modifier',settings:{foreground:'#569CD6'}},
             {scope:'constant.numeric',settings:{foreground:'#B5CEA8'}},
         ]},
         onigLib,
         loadGrammar:async()=>JSON.parse(fs.readFileSync(path.join(__dirname,'../syntaxes/thor.tmLanguage.json'),'utf8')),
     });
-    themedGrammar=await themed.loadGrammar('source.thor');
+    themedGrammar=await themed.loadGrammarWithConfiguration('source.thor',1,{balancedBracketSelectors:['*']});
     colorMap=themed.getColorMap();
 });
 
@@ -51,10 +53,22 @@ function check(source, word, scope, line = 0) {
     assert.ok(token.scopes.some(s => s.startsWith(scope)), `${word}: ${token.scopes.join(', ')} lacks ${scope}`);
 }
 
+function themedTokens(source) {
+    let state=textmate.INITIAL;
+    return source.split('\n').map(line=>{
+        const result=themedGrammar.tokenizeLine2(line,state);state=result.ruleStack;
+        return Array.from({length:line.length},(_,at)=>{
+            let i=0;while(i+2<result.tokens.length&&result.tokens[i+2]<=at)i+=2;
+            const metadata=result.tokens[i+1];
+            return {color:colorMap[(metadata>>>15)&511],type:(metadata>>>8)&3,balanced:!!(metadata&1024)};
+        });
+    });
+}
+
 for (const [name, source, word, scope, line] of [
-    ['package', 'package main', 'main', 'entity.name.type.module'],
+    ['package', 'package main', 'main', 'variable.other.namespace'],
     ['selective import', 'import "core:math" / sin, cos', 'import', 'keyword.control.import'],
-    ['named import', 'import math "core:math" / sin', 'math', 'entity.name.namespace'],
+    ['named import', 'import math "core:math" / sin', 'math', 'variable.other.namespace'],
     ['multiline import ends', 'import "core:math" / sin,\n cos\nmain :: proc() {}', 'main', 'entity.name.function', 2],
     ['comma continuation', 'import "core:math" /\n sin, // comment\n cos', 'cos', 'variable', 2],
     ['Thor if', '#if true {', '#if', 'keyword.control.conditional'],
@@ -147,15 +161,7 @@ test('main demo tokenizes without illegal or unclosed string/comment scopes', ()
 });
 
 test('nested interpolations retain string colors and ordinary expression colors',()=>{
-    function colors(source){
-        const data=themedGrammar.tokenizeLine2(source).tokens;
-        const out=[];
-        for(let i=0;i<data.length;i+=2){
-            const color=colorMap[(data[i+1]>>>15)&511];
-            for(let at=data[i];at<(data[i+2]??source.length);at++)out[at]=color;
-        }
-        return out;
-    }
+    const colors=source=>themedTokens(source)[0].map(t=>t.color);
     const source='text := f"outer {f"inner {mark(3)}"} {mark(1)} {mark(2)}"';
     const actual=colors(source);
     for(const [word,color] of [['outer ','#CE9178'],['inner ','#CE9178'],['mark','#DCDCAA'],['3','#B5CEA8'],['1','#B5CEA8'],['2','#B5CEA8']]){
@@ -165,6 +171,65 @@ test('nested interpolations retain string colors and ordinary expression colors'
     for(const source of ['assert(text == "{fields} 1 2 0001,234,567")','case 1: "first"','case: `raw {not_a_field}`']){
         const actual=colors(source),start=source.search(/["`]/);
         assert.ok(actual.slice(start,source.lastIndexOf(source[start])+1).every(c=>c==='#CE9178'));
+    }
+});
+
+test('reported ternary interpolation has ordinary expressions and nested string text',()=>{
+    const source='outer := f"{(allocated ? f"nested {7}" : borrowed)}"';
+    const tokens=themedTokens(source)[0];
+    for(const [word,color,type] of [['allocated','#9CDCFE',0],['nested ','#CE9178',2],['7','#B5CEA8',0],['borrowed','#9CDCFE',0]]){
+        const start=source.indexOf(word);
+        for(const token of tokens.slice(start,start+word.length))assert.deepEqual({color:token.color,type:token.type},{color,type},word);
+    }
+    for(let at=0;at<source.length;at++){
+        if('{}()'.includes(source[at])){
+            assert.equal(tokens[at].type,0,`Expression bracket at ${at} treated as string text`);
+            assert.ok(tokens[at].balanced);
+        }
+        if(source[at]==='f')assert.equal(tokens[at].type,0,'Interpolation prefix is syntax');
+    }
+});
+
+test('aggregate return braces and interpolation fields are code, escaped braces are text',()=>{
+    const source='return {f"report {text}",rows,values}';
+    const tokens=themedTokens(source)[0];
+    for(let at=0;at<source.length;at++)if('{}'.includes(source[at])){
+        assert.equal(tokens[at].type,0,`Code brace at ${at} treated as string text`);
+        assert.ok(tokens[at].balanced);
+    }
+    const escaped='text := f"{{fields}}"';
+    for(const [at,ch] of [...escaped].entries())if('{}'.includes(ch))assert.equal(themedTokens(escaped)[0][at].type,2);
+});
+
+test('package names are blue while set syntax uses the same dark blue as map',()=>{
+    for(const [source,word] of [['package main','main'],['import sets "thor:sets"','sets'],['names: sets.Set(string)','sets']]){
+        const start=source.indexOf(word);
+        assert.ok(themedTokens(source)[0].slice(start,start+word.length).every(t=>t.color==='#9CDCFE'));
+    }
+    for(const [source,word] of [['a := set[int]{1}','set'],['a: set[int]','set'],['a: map[int]int','map']]){
+        const start=source.indexOf(word);
+        assert.ok(themedTokens(source)[0].slice(start,start+word.length).every(t=>t.color==='#569CD6'),source);
+    }
+    const manifest=require('../package.json');
+    assert.deepEqual(manifest.contributes.semanticTokenScopes,[{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
+});
+
+test('reported colors and bracket metadata survive the full demo context',()=>{
+    const source=fs.readFileSync(path.join(__dirname,'../../../demo/main.thor'),'utf8');
+    const lines=source.split('\n'),tokens=themedTokens(source);
+    for(const [fragment,word,color,type] of [
+        ['return {f"report','{',undefined,0],
+        ['outer := f"{(allocated','allocated','#9CDCFE',0],
+        ['outer := f"{(allocated','nested ','#CE9178',2],
+        ['names: sets.Set','sets','#9CDCFE',0],
+        ['a := set[int]{1}','set','#569CD6',0],
+    ]){
+        const line=lines.findIndex(line=>line.includes(fragment));assert.ok(line>=0,fragment);
+        const start=lines[line].indexOf(word);
+        for(const token of tokens[line].slice(start,start+word.length)){
+            assert.equal(token.type,type,word);
+            if(color)assert.equal(token.color,color,word);
+        }
     }
 });
 

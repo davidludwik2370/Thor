@@ -12,6 +12,20 @@ class HardeningTests(unittest.TestCase):
                            '\n@(test) lifetime::proc(t:^testing.T){\n'+body+'\n}\n',
                            command='test', flags=['-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'])
 
+    def test_runtime_import_default_names_and_explicit_aliases(self):
+        imports='import "thor:format"\nimport "thor:sets"\nimport "thor:pure"\n'
+        body='''
+text:=format.group_integer(1234);testing.expect(t,text=="1,234");delete(text)
+names:sets.Set(string);sets.insert(&names,"ok")
+testing.expect(t,sets.contains(names,"ok"));sets.destroy(names)
+values:=pure.clone([]int{1,2});testing.expect(t,values[1]==2);pure.destroy(values)
+'''
+        self.memory(body,imports)
+        for name,alias in [('format','fmt_alias'),('sets','set_alias'),('pure','pure_alias')]:
+            imports=imports.replace(f'import "thor:{name}"',f'import {alias} "thor:{name}"')
+            body=body.replace(name+'.',alias+'.')
+        self.memory(body,imports)
+
     def test_native_xor_precedence_and_parentheses(self):
         self.memory('''
 a:=set[int]{1};b:=set[int]{2};c:=set[int]{2}
