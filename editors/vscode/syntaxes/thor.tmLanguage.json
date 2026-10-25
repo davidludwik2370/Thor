@@ -1,5 +1,5 @@
 {
-  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T17 additions. See THIRD_PARTY_NOTICES.md.",
+  "comment": "Adapted from DanielGavin/ols (MIT); Thor T01-T20 additions. See THIRD_PARTY_NOTICES.md.",
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Thor",
   "patterns": [
@@ -246,7 +246,7 @@
     },
     "procedure-assignment": {
       "name": "meta.definition.variable.thor",
-      "begin": "\\b([A-Za-z_]\\w*)\\s*(:\\s*:|=)\\s*(#\\w+)?\\s*(?=proc\\b)",
+      "begin": "\\b([A-Za-z_]\\w*)\\s*(:\\s*:|=)\\s*(#\\w+)?\\s*(?=(?:proc|fn)\\b)",
       "beginCaptures": {
         "1": {
           "name": "meta.definition.function.thor entity.name.function.thor"
@@ -441,7 +441,7 @@
           "include": "#map-bitset"
         },
         {
-          "begin": "\\b(proc|struct|union|enum|bit_field)\\b",
+          "begin": "\\b(proc|fn|struct|union|enum|bit_field)\\b",
           "beginCaptures": {
             "1": {
               "name": "storage.type.thor"
@@ -912,7 +912,7 @@
       "patterns": [
         {
           "name": "keyword.control.conditional.thor",
-          "match": "#(?:if|else|switch)\\b"
+          "match": "#(?:if|else|switch|run)\\b"
         },
         {
           "name": "keyword.control.thor",

@@ -41,6 +41,29 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_pure_contract_and_borrow_errors_point_to_original_source(self):
+        source='package main\nbad::fn(input:[]int)->int{_="😀";alias:=input;alias[0]=7;return 0}\nmain::proc(){a:=[1];_=bad(a[:])}\n'
+        errors=self.at(source,'alias[0]=7',message='borrowed from an input')
+        self.assertNotIn('runtime/',json.dumps(errors))
+        source='package main\nbad::fn()->string{return "text"}\nmain::proc(){_=bad()}\n'
+        errors=self.at(source,'fn()->string',message='Allocation-bearing pure results')
+        self.assertNotIn('runtime/',json.dumps(errors))
+
+    def test_run_helper_errors_runtime_failure_and_unsaved_import(self):
+        source='package main\nwork::fn()->int{return missing}\nVALUE::#run work()\nmain::proc(){_=VALUE}\n'
+        errors=self.at(source,'missing',message='missing')
+        self.assertNotIn('thor-run-',json.dumps(errors))
+        source='package main\nwork::fn()->int{assert(false,"oops");return 0}\nVALUE::#run work()\nmain::proc(){_=VALUE}\n'
+        errors=self.at(source,'#run work()',message='#run execution failed')
+        self.assertNotIn('thor-run-',json.dumps(errors))
+        source='package main\nimport "library"\nVALUE::#run library.work()\nmain::proc(){_=VALUE}\n'
+        library='package library\nwork::fn()->int{_="😀";return missing}\n'
+        entry,_,errors,_=self.invoke(source,files={'library/main.thor':'package library\nwork::fn()->int{return 7}\n'},overlays={'library/main.thor':library})
+        error=next(e for e in errors if 'missing' in e['msgs'][0])
+        self.assertEqual(error['pos']['file'],str(entry.parent/'library/main.thor'))
+        self.assertEqual(error['pos']['offset'],library.encode().index(b'missing'))
+        self.assertNotIn('thor-run-',json.dumps(errors))
+
     def test_anonymous_view_and_pointer_errors_keep_unicode_ranges(self):
         for expr in ['f"abc {1}"[1:]', 'raw_data(f"abc {1}")', '&f"abc {1}"[-1]']:
             with self.subTest(expr=expr):

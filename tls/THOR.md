@@ -36,6 +36,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 
 ## Current support
 
+- Parse `fn` and `#run` through the shared frontend. Hover retains the `fn`
+  spelling and explains purity; call results, including concrete generic results,
+  retain type inference and completion through `#run`. Live compiler checks
+  enforce purity/evaluation rules against unsaved source and dependencies.
 - Discover mixed `.thor`/`.odin` packages and dependencies.
 - Parse T13–T17 interpolation, switch expressions, compile-time switches and Set
   syntax. Infer interpolation's string type, runtime switch result types and
@@ -69,7 +73,8 @@ Like OLS, this server has its own partial semantic resolver, not Odin's complete
 type checker. Complex overloads, generic specialization, and some nested expected
 type contexts remain limited. The conditional evaluator is also a subset of
 Odin's constant evaluator; it does not execute arbitrary procedures. It does not
-implement future Thor features such as pure functions or `#run`.
+execute procedures to populate hover values or choose `#run`-dependent branches;
+the compiler checker performs explicit compile-time execution.
 
 For Thor packages, the checker invokes `thor check -json-errors` with snapshots
 of all open buffers. Thor lowers those buffers, checks the generated Odin, and

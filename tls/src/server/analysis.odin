@@ -2117,6 +2117,13 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 	case ^ast.Call_Expr:
 		old_call := ast_context.call
 		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
+			if name.name=="__thor_run"&&len(v.args)==1 {
+				defer ast_context.call=old_call
+				if call,is_call:=v.args[0].derived.(^ast.Call_Expr);is_call {
+					ast_context.call=call
+				}
+				out^,ok=resolve_value_type_expression(ast_context,v.args[0]);return ok
+			}
 			if name.name=="__thor_interpolation"{
 				ident:=new_type(ast.Ident,v.pos,v.end,context.temp_allocator)
 				ident.name="string"
@@ -4598,6 +4605,7 @@ make_symbol_procedure_from_ast :: proc(
 	}
 
 	symbol.value = SymbolProcedureValue {
+		thor_pure          = v.tok.text=="fn",
 		return_types       = return_types[:],
 		orig_return_types  = return_types[:],
 		arg_types          = arg_types[:],

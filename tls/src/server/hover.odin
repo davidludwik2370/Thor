@@ -17,6 +17,9 @@ write_hover_content :: proc(
 	layout := "",
 ) -> MarkupContent {
 	cat := construct_symbol_information(ast_context, symbol)
+    if value,ok:=symbol.value.(SymbolProcedureValue);ok&&value.thor_pure {
+        cat=append_first_line_comment(cat,"pure function",allocator)
+    }
 	if .Immutable in symbol.flags { cat = append_first_line_comment(cat, "immutable storage", allocator) }
 	doc := construct_symbol_docs(symbol, allocator)
 

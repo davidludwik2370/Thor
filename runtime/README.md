@@ -21,7 +21,8 @@ caller-owned string: `delete(result, allocator)`, using the selected allocator
 
 T13 interpolation uses these helpers and frees its own formatting buffers.
 Its final result is caller-owned; borrowed/user-returned field values retain
-their normal ownership. Pure execution and compile-time allocation are later tasks.
+their normal ownership in ordinary procedures. Pure functions use the separate
+compiler-managed scratch policy described below.
 The compiler releases anonymous nested interpolation results after formatting,
 including the selected allocated arm of a mixed owned/borrowed branch.
 
@@ -69,3 +70,28 @@ Signed arithmetic widens to i128 before adding length, and checks the wide resul
 before native machine-index conversion. Unsigned values retain their original
 type. The emitter applies this only to ordinary sequences, preserves storage for
 writes/addresses, and leaves map/pointer/enumerated-array indexing native.
+
+## Pure scratch storage and value protocol (T18–T20)
+
+`thor:pure` and `thor:eval` are compiler support, not general-purpose purity
+annotations for arbitrary user procedures. Generated contracts validate actual
+instantiated input/result types. The frontend supplies record field schemas,
+while Odin resolves their exact field types. Unsupported/reference-bearing
+results fail at the original function declaration.
+
+Every checked function saves its caller allocator in a tracking scratch allocator.
+Its ordinary and temporary allocator slots both refer to that scratch allocator.
+Explicit frees remove tracked allocations; every remaining allocation is freed
+on return. Nested calls have separate trackers backed by the outer scratch
+allocator. No allocated result may escape this initial implementation: strings,
+slices and nested allocation-bearing results are rejected. Ordinary `proc`
+interpolation remains allocated with the current allocator and caller-managed.
+
+The native helper serializes a versioned JSON value tree before its storage
+expires. Integers use decimal strings; floats carry raw bytes and endianness;
+strings carry byte hex; aggregates carry individual fields/elements and union
+variants. Nil and nonnil empty slice descriptors are distinct in the protocol.
+Padding and addresses are excluded. Reconstruction validates the packet and emits
+typed native constants. The current result policy intentionally exposes only
+scalar and pointer-free fixed aggregate results. See the root README for native
+execution limits and conservative schema boundaries.

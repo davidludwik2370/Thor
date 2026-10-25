@@ -219,6 +219,36 @@ main::proc(){
         self.assertIn('[2]f64', client.request('textDocument/hover', params)['contents']['value'])
         self.assertEqual(main.read_text(), text)
 
+    def test_pure_hover_run_inference_and_unsaved_diagnostics(self):
+        text='package main\nsquare::fn(value:int)->int{return value*value}\nSIZE::#run square(3)\nmain::proc(){result:=#run square(4);_=result;data:[SIZE]int;_=data}\n'
+        client,main=self.open(text)
+        hover=self.hover(client,main,text,'square')
+        self.assertIn('fn(value: int) -> int',hover['contents']['value'])
+        self.assertIn('pure function',hover['contents']['value'])
+        hover=self.hover(client,main,text,'result')
+        self.assertIn('result: int',hover['contents']['value'])
+        changed=text.replace('return value*value','_=context;return value*value')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='ambient context')
+        error=next(e for e in errors if 'ambient context' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'context',0))
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_run_imported_unsaved_purity_error(self):
+        text='package main\nimport "library" / square\nVALUE::#run square(3)\nmain::proc(){_=VALUE}\n'
+        original='package library\nsquare::fn(value:int)->int{return value*value}\n'
+        client,main=self.open(text,{'library/main.thor':original})
+        library=main.parent/'library/main.thor'
+        changed=original.replace('return value*value','_=context;return value*value')
+        client.send('textDocument/didOpen',{'textDocument':{'uri':library.as_uri(),'languageId':'thor','version':1,'text':changed}})
+        errors=client.diagnostic(library.as_uri(),contains='ambient context')
+        error=next(e for e in errors if 'ambient context' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'context',0))
+        self.assertEqual(library.read_text(),original)
+
     def test_expression_string_switch_and_set_hovers(self):
         text='''package main
 main::proc(){
@@ -273,7 +303,7 @@ main::proc(){_=GLOBAL;_=SELECTED}
         self.assertEqual(main.read_text(),text)
 
     def test_new_syntax_semantic_tokens_have_original_ranges(self):
-        text='package main\nmain::proc(){x:>7;s:=f"value {x}";names:=set[int]{x};_=switch x{case 7:1;case:2};delete(s);delete(names)}\n'
+        text='package main\nsquare::fn(value:int)->int{return value*value}\nSIZE::#run square(3)\nmain::proc(){x:>7;s:=f"value {x}";names:=set[int]{x};_=switch x{case 7:1;case:2};delete(s);delete(names)}\n'
         client,main=self.open(text)
         result=client.request('textDocument/semanticTokens/full',{'textDocument':{'uri':main.as_uri()}})
         line=column=0

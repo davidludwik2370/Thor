@@ -46,6 +46,41 @@ make_pair :: proc() -> [2]f64 {
 last_color :: proc(values: [2]$T, hint: T) -> T { return values[1] }
 callback_last :: proc "c"(values: []int, index: int) -> int { return values[index] }
 
+// T18: declared purity, generic calls, recursion, and scratch allocation.
+pure_square :: fn(value: $T) -> T { return value * value }
+pure_factorial :: fn(value: int) -> int {
+    if value < 2 { return 1 }
+    return value * pure_factorial(value - 1)
+}
+pure_sum :: fn(values: []int) -> int {
+    total := 0
+    for value in values { total += value }
+    return total
+}
+pure_work :: fn(text: string, value: int) -> int {
+    buffer := make([]int, 3)
+    buffer[0] = value
+    message := f"scratch {buffer[0]}"
+    // All internal allocations are released on return, including named buffers.
+    return len(text) + len(message)
+}
+
+// T19: contents-only reconstruction, with exact types and floating-point bits.
+Pure_Report :: struct { value: int, pair: [2]int }
+pure_report :: fn(value: int) -> Pure_Report { return {value, [value, value + 1]} }
+pure_negative_zero :: fn() -> f64 { return -f64(0) }
+
+// T20: an ordinary procedure is eligible when its entire call graph is pure.
+known_sum :: proc() -> int {
+    values := [2, 3, 5]
+    return pure_sum(values[:])
+}
+PURE_SIZE :: #run pure_square(4)
+PURE_NEXT :: #run pure_square(PURE_SIZE)
+PURE_REPORT :: #run pure_report(7)
+PURE_ZERO :: #run pure_negative_zero()
+PURE_SUM :: #run known_sum()
+
 DEMO_MODE :: #config(DEMO_MODE, 2)
 #if DEMO_MODE == 1 {
     BRANCH :: "first"
@@ -333,5 +368,28 @@ main :: proc() {
     pointer_value := 1; pointer := &pointer_value; pointer^=3; pointer^~=1
     assert(pointer^ == 2 && callback_last(sequence[:], -1) == 43)
 
-    println("All T01-T17 demos passed.")
+    println("T18: pure runtime functions, generic/recursive calls, and scratch storage")
+    runtime_values := [1, 2, 3]
+    assert(pure_sum(runtime_values[:]) == 6 && runtime_values[0] == 1)
+    assert(pure_square(f64(1.5)) == 2.25 && pure_factorial(5) == 120)
+    assert(pure_work("input", 7) == 14)
+
+    println("T19: typed records, arrays, and exact float reconstruction")
+    report := PURE_REPORT
+    assert(report.value == 7 && report.pair == [7, 8])
+    assert(transmute(u64)PURE_ZERO == 0x8000000000000000)
+
+    println("T20: explicit #run, ordinary eligible procedures, constants, and selection")
+    sized: [PURE_SIZE]int
+    assert(len(sized) == 16 && PURE_NEXT == 256 && PURE_SUM == 10)
+    SELECTED :: #switch DEMO_MODE {
+        case 1: #run pure_square(3)
+        case: #run pure_square(4)
+    }
+    assert(SELECTED == (DEMO_MODE == 1 ? 9 : 16))
+    when false { UNUSED :: #run unselected() } // no helper executes this call
+    // Plain fn calls with known arguments remain runtime calls until T23.
+    // String/slice returns are deliberately rejected by the initial result policy.
+
+    println("All T01-T20 demos passed.")
 }

@@ -508,6 +508,8 @@ class Expressions:
                 else:
                     value=self.ownership.evaluate(field,code)
                     expression=value.value
+                    if s.purity and (s.purity.eval_mode or s.purity.checked(s.purity.owner(n))):
+                        code.append(f'{s.purity.module(s)}.validate_format(type_of({expression}))')
                     field_code='\n'.join([f'{prefix}field_{i} := {formatting}.format({expression}, {options})',
                                          f'{strings}.write_string(&{builder}, {prefix}field_{i})',f'delete({prefix}field_{i})'])
                     code.append(s.mapping.wrap(field_code,s.path,field.start,field.end,'interpolation-field'))

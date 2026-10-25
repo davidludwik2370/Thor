@@ -1,4 +1,4 @@
-"""Lower T01-T17 using ASTs from the adapted Odin tooling parser.
+"""Lower T01-T20 using ASTs from the adapted Odin tooling parser.
 
 Offsets are UTF-8 byte offsets, as in Odin. Unchanged source is copied verbatim;
 all transformations are attached to parsed nodes, never textual pattern matches.
@@ -106,9 +106,13 @@ class Source:
             raise ThorError(f"invalid frontend output for {path}") from exc
         self.nodes = [Node(self, i, d) for i, d in enumerate(self.info["nodes"])]
         for feature in self.info.get("features") or []:
-            node = next((n for n in self.nodes if n.start == feature["start"] and n.end == feature["end"] and n.kind in {"Call", "Switch"}), None)
+            node = next((n for n in self.nodes if n.start == feature["start"] and n.end == feature["end"] and n.kind in {"Call", "Switch", "Procedure"}), None)
             if node:
+                if feature['kind']=='PureFunction':
+                    node.data['pure']=True
+                    continue
                 node.data.update(feature)
+                if feature['kind']=='Run': node.data.setdefault('roles',{})['expr']=node.data['lists']['args'][0]
                 if feature["kind"] in {"SwitchExpr", "CompileSwitchExpr", "CompileSwitch"}:
                     node.data.setdefault("roles", {})["selector"] = feature["selector"]
         self.excluded = self.info.get("excluded", False)
@@ -145,6 +149,9 @@ class Source:
         self.converted_do_blocks = set()
         self.guard_messages = {}
         self.resolver = None
+        self.purity = None
+        self.run_values = {}
+        self.evaluation_keep = None
         from .expressions import Expressions
         self.expressions = Expressions(self)
         self.selected = {}
@@ -181,6 +188,7 @@ class Source:
         # Discover support packages before emission so their dependencies and
         # source maps participate in the same project graph.
         for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
+                              ('pure',any(n.data.get('pure') or n.kind=='Run' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call'} for n in self.nodes)),
                               ('sequence',self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes))]:
             if needed:
@@ -344,6 +352,10 @@ class Source:
         builtins = {"bool", "b8", "b16", "b32", "b64", "int", "uint", "uintptr", "rune",
                     "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128",
                     "f16", "f32", "f64", "string", "cstring", "rawptr", "typeid", "any"}
+        builtins.update(f'{prefix}{bits}{endian}' for prefix in ['i','u','f']
+                        for bits in ([16,32,64] if prefix=='f' else [8,16,32,64,128])
+                        for endian in ['', 'le', 'be'])
+        builtins.update({'complex32','complex64','complex128','quaternion64','quaternion128','quaternion256'})
         declaration = self.declaration_for(expression)
         if declaration is None:
             return expression.kind == "Ident" and expression.text in builtins
@@ -495,6 +507,8 @@ class Source:
             return ""
         if n.source is not self:
             return n.source.render(n, expected, constant)
+        if self.evaluation_keep is not None and n is not self.root and n.kind!='Package':
+            if not any(k is n or k in n.ancestors() or n in k.ancestors() for k in self.evaluation_keep):return ''
         if n in self.blocked:
             token, message = self.blocked[n]
             self.error_messages[token] = message
@@ -530,6 +544,10 @@ class Source:
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
         kind = n.kind
+        if n in self.run_values: return self.run_values[n]
+        if self.purity:
+            pure_code=self.purity.render(n,expected,constant)
+            if pure_code is not None:return pure_code
         extra = self.expressions.render(n, expected, constant)
         if extra is not None:
             return extra
@@ -723,6 +741,9 @@ class Source:
         real_block = kind == "Block" and self.raw[n.start:n.start+1] == b"{"
         if guards and real_block:
             inserts = [(n.start+1, self.guard_code(guards))]
+        if real_block and self.purity:
+            prologue=self.purity.prologue(n)
+            if prologue:inserts.append((n.start+1,prologue))
         result = self.splice(n, replacements, inserts)
         if guards and not real_block:
             result = "{" + self.guard_code(guards) + result + "}"

@@ -1,7 +1,7 @@
 # Thor
 
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
-milestone implements **T01–T17** from the reference specification in
+milestone implements **T01–T20** from the reference specification in
 [thor.odin](thor.odin). It includes the parser and project support needed to make
 those features usable together.
 
@@ -16,7 +16,7 @@ caches the small Odin frontend automatically; no Python packages are required.
 
 [demo/main.thor](demo/main.thor) has a labeled section for every completed task,
 with assertions, ordinary Odin code, imported packages, and evaluation-order
-examples. It finishes with `All T01-T17 demos passed.`
+examples. It finishes with `All T01-T20 demos passed.`
 
 Select another compile-time branch with an ordinary Odin define:
 
@@ -40,7 +40,7 @@ Select another compile-time branch with an ordinary Odin define:
 ## VS Code and TLS
 
 The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
-support the current T01-T17 syntax. Build the server and extension from this repository:
+support the current T01-T20 syntax. Build the server and extension from this repository:
 
 ```sh
 python3 tools/build_tls.py
@@ -159,6 +159,9 @@ Debugger mappings and runtime stack traces are outside this implementation.
 | T15 | `set[T]`, literals, mathematical/in-place operators, logical equality, membership, len, iteration, clear and delete. |
 | T16 | Negative signed sequence indices and slice bounds, including writable/addressable access; native map, enum-array and pointer behavior retained. |
 | T17 | Expression-local helpers preserve lazy branches, operand order, nested arguments, loop reevaluation and assignment storage. |
+| T18 | Declared `fn` purity, transitive read-only inputs, verified direct calls, recursive/generic functions, and internal scratch allocation. |
+| T19 | Versioned contents-only value serialization and typed reconstruction, including wide integers, exact floats, enums, arrays, records and unions. |
+| T20 | Explicit native `#run` execution, verified dependency closures, dependent constants, selected/lazy paths, mapped failures and bounded execution. |
 
 ```odin
 import "core:math" / sin,
@@ -288,8 +291,8 @@ arm. Expected destination/argument/return types supply result context.
 `#switch` has the same selector forms in statement and expression positions;
 it uses native `when` semantics for constant selection, declaration visibility,
 control flow, and unchecked inactive arms. Later conditions, including those in
-a comma-separated case, stay unchecked after a match. Pure calls and `#run`
-remain T18–T23 work.
+a comma-separated case, stay unchecked after a match. Explicit `#run` follows
+selected compile-time branches and known lazy conditions.
 
 Sets use `|`, `&`, `-`, `~`, `==` and `!=`, with `|=`, `&=`, `-=`, `~=`
 for in-place updates; `+=` inserts one element, while `-=` accepts an element
@@ -392,7 +395,79 @@ protect an implicitly promoted `using` field. Write the existing pointer member
 explicitly (`value.pointer.field`) to retain shallow mutation in that case;
 concrete and shape-constrained records resolve pointer promotion directly.
 
-Later tasks T18–T23 cover purity, `fn`/`#run`, compile-time execution and caching.
+T21 adds persistent evaluation caching; T23 adds automatic known-argument `fn`
+folding and specialization-dependent evaluation scheduling. T22's scratch
+allocation prerequisite is already implemented; independently owned allocated
+results remain a later extension under the authorized fallback.
 `fn` and `set` remain valid ordinary Odin identifiers. The root `thor.odin` is the
 reference specification; `demo/main.thor` is the evaluation program. Follow
 [DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.
+
+## Pure functions and explicit compile-time execution
+
+```odin
+square :: fn(value: $T) -> T { return value * value }
+SIZE :: #run square(4)
+buffer: [SIZE]int
+```
+
+`fn` is a contextual procedure spelling. It lowers to an Odin procedure with a
+purity contract. Runtime inputs remain runtime values. For this milestone, use
+`#run` explicitly to obtain a constant; plain known-argument calls are not folded.
+`#run` also accepts an ordinary `proc` when its relevant transitive call graph
+passes the same checks. Recursion, concrete generic calls, local constants,
+overloads, named arguments and earlier `#run` results are supported.
+
+Inputs may contain scalar values, enums, strings, slices, fixed arrays, records,
+bit sets and tagged unions. Borrowed contents are protected through aliases,
+fields, slices, shallow copies, loops, union matches/assertions and calls. Local fixed-array
+copies and fresh buffers can be mutated. Pointers, maps, dynamic-array inputs,
+`any`, procedure values, globals, ambient context, foreign/indirect calls, raw
+addresses, unsafe casts, uninitialized storage and unapproved operations are rejected. Checks inside
+inactive native `when` branches remain inactive.
+
+The initial deterministic whitelist includes numeric conversions/operations,
+length/type/size queries, `make` for local slice/dynamic buffers, `copy`, `delete`,
+assertions, `core:strings.clone`, `core:slice.clone`, and Thor's scalar/string
+formatters. A declared `fn` otherwise calls declared `fn` targets only. Explicit
+allocator overrides and custom record formatters are rejected. Each checked
+function uses private tracking scratch storage, including for interpolation;
+all outstanding internal allocations are released on every return. Ordinary
+`proc` allocation and f-string ownership retain their existing manual rules.
+
+This batch uses the agreed **result fallback**: strings, slices and aggregates
+containing them cannot be returned by pure/compile-time calls. Return scalars or
+pointer-free fixed aggregates. That avoids escaping scratch storage or silently
+changing allocation ownership. The value protocol already represents arbitrary
+string bytes and nil versus nonnil empty slice descriptors for later extensions.
+It serializes fields rather than padding or process addresses, and reconstructs
+floats with native hex literals, preserving negative zero, infinities and NaNs.
+
+Each ready explicit call is compiled in a temporary native helper containing only
+its required declarations/imports. User entry points, unrelated runtime globals
+and package initializers are excluded; referenced runtime storage is rejected.
+Opaque native imports are restricted to `base:intrinsics`, `core:math`,
+`core:strings` and `core:slice`; user collections are inspected as project source.
+Native value reads are limited to explicitly approved `core:math` constants;
+an import name or a collection override does not confer purity.
+Helpers use the same native defines/configuration as the final build. Cross-target
+`#run` is rejected. Compilation errors map to original source; execution failures
+point to the `#run` expression. Helpers are deleted after use. Execution defaults
+to five seconds per helper; set `--run-timeout 10` to change it (maximum 300).
+There is no persistent result cache or independent-call batching yet.
+
+Current conservative boundaries: the native compiler cannot reflect record
+fields at compile time, so Thor supplies checked source field schemas. Unknown
+external record schemas, some `using`-promoted record shapes and raw unions are
+rejected; a record sharing a known raw union's field-name shape may also be
+rejected. Provenance joins can reject writes to a fresh buffer after it has shared
+a binding with borrowed storage. `#run` values that depend on enclosing generic
+bindings require T23's specialization scheduling and produce a clear diagnostic
+when selected. Enum-indexed array constants support declared keys and zeroed
+unnamed slots; nonzero unnamed slots fail rather than being changed on output.
+Source-location-dependent `#file`, `#directory` and `#line` values, including
+constants derived from them, are rejected in pure execution until their values
+can be kept identical across generated runtime code and helpers. Implicit deferred
+procedure callbacks are also rejected; make eligible calls explicit in the body.
+TLS infers call result types but does not execute procedures for hover values or
+its own branch selection; live compiler checks perform the actual evaluation.

@@ -3,6 +3,36 @@ package thor_parser
 import "core:odin/ast"
 import tokenizer "../tokenizer"
 
+thor_signature_token :: proc(lexer:^tokenizer.Tokenizer)->tokenizer.Token {
+    for {
+        token:=tokenizer.scan(lexer)
+        if token.kind!=.Comment && !(token.kind==.Semicolon && tokenizer.is_newline(token)) {return token}
+    }
+}
+
+// Keep fn usable as an ordinary identifier/callee. A procedure signature must
+// be followed by a return type, where clause or body, outside a control header.
+thor_fn_follows :: proc(p:^Parser)->bool {
+    if p.expr_level < 0 {return false}
+    lexer:=p.tok
+    lexer.insert_semicolon=false
+    token:=thor_signature_token(&lexer)
+    if token.kind==.String {token=thor_signature_token(&lexer)}
+    if token.kind!=.Open_Paren{return false}
+    depth:=1
+    for depth>0 {
+        token=thor_signature_token(&lexer)
+        if token.kind==.EOF{return false}
+        if token.kind==.Open_Paren{depth+=1}
+        if token.kind==.Close_Paren{depth-=1}
+    }
+    token=thor_signature_token(&lexer)
+    return token.kind==.Arrow_Right||token.kind==.Where||token.kind==.Open_Brace||token.kind==.Do
+}
+thor_exprs_run :: proc(expr:^ast.Expr)->[]^ast.Expr {
+    args:=make([]^ast.Expr,1);args[0]=expr;return args
+}
+
 Feature_Case :: struct {
     start, end: int,
     matches: [][2]int,

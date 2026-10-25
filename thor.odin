@@ -989,7 +989,7 @@ Implement Thor in batches of T tasks. Each batch follows the same full loop:
 See DEVELOPMENT.md for the commands, repository layout, and batch checklist.
 Debugger mappings, stack traces, and a formatter remain separate work.
 
-Implementation checkpoint: 0.4.1 covers T01-T17, including quoted/raw interpolation,
+Implementation checkpoint: 0.5.0 covers T01-T20, including quoted/raw interpolation,
 runtime switch expressions, both #switch forms, Set syntax/operators, negative
 sequence accesses, and expression-local lowering. The demo has labeled sections
 for every implemented task. Compiler/runtime, TLS, diagnostic, grammar and actual
@@ -998,7 +998,22 @@ a default arm in this implementation. The hardening round restores native ~/~=
 xor and pointer parsing, tracks anonymous expression cleanup (including mixed
 owned/borrowed branches), reuses union-chain result tables, and supports helpers
 inside C/system/contextless callbacks. Named results remain caller-managed.
-Pure functions and compile-time execution/caching remain T18-T23.
+T18 adds declared fn contracts, recursive/generic direct calls, transitive
+read-only borrowed inputs, and compiler-managed internal scratch allocation.
+T19 adds versioned typed content serialization/reconstruction, preserving wide
+integers, float bits, strings/sequence descriptors, fields and union variants.
+T20 adds explicit native #run calls, verified ordinary-procedure dependency
+closures, earlier-result dependencies, selected/lazy scheduling, bounded execution
+and mapped helper diagnostics. User initializers/entry points are excluded.
+The initial result policy uses the authorized fallback: string/slice inputs and
+internal allocation work; allocation-bearing return types are rejected, including
+nested members. This pulls forward the required scratch part of T22.
+T21 persistent caching and T23 automatic known-argument folding and generic
+specialization scheduling remain deferred. In particular, a #run depending on
+enclosing generic bindings is diagnosed when selected rather than evaluated with
+invented types/values. Native record-schema and enum-array serialization limits
+are documented in README.md. TLS infers call types but does not execute procedures
+for hover values or its own conditional resolver; live compiler checks do so.
 Remaining T11/T12 refinement: an unconstrained generic receiver's implicitly
 promoted using-pointer field is conservatively protected. Explicit pointer-member
 access preserves shallow writes; concrete/shape-constrained records resolve the

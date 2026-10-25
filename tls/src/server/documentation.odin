@@ -494,7 +494,7 @@ write_procedure_symbol_signature :: proc(sb: ^strings.Builder, value: SymbolProc
 			strings.write_string(sb, "#force_no_inline ")
 		}
 	}
-	strings.write_string(sb, "proc")
+	strings.write_string(sb, "fn" if value.thor_pure else "proc")
 	if s, ok := value.calling_convention.(string); ok && detailed_signature {
 		fmt.sbprintf(sb, " %s ", s)
 	} else if len(value.attributes) > 0 {

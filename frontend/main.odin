@@ -86,8 +86,14 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
                  roles=make(map[string]Span), lists=make(map[string][]Span)}
     if len(state.stack) > 0 { info.parent = state.stack[len(state.stack)-1] }
     #partial switch n in node.derived {
-    case ^ast.File: info.kind = "File"
+    case ^ast.File:
+        info.kind="File";info.name=n.pkg_name
+        if n.pkg_decl!=nil {info.roles["package"]={n.pkg_decl.pos.offset,n.pkg_decl.pos.offset+len(n.pkg_name)}}
+    case ^ast.Package_Decl: info.kind="Package"
     case ^ast.Ident: info.kind = "Ident"; info.name = n.name
+    case ^ast.Implicit: info.kind="Implicit";info.name=tokenizer.to_string(n.tok.kind)
+    case ^ast.Basic_Directive: info.kind="Directive";info.name=n.name
+    case ^ast.Asm_Template, ^ast.Undef: info.kind="Unsafe"
     case ^ast.Basic_Lit: info.kind = "Literal"; info.op = tokenizer.to_string(n.tok.kind)
     case ^ast.Implicit_Selector_Expr: info.kind = "ImplicitSelector"
     case ^ast.Poly_Type:
@@ -118,6 +124,13 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Type_Cast:
         info.kind = "Cast"; info.op = n.tok.text
         info.roles["expr"] = span(n.expr); info.roles["type"] = span(n.type)
+    case ^ast.Auto_Cast: info.kind="AutoCast";info.roles["expr"]=span(n.expr)
+    case ^ast.Type_Assertion:
+        info.kind="TypeAssertion";info.roles["expr"]=span(n.expr);info.roles["type"]=span(n.type)
+    case ^ast.Or_Else_Expr:
+        info.kind="OrElse";info.roles["x"]=span(n.x);info.roles["y"]=span(n.y)
+    case ^ast.Or_Return_Expr: info.kind="OrReturn";info.roles["expr"]=span(n.expr)
+    case ^ast.Or_Branch_Expr: info.kind="OrBranch";info.roles["expr"]=span(n.expr)
     case ^ast.Proc_Group: info.kind = "ProcedureGroup"; info.lists["args"] = spans(n.args)
     case ^ast.Field_Value:
         info.kind = "FieldValue"; info.roles["field"] = span(n.field); info.roles["value"] = span(n.value)
@@ -129,6 +142,10 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["x"] = span(n.x); info.roles["y"] = span(n.y)
     case ^ast.Value_Decl:
         info.kind = "Declaration"; info.mutable = n.is_mutable
+        attributes:=make([]Span,len(n.attributes))
+        for attribute,i in n.attributes {attributes[i]=span(attribute)}
+        info.lists["attributes"]=attributes
+        if len(n.attributes)>0 {info.start=n.attributes[0].pos.offset}
         info.using_field = n.is_using
         info.roles["type"] = span(n.type); info.lists["names"] = spans(n.names)
         info.lists["values"] = spans(n.values)
@@ -164,8 +181,11 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "DynamicArrayType"; info.roles["elem"] = span(n.elem)
     case ^ast.Struct_Type:
         info.kind = "StructType"; info.roles["fields"] = span(n.fields); info.roles["params"] = span(n.poly_params)
+        if n.is_raw_union {info.op="raw_union"}
         info.lists["where"] = spans(n.where_clauses)
-    case ^ast.Union_Type: info.kind = "UnionType"; info.lists["where"] = spans(n.where_clauses)
+    case ^ast.Union_Type:
+        info.kind = "UnionType"; info.lists["where"] = spans(n.where_clauses)
+        info.lists["variants"]=spans(n.variants)
     case ^ast.When_Stmt:
         info.kind = "When"; info.roles["cond"] = span(n.cond)
         info.roles["body"] = span(n.body); info.roles["else"] = span(n.else_stmt)
@@ -186,8 +206,12 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Switch_Stmt: info.kind = "Switch"
     case ^ast.Type_Switch_Stmt:
         info.kind = "TypeSwitch"
+        info.roles["expr"]=span(n.expr)
         if n.tag != nil {
-            if assignment, ok := n.tag.derived.(^ast.Assign_Stmt); ok { info.lists["names"] = spans(assignment.lhs) }
+            if assignment, ok := n.tag.derived.(^ast.Assign_Stmt); ok {
+                info.lists["names"] = spans(assignment.lhs)
+                if len(assignment.rhs)>0 {info.roles["expr"]=span(assignment.rhs[0])}
+            }
         }
     case ^ast.Expr_Stmt: info.kind = "ExpressionStatement"; info.roles["expr"] = span(n.expr)
     case ^ast.Case_Clause:
@@ -202,6 +226,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Distinct_Type:
         info.kind = "DistinctType"; info.roles["type"] = span(n.type)
     case ^ast.Using_Stmt: info.kind = "Using"; info.lists["values"] = spans(n.list)
+    case ^ast.Attribute: info.kind="Attribute";info.lists["elems"]=spans(n.elems)
     case ^ast.Foreign_Import_Decl: info.kind = "ForeignImport"; info.lists["paths"] = spans(n.fullpaths)
     }
     index := len(state.out.nodes)

@@ -2379,6 +2379,16 @@ parse_inlining_or_tailing_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.
 parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	#partial switch p.curr_tok.kind {
 	case .Ident:
+		if p.thor && p.curr_tok.text == "fn" && thor_fn_follows(p) {
+			start := p.curr_tok.pos.offset
+			p.curr_tok.kind = .Proc
+			p.tok.insert_semicolon = false
+			expr := parse_operand(p,lhs)
+			append(&p.edits,Edit{start=start,end=start+2,text="proc"})
+			if _,ok:=expr.derived_expr.(^ast.Proc_Lit);!ok {error(p,expr.pos,"A pure fn requires a body")}
+			append(&p.features,Feature{kind="PureFunction",start=expr.pos.offset,end=expr.end.offset})
+			return expr
+		}
 		if p.thor && p.curr_tok.text == "set" && thor_set_type_follows(p) { return parse_set_type(p) }
 		return parse_ident(p)
 	case .Switch:
@@ -2434,6 +2444,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Hash:
 		tok := expect_token(p, .Hash)
 		name := expect_token(p, .Ident)
+		if p.thor && name.text == "run" {
+			expr := parse_unary_expr(p,false)
+			call := thor_call("__thor_run",tok.pos,expr.end,thor_exprs_run(expr))
+			append(&p.features,Feature{kind="Run",start=call.pos.offset,end=call.end.offset})
+			return call
+		}
 		switch name.text {
 		case "type":
 			type := parse_type(p)

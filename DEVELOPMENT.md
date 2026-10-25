@@ -26,6 +26,8 @@ The specification in `thor.odin` defines the language contract.
 python3 -m unittest discover -s tests -v
 ./thor run demo
 python3 tools/build_tls.py test
+odin test runtime/pure -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+odin test runtime/eval -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
 cd editors/vscode
 npm test
 npm run package
@@ -43,8 +45,8 @@ TLS Git history, including checkpoint `cb009c7`, is preserved at
 `git --git-dir=.git/tls-upstream --work-tree=tls log`. It is local history, not a
 dependency required to build a fresh checkout.
 
-T01–T17 now have implementations, editor integration and evaluation sections in
-`demo/main.thor`. The 0.4.1 checkpoint covers interpolation (T13), runtime and
+T01–T20 now have implementations, editor integration and evaluation sections in
+`demo/main.thor`. The earlier 0.4.1 checkpoint covered interpolation (T13), runtime and
 compile-time switches (T14), Set syntax (T15), negative sequence accesses (T16),
 and expression-local lowering (T17), plus native xor/pointer compatibility,
 callback context handling and anonymous expression cleanup. It passes 289 Python
@@ -70,7 +72,30 @@ immediate reads carry the owner until the read finishes. Test new consumers with
 Odin's tracking allocator, including mixed branches and early exits. Broad TLS
 resolver work remains deferred to the later T tasks.
 
-Later tasks T18–T23 cover purity, compile-time serialization/execution, caching,
-scratch allocation and automatic folding. The compiler's resolution boundary and
-conservative generic `using` pointer case are documented in `README.md`; keep
-those limits visible while extending the resolver in later batches.
+The 0.5.0 batch adds declared `fn` contracts (T18), typed contents-only native
+serialization (T19), and explicit `#run` helpers (T20). It pulls forward the
+necessary T22 scratch lifetime support and takes the authorized result fallback:
+string/slice inputs and internal allocation work, but allocation-bearing returns
+are rejected recursively. T21 persistent caching and T23 automatic folding and
+specialization scheduling remain future work. Helper build/run failures use the
+same diagnostic maps as final Odin checking; execution failures point to #run.
+
+`thorlang/purity.py` tracks effects and transitive borrowed provenance. Native
+generic contracts check instantiated types and preserve inactive `when` behavior.
+`thorlang/evaluation.py` prunes helper dependencies, verifies ordinary procedure
+graphs, preserves overlays/configuration, schedules selected explicit calls, and
+bounds native execution. `thorlang/values.py` validates the versioned native value
+protocol and reconstructs typed constants. `runtime/pure` owns scratch lifetimes;
+`runtime/eval` serializes contents without padding or process addresses.
+
+The verified batch passes 335 Python compiler/LSP tests, 1,102 native TLS tests,
+54 grammar tests, allocation-tracked runtime/lexer checks, the actual VS Code
+integration test and the demo in all three define modes. The local TLS executable
+and Thor 0.5.0 VSIX are rebuilt and installed. Generated binaries remain ignored;
+their source and build/test commands are version-controlled.
+
+The compiler's resolution boundaries, conservative record schemas, raw-union
+rejection, generic `using` pointer case and specialization-dependent nested #run
+are documented in `README.md`; keep those limits visible while extending the
+resolver. Do not substitute a zero result for an unresolved active #run. Unknown
+native dependencies must not introduce unverified initializers into helpers.

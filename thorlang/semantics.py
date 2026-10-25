@@ -91,6 +91,8 @@ class Resolver:
                     if parent and parent.kind == "ProcedureType":
                         scope = parent.parent if parent.parent and parent.parent.kind == "Procedure" else parent
                         names, annotation = n.group("names"), n.role("type")
+                        if n.data.get('using_field'):
+                            self.using.setdefault(self.scope_key(scope), []).append(n)
                 elif n.kind == "Range":
                     names, scope = n.group("names"), n
                 elif n.kind == "TypeSwitch":
@@ -204,6 +206,7 @@ class Resolver:
             return Type(node=n)
         seen.add(key)
         kind = n.kind
+        if kind=='Run':return self.type_of(n.role('expr'),seen)
         if kind == 'SetType':
             return Type('set',node=n,elem=self.type_node(n.group('args')[0],substitutions,seen))
         if kind == "Paren":
@@ -276,6 +279,7 @@ class Resolver:
             return Type(node=n)
         seen.add(n)
         kind = n.kind
+        if kind=='Run':return self.type_of(n.role('expr'),seen)
         if kind == 'Interpolation':
             return Type('string','string',n,witness=n)
         if kind=='CompileSwitchExpr':
@@ -340,8 +344,10 @@ class Resolver:
                 results = self.fields(plan.signature.role("results"))
                 if results:
                     return self.type_node(results[0][1], plan.substitutions)
-        if kind == "Cast":
+        if kind in {"Cast","TypeAssertion"}:
             return self.type_node(n.role("type"))
+        if kind in {'AutoCast','OrReturn','OrBranch'}:return self.type_of(n.role('expr'),seen)
+        if kind=='OrElse':return self.type_of(n.role('x'),seen)
         if kind == "Deref":
             return self.type_of(n.role("expr"), seen).elem or Type(node=n)
         if kind == "Selector":

@@ -82,6 +82,7 @@ SymbolBitFieldValue :: struct {
 SymbolPackageValue :: struct {}
 
 SymbolProcedureValue :: struct {
+    thor_pure: bool,
 	return_types:       []^ast.Field,
 	arg_types:          []^ast.Field,
 	orig_return_types:  []^ast.Field, //When generics have overloaded the types, we store the original version here.

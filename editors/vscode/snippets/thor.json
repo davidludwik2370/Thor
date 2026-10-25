@@ -62,5 +62,21 @@
       "set[${1:int}]{${2:elements}}"
     ],
     "description": "Caller-owned Set literal"
+  },
+  "Pure function": {
+    "prefix": "fn",
+    "body": [
+      "${1:square} :: fn(${2:value}: ${3:int}) -> ${3:int} {",
+      "\t${0:return value * value}",
+      "}"
+    ],
+    "description": "Declared pure function with compiler-managed scratch storage"
+  },
+  "Explicit compile-time call": {
+    "prefix": "run",
+    "body": [
+      "#run ${1:function}(${2:arguments})"
+    ],
+    "description": "Evaluate a direct eligible call at compile time"
   }
 }

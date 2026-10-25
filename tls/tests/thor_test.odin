@@ -15,6 +15,34 @@ thor_source :: proc(source: string) -> test.Source {
 }
 
 @(test)
+thor_hover_pure_function :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+process::fn(value:int)->int{return value*value}
+main::proc(){pro{*}cess(3)}
+`)
+    test.expect_hover_contains(t,&source,"fn(value: int) -> int")
+}
+
+@(test)
+thor_hover_run_result :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+square::fn(value:int)->int{return value*value}
+main::proc(){result:=#run square(3);res{*}ult}
+`)
+    test.expect_hover_contains(t,&source,"result: int")
+}
+
+@(test)
+thor_pure_generic_completion :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Record::struct{value:int}
+identity::fn(value:$T)->T{return value}
+main::proc(){result:=#run identity(Record{7});result.{*}}
+`)
+    test.expect_completion_labels(t,&source,".",{"value"})
+}
+
+@(test)
 thor_parser_native_pointer_and_set_xor :: proc(t: ^testing.T) {
     context.allocator = context.temp_allocator
     source := `package test

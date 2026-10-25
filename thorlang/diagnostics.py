@@ -135,7 +135,7 @@ class Diagnostics:
                     if origin.kind != "membership-helper":
                         break
                 msgs = ["Membership requires comparable elements. " + msgs[0]]
-            compiler_support=origin and Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin'}
+            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin'} or origin.kind=='pure-type-validator')
             if compiler_support:
                 # Generic dispatch is part of language lowering. Its checker
                 # failures belong to the user's operation, not the support file.
@@ -144,7 +144,7 @@ class Diagnostics:
                     for reference_file,pattern in self.reference_patterns:
                         for match in pattern.finditer(message):
                             candidate=self.reference_origin(reference_file,*reference_coordinates(match)[:2])
-                            if not Path(candidate.file).is_relative_to(runtime):
+                            if not Path(candidate.file).is_relative_to(runtime) and candidate.kind!='pure-type-validator':
                                 caller=candidate
                                 break
                         if caller: break
@@ -152,7 +152,7 @@ class Diagnostics:
                 if caller: origin=caller
             msgs=[m for m in msgs if not ('instantiated as' in m and any(prefix in m for prefix in self.prefixes))]
             if compiler_support:
-                msgs=[m for m in msgs if not re.search(r"instantiated as '(?:compiler_[a-z_]+|normalize_signed|normalize_unsigned)\(",m)]
+                msgs=[m for m in msgs if not re.search(r"instantiated as '(?:compiler_[a-z_]+|normalize_signed|normalize_unsigned|validate|validate_format|write|emit)\(",m)]
             if any(prefix + "array_literal_needs_element_type" in m for m in msgs for prefix in self.prefixes):
                 msgs = ["An empty array literal needs an element type from its context."]
             elif msgs and any(f"procedure group '{prefix}contains'" in msgs[0] for prefix in self.prefixes):
