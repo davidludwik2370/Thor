@@ -195,3 +195,25 @@ All 64 grammar tests, the four targeted compiler/LSP regressions (including
 allocation-tracked import examples), and the actual VS Code integration test
 pass. The 0.7.2 VSIX is installed locally; its grammar/theme contributions require
 **Developer: Reload Window** in an already open editor.
+
+## Quoted interpolation fills: 0.7.3
+
+Explicit format fills now use ordinary Odin rune literals: `'界'^5`, `'0'>12,`
+and `'\u754c'^5`. The shared lexer validates a single Unicode scalar and native
+escapes; lowering preserves that literal in the formatter call. Bare fills are
+rejected with a diagnostic against the format span. Alignment-only and width-only
+formats keep their default space fill. This deliberately replaces the previous
+bare-fill spelling; the specification, demo and examples use the quoted form.
+
+TLS uses the same scanner and reports unsaved format failures at original UTF-16
+ranges. The grammar colors fills as rune literals, widths as numeric literals,
+and alignment/grouping punctuation as operators. Regression coverage includes
+braces and outer delimiters as fills, escaped quotes/backslashes, Unicode escapes,
+invalid/multiple runes, missing alignment, runtime/explicit/automatic evaluation,
+source maps and unsaved error clearing.
+
+The expression/diagnostic/TLS regression run exercised 153 tests with the existing
+contextual-enum navigation expected failure. All 65 grammar tests, 1,109 native
+TLS tests, two allocation-tracked lexer tests, the demo and actual VS Code
+integration pass. Install the 0.7.3 VSIX and run **Developer: Reload Window** to
+load its grammar changes in an existing editor window.

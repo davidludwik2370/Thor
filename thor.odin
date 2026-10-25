@@ -649,13 +649,15 @@ Syntax:
 - Evaluate each field once, left to right.
 - Default formatting uses Odin-style value formatting. Add integer decimal
   thousands grouping with a comma, including zero and negative signed values.
-- Minimum padding syntax is [[fill]align][width][,], with align <, >, or ^,
-  optional single-rune fill, nonnegative literal width, and default space fill.
+- Minimum padding syntax is [[rune-literal]align][width][,], with align <, >, or ^,
+  optional single-quoted fill rune, nonnegative literal width, and default space fill.
+  Use ordinary Odin rune escapes; bare fills are rejected. For example, '界'^5
+  centers with 界 padding, and '0'>12, groups digits then pads with zeros.
   Width alone right-aligns numeric values and left-aligns strings. For centering,
   put the extra padding rune on the right when the padding count is odd.
 - Group digits first, then pad the formatted text, counting signs/separators in
   its width. Match Odin's rune-based width convention, not terminal display cells.
-- Examples include >12, <12, ^12, 0>8, and >12,. This is a documented subset of
+- Examples include >12, <12, ^12, '0'>8, and >12,. This is a documented subset of
   Python-style formatting; other Python specifiers are not implicitly supported.
   A comma requests integer grouping and is rejected for unsupported value types.
 - Ordinary proc use allocates the final string with context.allocator; the caller

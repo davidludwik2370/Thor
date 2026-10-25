@@ -17,7 +17,7 @@ delete(a);delete(b)
 
     def test_interpolation_formatting_and_nested_fields(self):
         self.invoke(self.program('''
-a:=f"{i64(-9223372036854775808):,}|{1234:0>8,}|{"é😀":界^5}"
+a:=f"{i64(-9223372036854775808):,}|{1234:'0'>8,}|{"é😀":'界'^5}"
 assert(a=="-9,223,372,036,854,775,808|0001,234|界é😀界界")
 b:=f"outer {f"inner {2}"} {(false ? 8 : 9)}"
 assert(b=="outer inner 2 9")
@@ -30,8 +30,41 @@ delete(a);delete(b)
 
     def test_interpolation_delimiters_as_format_fill(self):
         self.invoke(self.program('''
-a:=f"{1:}>3}|{2:{<3}|{3:">3}"
+a:=f"{1:'}'>3}|{2:'{'<3}|{3:'"'>3}"
 assert(a==`}}1|2{{|""3`);delete(a)
+'''))
+
+    def test_interpolation_fill_uses_native_rune_escapes_in_quoted_and_raw_strings(self):
+        self.invoke(self.program(r'''
+a:=f"{1:'\''>3}|{2:'\\'<3}|{3:'\u754c'^5}|{4:'\U0001f600'>3}|{5:'\x30'>3}"
+assert(a==`''1|2\\|界界3界界|😀😀4|005`);delete(a)
+b:=f`{"é😀":'界'^5}|{1:'`'>3}`
+assert(b=="界é😀界界|``1");delete(b)
+c:=f"{"x":'\n'>3}|{"x":'\000'>3}"
+assert(c=="\n\nx|\x00\x00x");delete(c)
+'''))
+
+    def test_interpolation_fill_literals_and_alignment_are_validated(self):
+        for spec,message in [
+            ('0>5','single-quoted rune'),('界^5','single-quoted rune'),
+            ("'界'5",'followed by'),("'界'",'followed by'),
+            ("''>3",'illegal rune literal'),("'ab'>3",'illegal rune literal'),
+            (r"'\uD800'>3",'invalid Unicode'),(r"'\U00110000'>3",'invalid Unicode'),
+            (r"'\q'>3",'unknown escape'),("'x'>-3",'Unsupported interpolation format'),
+        ]:
+            with self.subTest(spec=spec):
+                self.invoke(self.program('_=f"{1:'+spec+'}"'),command='check',fail=message)
+
+    def test_quoted_format_fill_agrees_at_runtime_run_and_automatic_evaluation(self):
+        self.invoke(self.program('''
+value:=1234
+text:=label(value)
+assert(text=="0001,234|界é😀界界"&&text==AUTO&&text==EXPLICIT)
+delete(text)
+''','''
+label::fn(value:int)->string{return f`{value:'0'>8,}|{"é😀":'界'^5}`}
+AUTO::label(1234)
+EXPLICIT::#run label(1234)
 '''))
 
     def test_interpolation_empty_fields_and_formats_rejected(self):

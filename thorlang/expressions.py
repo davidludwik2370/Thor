@@ -7,6 +7,7 @@ Their calls stay inside the original branch/argument/loop; declarations do no wo
 from __future__ import annotations
 
 import json
+import re
 
 
 class Expressions:
@@ -500,8 +501,8 @@ class Expressions:
                 continue
             field=next(fields)
             spec=s.text(part['format_start'],part['format_end']) if part['format_start']>=0 else ''
-            fill,align,width,group=self.format_spec(spec,field)
-            parts.append((field,None,f'grouping={str(group).lower()}, width={width}, align=.{align}, fill=rune({ord(fill)})'))
+            fill,align,width,group=self.format_spec(spec,part['format_start'],part['format_end'])
+            parts.append((field,None,f'grouping={str(group).lower()}, width={width}, align=.{align}, fill={fill}'))
         def body(_):
             prefix=s.prefix+f'format_{n.start}_'
             builder=prefix+'builder'
@@ -541,10 +542,18 @@ class Expressions:
         for value in reversed(values): result=f'(true when ({value}) else {result})'
         return result
 
-    def format_spec(self,text,origin):
-        fill,align=' ', 'Default'
-        if len(text)>=2 and text[1] in '<>^':
-            fill,align,text=text[0],text[1],text[2:]
+    def format_spec(self,text,start,end):
+        fill,align="' '", 'Default'
+        if text.startswith("'"):
+            # The shared lexer validates one Unicode scalar and Odin escapes.
+            # Preserve that literal instead of decoding it a second way here.
+            literal=re.match(r"'(?:\\.|[^'\\\r\n])*'",text)
+            if not literal or len(text)<=literal.end() or text[literal.end()] not in '<>^':
+                self.source.error('Interpolation fill requires a rune literal followed by <, >, or ^',start,end)
+            fill=literal[0]
+            align,text=text[literal.end()],text[literal.end()+1:]
+        elif len(text)>=2 and text[1] in '<>^':
+            self.source.error("Interpolation fill must be a single-quoted rune, e.g. '0'>12 or '界'^5",start,end)
         elif text and text[0] in '<>^':
             align,text=text[0],text[1:]
         align={'<':'Left','>':'Right','^':'Center'}.get(align,align)
@@ -552,7 +561,7 @@ class Expressions:
         if grouping:
             text=text[:-1]
         if text and (not text.isascii() or not text.isdigit()):
-            self.source.error('Unsupported interpolation format; expected [[fill]align][width][,]',origin.start,origin.end)
+            self.source.error("Unsupported interpolation format; expected [[rune-literal]align][width][,]",start,end)
         return fill,align,int(text or '0'),grouping
 
     def switch(self,n,expected,constant):

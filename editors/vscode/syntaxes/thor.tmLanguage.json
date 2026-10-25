@@ -1283,10 +1283,7 @@
                   ]
                 },
                 {
-                  "name": "meta.interpolation.format.thor",
-                  "begin": ":(?:.[<>^])?",
-                  "end": "(?=\\})",
-                  "patterns": []
+                  "include": "#interpolation-format"
                 },
                 {
                   "include": "#expressions"
@@ -1355,10 +1352,7 @@
                   ]
                 },
                 {
-                  "name": "meta.interpolation.format.thor",
-                  "begin": ":(?:.[<>^])?",
-                  "end": "(?=\\})",
-                  "patterns": []
+                  "include": "#interpolation-format"
                 },
                 {
                   "include": "#expressions"
@@ -1408,6 +1402,36 @@
       "patterns": [
         {
           "include": "#expressions"
+        }
+      ]
+    },
+    "interpolation-format": {
+      "name": "meta.interpolation.format.thor",
+      "begin": ":",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.operator.interpolation.format.thor"
+        }
+      },
+      "end": "(?=\\})",
+      "patterns": [
+        {
+          "name": "string.quoted.single.thor",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "include": "#string-escaped-char"
+            }
+          ]
+        },
+        {
+          "name": "constant.numeric.thor",
+          "match": "[0-9]+"
+        },
+        {
+          "name": "keyword.operator.interpolation.format.thor",
+          "match": "[<>^,]"
         }
       ]
     }

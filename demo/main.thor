@@ -273,9 +273,9 @@ main :: proc() {
 
     println("T13: quoted/raw interpolation, braces, nested expressions, and formatting")
     calls, order = 0, 0
-    interpolated := f"{{fields}} {mark(1)} {mark(2)} {1234567:0>12,}"
+    interpolated := f"{{fields}} {mark(1)} {mark(2)} {1234567:'0'>12,}"
     assert(interpolated == "{fields} 1 2 0001,234,567" && order == 12)
-    raw_interpolated := f`raw \n {"é😀":界^5}`
+    raw_interpolated := f`raw \n {"é😀":'界'^5}`
     assert(raw_interpolated == `raw \n 界é😀界界`)
     nested_interpolated := f"outer {f"inner {3}"}"
     assert(nested_interpolated == "outer inner 3")

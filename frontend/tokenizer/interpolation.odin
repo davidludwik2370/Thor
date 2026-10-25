@@ -58,11 +58,11 @@ scan_interpolated :: proc(t: ^Tokenizer) -> (string, []Interpolation_Part) {
             if depth == 0 && token.kind == .Colon {
                 field.end = token.pos.offset
                 field.format_start = t.offset
-                // A fill rune followed by alignment is unambiguous, even
-                // when the fill itself is a brace or the string delimiter.
-                align := peek_rune(t,0)
-                if t.ch >= 0 && (align == '<' || align == '>' || align == '^') {
-                    advance_rune(t); advance_rune(t)
+                // The fill is an ordinary rune literal. Its contents may
+                // include braces, the outer delimiter, or escaped quotes.
+                if t.ch == '\'' {
+                    advance_rune(t)
+                    _ = scan_rune(t)
                 }
                 for t.ch >= 0 && t.ch != '}' && t.ch != quote { advance_rune(t) }
                 field.format_end = t.offset

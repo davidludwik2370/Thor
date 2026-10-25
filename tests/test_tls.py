@@ -536,6 +536,20 @@ main::proc(){_=GLOBAL;_=SELECTED}
             self.assertIsNotNone(result)
             self.assertIn(':: 7',result['contents']['value'])
 
+    def test_quoted_format_fill_unsaved_validation_and_token_ranges(self):
+        text='package main\nmain::proc(){text:=f`raw \\n {"é😀":\'界\'^5}`;delete(text)}\n'
+        client,main=self.open(text)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        changed=text.replace("'界'",'界')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='single-quoted rune')
+        error=next(e for e in errors if 'single-quoted rune' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'界^5',0))
+        self.assertEqual(error['range']['end'],self.position(changed,'界^5',3))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_interpolation_compiler_error_range_and_unsaved_fix(self):
         text='package main\nmain::proc(){text:=f"😀 {missing_value}";delete(text)}\n'
         client,main=self.open(text)

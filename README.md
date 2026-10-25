@@ -268,7 +268,7 @@ main :: proc() {
         case: "other"
     }
     value := switch { case len(tail) == 2: 1234567; case: 0 }
-    text := f"{{label}} {label}: {value:0>12,}"
+    text := f"{{label}} {label}: {value:'0'>12,}"
     assert(text == "{label} after: 0001,234,567")
     delete(text)
     delete(names)
@@ -278,9 +278,12 @@ main :: proc() {
 Interpolation accepts quoted or raw backtick literals. `{{` and `}}` escape
 literal braces. Fields contain real Thor expressions, including nested literals,
 switches and interpolations. Parenthesize a ternary before a format separator.
-The format grammar is `[[fill]align][width][,]`: align with `<`, `>` or `^`,
+The format grammar is `[[rune-literal]align][width][,]`: align with `<`, `>` or `^`,
 use a literal decimal width, and add `,` for integer grouping. Width counts
-Unicode runes. Fields execute once, left to right. The final string is owned by
+Unicode runes. An explicit fill is a single-quoted Odin rune followed by an
+alignment: `'界'^5` or `'0'>12,`. Rune escapes work too, such as `'\u754c'^5`.
+Bare fills such as `界^5` and `0>12` are rejected. Omit the fill to use a space:
+`^5`, `>12` or `12`. Fields execute once, left to right. The final string is owned by
 the caller. Internal formatting buffers and owned nested interpolations are
 released after use, including mixed branches such as
 `f"{(flag ? f"value {n}" : borrowed)}"`: only the selected owned string is freed.

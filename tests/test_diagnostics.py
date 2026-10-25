@@ -41,6 +41,13 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_invalid_format_fill_has_its_own_unicode_source_range(self):
+        source='package main\nmain::proc(){_="😀";_=f`{"é😀":界^5}`}\n'
+        errors=self.at(source,'界^5',message='single-quoted rune')
+        error=next(e for e in errors if 'single-quoted rune' in e['msgs'][0])
+        self.assertEqual(error['pos']['end_column']-error['pos']['column'],3)
+        self.assertNotIn('__thor_',json.dumps(errors))
+
     def test_automatic_failures_keep_original_unicode_ranges(self):
         source='package main\nwork::fn(n:int)->int{_="😀";return missing}\nVALUE::work(3)\nmain::proc(){_=VALUE}\n'
         errors=self.at(source,'missing',message='Undeclared name: missing')

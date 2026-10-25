@@ -32,6 +32,9 @@ It also parses quoted/raw interpolation, runtime/compile-time switches and Set
 types/literals; fields and arms retain completion/hover/definition positions.
 The grammar highlights embedded expressions independently from string text,
 including nested quotes and braces. Negative indices use native expression scopes.
+Explicit interpolation fills use Odin rune literals, e.g. `{"é😀":'界'^5}` or
+`{1234567:'0'>12,}`. Rune fills and numeric widths keep their ordinary literal
+colors; alignment and grouping punctuation stay neutral. Bare fills are rejected.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
 Package names use variable-blue theme scopes, while `set[T]` uses the same keyword

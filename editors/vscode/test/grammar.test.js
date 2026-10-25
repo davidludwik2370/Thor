@@ -85,7 +85,7 @@ for (const [name, source, word, scope, line] of [
     ['interpolation field', 's := f"hello {value}"', 'value', 'variable'],
     ['nested interpolation string', 's := f"{echo("inner")}"', 'inner', 'string.quoted.double'],
     ['raw interpolation field', 's := f`hello {value}`', 'value', 'variable'],
-    ['brace fill stays in format', 's := f"{1:}>3} after"', ' after', 'string.quoted.double'],
+    ['brace fill stays in format', 's := f"{1:\'}\'>3} after"', ' after', 'string.quoted.double'],
     ['nested switch field', 's := f"{switch x{case 1:value;case:0}}"', 'value', 'variable'],
     ['nested Set literal field', 's := f"{len(set[int]{1,2})}"', 'set', 'storage.type.set'],
     ['set literal type', 's := set[int]{1,2}', 'set', 'storage.type.set'],
@@ -212,6 +212,29 @@ test('package names are blue while set syntax uses the same dark blue as map',()
     }
     const manifest=require('../package.json');
     assert.deepEqual(manifest.contributes.semanticTokenScopes,[{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
+});
+
+test('format fills are rune literals, widths are numbers, format punctuation stays neutral',()=>{
+    for(const source of [
+        'text := f`raw \\n {"é😀":\'界\'^5}`',
+        'text := f"{1234567:\'0\'>12,}"',
+        'text := f"{1:\'}\'>3} after"',
+        'text := f`{1:\'`\'<3}`',
+        String.raw`text := f"{1:'\u754c'^5}"`,
+    ]){
+        const tokens=themedTokens(source)[0],format=source.indexOf(':',source.indexOf('{'));
+        const open=source.indexOf("'",format),close=source.indexOf("'",open+1);
+        for(const token of tokens.slice(open,close+1))assert.equal(token.type,2,'Fill is a rune literal');
+        assert.equal(tokens[open].color,'#CE9178');
+        for(let at=close+1;at<source.indexOf('}',close+1);at++){
+            if(/\d/.test(source[at]))assert.deepEqual({color:tokens[at].color,type:tokens[at].type},{color:'#B5CEA8',type:0});
+            if(/[<>^,]/.test(source[at])){
+                assert.equal(tokens[at].type,0);
+                assert.equal(tokens[at].color,'#D4D4D4');
+            }
+        }
+        assert.equal(tokens[format].color,'#D4D4D4');
+    }
 });
 
 test('reported colors and bracket metadata survive the full demo context',()=>{
