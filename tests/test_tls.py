@@ -537,6 +537,22 @@ main::proc(){result:=square(SIZE);data:[SIZE]int;assert(work(3)==9);_=result;_=d
         client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(library.read_text(),original)
 
+    def test_power_inference_precedence_tokens_and_unsaved_type_error(self):
+        text='package main\n#if 2**3**2==512 && -2**2 == -4 {SELECTED::42} #else {SELECTED::false}\nmain::proc(){_="😀";base:f64=2;exponent:f64 = -3;result:=base**exponent;_=result;_=SELECTED}\n'
+        client,main=self.open(text)
+        self.assertIn('result: f64',json.dumps(self.hover(client,main,text,'result')))
+        self.assertIn('42',json.dumps(self.hover(client,main,text,'SELECTED}')))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        client.notifications.clear()
+        changed=text.replace('exponent:f64 = -3','exponent:int = 3')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='matching operand types')
+        self.assertEqual(len(errors),1,errors)
+        self.assertNotIn('Thor expression',json.dumps(errors))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_range_membership_constraints_hover_tokens_and_unsaved_errors(self):
         text='''package main
 allowed::proc($N:int)->int where N in 0..<10{return N}

@@ -228,6 +228,21 @@ main :: proc() {
     #assert(int in [int, f64])
     #assert(bool not_in [int, f64])
 
+    println("Numeric power: precedence, literal coercion, matching types, and constant evaluation")
+    assert(2 ** 3 ** 2 == 512)
+    assert(-2 ** 2 == -4 && (-2) ** 2 == 4)
+    assert(2 * 3 ** 2 + 1 == 19 && 2.0 ** -3 == 0.125)
+    power_base: f32 = 2
+    power_exponent: f32 = -3
+    assert(power_base ** power_exponent == 0.125 && power_base ** 3 == 8)
+    POWER_SIZE :: 2 ** 3
+    power_values: [POWER_SIZE]int
+    assert(len(power_values) == 8 && 8 in 0..=2 ** 3)
+    calls, order = 0, 0
+    assert(mark(2) ** mark(3) == 8 && calls == 2 && order == 23)
+    #assert(2 ** 3 == 8)
+    // Typed mismatches require a cast: int_value ** float_value is an error.
+
     println("T07: owned integer grouping, padding, and Unicode fill")
     grouped := format.group_integer(i64(-9223372036854775808))
     padded := format.format(1234567, grouping=true, width=14, align=.Center, fill='界')

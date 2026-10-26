@@ -1022,6 +1022,10 @@
           "match": "\\.\\."
         },
         {
+          "name": "keyword.operator.power-or-expansion.thor",
+          "match": "\\*\\*"
+        },
+        {
           "name": "keyword.operator.assignment.thor",
           "match": ":[:=]|="
         },

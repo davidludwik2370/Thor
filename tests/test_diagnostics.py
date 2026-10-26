@@ -193,6 +193,26 @@ class DiagnosticTests(unittest.TestCase):
         source='package main\nf::proc(value:$T){x:>value; for i:=0;i<1;i+=1 do x[0]=7; _=missing}\nmain::proc(){f([1,2])}\n'
         self.at(source,'missing',message='missing')
 
+    def test_power_mismatch_has_one_original_unicode_operation_error(self):
+        source='package main\nmain::proc(){_="😀";a:int=2;b:f64=3;_=a**b}\n'
+        errors=self.at(source,'a**b',message='matching operand types')
+        self.assertEqual(len(errors),1,errors)
+        self.assertNotIn('type_of',json.dumps(errors))
+        self.assertNotIn('runtime/',json.dumps(errors))
+
+    def test_power_undefined_operand_and_unsupported_type(self):
+        errors=self.at('package main\nmain::proc(){_=2**missing}\n','missing',message='Undeclared')
+        self.assertEqual(len(errors),1,errors)
+        self.at('package main\nmain::proc(){a:="a";b:="b";_=a**b}\n','a**b',message='requires integer or floating-point operands')
+
+    def test_power_unrepresentable_literal_keeps_native_error_without_cascades(self):
+        for value in ['300','3.5']:
+            with self.subTest(value=value):
+                source=f'package main\nmain::proc(){{a:i8=2;_=a**{value}}}\n'
+                errors=self.at(source,'a**'+value,message='truncated to' if value=='3.5' else 'Cannot convert numeric value')
+                self.assertEqual(len(errors),1,errors)
+                self.assertNotIn('Thor expression',json.dumps(errors))
+
     def invoke(self, source, *, files=None, flags=(), command="check", overlays=None, success=False):
         temporary = tempfile.TemporaryDirectory(prefix="thor-diagnostics-")
         self.addCleanup(temporary.cleanup)

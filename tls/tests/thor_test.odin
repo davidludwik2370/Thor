@@ -411,3 +411,20 @@ unfinished := [1,
 `)
     test.expect_completion_labels(t, &source, ".", {"value"})
 }
+
+@(test)
+thor_hover_power :: proc(t:^testing.T){
+    source:=thor_source(`package test
+main::proc(){base:f32=2;result:=base**-3;res{*}ult}
+`)
+    test.expect_hover_contains(t,&source,"result: f32")
+}
+
+@(test)
+thor_if_power_precedence :: proc(t:^testing.T){
+    source:=thor_source(`package test
+#if 2**3**2 == 512 && -2**2 == -4 {SELECTED::42} #else {SELECTED::false}
+main::proc(){SEL{*}ECTED}
+`)
+    test.expect_hover_contains(t,&source,":: 42")
+}

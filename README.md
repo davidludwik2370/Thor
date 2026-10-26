@@ -242,6 +242,24 @@ low..<high` retains iteration. Three-part loop headers accept membership as thei
 condition, including an empty post statement. Intervals here are syntax for
 membership, rather than first-class range values.
 
+Power uses infix `**`; native prefix `**values` expansion remains available.
+It associates to the right and binds above multiplication and unary signs:
+`2 ** 3 ** 2 == 512`, `-2 ** 2 == -4`, and `(-2) ** 2 == 4`.
+Both operands must have the same integer or floating-point type. Untyped numeric
+constants follow native coercions, so `2.0 ** -3 == 0.125` and `f32_value ** 3`
+work; typed `int_value ** f64_value` requires an explicit conversion.
+
+Floating-point powers use `core:math.pow`, including fractional exponents.
+Integer powers require a nonnegative exponent (a compile error when known, a
+panic otherwise). `0 ** 0` is `1`; runtime integer overflow follows ordinary
+Odin multiplication. Untyped integer constants retain exact values through 128
+bits. Operands execute once in base/exponent order and retain lazy surrounding
+control flow. Powers work in constants, array sizes, `#if`/`#switch`, specialized
+procedure generics and `fn`/`#run`, using the existing native evaluation cache.
+Type-level generic expressions without a resolvable call site currently require
+a fixed nonnegative integer exponent through 128; other generic constant powers
+need a resolvable procedure specialization.
+
 `T in [int, f64]` compares exact type identity; aliases match, unlisted distinct
 types do not. Generic constraints and other constant contexts use constant
 comparisons rather than runtime search. Parentheses, `not_in`, duplicate entries,

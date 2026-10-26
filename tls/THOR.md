@@ -61,6 +61,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   report temporary-view lifetime errors at original unsaved source ranges.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
+- Parse right-associated power above unary signs and multiplication, preserving
+  native prefix expansion. Infer numeric results with literal coercion; fold
+  representable integer powers for branch selection. Compiler errors retain
+  original operation spans, including unsaved mixed-type expressions.
 - Parse interval membership with half-open/inclusive bounds, parentheses and
   arithmetic bounds, preserving native iteration and container precedence. Infer
   boolean results; fold integer interval conditions (including signed bounds)

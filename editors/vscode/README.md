@@ -44,6 +44,10 @@ shared parser, retains boolean inference and original token positions, and is
 checked in generic constraints by the compiler. TLS's limited branch folder also
 recognizes integer interval conditions; its existing scalar-evaluation limits
 remain for other constant expressions.
+Infix `**` uses the shared power precedence and numeric result inference; prefix
+`**` retains expansion. Integer constant powers participate in TLS branch
+selection, with overflow left unresolved. Compiler checks provide matching-type
+and negative-exponent diagnostics against unsaved source.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
 Package names use variable-blue theme scopes, while `set[T]` uses the same keyword

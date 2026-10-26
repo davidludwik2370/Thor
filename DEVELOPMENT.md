@@ -275,3 +275,33 @@ example; both were corrected. All 70 affected range/demo/expression regressions
 then passed. All 1,111 native TLS tests, 69 grammar tests, actual VS Code integration
 and all three demo modes pass. The 0.8.0 compiler/server and local VSIX are built
 and installed; scratch edits outside the feature changes remain uncommitted.
+
+## Numeric power: 0.9.0
+
+Infix `**` now associates to the right above prefix signs and multiplication;
+native prefix expansion is unchanged. A contextless numeric support routine uses
+integer squaring and native floating-point pow. Checked common-type witnesses
+preserve literal coercion and reject mixed typed operands, without overflowing
+while inferring types. Expression-local helpers evaluate operands once in order.
+Negative integer exponents fail when evaluated at compile time and panic at
+runtime even with assertions disabled. Untyped integers remain exact through
+128 bits; typed runtime multiplication retains native width behavior.
+
+Power participates in the existing lazy evaluator, specialization, contents cache
+and result mapping. Folded untyped results retain literal coercion, huge untyped
+exponents of zero/one remain valid, and type queries never execute powers.
+Fixed type-level generic exponents through 128 use native constant arithmetic;
+other type-level powers without a resolvable call site have an explicit limit.
+TLS shares the AST and precedence, infers numeric types and folds representable
+integer powers. Diagnostics collapse inference cascades into the original mixed
+operation, unsupported operand, or unrepresentable-literal error.
+
+The broad discovery run exercised 458 tests with the existing enum-navigation
+expected failure. One warm-cache assertion failed while compiler source identity
+was changing and passed on a stable rerun. The final 16 power regressions and
+focused diagnostic/LSP checks pass, covering generic signatures/records, constants,
+negative and fractional exponents, IEEE values, cache invalidation, evaluation
+order, lazy paths, native expansion, and UTF-16 unsaved errors and clearing.
+All 1,113 native TLS tests, 72 grammar tests, actual VS Code integration and all
+three demo modes pass. Compiler/TLS 0.9.0 is built and its local VSIX installed.
+The spec and main demo include the new rules; user scratch edits stay separate.

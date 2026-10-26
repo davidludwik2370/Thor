@@ -1656,6 +1656,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
+	case .Mul_Mul:
+		if p.thor { return 8 }
+		return 0
 	case .Question, .If, .When, .Or_Else:
 		return 1
 	case .Ellipsis, .Range_Half, .Range_Full:
@@ -3649,7 +3652,18 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		return ise
 
 	}
-	return parse_atom_expr(p, parse_operand(p, lhs), lhs)
+	expr := parse_atom_expr(p, parse_operand(p, lhs), lhs)
+	// Power binds more tightly than prefix operators. Parsing its RHS as a
+	// unary expression permits negative exponents and makes chains associate
+	// to the right; prefix ** retains Odin's expansion meaning above.
+	if p.thor && p.curr_tok.kind == .Mul_Mul {
+		op := advance_token(p)
+		right := parse_unary_expr(p, false)
+		power := ast.new(ast.Binary_Expr, expr.pos, right.end)
+		power.left, power.op, power.right = expr, op, right
+		return power
+	}
+	return expr
 }
 parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int, stop_membership:=false) -> ^ast.Expr {
 	start_pos := p.curr_tok.pos

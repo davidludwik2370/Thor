@@ -351,6 +351,8 @@ class Resolver:
                 return Type("array", node=n, elem=self.type_of(elements[0], seen) if elements else Type(), length=len(elements), witness=n)
         if kind == "Call":
             callee = n.role("callee")
+            if callee.text=='#config' and len(n.group('args'))==2:
+                return self.type_of(n.group('args')[1],seen)
             if callee.kind=='Ident' and self.symbol(callee) is None and n.group('args'):
                 if callee.text=='make': return self.type_node(n.group('args')[0])
                 if callee.text=='new': return Type('pointer',node=n,elem=self.type_node(n.group('args')[0]))
@@ -387,6 +389,10 @@ class Resolver:
         if kind == "Binary":
             if n.data["op"] in {"in", "not_in", "==", "!=", "<", ">", "<=", ">=", "&&", "||"}:
                 return Type("scalar", "bool", n)
+            if n.data['op']=='**':
+                left,right=(self.type_of(n.role(side),seen.copy()) for side in ['left','right'])
+                if left.untyped and (not right.untyped or right.name.startswith('f')):return replace(right,witness=n)
+                return replace(left,witness=n,untyped=left.untyped and right.untyped)
             return self.type_of(n.role("left"), seen)
         if kind == "Unary":
             inner = self.type_of(n.role("expr"), seen)

@@ -69,7 +69,12 @@ class Evaluator:
     @staticmethod
     def call(n):return n.role('expr') if n.kind=='Run' else n
 
+    @staticmethod
+    def power(n):return n.source.thor and n.kind=='Binary' and n.data['op']=='**'
+
     def automatic(self,n):
+        if self.power(n):
+            return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
         if n.kind!='Call' or n.parent and n.parent.kind=='Run':return False
         if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
         symbol=self.r.symbol(n.role('callee'))
@@ -93,8 +98,18 @@ class Evaluator:
         s=n.source;s.needs_intrinsics=s.needs_default=True
         bindings=self.specializations.relevant(n) if bindings is None else bindings
         with self.specializations.using({}):typ=self.result_type(self.call(n))
-        try:code=values.expression(data,typ,s.prefix+'meta')
+        # Like native arithmetic, expressions made entirely from untyped
+        # constants retain literal coercion at their eventual use site.
+        untyped=self.power(n) and self.r.type_of(n).untyped
+        try:code=values.expression(data,'' if untyped else typ,s.prefix+'meta')
         except (ValueError,TypeError,KeyError) as exc:self.fail(n,f'Invalid compile-time result: {exc}')
+        if untyped:
+            if data['kind']=='integer':
+                left,right=(s.render(n.role(side)) for side in ['left','right'])
+                common=f'(({left}) + ({right}))'
+                check=f'type_of({s.prefix}default_value({common} == {common})) == bool'
+            else:check=f'{typ} == {typ}'
+            code=f'({code} when ({check}) else {code})'
         literal=s.mapping.wrap(code,s.path,n.start,n.end,'compile-time-result')
         if values.has_owned(data):
             module=self.p.purity.module(s)
@@ -128,6 +143,7 @@ class Evaluator:
         s.run_values[n]=render
 
     def result_type(self,call):
+        if self.power(call):return call.source.expressions.power_type(call)
         plan=call.source.resolver.resolve_call(call)
         if not plan:self.fail(call,'Compile-time result type requires an unambiguous resolved procedure target.')
         if len(self.r.fields(plan.signature.role('results')))!=1:
@@ -247,7 +263,9 @@ class Evaluator:
             if n.data['op'] in {'&&','||'}:
                 chosen=self.boolean(left)
                 if (n.data['op']=='&&' and not chosen) or (n.data['op']=='||' and chosen):return True
-            return self.known(n.role('right'),seen.copy())
+            ready=self.known(n.role('right'),seen.copy())
+            if ready and self.power(n):self.evaluate(n)
+            return ready
         if n.kind in {'Ternary','WhenExpr'}:
             if not self.known(n.role('cond'),seen.copy()):return False
             selected=self.boolean(n.role('cond'))
@@ -331,7 +349,7 @@ class Evaluator:
         return True
 
     def evaluate(self,n):
-        if self.unbound_generic(n):return None
+        if self.unbound_generic(n) and not (self.power(n) and all(self.known(n.role(side)) for side in ['left','right'])):return None
         key=self.key(n)
         if key in self.results:return self.results[key]
         if key in self.busy:self.fail(n,'Cyclic #run or automatic fn constant dependency.')
@@ -355,6 +373,24 @@ class Evaluator:
                 self.register(n,value,self.specializations.relevant(n))
                 return None
             call=self.call(n)
+            if self.power(n):
+                if not all(self.known(n.role(side)) for side in ['left','right']):return None
+                self.ensure_runs(n)
+                # Keep untyped integer arithmetic exact, up to Odin's widest
+                # integer representation, instead of overflowing machine int.
+                typ=self.r.type_of(n)
+                left,right=(self.r.constant_int(n.role(side)) for side in ['left','right'])
+                if typ.untyped and left is not None and right is not None:
+                    if right<0:self.fail(n,'Integer power requires a nonnegative exponent; use floating-point operands for negative powers.')
+                    if abs(left)>1 and right>128:self.fail(n,"Power constant exceeds Odin's 128-bit integer range.")
+                    result=pow(left,right)
+                    if not -(1<<127)<=result<1<<128:self.fail(n,"Power constant exceeds Odin's 128-bit integer range.")
+                    data={'kind':'integer','value':str(result)}
+                else:
+                    self.native(n)
+                    data=self.execute(n)
+                self.results[key]=data;self.result_bindings[key]=self.specializations.relevant(n).copy();self.install(n,data)
+                return data
             if call.kind!='Call':self.fail(n,'#run requires a direct eligible procedure call.')
             if not self.purity.targets(call):self.fail(n,'#run requires a resolved direct call; indirect and foreign calls are not eligible.')
             if n.kind=='Run':self.explicit_arguments+=1
@@ -376,7 +412,7 @@ class Evaluator:
         finally:self.busy.remove(key)
 
     def evaluate_all(self):
-        if not any(n.kind=='Run' or self.purity.pure(n) for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
+        if not any(n.kind=='Run' or self.power(n) or self.purity.pure(n) for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
         for source in list(self.p.sources.values()):
             if source.excluded:continue
             for node in source.nodes:

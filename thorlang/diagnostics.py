@@ -90,6 +90,12 @@ class Diagnostics:
                     msgs = [message, *[m for m in msgs if "instantiated as" in m or "Called within" in m]]
             if origin and origin.kind=='range-type':
                 msgs=[m.replace('ternary expression','range membership') for m in msgs]
+            if origin and origin.kind=='power-type':
+                mismatch=next((re.search(r"Mismatched types in (?:binary expression .* : |ternary if expression, )(.+)",m) for m in msgs if 'Mismatched types in ' in m),None)
+                if mismatch:
+                    msgs=["Power ('**') requires matching operand types: "+mismatch[1]+'. Untyped numeric constants may be coerced.']
+                elif any('String concatenation' in m or 'not defined' in m or 'not supported' in m for m in msgs):
+                    msgs=["Power ('**') requires integer or floating-point operands."]
             # These are public Thor support contracts, rather than an error in
             # the library implementation. Native generic notes identify the
             # actual use (including a call in an imported/unsaved file).
@@ -103,6 +109,8 @@ class Diagnostics:
                 "type_is_valid_map_key(T)" in m or "Invalid type of a key for a map" in m for m in msgs
             ):
                 contract = "Set elements must be valid Odin map keys."
+            elif origin and Path(origin.file) == runtime / 'numeric' / 'numeric.odin':
+                contract = "Power ('**') requires integer or floating-point operands of matching types."
             if contract:
                 caller = None
                 for message in msgs:
@@ -118,7 +126,7 @@ class Diagnostics:
                         break
                 if caller:
                     source = self.sources.get(caller.file)
-                    calls = [n for n in source.nodes if n.kind == "Call" and n.start <= caller.start < n.end] if source else []
+                    calls = [n for n in source.nodes if (n.kind == "Call" or n.kind=='Binary' and n.data['op']=='**') and n.start <= caller.start < n.end] if source else []
                     if calls:
                         call = min(calls, key=lambda n: n.end - n.start)
                         caller = Origin(caller.file, call.start, call.end)
@@ -196,7 +204,11 @@ class Diagnostics:
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             diagnostic["_cascade"] = bool(origin and not origin.exact and (
-                origin.kind=='range-type' or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
+                origin.kind in {'range-type','power-type'} or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
+            if msgs and msgs[0].startswith("Power ('**') requires"):
+                diagnostic['_cascade']=False
+            if origin and origin.kind=='power-type' and msgs and (msgs[0].startswith('Cannot convert numeric value') or 'truncated to' in msgs[0]):
+                diagnostic['_cascade']=False
             key = json.dumps([diagnostic["type"], diagnostic["pos"], msgs], sort_keys=True)
             if key not in seen:
                 result.append(diagnostic)

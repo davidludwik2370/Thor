@@ -207,6 +207,8 @@ class Expressions:
                         return aliases[key]
         if not s.thor:
             return None
+        if n.kind=='Binary' and n.data['op']=='**':
+            return self.power(n,constant)
         code=self.ownership.discard(n)
         if code is not None: return code
         if n.kind=='Unary' and n.data['op']=='&' and not self.ownership.querying:
@@ -546,6 +548,47 @@ class Expressions:
         result='false'
         for value in reversed(values): result=f'(true when ({value}) else {result})'
         return result
+
+    def power_type(self,node):
+        s=self.source
+        s.needs_default=True
+        # A native conditional supplies the common operand/coercion rules.
+        # type_of does not execute either operand. The support signature also
+        # excludes string, enum, boolean and aggregate operands.
+        left,right=(s.render(node.role(side)) for side in ['left','right'])
+        typ=f'type_of({s.prefix}default_value(true ? ({left}) : ({right})))'
+        code=f'type_of({self.module("numeric")}.power(({typ}){{}},({typ}){{}}))'
+        return s.mapping.wrap(code,s.path,node.start,node.end,'power-type')
+
+    def power(self,node,constant=False):
+        s=self.source
+        typ=self.power_type(node)
+        exponent=s.resolver.constant_int(node.role('right'))
+        if constant and exponent is not None and 0<=exponent<=128:
+            # Native constant arithmetic also covers uninstantiated type-level
+            # generics (e.g. [N**2]int), which have no executable call site.
+            base=s.render(node.role('left'),constant=True)
+            product=' * '.join('('+base+')' for _ in range(exponent)) if exponent else '1'
+            return f'({typ})({product})'
+        if constant and any(a.kind=='StructType' for a in node.ancestors()):
+            return self.error(node,'Power in a generic type expression requires a fixed nonnegative integer exponent through 128, or a resolved procedure specialization.')
+        owner=next((a for a in node.ancestors() if a.kind=='Procedure'),None)
+        if owner and owner.role('body') not in set(node.ancestors()):
+            # Signature constraints contain constants, and cannot host a
+            # lexical helper that captures their generic parameter names.
+            left,right=(s.render(node.role(side)) for side in ['left','right'])
+            return f'{self.module("numeric")}.power(({typ})({left}),({typ})({right}))'
+        def body(hint):
+            code=[]
+            values=[self.ownership.evaluate(node.role(side),code,hint) for side in ['left','right']]
+            result=s.prefix+'power_result'
+            code.append(f'{result} := {self.module("numeric")}.power({values[0].value},{values[1].value})')
+            for value in reversed(values):self.ownership.release(value,code)
+            code.append('return '+result)
+            return '\n'.join(code)
+        name,args=self.closed(node,body,result=None,flavor='power')
+        args.append(typ)
+        return name+'('+', '.join(args)+')'
 
     def range_membership(self,node,interval,constant):
         s=self.source

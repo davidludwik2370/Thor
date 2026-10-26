@@ -498,6 +498,37 @@ Range membership (runtime and compile time):
   A condition-only for needs parentheses to distinguish membership from iteration.
 - This adds interval membership syntax, not a first-class range value/type.
 
+Numeric power (post-v1 extension):
+    2 ** 3 ** 2 == 512
+    -2 ** 2 == -4
+    (-2) ** 2 == 4
+    2.0 ** -3 == 0.125
+
+- Use infix ** for numeric exponentiation; retain prefix ** for native expansion.
+- Associate to the right, above multiplication and prefix unary operators.
+  Postfix selectors, calls, indexing and dereferences continue to bind first.
+- Accept integer and floating-point scalar operands. Typed operands must match
+  exactly, including width and distinct type identity. Untyped numeric constants
+  follow native Odin coercions: 2.0 ** -3 has two floating-point operands;
+  a typed int ** typed f64 is a compile error, requiring an explicit cast.
+- Return the common operand type. Float exponents may be fractional or negative;
+  use core:math pow semantics, including its IEEE special values. Define 0**0 as 1.
+- Integer exponents must be nonnegative. Reject negative compile-time powers;
+  negative runtime integer exponents panic even when assertions are disabled.
+  Runtime integer multiplication uses Odin's normal fixed-width overflow behavior.
+  Untyped integer constants remain exact up to Odin's 128-bit integer range.
+- Evaluate base then exponent exactly once, including right-associated chains.
+  Preserve enclosing lazy branches and per-iteration evaluation; allocate nothing.
+- Support constant declarations, #if/#switch, array sizes, generic procedure
+  specialization, fn and #run using the existing checked native evaluation/cache.
+  Preserve literal coercion for untyped folded results and validate operand types.
+- Uninstantiated type-level generic expressions with no executable call site
+  support fixed nonnegative integer exponents through 128 via native constant
+  arithmetic. Other such powers require a resolvable procedure specialization.
+- TLS shares precedence/AST spans and numeric inference; its partial branch
+  evaluator folds integer powers only when representable as machine int.
+
+
 Compile-time type membership and generic constraints:
     my_gen :: proc(x: $T) -> T where T in [int, f64] {
         return x

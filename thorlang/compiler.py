@@ -189,9 +189,10 @@ class Source:
         # Discover support packages before emission so their dependencies and
         # source maps participate in the same project graph.
         for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
-                              ('pure',any(n.data.get('pure') or n.kind=='Run' for n in self.nodes)),
+                              ('pure',any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call'} for n in self.nodes)),
-                              ('sequence',self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes))]:
+                              ('sequence',self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes)),
+                              ('numeric',self.thor and any(n.kind=='Binary' and n.data['op']=='**' for n in self.nodes))]:
             if needed:
                 self.imports[self.prefix+module]='thor:'+module
 

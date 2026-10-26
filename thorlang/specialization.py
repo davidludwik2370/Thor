@@ -160,7 +160,7 @@ class Specializations:
         self.running.add(key)
         try:
             with self.using(bindings,call,self.bindings.copy()):
-                for n in descendants(proc.role('body')):
+                for n in descendants(proc):
                     if n.kind=='Run' or e.automatic(n):e.evaluate(n)
                     if n.kind=='Call' and n not in e.busy:e.specializations.process(n)
             self.visited.add(key)

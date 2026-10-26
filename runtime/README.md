@@ -95,3 +95,10 @@ Padding and addresses are excluded. Reconstruction validates the packet and emit
 typed native constants. The current result policy intentionally exposes only
 scalar and pointer-free fixed aggregate results. See the root README for native
 execution limits and conservative schema boundaries.
+
+## Numeric power
+
+The compiler uses `thor:numeric` for infix `**`. Its contextless `power` procedure
+implements integer exponentiation by squaring and delegates floating-point powers
+to `core:math.pow`. Typed callers supply matching operands. Negative integer
+exponents panic; zero exponents return one. No allocator is used.

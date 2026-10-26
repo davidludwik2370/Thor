@@ -134,6 +134,19 @@ async function run() {
         await replace(runeFormat);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const declaration='allowed_size::proc($N:int)->int where N in [2,4,8]{return N}\n';
+        const powerSource='package main\nmain::proc(){_="😀";base:f64=2;exponent:f64 = -3;result:=base**exponent;_=result}\n';
+        await replace(powerSource);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(powerSource.indexOf('result:=')+2)),
+            values=>values?.some(value=>value.contents.some(content=>(content.value||'').includes('result: f64'))));
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        await replace(powerSource.replace('exponent:f64 = -3','exponent:int = 3'));
+        const powerErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('matching operand types')));
+        const powerError=powerErrors.find(value=>value.message.includes('matching operand types'));
+        assert.equal(testDocument.getText(powerError.range),'base**exponent');
+        assert.ok(!powerError.message.includes('Thor expression'));
+        await replace(powerSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const intervalSource='package main\nallowed_range::proc($N:int)->int where N in 0..<10{return N}\n#if -2 in -3..=0 {SELECTED::42} #else {SELECTED::false}\nmain::proc(){value:=3;found:=value in 0..<10;result:=allowed_range(9);_=found;_=result;_=SELECTED}\n';
         await replace(intervalSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -227,7 +240,7 @@ async function run() {
             'implicit runtime import names and namespace theme mapping',
             'rune fill syntax and mapped format diagnostics',
             'immediate same-file redeclarations and clearing',
-            'range membership inference and unsaved constraint diagnostics'];
+            'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);
