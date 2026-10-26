@@ -133,16 +133,17 @@ async function run() {
             testDocument.positionAt(genericLoop.indexOf('>v')+1)), values=>hoverText(values||[]).includes('v: T'));
         assert.ok(!hoverText(genericHover).includes('$v'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
-        const genericDefault = 'package main\n/* 😀 */ sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\nmain::proc(){}\n';
+        const genericDefault = 'package main\n/* 😀 */ sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return missing})->[]E{_=less(a[0],a[1]);return a}\nmain::proc(){_=sorted([]int{1,2})}\n';
         await replace(genericDefault);
         const defaultErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
-            values=>values.some(value=>value.message.includes('Anonymous default procedure')));
-        const defaultError=defaultErrors.find(value=>value.message.includes('Anonymous default procedure'));
-        assert.equal(testDocument.getText(defaultError.range),'proc(i,j:E)->bool');
+            values=>values.some(value=>value.message.includes('Undeclared name: missing')));
+        const defaultError=defaultErrors.find(value=>value.message.includes('Undeclared name: missing'));
+        assert.equal(testDocument.getText(defaultError.range),'missing');
+        assert.ok(!defaultError.message.includes('__thor_'));
         assert.ok(!defaultError.message.includes('did not provide a source location'));
-        assert.ok(!vscode.languages.getDiagnostics(document.uri).some(value=>value.message.includes('Anonymous default procedure')),
+        assert.ok(!vscode.languages.getDiagnostics(document.uri).some(value=>value.message.includes('Undeclared name: missing')),
             'An error in the temporary example must not appear on demo/main.thor');
-        await replace(genericDefault.replace('less:=proc(i,j:E)->bool{return i<j}','less:proc(i,j:E)->bool'));
+        await replace(genericDefault.replace('return missing','return i<j'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
@@ -307,7 +308,7 @@ async function run() {
             'unused imports carry VS Code dimming tags and update without saving',
             'activation and restart with no active editor', 'package declaration hover',
             'generic loop variables remain values in semantic tokens and hover',
-            'generic default callback errors highlight their exact source signature', 'hidden Set imports do not hover on comments',
+            'generic inline defaults compile and body errors highlight original source', 'hidden Set imports do not hover on comments',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

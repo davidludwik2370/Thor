@@ -259,15 +259,44 @@ back to the operation that instantiated them. Empty-array and membership failure
 have Thor-specific explanations; redundant inference errors are suppressed when
 the underlying expression already has a diagnostic.
 
-Anonymous default callbacks whose signatures directly depend on unspecialized
-generic parameters have a source-mapped check. For example, `less := proc(i,j:E)
--> bool {...}` in a generic procedure reports the problem on that callback's
-signature, instead of Odin's locationless `Unspecialized polymorphic procedure
-''` error. The message identifies the default parameter and generic dependency.
-Named generic defaults, concrete callbacks and callbacks using already-bound
-outer types retain native behavior. Odin still selects active branches and
-instantiates enclosing bodies before checking the guard. Computed type
-expressions that cannot be classified confidently stay with Odin's checker.
+Thor supports inline generic callback defaults in named procedures:
+
+```odin
+sorted :: proc(data: $T/[]$E,
+               less := proc(i, j: E) -> bool { return i < j }) -> []E {
+    ret := make([]E, len(data))
+    copy(ret, data)
+    slice.sort_by(ret, less)
+    return ret
+}
+```
+
+Import `core:slice` for this example. Calls can omit `less` or supply their own
+comparator, including a runtime procedure value. The returned slice belongs to
+the caller; delete it when finished. See the runnable, commented example in
+[examples/default_callbacks/demo.thor](examples/default_callbacks/demo.thor).
+
+Thor emits a named generic helper, an explicit callback parameter type, and the
+omitted argument at a statically resolved call. This works across Thor/Odin files,
+package imports and selective aliases. Supplying a comparator skips specialization
+of the default, so records can use a custom comparator even though `<` is not
+defined for records. Explicit `nil` stays `nil`. Ordinary Odin procedure-value
+types do not retain default arguments; indirect calls still supply the callback.
+Overloaded calls that Thor cannot resolve also need an explicit callback.
+
+Generic dependencies must be inferable from the callback's parameter types, such
+as `E` in `proc(a,b:E)` or `N` in `proc(a:[N]int)`. A dependency appearing only in
+the result/body is currently rejected with a mapped signature diagnostic.
+Callbacks cannot capture enclosing runtime parameters. An independently generic
+literal such as `proc(a,b:$U)` needs an explicit callback parameter type.
+Procedure-valued parameters remain outside the `fn`/`#run` pure-input contract.
+
+This extension applies to `.thor` declarations; native `.odin` declarations retain
+their source-mapped unsupported-default check. Named generic defaults, concrete
+callbacks and callbacks using already-bound outer types retain native behavior.
+Odin still selects active branches and instantiates enclosing bodies before
+checking guards or helper bodies. Computed type expressions that cannot be
+classified confidently stay with Odin's checker.
 Unrecoverable locationless errors retain an explicitly labeled package fallback
 in TLS rather than being assigned to an unrelated open file.
 

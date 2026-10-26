@@ -1365,6 +1365,40 @@ get_locals_poly :: proc(file: ast.File, params: ^ast.Field_List, ast_context: ^A
 	}
 }
 
+get_enclosing_generic_locals :: proc(file: ast.File, function: ^ast.Proc_Lit, ast_context: ^AstContext) {
+	// A default callback lives inside the enclosing signature. Cursor lookup
+	// enters that inner procedure directly, so its host's generics must be
+	// collected independently of the outer body/local-variable walk.
+	State :: struct {
+		file:        ast.File,
+		function:    ^ast.Proc_Lit,
+		ast_context: ^AstContext,
+	}
+	state := State{file, function, ast_context}
+	visit :: proc(visitor: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
+		if node == nil {
+			return nil
+		}
+		state := cast(^State)visitor.data
+		if node.pos.offset > state.function.pos.offset || node.end.offset < state.function.end.offset {
+			return nil
+		}
+		if outer, ok := node.derived.(^ast.Proc_Lit); ok {
+			if outer == state.function {
+				return nil
+			}
+			if outer.type != nil {
+				get_locals_poly(state.file, outer.type.params, state.ast_context)
+			}
+		}
+		return visitor
+	}
+	visitor := ast.Visitor{visit = visit, data = &state}
+	for decl in file.decls {
+		ast.walk(&visitor, decl)
+	}
+}
+
 get_function_locals :: proc(
 	file: ast.File,
 	function: ^ast.Node,
@@ -1380,6 +1414,7 @@ get_function_locals :: proc(
 		return
 	}
 
+	get_enclosing_generic_locals(file, proc_lit, ast_context)
 	get_locals_proc_param_and_results(file, proc_lit^, ast_context, document_position)
 
 	block: ^ast.Block_Stmt

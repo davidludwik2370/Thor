@@ -149,6 +149,7 @@ class Source:
         self.converted_do_blocks = set()
         self.guard_messages = {}
         self.resolver = None
+        self.defaults = None
         self.purity = None
         self.run_values = {}
         self.evaluation_keep = None
@@ -548,12 +549,18 @@ class Source:
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
         kind = n.kind
+        if self.defaults:
+            code = self.defaults.render(n)
+            if code is not None:
+                return code
         if n in self.run_values:
             value=self.run_values[n]
             if callable(value):return value(expected,constant)
             return value['constant' if constant else 'runtime'] if isinstance(value,dict) else value
         if kind == 'Procedure' and self.resolver:
-            invalid_default = self.resolver.generic_default_error(n)
+            invalid_default = (self.defaults.errors.get(n) if self.defaults else None)
+            if not invalid_default and not (self.defaults and n in self.defaults.plans):
+                invalid_default = self.resolver.generic_default_error(n)
             if invalid_default:
                 signature, message = invalid_default
                 token = self.prefix + f'generic_default_{n.start}_{n.end}'
@@ -757,6 +764,8 @@ class Source:
             hint, const = overrides.get(child, (None, constant))
             replacements.append((child.start, child.end, self.render(child, hint, const)))
         inserts = []
+        if self.defaults and kind == 'Call':
+            inserts.extend(self.defaults.arguments(n))
         guards = self.block_guards.get(n)
         real_block = kind == "Block" and self.raw[n.start:n.start+1] == b"{"
         if guards and real_block:
@@ -769,6 +778,8 @@ class Source:
             result = "{" + self.guard_code(guards) + result + "}"
         if self.resolver and kind == "Declaration":
             result += self.resolver.declaration_support(n)
+        if self.defaults and kind == 'Declaration':
+            result = self.defaults.helpers(n) + result
         if n in self.conditional_conflicts:
             result = '#panic("declaration conflicts with selective import")\n' + result
         if kind=='Case':

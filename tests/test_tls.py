@@ -1044,28 +1044,63 @@ main::proc(){
         self.assertEqual(error['range']['end']['character'] - error['range']['start']['character'], 7)
         self.assertNotIn('__thor_', error['message'])
 
-    def test_generic_default_callback_has_its_exact_signature_range_and_clears(self):
-        broken = 'package main\n/* 😀 */ sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\n'
+    def test_generic_default_callback_has_its_exact_body_range_and_clears(self):
+        broken = 'package basic\n/* 😀 */ sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return missing})->[]E{_=less(a[0],a[1]);return a}\ncheck::proc(){_=sorted([]int{1,2})}\n'
         clean = 'package main\nmain::proc(){}\n'
         client, main = self.open(clean, {'basic/main.thor': broken})
         bad = main.parent / 'basic/main.thor'
         client.send('textDocument/didOpen', {'textDocument': {'uri': bad.as_uri(),
                     'languageId': 'thor', 'version': 1, 'text': broken}})
-        errors = client.diagnostic(bad.as_uri(), code='thor', contains='Anonymous default procedure')
-        error = next(e for e in errors if 'Anonymous default procedure' in e['message'])
-        self.assertEqual(error['range']['start'], self.position(broken, 'proc(i,j:E)', 0))
-        self.assertEqual(error['range']['end'], self.position(broken, 'proc(i,j:E)->bool', len('proc(i,j:E)->bool')))
+        errors = client.diagnostic(bad.as_uri(), code='thor', contains='Undeclared name: missing')
+        error = next(e for e in errors if 'Undeclared name: missing' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(broken, 'missing', 0))
+        self.assertEqual(error['range']['end'], self.position(broken, 'missing', len('missing')))
+        self.assertNotIn('__thor_', error['message'])
         self.assertNotIn('did not provide a source location', error['message'])
         self.assertFalse(any(n.get('method') == 'textDocument/publishDiagnostics'
                              and n['params']['uri'] == main.as_uri()
-                             and any('Anonymous default procedure' in d['message'] for d in n['params']['diagnostics'])
+                             and any('Undeclared name: missing' in d['message'] for d in n['params']['diagnostics'])
                              for n in client.notifications))
-        fixed = broken.replace('less:=proc(i,j:E)->bool{return i<j}', 'less:proc(i,j:E)->bool')
+        fixed = broken.replace('return missing', 'return i<j')
         client.notifications.clear()
         client.send('textDocument/didChange', {'textDocument': {'uri': bad.as_uri(), 'version': 2},
                     'contentChanges': [{'text': fixed}]})
         client.diagnostic(bad.as_uri(), empty=True)
         self.assertEqual(bad.read_text(), broken)
+
+    def test_generic_inline_default_hover_navigation_tokens_and_rename(self):
+        text = 'package main\n/* 😀 */ sorted::proc(data:[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{_=less(data[0],data[1]);return data}\nmain::proc(){_=sorted([]int{1,2})}\n'
+        client, main = self.open(text, compiler=False)
+        document = {'uri': main.as_uri()}
+        for needle, offset, expected in [('less(data', 1, 'less: proc(i, j: E) -> bool'),
+                                         ('return i<j', 7, 'i: E'), ('i,j:E', 4, 'E')]:
+            with self.subTest(needle=needle):
+                hover = client.request('textDocument/hover', {'textDocument': document,
+                    'position': self.position(text, needle, offset)})
+                self.assertIsNotNone(hover, needle)
+                self.assertIn(expected, hover['contents']['value'])
+                self.assertNotIn('__thor_', hover['contents']['value'])
+        definition = client.request('textDocument/definition', {'textDocument': document,
+            'position': self.position(text, 'i,j:E', 4)})
+        self.assertEqual(definition['uri'], main.as_uri())
+        self.assertEqual(definition['range']['start'], self.position(text, '$E', 1))
+        renamed = client.request('textDocument/rename', {'textDocument': document,
+            'position': self.position(text, 'i,j:E', 4), 'newName': 'Element'})
+        edits = renamed['changes'][main.as_uri()]
+        self.assertEqual(len(edits), 3)
+        for edit in edits:
+            self.assertEqual(edit['newText'], 'Element')
+        tokens = client.request('textDocument/semanticTokens/full', {'textDocument': document})['data']
+        line = column = 0
+        i_types = []
+        for index in range(0, len(tokens), 5):
+            delta, char, length, kind, _ = tokens[index:index+5]
+            line += delta
+            column = char if delta else column + char
+            token = text.splitlines()[line].encode('utf-16-le')[column*2:(column+length)*2].decode('utf-16-le')
+            if token == 'i':
+                i_types.append(client.capabilities['semanticTokensProvider']['legend']['tokenTypes'][kind])
+        self.assertEqual(i_types, ['parameter', 'parameter'])
 
     @unittest.skipIf(os.name == 'nt', 'Uses an executable Python test compiler')
     def test_locationless_compiler_error_stays_with_its_package_and_clears(self):

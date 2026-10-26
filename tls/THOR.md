@@ -138,12 +138,23 @@ source file in that checked package (or a source file discovered there), with a
 note explaining the missing location. It never selects an unrelated open buffer
 as the fallback. Internal zero-length Set imports are excluded from source
 position lookup, so they cannot create package hovers on the first comment.
-The compiler recovers a precise span for anonymous default callbacks with a
-directly generic signature: a source-mapped assertion stays at the callback's
-original default-expression site. TLS displays that signature range, including
-unsaved and imported sources, and clears it after correction. This is a compiler
-check rather than a second TLS type checker; native conditional compilation and
-enclosing generic specialization still control whether it is checked.
+Thor supports inline default callbacks whose generic dependencies can be inferred
+from their parameter types. The compiler lifts the callback into a named generic
+helper, gives the parameter an explicit procedure type, and supplies omitted
+callbacks at resolved calls, including across imported packages. An explicit
+override does not specialize the default. TLS continues to use the original AST:
+hover shows the original inline signature, navigation/rename retain the outer
+generic bindings, and callback parameters retain value coloring. Cursor lookup
+collects enclosing generic parameters even when a callback is nested in a
+signature rather than in the outer body.
+
+Errors inside generated callback helpers map to the original body tokens,
+including unsaved/imported Unicode sources. Unsupported result/body-only generic
+dependencies and runtime captures have mapped diagnostics at their original
+signature or capture. Native `.odin` declarations retain their unsupported-default
+guard. Native conditional compilation and enclosing generic specialization still
+control whether guards and helper bodies are checked. This uses the compiler's
+checker rather than adding a second TLS type checker.
 
 Unconditional top-level redeclarations in an untagged file also have an immediate
 `Declaration` diagnostic, independent of native checking. The shared frontend

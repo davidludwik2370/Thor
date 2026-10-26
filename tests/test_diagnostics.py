@@ -41,50 +41,49 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
-    def test_generic_default_callback_points_to_its_unicode_signature(self):
-        signature = 'proc(i, j: E) -> bool'
-        source = 'package basic\n/* 😀 */ sorted::proc(a:$T/[]$E, less:=('+signature+' {return i<j}))->[]E{return a}\n'
-        errors = self.at(source, signature, flags=('-no-entry-point',), message="Anonymous default procedure for 'less'")
+    def test_generic_default_callback_body_error_has_its_unicode_source_range(self):
+        source = 'package main\n/* 😀 */ work::proc(a:[]$E,less:=(proc(i,j:E)->bool{return "wrong"}))->bool{return less(a[0],a[1])}\nmain::proc(){_=work([]int{1,2})}\n'
+        errors = self.at(source, '"wrong"', message='Cannot convert')
         self.assertEqual(len(errors), 1, errors)
         error = errors[0]
-        self.assertEqual(error['pos']['end_offset']-error['pos']['offset'], len(signature.encode()))
-        self.assertIn('signature (E)', error['msgs'][0])
+        self.assertEqual(error['pos']['end_offset']-error['pos']['offset'], len('"wrong"'.encode()))
         self.assertNotIn('Unspecialized polymorphic procedure', json.dumps(errors))
         self.assertNotIn('__thor_', json.dumps(errors))
 
-    def test_generic_default_callbacks_report_each_original_signature(self):
-        first = 'proc(i,j:E)->bool'
-        second = 'proc()->E'
+    def test_uninferable_generic_defaults_report_each_original_signature(self):
+        first = 'proc()->E'
+        second = 'proc()->[N]int'
         source = ('package basic\n'
-                  f'first::proc(a:[]$E,less:={first}{{return i<j}}){{}}\n'
-                  f'second::proc(a:[]$E,value:={second}{{return {{}}}}){{}}\n')
+                  f'first::proc(a:[]$E,value:={first}{{return {{}}}}){{}}\n'
+                  f'second::proc($N:int,value:={second}{{return {{}}}}){{}}\n')
         entry, _, errors, _ = self.invoke(source, flags=('-no-entry-point',))
         self.assertEqual(len(errors), 2, errors)
         self.assertEqual({e['pos']['offset'] for e in errors},
                          {source.encode().index(first.encode()), source.encode().index(second.encode())})
         self.assertTrue(all(e['pos']['file'] == str(entry) for e in errors))
 
-    def test_explicitly_generic_and_typed_default_callbacks_have_source_ranges(self):
-        for parameter in ['less:=proc(i,j:$U)->bool{return i<j}',
-                          'less:proc(E,E)->bool=proc(i,j:E)->bool{return i<j}',
-                          'less:=proc(value:[N]int)->bool{return true}']:
+    def test_uninferable_default_callbacks_and_captures_have_source_ranges(self):
+        for parameter, needle, message in [
+            ('less:=proc(i,j:$U)->bool{return i<j}', 'proc(i,j:$U)->bool', 'explicit callback parameter type'),
+            ('less:=proc(i,j:E)->bool{return N>0 && i<j}', 'proc(i,j:E)->bool', "generic 'N'"),
+            ('less:=proc(i,j:E)->bool{return len(a)>0 && i<j}', 'a)>0', "cannot capture enclosing parameter 'a'"),
+        ]:
             with self.subTest(parameter=parameter):
                 source = 'package basic\nwork::proc($N:int,a:[]$E,'+parameter+'){}\n'
-                needle = 'proc(i,j:' if 'proc(i,j:' in parameter else 'proc(value:'
-                errors = self.at(source, needle, flags=('-no-entry-point',), message='Anonymous default procedure')
+                errors = self.at(source, needle, flags=('-no-entry-point',), message=message)
                 self.assertEqual(len(errors), 1, errors)
 
     def test_generic_default_guard_preserves_native_conditional_checking(self):
-        bad = 'sorted::proc(a:[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}'
+        bad = 'work::proc(a:[]$E,value:=proc()->E{return {}})->[]E{return a}'
         for wrapper in ['when false {%s}', '#if false {%s}',
                         'outer::proc(a:[]$T){%s}',
                         '#if #config(ENABLE_BAD,false) {%s}']:
             with self.subTest(wrapper=wrapper):
                 self.invoke('package basic\n'+wrapper % bad+'\n', flags=('-no-entry-point',), success=True)
         self.at('package basic\n#if #config(ENABLE_BAD,false) {'+bad+'}\n',
-                'proc(i,j:E)',flags=('-no-entry-point','-define:ENABLE_BAD=true'),message='Anonymous default procedure')
+                'proc()->E',flags=('-no-entry-point','-define:ENABLE_BAD=true'),message='cannot be inferred')
         self.at('package main\nouter::proc($T:typeid){'+bad+'}\nmain::proc(){outer(int)}\n',
-                'proc(i,j:E)', message='Anonymous default procedure')
+                'proc()->E', message='cannot be inferred')
 
     def test_valid_default_callbacks_and_enclosing_specializations_are_preserved(self):
         variants = [

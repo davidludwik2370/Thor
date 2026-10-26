@@ -575,3 +575,57 @@ rename to unsaved Unicode/interpolation source, and checks diagnostics clear.
 The installed client remains 0.10.2: Thor: Restart Language Server loads the new
 server capability without reinstalling the extension. Existing user source edits
 in Library.odin, demo/main.thor, thor.odin and basic/ remain untouched.
+
+## Inline generic callback defaults: compiler 0.11.0 / TLS 0.10.1
+
+Thor declarations can now use an inline callback such as
+`less := proc(i,j:E)->bool{return i<j}` when E is supplied by the enclosing
+generic signature. Lift it into a named helper beside the owning declaration,
+introduce the inferred helper generics at structural parameter-type positions,
+and give the original parameter an explicit callback type. Existing concrete
+defaults and native Odin declarations retain their previous handling.
+
+Odin exposed two additional constraints while testing: imported generic defaults
+can resolve names in the caller's scope, and an overridden default can still
+specialize an invalid comparison (for example `<` on records). Remove the
+lowered default and supply the helper only at statically resolved calls that
+omit it. Qualify cross-package helpers through hidden imports, including when a
+package-level alias exposes a procedure to a file without that import. Keep
+runtime evaluation order, named/positional overrides, explicit nil and the
+procedure-value signature intact. Defaults are not carried by ordinary Odin
+procedure-value types; unresolved overload calls require an explicit callback.
+
+Helpers for alternate declarations of the same procedure/parameter share a
+scope-specific name across when/#if branches and package files. Odin selects the
+active declaration/helper; Thor does not guess conditional values. Unused helper
+bodies stay uninstantiated. Imports, selected aliases, outer compile-time bindings,
+comments, nested Thor expressions and exact copied source spans remain available.
+Errors in helper bodies point to their original callback tokens. Runtime captures,
+generic dependencies not inferable from callback parameter types, and independently
+generic literals without an explicit callback type retain precise diagnostics.
+Procedure inputs and indirect calls remain outside the fn/#run pure contract.
+
+TLS cursor lookup now collects enclosing generic parameters before resolving a
+nested callback's own parameters. This restores E navigation/rename and `i: E`
+hover inside defaults without admitting outer runtime-variable captures. The
+original AST continues to drive hover, semantic tokens, definitions and edits.
+The installed client remains 0.10.2; restarting TLS loads the rebuilt server.
+
+The commented runnable example is examples/default_callbacks/demo.thor. Fifteen
+runtime acceptance tests cover sorting, typed and independently generic defaults,
+generic lengths/types, overrides that invalidate the default, nil, multiple
+callbacks, conditionals across files, mixed Thor/Odin callers, selected imports,
+aliases, side effects, nested scopes, other Thor expressions and purity boundaries.
+Mapped diagnostics cover Unicode callback body errors, unsupported dependencies,
+captures, inactive and unused code, native imports and unsaved correction. TLS
+tests verify callback hover, generic definitions and rename, parameter colors,
+and isolated live body errors. Actual VS Code integration compiles the inline
+default after correction and confirms its body error has the original token range.
+
+Validation: the full Python run passed 543 tests with one pre-existing expected
+failure, including actual CodeLLDB tests. The final fifteen callback acceptance
+tests and seven focused diagnostic tests also pass, alongside all 1,118 native
+TLS tests, 78 Node tests and actual VS Code integration. The new demo runs and
+checks integer/float results, custom ordering, record overrides and preservation
+of the input. Existing user edits in thor.odin, demo/main.thor and basic/ are
+preserved.
