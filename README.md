@@ -139,10 +139,12 @@ set `tls.server.path` to the absolute path of `tls/bin/tls`.
 
 The extension provides a Thor grammar, snippets, brackets/comments, and a TLS
 client. TLS provides completion, hover, definitions, semantic highlighting,
-and live parser/compiler diagnostics on original, unsaved Thor text. The client
+symbol renaming, and live parser/compiler diagnostics on original, unsaved Thor
+text. The client
 finds the `thor` compiler launcher alongside the local TLS checkout; use
-`tls.compiler.path` for another location. Rename, formatting, automatic imports,
-and Thor code actions are disabled for this first editor milestone. Existing
+`tls.compiler.path` for another location. Use **Rename Symbol** in the context menu
+or **F2** to rename a resolved source identifier. Formatting, automatic imports,
+and Thor code actions remain disabled. Existing
 Odin support continues to handle `.odin` files.
 
 Additional editor checks:

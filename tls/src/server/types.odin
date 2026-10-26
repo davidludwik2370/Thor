@@ -142,7 +142,7 @@ ServerCapabilities :: struct {
 	hoverProvider:              bool,
 	documentFormattingProvider: bool,
 	inlayHintProvider:          bool,
-	renameProvider:             bool,
+	renameProvider:             RenameOptions,
 	referencesProvider:         bool,
 	documentHighlightProvider:  bool,
 	workspaceSymbolProvider:    bool,

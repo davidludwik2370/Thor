@@ -577,7 +577,7 @@ time.sleep(10)
             'assets/message.txt': (ROOT / 'demo' / 'assets' / 'message.txt').read_text(),
             'library/library.odin': (ROOT / 'demo' / 'library' / 'library.odin').read_text()})
         self.assertFalse(client.capabilities['documentFormattingProvider'])
-        self.assertFalse(client.capabilities['renameProvider'])
+        self.assertEqual(client.capabilities['renameProvider'], {'prepareProvider': True})
         client.request('textDocument/documentSymbol', {'textDocument': {'uri': main.as_uri()}})
         diagnostics = [value['params']['diagnostics'] for value in client.notifications
                        if value.get('method') == 'textDocument/publishDiagnostics']

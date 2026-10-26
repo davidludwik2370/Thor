@@ -843,8 +843,7 @@ request_initialize :: proc(
 		params = ResponseInitializeParams {
 			capabilities = ServerCapabilities {
 				textDocumentSync = TextDocumentSyncOptions{openClose = true, change = 2, save = {includeText = true}},
-				// Thor import aliases need origin-aware rename edits before enabling this.
-				renameProvider = false,
+				renameProvider = {prepareProvider = true},
 				workspaceSymbolProvider = true,
 				referencesProvider = config.enable_references,
 				documentHighlightProvider = config.enable_document_highlights,
@@ -1645,6 +1644,16 @@ request_rename :: proc(params: json.Value, id: RequestId, config: ^common.Config
 	}
 
 	workspace_edit: WorkspaceEdit
+	if filepath.ext(document.fullpath) == ".thor" {
+		message: string
+		workspace_edit, message = thor_rename(document, rename_param.newName, rename_param.position)
+		if message != "" {
+			send_error(make_response_message_error(id, ResponseError{code = .InvalidParams, message = message}), writer)
+			return .None
+		}
+		send_response(make_response_message(params = workspace_edit, id = id), writer)
+		return .None
+	}
 	workspace_edit, ok = get_rename(document, rename_param.newName, rename_param.position)
 
 	if !ok {

@@ -158,9 +158,33 @@ checkout, or from `tls.compiler.path`; `odin_command` selects the backend. TLS
 stores generated sources, source maps, and overlay files in its temporary checker
 directory. Source files are never saved by checking.
 
-Rename, formatting, automatic imports, and Thor code actions remain disabled
-because their edits need to preserve Thor syntax. References retain OLS's
-existing limitations and do not constitute a rename implementation.
+### Rename Symbol
+
+TLS advertises rename with `prepareRename` support. Thor rename resolves the
+selected identifier to its declaration, then validates every edit against the
+original source. It uses unsaved open buffers in both the package index and
+reference search. Local variables, immutable bindings, generic parameters,
+procedure parameters (including named arguments), and resolvable record/enum
+members are supported. Global names are searched across `.thor` and `.odin`
+sources in the configured workspace, including selective import lists. Strings,
+comments and generated output directories are excluded.
+
+Import namespaces are file-local: renaming `fmt` from `import "core:fmt"` adds
+an explicit alias and updates its uses, leaving the path and other files alone.
+Declarations outside the editable workspace, such as SDK procedures, cannot be
+renamed from an imported use. Renaming a package declaration itself is not
+supported.
+
+Rename rejects invalid identifiers, detected name collisions, and unresolved
+same-name uses in related files rather than returning known partial edits. This
+includes the contextual `.Red` in switch-arm arrays mentioned above: that member
+rename is refused until the resolver can locate every use. Resolve related syntax
+errors before a global rename. The search is limited to workspace/open sources;
+references in other projects are outside its scope. References/highlights retain
+their existing OLS limitations independently of rename.
+
+Formatting, automatic imports, and Thor code actions remain disabled because
+their edits still need to preserve Thor syntax.
 
 TLS reads `tls.json` instead of `ols.json`, using the existing OLS configuration
 schema. `OLS_BUILTIN_FOLDER` remains supported for the upstream builtin index.

@@ -176,6 +176,16 @@ the live compiler evaluates explicit and known-argument calls, including generic
 Live compiler diagnostics use source maps to report errors against original Thor
 files, including unsaved edits and imported buffers. Errors clear after a fix;
 generated helper names are replaced with messages about the Thor operation.
-Formatting, automatic import edits, and rename are disabled until their edits can
-preserve Thor syntax. See [the TLS implementation notes](../../tls/THOR.md) for
-details and current resolver limitations.
+Use **Rename Symbol** in the context menu or **F2** on an identifier. TLS supports
+local/global declarations, generic and procedure parameters, resolvable members,
+selective imports, and file-local import aliases. It returns edits to original
+Thor/Odin workspace sources, including unsaved buffers. Import paths, comments,
+string text, and generated sources are preserved. Ambiguous or unresolved uses
+and detected name conflicts cancel the rename. References outside the workspace
+are not searched; SDK declarations and package declarations cannot be renamed.
+After rebuilding TLS, run **Thor: Restart Language Server** to refresh the
+advertised capabilities; an extension reinstall is unnecessary for this change.
+
+Formatting and automatic import edits remain disabled until their edits can
+preserve Thor syntax. See [the TLS implementation notes](../../tls/THOR.md#rename-symbol)
+for details and current resolver limitations.

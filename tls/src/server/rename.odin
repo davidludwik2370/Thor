@@ -4,6 +4,7 @@ import "base:runtime"
 
 import "core:log"
 import "core:odin/ast"
+import "core:path/filepath"
 import "core:strings"
 
 import "src:common"
@@ -60,6 +61,9 @@ get_rename :: proc(document: ^Document, new_text: string, position: common.Posit
 
 
 get_prepare_rename :: proc(document: ^Document, position: common.Position) -> (common.Range, bool) {
+	if filepath.ext(document.fullpath) == ".thor" {
+		return thor_prepare_rename(document, position)
+	}
 	ast_context := make_ast_context(
 		document.ast,
 		document.imports,

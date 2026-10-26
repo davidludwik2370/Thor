@@ -96,6 +96,15 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const renameSource = 'package main\nmain::proc(){_="😀";value:=2;message:=f"value {value}";delete(message);_=value}\n';
+        await replace(renameSource);
+        const renameEdit = await eventually(() => vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
+            testDocument.uri, testDocument.positionAt(renameSource.indexOf('value:=')+1), 'count'),
+            value => value?.size > 0);
+        assert.equal(renameEdit.get(testDocument.uri).length, 3);
+        assert.ok(await vscode.workspace.applyEdit(renameEdit));
+        assert.equal(testDocument.getText(), renameSource.replace('value:=', 'count:=').replace('{value}', '{count}').replace('_=value', '_=count'));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         const unusedImportSource = 'package main\nimport "core:fmt"\nimport "core:math/big"\nmain::proc(){fmt.println("big.Int is only text")}\n';
         await replace(unusedImportSource);
         const unused = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
@@ -293,6 +302,7 @@ async function run() {
         await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)), values => values?.length > 0);
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
+            'Rename Symbol provider applies original-source edits to unsaved Unicode text',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',
             'activation and restart with no active editor', 'package declaration hover',

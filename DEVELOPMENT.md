@@ -541,3 +541,37 @@ A direct check of the user's basic package now points to the comparator
 signature on line 45 rather than the package declaration. User source files
 remain unchanged; the installed client/server can use the updated compiler on
 the next check or Thor: Restart Language Server.
+
+## Original-source Rename Symbol: TLS 0.10.0
+
+Rename was explicitly disabled despite references/highlights being enabled.
+Advertise rename with prepare support and route Thor requests through a dedicated
+original-source edit builder. Resolve declarations and uses by source identity,
+validate identifier spans, deduplicate adapted selective-import aliases, and
+refresh the package index from all valid unsaved open buffers before searching.
+Workspace scans include Thor and native Odin sources, skip generated directories,
+and retain open text in preference to disk. Local bindings avoid workspace scans;
+procedure parameters also search named arguments across files. Import namespaces
+are renamed only in their source file, inserting an alias for implicit imports
+without modifying import paths. SDK declarations outside editable sources and
+package declarations are not rename targets.
+
+Reject invalid names, detected collisions, related syntax errors and unresolved
+same-name uses instead of returning known partial edits. The existing contextual
+enum navigation limitation therefore cancels an affected rename. Fix the shared
+named-argument resolver to measure its declaration range in the declaration's
+Unicode source, including an unsaved imported buffer, rather than in the caller.
+Ordinary Odin requests retain their inherited rename path.
+
+Twenty real stdio rename tests cover local/immutable/generic bindings, shadowing,
+types and overload groups, record/enum members, compile-time conditionals,
+cross-file selected and qualified imports, mixed closed Thor/Odin sources,
+named arguments, unsaved imported declarations, Unicode edits, namespace aliases,
+collisions, unresolved cases and generated-file exclusion. Representative edited
+projects are compiled with Thor. All 64 existing TLS stdio tests also pass (one
+pre-existing expected failure), alongside 1,118 native TLS tests and 78 Node
+tests. Actual VS Code integration verifies provider registration, applies a
+rename to unsaved Unicode/interpolation source, and checks diagnostics clear.
+The installed client remains 0.10.2: Thor: Restart Language Server loads the new
+server capability without reinstalling the extension. Existing user source edits
+in Library.odin, demo/main.thor, thor.odin and basic/ remain untouched.

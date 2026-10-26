@@ -6,6 +6,7 @@ import "core:log"
 import "core:mem"
 import "core:odin/ast"
 import "core:odin/tokenizer"
+import "core:os"
 import "core:path/filepath"
 import path "core:path/slashpath"
 import "core:reflect"
@@ -3967,7 +3968,18 @@ resolve_location_proc_param_name :: proc(
 	reset_ast_context(ast_context)
 	if value, ok := symbol.value.(SymbolProcedureValue); ok {
 		if arg_name, ok := get_proc_arg_name_from_name(value, ident.name); ok {
-			symbol.range = common.get_token_range(arg_name, ast_context.file.src)
+			// Parameter offsets belong to the declaration file, including its
+			// current unsaved Unicode text, rather than the caller's source.
+			source := ast_context.file.src
+			if arg_name.pos.file != ast_context.fullpath {
+				if opened := thor_rename_open_document(arg_name.pos.file); opened != nil {
+					source = string(opened.text[:opened.used_text])
+				} else if data, err := os.read_entire_file(arg_name.pos.file, context.temp_allocator); err == nil {
+					source = string(data)
+				}
+			}
+			symbol.range = common.get_token_range(arg_name, source)
+			symbol.uri = common.create_uri(arg_name.pos.file, context.temp_allocator).uri
 		}
 	}
 	return symbol, true
