@@ -103,6 +103,13 @@ compiler parser errors for open documents. Parser errors use exact token ranges,
 including after Unicode text and at EOF. Closing the server terminates its active
 check before removing the overlay; Thor cancellation also unwinds native helpers.
 
+Unconditional top-level redeclarations in an untagged file also have an immediate
+`Declaration` diagnostic, independent of native checking. The shared frontend
+performs the same check before evaluating `fn`/`#run` calls in the CLI. Duplicate
+backend reports are suppressed for open buffers, and fixing or closing the buffer
+clears the early diagnostic. Conditional declarations, tagged files, local scopes
+and cross-file conflicts remain with the backend checker.
+
 Set `thor_command` in `tls.json` or initialization options to the absolute Thor
 launcher path. The VS Code extension supplies this automatically from the local
 checkout, or from `tls.compiler.path`; `odin_command` selects the backend. TLS

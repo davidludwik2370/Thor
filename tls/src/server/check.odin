@@ -534,9 +534,9 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			if len(error.msgs) == 0 {
 				continue
 			}
-			if error.stage == "parser" && config.enable_parser_errors {
-				// The shared live parser already diagnoses open buffers. Closed
-				// dependencies still need the compiler's parser diagnostics.
+			if error.stage == "declaration" || error.stage == "parser" && config.enable_parser_errors {
+				// The shared frontend already diagnoses open buffers immediately.
+				// Closed dependencies still need these compiler diagnostics.
 				open := false
 				for b in buffers { if b.path == error.pos.file || b.canonical == error.pos.file { open = true; break } }
 				if open { continue }

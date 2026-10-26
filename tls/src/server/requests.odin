@@ -1299,6 +1299,7 @@ notification_did_close :: proc(
 	if n := document_close(close_params.textDocument.uri); n != nil {
 		return .InternalError
 	}
+	push_diagnostics(writer)
 
 	return .None
 }

@@ -343,6 +343,7 @@ document_close :: proc(uri_string: string) -> common.Error {
 	document.allocator = nil
 	destroy_document_symbol_cache(document)
 	document.client_owned = false
+	remove_diagnostics(.Declaration, document.uri.uri)
 
 	common.delete_uri(document.uri)
 
@@ -381,6 +382,7 @@ document_refresh :: proc(document: ^Document, config: ^common.Config, writer: ^W
 	uri := common.create_uri(path, context.temp_allocator)
 
 	remove_diagnostics(.Syntax, uri.uri)
+	remove_diagnostics(.Declaration, uri.uri)
 	remove_diagnostics(.Unused, uri.uri)
 
 	if writer != nil && config.enable_parser_errors {
@@ -399,6 +401,16 @@ document_refresh :: proc(document: ^Document, config: ^common.Config, writer: ^W
 			)
 		}
 
+	}
+	if writer!=nil && config.enable_diagnostics {
+		if len(errors)==0 {
+			for duplicate in parser.file_redeclarations(&document.ast,context.temp_allocator) {
+				add_diagnostics(.Declaration,uri.uri,Diagnostic{
+					range=common.get_token_range(duplicate.name,document.ast.src),
+					severity=DiagnosticSeverity.Error,code="Declaration",message=duplicate.message,
+				})
+			}
+		}
 		push_diagnostics(writer)
 	}
 

@@ -15,6 +15,23 @@ class InteractionTests(unittest.TestCase):
     invoke=base.ThorTests.invoke
     program=base.ThorTests.program
 
+    def test_duplicate_file_declaration_precedes_compile_time_execution(self):
+        declaration='allowed_size::proc($N:int)->int where N in [2,4,8]{return N}\n'
+        _,result=self.invoke('package main\nspin::fn()->int{for{};return 0}\nWAIT::spin()\n'+
+            declaration+declaration+'main::proc(){}\n',command='check',flags=['--no-cache','--run-timeout','0.1'],fail="Redeclaration of 'allowed_size'")
+        self.assertNotIn('timed out',result.stderr)
+
+    def test_early_redeclarations_preserve_conditional_scopes_and_blank_names(self):
+        self.invoke('''package main
+when true {VALUE::2}else{VALUE::4}
+#if true {selected::proc()->int{return 2}}#else{selected::proc()->int{return 4}}
+_::1
+_::2
+A::struct{value:int}
+B::struct{value:int}
+main::proc(){value:=VALUE;{value:=3;assert(value==3)};assert(value==2&&selected()==2)}
+''')
+
     @unittest.skipIf(os.name=='nt','POSIX graceful compiler cancellation')
     def test_cancellation_stops_helper_and_removes_temporary_project(self):
         with tempfile.TemporaryDirectory(prefix='thor-cancellation-') as directory:

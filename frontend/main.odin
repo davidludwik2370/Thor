@@ -298,6 +298,16 @@ main :: proc() {
         fmt.println(string(encoded))
         os.exit(1)
     }
+    duplicates:=parser.file_redeclarations(file)
+    if len(duplicates)>0 {
+        for duplicate in duplicates {
+            collect_error(duplicate.name.pos,"%s",duplicate.message)
+            parse_errors[len(parse_errors)-1].stage="declaration"
+        }
+        encoded,_:=json.marshal(struct{errors:[]Parse_Error}{parse_errors[:]})
+        fmt.println(string(encoded))
+        os.exit(1)
+    }
     file.end.offset = len(data)
     out := Output{edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
     lexer: tokenizer.Tokenizer

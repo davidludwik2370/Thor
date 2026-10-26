@@ -107,6 +107,12 @@ Thor validation, and Odin type-checking errors use the same display. For example
 `values := [1, "wrong"]` underlines `"wrong"` in your Thor source, even though
 the generated array declaration is much longer.
 
+Unconditional top-level redeclarations in the same untagged file are checked by
+the shared frontend before compile-time evaluation. TLS reports these immediately
+while editing, even without compiler checking, with the duplicate name underlined
+and the earlier declaration's line. Conditional declarations, tagged files,
+cross-file conflicts and other type checks still use the backend.
+
 Each generated `.odin` file has a `.odin.map.json` sidecar. These versioned maps
 record exact copied byte ranges, source ranges for generated constructs, and
 original source snapshots. Nested, reordered, and duplicated expressions retain

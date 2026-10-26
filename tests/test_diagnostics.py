@@ -41,6 +41,13 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_early_redeclaration_has_original_unicode_range_and_prior_line(self):
+        source='package main\ncafé::proc(){}\nLABEL::"😀";café::proc(){}\nmain::proc(){}\n'
+        errors=self.at(source,'café::proc(){}\nmain',message="Redeclaration of 'café'")
+        self.assertEqual(len(errors),1)
+        self.assertEqual(errors[0]['stage'],'declaration')
+        self.assertIn('previous declaration on line 2',errors[0]['msgs'][0])
+
     def test_invalid_format_fill_has_its_own_unicode_source_range(self):
         source='package main\nmain::proc(){_="😀";_=f`{"é😀":界^5}`}\n'
         errors=self.at(source,'界^5',message='single-quoted rune')

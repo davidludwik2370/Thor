@@ -10,6 +10,7 @@ import "src:spall"
 
 DiagnosticType :: enum {
 	Syntax,
+	Declaration,
 	Unused,
 	Check,
 }

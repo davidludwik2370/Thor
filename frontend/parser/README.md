@@ -18,5 +18,10 @@ Parser files use the package name `thor_parser` so TLS can link this parser
 alongside the native Odin formatter's parser. Selection metadata retains name
 positions for TLS; the transpiler continues to consume the same AST spans.
 
+`file_redeclarations` supplies a shared early check of original, unconditional
+top-level value declarations in untagged files. It does not alter the parser's
+syntax-error state or attempt type/branch resolution. The CLI runs it before
+compile-time evaluation; TLS publishes its results immediately while editing.
+
 The original license is reproduced in [LICENSE](LICENSE). Changes to this copy
 do not modify the user's Odin installation.

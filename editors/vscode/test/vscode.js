@@ -133,6 +133,15 @@ async function run() {
         assert.equal(testDocument.getText(formatError.range),'界^5');
         await replace(runeFormat);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const declaration='allowed_size::proc($N:int)->int where N in [2,4,8]{return N}\n';
+        const redeclared='package main\n'+declaration+declaration+'main::proc(){}\n';
+        await replace(redeclared);
+        const redeclarations=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.code==='Declaration'));
+        const redeclaration=redeclarations.find(value=>value.code==='Declaration');
+        assert.ok(redeclaration.message.includes("Redeclaration of 'allowed_size'"));
+        assert.deepEqual(redeclaration.range.start,testDocument.positionAt(redeclared.lastIndexOf('allowed_size')));
+        await replace(runeFormat);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const hardened = 'package main\nlast::proc "c"(a:[]int,i:int)->int{return a[i]}\nmain::proc(){value:=1;p:=&value;p^=2;a:=set[int]{1};b:=set[int]{2};a~=b;_=len(a~b);_=f"{(true ? f"nested {7}" : "borrowed")}";for item in set[int]{1,2}{_=item};delete(a);delete(b)}\n';
         await replace(hardened);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
@@ -207,7 +216,8 @@ async function run() {
             'automatic constants', 'generic-dependent evaluation', 'mapped unsaved generic diagnostic',
             'full demo semantic-token ranges and classifications',
             'implicit runtime import names and namespace theme mapping',
-            'rune fill syntax and mapped format diagnostics'];
+            'rune fill syntax and mapped format diagnostics',
+            'immediate same-file redeclarations and clearing'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

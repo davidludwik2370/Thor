@@ -223,3 +223,27 @@ directives. The `if` following `#else` shares that scope, across whitespace and
 comments; conditions and subsequent runtime keywords retain their own scopes.
 All 67 grammar tests pass, including actual color checks, comments/strings,
 multiline chains and runtime-keyword boundaries. This changes editor styling only.
+
+## Early redeclarations: compiler/TLS 0.7.5
+
+Previously, an otherwise parseable redeclaration waited until the final native
+check, after compile-time evaluations. A copied cold demo took about 55 seconds
+to report a duplicated `allowed_size`; the early check rejects it in about 0.2
+seconds before evaluation. `frontend/parser/declarations.odin` supplies the same
+conservative check to the CLI and TLS. It covers unconditional top-level names
+in one untagged file, ignores blank/synthetic names, and leaves branches, tagged
+files, locals and cross-file conflicts to native checking.
+
+TLS publishes a separate immediate `Declaration` diagnostic with an exact UTF-16
+identifier range and prior declaration line. Compiler checking is not required.
+Fixing or closing a buffer clears it, and background checks avoid duplicating it.
+Regression cases include the reported generic constraint, an infinite pure
+initializer that must never run before the error, Unicode, valid conditional
+definitions, scoped shadowing and blank names.
+
+Validation used an isolated snapshot of the working implementation with the
+committed demo/spec, preserving the user's experimental edits in this checkout.
+The CLI/scope/interaction/diagnostic/LSP run exercised 240 tests with the existing
+contextual-enum navigation expected failure. All 1,109 native TLS tests and the
+actual VS Code integration test pass, including early redeclaration clearing.
+The compiler and TLS advance to 0.7.5; the editor grammar/client remain 0.7.4.

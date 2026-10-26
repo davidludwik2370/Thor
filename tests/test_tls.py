@@ -166,6 +166,48 @@ class TLSTests(unittest.TestCase):
         return client.request('textDocument/hover', {
             'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, word)})
 
+    def test_duplicate_procedure_is_immediate_without_a_compiler_and_clears(self):
+        temporary=tempfile.TemporaryDirectory(prefix='tls-redeclaration-');self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name).resolve();main=root/'main.thor'
+        declaration='allowed_size :: proc($N: int) -> int where N in [2, 4, 8] {return N}\n'
+        text='package main\n'+declaration+'main::proc(){}\n';main.write_text(text)
+        client=Client(root,compiler=False);self.addCleanup(client.close)
+        client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
+        client.request('textDocument/documentSymbol',{'textDocument':{'uri':main.as_uri()}})
+        client.notifications.clear()
+        changed=text+'LABEL::"😀";'+declaration
+        start=time.monotonic()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),code='Declaration')
+        self.assertLess(time.monotonic()-start,2,'Redeclarations should not wait for native evaluation')
+        self.assertEqual(len(errors),1)
+        error=errors[0];needle='LABEL::"😀";allowed_size';offset=len('LABEL::"😀";')
+        self.assertEqual(error['range']['start'],self.position(changed,needle,offset))
+        self.assertEqual(error['range']['end'],self.position(changed,needle,offset+len('allowed_size')))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':4},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),code='Declaration')
+        client.request('textDocument/documentSymbol',{'textDocument':{'uri':main.as_uri()}})
+        client.notifications.clear()
+        client.send('textDocument/didClose',{'textDocument':{'uri':main.as_uri()}})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_fast_redeclarations_do_not_flag_branches_or_scoped_shadowing(self):
+        text='''package main
+when true {VALUE::2}else{VALUE::4}
+#if true {selected::proc(){}}#else{selected::proc(){}}
+_::1
+_::2
+main::proc(){value:=VALUE;{value:=3;_=value};_=value;selected()}
+'''
+        client,main=self.open(text)
+        client.request('textDocument/documentSymbol',{'textDocument':{'uri':main.as_uri()}})
+        for value in client.notifications:
+            if value.get('method')=='textDocument/publishDiagnostics':
+                self.assertFalse(any(e.get('code')=='Declaration' for e in value['params']['diagnostics']))
+
     def semantic_spans(self,client,main,text):
         result=client.request('textDocument/semanticTokens/full',{'textDocument':{'uri':main.as_uri()}})
         legend=client.capabilities['semanticTokensProvider']['legend']['tokenTypes']
