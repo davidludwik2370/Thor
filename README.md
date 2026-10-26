@@ -49,6 +49,75 @@ branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
 ./thor check demo --output-dir /tmp/thor-generated
 ```
 
+## Compilation and Odin flags
+
+Thor uses Odin as its native backend. For a single-file build:
+
+```sh
+./thor build path/to/my_file.thor -o:speed -debug -out:my_program
+```
+
+1. Thor parses the original files with its shared Odin/Thor frontend and checks
+   Thor-specific rules.
+2. Required compile-time work, including `#run` and eligible known-argument `fn`
+   calls, is evaluated. This can compile and run temporary native Odin helpers;
+   successful results can be reused from the evaluation cache.
+3. Thor writes generated `.odin` files, source maps and a manifest into
+   `.thor-build/my_file/`. Imported project packages are mirrored there too.
+4. Thor invokes Odin on the generated file, automatically supplying `-file` for
+   a single-file input. Odin performs native checking, code generation and linking.
+5. Thor translates compiler diagnostics back to the original source locations.
+   A successful default build leaves the executable at `my_program` in this example.
+
+Generated files retain the original relative layout inside the output tree;
+`my_file.odin` is not written over or beside the original `my_file.thor`. Use
+`--output-dir /tmp/generated` to choose the generated tree's location. Without
+`-out:...`, the default executable is `<output-dir>/program` (`program.exe` on
+Windows). Odin's other native build modes can be selected with `-build-mode:...`.
+
+| Thor command | Work after parsing and compile-time evaluation |
+| --- | --- |
+| `transpile` | Write the generated Odin tree and print its entry path; skip final Odin checking/building. |
+| `check` | Ask Odin to check the generated source. |
+| `build` | Ask Odin to build the requested artifact; an executable by default. |
+| `run` | Build an executable, then run it. |
+| `test` | Build with Odin's `-build-mode:test`, then run the test executable. |
+
+`run` and `test` remove their executable afterward unless `-keep-executable` is
+passed. The generated sources and maps remain available for inspection.
+
+Thor forwards flags it does not handle itself to the final Odin invocation.
+Use Odin's usual `-flag:value` spelling, including `-o:speed`, `-debug`,
+`-define:NAME=value`, `-out:path`, and `-target:os_arch`. Values containing spaces
+must remain part of the same quoted argument. Thor does not reproduce Odin's
+complete flag catalog; Odin validates forwarded flags, and compatibility with
+every option is not guaranteed. Thor exposes the five commands above rather
+than forwarding arbitrary Odin subcommands.
+
+A few options receive additional handling:
+
+- `-collection:name=path` is rewritten to the corresponding generated package
+  location. Source-relative assets keep their original resource paths.
+- Diagnostics normally use Odin's JSON output internally, followed by Thor's
+  source mapping. `-json-errors` requests mapped JSON; `--raw-diagnostics`
+  exposes the unmodified backend diagnostics.
+- Defines and relevant native options also reach compile-time helpers. Options
+  for the final artifact, such as `-out:` and `-build-mode:`, are omitted from
+  helper builds. Helpers execute natively; a cross-target build requiring Thor
+  compile-time execution currently reports an unsupported-target error.
+
+Thor's own options use long names, such as `--output-dir`, `--odin`,
+`--run-timeout`, `--no-cache`, and `--cache-report`. Run `./thor --help` for the
+complete list. `--odin /path/to/odin` or `THOR_ODIN` selects the Odin executable.
+The `--run-timeout` option bounds compile-time helper execution, not your final
+program's runtime.
+
+Arguments after `--` are passed to the executable by `run` or `test`:
+
+```sh
+./thor run path/to/my_file.thor -o:speed -- first_argument "two words"
+```
+
 ## VS Code and TLS
 
 The local [TLS fork](tls/THOR.md) and [Thor VS Code extension](editors/vscode/README.md)
@@ -85,6 +154,8 @@ python3 tools/test_vscode.py
 
 The VS Code test uses a temporary editor profile. See [TLS's notes](tls/THOR.md)
 for the pinned upstream revision, semantic-resolution limits, and configuration.
+For the startup sequence, local installation model, LSP communication and the two
+highlighting layers, see [how the VS Code extension works](editors/vscode/README.md#how-vs-code-launches-tls).
 
 ## Project inputs and output
 
@@ -100,8 +171,8 @@ assets are referenced in place, so retain the original project when compiling
 generated output. `thor:` defaults to this checkout's [runtime](runtime/README.md)
 collection and may be overridden with an explicit collection flag.
 
-Other Odin flags are forwarded. Use `--odin /path/to/odin`, or set `THOR_ODIN`, to
-select a compiler. Arguments after `--` are forwarded by `run` and `test`.
+See [Compilation and Odin flags](#compilation-and-odin-flags) for flag forwarding,
+native helper builds, output locations and runtime arguments.
 
 Generated files live under `.thor-build/`; the frontend binary is cached under
 `.thor-cache/`, keyed by its source and Odin version. Source files are never

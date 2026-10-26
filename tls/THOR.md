@@ -146,6 +146,10 @@ configuration can be provided in `tls.json` when needed.
 
 ## VS Code
 
+The extension's [startup and communication guide](../editors/vscode/README.md#how-vs-code-launches-tls)
+explains manifest activation, the local server process, LSP over standard streams,
+grammar versus semantic highlighting, compiler checks, and installation updates.
+
 The separate extension lives in `../editors/vscode`. Build its local VSIX, install
 it, and open a `.thor` file. The supplied workspace settings point to this local
 binary. A **Thor: Restart Language Server** command reloads a rebuilt executable.
