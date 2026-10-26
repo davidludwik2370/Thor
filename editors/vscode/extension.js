@@ -32,7 +32,8 @@ async function start(context) {
     watcher?.dispose();
     watcher = undefined;
     if (!vscode.workspace.isTrusted) return;
-    const folder = vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor?.document.uri)
+    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    const folder = (activeUri && vscode.workspace.getWorkspaceFolder(activeUri))
         || vscode.workspace.workspaceFolders?.[0];
     const config = vscode.workspace.getConfiguration('tls', folder?.uri);
     if (!folder || !config.get('enabled', true)) return;

@@ -161,7 +161,9 @@ aliases are kept when available. Hover snippets in Thor files use Thor highlight
 Odin files retain native type spelling and highlighting.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
-Package names use variable-blue theme scopes, while `set[T]` uses the same keyword
+The declared name in `package main` uses the usual namespace declaration scope
+(green in Dark+). Imported namespace names and references use variable-blue theme
+scopes, while `set[T]` uses the same keyword
 scope family as `map`. String scopes cover literal text and quotes; interpolation
 expressions, their prefixes and surrounding aggregate braces retain code metadata
 for bracket matching and coloring. Unaliased `import "thor:sets"` exposes `sets`;

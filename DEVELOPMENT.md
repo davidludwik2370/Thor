@@ -445,3 +445,19 @@ pre-existing contextual-enum expected failure), along with 1,115 native TLS test
 and 78 Node tests. Actual VS Code integration verifies the diagnostic tag and
 clearing on unsaved use. A read-only check of basic.thor confirms math/big is
 marked unused. Existing user demo/spec/basic source edits are preserved.
+
+## Startup without an active editor: client 0.10.2
+
+The user's real extension log exposed a startup exception: workspace selection
+passed an undefined URI to VS Code when activation/restart ran before an editor
+was active. The server never launched, so hover and unused-import diagnostics
+were unavailable despite the updated extension being installed. Guard the editor
+URI and fall back to the first workspace folder in both TLS startup and the
+debug command. Restore the package declaration's native namespace scope (green
+in Dark+), keeping imported namespaces blue.
+
+The actual VS Code integration now activates the extension before opening any
+editor, checks package hover and unused hints, and restarts TLS with all editors
+closed before reopening source. It passes alongside all 78 Node tests, including
+the updated themed declaration/reference colors. Reloading the VS Code window
+loads the new client/grammar; restarting only TLS cannot replace client code.

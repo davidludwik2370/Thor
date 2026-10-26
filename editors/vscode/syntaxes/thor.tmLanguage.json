@@ -48,7 +48,7 @@
           "name": "keyword.control.thor"
         },
         "2": {
-          "name": "variable.other.namespace.thor"
+          "name": "entity.name.namespace.thor"
         }
       }
     },

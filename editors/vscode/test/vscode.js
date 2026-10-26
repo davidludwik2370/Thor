@@ -26,12 +26,14 @@ async function run() {
     const result = { success: false };
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'thor-editor-diagnostics-'));
     try {
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'demo/main.thor')));
-        await vscode.window.showTextDocument(document);
-        assert.equal(document.languageId, 'thor');
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        assert.equal(vscode.window.activeTextEditor, undefined);
         const extension = vscode.extensions.getExtension('thor-local.thor-language');
         assert.ok(extension);
         await extension.activate();
+        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'demo/main.thor')));
+        await vscode.window.showTextDocument(document);
+        assert.equal(document.languageId, 'thor');
         assert.deepEqual(extension.packageJSON.contributes.semanticTokenScopes,
             [{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
         const source = document.getText();
@@ -39,6 +41,10 @@ async function run() {
         const hover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)),
             values => values?.some(value => value.contents.some(content => (content.value || '').includes('[3]int'))));
         assert.ok(hover.length);
+        const packageHover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri,
+            document.positionAt(source.indexOf('package main')+'package '.length+1)),
+            values => hoverText(values || []).includes('main: package'));
+        assert.ok(hoverText(packageHover).includes('main: package'));
         for(const [fragment,expected] of [['names: sets.Set(string)','names: set[string]'],['other_names := sets.clone','other_names: set[string]']]){
             const setHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',document.uri,
                 document.positionAt(source.indexOf(fragment)+2)),
@@ -249,13 +255,16 @@ async function run() {
         await replace(hardened);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-        await vscode.window.showTextDocument(document);
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        assert.equal(vscode.window.activeTextEditor, undefined);
         await vscode.commands.executeCommand('tls.restart');
+        await vscode.window.showTextDocument(document);
         await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)), values => values?.length > 0);
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',
+            'activation and restart with no active editor', 'package declaration hover',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

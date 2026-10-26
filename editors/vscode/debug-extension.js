@@ -26,7 +26,8 @@ function activateDebugging(context) {
         }
     }));
     context.subscriptions.push(vscode.commands.registerCommand('thor.debug', async () => {
-        const folder = vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor?.document.uri)
+        const activeUri = vscode.window.activeTextEditor?.document.uri;
+        const folder = (activeUri && vscode.workspace.getWorkspaceFolder(activeUri))
             || vscode.workspace.workspaceFolders?.[0];
         if (!folder) throw new Error('Open a Thor project folder first.');
         await vscode.workspace.saveAll(false);

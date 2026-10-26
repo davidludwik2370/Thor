@@ -68,7 +68,7 @@ function themedTokens(source) {
 }
 
 for (const [name, source, word, scope, line] of [
-    ['package', 'package main', 'main', 'variable.other.namespace'],
+    ['package', 'package main', 'main', 'entity.name.namespace'],
     ['selective import', 'import "core:math" / sin, cos', 'import', 'keyword.control.import'],
     ['named import', 'import math "core:math" / sin', 'math', 'variable.other.namespace'],
     ['multiline import ends', 'import "core:math" / sin,\n cos\nmain :: proc() {}', 'main', 'entity.name.function', 2],
@@ -244,8 +244,9 @@ test('aggregate return braces and interpolation fields are code, escaped braces 
     for(const [at,ch] of [...escaped].entries())if('{}'.includes(ch))assert.equal(themedTokens(escaped)[0][at].type,2);
 });
 
-test('package names are blue while set syntax uses the same dark blue as map',()=>{
-    for(const [source,word] of [['package main','main'],['import sets "thor:sets"','sets'],['names: sets.Set(string)','sets']]){
+test('declared package names are green, namespace references blue, and set/map syntax dark blue',()=>{
+    assert.ok(themedTokens('package main')[0].slice('package '.length).every(t=>t.color==='#4EC9B0'));
+    for(const [source,word] of [['import sets "thor:sets"','sets'],['names: sets.Set(string)','sets']]){
         const start=source.indexOf(word);
         assert.ok(themedTokens(source)[0].slice(start,start+word.length).every(t=>t.color==='#9CDCFE'));
     }
