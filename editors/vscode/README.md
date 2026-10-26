@@ -48,6 +48,12 @@ Infix `**` uses the shared power precedence and numeric result inference; prefix
 `**` retains expansion. Integer constant powers participate in TLS branch
 selection, with overflow left unresolved. Compiler checks provide matching-type
 and negative-exponent diagnostics against unsaved source.
+Hover, signature help, and completion type labels display Thor's Set as `set[T]`,
+including `^set[$T]` parameters, nested containers, return types, renamed imports,
+and inferred library results. Detection follows the actual `thor:sets.Set` type;
+unrelated `Set` types and distinct aliases retain their own identity. Declared
+aliases are kept when available. Hover snippets in Thor files use Thor highlighting;
+Odin files retain native type spelling and highlighting.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
 Package names use variable-blue theme scopes, while `set[T]` uses the same keyword

@@ -27,15 +27,12 @@ build_documentation :: proc(ast_context: ^AstContext, symbol: ^Symbol, short_sig
 	}
 }
 
-build_markup_content :: proc(symbol_info: string, doc: string, allocator := context.temp_allocator) -> (content: MarkupContent) {
+build_markup_content :: proc(symbol_info: string, doc: string, allocator := context.temp_allocator, language := "odin") -> (content: MarkupContent) {
 
 	if symbol_info != "" {
 		content.kind = "markdown"
-		if doc != "" {
-			content.value = fmt.aprintf(DOC_FMT_MARKDOWN, symbol_info, doc, allocator=allocator)
-		} else {
-			content.value = fmt.aprintf(DOC_FMT_ODIN, symbol_info, allocator=allocator)
-		}
+		code := fmt.aprintf("```%s\n%s\n```", language, symbol_info, allocator=allocator)
+		content.value = strings.concatenate({code, DOC_SECTION_DELIMITER, doc}, allocator) if doc != "" else code
 	} else {
 		content.kind = "plaintext"
 	}
@@ -65,12 +62,14 @@ construct_docs :: proc(doc, comment: string, allocator := context.temp_allocator
 
 // Returns the fully detailed signature for the symbol, including things like attributes and fields
 get_signature :: proc(ast_context: ^AstContext, symbol: Symbol, depth := 0) -> string {
+	symbol := thor_display_symbol(ast_context, symbol)
 	sb := strings.builder_make(ast_context.allocator)
 	write_signature(&sb, ast_context, symbol, depth)
 	return strings.to_string(sb)
 }
 
 write_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, symbol: Symbol, depth := 0) {
+	if thor_write_set_type(sb, ast_context, symbol) { return }
 	pointer_prefix := repeat("^", symbol.pointers, ast_context.allocator)
 
 	spall.trace(#procedure, symbol.name)
@@ -217,12 +216,14 @@ write_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, symbol: 
 }
 
 get_short_signature :: proc(ast_context: ^AstContext, symbol: Symbol) -> string {
+	symbol := thor_display_symbol(ast_context, symbol)
 	sb := strings.builder_make(ast_context.allocator)
 	write_short_signature(&sb, ast_context, symbol)
 	return strings.to_string(sb)
 }
 
 write_short_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, symbol: Symbol) {
+	if thor_write_set_type(sb, ast_context, symbol) { return }
 	spall.trace(#procedure, ast_context.fullpath)
 
 	pointer_prefix := repeat("^", symbol.pointers, ast_context.allocator)
@@ -850,6 +851,7 @@ write_comments :: proc(sb: ^strings.Builder, comments: []^ast.Comment_Group, ind
 }
 
 construct_symbol_information :: proc(ast_context: ^AstContext, symbol: Symbol) -> string {
+	symbol := thor_display_symbol(ast_context, symbol)
 	if symbol.name in keywords_docs {
 		return symbol.name
 	}
@@ -951,11 +953,17 @@ write_symbol_name :: proc(sb: ^strings.Builder, symbol: Symbol) {
 }
 
 write_symbol_type_information :: proc(sb: ^strings.Builder, ast_context: ^AstContext, symbol: Symbol) -> bool {
-	if symbol.type_name == "" {
+	if symbol.type != .Variable && symbol.type != .Field {
 		return false
 	}
-
-	if symbol.type != .Variable && symbol.type != .Field {
+	// Prefer the declared type when available. This preserves user aliases
+	// and pointer/container syntax instead of rebuilding them from an
+	// underlying record's generic metadata. The display AST is already adapted.
+	if thor_type_display_enabled(ast_context) && symbol.type_expr != nil {
+		build_string_node(symbol.type_expr, sb, false)
+		return true
+	}
+	if symbol.type_name == "" {
 		return false
 	}
 
@@ -980,12 +988,7 @@ write_symbol_type_information :: proc(sb: ^strings.Builder, ast_context: ^AstCon
 
 	append_type_pkg := false
 	pkg_name := get_pkg_name(ast_context, symbol.type_pkg)
-	if symbol.type_name=="Set"&&strings.has_prefix(pkg_name,"__thor_tls_sets"){
-		if value,ok:=symbol.value.(SymbolStructValue);ok&&len(value.poly_names)==1{
-			fmt.sbprintf(sb,"%sset[%s]",pointer_prefix,value.poly_names[0])
-			return true
-		}
-	}
+	if thor_write_set_type(sb, ast_context, symbol) { return true }
 	if pkg_name != "" && pkg_name != "$builtin" {
 		if _, ok := keywords_docs[symbol.type_name]; !ok {
 			append_type_pkg = true

@@ -788,6 +788,7 @@ position_should_skip_struct_type_decl :: proc(position_context: ^DocumentPositio
 }
 
 get_completion_details :: proc(ast_context: ^AstContext, symbol: Symbol) -> string {
+	symbol := thor_display_symbol(ast_context, symbol)
 	#partial switch v in symbol.value {
 	case SymbolProcedureValue:
 		sb := strings.builder_make(ast_context.allocator)

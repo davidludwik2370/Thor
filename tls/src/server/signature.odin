@@ -203,6 +203,7 @@ add_proc_signature :: proc(
 	}
 
 	split_all_field_arguments(&call, allocator)
+	call = thor_display_symbol(ast_context, call)
 
 	if value, ok := call.value.(SymbolProcedureValue); ok {
 		add_signature_info(call, value.orig_arg_types, &active_parameter, signature_information, allocator)

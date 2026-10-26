@@ -36,7 +36,7 @@ write_hover_content :: proc(
 		}
 	}
 
-	return build_markup_content(cat, doc, allocator)
+	return build_markup_content(cat, doc, allocator, language="thor" if thor_type_display_enabled(ast_context) else "odin")
 }
 
 write_field_hover_content :: proc(

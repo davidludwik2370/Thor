@@ -61,6 +61,12 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   report temporary-view lifetime errors at original unsaved source ranges.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
+- Present the actual `thor:sets.Set` as `set[T]` throughout hover, signature
+  help and completion type labels, including pointers/containers, nested generic
+  arguments and imported procedures. Temporary display ASTs preserve indexed
+  metadata and navigation. User-defined Set types and distinct aliases retain
+  identity; declared type annotations keep their names. Thor hover code blocks
+  use the Thor grammar, while native Odin buffers keep native presentation.
 - Distinguish record-valued constants and value aliases from type aliases,
   including explicit #run and automatic fn results. Generic type construction
   and type_of aliases retain type classification. Constant hover prints the

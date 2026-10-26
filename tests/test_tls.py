@@ -716,6 +716,64 @@ main::proc(){_=GLOBAL;_=SELECTED}
             self.assertLessEqual(column + length, len(lines[line].encode('utf-16-le')) // 2)
             previous_end = column + length
 
+    def test_set_hover_canonical_types_signatures_and_containers(self):
+        text='package main\nimport sets "thor:sets"\nHolder::struct{names:sets.Set(string), groups:[]sets.Set(int), callback:proc(items:[]^sets.Set(string))->sets.Set(int)}\naccept::proc(names:^sets.Set(string))->sets.Set(string){return names^}\nmain::proc(){\n short:set[string]\n explicit:sets.Set(string)\n cloned:=sets.clone(explicit)\n table:map[string][]^sets.Set(int)\n holder:Holder\n _=short;_=cloned;_=table;_=holder.names\n sets.insert(&explicit,"apple")\n}\n'
+        client,main=self.open(text)
+        for name,expected in [('short','short: set[string]'),('explicit:','explicit: set[string]'),
+                              ('cloned','cloned: set[string]'),('table:','map[string][]^set[int]'),
+                              ('accept','proc(names: ^set[string]) -> set[string]')]:
+            with self.subTest(name=name):
+                hover=json.dumps(self.hover(client,main,text,name))
+                self.assertIn(expected,hover)
+                self.assertNotIn('__thor_',hover)
+                self.assertNotIn('sets.Set(',hover)
+                self.assertIn('```thor',hover)
+        insertion=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'sets.insert',len('sets.')+2)})
+        self.assertIn('set: ^set[$T]',json.dumps(insertion))
+        self.assertNotIn('Set(',json.dumps(insertion))
+        holder=json.dumps(self.hover(client,main,text,'Holder::'))
+        self.assertIn('proc(items: []^set[string]) -> set[int]',holder)
+        member=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'holder.names',len('holder.')+1)})
+        self.assertIn('names: set[string]',json.dumps(member))
+        definition=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'holder.names',len('holder.')+1)})
+        self.assertEqual(definition['range']['start'],self.position(text,'names:sets.Set',0))
+        signature=client.request('textDocument/signatureHelp',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'sets.insert(&explicit,',len('sets.insert(&explicit,'))})
+        self.assertIn('^set[$T]',json.dumps(signature))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+
+    def test_set_hover_aliases_nested_types_and_unrelated_set_types(self):
+        text='package main\nimport bag "thor:sets"\nimport fake "fake"\nSet::struct($T:typeid){value:T}\nTagged::distinct bag.Set(string)\nidentity::proc(value:bag.Set(string))->bag.Set(string){return value}\nmain::proc(){\n names:bag.Set(string)\n others:fake.Set(string)\n own:Set(string)\n tagged:Tagged\n nested:bag.Set([2]int)\n pointers:[2]^bag.Set(string)\n _=names;_=others;_=own;_=nested;_=pointers\n}\n'
+        client,main=self.open(text,{'fake/main.thor':'package sets\nSet::struct($T:typeid){value:T}\n'})
+        for name,expected in [('names:','names: set[string]'),('nested:','set[[2]int]'),
+                              ('pointers:','[2]^set[string]'),('identity','proc(value: set[string]) -> set[string]')]:
+            with self.subTest(name=name):self.assertIn(expected,json.dumps(self.hover(client,main,text,name)))
+        self.assertIn('tagged: Tagged',json.dumps(self.hover(client,main,text,'tagged:')))
+        for name in ['others:','own:']:
+            hover=json.dumps(self.hover(client,main,text,name))
+            self.assertIn('Set(string)',hover)
+            self.assertNotIn('set[string]',hover)
+
+    def test_imported_set_signatures_generic_arguments_and_native_file_hovers(self):
+        text='package main\nimport "library"\nimport sets "thor:sets"\nBox::struct($T:typeid){value:T}\nmain::proc(){\n nested:Box(sets.Set(string))\n names:set[string]\n result:=library.copy_names(names)\n _=nested;_=result\n}\n'
+        library='package library\nimport bag "thor:sets"\ncopy_names::proc(names:bag.Set(string))->bag.Set(string){return names}\n'
+        client,main=self.open(text,{'library/main.odin':library})
+        hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'library.copy_names',len('library.')+2)})
+        self.assertIn('proc(names: set[string]) -> set[string]',json.dumps(hover))
+        for word in ['nested:','result:=']:
+            self.assertIn('set[string]',json.dumps(self.hover(client,main,text,word)))
+        # Odin files keep their native spelling, even when opened by the same TLS.
+        native=main.parent/'library/main.odin'
+        client.send('textDocument/didOpen',{'textDocument':{'uri':native.as_uri(),'languageId':'odin','version':1,'text':library}})
+        hover=client.request('textDocument/hover',{'textDocument':{'uri':native.as_uri()},'position':self.position(library,'copy_names')})
+        self.assertIn('Set(string)',json.dumps(hover))
+        self.assertNotIn('set[string]',json.dumps(hover))
+        self.assertIn('```odin',json.dumps(hover))
+
     def test_runtime_import_default_names_resolve_and_keep_namespace_tokens(self):
         text='''package main
 import "thor:format"

@@ -323,3 +323,26 @@ All 1,114 native TLS tests pass in the serial runner. An imported-selector
 completion test failed once in the parallel runner and passed alone and in that
 complete serial run. The workspace server is rebuilt/restarted as TLS 0.9.1;
 the compiler and editor client/grammar remain 0.9.0. Scratch edits are preserved.
+
+## Thor type presentation: TLS 0.9.2
+
+Hover, signature help and completion labels now share a temporary presentation
+view of type ASTs. The actual thor:sets.Set declaration is identified through the
+configured collection and declaration identity, rather than an import alias or
+any record named Set. Variables, pointers, containers, generic arguments and
+procedure parameters/returns display set[T], including inferred clone results.
+Indexed/original ASTs and source ranges remain unchanged. Distinct aliases and
+unrelated Set types retain identity; explicit type annotations preserve their
+names instead of reconstructing them from underlying generic metadata.
+
+Thor hover snippets now use the Thor language fence, giving set/fn/directives the
+workspace grammar. Native Odin buffers keep native spelling and highlighting.
+Regression coverage checks renamed/default imports, nested callbacks, cross-package
+signatures, generic record arguments, distinct aliases, field hover/definition,
+semantic token identity and signature help. The actual VS Code test checks both
+reported variable forms, clone inference, insertion signatures and Thor fences.
+
+The 50-test stdio LSP suite passes with the existing contextual-enum expected
+failure. All 1,115 native TLS tests pass with allocation tracking in the serial
+runner, and actual VS Code integration passes. TLS 0.9.2 is rebuilt and restarted;
+the compiler/client/grammar remain 0.9.0. User scratch edits remain separate.

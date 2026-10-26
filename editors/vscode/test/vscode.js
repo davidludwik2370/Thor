@@ -17,6 +17,10 @@ async function eventually(action, predicate) {
     assert.fail(`Language provider did not become ready: ${JSON.stringify(result)}`);
 }
 
+function hoverText(values) {
+    return values.flatMap(value=>value.contents.map(content=>typeof content==='string'?content:content.value||'')).join('\n');
+}
+
 async function run() {
     const root = path.resolve(__dirname, '../../..');
     const result = { success: false };
@@ -35,6 +39,17 @@ async function run() {
         const hover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)),
             values => values?.some(value => value.contents.some(content => (content.value || '').includes('[3]int'))));
         assert.ok(hover.length);
+        for(const [fragment,expected] of [['names: sets.Set(string)','names: set[string]'],['other_names := sets.clone','other_names: set[string]']]){
+            const setHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',document.uri,
+                document.positionAt(source.indexOf(fragment)+2)),
+                values=>values?.some(value=>value.contents.some(content=>(content.value||'').includes(expected))));
+            assert.ok(!hoverText(setHover).includes('sets.Set('));
+            assert.ok(hoverText(setHover).includes('```thor'),hoverText(setHover));
+        }
+        const insertPosition=document.positionAt(source.indexOf('sets.insert(&names')+'sets.'.length+2);
+        const insertHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',document.uri,insertPosition),
+            values=>values?.some(value=>value.contents.some(content=>(content.value||'').includes('set: ^set[$T]'))));
+        assert.ok(!hoverText(insertHover).includes('Set('));
         const legend=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend',document.uri),value=>value?.tokenTypes?.length>0);
         const semantic=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',document.uri),value=>value?.data?.length>0);
         let line=0,column=0,previousEnd=0;
@@ -240,7 +255,7 @@ async function run() {
             'implicit runtime import names and namespace theme mapping',
             'rune fill syntax and mapped format diagnostics',
             'immediate same-file redeclarations and clearing',
-            'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics'];
+            'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

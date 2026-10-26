@@ -439,3 +439,18 @@ main::proc(){REP{*}ORT}
 `)
     test.expect_hover_contains(t,&source,"#run report(7)")
 }
+
+@(test)
+thor_hover_set_library_parameter :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+import "thor:sets"
+main::proc(){names:set[string];sets.ins{*}ert(&names,"apple")}
+`)
+    source.collections=make(map[string]string)
+    source.collections["thor"]="test"
+    source.packages={{pkg="sets",source=`package sets
+Set::struct($T:typeid){table:map[T]struct{}}
+insert::proc(set:^Set($T),value:T){}
+`}}
+    test.expect_hover_contains(t,&source,"set: ^set[$T]")
+}
