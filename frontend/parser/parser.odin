@@ -963,13 +963,17 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		if !is_range && parse_control_statement_semicolon_separator(p) {
 			init = cond
 			cond = nil
+			previous_in:=p.allow_in_expr
+			defer p.allow_in_expr=previous_in
+			membership_condition:=p.thor && thor_for_condition_has_separator(p)
+			if membership_condition {p.allow_in_expr=true}
 
 
 			if p.curr_tok.kind == .Open_Brace || p.curr_tok.kind == .Do {
 				error(p, p.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", tokenizer.tokens[p.curr_tok.kind])
 			} else {
 				if p.curr_tok.kind != .Semicolon {
-					if p.curr_tok.kind == .Ident {
+					if p.curr_tok.kind == .Ident && !membership_condition {
 						next_token := peek_token(p)
 						if next_token.kind == .In || next_token.kind == .Comma {
 							cond = parse_simple_stmt(p, {.In})
@@ -3647,7 +3651,7 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	}
 	return parse_atom_expr(p, parse_operand(p, lhs), lhs)
 }
-parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
+parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int, stop_membership:=false) -> ^ast.Expr {
 	start_pos := p.curr_tok.pos
 	expr := parse_unary_expr(p, lhs)
 
@@ -3659,6 +3663,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 		loop: for {
 			op := p.curr_tok
 			op_prec := token_precedence(p, op.kind)
+			if stop_membership && (op.kind==.In || op.kind==.Not_In) {op_prec=0}
 			if op_prec != prec {
 				break loop
 			}
@@ -3729,7 +3734,10 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				expr = oe
 
 			case:
-				right := parse_binary_expr(p, false, prec+1)
+				right:^ast.Expr
+				if p.thor && (op.kind==.In || op.kind==.Not_In) {
+					right=thor_parse_membership_rhs(p,prec+1)
+				}else{right=parse_binary_expr(p,false,prec+1,stop_membership)}
 				if right == nil {
 					error(p, op.pos, "expected expression on the right-hand side of the binary operator")
 				}

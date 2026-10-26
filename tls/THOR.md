@@ -61,6 +61,11 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   report temporary-view lifetime errors at original unsaved source ranges.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
+- Parse interval membership with half-open/inclusive bounds, parentheses and
+  arithmetic bounds, preserving native iteration and container precedence. Infer
+  boolean results; fold integer interval conditions (including signed bounds)
+  in the server's partial branch selector. Compiler checks handle the complete
+  ordered-type rules and generic-constraint failures against unsaved buffers.
 - Parse inferred/typed immutable runtime bindings. Hover explains immutable
   storage, semantic tokens mark declarations/uses readonly, and shadowed mutable
   bindings retain their ordinary behavior. Compiler checks enforce shallow

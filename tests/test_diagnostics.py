@@ -41,6 +41,14 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_range_operand_errors_keep_unicode_bounds_without_query_cascades(self):
+        source='package main\nmain::proc(){_="😀";value:=3;_=value in "a"..<"z"}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertEqual(len(errors),2,errors)
+        self.assertEqual({e['pos']['offset'] for e in errors},{source.encode().index(b'"a"'),source.encode().index(b'"z"')})
+        self.assertNotIn('ternary',json.dumps(errors))
+        self.assertNotIn('__thor_',json.dumps(errors))
+
     def test_early_redeclaration_has_original_unicode_range_and_prior_line(self):
         source='package main\ncafé::proc(){}\nLABEL::"😀";café::proc(){}\nmain::proc(){}\n'
         errors=self.at(source,'café::proc(){}\nmain',message="Redeclaration of 'café'")

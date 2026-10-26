@@ -99,6 +99,8 @@ for (const [name, source, word, scope, line] of [
     ['native when', 'when true {', 'when', 'keyword.control'],
     ['native else when', '} else when true {', 'when', 'keyword.control'],
     ['membership', 'x in [1, 2]', 'in', 'keyword.control'],
+    ['range membership', 'x in 0..<10', '..<', 'keyword.operator.range'],
+    ['inclusive range membership', 'x not_in 0..=10', '..=', 'keyword.operator.range'],
     ['negative membership', 'x not_in xs', 'not_in', 'keyword.control'],
     ['type constraints', 'f :: proc(x: $T) -> T where T in [int, f64] {}', 'where', 'keyword.control'],
     ['type list int', 'T in [int, f64]', 'int', 'support.type.primitive'],

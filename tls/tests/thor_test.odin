@@ -267,6 +267,24 @@ main :: proc() { found := 2 in [1,2]; fou{*}nd }
 }
 
 @(test)
+thor_hover_range_membership :: proc(t:^testing.T){
+    source:=thor_source(`package test
+allowed::proc($N:int)->int where N in 0..<10 {return N}
+main::proc(){value:=3;found:=value in 0..=9;fou{*}nd}
+`)
+    test.expect_hover_contains(t,&source,"found: bool")
+}
+
+@(test)
+thor_if_range_membership_condition :: proc(t:^testing.T){
+    source:=thor_source(`package test
+#if -2 in (-3..=0) && 5 not_in 0..<5 {VALUE::42} #else {VALUE::false}
+main::proc(){VAL{*}UE}
+`)
+    test.expect_hover_contains(t,&source,"42")
+}
+
+@(test)
 thor_hover_not_in :: proc(t: ^testing.T) {
     source := thor_source(`package test
 main :: proc() { missing := 3 not_in [1,2]; miss{*}ing }

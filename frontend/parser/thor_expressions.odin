@@ -3,6 +3,67 @@ package thor_parser
 import "core:odin/ast"
 import tokenizer "../tokenizer"
 
+thor_for_condition_has_separator :: proc(p:^Parser)->bool {
+    lexer:=p.tok
+    lexer.err=nil
+    token:=p.curr_tok
+    depth:=0
+    for {
+        if token.kind==.EOF {return false}
+        if depth==0 {
+            if token.kind==.Semicolon {return token.text==";"}
+            if token.kind==.Open_Brace || token.kind==.Do {return false}
+        }
+        #partial switch token.kind {
+        case .Open_Paren,.Open_Bracket,.Open_Brace:depth+=1
+        case .Close_Paren,.Close_Bracket,.Close_Brace:depth-=1
+        }
+        token=tokenizer.scan(&lexer)
+    }
+}
+
+// Look ahead only through the arithmetic part of a membership RHS. Native in
+// precedence stays unchanged unless an interval is actually present.
+thor_membership_range_follows :: proc(p:^Parser)->bool {
+    lexer:=p.tok
+    lexer.err=nil
+    token:=p.curr_tok
+    depth:=0
+    for {
+        if token.kind==.EOF {return false}
+        if depth==0 {
+            #partial switch token.kind {
+            case .Range_Half,.Range_Full,.Ellipsis:return true
+            case .Cmp_And,.Cmp_Or,.Cmp_Eq,.Not_Eq,.Lt,.Gt,.Lt_Eq,.Gt_Eq,
+                 .Question,.If,.When,.Or_Else,.In,.Not_In,.Comma,.Colon,
+                 .Semicolon,.Close_Paren,.Close_Bracket,.Close_Brace,.Open_Brace:
+                return false
+            }
+        }
+        #partial switch token.kind {
+        case .Open_Paren,.Open_Bracket,.Open_Brace:depth+=1
+        case .Close_Paren,.Close_Bracket,.Close_Brace:depth-=1
+        }
+        token=tokenizer.scan(&lexer)
+    }
+}
+
+thor_parse_membership_rhs :: proc(p:^Parser,prec:int)->^ast.Expr {
+    if thor_membership_range_follows(p) {
+        low:=parse_binary_expr(p,false,6,true)
+        interval:=advance_token(p)
+        high:=parse_binary_expr(p,false,6,true)
+        range:=ast.new(ast.Binary_Expr,low.pos,high.end)
+        range.left,range.op,range.right=low,interval,high
+        return range
+    }
+    // Parenthesized intervals are also permitted as membership operands.
+    previous:=p.allow_range
+    defer p.allow_range=previous
+    p.allow_range=true
+    return parse_binary_expr(p,false,prec)
+}
+
 thor_signature_token :: proc(lexer:^tokenizer.Tokenizer)->tokenizer.Token {
     for {
         token:=tokenizer.scan(lexer)

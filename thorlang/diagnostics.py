@@ -88,6 +88,8 @@ class Diagnostics:
                 message = self.guard_messages.get((origin.file, origin.start, origin.end))
                 if message:
                     msgs = [message, *[m for m in msgs if "instantiated as" in m or "Called within" in m]]
+            if origin and origin.kind=='range-type':
+                msgs=[m.replace('ternary expression','range membership') for m in msgs]
             # These are public Thor support contracts, rather than an error in
             # the library implementation. Native generic notes identify the
             # actual use (including a call in an imported/unsaved file).
@@ -193,8 +195,8 @@ class Diagnostics:
                 msgs = [pattern.sub(lambda m: self.reference(generated_file, *reference_coordinates(m)), text) for text in msgs]
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
-            diagnostic["_cascade"] = bool(origin and not origin.exact and origin.kind in {"array", "Compound"}
-                                           and any("type_of" in m for m in msgs))
+            diagnostic["_cascade"] = bool(origin and not origin.exact and (
+                origin.kind=='range-type' or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
             key = json.dumps([diagnostic["type"], diagnostic["pos"], msgs], sort_keys=True)
             if key not in seen:
                 result.append(diagnostic)

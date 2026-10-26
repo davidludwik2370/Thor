@@ -205,6 +205,11 @@ resolve_when_expr :: proc(
 				b := expr.(bool) or_return
 				return !b, true
 			}
+			if odin_expr.op.kind==.Add || odin_expr.op.kind==.Sub {
+				value:=resolve_when_expr(when_expr_map,odin_expr.expr) or_return
+				integer:=value.(int) or_return
+				return -integer if odin_expr.op.kind==.Sub else integer,true
+			}
 		case ^ast.Binary_Expr:
 			lhs := resolve_when_expr(when_expr_map, odin_expr.left) or_return
 			if odin_expr.op.kind == .Cmp_And {
@@ -223,6 +228,15 @@ resolve_when_expr :: proc(
 						if lhs == rhs { found = true }
 					}
 					return found if odin_expr.op.kind == .In else !found, true
+				}
+				if interval,ok:=right.derived.(^ast.Binary_Expr);ok && (interval.op.kind==.Range_Half || interval.op.kind==.Range_Full || interval.op.kind==.Ellipsis) {
+					low:=resolve_when_expr(when_expr_map,interval.left) or_return
+					high:=resolve_when_expr(when_expr_map,interval.right) or_return
+					value:=lhs.(int) or_return
+					lower:=low.(int) or_return
+					upper:=high.(int) or_return
+					found:=value>=lower && (value<=upper if interval.op.kind==.Range_Full else value<upper)
+					return found if odin_expr.op.kind==.In else !found,true
 				}
 				return {}, false
 			}

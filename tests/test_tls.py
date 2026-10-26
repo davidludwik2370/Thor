@@ -537,6 +537,25 @@ main::proc(){result:=square(SIZE);data:[SIZE]int;assert(work(3)==9);_=result;_=d
         client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(library.read_text(),original)
 
+    def test_range_membership_constraints_hover_tokens_and_unsaved_errors(self):
+        text='''package main
+allowed::proc($N:int)->int where N in 0..<10{return N}
+#if -2 in -3..=0 {SELECTED::42} #else {SELECTED::false}
+main::proc(){value:=3;found:=value in 0..<10;result:=allowed(9);_=found;_=result;_=SELECTED}
+'''
+        client,main=self.open(text)
+        self.assertIn('found: bool',json.dumps(self.hover(client,main,text,'found')))
+        self.assertIn('42',json.dumps(self.hover(client,main,text,'SELECTED}')))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        client.notifications.clear()
+        changed=text.replace('allowed(9)','allowed(10)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='where')
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_expression_string_switch_and_set_hovers(self):
         text='''package main
 main::proc(){

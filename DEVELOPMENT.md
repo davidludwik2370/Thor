@@ -247,3 +247,31 @@ The CLI/scope/interaction/diagnostic/LSP run exercised 240 tests with the existi
 contextual-enum navigation expected failure. All 1,109 native TLS tests and the
 actual VS Code integration test pass, including early redeclaration clearing.
 The compiler and TLS advance to 0.7.5; the editor grammar/client remain 0.7.4.
+
+## Interval membership: 0.8.0
+
+`in`/`not_in` now accept half-open and inclusive intervals at runtime and in
+constant/generic contexts. The shared parser consumes arithmetic bounds without
+changing ordinary container precedence or native iteration. A second explicit
+semicolon identifies a three-part loop's membership condition; condition-only
+loops retain native iteration unless the boolean membership is parenthesized.
+
+Runtime lowering evaluates value, low and high once in that order, including
+out-of-range values, and releases anonymous owned strings/views afterward. Native
+type witnesses preserve literal coercions, enum contexts, private/generic types
+and ordered comparisons. Constant contexts retain checked comparisons. Inclusive
+bounds do not increment the upper endpoint, avoiding integer overflow. Query
+diagnostics use `range-type` mappings and suppress redundant inference cascades.
+
+TLS retains boolean inference and original token ranges, folds integer interval
+conditions (including unary signs), and reports generic failures against unsaved
+source. Its existing partial scalar/branch evaluator remains a documented limit.
+The spec and demo include interval rules, constraints, boundaries and order checks.
+Power remains a design discussion; the existing prefix `**` expansion is unchanged.
+
+The full discovery run exercised 443 tests with one existing expected failure.
+It exposed an invalid new loop fixture and a demo dependency on a commented user
+example; both were corrected. All 70 affected range/demo/expression regressions
+then passed. All 1,111 native TLS tests, 69 grammar tests, actual VS Code integration
+and all three demo modes pass. The 0.8.0 compiler/server and local VSIX are built
+and installed; scratch edits outside the feature changes remain uncommitted.

@@ -39,6 +39,11 @@ Compile-time `#if`, `#else`, `#switch` and `#run` use directive scopes, matching
 `#assert` and `#partial`. The entire `#else if` branch introducer has that styling,
 including when comments or line breaks separate the words. Ordinary runtime
 `if`, `else` and `switch` retain their normal control-flow scopes.
+Range membership (`value in low..<high`, inclusive `..=`, and `not_in`) uses the
+shared parser, retains boolean inference and original token positions, and is
+checked in generic constraints by the compiler. TLS's limited branch folder also
+recognizes integer interval conditions; its existing scalar-evaluation limits
+remain for other constant expressions.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
 Package names use variable-blue theme scopes, while `set[T]` uses the same keyword

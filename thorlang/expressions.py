@@ -238,6 +238,11 @@ class Expressions:
             if callee.kind=='Ident' and callee.text=='raw_data' and s.resolver.symbol(callee) is None:
                 if any(self.ownership.may_own(arg) or self.ownership.borrows_temporary(arg) for arg in n.group('args')):
                     return self.error(n,'A pointer into an anonymous allocation needs a named owner; bind the allocation before taking raw_data.')
+        if n.kind=='Binary' and n.data['op'] in {'in','not_in'}:
+            interval=n.role('right')
+            while interval.kind=='Paren':interval=interval.role('expr')
+            if interval.kind=='Binary' and interval.data['op'] in {'..','..<','..='}:
+                return self.range_membership(n,interval,constant)
         if n.kind=='Binary' and not constant:
             if n.data['op'] in {'in','not_in'}:
                 code=self.ownership.membership(n)
@@ -541,6 +546,56 @@ class Expressions:
         result='false'
         for value in reversed(values): result=f'(true when ({value}) else {result})'
         return result
+
+    def range_membership(self,node,interval,constant):
+        s=self.source
+        s.needs_default=True
+        operands=[node.role('left'),interval.role('left'),interval.role('right')]
+        upper='<=' if interval.data['op']=='..=' else '<'
+        def predicate(parts):
+            value,low,high=parts
+            result=f'(({value}) >= ({low}) && ({value}) {upper} ({high}))'
+            return '!'+result if node.data['op']=='not_in' else result
+        def common_value(parts):
+            value,low,high=parts
+            return f'(true ? ({value}) : (true ? ({low}) : ({high})))'
+        def static(operand,seen=None):
+            seen=set() if seen is None else seen
+            if operand in seen:return False
+            seen.add(operand)
+            if operand.kind=='Literal':return True
+            if operand.kind in {'Paren','Unary'} and operand.data.get('op') not in {'&','**'}:
+                return static(operand.role('expr'),seen)
+            if operand.kind=='Binary':return all(static(operand.role(side),seen.copy()) for side in ['left','right'])
+            symbol=s.resolver.symbol(operand)
+            return bool(symbol and symbol.declaration.kind=='Declaration' and not symbol.declaration.data.get('mutable',True)
+                        and symbol.value and static(symbol.value,seen))
+        if constant or all(static(operand) for operand in operands):
+            parts=[s.render(operand,constant=True) for operand in operands]
+            common=common_value(parts)
+            # Infer a common operand type without materializing arbitrary-width
+            # untyped numeric constants. Only the boolean needs a default type.
+            valid=f'type_of({s.prefix}default_value(({common}) == ({common}))) == bool'
+            valid=s.mapping.wrap(valid,s.path,node.start,node.end,'range-type')
+            return f'(({valid}) && ({predicate(parts)}))'
+        def body(_):
+            # The type query does not execute operands. Native inference keeps
+            # literal/enum contexts and diagnoses incompatible operand types.
+            self.ownership.querying+=1
+            try:common=common_value([s.render(operand) for operand in operands])
+            finally:self.ownership.querying-=1
+            typ=f'type_of({s.prefix}default_value({common}))'
+            typ=s.mapping.wrap(typ,s.path,node.start,node.end,'range-type')
+            hint=self.ownership.hint(typ,node)
+            code=[]
+            values=[self.ownership.evaluate(operand,code,hint) for operand in operands]
+            result=s.prefix+'range_result'
+            code.append(f'{result} := {predicate([value.value for value in values])}')
+            for value in reversed(values):self.ownership.release(value,code)
+            code.append('return '+result)
+            return '\n'.join(code)
+        name,args=self.closed(node,body,result='bool',flavor='range_contains')
+        return name+'('+', '.join(args)+')'
 
     def format_spec(self,text,start,end):
         fill,align="' '", 'Default'

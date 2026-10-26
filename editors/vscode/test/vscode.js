@@ -134,6 +134,15 @@ async function run() {
         await replace(runeFormat);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const declaration='allowed_size::proc($N:int)->int where N in [2,4,8]{return N}\n';
+        const intervalSource='package main\nallowed_range::proc($N:int)->int where N in 0..<10{return N}\n#if -2 in -3..=0 {SELECTED::42} #else {SELECTED::false}\nmain::proc(){value:=3;found:=value in 0..<10;result:=allowed_range(9);_=found;_=result;_=SELECTED}\n';
+        await replace(intervalSource);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(intervalSource.indexOf('found:=')+2)),values=>values?.some(value=>value.contents.some(content=>(content.value||'').includes('found: bool'))));
+        await replace(intervalSource.replace('allowed_range(9)','allowed_range(10)'));
+        const intervalErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('where')));
+        assert.ok(intervalErrors.every(value=>!value.message.includes('__thor_')));
+        await replace(intervalSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const redeclared='package main\n'+declaration+declaration+'main::proc(){}\n';
         await replace(redeclared);
         const redeclarations=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.code==='Declaration'));
@@ -217,7 +226,8 @@ async function run() {
             'full demo semantic-token ranges and classifications',
             'implicit runtime import names and namespace theme mapping',
             'rune fill syntax and mapped format diagnostics',
-            'immediate same-file redeclarations and clearing'];
+            'immediate same-file redeclarations and clearing',
+            'range membership inference and unsaved constraint diagnostics'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

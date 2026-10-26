@@ -38,6 +38,9 @@ other_identity :: proc(x: $T) -> T where T not_in [int, f64] {
 allowed_size :: proc($N: int) -> int where N in [2, 4, 8] {
     return N
 }
+demo_range_size :: proc($N: int) -> int where N in 0..<10 {
+    return N
+}
 sum_pair :: proc(values: [2]f64) -> f64 {
     return values[0] + values[1]
 }
@@ -216,6 +219,12 @@ main :: proc() {
     assert(numeric_identity(f64(2.5)) == 2.5)
     assert(other_identity(f32(3)) == 3)
     assert(allowed_size(4) == 4)
+    assert(demo_range_size(0) == 0 && demo_range_size(9) == 9)
+    assert(9 in 0..<10 && 10 not_in 0..<10 && 10 in 0..=10)
+    #assert(3 in (0..<10))
+    calls, order = 0, 0
+    assert(mark(3) in mark(0)..<mark(9))
+    assert(calls == 3 && order == 309)
     #assert(int in [int, f64])
     #assert(bool not_in [int, f64])
 

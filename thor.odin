@@ -473,6 +473,31 @@ Syntax:
   behavior. In particular, never duplicate the needle or skip element side effects.
 - Retain Odin's operator precedence and existing membership meanings.
 
+Range membership (runtime and compile time):
+    value in low..<high
+    value in low..=high
+    value not_in (low..<high)
+    allowed_size_range :: proc($N: int) -> int where N in 0..<10 { return N }
+
+- A half-open interval includes low and excludes high; an inclusive interval
+  includes both endpoints. Retain Odin's legacy .. spelling as half-open.
+- Reversed intervals are empty. low..<low is empty; low..=low includes low.
+  Implement inclusive comparisons directly, without incrementing high.
+- Runtime evaluation is value, low, then high, once each, even when value is
+  below low. Preserve surrounding short-circuiting and per-iteration evaluation.
+- Use normal Odin ordered operand types and literal coercions. Numeric values,
+  runes, enums and strings are supported when their types are compatible.
+  String intervals use lexicographic ordering; this is not substring search.
+- Release anonymous owned operands/views after comparing; named owners remain
+  the programmer's responsibility. The interval itself allocates no storage.
+- Support constant declarations, #if, #switch, generic constraints and fn/#run.
+  Constant contexts lower to checked comparisons, without runtime evaluation.
+- Arithmetic bounds bind within the interval; comparisons and logical operators
+  follow membership, so N in 0..<10 && N != 5 has the intended boolean meaning.
+  Existing container membership precedence and native for-in loops are unchanged.
+  A condition-only for needs parentheses to distinguish membership from iteration.
+- This adds interval membership syntax, not a first-class range value/type.
+
 Compile-time type membership and generic constraints:
     my_gen :: proc(x: $T) -> T where T in [int, f64] {
         return x

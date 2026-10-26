@@ -153,7 +153,7 @@ Debugger mappings and runtime stack traces are outside this implementation.
 | T03 | Ternaries may continue before `:` without a backslash, including nesting and comments. |
 | T04 | `#if`, `#else if`, and `#else` lower to `when`; native `when` remains supported. |
 | T05 | `[1, 2, 3]` is an inferred fixed array; contextual types, empty typed arrays, nested arrays, arguments, returns, and assignments are supported. |
-| T06 | `in`/`not_in` for arrays, slices, dynamic arrays, native maps and bit sets; constant type/value membership in generic constraints. |
+| T06 | `in`/`not_in` for arrays, slices, dynamic arrays, native maps and bit sets; interval membership; constant type/value membership in generic constraints. |
 | T07 | Caller-owned integer grouping and Unicode padding helpers in `thor:format`. |
 | T08 | Map-backed `Set(T)` library in `thor:sets`, including mathematical, in-place, clone, iteration, and cleanup operations. |
 | T09 | Shared Thor-owned lexer/parser and source emitter; native AST/token compatibility, comments, and byte spans retained. |
@@ -219,6 +219,28 @@ each. All literal elements execute before searching, even when the first element
 matches. Enclosing `&&`, `||`, and ternaries retain their lazy behavior. Generated
 membership helpers are contextless and allocate no storage. Map membership tests
 keys, and string substring membership is intentionally unsupported.
+
+Intervals also support membership: `value in low..<high`, `value in low..=high`
+and `value not_in (low..<high)`. The half-open form excludes `high`; inclusive
+membership compares directly without incrementing the bound. Reversed intervals
+are empty. Compatible numeric values, runes, enums and strings use Odin's ordered
+comparisons; string intervals are lexicographic.
+
+Runtime operands execute once in value/low/high order, including the high bound
+when the value is outside the interval. Anonymous owned strings/views are freed
+after comparison. Constants, `#if`, `#switch`, `fn`/`#run` and constraints work too:
+
+```odin
+allowed_size_range :: proc($N: int) -> int where N in 0..<10 {
+    return N
+}
+```
+
+Arithmetic bounds work directly, as in `value in low+1..<high-1 && value != 5`.
+Use `for (value in low..<high)` for a condition-only loop; native `for value in
+low..<high` retains iteration. Three-part loop headers accept membership as their
+condition, including an empty post statement. Intervals here are syntax for
+membership, rather than first-class range values.
 
 `T in [int, f64]` compares exact type identity; aliases match, unlisted distinct
 types do not. Generic constraints and other constant contexts use constant
