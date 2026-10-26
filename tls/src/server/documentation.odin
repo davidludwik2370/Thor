@@ -236,7 +236,8 @@ write_short_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, sy
 		build_string_node(v.ident, sb, false)
 		return
 	case SymbolPolyTypeValue:
-		fmt.sbprintf(sb, "%s$", pointer_prefix)
+		strings.write_string(sb, pointer_prefix)
+		if .PolyType in symbol.flags { strings.write_string(sb, "$") }
 		build_string_node(v.ident, sb, false)
 		return
 	case SymbolBitSetValue:

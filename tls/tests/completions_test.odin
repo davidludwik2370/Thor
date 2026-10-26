@@ -4369,7 +4369,7 @@ ast_completion_poly_type :: proc(t: ^testing.T) {
 		}
 		`,
 	}
-	test.expect_completion_docs(t, &source, "", {"test.elem: $T"})
+	test.expect_completion_docs(t, &source, "", {"test.elem: T"})
 }
 
 @(test)

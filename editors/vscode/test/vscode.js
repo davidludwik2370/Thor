@@ -104,6 +104,24 @@ async function run() {
         assert.ok(unusedImport.tags.includes(vscode.DiagnosticTag.Unnecessary));
         await replace(unusedImportSource.replace('fmt.println(', 'value:big.Int;_=value;fmt.println('));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const genericLoop = 'package main\nasc::proc(first:$T,rest:..T)->bool{previous:=first;for v in rest{if previous>v do return false;previous=v};return true}\ndesc::proc(first:$T,rest:..T)->bool{previous:=first;for v in rest{if previous<v do return false;previous=v};return true}\nmain::proc(){assert(asc(1,2,3));assert(desc(3,2,1))}\n';
+        await replace(genericLoop);
+        await eventually(() => vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri), value => {
+            if (!value?.data?.length) return false;
+            let line=0,column=0;
+            const kinds=[];
+            for(let i=0;i<value.data.length;i+=5){
+                const [delta,char,length,kind]=value.data.slice(i,i+4);
+                line+=delta;column=delta?char:column+char;
+                const start=testDocument.offsetAt(new vscode.Position(line,column));
+                if(genericLoop.slice(start,start+length)==='v') kinds.push(legend.tokenTypes[kind]);
+            }
+            return kinds.length===6 && kinds.every(kind=>kind==='variable');
+        });
+        const genericHover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(genericLoop.indexOf('>v')+1)), values=>hoverText(values||[]).includes('v: T'));
+        assert.ok(!hoverText(genericHover).includes('$v'));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -265,6 +283,7 @@ async function run() {
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',
             'activation and restart with no active editor', 'package declaration hover',
+            'generic loop variables remain values in semantic tokens and hover',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

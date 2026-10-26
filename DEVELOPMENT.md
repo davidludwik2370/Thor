@@ -461,3 +461,22 @@ editor, checks package hover and unused hints, and restarts TLS with all editors
 closed before reopening source. It passes alongside all 78 Node tests, including
 the updated themed declaration/reference colors. Reloading the VS Code window
 loads the new client/grammar; restarting only TLS cannot replace client code.
+
+## Generic value classification: TLS 0.9.4
+
+Generic loop values inherited the element type's PolyType flag. Their declaration
+could be blue while uses inside the body were green, and hover could incorrectly
+name the value `$v`. Clear the inherited flag for value bindings, then restore it
+only for an explicitly polymorphic binding. Generic type aliases retain their
+type classification. Hover/completion print generic element types as T/^T rather
+than introducing a new $T; two upstream display expectations are updated for
+that corrected presentation.
+
+Two stdio regressions cover the asc/desc variadic loops and generic slice, fixed
+array, dynamic array and map elements, alongside ordinary/immutable locals and
+type aliases. All 61 stdio tests pass (one pre-existing expected failure), along
+with 1,115 native TLS tests and 78 Node tests. The VS Code integration verifies
+all six asc/desc declaration/use tokens and the `v: T` hover. A read-only check
+also confirms all eight v tokens in the user's basic/basic.thor are variables.
+This update rebuilds tls/bin/tls; the installed client remains 0.10.2 and the
+Thor: Restart Language Server command loads the rebuilt executable.

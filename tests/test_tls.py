@@ -177,6 +177,58 @@ class TLSTests(unittest.TestCase):
         diagnostics = publications[-1]['params']['diagnostics'] if publications else []
         return [d for d in diagnostics if d.get('code') == 'Unused']
 
+    def test_generic_variadic_loop_values_are_variables_including_body_uses(self):
+        text = '''package main
+asc :: proc(first: $T, rest: ..T) -> bool {
+    previous := first
+    for v in rest {
+        if previous > v do return false
+        previous = v
+    }
+    return true
+}
+desc :: proc(first: $T, rest: ..T) -> bool {
+    previous := first
+    for v in rest {
+        if previous < v do return false
+        previous = v
+    }
+    return true
+}
+'''
+        client, main = self.open(text, compiler=False)
+        spans = self.semantic_spans(client, main, text)
+        self.assertEqual([kind for _, _, kind, token, _ in spans if token == 'v'], ['variable']*6)
+        self.assertTrue(all(kind == 'typeParameter' for _, _, kind, token, _ in spans if token == 'T'))
+        for occurrence in ['v in rest', 'v do return', 'v\n']:
+            hover = client.request('textDocument/hover', {'textDocument': {'uri': main.as_uri()},
+                                   'position': self.position(text, occurrence, 0)})['contents']['value']
+            self.assertIn('v: T', hover)
+            self.assertNotIn('$v', hover)
+
+    def test_generic_container_values_preserve_type_parameter_classification(self):
+        text = '''package main
+walk :: proc(first: $T, rows: []T, fixed: [2]T, growing: [dynamic]T, table: map[string]T) {
+    for item, index in rows { _=item;_=index }
+    for item in fixed { _=item }
+    for item in growing { _=item }
+    for key, value in table { _=key;_=value }
+    typed:T=first;copied:=first;frozen:>first
+    Alias::T
+    another:Alias=first;_=typed;_=copied;_=frozen;_=another
+}
+'''
+        client, main = self.open(text, compiler=False)
+        spans = self.semantic_spans(client, main, text)
+        for name in ['item', 'index', 'key', 'value', 'typed', 'copied', 'frozen']:
+            kinds = [kind for _, _, kind, token, _ in spans if token == name]
+            self.assertTrue(kinds, name)
+            self.assertTrue(all(kind == 'variable' for kind in kinds), (name, kinds))
+        for name in ['T', 'Alias']:
+            kinds = [kind for _, _, kind, token, _ in spans if token == name]
+            self.assertTrue(kinds, name)
+            self.assertTrue(all(kind == 'typeParameter' for kind in kinds), (name, kinds))
+
     def test_unused_imports_dim_full_declarations_and_follow_unsaved_edits(self):
         text = '''package main
 import "core:fmt"

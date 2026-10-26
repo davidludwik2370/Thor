@@ -3043,6 +3043,11 @@ resolve_local_identifier :: proc(
 	)
 
 	symbol.flags -= {.Parameter}
+	// Value bindings must not inherit their element type's generic-parameter
+	// flag. Actual $T parameters restore it below; type aliases retain it.
+	if .Mutable in local.flags || .Variable in local.flags {
+		symbol.flags -= {.PolyType}
+	}
 	if local.parameter {
 		symbol.flags |= {.Parameter}
 	}

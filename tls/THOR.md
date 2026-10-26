@@ -71,6 +71,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   including explicit #run and automatic fn results. Generic type construction
   and type_of aliases retain type classification. Constant hover prints the
   source #run syntax rather than its synthetic parser wrapper.
+- Keep generic loop elements and other value bindings variable-colored rather
+  than inheriting their type parameter's semantic classification. Hover and
+  completion describe an element as `v: T`, preserving actual `$T` parameters
+  and generic type aliases as types.
 - Parse right-associated power above unary signs and multiplication, preserving
   native prefix expansion. Infer numeric results with literal coercion; fold
   representable integer powers for branch selection. Compiler errors retain

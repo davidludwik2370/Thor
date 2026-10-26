@@ -3817,7 +3817,7 @@ ast_hover_parapoly_proc_dynamic_array_elems :: proc(t: ^testing.T) {
 		}
 		`,
 	}
-	test.expect_hover(t, &source, "test.elem: ^$T")
+	test.expect_hover(t, &source, "test.elem: ^T")
 }
 
 @(test)
