@@ -124,12 +124,14 @@ async function run() {
             testDocument.positionAt(genericLoop.indexOf('>v')+1)), values=>hoverText(values||[]).includes('v: T'));
         assert.ok(!hoverText(genericHover).includes('$v'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
-        const genericDefault = 'package main\nsorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\nmain::proc(){}\n';
+        const genericDefault = 'package main\n/* 😀 */ sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\nmain::proc(){}\n';
         await replace(genericDefault);
-        const locationless = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
-            values=>values.some(value=>value.message.includes('Unspecialized polymorphic')));
-        assert.ok(locationless.some(value=>value.message.includes('did not provide a source location')));
-        assert.ok(!vscode.languages.getDiagnostics(document.uri).some(value=>value.message.includes('Unspecialized polymorphic')),
+        const defaultErrors = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values=>values.some(value=>value.message.includes('Anonymous default procedure')));
+        const defaultError=defaultErrors.find(value=>value.message.includes('Anonymous default procedure'));
+        assert.equal(testDocument.getText(defaultError.range),'proc(i,j:E)->bool');
+        assert.ok(!defaultError.message.includes('did not provide a source location'));
+        assert.ok(!vscode.languages.getDiagnostics(document.uri).some(value=>value.message.includes('Anonymous default procedure')),
             'An error in the temporary example must not appear on demo/main.thor');
         await replace(genericDefault.replace('less:=proc(i,j:E)->bool{return i<j}','less:proc(i,j:E)->bool'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
@@ -295,7 +297,7 @@ async function run() {
             'unused imports carry VS Code dimming tags and update without saving',
             'activation and restart with no active editor', 'package declaration hover',
             'generic loop variables remain values in semantic tokens and hover',
-            'locationless compiler errors stay in their checked package', 'hidden Set imports do not hover on comments',
+            'generic default callback errors highlight their exact source signature', 'hidden Set imports do not hover on comments',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

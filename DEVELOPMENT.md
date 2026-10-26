@@ -505,3 +505,39 @@ expected failure), all 1,118 native tests and 78 Node tests pass, and actual VS
 Code integration verifies that the error cannot land on the open demo or create
 a package hover on its first comment. A fresh CLI check of demo succeeds. User
 edits to Library.odin, demo/main.thor, thor.odin and basic/ remain untouched.
+
+## Generic default callback source diagnostics: compiler 0.10.1
+
+The resolver now recognizes an anonymous procedure used directly as a parameter
+default whose signature contains its own generic parameters or direct structural
+references to generics owned by the hosting parameter list. It distinguishes
+those bindings from concrete/shadowing/imported types and generic bindings from
+an enclosing body that may already be specialized. Computed type/length
+expressions are left to Odin: mentioning N inside `[N when false else 2]int`
+does not prove a polymorphic signature.
+
+Lower that unsupported default to a source-mapped compile-time assertion at the
+same default-expression site. Odin therefore retains native active-branch and
+enclosing-body checking behavior, while its error has a reliable original
+callback-signature span. The public message names the parameter and generic
+dependencies, and suggests a named generic default or an explicit callback.
+Multiple invalid callbacks report separately. No backend location is guessed;
+other genuinely locationless failures keep the labeled package fallback.
+
+Regression coverage includes Unicode ranges, parenthesized defaults, explicit
+generic and typed defaults, generic array lengths, multiple callbacks, inactive
+when/#if/config branches, unused and specialized enclosing bodies, valid concrete
+callbacks, type/member shadowing, named generic defaults, native imported sources
+and unsaved correction. The locationless fallback regression now uses a test
+compiler to keep testing unknown failures independently from this recovered
+case. Actual TLS and VS Code tests assert the callback signature range and
+clearing, rather than accepting a package-header diagnostic.
+
+Validation: the full Python regression run passed 507 tests with one existing
+expected failure, including the real CodeLLDB cases. The seven final focused
+diagnostic tests (with additional computed-expression and enclosing-scope cases)
+also pass, along with all 78 Node tests and the final actual VS Code integration.
+A direct check of the user's basic package now points to the comparator
+signature on line 45 rather than the package declaration. User source files
+remain unchanged; the installed client/server can use the updated compiler on
+the next check or Thor: Restart Language Server.

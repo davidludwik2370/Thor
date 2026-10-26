@@ -552,6 +552,17 @@ class Source:
             value=self.run_values[n]
             if callable(value):return value(expected,constant)
             return value['constant' if constant else 'runtime'] if isinstance(value,dict) else value
+        if kind == 'Procedure' and self.resolver:
+            invalid_default = self.resolver.generic_default_error(n)
+            if invalid_default:
+                signature, message = invalid_default
+                token = self.prefix + f'generic_default_{n.start}_{n.end}'
+                self.error_messages[token] = message
+                # Keep the assertion at the original default-expression site.
+                # Odin then honors inactive when arms and uninstantiated outer
+                # bodies, while its diagnostic retains a real source span.
+                return self.mapping.wrap(f'#assert(false, {json.dumps(token)})', self.path,
+                                         signature.start, signature.end, 'generic-default')
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code

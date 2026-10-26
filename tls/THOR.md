@@ -138,6 +138,12 @@ source file in that checked package (or a source file discovered there), with a
 note explaining the missing location. It never selects an unrelated open buffer
 as the fallback. Internal zero-length Set imports are excluded from source
 position lookup, so they cannot create package hovers on the first comment.
+The compiler recovers a precise span for anonymous default callbacks with a
+directly generic signature: a source-mapped assertion stays at the callback's
+original default-expression site. TLS displays that signature range, including
+unsaved and imported sources, and clears it after correction. This is a compiler
+check rather than a second TLS type checker; native conditional compilation and
+enclosing generic specialization still control whether it is checked.
 
 Unconditional top-level redeclarations in an untagged file also have an immediate
 `Declaration` diagnostic, independent of native checking. The shared frontend

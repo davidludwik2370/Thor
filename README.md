@@ -257,6 +257,18 @@ back to the operation that instantiated them. Empty-array and membership failure
 have Thor-specific explanations; redundant inference errors are suppressed when
 the underlying expression already has a diagnostic.
 
+Anonymous default callbacks whose signatures directly depend on unspecialized
+generic parameters have a source-mapped check. For example, `less := proc(i,j:E)
+-> bool {...}` in a generic procedure reports the problem on that callback's
+signature, instead of Odin's locationless `Unspecialized polymorphic procedure
+''` error. The message identifies the default parameter and generic dependency.
+Named generic defaults, concrete callbacks and callbacks using already-bound
+outer types retain native behavior. Odin still selects active branches and
+instantiates enclosing bodies before checking the guard. Computed type
+expressions that cannot be classified confidently stay with Odin's checker.
+Unrecoverable locationless errors retain an explicitly labeled package fallback
+in TLS rather than being assigned to an unrelated open file.
+
 Useful options:
 
 ```sh

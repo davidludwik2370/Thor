@@ -41,6 +41,83 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_generic_default_callback_points_to_its_unicode_signature(self):
+        signature = 'proc(i, j: E) -> bool'
+        source = 'package basic\n/* 😀 */ sorted::proc(a:$T/[]$E, less:=('+signature+' {return i<j}))->[]E{return a}\n'
+        errors = self.at(source, signature, flags=('-no-entry-point',), message="Anonymous default procedure for 'less'")
+        self.assertEqual(len(errors), 1, errors)
+        error = errors[0]
+        self.assertEqual(error['pos']['end_offset']-error['pos']['offset'], len(signature.encode()))
+        self.assertIn('signature (E)', error['msgs'][0])
+        self.assertNotIn('Unspecialized polymorphic procedure', json.dumps(errors))
+        self.assertNotIn('__thor_', json.dumps(errors))
+
+    def test_generic_default_callbacks_report_each_original_signature(self):
+        first = 'proc(i,j:E)->bool'
+        second = 'proc()->E'
+        source = ('package basic\n'
+                  f'first::proc(a:[]$E,less:={first}{{return i<j}}){{}}\n'
+                  f'second::proc(a:[]$E,value:={second}{{return {{}}}}){{}}\n')
+        entry, _, errors, _ = self.invoke(source, flags=('-no-entry-point',))
+        self.assertEqual(len(errors), 2, errors)
+        self.assertEqual({e['pos']['offset'] for e in errors},
+                         {source.encode().index(first.encode()), source.encode().index(second.encode())})
+        self.assertTrue(all(e['pos']['file'] == str(entry) for e in errors))
+
+    def test_explicitly_generic_and_typed_default_callbacks_have_source_ranges(self):
+        for parameter in ['less:=proc(i,j:$U)->bool{return i<j}',
+                          'less:proc(E,E)->bool=proc(i,j:E)->bool{return i<j}',
+                          'less:=proc(value:[N]int)->bool{return true}']:
+            with self.subTest(parameter=parameter):
+                source = 'package basic\nwork::proc($N:int,a:[]$E,'+parameter+'){}\n'
+                needle = 'proc(i,j:' if 'proc(i,j:' in parameter else 'proc(value:'
+                errors = self.at(source, needle, flags=('-no-entry-point',), message='Anonymous default procedure')
+                self.assertEqual(len(errors), 1, errors)
+
+    def test_generic_default_guard_preserves_native_conditional_checking(self):
+        bad = 'sorted::proc(a:[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}'
+        for wrapper in ['when false {%s}', '#if false {%s}',
+                        'outer::proc(a:[]$T){%s}',
+                        '#if #config(ENABLE_BAD,false) {%s}']:
+            with self.subTest(wrapper=wrapper):
+                self.invoke('package basic\n'+wrapper % bad+'\n', flags=('-no-entry-point',), success=True)
+        self.at('package basic\n#if #config(ENABLE_BAD,false) {'+bad+'}\n',
+                'proc(i,j:E)',flags=('-no-entry-point','-define:ENABLE_BAD=true'),message='Anonymous default procedure')
+        self.at('package main\nouter::proc($T:typeid){'+bad+'}\nmain::proc(){outer(int)}\n',
+                'proc(i,j:E)', message='Anonymous default procedure')
+
+    def test_valid_default_callbacks_and_enclosing_specializations_are_preserved(self):
+        variants = [
+            'work::proc(a:[]$E,less:=proc(i,j:int)->bool{return i<j})->[]E{return a}',
+            'work::proc(a:[]$E,less:=proc(i,j:int)->bool{_=size_of(E);return i<j})->[]E{return a}',
+            'work::proc(a:[]$E,less:=proc(E,j:int)->bool{return E<j})->[]E{return a}',
+            'E::int\nwork::proc(a:[]$T,less:=proc(i,j:E)->bool{return i<j})->[]T{return a}',
+            'work::proc($N:int,less:=proc(i:[N when false else 2]int)->int{return i[0]}){}',
+            'less::proc(i,j:$T)->bool{return i<j}\nwork::proc(a:[]$T,compare:=less)->[]T{_=compare(a[0],a[1]);return a}\nmain::proc(){_=work([]int{1,2})}',
+            'outer::proc($E:typeid){inner::proc(a:[]E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a};_=inner([]E{1,2})}\nmain::proc(){outer(int)}',
+        ]
+        for code in variants:
+            with self.subTest(code=code):
+                self.invoke('package main\n'+code+'\n', flags=('-no-entry-point',), success=True)
+
+    def test_computed_default_signature_keeps_the_native_type_error(self):
+        source = 'package basic\nwork::proc($N:int,less:=proc(i:type_of(N))->int{return i}){}\n'
+        errors = self.at(source, 'type_of(N)', flags=('-no-entry-point',), message='is not a type')
+        self.assertFalse(any('Anonymous default procedure' in message for error in errors for message in error['msgs']))
+
+    def test_imported_native_callback_and_unsaved_fix_keep_their_actual_source(self):
+        source = 'package main\nimport "library"\nmain::proc(){_=library.VALUE}\n'
+        library = 'package library\nVALUE::1\n/* 😀 */ sorted::proc(a:[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\n'
+        entry, _, errors, _ = self.invoke(source, files={'library/main.odin': library})
+        self.assertEqual(len(errors), 1, errors)
+        self.assertEqual(errors[0]['pos']['file'], str(entry.parent/'library/main.odin'))
+        self.assertEqual(errors[0]['pos']['offset'], library.encode().index(b'proc(i,j:E)'))
+        fixed = library.replace('less:=proc(i,j:E)->bool{return i<j}', 'less:proc(i,j:E)->bool')
+        self.invoke(source, files={'library/main.odin': library}, overlays={'library/main.odin': fixed}, success=True)
+        # An imported type named E is independent of the host's generic E.
+        self.invoke('package main\nimport "library"\nwork::proc(a:[]$E,less:=proc(i,j:library.E)->bool{return i<j})->[]E{return a}\n',
+                    files={'library/main.odin': 'package library\nE::int\n'}, flags=('-no-entry-point',), success=True)
+
     def test_range_operand_errors_keep_unicode_bounds_without_query_cascades(self):
         source='package main\nmain::proc(){_="😀";value:=3;_=value in "a"..<"z"}\n'
         _,_,errors,_=self.invoke(source)

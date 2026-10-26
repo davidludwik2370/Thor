@@ -1044,18 +1044,21 @@ main::proc(){
         self.assertEqual(error['range']['end']['character'] - error['range']['start']['character'], 7)
         self.assertNotIn('__thor_', error['message'])
 
-    def test_locationless_compiler_error_stays_with_its_package_and_clears(self):
-        broken = 'package main\nsorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\n'
+    def test_generic_default_callback_has_its_exact_signature_range_and_clears(self):
+        broken = 'package main\n/* 😀 */ sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\n'
         clean = 'package main\nmain::proc(){}\n'
         client, main = self.open(clean, {'basic/main.thor': broken})
         bad = main.parent / 'basic/main.thor'
         client.send('textDocument/didOpen', {'textDocument': {'uri': bad.as_uri(),
                     'languageId': 'thor', 'version': 1, 'text': broken}})
-        errors = client.diagnostic(bad.as_uri(), code='thor', contains='Unspecialized polymorphic')
-        self.assertTrue(any('did not provide a source location' in e['message'] for e in errors))
+        errors = client.diagnostic(bad.as_uri(), code='thor', contains='Anonymous default procedure')
+        error = next(e for e in errors if 'Anonymous default procedure' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(broken, 'proc(i,j:E)', 0))
+        self.assertEqual(error['range']['end'], self.position(broken, 'proc(i,j:E)->bool', len('proc(i,j:E)->bool')))
+        self.assertNotIn('did not provide a source location', error['message'])
         self.assertFalse(any(n.get('method') == 'textDocument/publishDiagnostics'
                              and n['params']['uri'] == main.as_uri()
-                             and any('Unspecialized polymorphic' in d['message'] for d in n['params']['diagnostics'])
+                             and any('Anonymous default procedure' in d['message'] for d in n['params']['diagnostics'])
                              for n in client.notifications))
         fixed = broken.replace('less:=proc(i,j:E)->bool{return i<j}', 'less:proc(i,j:E)->bool')
         client.notifications.clear()
@@ -1063,6 +1066,44 @@ main::proc(){
                     'contentChanges': [{'text': fixed}]})
         client.diagnostic(bad.as_uri(), empty=True)
         self.assertEqual(bad.read_text(), broken)
+
+    @unittest.skipIf(os.name == 'nt', 'Uses an executable Python test compiler')
+    def test_locationless_compiler_error_stays_with_its_package_and_clears(self):
+        temporary = tempfile.TemporaryDirectory(prefix='tls-locationless-')
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        main, bad, compiler = root/'main.thor', root/'basic/main.thor', root/'compiler.py'
+        bad.parent.mkdir()
+        clean = 'package main\nmain::proc(){}\n'
+        broken = 'package basic\n// BROKEN\n'
+        main.write_text(clean)
+        bad.write_text(broken)
+        compiler.write_text('''#!/usr/bin/env python3
+import json,sys
+from pathlib import Path
+source=Path(sys.argv[2])/'main.thor'
+overlay=json.loads(Path(sys.argv[sys.argv.index('--overlay')+1]).read_text())['Replace']
+text=Path(overlay.get(str(source),source)).read_text()
+errors=[{'type':'error','pos':None,'msgs':['Locationless test compiler error']}] if 'BROKEN' in text else []
+print(json.dumps({'error_count':len(errors),'errors':errors}),file=sys.stderr)
+raise SystemExit(bool(errors))
+''')
+        compiler.chmod(0o755)
+        client = Client(root, compiler_command=compiler)
+        self.addCleanup(client.close)
+        for file, text in [(main, clean), (bad, broken)]:
+            client.send('textDocument/didOpen', {'textDocument': {'uri': file.as_uri(),
+                        'languageId': 'thor', 'version': 1, 'text': text}})
+        errors = client.diagnostic(bad.as_uri(), code='thor', contains='Locationless test compiler error')
+        self.assertTrue(any('did not provide a source location' in e['message'] for e in errors))
+        self.assertFalse(any(n.get('method') == 'textDocument/publishDiagnostics'
+                             and n['params']['uri'] == main.as_uri()
+                             and any('Locationless test compiler error' in d['message'] for d in n['params']['diagnostics'])
+                             for n in client.notifications))
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': bad.as_uri(), 'version': 2},
+                    'contentChanges': [{'text': 'package basic\n'}]})
+        client.diagnostic(bad.as_uri(), empty=True)
 
     def test_compiler_warning_is_published_once_with_original_range(self):
         text = 'package main\nS :: struct #field_align(4) {x:int}\nmain :: proc(){}\n'

@@ -200,6 +200,62 @@ class Resolver:
         symbol = self.symbol(n)
         return symbol.declaration if symbol else None
 
+    def generic_default_error(self, procedure):
+        """Recognize anonymous default signatures Odin cannot specialize.
+
+        Only generic bindings owned by this parameter list (or by the default
+        procedure itself) are still unbound here. Types from an enclosing
+        procedure body can already be concrete when that body is instantiated.
+        Leave inferred default-parameter types and other uncertain cases to Odin.
+        """
+        value = procedure
+        while value.parent and value.parent.kind == 'Paren' and value.parent.role('expr') is value:
+            value = value.parent
+        field = value.parent
+        if not field or field.kind != 'Field' or field.role('default') is not value:
+            return None
+        host_signature = next((n for n in field.ancestors() if n.kind == 'ProcedureType'), None)
+        if host_signature is None or field.parent is not host_signature.role('params'):
+            return None
+        host = host_signature.parent if host_signature.parent and host_signature.parent.kind == 'Procedure' else host_signature
+        signature = procedure.role('type')
+        dependencies = set()
+
+        def visit(node):
+            if node is None:
+                return
+            # A computed type/length can be independent of a generic mentioned
+            # inside it (e.g. [N when false else 2]int). Without Odin's type
+            # evaluator, those expressions cannot prove polymorphism.
+            if node.kind in {'Call', 'Selector', 'WhenExpr', 'Ternary', 'Binary'}:
+                return
+            if node.kind == 'Field':
+                for name in node.group('names'):
+                    if name.kind == 'PolyType':
+                        dependencies.add(name.data['name'])
+                visit(node.role('type'))
+                return  # Defaults are values, not necessarily part of the signature's type.
+            if node.kind == 'PolyType':
+                dependencies.add(node.data['name'])
+            elif node.kind == 'Ident':
+                parent = node.parent
+                if parent and parent.kind in {'Selector', 'FieldValue'} and parent.role('field') is node:
+                    return
+                symbol = self.symbol(node)
+                if symbol and symbol.node.kind == 'PolyType' and symbol.scope in {host, procedure}:
+                    dependencies.add(symbol.name)
+            for child in node.children:
+                visit(child)
+
+        visit(signature)
+        if not dependencies:
+            return None
+        names = ', '.join(n.text for n in field.group('names'))
+        generics = ', '.join(sorted(dependencies))
+        message = (f"Anonymous default procedure for '{names}' has an unspecialized generic signature ({generics}). "
+                   "Use a named generic procedure as the default, or require an explicit callback.")
+        return signature, message
+
     def type_node(self, n, substitutions=None, seen=None):
         if n is None:
             return Type()
