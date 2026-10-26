@@ -102,6 +102,28 @@ work::fn(input:string,n:int)->int{
         self.invoke(self.program('a:=[1,2];assert(work(a)==9&&a[0]==1)',
             'work::fn(input:[2]int)->int{copy:=input;copy[0]=9;return copy[0]}\n'))
 
+    def test_mutable_range_binding_reports_pure_restriction_without_cascades(self):
+        for declaration,call in [('fn','work()'),('proc','#run work()')]:
+            with self.subTest(declaration=declaration):
+                _,result=self.invoke(self.program('_='+call,
+                    'work::'+declaration+'()->int{data:=[1,2];total:=0;for &value in data{value+=1;total+=value};return total}\n'),
+                    command='check',fail='Pure code cannot iterate by mutable reference')
+                self.assertNotIn('Undeclared name: value',result.stderr)
+                self.assertNotIn('__thor_',result.stderr)
+
+    def test_run_local_shadow_of_selective_import_does_not_retain_unused_alias(self):
+        self.invoke(self.program('assert(TEXT=="name birch"&&COUNT==9&&NEXT==5)', '''
+import "guide" / label, next_code
+text::fn(label:string)->string{return f"name {label}"}
+count::fn()->int{label:=9;return label}
+TEXT::#run text("birch")
+COUNT::#run count()
+NEXT::next_code(3)
+'''),files={
+            'guide/native.odin':'package guide\nint_label::proc(n:int)->int{return n}\nfloat_label::proc(n:f64)->f64{return n}\nlabel::proc{int_label,float_label}\n',
+            'guide/pure.thor':'package guide\nnext_code::fn(n:int)->int{return n+2}\n',
+        })
+
     def test_borrowed_aliases_fields_and_subslices_rejected(self):
         cases=[
             ('bad::fn(input:[]int)->int{input[0]=9;return 0}', 'a:=[1,2];_=bad(a[:])'),

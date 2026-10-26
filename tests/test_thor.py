@@ -588,6 +588,13 @@ assert(count == 2)'''))
         self.assertIn("All T01-T23 demos passed.", result.stdout)
         self.assertNotIn("Warning:",result.stderr)
 
+    def test_commented_walkthrough_with_allocation_tracking(self):
+        result = subprocess.run([str(THOR), "test", str(ROOT / "examples" / "demo"),
+            "-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true"], text=True, capture_output=True, timeout=180)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("All Thor walkthrough examples passed.", result.stdout)
+        self.assertNotIn("Warning:", result.stderr)
+
     def test_checked_in_rejection_examples(self):
         for directory in sorted((ROOT / "tests" / "fixtures").iterdir()):
             with self.subTest(fixture=directory.name):

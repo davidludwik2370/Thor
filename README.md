@@ -25,6 +25,18 @@ Select another compile-time branch with an ordinary Odin define:
 ./thor run demo -define:DEMO_MODE=3
 ```
 
+For a more spacious, commented walkthrough in the style of Odin's language demo,
+read [examples/demo/demo.thor](examples/demo/demo.thor) and run:
+
+```sh
+./thor run examples/demo
+./thor test examples/demo -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+```
+
+It uses fresh examples, with a procedure per topic, ownership explanations,
+commented invalid cases, and a mixed Odin/Thor helper package. Its compile-time
+branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
+
 ## Commands
 
 ```sh

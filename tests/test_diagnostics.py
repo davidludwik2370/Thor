@@ -94,6 +94,14 @@ class DiagnosticTests(unittest.TestCase):
         errors=self.at(source,'fn()->^int',message='Unsupported pure value type')
         self.assertNotIn('runtime/',json.dumps(errors))
 
+    def test_pure_reference_iteration_reports_original_loop_without_body_cascades(self):
+        for call in ['work()', '#run work()']:
+            with self.subTest(call=call):
+                source='package main\nwork::fn()->int{_="😀";values:=[1,2];for &value in values{value+=1};return values[0]}\nmain::proc(){_='+call+'}\n'
+                errors=self.at(source,'for &value',message='Pure code cannot iterate by mutable reference')
+                self.assertEqual(len(errors),1,errors)
+                self.assertNotIn('Undeclared name',json.dumps(errors))
+
     def test_run_helper_errors_runtime_failure_and_unsaved_import(self):
         source='package main\nwork::fn()->int{return missing}\nVALUE::#run work()\nmain::proc(){_=VALUE}\n'
         errors=self.at(source,'missing',message='missing')

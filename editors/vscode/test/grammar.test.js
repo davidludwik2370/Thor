@@ -307,6 +307,29 @@ test('demo regression expressions retain complete identifier and literal scopes'
     check('text := f"{switch n{case 1:"first";case:"second"}}"','first','string.quoted');
 });
 
+test('commented walkthrough keeps strings and syntax distinct across topic sections',()=>{
+    const source=fs.readFileSync(path.join(__dirname,'../../../examples/demo/demo.thor'),'utf8');
+    const lines=source.split('\n'),tokens=themedTokens(source);
+    for(const [fragment,word,color,type] of [
+        ['message := f"Meet','place','#9CDCFE',0],
+        ['message := f"Meet',"'0'",'#CE9178',2],
+        ['message := f"Meet','9','#B5CEA8',0],
+        ['nested := f"outside','inside ','#CE9178',2],
+        ['outer := f"{(allocate_inner','allocate_inner','#9CDCFE',0],
+        ['outer := f"{(allocate_inner','fresh ','#CE9178',2],
+        ['report := f"last','ready','#CE9178',2],
+        ['staff: set[string]','set','#569CD6',0],
+        ['title=f"journey','label','#9CDCFE',0],
+    ]){
+        const line=lines.findIndex(line=>line.includes(fragment));assert.ok(line>=0,fragment);
+        const start=lines[line].indexOf(word);assert.ok(start>=0,word);
+        for(const token of tokens[line].slice(start,start+word.length)){
+            assert.equal(token.type,type,`${fragment}: ${word}`);
+            assert.equal(token.color,color,`${fragment}: ${word}`);
+        }
+    }
+});
+
 test('manifest owns Thor without replacing Odin', () => {
     const manifest = require('../package.json');
     assert.deepEqual(manifest.contributes.languages[0].extensions, ['.thor']);

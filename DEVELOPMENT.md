@@ -346,3 +346,31 @@ The 50-test stdio LSP suite passes with the existing contextual-enum expected
 failure. All 1,115 native TLS tests pass with allocation tracking in the serial
 runner, and actual VS Code integration passes. TLS 0.9.2 is rebuilt and restarted;
 the compiler/client/grammar remain 0.9.0. User scratch edits remain separate.
+
+## Commented language walkthrough
+
+`examples/demo/demo.thor` is a separate, spacious language tour modeled on the
+organization of Odin's examples/demo/demo.odin. Fourteen topic procedures cover
+T01–T23, interval membership and power, with original examples, explanatory
+comments, ownership guidance and commented rejection cases. A mixed Odin/Thor
+guide package and source-relative resource exercise project handling. The native
+test wrapper runs the entire tour under Odin's allocation tracker; the root
+acceptance suite now includes it. The earlier demo remains independently covered.
+
+The new examples exposed two compiler issues. Evaluation closure construction
+retained a selective import even when a parameter/local shadowed its name, then
+validated that alias against a pruned helper package. It now uses lexical lookup
+before retaining an alias. Pure mutable-reference loop bindings were replaced by
+error tokens which Odin treated as legal declarations, hiding the intended
+restriction behind undeclared-name errors in the body. The rejection now targets
+the entire loop and suggests supported indexed writes to fresh local storage.
+Mutable-reference iteration inside pure code remains a conservative limitation.
+
+The tour passes all three TOUR_MODE values, directory and single-file invocation,
+allocation tracking, and uncached evaluation. A stable warm run reuses all 21
+evaluations with no misses. Validation also passes 44 pure-function tests, 88
+automatic-evaluation/source-map tests, three focused diagnostic/LSP checks, both
+demo acceptance tests, and 73 grammar tests. The new LSP checks cover original
+semantic-token identity across the full tour, set hover spelling, and unsaved
+pure-loop errors/recovery. Grammar checks inspect nested strings, Unicode fills,
+switch interpolation and Set colors in the complete new file.

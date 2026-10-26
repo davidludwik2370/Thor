@@ -383,7 +383,14 @@ class Purity:
                 self.problem(n,'This directive is not permitted in pure code.')
             if n.kind=='Directive' and n.data['name'] in {'file','line','directory'}:
                 self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
-            if n.kind=='Unary' and n.data['op']=='&':self.problem(n,'Pure code cannot take or expose raw addresses.')
+            if n.kind=='Unary' and n.data['op']=='&':
+                # A range binding is a declaration, so replacing just `&value`
+                # with an error token silently declares that token instead.
+                # Diagnose the statement, keeping its body from cascading.
+                binding=n.parent and n.parent.kind=='Range' and n in n.parent.group('names')
+                self.problem(n.parent if binding else n,
+                    'Pure code cannot iterate by mutable reference; use indexed writes to a fresh local buffer.'
+                    if binding else 'Pure code cannot take or expose raw addresses.')
             if n.kind=='Call':
                 builtin=self.builtin(n);library=self.library(n)
                 if builtin=='make':
@@ -444,6 +451,8 @@ class Purity:
             return self.parameter_name(n)
         message=self.problems.get(n)
         if message:
+            if n.kind=='Range':
+                return '#panic('+json.dumps(message)+')\n'
             if n.kind=='Declaration' and not(n.parent and n.parent.role('init') is n):
                 added=set(descendants(n))-self.rendering
                 self.rendering.update(added)

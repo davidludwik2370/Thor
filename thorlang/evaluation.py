@@ -534,7 +534,8 @@ class Evaluator:
             if node.kind=='Procedure':procedures.add(node)
             if node.kind=='Ident' and self.purity.reference(node):
                 s=node.source
-                if node.text in s.selected:aliases.setdefault(s,set()).add(node.text)
+                if node.text in s.selected and self.r.lookup(node.text,node) is None:
+                    aliases.setdefault(s,set()).add(node.text)
                 if node.text in s.imports and self.r.lookup(node.text,node) is None:imports.setdefault(s,set()).add(node.text)
                 symbol=self.r.symbol(node)
                 if symbol and symbol.declaration is not node and not any(a is symbol.declaration for a in node.ancestors()):

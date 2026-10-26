@@ -482,6 +482,36 @@ main::proc(){
         client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(main.read_text(),text)
 
+    def test_pure_reference_iteration_unsaved_diagnostic_and_recovery(self):
+        text='package main\nwork::fn()->int{values:=[1,2];for i in 0..<len(values){values[i]+=1};return values[0]}\nmain::proc(){_=work()}\n'
+        client,main=self.open(text)
+        changed=text.replace('for i in 0..<len(values){values[i]+=1}', 'for &value in values{value+=1}')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='Pure code cannot iterate by mutable reference')
+        error=next(e for e in errors if 'Pure code cannot iterate by mutable reference' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'for &value',0))
+        self.assertFalse(any('Undeclared name' in e['message'] for e in errors),errors)
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_commented_walkthrough_semantics_and_hover(self):
+        main=ROOT/'examples/demo/demo.thor'
+        text=main.read_text()
+        client=Client(main.parent,compiler=False)
+        self.addCleanup(client.close)
+        client.send('textDocument/didOpen',{'textDocument':{'uri':main.as_uri(),'languageId':'thor','version':1,'text':text}})
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        self.assertGreater(len(spans),300)
+        hover=self.hover(client,main,text,'staff: set[string]')
+        self.assertIn('staff: set[string]',hover['contents']['value'])
+        self.assertIn('```thor',hover['contents']['value'])
+        for value in client.notifications:
+            if value.get('method')=='textDocument/publishDiagnostics':
+                self.assertFalse(any(e.get('code') in {'Syntax','Declaration'} for e in value['params']['diagnostics']),value)
+
     def test_allocated_run_hover_and_unsaved_constant_diagnostic(self):
         text='package main\nimport pure "thor:pure"\nnames::fn()->[]string{result:=make([]string,1);result[0]="hello";return result}\nmain::proc(){result:=#run names();pure.destroy(result)}\n'
         client,main=self.open(text)
