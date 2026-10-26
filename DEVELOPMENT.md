@@ -217,3 +217,9 @@ contextual-enum navigation expected failure. All 65 grammar tests, 1,109 native
 TLS tests, two allocation-tracked lexer tests, the demo and actual VS Code
 integration pass. Install the 0.7.3 VSIX and run **Developer: Reload Window** to
 load its grammar changes in an existing editor window.
+
+The 0.7.4 editor update styles `#if`, `#else`, `#switch` and `#run` like existing
+directives. The `if` following `#else` shares that scope, across whitespace and
+comments; conditions and subsequent runtime keywords retain their own scopes.
+All 67 grammar tests pass, including actual color checks, comments/strings,
+multiline chains and runtime-keyword boundaries. This changes editor styling only.

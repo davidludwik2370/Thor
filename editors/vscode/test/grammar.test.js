@@ -29,6 +29,8 @@ before(async () => {
             {scope:'storage.type',settings:{foreground:'#569CD6'}},
             {scope:'storage.modifier',settings:{foreground:'#569CD6'}},
             {scope:'constant.numeric',settings:{foreground:'#B5CEA8'}},
+            {scope:'keyword.control',settings:{foreground:'#C586C0'}},
+            {scope:'entity.name.tag',settings:{foreground:'#569CD6'}},
         ]},
         onigLib,
         loadGrammar:async()=>JSON.parse(fs.readFileSync(path.join(__dirname,'../syntaxes/thor.tmLanguage.json'),'utf8')),
@@ -71,16 +73,16 @@ for (const [name, source, word, scope, line] of [
     ['named import', 'import math "core:math" / sin', 'math', 'variable.other.namespace'],
     ['multiline import ends', 'import "core:math" / sin,\n cos\nmain :: proc() {}', 'main', 'entity.name.function', 2],
     ['comma continuation', 'import "core:math" /\n sin, // comment\n cos', 'cos', 'variable', 2],
-    ['Thor if', '#if true {', '#if', 'keyword.control.conditional'],
-    ['Thor else', '} #else if false {', '#else', 'keyword.control.conditional'],
-    ['compile switch', 'x :: #switch 1 {case:2}', '#switch', 'keyword.control.conditional'],
+    ['Thor if', '#if true {', '#if', 'entity.name.tag'],
+    ['Thor else', '} #else if false {', '#else', 'entity.name.tag'],
+    ['compile switch', 'x :: #switch 1 {case:2}', '#switch', 'entity.name.tag'],
     ['pure function keyword', 'square :: fn(x:int)->int{return x*x}', 'fn', 'storage.type'],
     ['pure function name', 'square :: fn(x:int)->int{return x*x}', 'square', 'entity.name.function'],
-    ['explicit run', 'SIZE :: #run square(8)', '#run', 'keyword.control.conditional'],
+    ['explicit run', 'SIZE :: #run square(8)', '#run', 'entity.name.tag'],
     ['allocated pure return', 'names :: fn()->[]string{return nil}', 'fn', 'storage.type'],
-    ['allocated run binding', 'names := #run names()', '#run', 'keyword.control.conditional'],
+    ['allocated run binding', 'names := #run names()', '#run', 'entity.name.tag'],
     ['automatic constant call', 'SIZE :: square(8)', 'square', 'entity.name.function'],
-    ['generic dependent run', 'work :: proc($N:int){SIZE::#run square(N)}', '#run', 'keyword.control.conditional'],
+    ['generic dependent run', 'work :: proc($N:int){SIZE::#run square(N)}', '#run', 'entity.name.tag'],
     ['interpolation prefix', 's := f"hello {value}"', 'f', 'storage.modifier.interpolation'],
     ['interpolation field', 's := f"hello {value}"', 'value', 'variable'],
     ['nested interpolation string', 's := f"{echo("inner")}"', 'inner', 'string.quoted.double'],
@@ -125,19 +127,55 @@ for (const [name, source, word, scope, line] of [
 test('comments hide Thor syntax and nested comments close correctly', () => {
     const lines = tokenize('/* outer\n /* #if x in [1,2] */\n still a comment */\n#if true {}');
     for (const token of lines[1]) assert.ok(token.scopes.some(s => s.startsWith('comment.block')));
-    assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('keyword.control.conditional.thor'));
+    assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
 });
 
 test('raw strings retain syntax-looking text across lines', () => {
     const lines = tokenize('text := `#if\nx in [1,2]\n`\n#if true {}');
     for (const token of lines[1]) assert.ok(token.scopes.some(s => s.startsWith('string.quoted.raw')));
-    assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('keyword.control.conditional.thor'));
+    assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
 });
 
 test('escaped quotes stay inside strings', () => {
     const tokens = tokenize('s := "\\\"#if in [1,2]"')[0];
     for (const token of tokens.filter(t => t.text.includes('#if'))) {
         assert.ok(token.scopes.some(s => s.startsWith('string.quoted.double')));
+    }
+});
+
+test('compile-time directive colors include the if in an else-if chain',()=>{
+    for(const source of ['#if true {}','#else {}','#else if condition {}','value :: #switch 1 {case:2}','value :: #run compute(3)','#partial switch x {}','#assert(true)']){
+        const tokens=themedTokens(source)[0];
+        for(const match of source.matchAll(/#(?:if|else|switch|run|partial|assert)\b/g)){
+            assert.ok(tokens.slice(match.index,match.index+match[0].length).every(t=>t.color==='#569CD6'),source);
+        }
+        if(source.startsWith('#else if')){
+            assert.ok(tokens.slice(6,8).every(t=>t.color==='#569CD6'));
+            assert.ok(tokens.slice(9,18).every(t=>t.color==='#9CDCFE'),'Condition keeps its own color');
+        }
+    }
+    const source='if x {} else if y {} switch z {}';
+    for(const match of source.matchAll(/\b(if|else|switch)\b/g)){
+        assert.ok(themedTokens(source)[0].slice(match.index,match.index+match[0].length).every(t=>t.color==='#C586C0'));
+    }
+});
+
+test('compile-time else-if handles trivia without coloring later runtime keywords',()=>{
+    for(const between of [' ','\t  ','\n',' /* comment */ ',' // comment\n',' /* outer /* nested */ comment */\n']){
+        const source='#else'+between+'if condition {if runtime {}}';
+        const tokens=tokenize(source).flat();
+        const ifs=tokens.filter(t=>t.text==='if');
+        assert.equal(ifs.length,2,source);
+        assert.ok(ifs[0].scopes.includes('entity.name.tag.thor'),source);
+        assert.ok(ifs[1].scopes.includes('keyword.control.thor'),source);
+        const condition=tokens.find(t=>t.text==='condition');
+        assert.ok(!condition.scopes.includes('entity.name.tag.thor'),source);
+    }
+    for(const source of ['#else { if runtime {} }','#else iffy { if runtime {} }']){
+        assert.ok(tokenize(source).flat().filter(t=>t.text==='if').every(t=>t.scopes.includes('keyword.control.thor')),source);
+    }
+    for(const source of ['text := "#else if"','text := `#else if`','// #else if','/* #else if */']){
+        assert.ok(!tokenize(source).flat().some(t=>t.scopes.includes('entity.name.tag.thor')),source);
     }
 });
 
