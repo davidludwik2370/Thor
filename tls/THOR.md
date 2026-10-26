@@ -61,6 +61,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   report temporary-view lifetime errors at original unsaved source ranges.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
+- Distinguish record-valued constants and value aliases from type aliases,
+  including explicit #run and automatic fn results. Generic type construction
+  and type_of aliases retain type classification. Constant hover prints the
+  source #run syntax rather than its synthetic parser wrapper.
 - Parse right-associated power above unary signs and multiplication, preserving
   native prefix expansion. Infer numeric results with literal coercion; fold
   representable integer powers for branch selection. Compiler errors retain

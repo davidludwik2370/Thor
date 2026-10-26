@@ -1320,6 +1320,11 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 		strings.write_string(builder, ")")
 	case ^ast.Call_Expr:
 		thor_set:=false
+		if name,ok:=n.expr.derived.(^ast.Ident);ok&&name.name=="__thor_run"&&name.pos.offset==name.end.offset&&len(n.args)==1 {
+			strings.write_string(builder,"#run ")
+			build_string(n.args[0],builder,remove_pointers)
+			return
+		}
 		if selector,ok:=n.expr.derived.(^ast.Selector_Expr);ok&&selector.field.name=="Set"{
 			if alias,ok:=selector.expr.derived.(^ast.Ident);ok&&alias.pos.offset==alias.end.offset&&strings.has_prefix(alias.name,"__thor_tls_sets"){thor_set=true}
 		}

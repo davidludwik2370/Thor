@@ -51,7 +51,7 @@ async function run() {
             semanticByOffset.set(start,{type:legend.tokenTypes[kind],token});
             previousEnd=column+length;
         }
-        for(const [fragment,name,type] of [['either := fruit ~ more_fruit','fruit','variable'],['case 3..<5: [.Red','.Red','enumMember']]){
+        for(const [fragment,name,type] of [['either := fruit ~ more_fruit','fruit','variable'],['case 3..<5: [.Red','.Red','enumMember'],['PURE_REPORT ::','PURE_REPORT','variable'],['report := PURE_REPORT','PURE_REPORT','variable'],['Owned_Report ::','Owned_Report','struct']]){
             const start=source.indexOf(fragment)+fragment.indexOf(name)+(name.startsWith('.')?1:0);
             assert.deepEqual(semanticByOffset.get(start),{type,token:name.replace(/^\./,'')});
         }

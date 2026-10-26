@@ -2196,6 +2196,15 @@ resolve_call_expr :: proc(ast_context: ^AstContext, v: ^ast.Call_Expr) -> (Symbo
 		case "type_of":
 			ast_context.call = nil
 			ok = internal_resolve_type_expression(ast_context, v.args[0], &symbol)
+			// The operand may carry variable/mutability flags, but type_of
+			// itself denotes its type rather than another value of that type.
+			symbol.flags -= {.Variable, .Mutable, .Immutable, .Parameter}
+			symbol.type = .Type
+			#partial switch _ in symbol.value {
+			case SymbolStructValue, SymbolBitFieldValue: symbol.type = .Struct
+			case SymbolEnumValue, SymbolUnionValue, SymbolBitSetValue: symbol.type = .Enum
+			case SymbolProcedureValue: symbol.type = .Type_Function
+			}
 			return symbol, ok
 		}
 	} else if call, ok := v.expr.derived.(^ast.Call_Expr); ok {
@@ -2910,7 +2919,9 @@ resolve_identifier_expr :: proc(
 		ast_context.call = cast(^ast.Call_Expr)orig_expr
 		defer ast_context.call = old_call
 
-		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
+		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.name=="type_of" {
+			symbol,ok=resolve_call_expr(ast_context,v)
+		} else if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
 			ok=internal_resolve_type_expression(ast_context,v,&symbol)
 		} else if _, ok = v.expr.derived.(^ast.Basic_Directive); ok {
 			symbol, ok = resolve_call_directive(ast_context, v)
@@ -2969,6 +2980,29 @@ resolve_identifier_expr :: proc(
 	return symbol, ok
 }
 
+// Calls can produce a value or instantiate a generic record/union type. Their
+// resolved aggregate shape alone cannot distinguish those two cases.
+is_type_alias_call :: proc(ast_context: ^AstContext, expr: ^ast.Expr) -> bool {
+	if expr == nil { return false }
+	if paren, ok := expr.derived.(^ast.Paren_Expr); ok {
+		return is_type_alias_call(ast_context, paren.expr)
+	}
+	call := expr.derived.(^ast.Call_Expr) or_return
+	if name, ok := call.expr.derived.(^ast.Ident); ok {
+		if name.name == "type_of" { return true }
+		if name.pos.offset == name.end.offset { return false }
+	}
+	alias_context := ast_context^
+	alias_context.call = nil
+	callee, found := resolve_type_expression(&alias_context, call.expr)
+	if !found { return false }
+	#partial switch value in callee.value {
+	case SymbolStructValue: return value.poly != nil
+	case SymbolUnionValue: return value.poly != nil
+	}
+	return false
+}
+
 resolve_local_identifier :: proc(
 	ast_context: ^AstContext,
 	node: ast.Ident,
@@ -3019,6 +3053,9 @@ resolve_local_identifier :: proc(
 		symbol.flags |= {.PolyType}
 	}
 	if .Immutable in local.flags { symbol.flags |= {.Immutable} }
+	if .Mutable not_in local.flags && local.type_expr == nil && is_type_alias_call(ast_context, local.value_expr) {
+		symbol.flags -= {.Variable}
+	}
 
 	symbol.flags |= {.Local}
 	symbol.value_expr = local.value_expr
@@ -3059,14 +3096,11 @@ resolve_global_identifier :: proc(
 	}
 	if .Immutable in global.flags { symbol.flags |= {.Immutable} }
 
-	// `is_variable_declaration` flags every `Call_Expr` as a variable,
-	// so a generic `Bar :: Foo(f32)` arrives here marked `.Variable`
-	#partial switch _ in symbol.value {
-	case SymbolStructValue, SymbolUnionValue, SymbolEnumValue, SymbolBitFieldValue:
-		if global.value_expr != nil do #partial switch _ in global.value_expr.derived {
-		case ^ast.Call_Expr, ^ast.Ident:
-			symbol.flags -= {.Variable}
-		}
+	// Keep value aliases and procedure/#run results variable-colored, even
+	// when their inferred type is a record. Only actual type-producing calls
+	// override the parser's conservative Call_Expr-as-variable marker.
+	if .Mutable not_in global.flags && global.type_expr == nil && is_type_alias_call(ast_context, global.value_expr) {
+		symbol.flags -= {.Variable}
 	}
 
 	if global.docs != nil {

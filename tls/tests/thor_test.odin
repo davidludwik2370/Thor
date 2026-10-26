@@ -428,3 +428,14 @@ main::proc(){SEL{*}ECTED}
 `)
     test.expect_hover_contains(t,&source,":: 42")
 }
+
+@(test)
+thor_hover_record_run_constant_uses_source_syntax :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Report::struct{value:int}
+report::fn(n:int)->Report{return {n}}
+REPORT::#run report(7)
+main::proc(){REP{*}ORT}
+`)
+    test.expect_hover_contains(t,&source,"#run report(7)")
+}

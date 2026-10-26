@@ -253,7 +253,9 @@ main::proc(){value:=VALUE;{value:=3;_=value};_=value;selected()}
         by_offset={a:(kind,token) for a,_,kind,token,_ in spans}
         for text_before,name,kind in [
             ('{mark(1)}','mark','function'),('{mark(2)}','mark','function'),
-            ('case 3..<5: [.Red','.Red','enumMember')]:
+            ('case 3..<5: [.Red','.Red','enumMember'),
+            ('PURE_REPORT ::','PURE_REPORT','variable'),('report := PURE_REPORT','PURE_REPORT','variable'),
+            ('Owned_Report ::','Owned_Report','struct')]:
             start=text.encode().index(text_before.encode())+text_before.index(name)+(1 if name.startswith('.') else 0)
             self.assertEqual(by_offset.get(start),(kind,name.lstrip('.')))
         for fragment in ['either := fruit ~ more_fruit','assert(len(combined) == 3 && len(either) == 2 && fruit != more_fruit)']:
@@ -261,6 +263,27 @@ main::proc(){value:=VALUE;{value:=3;_=value};_=value;selected()}
             for name in ['fruit','more_fruit','combined','either']:
                 start=fragment.find(name)
                 if start>=0:self.assertEqual(by_offset.get(line_start+start),('variable',name))
+
+    def test_record_values_and_type_aliases_have_distinct_semantic_tokens(self):
+        text='package main\nReport::struct{value:int}\nOwned_Report::struct{rows:[]int}\nmake_report::fn(value:int)->Report{return {value}}\nPURE_REPORT::#run make_report(7)\nAUTO_REPORT::make_report(8)\nALIAS_REPORT::PURE_REPORT\nLITERAL_REPORT::Report{9}\nLITERAL_ALIAS::LITERAL_REPORT\nTYPED_REPORT:Report:PURE_REPORT\nReport_Alias::Report\nReport_From_Value::type_of(PURE_REPORT)\nBox::struct($T:typeid){value:T}\nInt_Box::Box(int)\nInt_Box_Alias::Int_Box\nmain::proc(){\n local_run::#run make_report(1)\n local_auto::make_report(2)\n Local_Type::Box(int)\n Local_From_Value::type_of(local_run)\n _=PURE_REPORT;_=AUTO_REPORT;_=ALIAS_REPORT;_=LITERAL_ALIAS\n _=local_run;_=local_auto;_=PURE_REPORT.value\n x:Int_Box;y:Local_Type;_=x;_=y\n}\n'
+        client,main=self.open(text)
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        values={'PURE_REPORT','AUTO_REPORT','ALIAS_REPORT','LITERAL_REPORT','LITERAL_ALIAS','TYPED_REPORT','local_run','local_auto'}
+        types={'Report','Owned_Report','Report_Alias','Report_From_Value','Box','Int_Box','Int_Box_Alias','Local_Type','Local_From_Value'}
+        for _,_,kind,name,modifiers in spans:
+            if name in values:
+                self.assertEqual(kind,'variable',(name,kind))
+                self.assertTrue(modifiers & (1<<4),(name,modifiers))
+            if name in types:self.assertEqual(kind,'struct',(name,kind))
+        for name in values|types:
+            self.assertTrue(any(token==name for _,_,_,token,_ in spans),name)
+        hover=json.dumps(self.hover(client,main,text,'PURE_REPORT'))
+        self.assertIn('#run make_report(7)',hover)
+        self.assertNotIn('__thor_',hover)
+        field=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'PURE_REPORT.value',len('PURE_REPORT.')+1)})
+        self.assertIn('value: int',json.dumps(field))
 
     def test_semantic_tokens_survive_reordered_switches_unicode_and_edits(self):
         text='''package main

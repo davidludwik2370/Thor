@@ -305,3 +305,21 @@ order, lazy paths, native expansion, and UTF-16 unsaved errors and clearing.
 All 1,113 native TLS tests, 72 grammar tests, actual VS Code integration and all
 three demo modes pass. Compiler/TLS 0.9.0 is built and its local VSIX installed.
 The spec and main demo include the new rules; user scratch edits stay separate.
+
+## Record value highlighting: TLS 0.9.1
+
+The aggregate-alias heuristic cleared the value marker from every record-valued
+call and identifier. `PURE_REPORT :: #run pure_report(7)` therefore looked like a
+type. TLS now distinguishes actual generic type construction from value-producing
+calls, retains value aliases and annotated constants, and normalizes type_of
+results as types. Local/global generic aliases keep type colors. Constant hover
+prints source `#run` syntax instead of the synthetic call wrapper.
+
+The stdio LSP suite passes 47 tests with the existing contextual-enum expected
+failure, covering declarations/uses, readonly flags, fn/#run records, value/type
+aliases, typed constants, field hover and full-demo token identity. The actual
+VS Code integration asserts PURE_REPORT is a variable and Owned_Report a struct.
+All 1,114 native TLS tests pass in the serial runner. An imported-selector
+completion test failed once in the parallel runner and passed alone and in that
+complete serial run. The workspace server is rebuilt/restarted as TLS 0.9.1;
+the compiler and editor client/grammar remain 0.9.0. Scratch edits are preserved.
