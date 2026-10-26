@@ -77,6 +77,15 @@ behavior. The server communicates through local process streams, with no network
 port or remote service required. If TLS cannot start, check the **Thor Language
 Server** channel in VS Code's Output panel.
 
+## Debugging
+
+The extension also provides **Thor: Debug Project**, bound to **Cmd+Shift+R** in
+Thor editors on macOS, and a `thor-lldb` debug adapter using ordinary CodeLLDB.
+Run `mkthor my_project` to create a project with matching build and launch files.
+Breakpoints, stepping and stack locations map back to the original Thor source.
+This uses DAP separately from TLS's LSP connection. See the
+[debugger guide](DEBUGGING.md) for setup, architecture and supported behavior.
+
 ## Highlighting and compiler diagnostics
 
 There are two highlighting layers:

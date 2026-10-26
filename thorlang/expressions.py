@@ -85,6 +85,7 @@ class Expressions:
         refs=[self.reference_capture(symbol) for symbol,_ in variables.values()]
         params=[f'{s.prefix}capture_{i}: {"^" if refs[i] else ""}${s.prefix}Capture_{i}' for i in range(len(variables))]
         args=[f'&({s.render(child)})' if refs[i] else s.render(child) for i,(_,child) in enumerate(variables.values())]
+        args=[s.mapping.wrap(arg,s.path,node.start,node.end,'debug-capture') for arg in args]
         aliases={k:f'({s.prefix}capture_{i}{"^" if refs[i] else ""})' for i,k in enumerate(variables)}
         if result is False:
             result_type=None

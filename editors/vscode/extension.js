@@ -4,11 +4,24 @@ const vscode = require('vscode');
 const path = require('node:path');
 const fs = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
+const { isBuildOutput } = require('./workspace-files');
 
 let client;
 let output;
 let watcher;
 let restarting = Promise.resolve();
+
+function sourceWatcher() {
+    const raw=vscode.workspace.createFileSystemWatcher('**/*.{thor,odin}');
+    const subscriptions=[raw],events={};
+    for (const name of ['onDidCreate','onDidChange','onDidDelete']) {
+        const emitter=new vscode.EventEmitter();
+        subscriptions.push(emitter,raw[name](uri=>{if (!isBuildOutput(uri.fsPath)) emitter.fire(uri);}));
+        events[name]=emitter.event;
+    }
+    return {...events,ignoreCreateEvents:false,ignoreChangeEvents:false,ignoreDeleteEvents:false,
+        dispose:()=>subscriptions.forEach(item=>item.dispose())};
+}
 
 async function start(context) {
     if (client) {
@@ -56,7 +69,7 @@ async function start(context) {
         initializationOptions.odin_command = path.join(initializationOptions.odin_root_override,
             process.platform === 'win32' ? 'odin.exe' : 'odin');
     }
-    watcher = vscode.workspace.createFileSystemWatcher('**/*.{thor,odin}');
+    watcher = sourceWatcher();
     const next = new LanguageClient('tls', 'Thor Language Server',
         { command: executable, args: [], options }, {
             documentSelector: [{ scheme: 'file', language: 'thor' }],
@@ -76,6 +89,7 @@ async function start(context) {
 }
 
 function activate(context) {
+    require('./debug-extension').activateDebugging(context);
     output = vscode.window.createOutputChannel('Thor Language Server');
     context.subscriptions.push(output);
     const restart = () => {

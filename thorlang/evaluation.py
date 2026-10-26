@@ -77,6 +77,7 @@ class Evaluator:
             return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
         if n.kind!='Call' or n.parent and n.parent.kind=='Run':return False
         if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
+        if '-debug' in self.p.flags and not self.constant_context(n):return False
         symbol=self.r.symbol(n.role('callee'))
         alternatives=symbol.candidates if symbol else []
         if len(alternatives)>1 and any(any(a.kind in {'When','CompileSwitch'} for a in s.declaration.ancestors()) for s in alternatives):
@@ -85,6 +86,41 @@ class Evaluator:
         targets=self.purity.targets(n)
         if len(targets)!=1 or not self.purity.pure(targets[0]):return False
         return len(self.r.fields(targets[0].role('type').role('results')))==1
+
+    def constant_context(self,n):
+        """Debug builds retain optional runtime fn calls for native stepping.
+
+        Required constants, type/signature work and explicit #run still execute
+        during compilation. Stop at procedure bodies before their :: declaration.
+        """
+        child=n
+        for parent in n.ancestors():
+            if parent.kind=='Run':return True
+            if parent.kind=='Procedure':
+                return child is not parent.role('body')
+            if parent.kind=='Declaration':
+                if child is parent.role('type'):return True
+                if child in parent.group('values'):
+                    return not(parent.data.get('mutable',True) or parent.data.get('immutable',False))
+            if parent.kind=='ArrayType' and child is parent.role('len'):return True
+            if parent.kind in {'StructType','UnionType','ProcedureType','EnumType','BitSetType'}:return True
+            if parent.kind in {'When','WhenExpr','CompileSwitch','CompileSwitchExpr'}:
+                if child in {parent.role('cond'),parent.role('selector')}:return True
+                if parent.kind.startswith('CompileSwitch'):
+                    if any(a<=n.start<n.end<=b for case in parent.data['cases'] for a,b in case['matches']):return True
+            if parent.kind=='Call':
+                if self.purity.builtin(parent) in {'#assert','#config'}:return True
+                plan=self.r.resolve_call(parent)
+                if plan and child in parent.group('args'):
+                    args=parent.group('args');index=args.index(child)
+                    fields=[(name,field) for field in plan.signature.role('params').children if field.kind=='Field'
+                            for name in field.group('names')]
+                    if child.kind=='FieldValue':
+                        field=next((field for name,field in fields if name.text.lstrip('$')==child.role('field').text),None)
+                    else:field=fields[index][1] if index<len(fields) else None
+                    if field and any(name.kind=='PolyType' for name in field.group('names')):return True
+            child=parent
+        return False
 
     def fail(self,n,message):n.source.error(message,n.start,n.end)
 

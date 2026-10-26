@@ -35,7 +35,7 @@ class MappingBuilder:
 
     def finish(self, annotated):
         pattern = re.compile(re.escape(self.prefix) + r"(\d+)([+-])\x00")
-        output, segments, stack, expansions = [], [], [], []
+        output, segments, stack, expansions, regions = [], [], [], [], []
         cursor = offset = 0
         for match in pattern.finditer(annotated):
             chunk = annotated[cursor:match.start()]
@@ -57,15 +57,18 @@ class MappingBuilder:
                 origin, opened = stack.pop()
                 if not origin.exact and origin.kind in {"array", "Binary", "Ternary", "Ident"}:
                     expansions.append([opened, offset, origin.file, origin.start, origin.end])
+                if origin.kind in {"expression-helper", "debug-capture"}:
+                    regions.append([opened, offset, origin.kind, origin.file, origin.start, origin.end])
             cursor = match.end()
         assert not stack and cursor == len(annotated), "unbalanced emission annotations"
-        return "".join(output), SourceMap(segments, expansions)
+        return "".join(output), SourceMap(segments, expansions, regions)
 
 
 class SourceMap:
-    def __init__(self, segments, expansions=()):
+    def __init__(self, segments, expansions=(), regions=()):
         self.segments = segments
         self.expansions = expansions
+        self.regions = regions
         self.starts = [s[0] for s in segments]
 
     def lookup(self, offset, length=1):
@@ -82,7 +85,8 @@ class SourceMap:
         referenced = {s[2] for s in self.segments}
         return {"version": 1, "encoding": "utf-8", "generated": str(generated),
                 "sources": {str(p): s.raw.decode("utf-8") for p, s in sources.items() if str(p) in referenced},
-                "segments": self.segments, "expansions": self.expansions}
+                "segments": self.segments, "expansions": self.expansions,
+                "regions": self.regions}
 
 
 def position(raw, offset):

@@ -10,6 +10,29 @@ class AutomaticTests(unittest.TestCase):
     invoke=base.ThorTests.invoke
     program=base.ThorTests.program
 
+    def test_debug_retains_runtime_fn_calls_but_evaluates_required_constants(self):
+        root,_=self.invoke(self.program('''
+runtime:=square(3)
+immutable:>square(4)
+constant::square(5)
+fixed:[square(2)]int
+assert(runtime==9&&immutable==16&&constant==25&&len(fixed)==4)
+assert(take(square(2))==4)
+explicit:=#run square(6)
+assert(explicit==36)
+''','''
+square::fn(n:int)->int{result:=n*n;return result}
+take::proc($N:int)->int{return N}
+'''),flags=['-debug','-o:none'])
+        generated=next((root/'output').rglob('main.odin')).read_text()
+        self.assertIn('runtime:=square(3)',generated)
+        self.assertIn('square(4)',generated)
+        self.assertNotIn('constant::square(5)',generated)
+
+    def test_debug_runtime_assertion_can_be_reached_instead_of_executed_by_helper(self):
+        self.invoke(self.program('if false{_=work(3)}','work::fn(n:int)->int{assert(false);return n}\n'),
+            flags=['-debug','-o:none'])
+
     def test_forward_and_dependent_constants_are_native_constants(self):
         self.invoke(self.program('data:[SECOND]int;assert(len(data)==256&&FIRST==16)', '''
 SECOND::square(FIRST)

@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.9.0"
+VERSION = "0.10.0"
 
 
 def frontend_binary(odin):
@@ -151,10 +151,16 @@ class Project:
             self.maps[str(destination / relative)] = source.source_map
             self.generated[str(destination / relative)] = generated[relative.as_posix()].encode()
             # Each sidecar is self-contained, including original source snapshots.
+            map_data=source.source_map.json(destination / relative, self.sources)
+            map_data['generated_sha256']=hashlib.sha256(generated[relative.as_posix()].encode()).hexdigest()
             generated[relative.as_posix() + ".map.json"] = json.dumps(
-                source.source_map.json(destination / relative, self.sources), ensure_ascii=False, separators=(",", ":")) + "\n"
+                map_data, ensure_ascii=False, separators=(",", ":")) + "\n"
         # Do all parsing/lowering before updating any generated source.
         destination.mkdir(parents=True, exist_ok=True)
+        if not manifest_path.exists():
+            # Mark the tree before its first source-file event reaches editors.
+            # Retain planned ownership if an initial emission is interrupted.
+            manifest_path.write_text(json.dumps({'generated':sorted(generated)},indent=2)+'\n')
         for collection in self.collections.values():
             (destination / collection.relative_to(self.common)).mkdir(parents=True, exist_ok=True)
         for relative, code in generated.items():
@@ -168,7 +174,8 @@ class Project:
                 obsolete.unlink()
         self.destination = destination
         manifest = {"thor_version": VERSION, "entry": str(self.entry), "source_map_version": 1,
-                    "generated": sorted(generated), "odin_flags": self.odin_flags()}
+                    "generated": sorted(generated), "odin_flags": self.odin_flags(),
+                    "debug_roots": getattr(self,"debug_roots",[]), "debug_map_version": 1}
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
         return self.outputs[self.entry] if self.file_entry else destination / self.entry.relative_to(self.common)
 
@@ -251,6 +258,9 @@ def _main(argv=None):
         frontend, odin = frontend_binary(options.odin)
         test_mode = options.command == "test" or "-build-mode:test" in flags
         project = Project(options.source, frontend, flags, test=test_mode, overlays=overlays)
+        if '-debug' in flags:
+            odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
+            project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
         from .evaluation import Evaluator
         from .cache import EvaluationCache
         cache_root=options.cache_dir or (Path(os.environ['THOR_CACHE_DIR']) if 'THOR_CACHE_DIR' in os.environ else None)
@@ -299,6 +309,11 @@ def _main(argv=None):
                     report([*frontend_diagnostics, *diagnostics.translate(native.get("errors", []))])
             elif json_output or frontend_diagnostics:
                 report(frontend_diagnostics)
+        if not result.returncode and not reported_errors and options.command in {'build','run','test'} and '-debug' in flags and executable.is_file():
+            manifest_path=project.destination/'thor-manifest.json'
+            manifest=json.loads(manifest_path.read_text())
+            manifest['debug_program']={'path':str(executable),'sha256':hashlib.sha256(executable.read_bytes()).hexdigest()}
+            manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
         if result.returncode or reported_errors or options.command not in {"run", "test"}:
             return result.returncode or (1 if reported_errors else 0)
         try:

@@ -157,6 +157,58 @@ for the pinned upstream revision, semantic-resolution limits, and configuration.
 For the startup sequence, local installation model, LSP communication and the two
 highlighting layers, see [how the VS Code extension works](editors/vscode/README.md#how-vs-code-launches-tls).
 
+## Create a project and debug Thor
+
+With this checkout on PATH and the local Thor Language extension installed:
+
+```sh
+mkthor my_project
+```
+
+This creates `~/Code/Odin/my_project`, writes a starter `.thor` file and `.vscode`
+build/launch/settings files, then opens the folder in VS Code. Set a breakpoint
+and press **Cmd+Shift+R** on macOS (**Ctrl+Shift+R** elsewhere), or **F5**.
+The Thor extension supplies the shortcut for Thor documents. The existing Odin
+project setup and shortcuts continue to work with their own configurations.
+
+Install **CodeLLDB** (`vadimcn.vscode-lldb`) as well as the locally built Thor
+extension. Rebuild/install the VSIX and reload VS Code after updating from an
+older extension. `mkthor` itself is an executable beside `thor`, so the same PATH
+entry makes both commands available. Other creation options include:
+
+```sh
+mkthor my_project --parent /path/to/projects
+mkthor my_project --no-open
+mkthor my_project --odin /path/to/odin
+```
+
+The generated task runs `thor build . -debug -o:none`, keeps the executable in
+`.vscode/bin/debug`, and writes the matching generated sources/maps beneath
+`.vscode/bin/generated/`. It records local compiler/TLS/Odin paths, so VS Code
+does not depend on picking up your interactive shell's PATH. Existing project
+folders are never overwritten.
+
+The `thor-lldb` debug adapter reads those maps and uses ordinary Odin and CodeLLDB.
+Breakpoints, stack frames, Step Over/Into/Out, watches and local inspection refer
+to original Thor files; generated expression helpers are presented as their
+owning procedure. A step can enter a user procedure called from inside an fstring
+or switch arm. Compiler/runtime housekeeping is skipped during source stepping.
+Mixed imported Odin files retain normal source locations. Conditional breakpoints
+and variable editing also work through expression captures.
+
+With `-debug`, optional automatic `fn` evaluation in runtime expressions is
+retained as runtime calls for stepping. Required constants, type/signature work,
+generic constant arguments and explicit `#run` still evaluate during compilation.
+Compile-time-only code and inactive branches have no runtime breakpoint location.
+Watch/condition expressions use CodeLLDB's expression syntax; they are not a full
+Thor interpreter. Save before debugging; the pre-launch task rebuilds, and the
+adapter rejects stale source snapshots or incompatible maps.
+
+This repository also includes **Debug Thor Walkthrough (LLDB)**, which builds
+`examples/demo` when the debug shortcut is used from a Thor document in this
+workspace. See the [debugger guide](editors/vscode/DEBUGGING.md) for setup,
+architecture, supported behavior and tests.
+
 ## Project inputs and output
 
 Inputs can be a single `.thor`/`.odin` file or a package directory. Directory
@@ -225,7 +277,9 @@ TLS uses this same compiler pipeline on open/change/save, including unsaved
 dependencies. It translates ranges to LSP coordinates, preserves the editor's URI
 for symlinked files, clears resolved errors, and discards superseded checks.
 Program/test stdout and stderr remain separate from compiler diagnostics.
-Debugger mappings and runtime stack traces are outside this implementation.
+The [Thor debug adapter](editors/vscode/DEBUGGING.md) also maps debugger stack
+frames and stepping. Stack traces printed directly by the native runtime still
+use its own locations.
 
 ## Implemented syntax
 

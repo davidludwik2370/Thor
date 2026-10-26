@@ -48,6 +48,24 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "build-thor-debug",
+      "type": "process",
+      "command": "${workspaceFolder}/thor",
+      "args": [
+        "build",
+        "examples/demo",
+        "-debug",
+        "-o:none",
+        "--output-dir",
+        "${workspaceFolder}/.vscode/bin/generated",
+        "-out:${workspaceFolder}/.vscode/bin/thor-debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
     }
   ]
 }

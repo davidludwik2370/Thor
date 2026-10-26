@@ -1,19 +1,21 @@
 {
   "name": "thor-language",
   "displayName": "Thor Language",
-  "description": "Thor T01-T23 syntax highlighting and the local TLS language server.",
+  "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Debuggers"
   ],
   "main": "./extension.js",
   "activationEvents": [
-    "onLanguage:thor"
+    "onLanguage:thor",
+    "onDebugResolve:thor-lldb"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -52,6 +54,10 @@
       {
         "command": "tls.restart",
         "title": "Thor: Restart Language Server"
+      },
+      {
+        "command": "thor.debug",
+        "title": "Thor: Debug Project"
       }
     ],
     "configuration": {
@@ -107,11 +113,114 @@
           ]
         }
       }
+    ],
+    "keybindings": [
+      {
+        "command": "thor.debug",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorLangId == thor && !inDebugMode"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "thor"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "thor-lldb",
+        "label": "Thor (CodeLLDB)",
+        "languages": [
+          "thor"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program",
+              "manifest"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Native executable produced by the Thor debug build."
+              },
+              "manifest": {
+                "type": "string",
+                "description": "thor-manifest.json from the matching debug build."
+              },
+              "cwd": {
+                "type": "string",
+                "default": "${workspaceFolder}"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": false
+              },
+              "terminal": {
+                "type": "string",
+                "enum": [
+                  "console",
+                  "integrated",
+                  "external"
+                ],
+                "default": "console"
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "initCommands": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "expressions": {
+                "type": "string",
+                "enum": [
+                  "simple",
+                  "native",
+                  "python"
+                ],
+                "default": "simple"
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "Thor: Debug Project",
+            "body": {
+              "name": "Debug Thor (LLDB)",
+              "type": "thor-lldb",
+              "request": "launch",
+              "program": "${workspaceFolder}/.vscode/bin/debug",
+              "manifest": "${workspaceFolder}/.vscode/bin/generated/thor-manifest.json",
+              "cwd": "${workspaceFolder}",
+              "args": [],
+              "preLaunchTask": "build-thor-debug"
+            }
+          }
+        ]
+      }
     ]
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "package": "vsce package --allow-missing-repository -o thor-language.vsix"
+    "package": "vsce package --allow-missing-repository --no-rewrite-relative-links -o thor-language.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

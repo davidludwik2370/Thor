@@ -374,3 +374,50 @@ demo acceptance tests, and 73 grammar tests. The new LSP checks cover original
 semantic-token identity across the full tour, set hover spelling, and unsaved
 pure-loop errors/recovery. Grammar checks inspect nested strings, Unicode fills,
 switch interpolation and Set colors in the complete new file.
+
+## Thor 0.10: source debugging and mkthor
+
+The native debug-adapter prototype demonstrated usable Thor breakpoints and
+stepping with ordinary Odin and the installed CodeLLDB. The implementation keeps
+that bridge rather than requiring an Odin fork or rewriting DWARF. The VS Code
+extension now registers `thor-lldb`, Thor breakpoint support and Cmd+Shift+R via
+**Thor: Debug Project**. TLS remains the editing server and does not implement
+debugging. Its native parser/server version is unchanged.
+
+Debug source maps retain helper and capture regions in additive version-1 fields.
+Breakpoint inversion excludes generated type witnesses and capture arguments,
+and rejects native locations moved onto another original statement. Frame mapping
+collapses helpers, merges their user scopes, adapts captured-name conditions and
+keeps watches/edits available in the caller. Source stepping skips generated and
+library housekeeping while preserving real breakpoint/exception stops. Original
+editor path aliases and Unicode scalar/UTF-16 column conversions are retained.
+
+Debug manifests have a separate version and record original snapshots, generated
+source hashes and a successfully built executable's hash. Failed/check-only builds
+cannot certify an old executable against new maps. VS Code restart uses a fresh
+adapter and pre-launch rebuild; an integration test changes source before restart.
+The backend connects over an authenticated local stream and shuts down through
+CodeLLDB. Advanced mapped step targets, hardware data breakpoints, jump-to-location
+and restart-frame capabilities remain disabled. Watches use CodeLLDB expression
+syntax; native runtime printed traces and direct LLDB use remain native locations.
+
+With `-debug`, optional runtime `fn` calls remain runtime calls, including literal
+arguments. Required constants, type/signature work, constant generic arguments and
+explicit #run still evaluate during compilation. Non-debug folding is unchanged.
+`mkthor` creates a project under ~/Code/Odin with main.thor, build/launch/TLS
+settings and a CodeLLDB recommendation, then opens VS Code. It rejects existing
+folders/symlinks and uses main.thor to avoid platform-suffix file selection traps.
+The root workspace also has a debug configuration for the commented walkthrough.
+
+Validation passes 166 pure/evaluation/cache/source-map/project regressions, 59
+expression-lowering regressions, ten
+real CodeLLDB tests, four project/build-identity tests and the focused CLI checks.
+All 78 Node grammar/protocol/watcher tests pass. Both demo acceptance tests pass, and the
+commented walkthrough also runs with -debug -o:none. Actual VS Code language and
+debug integration suites pass, including a newly generated project, the shortcut
+command, pre-launch task, breakpoint, Step Over/Into/Out, locals/watch and restart
+after a saved edit. Compiler/client 0.10.0 is packaged and installed locally.
+The VSIX packaging command preserves local relative documentation links because
+this checkout has no published repository URL. See editors/vscode/DEBUGGING.md.
+The client watcher also excludes generated debug/build trees, including custom
+output roots identified by their manifest, to keep those symbols out of TLS.
