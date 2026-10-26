@@ -32,6 +32,7 @@ Package :: struct {
 	base_original: string,
 	original:      string,
 	range:         common.Range,
+	declaration_range: common.Range, // Full source import, including Thor's selected names.
 	import_decl:   ^ast.Import_Decl,
 }
 
@@ -344,6 +345,7 @@ document_close :: proc(uri_string: string) -> common.Error {
 	destroy_document_symbol_cache(document)
 	document.client_owned = false
 	remove_diagnostics(.Declaration, document.uri.uri)
+	remove_diagnostics(.Unused, document.uri.uri)
 
 	common.delete_uri(document.uri)
 
@@ -483,7 +485,7 @@ parse_document :: proc(document: ^Document, config: ^common.Config) -> ([]Parser
 
 	parse_file(&p, &document.ast)
 
-	parse_imports(document, config)
+	parse_imports(document, config, p.selections[:])
 
 	folder := filepath.dir(document.fullpath)
 	if strings.equal_fold(folder, config.builtin_path) {
@@ -493,11 +495,27 @@ parse_document :: proc(document: ^Document, config: ^common.Config) -> ([]Parser
 	return current_errors[:], true
 }
 
-parse_imports :: proc(document: ^Document, config: ^common.Config) {
+parse_imports :: proc(document: ^Document, config: ^common.Config, selections: []parser.Selection = nil) {
 
 	spall.trace(#procedure, document.fullpath)
 
 	imports := make([dynamic]Package)
+	selection_ends := make(map[int]common.Position, context.temp_allocator)
+	for selection in selections {
+		import_decl: ^ast.Import_Decl
+		for imp in document.ast.imports {
+			if imp.end.offset <= selection.start && (import_decl == nil || imp.end.offset > import_decl.end.offset) {
+				import_decl = imp
+			}
+		}
+		if import_decl != nil && len(selection.names) > 0 {
+			last := len(selection.names)-1
+			end := selection.positions[last]
+			end.offset += len(selection.names[last])
+			end.column += len(selection.names[last])
+			selection_ends[import_decl.pos.offset] = common.token_pos_to_position(end, document.ast.src)
+		}
+	}
 
 	for imp, index in document.ast.imports {
 		if i := strings.index(imp.fullpath, "\""); i == -1 {
@@ -505,6 +523,8 @@ parse_imports :: proc(document: ^Document, config: ^common.Config) {
 		}
 		// TODO: Breakdown this range like with semantic tokens
 		range := get_import_range(imp, string(document.text))
+		declaration_range := common.get_token_range(imp, document.ast.src)
+		if end, selected := selection_ends[imp.pos.offset]; selected { declaration_range.end = end }
 
 		//collection specified
 		if i := strings.index(imp.fullpath, ":"); i != -1 && i > 1 && i < len(imp.fullpath) - 1 {
@@ -525,6 +545,7 @@ parse_imports :: proc(document: ^Document, config: ^common.Config) {
 			import_.original = imp.fullpath
 			import_.name = strings.clone(path.join(elems = {dir, p}, allocator = context.temp_allocator))
 			import_.range = range
+			import_.declaration_range = declaration_range
 			import_.import_decl = imp
 
 			if imp.name.text != "" {
@@ -549,6 +570,7 @@ parse_imports :: proc(document: ^Document, config: ^common.Config) {
 			)
 			import_.name = path.clean(import_.name)
 			import_.range = range
+			import_.declaration_range = declaration_range
 			import_.import_decl = imp
 
 			if imp.name.text != "" {

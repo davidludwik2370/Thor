@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"

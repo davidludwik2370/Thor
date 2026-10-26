@@ -421,3 +421,27 @@ The VSIX packaging command preserves local relative documentation links because
 this checkout has no published repository URL. See editors/vscode/DEBUGGING.md.
 The client watcher also excludes generated debug/build trees, including custom
 output roots identified by their manifest, to keep those symbols out of TLS.
+
+## Unused import dimming: TLS 0.9.3 / client 0.10.1
+
+The VS Code client now enables unused-import hints on open/change/save. TLS
+publishes `Hint` diagnostics tagged `Unnecessary`, letting VS Code apply its
+normal unused-code opacity without changing semantic token colors. Hints update
+against unsaved text, clear during incomplete syntax and on close, and do not
+require the compiler check to finish.
+
+Import usage follows source namespace aliases and resolved selected identifiers,
+including shadowing and multiple aliases of one package. Synthetic selected
+declarations do not themselves count as uses; the hidden set[T] adapter does not
+keep an unused explicit thor:sets import alive. Explicit blank imports remain
+intentional. Native using imports now populate the resolver's using-package
+context. Full diagnostic ranges include Thor's multiline selections, stored
+separately from the native import AST ranges used for navigation.
+
+Seven stdio regressions cover live edits/clearing, Unicode ranges, selective
+imports/shadowing, nested interpolation and switches, duplicate package aliases,
+set adapters, blank imports and using imports. All 59 stdio tests pass (with the
+pre-existing contextual-enum expected failure), along with 1,115 native TLS tests
+and 78 Node tests. Actual VS Code integration verifies the diagnostic tag and
+clearing on unsaved use. A read-only check of basic.thor confirms math/big is
+marked unused. Existing user demo/spec/basic source edits are preserved.

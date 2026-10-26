@@ -88,6 +88,12 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   Explicit collection configuration takes precedence.
 - Resolve selected import aliases with file privacy and local shadowing. Hover
   retains the imported declaration's signature; definitions follow the origin.
+- Report unused source imports as `Hint` diagnostics tagged `Unnecessary`, so
+  VS Code dims them. The client enables reporting on open/change/save, including
+  unsaved edits. Usage follows the actual namespace or selected name, distinguishing
+  aliases of the same package and local shadowing. Synthetic selected aliases and
+  implicit `set[T]` imports do not count as explicit source uses. Blank imports are
+  intentional; syntax-incomplete buffers and closed documents clear stale hints.
 - Infer common bracket-array types (including nested arrays), indexed element
   types, and membership's boolean type. Explicit declaration types continue to
   supply contextual information through OLS.

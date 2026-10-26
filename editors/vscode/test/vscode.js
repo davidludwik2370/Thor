@@ -88,6 +88,16 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const unusedImportSource = 'package main\nimport "core:fmt"\nimport "core:math/big"\nmain::proc(){fmt.println("big.Int is only text")}\n';
+        await replace(unusedImportSource);
+        const unused = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values => values.some(value => value.code === 'Unused'));
+        const unusedImport = unused.find(value => value.code === 'Unused');
+        assert.equal(testDocument.getText(unusedImport.range), 'import "core:math/big"');
+        assert.equal(unusedImport.severity, vscode.DiagnosticSeverity.Hint);
+        assert.ok(unusedImport.tags.includes(vscode.DiagnosticTag.Unnecessary));
+        await replace(unusedImportSource.replace('fmt.println(', 'value:big.Int;_=value;fmt.println('));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -245,6 +255,7 @@ async function run() {
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
+            'unused imports carry VS Code dimming tags and update without saving',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

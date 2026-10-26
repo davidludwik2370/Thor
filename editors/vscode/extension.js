@@ -54,7 +54,8 @@ async function start(context) {
         enable_document_symbols: true,
         enable_references: true,
         enable_completions: true,
-        enable_unused_imports_reporting: false,
+        enable_unused_imports_reporting: true,
+        enable_unused_imports_on_change: true,
         enable_auto_import: false,
         enable_checker_workspace_diagnostics: false
     };

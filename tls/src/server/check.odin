@@ -239,7 +239,7 @@ check_unused_imports :: proc(document: ^Document, config: ^common.Config) {
 			.Unused,
 			uri.uri,
 			Diagnostic {
-				range = common.get_token_range(imp.import_decl, document.ast.src),
+				range = imp.declaration_range,
 				severity = DiagnosticSeverity.Hint,
 				code = "Unused",
 				message = "unused import",

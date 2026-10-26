@@ -17,7 +17,7 @@ BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True, compiler_command=None):
+    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
@@ -39,7 +39,8 @@ class Client:
             'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
                 'odin_command': odin, 'thor_command': str(compiler_command or ROOT / 'thor') if compiler else '',
                 'enable_parser_errors': True, 'enable_semantic_tokens': True,
-                'enable_unused_imports_reporting': False, 'enable_auto_import': False,
+                'enable_unused_imports_reporting': unused_imports,
+                'enable_unused_imports_on_change': unused_imports, 'enable_auto_import': False,
                 'enable_checker_workspace_diagnostics': False, 'thread_count': 1}
         })['capabilities']
         self.send('initialized', {})
@@ -140,7 +141,7 @@ class TLSTests(unittest.TestCase):
         subprocess.run(['python3', str(ROOT / 'tools' / 'build_tls.py')], check=True,
                        capture_output=True, timeout=90)
 
-    def open(self, text, files=None):
+    def open(self, text, files=None, **client_options):
         temporary = tempfile.TemporaryDirectory(prefix='tls-test-')
         self.addCleanup(temporary.cleanup)
         directory = Path(temporary.name).resolve()
@@ -149,7 +150,7 @@ class TLSTests(unittest.TestCase):
             destination = directory / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(content)
-        client = Client(directory)
+        client = Client(directory, **client_options)
         self.addCleanup(client.close)
         client.send('textDocument/didOpen', {'textDocument': {
             'uri': main.as_uri(), 'languageId': 'thor', 'version': 1, 'text': text}})
@@ -165,6 +166,112 @@ class TLSTests(unittest.TestCase):
     def hover(self, client, main, text, word):
         return client.request('textDocument/hover', {
             'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, word)})
+
+    def unused_imports(self, client, main):
+        # A request acts as a barrier after didOpen/didChange. Inspect the last
+        # publication, not a stale diagnostic left in the notification queue.
+        client.request('textDocument/documentSymbol', {'textDocument': {'uri': main.as_uri()}})
+        publications = [n for n in client.notifications
+                        if n.get('method') == 'textDocument/publishDiagnostics'
+                        and n['params']['uri'] == main.as_uri()]
+        diagnostics = publications[-1]['params']['diagnostics'] if publications else []
+        return [d for d in diagnostics if d.get('code') == 'Unused']
+
+    def test_unused_imports_dim_full_declarations_and_follow_unsaved_edits(self):
+        text = '''package main
+import "core:fmt"
+/* 😀 */ import large "core:math/big"
+main::proc(){fmt.println("large.Int is only text") /* large.Int is only a comment */}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        errors = self.unused_imports(client, main)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]['severity'], 4)
+        self.assertEqual(errors[0]['tags'], [1])  # LSP Unnecessary, interpreted by VS Code as dimmed text.
+        self.assertEqual(errors[0]['range']['start'], self.position(text, 'import large', 0))
+        self.assertEqual(errors[0]['range']['end'], self.position(text, 'import large "core:math/big"',
+                                                              len('import large "core:math/big"')))
+        used = text.replace('fmt.println(', 'value:large.Int;_=value;fmt.println(')
+        for version, changed, expected in [(2, used, 0), (3, text, 1)]:
+            client.notifications.clear()
+            client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': version},
+                        'contentChanges': [{'text': changed}]})
+            self.assertEqual(len(self.unused_imports(client, main)), expected)
+        self.assertEqual(main.read_text(), text)
+        client.notifications.clear()
+        client.send('textDocument/didClose', {'textDocument': {'uri': main.as_uri()}})
+        client.diagnostic(main.as_uri(), empty=True)
+
+    def test_unused_selective_imports_and_shadowing(self):
+        text = '''package main
+import "core:fmt" / println
+import math "core:math" / sqrt
+main::proc(){println("hello");sqrt::proc(){};sqrt()}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        errors = self.unused_imports(client, main)
+        self.assertEqual([d['range']['start']['line'] for d in errors], [2])
+        self.assertEqual(errors[0]['range']['end'], self.position(text, '/ sqrt', len('/ sqrt')))
+        used = text.replace('sqrt::proc(){};sqrt()', '_=sqrt(f64(4))')
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2},
+                    'contentChanges': [{'text': used}]})
+        self.assertEqual(self.unused_imports(client, main), [])
+
+    def test_imports_in_thor_expressions_and_explicit_blank_imports_are_used(self):
+        text = '''package main
+import "core:fmt"
+import "core:math"
+import "thor:sets"
+import _ "core:math/big"
+main::proc(){
+    value:=f"nested {f"{math.sqrt(f64(4))}"}"
+    selected:=switch {case true:fmt.tprintf("%s",value);case:""}
+    names:set[string];sets.insert(&names,selected)
+    delete(names);delete(selected);delete(value)
+}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        self.assertEqual(self.unused_imports(client, main), [])
+
+    def test_unused_imports_ignore_local_package_name_and_synthetic_set_import(self):
+        text = '''package main
+import "core:math"
+import "thor:sets"
+main::proc(){math:=struct{x:int}{1};_=math.x;values:=set[int]{1};delete(values)}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        errors = self.unused_imports(client, main)
+        self.assertEqual([d['range']['start']['line'] for d in errors], [1, 2])
+
+    def test_unused_imports_distinguish_aliases_of_the_same_package(self):
+        text = '''package main
+import first "core:math"
+import second "core:math"
+import third "core:math" / PI
+main::proc(){_=first.sqrt(f64(4));_=PI}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        errors = self.unused_imports(client, main)
+        self.assertEqual([d['range']['start']['line'] for d in errors], [2])
+
+    def test_using_import_and_selected_types_count_as_used(self):
+        text = '''package main
+using import "core:fmt"
+import "core:math/big" / Int
+main::proc(){value:Int;println(value)}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        self.assertEqual(self.unused_imports(client, main), [])
+
+    def test_unused_imports_clear_while_syntax_is_incomplete(self):
+        text = 'package main\nimport "core:math/big"\nmain::proc(){}\n'
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        self.assertEqual(len(self.unused_imports(client, main)), 1)
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2},
+                    'contentChanges': [{'text': text + 'broken::\\\n'}]})
+        self.assertEqual(self.unused_imports(client, main), [])
 
     def test_duplicate_procedure_is_immediate_without_a_compiler_and_clears(self):
         temporary=tempfile.TemporaryDirectory(prefix='tls-redeclaration-');self.addCleanup(temporary.cleanup)

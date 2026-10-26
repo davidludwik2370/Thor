@@ -106,6 +106,14 @@ and the transpiler share the Thor parser, keeping their accepted syntax aligned.
 TLS uses its own partial semantic resolver for interactive features; the Thor
 compiler and Odin perform the complete checks.
 
+TLS marks unused imports with an LSP `Unnecessary` hint. VS Code dims the full
+declaration using the current theme's unused-code styling (`editor.showUnused`
+must be enabled, as it is by default). These hints update on open, unsaved edits
+and save, independently of compiler checks. Explicit aliases, selective imports,
+local shadowing and imports used inside interpolation are recognized. Intentional
+blank imports (`import _ "..."`) are kept. Internal imports added for `set[T]`
+never appear as unused source declarations.
+
 Syntax errors and some obvious redeclarations can be reported immediately. For
 deeper checks, TLS invokes `thor check -json-errors` using snapshots of the open
 buffers. Thor performs compile-time evaluation, lowers the source, checks it with

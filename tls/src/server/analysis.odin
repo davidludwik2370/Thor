@@ -92,6 +92,11 @@ make_ast_context :: proc(
 	}
 
 	add_local_group(&ast_context)
+	for imp in imports {
+		if imp.import_decl != nil && imp.import_decl.is_using {
+			add_using(&ast_context, imp.base, imp.name)
+		}
+	}
 
 	return ast_context
 }

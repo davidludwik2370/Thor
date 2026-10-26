@@ -104,14 +104,49 @@ find_unused_imports :: proc(document: ^Document, allocator := context.temp_alloc
 
 	symbols := resolve_entire_file(document)
 
+	// Selective imports add synthetic alias declarations to the server AST.
+	// Resolving those declarations alone does not mean the source uses them.
+	synthetic_positions := make(map[int]bool, context.temp_allocator)
+	selections := make(map[string]string, context.temp_allocator)
+	for decl in document.ast.decls {
+		if value, ok := decl.derived.(^ast.Value_Decl); ok && thor_is_import_alias(value) {
+			synthetic_positions[decl.pos.offset] = true
+			selector := value.values[0].derived.(^ast.Selector_Expr)
+			namespace := selector.expr.derived.(^ast.Ident)
+			selections[selector.field.name] = namespace.name
+		}
+	}
+
 	pkgs := make(map[string]struct{}, context.temp_allocator)
+	used_names := make(map[string]bool, context.temp_allocator)
 	for _, v in symbols {
+		if v.node == nil || synthetic_positions[v.node.pos.offset] { continue }
 		pkgs[v.symbol.pkg] = {}
+		if ident, ok := v.node.derived.(^ast.Ident); ok {
+			// Track source namespaces, not just package paths: two aliases of
+			// one package can have different usage. The hidden set[T] adapter
+			// must not make an explicit, unused import of thor:sets look used.
+			if v.symbol.type == .Package && ident.end.offset > ident.pos.offset {
+				used_names[ident.name] = true
+			}
+			if namespace, selected := selections[ident.name]; selected {
+				for imp in document.imports {
+					// A local that shadows a selected name is not an import use.
+					if imp.base == namespace && imp.name == v.symbol.pkg {
+						used_names[namespace] = true
+					}
+				}
+			}
+		}
 	}
 
 	unused := make([dynamic]Package, allocator)
 	for imp in document.imports {
-		if imp.base != "_" && imp.name not_in pkgs {
+		// Zero-length imports are internal adapters (e.g. for set[T]), with no
+		// source declaration to dim or remove. Blank imports are intentional.
+		used := used_names[imp.base]
+		if imp.import_decl.is_using { used = imp.name in pkgs }
+		if imp.base != "_" && imp.import_decl.pos.offset < imp.import_decl.end.offset && !used {
 			append(&unused, imp)
 		}
 	}
