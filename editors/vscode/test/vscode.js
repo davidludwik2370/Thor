@@ -45,6 +45,8 @@ async function run() {
             document.positionAt(source.indexOf('package main')+'package '.length+1)),
             values => hoverText(values || []).includes('main: package'));
         assert.ok(hoverText(packageHover).includes('main: package'));
+        const commentHover = await vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, new vscode.Position(0,0));
+        assert.equal(commentHover.length,0,'A hidden set import must not create a package hover on the first comment');
         for(const [fragment,expected] of [['names: sets.Set(string)','names: set[string]'],['other_names := sets.clone','other_names: set[string]']]){
             const setHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',document.uri,
                 document.positionAt(source.indexOf(fragment)+2)),
@@ -122,6 +124,15 @@ async function run() {
             testDocument.positionAt(genericLoop.indexOf('>v')+1)), values=>hoverText(values||[]).includes('v: T'));
         assert.ok(!hoverText(genericHover).includes('$v'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const genericDefault = 'package main\nsorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\nmain::proc(){}\n';
+        await replace(genericDefault);
+        const locationless = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
+            values=>values.some(value=>value.message.includes('Unspecialized polymorphic')));
+        assert.ok(locationless.some(value=>value.message.includes('did not provide a source location')));
+        assert.ok(!vscode.languages.getDiagnostics(document.uri).some(value=>value.message.includes('Unspecialized polymorphic')),
+            'An error in the temporary example must not appear on demo/main.thor');
+        await replace(genericDefault.replace('less:=proc(i,j:E)->bool{return i<j}','less:proc(i,j:E)->bool'));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -284,6 +295,7 @@ async function run() {
             'unused imports carry VS Code dimming tags and update without saving',
             'activation and restart with no active editor', 'package declaration hover',
             'generic loop variables remain values in semantic tokens and hover',
+            'locationless compiler errors stay in their checked package', 'hidden Set imports do not hover on comments',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

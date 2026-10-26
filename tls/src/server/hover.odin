@@ -102,7 +102,7 @@ get_hover_information :: proc(
 			}
 			try_build_package(symbol.pkg)
 			if symbol, ok = resolve_symbol_return(&ast_context, symbol); ok {
-				hover.range = common.get_token_range(document.ast.pkg_decl, ast_context.file.src)
+				hover.range = common.get_token_range(position_context.import_stmt, ast_context.file.src)
 				hover.contents = write_hover_content(&ast_context, symbol)
 				return hover, true, true
 			}

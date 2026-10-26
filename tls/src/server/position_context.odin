@@ -140,7 +140,9 @@ get_document_position_context :: proc(
 	exists_in_decl := get_document_position_decls(document.ast.decls[:], &position_context)
 
 	for import_stmt in document.ast.imports {
-		if position_in_node(import_stmt, position_context.position) {
+		// Internal Set adapters have no source span; they must not produce a
+		// package hover/definition at byte zero (often the first comment).
+		if import_stmt.end.offset > import_stmt.pos.offset && position_in_node(import_stmt, position_context.position) {
 			position_context.import_stmt = import_stmt
 			break
 		}

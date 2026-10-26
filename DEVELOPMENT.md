@@ -480,3 +480,28 @@ all six asc/desc declaration/use tokens and the `v: T` hover. A read-only check
 also confirms all eight v tokens in the user's basic/basic.thor are variables.
 This update rebuilds tls/bin/tls; the installed client remains 0.10.2 and the
 Thor: Restart Language Server command loads the rebuilt executable.
+
+## Locationless compiler error routing: TLS 0.9.5
+
+The user's sorted default comparator in basic/basic.thor triggers Odin's
+`Unspecialized polymorphic procedure ''` error with no source filename or range.
+TLS previously assigned any such error to buffers[0], so a valid demo/main.thor
+could display another package's error on its first line. Keep the input paths
+with each compiler process/result. The fallback now selects a source only from
+that check's inputs, preserves editor URI spelling, and explicitly notes when
+the compiler supplied no source location. A timeout also uses source fallback
+instead of creating a diagnostic URI for a directory.
+
+The screenshot also exposed a phantom sets package hover at byte zero: the
+internal Set import has an empty source span. Exclude empty imports from cursor
+lookup, and use the actual import range for import hovers rather than the
+package declaration's range.
+
+Three native tests cover package isolation, symlink/unsaved-buffer matching and
+refusal to select an unrelated buffer. Two stdio regressions reproduce the
+native locationless error with a second package open, its unsaved correction,
+and hidden-import hover/range behavior. All 63 stdio tests pass (one pre-existing
+expected failure), all 1,118 native tests and 78 Node tests pass, and actual VS
+Code integration verifies that the error cannot land on the open demo or create
+a package hover on its first comment. A fresh CLI check of demo succeeds. User
+edits to Library.odin, demo/main.thor, thor.odin and basic/ remain untouched.

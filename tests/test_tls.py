@@ -1012,6 +1012,18 @@ main::proc(){
         self.assertTrue(alias_highlighted, 'Explicit import aliases should retain namespace coloring')
         self.assertTrue(namespace_use_highlighted, 'Qualified namespace uses should retain namespace coloring')
 
+    def test_hidden_set_import_has_no_hover_at_the_first_comment(self):
+        text = '// Introduction to this example.\npackage main\nimport sets "thor:sets"\nmain::proc(){names:set[string];sets.insert(&names,"ok");delete(names)}\n'
+        client, main = self.open(text, compiler=False)
+        for character in (0, 1, 3):
+            self.assertIsNone(client.request('textDocument/hover', {'textDocument': {'uri': main.as_uri()},
+                                             'position': {'line': 0, 'character': character}}))
+        params = {'textDocument': {'uri': main.as_uri()}, 'position': self.position(text, 'import sets', len('import ')+1)}
+        hover = client.request('textDocument/hover', params)
+        self.assertIn('sets: package', hover['contents']['value'])
+        self.assertEqual(hover['range']['start']['line'], 2)
+        self.assertEqual(hover['range']['end']['line'], 2)
+
     def test_parser_diagnostics_clear_after_unsaved_fix(self):
         text = 'package main\nmain :: proc() { values := [1, }\n'
         client, main = self.open(text)
@@ -1031,6 +1043,26 @@ main::proc(){
         self.assertEqual(error['range']['start'], self.position(text, '"wrong"', 0))
         self.assertEqual(error['range']['end']['character'] - error['range']['start']['character'], 7)
         self.assertNotIn('__thor_', error['message'])
+
+    def test_locationless_compiler_error_stays_with_its_package_and_clears(self):
+        broken = 'package main\nsorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j})->[]E{return a}\n'
+        clean = 'package main\nmain::proc(){}\n'
+        client, main = self.open(clean, {'basic/main.thor': broken})
+        bad = main.parent / 'basic/main.thor'
+        client.send('textDocument/didOpen', {'textDocument': {'uri': bad.as_uri(),
+                    'languageId': 'thor', 'version': 1, 'text': broken}})
+        errors = client.diagnostic(bad.as_uri(), code='thor', contains='Unspecialized polymorphic')
+        self.assertTrue(any('did not provide a source location' in e['message'] for e in errors))
+        self.assertFalse(any(n.get('method') == 'textDocument/publishDiagnostics'
+                             and n['params']['uri'] == main.as_uri()
+                             and any('Unspecialized polymorphic' in d['message'] for d in n['params']['diagnostics'])
+                             for n in client.notifications))
+        fixed = broken.replace('less:=proc(i,j:E)->bool{return i<j}', 'less:proc(i,j:E)->bool')
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': bad.as_uri(), 'version': 2},
+                    'contentChanges': [{'text': fixed}]})
+        client.diagnostic(bad.as_uri(), empty=True)
+        self.assertEqual(bad.read_text(), broken)
 
     def test_compiler_warning_is_published_once_with_original_range(self):
         text = 'package main\nS :: struct #field_align(4) {x:int}\nmain :: proc(){}\n'

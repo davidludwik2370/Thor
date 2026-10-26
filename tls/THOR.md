@@ -132,6 +132,13 @@ compiler parser errors for open documents. Parser errors use exact token ranges,
 including after Unicode text and at EOF. Closing the server terminates its active
 check before removing the overlay; Thor cancellation also unwinds native helpers.
 
+Compiler results retain the package/file check that produced them. If the native
+compiler supplies no source location, TLS attaches the diagnostic to an open
+source file in that checked package (or a source file discovered there), with a
+note explaining the missing location. It never selects an unrelated open buffer
+as the fallback. Internal zero-length Set imports are excluded from source
+position lookup, so they cannot create package hovers on the first comment.
+
 Unconditional top-level redeclarations in an untagged file also have an immediate
 `Declaration` diagnostic, independent of native checking. The shared frontend
 performs the same check before evaluating `fn`/`#run` calls in the CLI. Duplicate

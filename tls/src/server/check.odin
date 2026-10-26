@@ -38,6 +38,7 @@ Json_Type_Error :: struct {
 Json_Errors :: struct {
 	error_count: int,
 	errors:      []Json_Error,
+	check_paths: []string, // Local provenance, supplied after reading the compiler's JSON.
 }
 
 Check_Mode :: enum {
@@ -280,6 +281,32 @@ CheckProcess :: struct {
 	reader:   ^os.File,
 	finished: bool,
 	buffer:   [dynamic]u8,
+	check_paths: []string,
+}
+
+// A native diagnostic can lack a filename entirely. Keep that error with the
+// job that produced it, rather than choosing an arbitrary open editor buffer.
+compiler_error_fallback_path :: proc(check_paths: []string, buffers: []Check_Buffer) -> string {
+	for requested in check_paths {
+		checked := os.get_absolute_path(requested, context.temp_allocator) or_else requested
+		is_file := filepath.ext(checked) == ".thor" || filepath.ext(checked) == ".odin"
+		selected := ""
+		for b in buffers {
+			matches := b.path == checked || b.canonical == checked if is_file else
+				filepath.dir(b.path) == checked || filepath.dir(b.canonical) == checked
+			if matches && (selected == "" || strings.compare(b.path, selected) < 0) { selected = b.path }
+		}
+		if selected != "" { return selected }
+		if is_file { return checked }
+		files, err := thor_source_files(checked)
+		if err == nil {
+			for file in files {
+				if selected == "" || strings.compare(file, selected) < 0 { selected = file }
+			}
+		}
+		if selected != "" { return selected }
+	}
+	return ""
 }
 
 stop_check_processes :: proc(processes:[]CheckProcess) {
@@ -443,7 +470,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 		if time.since(start) > deadline {
 			log.error("`odin check` timed out")
 			stop_check_processes(processes[:])
-			append(&errors,Json_Errors{error_count=1,errors=[]Json_Error{{type="error",stage="toolchain",pos={file=check_paths[0],line=1,column=1,end_column=1},msgs=[]string{"Compiler check timed out; reduce compile-time work or check from the command line."}}}})
+			append(&errors,Json_Errors{error_count=1,check_paths=paths,errors=[]Json_Error{{type="error",stage="toolchain",msgs=[]string{"Compiler check timed out; reduce compile-time work or check from the command line."}}}})
 			break
 		}
 
@@ -501,6 +528,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 					log.errorf("Failed to unmarshal check results: %v, %v", res, string(p.buffer[:]))
 					continue
 				}
+				json_errors.check_paths = p.check_paths
 				append(&errors, json_errors)
 			}
 		}
@@ -552,8 +580,9 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			// Keep the URI the editor opened, including symlinked workspaces.
 			for b in buffers { if b.canonical == path { path = b.path; break } }
 			if path == "" {
-				if len(buffers) == 0 { log.errorf("Compiler: %s", message); continue }
-				path = buffers[0].path
+				path = compiler_error_fallback_path(e.check_paths, buffers)
+				if path == "" { log.errorf("Compiler: %s", message); continue }
+				message = fmt.tprintf("%s\nThe compiler did not provide a source location; this diagnostic is attached to a file in the package being checked.", message)
 			}
 
 			when ODIN_OS == .Windows {
@@ -669,5 +698,5 @@ start_check_process :: proc(
 	}
 
 	buffer := make([dynamic]u8, 0, mem.Kilobyte * 200, context.temp_allocator)
-	return CheckProcess{process = p, reader = r, buffer = buffer}, true
+	return CheckProcess{process = p, reader = r, buffer = buffer, check_paths = check_paths}, true
 }
