@@ -42,7 +42,7 @@ branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
 ```sh
 ./thor transpile demo                  # Print the generated package path.
 ./thor check demo
-./thor build demo                      # Produce .thor-build/demo/program.
+./thor build demo                      # Produce ./program (program.exe on Windows).
 ./thor run demo
 ./thor test path/to/tests              # Run Odin @(test) procedures.
 ./thor run path/to/main.thor -- argument "two words"
@@ -145,13 +145,16 @@ Thor uses Odin as its native backend. For a single-file build:
 4. Thor invokes Odin on the generated file, automatically supplying `-file` for
    a single-file input. Odin performs native checking, code generation and linking.
 5. Thor translates compiler diagnostics back to the original source locations.
-   A successful default build leaves the executable at `my_program` in this example.
+   A successful build leaves the executable at `my_program` in this example.
 
 Generated files retain the original relative layout inside the output tree;
 `my_file.odin` is not written over or beside the original `my_file.thor`. Use
 `--output-dir /tmp/generated` to choose the generated tree's location. Without
-`-out:...`, the default executable is `<output-dir>/program` (`program.exe` on
-Windows). Odin's other native build modes can be selected with `-build-mode:...`.
+`-out:...`, `thor build` writes `program` (`program.exe` on Windows) into the
+directory where you run the command, even when building a source elsewhere or
+using `--output-dir`. Set `-out:path` to choose the artifact's name and location.
+`run` and `test` keep their temporary executables under the generated output tree.
+Odin's other native build modes can be selected with `-build-mode:...`.
 
 | Thor command | Work after parsing and compile-time evaluation |
 | --- | --- |

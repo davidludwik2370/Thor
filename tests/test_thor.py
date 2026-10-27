@@ -32,7 +32,8 @@ class ThorTests(unittest.TestCase):
         argv = [str(THOR), command, str(entry.parent if directory else entry), "--output-dir", str(root / "output"), *flags]
         if args:
             argv += ["--", *args]
-        result = subprocess.run(argv, text=True, capture_output=True, timeout=40)
+        result = subprocess.run(argv, cwd=root if command == "build" else None,
+                                text=True, capture_output=True, timeout=40)
         combined = result.stdout + result.stderr
         if fail is not None:
             self.assertNotEqual(result.returncode, 0, combined)
@@ -63,11 +64,45 @@ class ThorTests(unittest.TestCase):
         self.invoke(self.program("assert(2 + 2 == 4)"), command="check")
 
     def test_cli_build(self):
-        root, _ = self.invoke(self.program('fmt.println("built")', 'import "core:fmt"\n'), command="build")
-        executable = root / "output" / ("program.exe" if os.name == "nt" else "program")
+        root, _ = self.invoke(self.program('fmt.println("built")', 'import "core:fmt"\n'), command="build", flags=['-debug'])
+        executable = root / ("program.exe" if os.name == "nt" else "program")
+        manifest = json.loads((root / "output" / "thor-manifest.json").read_text())
+        self.assertEqual(manifest['debug_program']['path'], str(executable.resolve()))
+        self.assertFalse((root / "output" / executable.name).exists())
         run = subprocess.run([str(executable)], capture_output=True, text=True)
         self.assertEqual(run.returncode, 0)
         self.assertEqual(run.stdout.strip(), "built")
+
+    def test_cli_build_dot_defaults_to_current_directory(self):
+        root, _ = self.invoke(self.program('assert(true)'), command='transpile')
+        directory = root / 'input'
+        result = subprocess.run([str(THOR), 'build', '.'], cwd=directory,
+                                capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        executable = directory / ('program.exe' if os.name == 'nt' else 'program')
+        self.assertTrue(executable.is_file())
+        self.assertTrue((directory / '.thor-build' / 'input' / 'thor-manifest.json').is_file())
+        self.assertEqual(subprocess.run([str(executable)], capture_output=True).returncode, 0)
+
+    def test_cli_build_explicit_output_overrides_default(self):
+        name = 'chosen.exe' if os.name == 'nt' else 'chosen'
+        root, _ = self.invoke(self.program('assert(true)'), command='build', flags=['-out:'+name])
+        self.assertTrue((root / name).is_file())
+        self.assertFalse((root / ('program.exe' if os.name == 'nt' else 'program')).exists())
+        self.assertEqual(subprocess.run([str(root / name)], capture_output=True).returncode, 0)
+
+    def test_cli_run_keeps_its_temporary_binary_in_generated_tree(self):
+        root, _ = self.invoke(self.program('assert(true)'), flags=['-keep-executable'])
+        name = 'program.exe' if os.name == 'nt' else 'program'
+        self.assertTrue((root / 'output' / name).is_file())
+        self.assertFalse((root / name).exists())
+        (root / name).write_bytes(b'preserve the existing build artifact')
+        result = subprocess.run([str(THOR), 'run', str(root / 'input' / 'main.thor'),
+                                 '--output-dir', str(root / 'output')], cwd=root,
+                                capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((root / name).read_bytes(), b'preserve the existing build artifact')
+        self.assertFalse((root / 'output' / name).exists())
 
     def test_cli_run_arguments(self):
         self.invoke(self.program('assert(os.args[1] == "one two"); assert(os.args[2] == "three")', 'import "core:os"\n'), args=("one two", "three"))

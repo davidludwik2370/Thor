@@ -817,3 +817,22 @@ All 1,118 native TLS tests, 86 Node tests and actual VS Code integration pass.
 The new import walkthrough, main T01-T23 demo and user's playground program run
 successfully. A direct call to the user's table helper through a wildcard import
 also prints the expected aligned table.
+
+## Build artifact in the invoking directory: compiler 0.13.1
+
+Default `thor build` output to `program` (`program.exe` on Windows) in the
+command's working directory, independently of the input path or generated Odin
+output directory. Retain `-out:` overrides and leave `run`/`test` temporary
+executables in their generated trees. Debug manifests record the new default
+artifact path normally. Generated Odin, source maps and manifests still live
+under `.thor-build/<source>` or the explicitly selected `--output-dir`.
+
+Isolate acceptance-test build working directories so their artifacts remain in
+temporary folders. Cover `build .`, single-file builds from another directory,
+explicit output names, debug manifest identity, and the retained run/test output
+behavior. Update the basic input and test-mode build consumers to use the new
+artifact location. The user's playground builds in place and prints `hello`.
+
+Validation: all 100 focused CLI, basic-library, project-template and test-mode
+build regressions pass. An additional run check confirms that a pre-existing
+`program` in the working directory survives temporary executable cleanup.

@@ -16,7 +16,7 @@ class ProjectTemplateTests(unittest.TestCase):
             source=root/'main.thor';output=root/'generated'
             source.write_text('package main\nmain::proc(){value:=1;assert(value==1)}\n')
             args=[str(source),'-debug','-o:none','--output-dir',str(output)]
-            result=subprocess.run([str(ROOT/'thor'),'build',*args],capture_output=True,text=True,timeout=40)
+            result=subprocess.run([str(ROOT/'thor'),'build',*args],cwd=root,capture_output=True,text=True,timeout=40)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             manifest=json.loads((output/'thor-manifest.json').read_text())
             self.assertEqual({Path(path).name for path in manifest['debug_roots']},{'runtime','base','core','vendor'})

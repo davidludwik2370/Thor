@@ -320,7 +320,7 @@ generic::proc(values:$A/[2]Color)->int{return int(values[1])}
     def test_build_test_mode_includes_test_tagged_sources(self):
         root, _ = self.invoke('package main\nmain::proc(){}\n', command='build', directory=True, flags=['-build-mode:test'],
                     files={'extra.thor':'#+test\npackage main\nimport "core:testing"\n@(test) added::proc(t:^testing.T){testing.expect(t,true)}\n'})
-        executable=root/'output'/('program.exe' if os.name=='nt' else 'program')
+        executable=root/('program.exe' if os.name=='nt' else 'program')
         result=subprocess.run([str(executable)],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('1 test', result.stderr)

@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.13.0"
+VERSION = "0.13.1"
 
 
 def frontend_binary(odin):
@@ -290,8 +290,9 @@ def _main(argv=None):
         if project.file_entry:
             command.append("-file")
         command.extend(project.odin_flags())
+        binary_directory = Path.cwd() if options.command == "build" else project.destination
         executable = Path(next((f[len("-out:"):] for f in flags if f.startswith("-out:")),
-                               str(project.destination / ('program.exe' if os.name == 'nt' else 'program')))).resolve()
+                               str(binary_directory / ('program.exe' if os.name == 'nt' else 'program')))).resolve()
         if options.command in {"build", "run", "test"} and not any(f.startswith("-out:") for f in flags):
             command.append(f"-out:{executable}")
         if options.command == "test":
