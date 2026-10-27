@@ -661,3 +661,44 @@ basic/basic.thor confirms three rename edits and a parameter token for the
 forwarded less. Source edits in basic/, demo/main.thor and thor.odin are preserved.
 Rebuild TLS, package and install client 0.10.3, then reload the VS Code window to
 refresh both grammar and server. Restarting TLS alone cannot refresh the grammar.
+
+## Bundled basic collection package
+
+Move the user's basic/basic.thor into runtime/basic/basic.thor, retaining
+package basic. The driver and TLS already map the default thor collection to
+runtime, so ordinary import "thor:basic" now resolves from external projects
+without compiler or server changes. Ordinary imports retain the basic namespace;
+existing explicit selected imports also work. The package uses the inline
+generic default callback lowering for sorted and must be built through Thor.
+Private helpers and internal package imports remain private to the library.
+
+Exercise the public procedures through actual external consumers before making
+the library part of the collection. Fix desc's inverted comparison and ordered's
+variadic forwarding, selecting the first element and forwarding the remaining
+slice. Keep its original generic variadic API: callers spread a typed slice,
+as required by the current Odin backend. Preserve empty/singleton ordering.
+Dispatch base=0 integer parsing to the prefixed native overloads, and use wide
+range checks for narrower integer conversions. Honor read's supplied path and
+free partial data on error; truncate existing output files when writing. Input
+retains a partial EOF line, handles empty lines and CRLF, uses the requested
+allocator, and avoids losing subsequent lines to a discarded read-ahead buffer.
+Release clone's temporary allocation while retaining its shallow-copy semantics.
+Write print's values and terminator to the stdout stream directly, honoring flush
+without dropping output in a discarded temporary fmt buffer.
+
+Add runtime/basic/README.md with the API, import examples and ownership rules,
+and examples/basic/demo.thor with a runnable walkthrough. Tests cover default
+and aliased/selected imports, mixed native Odin consumers built through Thor,
+sorting different element types and custom comparators, original input storage,
+order checks, numeric bases/bounds, file replacement and missing files, multiple
+stdin lines and EOF, private access rejection, and allocation tracking. TLS
+tests verify hover, completion, namespace tokens, original-source definitions,
+and live mapped call errors that clear after correction. A JSON compiler test
+also checks the exact original argument range for an invalid comparator.
+
+Validation: all 159 tests in tests.test_basic, tests.test_defaults,
+tests.test_tls and tests.test_diagnostics pass with one existing expected
+failure. The ten basic acceptance tests include real Odin execution, an
+allocation-tracked test run, stdin through a pipe, and the commented example.
+Checking runtime/basic with -no-entry-point also passes. No extension reinstall
+is required. Existing edits in demo/main.thor and thor.odin remain uncommitted.

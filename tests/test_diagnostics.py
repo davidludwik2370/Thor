@@ -41,6 +41,10 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_bundled_basic_call_error_maps_to_original_argument(self):
+        self.at('package main\nimport "thor:basic"\nmain::proc(){data:=basic.sorted([]int{2,1},less=7);delete(data)}\n',
+                '7', message='Cannot convert')
+
     def test_generic_default_callback_body_error_has_its_unicode_source_range(self):
         source = 'package main\n/* 😀 */ work::proc(a:[]$E,less:=(proc(i,j:E)->bool{return "wrong"}))->bool{return less(a[0],a[1])}\nmain::proc(){_=work([]int{1,2})}\n'
         errors = self.at(source, '"wrong"', message='Cannot convert')

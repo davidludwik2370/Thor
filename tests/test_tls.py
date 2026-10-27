@@ -1234,6 +1234,58 @@ raise SystemExit(bool(errors))
             definitions = [definitions]
         self.assertTrue(any(d['uri'].endswith('/runtime/format/format.odin') for d in definitions), definitions)
 
+    def test_bundled_basic_import_navigation_completion_and_diagnostics(self):
+        text = '''package main
+import "thor:basic"
+main :: proc() {
+    result := basic.sorted([]int{3, 1, 2})
+    defer delete(result)
+    basic.print(result)
+}
+'''
+        client, main = self.open(text)
+        params = {'textDocument': {'uri': main.as_uri()},
+                  'position': self.position(text, 'basic.sorted', len('basic.')+2)}
+        hover = client.request('textDocument/hover', params)
+        self.assertIn('sorted', hover['contents']['value'])
+        self.assertIn('less', hover['contents']['value'])
+        definition = client.request('textDocument/definition', params)
+        self.assertTrue(definition['uri'].endswith('/runtime/basic/basic.thor'), definition)
+        self.assertIn('namespace', [kind for _, _, kind, token, _ in self.semantic_spans(client, main, text)
+                                   if token == 'basic'])
+        completion = client.request('textDocument/completion', {
+            'textDocument': {'uri': main.as_uri()},
+            'position': self.position(text, 'basic.sorted', len('basic.')),
+            'context': {'triggerKind': 1}})
+        labels = [item['label'] for item in completion['items']]
+        self.assertIn('sorted', labels)
+        completion = client.request('textDocument/completion', {
+            'textDocument': {'uri': main.as_uri()},
+            'position': self.position(text, 'basic.print', len('basic.')),
+            'context': {'triggerKind': 1}})
+        self.assertIn('print', [item['label'] for item in completion['items']])
+        # A clean initial file need not publish an empty diagnostics notification.
+        # Introduce and fix a real call error to verify the compiler path too.
+        broken = text.replace('sorted([]int{3, 1, 2})', 'sorted([]int{3, 1, 2}, less=7)')
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2},
+                    'contentChanges': [{'text': broken}]})
+        errors = client.diagnostic(main.as_uri(), contains='Cannot convert')
+        error = next(e for e in errors if 'Cannot convert' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(broken, 'less=7', len('less=')))
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 3},
+                    'contentChanges': [{'text': text}]})
+        client.diagnostic(main.as_uri(), empty=True)
+
+    def test_bundled_basic_selected_import_resolves_to_original_thor_source(self):
+        text = 'package main\nimport "thor:basic" / sorted\nmain::proc(){data:=sorted([]int{2,1});delete(data)}\n'
+        client, main = self.open(text)
+        params = {'textDocument': {'uri': main.as_uri()},
+                  'position': self.position(text, 'data:=sorted', len('data:=')+2)}
+        self.assertIn('less', client.request('textDocument/hover', params)['contents']['value'])
+        definition = client.request('textDocument/definition', params)
+        self.assertTrue(definition['uri'].endswith('/runtime/basic/basic.thor'), definition)
+
     def test_generic_immutable_error_is_mapped_to_operation(self):
         text = 'package main\nf::proc(value:$T){x:>value; x[0]=3}\nmain::proc(){f([1,2])}\n'
         client, main = self.open(text)

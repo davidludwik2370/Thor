@@ -49,6 +49,25 @@ branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
 ./thor check demo --output-dir /tmp/thor-generated
 ```
 
+## Basic library
+
+The bundled [`thor:basic` package](runtime/basic/README.md) works from any Thor
+project without additional collection flags:
+
+```odin
+import "thor:basic"
+
+// Inside a procedure:
+result := basic.sorted([]int{3, 1, 2})
+defer delete(result)
+basic.print(result)
+```
+
+Use `import "thor:basic" / sorted, print` for selected unqualified names.
+Its canonical source is [runtime/basic/basic.thor](runtime/basic/basic.thor).
+Run the [commented example](examples/basic/demo.thor) with
+`thor run /path/to/thor/examples/basic`.
+
 ## Compilation and Odin flags
 
 Thor uses Odin as its native backend. For a single-file build:

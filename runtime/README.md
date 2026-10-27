@@ -1,8 +1,21 @@
 # Thor support collection
 
 The driver supplies `thor:` automatically unless explicitly overridden with
-`-collection:thor=...`. These libraries use ordinary Odin syntax and can also be
-used with native Odin by supplying `-collection:thor=/path/to/thor/runtime`.
+`-collection:thor=...`. Libraries written in `.odin` can also be used with native
+Odin by supplying `-collection:thor=/path/to/thor/runtime`. The `basic` package is
+written in Thor and uses its inline generic default callbacks.
+
+## Basic helpers
+
+`import "thor:basic"` provides `basic.print`, `basic.sorted`, order checks, parsing,
+file/line I/O, and small collection/string helpers. It resolves automatically from
+any Thor project. For unqualified names, use the existing selection syntax, such
+as `import "thor:basic" / print, sorted`.
+
+The source is [basic/basic.thor](basic/basic.thor), moved from the checkout's
+former top-level `basic/` directory. See the [API and ownership notes](basic/README.md)
+and [runnable example](../examples/basic/demo.thor). Allocated results remain
+caller-owned; `clone` retains shallow value-copy semantics.
 
 ## Formatting (T07)
 
