@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.15.1"
+VERSION = "0.16.0"
 
 
 def frontend_binary(odin):
@@ -46,10 +46,9 @@ def frontend_binary(odin):
 
 
 class Project:
-    def __init__(self, entry, frontend, flags, *, test=False, overlays=None, inputs=None, cache_frontend=True):
+    def __init__(self, entry, frontend, flags, *, test=False, overlays=None, cache_frontend=True):
         self.entry = Path(entry).resolve()
         self.overlays = overlays or {}
-        self.inputs = inputs
         self.cache_frontend = cache_frontend
         self.file_entry = self.entry.is_file() or self.entry in self.overlays
         self.mapping = MappingBuilder()
@@ -69,8 +68,6 @@ class Project:
                 name, separator, value = flag[len("-collection:"):].partition("=")
                 if not separator:
                     raise ThorError(f"invalid collection flag: {flag}")
-                if self.inputs is not None:
-                    self.inputs.binding(Path(value))
                 self.collections[name] = Path(value).resolve()
         self.sources = {}
         self.packages = {}
@@ -96,9 +93,6 @@ class Project:
 
     def discover(self, entry):
         entry = entry.resolve()
-        if self.inputs is not None:
-            for directory in [entry, *entry.parents]:
-                if directory.is_dir():self.inputs.file(directory/'thor-manifest.json',content=False)
         if any((directory / "thor-manifest.json").is_file() for directory in [entry, *entry.parents] if directory.is_dir()):
             raise ThorError(f"generated Odin is not a Thor input; use the original source: {entry}")
         key = (entry, entry.is_file())
@@ -108,8 +102,6 @@ class Project:
         paths = [entry] if entry.is_file() or entry in self.overlays else sorted(
             {p for p in entry.iterdir() if p.is_file() and p.suffix in {".thor", ".odin"}} |
             {p for p in self.overlays if p.parent == entry and p.suffix in {".thor", ".odin"}})
-        if self.inputs is not None and entry.is_dir():
-            self.inputs.package(entry, paths)
         for path in paths:
             if path in self.sources:
                 continue
@@ -134,8 +126,6 @@ class Project:
                     dependency = base / relative
                 else:
                     dependency = path.parent / imported
-                if self.inputs is not None:
-                    self.inputs.binding(dependency)
                 dependency = dependency.resolve()
                 if not dependency.is_dir():
                     node = next(n for n in source.nodes if n.kind == "Import" and imported == unquote(n.data["op"]))
@@ -234,10 +224,9 @@ def _main(argv=None):
     parser.add_argument("--raw-diagnostics", action="store_true", help="show unmodified Odin diagnostics for transpiler debugging")
     parser.add_argument("--run-timeout",type=float,default=5,help="maximum seconds for each native #run execution (default: 5)")
     parser.add_argument('--cache-dir',type=Path,help='cache root (default: .thor-cache beside the entry package)')
-    parser.add_argument('--no-cache',action='store_true',help='bypass persistent evaluation and transpilation caching')
-    parser.add_argument('--no-transpile-cache',action='store_true',help='bypass generated-code reuse, retaining evaluation caching')
-    parser.add_argument('--clear-cache',action='store_true',help='clear evaluation and transpilation entries before compiling')
-    parser.add_argument('--cache-report',action='store_true',help='print evaluation and transpilation cache counters as JSON on stdout')
+    parser.add_argument('--no-cache',action='store_true',help='bypass compile-time result and per-file parser caching')
+    parser.add_argument('--clear-cache',action='store_true',help='clear compile-time result and per-file parser entries before compiling')
+    parser.add_argument('--cache-report',action='store_true',help='print compile-time evaluation cache counters as JSON on stdout')
     options, flags = parser.parse_known_args(argv)
     if not 0<options.run_timeout<=300:parser.error('--run-timeout must be greater than 0 and at most 300 seconds')
     if any(not flag.startswith("-") for flag in flags):
@@ -285,47 +274,27 @@ def _main(argv=None):
         test_mode = options.command == "test" or "-build-mode:test" in flags
         from .evaluation import Evaluator
         from .cache import EvaluationCache
-        from .buildcache import TranspilationCache
         cache_root=options.cache_dir or (Path(os.environ['THOR_CACHE_DIR']) if 'THOR_CACHE_DIR' in os.environ else None)
         cache_root=cache_root or (entry.parent if entry.is_file() or entry in overlays else entry)/'.thor-cache'
         cache=EvaluationCache(cache_root,enabled=not options.no_cache)
-        reuse=TranspilationCache(cache_root,
-            TranspilationCache.request(entry,destination,flags,test_mode,odin,options.run_timeout),
-            enabled=not(options.no_cache or options.no_transpile_cache or options.overlay))
         if options.clear_cache:
             cache.clear()
-            reuse.clear()
         try:
-            project = reuse.load()
-            if project is not None:
-                target = Path(project.record['target'])
-                diagnostics = project.diagnostic_adapter()
-                frontend_diagnostics = project.frontend_diagnostics
-            else:
-                if reuse.enabled:
-                    sdk = Path(subprocess.check_output([odin,'root'],text=True).strip())
-                    reuse.inputs.binding(sdk)
-                    reuse.begin(ROOT,odin,sdk.resolve())
-                    from .cache import canonical
-                    cache.toolchain_stamp=hashlib.sha256(canonical(reuse.inputs.data)).hexdigest()
-                frontend, odin = frontend_binary(options.odin)
-                if options.clear_cache:
-                    from . import parsecache
-                    parsecache.clear(frontend)
-                project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
-                                  inputs=reuse.inputs if reuse.enabled else None,cache_frontend=not options.no_cache)
-                if '-debug' in flags:
-                    odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
-                    project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
-                if reuse.enabled:
-                    for source in project.sources.values():reuse.inputs.source(source)
-                Evaluator(project,odin,options.run_timeout,cache).evaluate_all()
-                target = project.emit(destination)
-                diagnostics = project.diagnostic_adapter()
-                frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
-                reuse.save(project,target,frontend_diagnostics)
+            frontend, odin = frontend_binary(options.odin)
+            if options.clear_cache:
+                from . import parsecache
+                parsecache.clear(frontend)
+            project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
+                              cache_frontend=not options.no_cache)
+            if '-debug' in flags:
+                odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
+                project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
+            Evaluator(project,odin,options.run_timeout,cache).evaluate_all()
+            target = project.emit(destination)
+            diagnostics = project.diagnostic_adapter()
+            frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
         finally:
-            if options.cache_report:print(json.dumps({'thor_cache':cache.stats,'thor_prepared_hits':cache.prepared_hits,'thor_transpile_cache':reuse.stats}),flush=True)
+            if options.cache_report:print(json.dumps({'thor_cache':cache.stats,'thor_prepared_hits':cache.prepared_hits}),flush=True)
         if options.command == "transpile":
             if frontend_diagnostics or json_output:
                 report(frontend_diagnostics)

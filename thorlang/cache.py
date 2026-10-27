@@ -10,6 +10,7 @@ from pathlib import Path
 import platform
 import re
 import subprocess
+import sys
 import tempfile
 from . import values
 from .compiler import unquote
@@ -32,7 +33,6 @@ class EvaluationCache:
         self.enabled = enabled
         self.stats = dict(hits=0, misses=0, writes=0, corrupt=0, bypasses=0)
         self.identities = {}
-        self.toolchain_stamp = None
         self.prepared_hits = 0
 
     def clear(self):
@@ -87,24 +87,38 @@ class EvaluationCache:
 
     def identity(self, odin, root):
         if odin in self.identities: return self.identities[odin]
-        if self.toolchain_stamp is not None:
-            saved=self.read_record('identity-v1',self.toolchain_stamp)
-            if isinstance(saved,str) and re.fullmatch('[0-9a-f]{64}',saved):
-                self.identities[odin]=saved;return saved
-        digest = hashlib.sha256(canonical(dict(schema=SCHEMA, platform=os.sys.platform, machine=platform.machine())))
         executable = Path(odin).resolve()
-        digest.update(canonical([str(executable),file_digest(executable)]))
+        config=dict(schema=SCHEMA,platform=sys.platform,machine=platform.machine())
+        commands={}
         for command in ['version', 'root']:
             result = subprocess.run([odin, command], capture_output=True, check=True, timeout=15)
-            digest.update(canonical([command,result.stdout.hex()]))
-            if command == 'root': native_root = Path(result.stdout.decode().strip())
+            commands[command]=result.stdout
+        native_root=Path(commands['root'].decode().strip())
+        trees=[root/'thorlang',root/'frontend',root/'runtime',native_root/'base',native_root/'core',native_root/'vendor']
+        # This inventory only validates the compile-time toolchain identity.
+        # It is built lazily; ordinary builds without evaluation do not scan SDKs.
+        from .dependencies import Inputs
+        snapshot=Inputs()
+        try:
+            snapshot.file(executable,content=False)
+            snapshot.file(Path(sys.executable).resolve(),content=False)
+            snapshot.binding(native_root)
+            for tree in trees:snapshot.tree(tree)
+        except OSError:snapshot.usable=False
+        stamp=hashlib.sha256(canonical([config,commands['version'].hex(),snapshot.data])).hexdigest() if snapshot.usable else None
+        saved=self.read_record('identity-v1',stamp)
+        if isinstance(saved,str) and re.fullmatch('[0-9a-f]{64}',saved):
+            self.identities[odin]=saved;return saved
+        digest=hashlib.sha256(canonical(config))
+        digest.update(canonical([str(executable),file_digest(executable)]))
+        for command,output in commands.items():digest.update(canonical([command,output.hex()]))
         # Locally edited stdlib/compiler support invalidates unchanged binaries.
-        for tree in [root/'thorlang', root/'frontend', root/'runtime', native_root/'base', native_root/'core', native_root/'vendor']:
+        for tree in trees:
             for path in sorted(tree.rglob('*')):
                 if path.suffix in {'.odin', '.py'} and path.is_file():
                     digest.update(canonical([str(path),file_digest(path)]))
         self.identities[odin] = digest.hexdigest()
-        self.write_record('identity-v1',self.toolchain_stamp,self.identities[odin])
+        if snapshot.valid():self.write_record('identity-v1',stamp,self.identities[odin])
         return self.identities[odin]
 
     def resources(self, project):

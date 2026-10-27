@@ -42,8 +42,6 @@ class NativeSources:
             self.packages[directory] = members
             p = self.project
             files=set(directory.glob('*.odin')) | {path for path in p.overlays if path.parent==directory and path.suffix=='.odin'}
-            if getattr(p,'inputs',None) is not None:
-                p.inputs.package(directory,files,suffixes=('.odin',))
             for file in sorted(files):
                 member = Source(file, p.frontend, thor=False, package=True, test=p.test,
                                 project_name=p.entry.stem, raw=p.overlays.get(file), target=p.target, mapping=p.mapping,cache=p.cache_frontend)
@@ -51,8 +49,6 @@ class NativeSources:
                 member.project = p.packages
                 member.collections = p.collections
                 member.purity = p.purity
-                if getattr(p,'inputs',None) is not None:
-                    p.inputs.source(member)
                 members.append(member)
                 self.sources[file] = member
             p.resolver.add_sources(members)

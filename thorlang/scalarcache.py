@@ -2,7 +2,7 @@
 import hashlib
 from pathlib import Path
 
-from .buildcache import Inputs
+from .dependencies import Inputs
 from .cache import canonical
 from .semantics import descendants
 

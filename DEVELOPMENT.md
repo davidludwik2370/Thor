@@ -88,7 +88,7 @@ protocol and reconstructs typed constants. `runtime/pure` owns scratch lifetimes
 
 `thorlang/cache.py` caches successful typed contents with atomic replacement and
 conservative dependency/toolchain/resource fingerprints. It never caches helper
-executables. Eligibility and closure construction run before lookups. Cover warm
+executables. Validate eligibility, dependencies and configuration before reuse. Cover warm
 backend skipping, corruption/concurrent publication, clear/bypass, defines,
 transitive source/types/constants, imported unsaved buffers and resource changes.
 
@@ -912,7 +912,10 @@ and the user's playground execute successfully. A final 74-test purity,
 allocation, cache and test-mode regression run also passes. User playground moves, table
 work, demo edits and specification deletion remain outside this feature commit.
 
-## Reuse complete transpilation artifacts: compiler 0.15.0
+## Reuse complete transpilation artifacts: compiler 0.15.0 (historical)
+
+This generated-output cache was removed in 0.16.0; the following section records
+the earlier implementation and measurements. See the current cache design below.
 
 Profiled the user's playground at 5.4-6.0 seconds per unchanged build. Both
 compile-time operations hit the evaluation cache, but its lookup occurred after
@@ -1033,3 +1036,55 @@ These figures include the final Odin build. Changed builds still pay for Thor
 parsing, analysis and source-map emission; that remaining overhead is material
 and should not be described as negligible. The copied program prints the table
 and array length 10, and its original source hash is unchanged.
+
+## Keep result and per-file parser caches: compiler 0.16.0
+
+Remove the complete-project/generated-output cache. The normal workflow edits
+source before building, so the unchanged-project shortcut adds artifact,
+manifest and diagnostic snapshot validation for little benefit in that workflow.
+Delete TranspilationCache, CachedProject and LazyDiagnostics, and remove their
+hooks from project discovery and inspected native-source loading.
+
+Every invocation discovers the current files, reconstructs syntax objects,
+performs Thor analysis/evaluation, emits Odin and source maps, and invokes Odin.
+Retain successful per-file parser JSON keyed by contents/parser/options. Retain
+typed compile-time result packets and their dependency records, including early
+scalar #run reuse across unrelated runtime edits. No semantic analysis or
+generated output is reused across invocations.
+
+Move shared file/package/resource checks to thorlang/dependencies.py. Validate
+the compile-time toolchain identity lazily inside EvaluationCache.identity;
+there is no SDK inventory scan for builds that need no compile-time execution.
+This metadata supports result invalidation and does not retain project analysis.
+
+Remove --no-transpile-cache and thor_transpile_cache reporting. --no-cache
+bypasses parser/results; --clear-cache clears parser/results and their owned
+dependency records. --cache-report exposes evaluation counters and early hits.
+Old transpile-v1 records are ignored and no new ones are written.
+
+Replace whole-project cache tests with fresh-compilation tests. Cover unchanged
+builds rerunning analysis/emission, single-file edits reusing parsed imports,
+bypass reparsing all files, stale legacy records being ignored, generated-file
+repair, overlays, resources, flags, fresh Unicode diagnostics, collection symlinks
+and refreshed debug maps/executable identities. Keep compile-time invalidation
+and helper-skipping tests; they no longer need a separate transpilation bypass.
+
+Validation: 37 focused compiler/cache/parser checks and two additional
+single-file/legacy-record checks pass. Actual VS Code integration passes. The
+673-test full run included one existing expected TLS navigation failure and
+found two failures: an obsolete assertion that rejected toolchain metadata after
+a failed calculation (updated to reject only result/reuse records, then passed),
+and an Odin subprocess crash while compiling the math.ln helper (exit -11).
+That native-math test passed its isolated rerun and five consecutive final
+reruns. The corrected cache test also passed in the final six-test recheck.
+All other cases in the full run passed.
+
+Final measurements use a temporary copy of the original playground, with five
+alternating runtime edits, unchanged builds and native Odin builds. Edited
+builds took 0.640-0.671 seconds (median 0.644); unchanged builds took
+0.637-0.683 seconds (median 0.646); native Odin took 0.211-0.227 seconds (median
+0.215). Both Thor paths report one early result hit and zero evaluation misses.
+The initially empty evaluation cache took 3.509 seconds to warm. The copied
+program prints its table and array length 10, and the original source hash
+remains unchanged. Removing complete reuse intentionally gives unchanged builds
+the same analysis/emission path as edited builds.

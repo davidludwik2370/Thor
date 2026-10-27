@@ -2,15 +2,15 @@
 from unittest.mock import patch
 import unittest
 
-from tests import test_build_cache as base
+from tests import test_compilation as base
 from thorlang import driver
 from thorlang.cache import EvaluationCache
 
 
 class EditedBuildTests(unittest.TestCase):
-    setUp=base.BuildCacheTests.setUp
-    write=base.BuildCacheTests.write
-    compile=base.BuildCacheTests.compile
+    setUp=base.CompilationTests.setUp
+    write=base.CompilationTests.write
+    compile=base.CompilationTests.compile
 
     def test_runtime_edits_before_and_after_run_skip_all_helper_projects(self):
         source='''package main
@@ -32,11 +32,10 @@ main::proc(){
             self.source.write_text(source)
             original=driver.Project.__init__
             def without_helpers(project,*args,**kwargs):
-                self.assertIsNotNone(kwargs.get('inputs'),'runtime edit reconstructed a compile-time helper')
+                self.assertFalse(kwargs.get('overlays'),'runtime edit reconstructed a compile-time helper')
                 return original(project,*args,**kwargs)
             with patch.object(driver.Project,'__init__',without_helpers):
                 report,_=self.compile(command='build')
-            self.assertEqual(report['thor_transpile_cache']['hits'],0)
             self.assertGreaterEqual(report['thor_prepared_hits'],1,report)
             self.assertEqual(report['thor_cache']['misses'],0,report)
 
@@ -76,16 +75,16 @@ main::proc(){}
             report,_=self.compile(status=1 if old.startswith('INPUT') else 0)
             self.assertEqual(report['thor_prepared_hits'],0)
 
-    def test_unchanged_bytes_after_editor_save_reuse_artifacts(self):
-        self.write('package main\nmain::proc(){}\n')
+    def test_unchanged_bytes_after_editor_save_reuse_evaluation(self):
+        self.write('package main\nwork::proc()->int{return 7}\nVALUE::#run work()\n#assert(VALUE==7)\nmain::proc(){}\n')
         self.compile()
         self.source.write_bytes(self.source.read_bytes())
         report,_=self.compile()
-        self.assertEqual(report['thor_transpile_cache']['hits'],1)
+        self.assertGreater(report['thor_prepared_hits'],0)
         generated=next(self.output.rglob('main.odin'))
         generated.write_bytes(generated.read_bytes())
         report,_=self.compile()
-        self.assertEqual(report['thor_transpile_cache']['hits'],1)
+        self.assertGreater(report['thor_prepared_hits'],0)
 
     def test_clear_removes_early_records_without_a_result_directory(self):
         cache=EvaluationCache(self.root/'cache')

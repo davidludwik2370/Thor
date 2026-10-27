@@ -64,16 +64,14 @@ class CacheTests(unittest.TestCase):
     program=base.ThorTests.program
 
     def invoke(self, source, *, flags=(), **kwargs):
-        # These cases exercise the evaluation-result cache independently of the
-        # complete-transpilation cache tested in test_build_cache.py.
-        return base.ThorTests.invoke(self,source,flags=['--no-transpile-cache',*flags],**kwargs)
+        return base.ThorTests.invoke(self,source,flags=[*flags],**kwargs)
 
     def report(self,result):
         return next(json.loads(line)['thor_cache'] for line in result.stdout.splitlines() if line.startswith('{"thor_cache"'))
 
     def again(self,root,*,flags=(),fail=None):
         result=subprocess.run([str(base.THOR),'run',str(root/'input'),'--output-dir',str(root/'output'),
-                               '--cache-report','--no-transpile-cache',*flags],capture_output=True,text=True,timeout=45)
+                               '--cache-report',*flags],capture_output=True,text=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0);self.assertIn(fail,result.stderr)
         else:self.assertEqual(result.returncode,0,result.stderr)
         return result
@@ -127,7 +125,10 @@ VALUE::#run work()
         source=self.program('_=VALUE','bad::fn()->int{assert(false);return 0}\nVALUE::#run bad()\n')
         root,result=self.invoke(source,command='check',flags=['--cache-report'],fail='#run execution failed')
         self.assertEqual(self.report(result)['writes'],0)
-        self.assertFalse(list((root/'input/.thor-cache').rglob('*.json')))
+        # A valid toolchain fingerprint may be recorded before execution fails;
+        # neither result packets nor records that reuse results may be published.
+        for namespace in ['eval-v1','prepared-v1','scalar-v1']:
+            self.assertFalse(list((root/'input/.thor-cache'/namespace).glob('*.json')))
         (root/'input/main.thor').write_text(source.replace('assert(false);',''))
         blocked=root/'blocked';blocked.write_text('not a directory')
         self.assertEqual(self.report(self.again(root,flags=['--cache-dir',str(blocked)]))['writes'],0)

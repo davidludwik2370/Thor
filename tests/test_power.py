@@ -132,11 +132,11 @@ assert(true || 2**-3==0)
 
     def test_float_power_cache_hits_and_exponent_invalidation(self):
         source=self.program('assert(VALUE==.125)','VALUE::2.0**-3\n')
-        root,first=self.invoke(source,flags=['--cache-report','--no-transpile-cache'])
+        root,first=self.invoke(source,flags=['--cache-report'])
         self.assertEqual(json.loads(first.stdout)['thor_cache']['writes'],1)
         entry=root/'input/main.thor'
         def again():
-            result=subprocess.run([str(base.THOR),'run',str(entry),'--output-dir',str(root/'output'),'--cache-report','--no-transpile-cache'],
+            result=subprocess.run([str(base.THOR),'run',str(entry),'--output-dir',str(root/'output'),'--cache-report'],
                                   capture_output=True,text=True,timeout=40)
             self.assertEqual(result.returncode,0,result.stderr)
             return json.loads(result.stdout)['thor_cache']
