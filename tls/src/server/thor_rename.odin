@@ -50,6 +50,7 @@ thor_rename_token :: proc(document: ^Document, position: common.Position) -> (Th
 		offset:   int,
 		token:    Thor_Rename_Token,
 		found:    bool,
+		inside:   bool,
 	}
 	state := State {
 		document = document,
@@ -60,8 +61,8 @@ thor_rename_token :: proc(document: ^Document, position: common.Position) -> (Th
 		state := cast(^State)v.data
 		ident, ok := node.derived.(^ast.Ident)
 		if !ok {return v}
-		if ident.pos.offset <= state.offset &&
-		   state.offset < ident.end.offset &&
+		inside := ident.pos.offset <= state.offset && state.offset < ident.end.offset
+		if (inside || !state.inside && state.offset == ident.end.offset) &&
 		   ident.pos.offset >= 0 &&
 		   ident.end.offset <= state.document.used_text &&
 		   state.document.ast.src[ident.pos.offset:ident.end.offset] == ident.name {
@@ -72,6 +73,7 @@ thor_rename_token :: proc(document: ^Document, position: common.Position) -> (Th
 				ident.end.offset,
 			}
 			state.found = true
+			state.inside = inside
 		}
 		return v
 	}
@@ -84,7 +86,8 @@ thor_rename_token :: proc(document: ^Document, position: common.Position) -> (Th
 		token := imp.import_decl.name
 		if token.text != "" &&
 		   token.pos.offset <= int(absolute) &&
-		   int(absolute) < token.pos.offset + len(token.text) {
+		   int(absolute) <= token.pos.offset + len(token.text) &&
+		   (!state.inside || int(absolute) < token.pos.offset + len(token.text)) {
 			return {token.text, imp.range, token.pos.offset, token.pos.offset + len(token.text)}, true
 		}
 	}
@@ -159,7 +162,9 @@ thor_rename_target :: proc(document: ^Document, position: common.Position) -> (T
 		document.fullpath,
 		context.temp_allocator,
 	)
-	pos, found := get_document_position_context(document, position, .Hover)
+	// Editors commonly place the caret just after a word, especially a
+	// one-letter parameter. Resolve inside the selected token consistently.
+	pos, found := get_document_position_context(document, token.range.start, .Hover)
 	if !found {return {}, "Cannot resolve this identifier."}
 	ctx.position_hint = pos.hint
 	get_globals(document.ast, &ctx)

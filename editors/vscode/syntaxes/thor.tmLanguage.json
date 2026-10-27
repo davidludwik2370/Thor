@@ -155,6 +155,9 @@
           "include": "#slice"
         },
         {
+          "include": "#procedure-expression"
+        },
+        {
           "include": "#keywords"
         },
         {
@@ -241,6 +244,33 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    "procedure-expression": {
+      "name": "meta.procedure.literal.thor",
+      "begin": "\\b(proc)\\b(?=\\s*(?:\"[^\"]*\"\\s*)?[({])|\\b(fn)\\b(?=\\s*\\(\\s*(?:\\$?[A-Za-z_]\\w*\\s*,\\s*)*\\$?[A-Za-z_]\\w*\\s*:)",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.thor"
+        },
+        "2": {
+          "name": "storage.type.thor"
+        }
+      },
+      "end": "(?=^|\\)|,|;)|(?<=\\})",
+      "patterns": [
+        {
+          "include": "#parameters"
+        },
+        {
+          "include": "#return-type-declaration"
+        },
+        {
+          "include": "#block-definition"
+        },
+        {
+          "include": "#expressions"
         }
       ]
     },
@@ -910,6 +940,10 @@
     },
     "keywords": {
       "patterns": [
+        {
+          "name": "storage.type.thor",
+          "match": "\\bproc\\b"
+        },
         {
           "name": "meta.conditional.directive.thor",
           "begin": "#else\\b",

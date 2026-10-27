@@ -106,6 +106,42 @@ class RenameTests(unittest.TestCase):
                 edit = self.rename(client, main, text, old, new)
                 self.assertEqual(self.apply(root, {'main.thor': text}, edit)['main.thor'], text.replace(old, new))
 
+    def test_one_letter_generic_container_parameter_at_word_end(self):
+        # The unresolved 'data' is intentional: type errors must not prevent
+        # renaming the correctly declared a, including its named arguments.
+        text = '''package main
+import "core:slice"
+sorted :: proc(
+    a: $T/[]$E,
+    less := proc(i,j:E)->bool{return i<j},
+    allocator := context.allocator,
+)->[]E {
+    ret := make([]E,len(a),allocator)
+    copy(ret,a)
+    slice.sort_by(data,less)
+    return ret
+}
+'''
+        files = {'main.thor': text,
+                 'caller.thor': 'package main\ncaller::proc(){result:=sorted(a=[]int{1,2});delete(result)}\n'}
+        client, root, main = self.project(files)
+        expected = dict(files)
+        expected['main.thor'] = text.replace('a: $T', 'values: $T').replace('len(a)', 'len(values)').replace('copy(ret,a)', 'copy(ret,values)')
+        expected['caller.thor'] = files['caller.thor'].replace('sorted(a=', 'sorted(values=')
+        for needle, offset in [('a: $T', 0), ('a: $T', 1), ('len(a)', 5), ('copy(ret,a)', 10)]:
+            with self.subTest(needle=needle, offset=offset):
+                edit = self.rename(client, main, text, needle, 'values', offset)
+                self.assertEqual(self.apply(root, files, edit), expected)
+
+    def test_unicode_word_end_and_interpolation_closing_brace(self):
+        text = 'package main\nmain::proc(){_="😀";é:=1;value:=f"{é}";delete(value);_=é}\n'
+        files = {'main.thor': text}
+        client, root, main = self.project(files)
+        for needle, offset in [('é:=', 1), ('{é}', 2), ('_=é', 3)]:
+            with self.subTest(needle=needle):
+                edit = self.rename(client, main, text, needle, 'number', offset)
+                self.assertEqual(self.apply(root, files, edit)['main.thor'], text.replace('é', 'number'))
+
     def test_struct_fields_and_enum_members(self):
         for text, needle, old, new in [
             ('package main\nRecord::struct{value:int}\nmain::proc(){r:=Record{value=2};_=r.value}\n', 'r.value', 'value', 'count'),

@@ -629,3 +629,35 @@ TLS tests, 78 Node tests and actual VS Code integration. The new demo runs and
 checks integer/float results, custom ordering, record overrides and preservation
 of the input. Existing user edits in thor.odin, demo/main.thor and basic/ are
 preserved.
+
+## Callback highlighting and rename boundaries: TLS 0.10.2 / client 0.10.3
+
+The user's inline comparator exposed two independent highlighting paths.
+Expression grammar matched anonymous `proc(...)` as a function call. Add a
+procedure-expression scope with keyword coloring and nested parameter/body
+handling so an inner closing parenthesis does not terminate the outer generic
+parameter list. Recognize typed anonymous fn expressions while preserving
+ordinary calls to an identifier named fn. TLS inferred callback parameters from
+their procedure-valued defaults and colored uses as functions. Preserve parameter
+or mutable-variable colors for passed/stored procedure values, tracking the
+actual callee node so direct and parenthesized calls remain function-colored.
+Named procedure declarations/references retain their existing presentation.
+
+Rename rejected a cursor exactly at the right boundary of an identifier. This
+made a one-letter parameter such as a look unrenameable even though its start
+resolved and its references highlighted. Accept an end-boundary token as a
+fallback, prefer a token containing the cursor, and resolve the selected token
+from its original start. Apply the same boundary behavior to import aliases.
+Original-source validation, collision checks and refusal of partial edits remain.
+
+Validation: all 88 rename/TLS stdio tests pass with one existing expected failure,
+along with all 1,118 native TLS tests and 85 Node tests. New cases cover the exact
+generic slice parameter, inferred allocator, an unrelated unresolved identifier,
+closed-file named arguments, Unicode and interpolation boundaries, callback value
+versus call tokens, and multiline grammar/theme scopes. Actual VS Code integration
+verifies the passed callback token and applies a rename with the caret immediately
+after a, then checks that diagnostics remain clear. A read-only probe of the user's
+basic/basic.thor confirms three rename edits and a parameter token for the
+forwarded less. Source edits in basic/, demo/main.thor and thor.odin are preserved.
+Rebuild TLS, package and install client 0.10.3, then reload the VS Code window to
+refresh both grammar and server. Restarting TLS alone cannot refresh the grammar.

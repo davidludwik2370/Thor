@@ -122,6 +122,7 @@ SemanticTokenBuilder :: struct {
 	entries:       [dynamic]SemanticTokenEntry,
 	symbols:       SymbolAndNodeMap,
 	src:           string,
+	call_target:   ^ast.Node,
 }
 
 SemanticTokenEntry :: struct {
@@ -318,7 +319,18 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_nodes(n.list, builder)
 		visit_nodes(n.body, builder)
 	case ^ast.Call_Expr:
+		previous := builder.call_target
+		callee := n.expr
+		unwrap: for callee != nil {
+			#partial switch value in callee.derived {
+			case ^ast.Paren_Expr: callee = value.expr
+			case ^ast.Deref_Expr: callee = value.expr
+			case: break unwrap
+			}
+		}
+		builder.call_target = callee
 		if name,ok:=n.expr.derived.(^ast.Ident);!ok||name.pos.offset!=name.end.offset{visit_node(n.expr, builder)}
+		builder.call_target = previous
 		visit_nodes(n.args, builder)
 	case ^ast.Implicit_Selector_Expr:
 		write_semantic_node(builder, n.field, .EnumMember)
@@ -584,7 +596,22 @@ visit_ident :: proc(
 		return
 	}
 
-	if .Variable in symbol.flags {
+	callable := false
+	#partial switch _ in symbol.value {
+	case SymbolProcedureValue, SymbolProcedureGroupValue, SymbolAggregateValue:
+		callable = true
+	}
+	called := symbol_ptr == cast(rawptr)builder.call_target
+	if callable && !called &&
+	   (symbol.type == .Variable || symbol.type == .Constant || symbol.type == .Function) &&
+	   (.Parameter in symbol.flags || .Mutable in symbol.flags || .Variable in symbol.flags) {
+		// An inferred procedure default is still a parameter value. Keep its
+		// references blue when passed/stored, and function-colored when called.
+		kind := SemanticTokenTypes.Parameter if .Parameter in symbol.flags else .Variable
+		write_semantic_node(builder, ident, kind, modifiers)
+		return
+	}
+	if .Variable in symbol.flags && !(callable && called) {
 		write_semantic_node(builder, ident, .Variable, modifiers)
 		return
 	}

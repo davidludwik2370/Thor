@@ -161,6 +161,9 @@ aliases are kept when available. Hover snippets in Thor files use Thor highlight
 Odin files retain native type spelling and highlighting.
 TLS normalizes semantic token ranges before publishing them, preserving string
 and comment colors even around adapted switches and nested interpolation.
+Inline `proc` literals use the same keyword color as procedure declarations.
+Callback parameters and mutable procedure values use value colors when passed
+or stored; direct calls use function colors, including parenthesized callees.
 The declared name in `package main` uses the usual namespace declaration scope
 (green in Dark+). Imported namespace names and references use variable-blue theme
 scopes, while `set[T]` uses the same keyword
@@ -183,6 +186,8 @@ Thor/Odin workspace sources, including unsaved buffers. Import paths, comments,
 string text, and generated sources are preserved. Ambiguous or unresolved uses
 and detected name conflicts cancel the rename. References outside the workspace
 are not searched; SDK declarations and package declarations cannot be renamed.
+The caret may be inside an identifier or immediately after it, including
+one-letter generic parameters and identifiers after Unicode text.
 After rebuilding TLS, run **Thor: Restart Language Server** to refresh the
 advertised capabilities; an extension reinstall is unnecessary for this change.
 

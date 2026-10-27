@@ -1102,6 +1102,41 @@ main::proc(){
                 i_types.append(client.capabilities['semanticTokensProvider']['legend']['tokenTypes'][kind])
         self.assertEqual(i_types, ['parameter', 'parameter'])
 
+    def test_callback_values_are_parameters_or_variables_and_calls_are_functions(self):
+        text = '''package main
+import "core:slice"
+sorted::proc(a:$T/[]$E,less:=proc(i,j:E)->bool{return i<j},allocator:=context.allocator)->[]E{
+    ret:=make([]E,len(a),allocator)
+    copy(ret,a)
+    slice.sort_by(ret,less)
+    _=less(a[0],a[1])
+    _=(less)(a[0],a[1])
+    return ret
+}
+typed::proc(a:[]$E,compare:proc(E,E)->bool){slice.sort_by(a,compare);_=compare(a[0],a[1])}
+main::proc(){local:=proc(a,b:int)->bool{return a<b};_=local;_=local(1,2)}
+'''
+        client, main = self.open(text, compiler=False)
+        data = client.request('textDocument/semanticTokens/full', {'textDocument': {'uri': main.as_uri()}})['data']
+        legend = client.capabilities['semanticTokensProvider']['legend']['tokenTypes']
+        tokens = {}
+        line = column = 0
+        for index in range(0, len(data), 5):
+            delta, char, length, kind, _ = data[index:index+5]
+            line += delta
+            column = char if delta else column+char
+            tokens[line, column] = legend[kind]
+        for fragment, offset, kind in [
+            ('less:=', 0, 'parameter'), ('sort_by(ret,less)', len('sort_by(ret,'), 'parameter'),
+            ('_=less(', 2, 'function'), ('_=(less)', 3, 'function'),
+            ('sort_by(a,compare)', len('sort_by(a,'), 'parameter'),
+            ('_=compare(', 2, 'function'),
+            ('local:=', 0, 'variable'), ('_=local;', 2, 'variable'), ('_=local(', 2, 'function'),
+        ]:
+            with self.subTest(fragment=fragment):
+                position = self.position(text, fragment, offset)
+                self.assertEqual(tokens.get((position['line'], position['character'])), kind)
+
     @unittest.skipIf(os.name == 'nt', 'Uses an executable Python test compiler')
     def test_locationless_compiler_error_stays_with_its_package_and_clears(self):
         temporary = tempfile.TemporaryDirectory(prefix='tls-locationless-')

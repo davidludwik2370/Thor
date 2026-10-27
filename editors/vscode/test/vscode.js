@@ -145,6 +145,27 @@ async function run() {
             'An error in the temporary example must not appear on demo/main.thor');
         await replace(genericDefault.replace('return missing','return i<j'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const comparatorSource = 'package main\nimport "core:slice"\nsorted::proc(\n a:$T/[]$E,\n less:=proc(i,j:E)->bool{return i<j},\n allocator:=context.allocator,\n)->[]E{ret:=make([]E,len(a),allocator);copy(ret,a);slice.sort_by(ret,less);return ret}\nmain::proc(){result:=sorted([]int{2,1});delete(result)}\n';
+        await replace(comparatorSource);
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const forwardedOffset=comparatorSource.indexOf('sort_by(ret,less)')+'sort_by(ret,'.length;
+        await eventually(() => vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),value=>{
+            if(!value?.data?.length)return false;
+            let line=0,column=0;
+            for(let i=0;i<value.data.length;i+=5){
+                const [delta,char,,kind]=value.data.slice(i,i+4);
+                line+=delta;column=delta?char:column+char;
+                if(testDocument.offsetAt(new vscode.Position(line,column))===forwardedOffset)return legend.tokenTypes[kind]==='parameter';
+            }
+            return false;
+        });
+        const parameterEnd=testDocument.positionAt(comparatorSource.indexOf('a:$T')+1);
+        const parameterEdit=await eventually(()=>vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
+            testDocument.uri,parameterEnd,'data'),value=>value?.size>0);
+        assert.equal(parameterEdit.get(testDocument.uri).length,3);
+        assert.ok(await vscode.workspace.applyEdit(parameterEdit));
+        assert.equal(testDocument.getText(),comparatorSource.replace('a:$T','data:$T').replace('len(a)','len(data)').replace('copy(ret,a)','copy(ret,data)'));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -309,6 +330,7 @@ async function run() {
             'activation and restart with no active editor', 'package declaration hover',
             'generic loop variables remain values in semantic tokens and hover',
             'generic inline defaults compile and body errors highlight original source', 'hidden Set imports do not hover on comments',
+            'callback values use parameter color and a one-letter parameter renames at its end boundary',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

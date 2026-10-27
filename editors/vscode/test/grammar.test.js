@@ -78,6 +78,12 @@ for (const [name, source, word, scope, line] of [
     ['compile switch', 'x :: #switch 1 {case:2}', '#switch', 'entity.name.tag'],
     ['pure function keyword', 'square :: fn(x:int)->int{return x*x}', 'fn', 'storage.type'],
     ['pure function name', 'square :: fn(x:int)->int{return x*x}', 'square', 'entity.name.function'],
+    ['inline procedure default keyword', 'less := proc(i,j:E)->bool{return i<j}', 'proc', 'storage.type'],
+    ['inline pure default keyword', 'less := fn(i,j:E)->bool{return i<j}', 'fn', 'storage.type'],
+    ['procedure argument keyword', 'apply(proc(i:int)->int{return i})', 'proc', 'storage.type'],
+    ['contextless procedure expression keyword', 'return proc "contextless" (i:int)->int{return i}', 'proc', 'storage.type'],
+    ['ordinary function named fn', 'value := fn(data)', 'fn', 'entity.name.function'],
+    ['ordinary fn call with a slice', 'value := fn(data[1:])', 'fn', 'entity.name.function'],
     ['explicit run', 'SIZE :: #run square(8)', '#run', 'entity.name.tag'],
     ['allocated pure return', 'names :: fn()->[]string{return nil}', 'fn', 'storage.type'],
     ['allocated run binding', 'names := #run names()', '#run', 'entity.name.tag'],
@@ -256,6 +262,18 @@ test('declared package names are green, namespace references blue, and set/map s
     }
     const manifest=require('../package.json');
     assert.deepEqual(manifest.contributes.semanticTokenScopes,[{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
+});
+
+test('inline comparator procedure keywords are dark blue in a multiline generic signature',()=>{
+    const source='sorted :: proc(\n    a: $T/[]$E,\n    less := proc(i,j:E)->bool{return i<j},\n    allocator := context.allocator\n)->[]E { return a }';
+    const lines=source.split('\n'),tokens=themedTokens(source);
+    for(const [line,word] of [[0,'proc'],[2,'proc']]){
+        const start=lines[line].indexOf(word);
+        assert.ok(tokens[line].slice(start,start+word.length).every(t=>t.color==='#569CD6'));
+        assert.ok(!tokenize(source)[line].find(t=>t.text===word).scopes.includes('entity.name.function.thor'));
+    }
+    const allocator=tokenize(source)[3].find(t=>t.text==='allocator');
+    assert.ok(allocator.scopes.includes('meta.parameters.thor'),'Inner callback parentheses must not close the outer parameter list');
 });
 
 test('format fills are rune literals, widths are numbers, format punctuation stays neutral',()=>{
