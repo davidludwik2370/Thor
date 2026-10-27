@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.15.0"
+VERSION = "0.15.1"
 
 
 def frontend_binary(odin):
@@ -306,6 +306,8 @@ def _main(argv=None):
                     sdk = Path(subprocess.check_output([odin,'root'],text=True).strip())
                     reuse.inputs.binding(sdk)
                     reuse.begin(ROOT,odin,sdk.resolve())
+                    from .cache import canonical
+                    cache.toolchain_stamp=hashlib.sha256(canonical(reuse.inputs.data)).hexdigest()
                 frontend, odin = frontend_binary(options.odin)
                 if options.clear_cache:
                     from . import parsecache
@@ -323,7 +325,7 @@ def _main(argv=None):
                 frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
                 reuse.save(project,target,frontend_diagnostics)
         finally:
-            if options.cache_report:print(json.dumps({'thor_cache':cache.stats,'thor_transpile_cache':reuse.stats}),flush=True)
+            if options.cache_report:print(json.dumps({'thor_cache':cache.stats,'thor_prepared_hits':cache.prepared_hits,'thor_transpile_cache':reuse.stats}),flush=True)
         if options.command == "transpile":
             if frontend_diagnostics or json_output:
                 report(frontend_diagnostics)

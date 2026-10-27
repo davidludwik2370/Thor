@@ -16,6 +16,17 @@ class Extrema:
         if node.kind == 'Paren':
             return self.builtin(node.role('expr'), seen)
         s, r = node.source, node.source.resolver
+        # Installed namespaces other than math/builtin are ordinary procedures,
+        # not Thor's builtin extrema spellings. Do not load fmt/reflect/etc just
+        # to classify a normal variadic call while scanning runtime code.
+        namespace=None
+        if node.kind=='Selector':
+            base=node.role('expr')
+            if base.kind=='Ident' and r.lookup(base.text,base) is None:namespace=base.text
+        elif node.kind=='Ident' and node.text in s.selected and r.lookup(node.text,node) is None:
+            namespace=s.selected[node.text].split('.',1)[0]
+        path=s.imports.get(namespace)
+        if path and path not in {'core:math','base:builtin'} and s.import_dir(path) is None:return None
         symbol = r.symbol(node)
         if symbol:
             if symbol.declaration.data.get('mutable') or not symbol.value:

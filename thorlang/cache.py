@@ -32,18 +32,65 @@ class EvaluationCache:
         self.enabled = enabled
         self.stats = dict(hits=0, misses=0, writes=0, corrupt=0, bypasses=0)
         self.identities = {}
+        self.toolchain_stamp = None
+        self.prepared_hits = 0
 
     def clear(self):
         """Preserve unrelated files, directories and symlinks."""
         try:
-            if not self.directory.is_dir(): return
             for path in self.directory.iterdir():
                 if re.fullmatch(r'[0-9a-f]{64}\.json', path.name) and path.is_file() and not path.is_symlink():
                     path.unlink(missing_ok=True)
         except OSError: pass
+        for name in ['prepared-v1', 'identity-v1', 'scalar-v1']:
+            try:
+                for path in (self.directory.parent/name).glob('*.json'):
+                    if re.fullmatch(r'[0-9a-f]{64}\.json',path.name) and not path.is_symlink():path.unlink(missing_ok=True)
+            except OSError:pass
+
+    def read_record(self, namespace, key):
+        if not self.enabled or key is None:return None
+        try:
+            path=self.directory.parent/namespace/(key+'.json')
+            if path.stat().st_size>MAX_PACKET:return None
+            packet=json.loads(path.read_bytes());data=packet['data']
+            if packet['checksum']!=hashlib.sha256(canonical(data)).hexdigest():return None
+            return data
+        except (OSError,ValueError,TypeError,KeyError):return None
+
+    def write_record(self, namespace, key, data):
+        if not self.enabled or key is None:return
+        temporary=None
+        try:
+            directory=self.directory.parent/namespace;directory.mkdir(parents=True,exist_ok=True)
+            packet=canonical(dict(data=data,checksum=hashlib.sha256(canonical(data)).hexdigest()))
+            with tempfile.NamedTemporaryFile(dir=directory,prefix='.entry-',delete=False) as stream:
+                temporary=Path(stream.name);stream.write(packet)
+            os.replace(temporary,directory/(key+'.json'))
+        except (OSError,ValueError,TypeError):pass
+        finally:
+            if temporary is not None:
+                try:temporary.unlink(missing_ok=True)
+                except OSError:pass
+
+    def prepared(self, key, skip=None):
+        record=self.read_record('prepared-v1',key)
+        target=record.get('target') if isinstance(record,dict) else None
+        if not isinstance(target,str) or not re.fullmatch('[0-9a-f]{64}',target):return None,None
+        if target==skip:return None,target
+        value=self.get(target)
+        if value is not None:self.prepared_hits+=1
+        return value,target
+
+    def remember(self, prepared, target):
+        if target is not None:self.write_record('prepared-v1',prepared,dict(target=target))
 
     def identity(self, odin, root):
         if odin in self.identities: return self.identities[odin]
+        if self.toolchain_stamp is not None:
+            saved=self.read_record('identity-v1',self.toolchain_stamp)
+            if isinstance(saved,str) and re.fullmatch('[0-9a-f]{64}',saved):
+                self.identities[odin]=saved;return saved
         digest = hashlib.sha256(canonical(dict(schema=SCHEMA, platform=os.sys.platform, machine=platform.machine())))
         executable = Path(odin).resolve()
         digest.update(canonical([str(executable),file_digest(executable)]))
@@ -57,6 +104,7 @@ class EvaluationCache:
                 if path.suffix in {'.odin', '.py'} and path.is_file():
                     digest.update(canonical([str(path),file_digest(path)]))
         self.identities[odin] = digest.hexdigest()
+        self.write_record('identity-v1',self.toolchain_stamp,self.identities[odin])
         return self.identities[odin]
 
     def resources(self, project):

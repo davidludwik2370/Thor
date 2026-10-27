@@ -979,3 +979,57 @@ reports one complete-transpilation hit and no evaluation-cache lookups. These
 are unchanged-build measurements; changed inputs still require transpilation,
 using the parser and evaluation caches where possible. Existing playground moves,
 table work, demo edits and specification deletion remain outside this commit.
+
+## Reuse scalar evaluation across runtime edits: compiler 0.15.1
+
+The 0.15.0 fast path covered unchanged inputs. Editing an unrelated runtime
+variable invalidated that path, and evaluation-cache hits still came after
+helper reconstruction/emission. The user's playground therefore still spent
+roughly three seconds rebuilding after small edits. Treat the edit-and-build
+case as a separate acceptance criterion from repeating an identical build.
+
+Add dependency-keyed prepared-result records before helper reconstruction.
+For verified straight-line primitive scalar #run sites, check a saved dependency
+record before loading SDK ASTs. Retain file-level source syntax with only
+top-level procedure bodies removed, then separately validate selected bodies,
+local bindings, SDK source/package membership and static resources. Preserve
+attributes, privacy, foreign defaults and conditional declarations. Body-local
+offset changes do not change the calculation's identity. Cached roots cover
+their nested calculations, which need not be scheduled again.
+
+Keep native type witnesses around the original call on early hits. Do not turn
+cached scalar values into unchecked primitive casts: the native checker must
+still validate privacy, overload resolution, parameter conversions and nominal
+return types. Keep generic/aggregate execution, nested #run arguments, unsaved
+overlays and unsupported lexical contexts on conservative paths. Resource,
+body, type, purity and binding edits invalidate early reuse. Corrupted result
+packets fall back without double-counting the same failed lookup.
+
+Cache the toolchain content fingerprint against the already captured metadata
+inventory. Source/generated files tracked by content tolerate identical-byte
+rewrites. Skip automatic-fn and generic scheduling where no relevant fn/generic
+compile-time work exists. Avoid discovering unrelated SDK packages just to
+classify ordinary native variadic calls as builtin min/max candidates.
+
+New tests edit runtime variables before and after #run while forbidding helper
+project construction. Additional cases cover changed bodies/constants/types,
+runtime shadowing, nominal and shadowed primitive types, global/local conditional
+declarations, new library privacy, no-op saves and modified native overlays.
+The original playground source remains unchanged by the performance work.
+
+Validation: the full regression run passed 669 tests with one existing expected
+failure, including real debugger coverage. After final native-type/privacy
+hardening, 148 focused edited-build/native-run/extrema/power/cache/diagnostic
+tests pass. Nine additional cache tests pass, including clearing early records
+when the result directory is missing. Actual VS Code integration also passes.
+
+Five final alternating edited/unchanged/native builds of a temporary copy of
+the playground measured runtime edits at 0.662-0.676 seconds (median 0.666),
+unchanged builds at 0.276-0.284 seconds (median 0.280), and native Odin at
+0.198-0.216 seconds (median 0.207). All edited samples report one early result
+hit and zero evaluation misses; all unchanged samples report complete reuse.
+The initially empty evaluation/transpilation cache took 2.855 seconds to warm.
+These figures include the final Odin build. Changed builds still pay for Thor
+parsing, analysis and source-map emission; that remaining overhead is material
+and should not be described as negligible. The copied program prints the table
+and array length 10, and its original source hash is unchanged.

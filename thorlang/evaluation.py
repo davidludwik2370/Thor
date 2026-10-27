@@ -4,6 +4,7 @@ Each helper is an isolated throw-away project with source maps. Only necessary
 declarations/imports enter it; user init/fini and entry points are never copied.
 Explicit #run and known-argument fn calls share contents caching and ownership.
 """
+import hashlib
 import json
 import os
 import platform
@@ -36,6 +37,22 @@ class Evaluator:
         from .native import NativeSources
         self.p.native_sources=NativeSources(project)
         self.r.native=self.p.native_sources
+        from .scalarcache import ScalarSites
+        self.scalar_sites=ScalarSites(self)
+        self.scalar_witnesses={};self.execution_records={};self.reused_runs=set();self.failed_scalar_targets={}
+        self.has_pure_functions=any(self.purity.pure(node) for source in project.sources.values() for node in source.nodes)
+        self.schedule_generics=self.has_pure_functions or any(
+            (node.kind=='Run' or self.power(node) or node.source.thor and node.kind=='Call' and
+                node.source.expressions.extrema.plan(node) and self.constant_context(node)) and
+            any(self.r.generic_parameters(a.role('type') if a.kind=='Procedure' else a)
+                for a in node.ancestors() if a.kind in {'Procedure','StructType'})
+            for source in project.sources.values() for node in source.nodes)
+        self.work_sources=None
+        if not self.has_pure_functions and not self.schedule_generics:
+            self.work_sources={source for source in project.sources.values() if any(
+                node.kind=='Run' or self.power(node) or node.source.thor and node.kind=='Call' and
+                node.source.expressions.extrema.plan(node) and self.constant_context(node)
+                for node in source.nodes)}
 
     def key(self,n):return self.specializations.key(n)
 
@@ -76,6 +93,7 @@ class Evaluator:
         if self.power(n):
             return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
         if n.kind!='Call' or n.parent and n.parent.kind=='Run':return False
+        if not self.has_pure_functions and not n.source.expressions.extrema.plan(n):return False
         library=self.purity.library(n)
         if library and n.source.import_dir(library[0]) is None and not (
             library[0] in {'core:math','base:builtin'} and library[1] in {'min','max'}):return False
@@ -189,6 +207,14 @@ class Evaluator:
         s.run_values[n]=render
 
     def result_type(self,call):
+        if call in self.scalar_witnesses:
+            source=call.source;source.needs_intrinsics=True
+            enabled=self.r.native_enabled;self.r.native_enabled=False
+            try:code=source.render(call)
+            finally:self.r.native_enabled=enabled
+            if self.scalar_witnesses[call]=='expression':return f'type_of({code})'
+            meta=source.prefix+'meta'
+            return f'{meta}.type_proc_return_type(type_of({meta}.procedure_of({code})),0)'
         if self.power(call):return call.source.expressions.power_type(call)
         if call.source.expressions.extrema.plan(call):return call.source.expressions.extrema.result_type(call)
         plan=call.source.resolver.resolve_call(call)
@@ -421,6 +447,12 @@ class Evaluator:
                 self.register(n,value,self.specializations.relevant(n))
                 return None
             call=self.call(n)
+            if n.kind=='Run':
+                cached=self.scalar_sites.load(n)
+                if cached is not None:
+                    self.results[key]=cached;self.result_bindings[key]={}
+                    self.install(n,cached);self.reused_runs.add(n)
+                    return cached
             if self.power(n):
                 if not all(self.known(n.role(side)) for side in ['left','right']):return None
                 self.ensure_runs(n)
@@ -464,6 +496,7 @@ class Evaluator:
             self.ensure_runs(call)
             data=self.execute(call)
             self.results[key]=data;self.result_bindings[key]=self.specializations.relevant(n).copy();self.install(n,data)
+            if n.kind=='Run':self.scalar_sites.save(n)
             return data
         finally:self.busy.remove(key)
 
@@ -477,7 +510,9 @@ class Evaluator:
                    for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
         for source in list(self.p.sources.values()):
             if source.excluded:continue
+            if self.work_sources is not None and source not in self.work_sources:continue
             for node in source.nodes:
+                if any(parent in self.reused_runs for parent in node.ancestors()):continue
                 if (node.kind=='Run' or self.automatic(node)) and self.key(node) not in self.results and self.key(node) not in self.skipped:self.evaluate(node)
                 if node.kind=='Call':self.specializations.process(node)
         self.resolve_local_identities()
@@ -654,6 +689,36 @@ class Evaluator:
             for name in names:imports.setdefault(source,set()).add(source.selected[name].split('.')[0])
         return keep,imports,aliases,procedures,queries,calls,external
 
+    def prepared_key(self,n,roots,keep,procedures,queries):
+        """An early scalar-result lookup independent of unrelated runtime bodies.
+
+        Keep generic/aggregate execution on the established emitted-helper key.
+        Whole declaration headers preserve overloads, types and globals; only
+        the bodies selected by this dependency closure participate in the key.
+        """
+        if not self.cache or not self.cache.enabled:return None
+        typ=self.r.type_of(n)
+        if typ.kind!='scalar' or typ.name in {'any','typeid','rawptr','cstring'}:return None
+        if any(self.r.generic_parameters(proc.role('type')) for proc in procedures):return None
+        if any(node.kind=='Directive' and node.data['name']=='procedure' for item in (*roots,*keep) for node in descendants(item)):return None
+        from .cache import canonical
+        from .scalarcache import headers as interfaces
+        headers=interfaces(self.p)
+        dependencies=sorted((str(node.source.path),node.kind,node.text,
+                             [attribute.text for attribute in node.group('attributes')]) for node in keep)
+        native=sorted((str(path),hashlib.sha256(source.raw).hexdigest()) for path,source in self.p.native_sources.sources.items())
+        support=sorted((str(source.path),hashlib.sha256(source.raw).hexdigest()) for source in self.p.sources.values()
+                       if self.p.native_sources.support(source))
+        previous=sorted((str(node.source.path),node.text,data) for (node,_),data in self.results.items()
+                        if any(root.source is node.source and root.start<=node.start and node.end<=root.end for root in (*roots,*keep)))
+        resources=self.cache.resources(self.p)
+        if resources is None:return None
+        data=dict(schema=1,identity=self.cache.identity(self.odin,self.root),entry=str(self.p.entry),
+            flags=self.p.flags,test=self.p.test,expression=n.text,headers=headers,dependencies=dependencies,
+            native=native,support=support,previous=previous,queries=sorted((query.text,code) for query,code in queries.items()),
+            scopes=[a.role('type').text for a in n.ancestors() if a.kind=='Procedure'],resources=resources)
+        return hashlib.sha256(canonical(data)).hexdigest()
+
     def execute(self,n,*,condition=False,condition_case=None,extra=()):
         from .driver import Project
         error_site=n.parent if n.parent and n.parent.kind=='Run' else n
@@ -664,6 +729,13 @@ class Evaluator:
                   b.typ.node.kind in {'StructType','UnionType','EnumType','DistinctType','BitSetType'} else b.typ.node
                   for b in bindings.values() if b.typ.node]
         keep,imports,aliases,procedures,queries,calls,external=self.closure(roots)
+        prepared=self.prepared_key(n,roots,keep,procedures,queries) if not (condition or condition_case is not None or extra or bindings) else None
+        failed_prepared=None
+        if prepared is not None:
+            cached,failed_prepared=self.cache.prepared(prepared,self.failed_scalar_targets.get(n))
+            if cached is not None:
+                self.execution_records[n]=(failed_prepared,keep,procedures)
+                return cached
         flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:','-vet','-target:')) and f not in {'-keep-executable','-no-entry-point'}]
         overlays={path:s.raw for path,s in self.p.sources.items()}
         helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays,cache_frontend=self.p.cache_frontend)
@@ -861,7 +933,8 @@ class Evaluator:
             executable=directory/('helper.exe' if sys.platform=='win32' else 'helper')
             command=[self.odin,'build',str(target),*helper.odin_flags(),f'-out:{executable}','-json-errors']
             key=self.cache.key(self.p,helper,target,self.odin,self.root) if self.cache else None
-            cached=self.cache.get(key) if self.cache else None
+            self.execution_records[n]=(key,keep,procedures)
+            cached=self.cache.get(key) if self.cache and key not in {failed_prepared,self.failed_scalar_targets.get(n)} else None
             def unpack(data):
                 if data.get('kind')!='specialized':return data
                 for binding,name in zip((b for b in bindings.values() if b.value is None),data['types']):
@@ -870,7 +943,9 @@ class Evaluator:
                         canonical=re.sub(r'\b'+re.escape(internal)+r'\b',original,canonical)
                     binding.canonical=canonical
                 return data['value']
-            if cached is not None:return unpack(cached)
+            if cached is not None:
+                if self.cache:self.cache.remember(prepared,key)
+                return unpack(cached)
             try:built=subprocess.run(command,capture_output=True,timeout=max(30,self.timeout))
             except subprocess.TimeoutExpired:self.fail(error_site,label+' helper compilation timed out.')
             diagnostics=Diagnostics(helper.sources,helper.maps,helper.generated)
@@ -914,4 +989,5 @@ class Evaluator:
                 if key and self.cache.key(self.p,helper,target,self.odin,self.root)!=key:
                     self.fail(error_site,'#run resource inputs changed during evaluation; compile again with stable inputs.')
                 self.cache.put(key,value)
+                self.cache.remember(prepared,key)
             return unpack(value)

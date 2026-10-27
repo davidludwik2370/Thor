@@ -118,6 +118,7 @@ class Specializations:
 
     def process(self,call):
         e=self.e;r=e.r
+        if not e.schedule_generics:return
         library=e.purity.library(call)
         # Installed Odin bodies cannot contain Thor fn/#run syntax. Their
         # generic runtime calls need no Thor specialization traversal; explicit

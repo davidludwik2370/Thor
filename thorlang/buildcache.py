@@ -81,9 +81,9 @@ class Inputs:
                 if Path(name).suffix in {'.odin', '.py'}:
                     self.file(Path(directory) / name, content=False)
 
-    def source(self, source):
+    def source(self, source, *, source_file=True):
         from .compiler import unquote
-        self.file(source.path, source.raw)
+        if source_file:self.file(source.path, source.raw)
         for node in source.nodes:
             if node.kind != 'Call':
                 continue
@@ -115,7 +115,9 @@ class Inputs:
             return False
         try:
             for path, value in self.data['files'].items():
-                if signature(path) != value['stat']:
+                # Editors and other compiler invocations can rewrite identical
+                # bytes. Content-tracked inputs/artifacts remain valid then.
+                if signature(path) != value['stat'] and value['sha256'] is None:
                     return False
                 if value['sha256'] is not None and file_digest(Path(path)) != value['sha256']:
                     return False
