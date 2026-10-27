@@ -6,6 +6,7 @@ pass tracks effects and provenance; it never treats contextless as purity.
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+import re
 from .compiler import Hint
 from .semantics import descendants
 
@@ -53,6 +54,21 @@ class Purity:
     libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}
     native_constants={('core:math',name) for name in ['PI','TAU','E','SQRT_TWO','SQRT_THREE','SQRT_FIVE']}
+    scalar_intrinsics = {'sqrt', 'fused_mul_add', 'count_ones', 'count_zeros',
+        'count_leading_zeros', 'count_trailing_zeros', 'count_leading_ones',
+        'count_trailing_ones', 'reverse_bits', 'byte_swap', 'saturating_add',
+        'saturating_sub', 'constant_log2', 'expect', 'likely', 'unlikely'}
+    source_identity_intrinsics = {'type_canonical_name', 'type_name_of'}
+    structural_intrinsics = {'type_base_type','type_core_type','type_elem_type',
+        'type_union_tag_type','type_union_tag_offset','type_union_base_tag_value',
+        'type_union_variant_count','type_variant_type_of','type_variant_index_of',
+        'type_bit_set_elem_type','type_bit_set_underlying_type','type_field_type',
+        'type_field_bit_size','type_field_bit_offset','type_proc_parameter_count',
+        'type_proc_return_count','type_proc_parameter_type','type_proc_return_type',
+        'type_proc_calling_convention','type_struct_field_count','type_struct_has_implicit_padding',
+        'type_polymorphic_record_parameter_count','type_field_index_of',
+        'type_fixed_capacity_dynamic_array_len_offset','type_enum_is_contiguous',
+        'type_convert_variants_to_pointers','type_merge','type_integer_to_unsigned','type_integer_to_signed'}
 
     def __init__(self,project):
         self.project=project
@@ -65,6 +81,7 @@ class Purity:
         self.active=set()
         self.contracts={}
         self.inner_bodies=set()
+        self.scalar_casts=set()
         for source in self.r.sources:source.purity=self
 
     @staticmethod
@@ -72,6 +89,14 @@ class Purity:
 
     @staticmethod
     def pure(proc):return proc and proc.kind=='Procedure' and proc.data.get('pure',False)
+
+    @staticmethod
+    def contextual(proc):
+        cc=proc.role('type').data.get('calling_convention','')
+        if cc=='foreign':
+            foreign=next((a for a in proc.ancestors() if a.kind=='ForeignBlock'),None)
+            cc=foreign.data.get('calling_convention','c') if foreign else 'c'
+        return cc in {'','odin'}
 
     def checked(self,proc):return bool(proc and (self.pure(proc) or self.eval_mode and proc in self.active))
 
@@ -103,6 +128,7 @@ class Purity:
     def library(self,call):return self.imported(call.role('callee'))
 
     def approved(self,call):
+        if self.primitive(call.role('callee')):return True
         library=self.library(call)
         if library not in self.libraries:return False
         package=call.source.import_dir(library[0])
@@ -110,13 +136,59 @@ class Purity:
             return package==Path(__file__).resolve().parents[1]/'runtime'/'format'
         return package is None # installed native package, not a user override
 
+    def primitive(self,callee,seen=None):
+        if callee is None:return False
+        seen=set() if seen is None else seen
+        if callee in seen:return False
+        seen.add(callee)
+        imported=self.imported(callee)
+        if imported and imported[0]=='base:intrinsics' and callee.source.import_dir(imported[0]) is None:
+            return imported[1] in self.scalar_intrinsics|self.structural_intrinsics or imported[1].startswith(('type_is_','type_has_'))
+        symbol=self.r.symbol(callee)
+        if not symbol or symbol.declaration.data.get('mutable') or symbol.immutable:return False
+        if symbol.value and symbol.value.kind in {'Ident','Selector','Paren'}:
+            value=symbol.value.role('expr') if symbol.value.kind=='Paren' else symbol.value
+            return self.primitive(value,seen)
+        if not getattr(symbol.node.source,'native_inspected',False):return False
+        foreign=next((a for a in symbol.declaration.ancestors() if a.kind=='ForeignBlock'),None)
+        if not foreign or foreign.data.get('calling_convention')!='none':return False
+        for attribute in symbol.declaration.group('attributes'):
+            for item in attribute.group('elems'):
+                if item.kind=='FieldValue' and item.role('field').text=='link_name':
+                    name=item.role('value').text.strip('"')
+                    if re.fullmatch(r'llvm\.(sin|cos|pow|exp|exp2|log|log2|log10|fmuladd|fma|sqrt|floor|ceil|trunc|round|roundeven)\.f(16|32|64)',name):return True
+        return False
+
+    def builtin_name(self,callee,seen=None):
+        if callee is None:return None
+        seen=set() if seen is None else seen
+        if callee in seen:return None
+        seen.add(callee)
+        imported=self.imported(callee)
+        if imported and imported[0]=='base:builtin' and callee.source.import_dir(imported[0]) is None:
+            return imported[1] if imported[1] in self.builtins else None
+        symbol=self.r.symbol(callee)
+        if symbol and not symbol.declaration.data.get('mutable') and not symbol.immutable and symbol.value:
+            if symbol.value.kind in {'Ident','Selector'}:return self.builtin_name(symbol.value,seen)
+        if callee.kind=='Ident' and symbol is None and not imported and callee.text in self.builtins:return callee.text
+        return None
+
     def builtin(self,call):
         extrema=call.source.expressions.extrema.builtin(call.role('callee'))
         if extrema:return extrema
         callee=call.role('callee')
         if callee.kind=='Directive' and callee.data['name'] in {'assert','config'}:return '#'+callee.data['name']
-        if callee.kind=='Ident' and self.r.symbol(callee) is None and callee.text in self.builtins:return callee.text
-        return None
+        return self.builtin_name(callee)
+
+    def scalar_transmute(self,node):
+        types=[self.r.type_node(node.role('type')),self.r.type_of(node.role('expr'))]
+        def safe(t):
+            if t.kind in {'enum','bitset'}:return True
+            if t.kind=='scalar':return t.name not in {'rawptr','any','typeid','cstring'}
+            if t.kind in {'unknown','generic'}:return None
+            return False
+        allowed=[safe(t) for t in types]
+        return False if False in allowed else None if None in allowed else True
 
     def targets(self,call):
         direct=self.r.symbol(call.role('callee'))
@@ -238,8 +310,16 @@ class Purity:
 
     def explicit_allocator(self,n):
         args=n.group('args');library=self.library(n)
-        if any(a.kind=='FieldValue' and a.role('field').text=='allocator' for a in args):return True
+        named=any(a.kind=='FieldValue' and a.role('field').text=='allocator' for a in args)
+        plan=self.r.resolve_call(n)
+        fields=self.r.fields(plan.signature.role('params')) if plan else []
+        if named:
+            annotation=next((typ for name,typ in fields if name=='allocator'),None)
+            actual=self.r.type_node(annotation,plan.substitutions) if annotation else None
+            return not(actual and actual.kind in {'scalar','enum','bitset'} and actual.name not in {'any','rawptr','typeid','cstring'})
         positional=[a for a in args if a.kind!='FieldValue']
+        if library in self.libraries and fields:
+            return any(name=='allocator' for name,_ in fields[:len(positional)])
         if library in {('core:strings','clone'),('core:slice','clone'),('thor:format','group_integer')}:
             return len(positional)>1
         if library and library[0]=='thor:format':
@@ -290,13 +370,22 @@ class Purity:
         seen=set() if seen is None else seen
         if n in seen:return False
         seen.add(n)
-        if n.kind=='Directive' and n.data['name'] in {'file','directory','line'}:return True
+        if n.kind=='Directive' and n.data['name'] in {'file','directory','line','caller_location','defined'}:return True
+        if n.kind=='Ident' and n.text=='ODIN_BUILD_PROJECT_NAME' and self.reference(n) and self.r.symbol(n) is None:return True
+        if self.imported(n)==('base:builtin','ODIN_BUILD_PROJECT_NAME'):return True
+        if self.imported(n) in {('base:intrinsics',name) for name in self.source_identity_intrinsics}:return True
         symbol=self.r.symbol(n) if n.kind in {'Ident','Selector'} else None
         if symbol and symbol.declaration.kind=='Declaration' and not symbol.declaration.data.get('mutable'):
             if self.source_location_dependent(symbol.value,seen):return True
         return any(self.source_location_dependent(child,seen) for child in n.children)
 
     def analyze(self,proc):
+        enabled=self.r.native_enabled
+        if self.r.native:self.r.native_enabled=True
+        try:return self._analyze(proc)
+        finally:self.r.native_enabled=enabled
+
+    def _analyze(self,proc):
         if proc in self.analyzed:return
         self.analyzed.add(proc)
         nodes=self.walk(proc);env={}
@@ -339,8 +428,8 @@ class Purity:
                     else:changed |= env[key].merge(value)
             if not changed:break
         cc=proc.role('type').data.get('calling_convention','')
-        if cc not in {'','odin'} and not(cc=='contextless' and not self.pure(proc)):
-            self.problem(proc,'Pure functions require the Odin calling convention; eligible ordinary procedures may also be contextless.')
+        if self.pure(proc) and cc not in {'','odin'}:
+            self.problem(proc,'Declared pure functions require the Odin calling convention.')
         declaration=proc.parent
         if declaration and declaration.kind=='Declaration':
             for attribute in declaration.group('attributes'):
@@ -362,6 +451,9 @@ class Purity:
                 if any(self.r.type_of(owner).kind in {'generic','unknown'} for owner in owners):
                     self.problem(n,'Pure using requires a resolved record schema; unverified namespaces and unconstrained generic projections are not eligible.')
             if n.kind=='Selector' or n.kind=='Ident' and self.reference(n):
+                if ((n.kind=='Ident' and n.text=='ODIN_BUILD_PROJECT_NAME' and self.r.symbol(n) is None) or
+                    self.imported(n)==('base:builtin','ODIN_BUILD_PROJECT_NAME')):
+                    self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
                 if any(a.kind=='Call' and self.builtin(a) in self.type_queries and a.role('callee') is not n for a in n.ancestors() if a is not proc):continue
                 symbol=self.r.symbol(n)
                 if symbol and symbol.declaration.kind=='Declaration' and self.source_location_dependent(symbol.value):
@@ -370,10 +462,10 @@ class Purity:
                     if symbol.declaration.data.get('mutable',False) or symbol.immutable:
                         self.problem(n,f"Pure code cannot read or write runtime storage '{symbol.name}' outside the function.")
                 imported=self.imported(n)
-                if imported and n.source.import_dir(imported[0]) is None and imported not in self.native_constants:
+                if imported and symbol is None and n.source.import_dir(imported[0]) is None and imported not in self.native_constants:
                     call=n.parent
                     if not(call and call.kind=='Call' and call.role('callee') is n and
-                           (self.approved(call) or call.source.expressions.extrema.builtin(call.role('callee')))):
+                           (self.approved(call) or self.builtin(call))):
                         self.problem(n,'Pure code cannot read unverified native package storage or values; only approved constants/helpers are eligible.')
             if n.kind=='Implicit':self.problem(n,'Pure code cannot access the ambient context or implicit runtime state.')
             if n.kind=='Unsafe':self.problem(n,'Assembly, uninitialized storage and unsafe operations are not permitted in pure code.')
@@ -381,7 +473,12 @@ class Purity:
                 results=self.r.fields(proc.role('type').role('results'))
                 if len(results)>1 and any(not name for name,_ in results):
                     self.problem(n,'or_return in a procedure with multiple results requires named return values.')
-            if n.kind=='Cast' and n.data['op']=='transmute':self.problem(n,'Pure code cannot transmute storage or observe pointer representations.')
+            if n.kind=='Cast' and n.data['op']=='transmute':
+                allowed=self.scalar_transmute(n)
+                message='Pure transmute requires scalar numeric, boolean, enum or bit-set values; pointer and aggregate representations are not eligible.'
+                if allowed is False:self.problem(n,message)
+                elif allowed is None:
+                    self.scalar_casts.add(n)
             if n.kind=='Directive' and n.data['name'] not in {'assert','config','type','file','line','directory','procedure'}:
                 self.problem(n,'This directive is not permitted in pure code.')
             if n.kind=='Directive' and n.data['name'] in {'file','line','directory'}:
@@ -463,6 +560,18 @@ class Purity:
                 finally:self.rendering.difference_update(added)
                 return code+'\n#panic('+json.dumps(message)+')\n'
             return n.source.expressions.error(n,message)
+        if n in self.scalar_casts:
+            self.rendering.add(n)
+            try:
+                source=n.source;source.needs_intrinsics=True;meta=source.prefix+'meta'
+                def body(_):
+                    def scalar(t):return '('+' || '.join(f'{meta}.type_is_{kind}({t})' for kind in ['numeric','boolean','enum','bit_set'])+')'
+                    condition=f'{scalar(source.render(n.role("type")))} && {scalar("type_of("+source.render(n.role("expr"))+")")}'
+                    return f'when {condition} {{return '+source._render(n,expected,constant)+'} else {#panic("Pure transmute requires scalar values; pointer and aggregate representations are not eligible.")}'
+                name,args=source.expressions.closed(n,body,result=None,flavor='pure_transmute')
+                args.append(source.render(n.role('type')))
+                return name+'('+', '.join(args)+')'
+            finally:self.rendering.remove(n)
         if n.kind=='Return' and proc in self.inner_bodies:
             s=n.source;results=self.r.fields(proc.role('type').role('results'))
             named=self.result_names(proc)
@@ -479,7 +588,7 @@ class Purity:
             return s.mapping.wrap(code,s.path,n.start,n.end,'pure-return')
         if n is proc.role('body') and proc not in self.inner_bodies and self.wraps(proc):
             return self.wrapper(proc,n)
-        if n.kind=='Call' and self.approved(n) and self.library(n)[0]=='thor:format' and n not in self.rendering:
+        if n.kind=='Call' and self.approved(n) and self.library(n) and self.library(n)[0]=='thor:format' and n not in self.rendering:
             self.rendering.add(n)
             try:
                 source=n.source
@@ -528,7 +637,7 @@ class Purity:
         return False
 
     def wraps(self,proc):
-        return proc.role('type').data.get('calling_convention')!='contextless' and any(
+        return self.contextual(proc) and any(
             self.owned_type(self.r.type_node(typ)) for _,typ in self.r.fields(proc.role('type').role('results')) if typ)
 
     def result_names(self,proc):
@@ -591,8 +700,8 @@ class Purity:
                     continue
                 code.append(f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,0)')
         for _,typ in self.r.fields(proc.role('type').role('results')):
-            if typ:code.append(f'{self.validator(s)}({self.r.template(typ)},true,{str(proc.role("type").data.get("calling_convention")!="contextless").lower()},0)')
-        if proc.role('type').data.get('calling_convention')=='contextless':
+            if typ:code.append(f'{self.validator(s)}({self.r.template(typ)},true,{str(self.contextual(proc)).lower()},0)')
+        if not self.contextual(proc):
             return s.mapping.wrap('\n'+'\n'.join(code)+'\n',s.path,proc.start,proc.role('type').end,'pure-contract')
         if self.wraps(proc):code.append(f'{prefix}_caller:=context.allocator')
         code += [f'{prefix}: {module}.Scratch',f'{module}.scratch_init(&{prefix})',

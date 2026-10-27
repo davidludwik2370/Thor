@@ -41,6 +41,18 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_native_run_overload_error_uses_public_name_and_original_callee(self):
+        source='package main\nimport "core:math"\n/* 😀 */ VALUE :: #run math.round("bad")\nmain::proc(){}\n'
+        errors=self.at(source,'math.round',message='No procedures or ambiguous call')
+        self.assertEqual(len(errors),1,errors)
+        self.assertEqual(errors[0]['pos']['end_offset']-errors[0]['pos']['offset'],len('math.round'))
+        self.assertNotIn('thor_eval_',json.dumps(errors))
+        self.assertNotIn('__thor_',json.dumps(errors))
+
+    def test_native_run_foreign_rejection_highlights_the_run_expression(self):
+        self.at('package main\nimport "core:c/libc"\n/* 😀 */ VALUE :: #run libc.rand()\nmain::proc(){}\n',
+                '#run libc.rand()',message='foreign')
+
     def test_wildcard_import_errors_map_to_original_names_and_marker(self):
         self.at('package main\nimport * "lib"\n/* 😀 */ VALUE::8\nmain::proc(){}\n','VALUE::',
             files={'lib/main.odin':'package lib\nVALUE::7\n'},message='conflicts with wildcard import')

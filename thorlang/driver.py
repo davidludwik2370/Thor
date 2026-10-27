@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.13.2"
+VERSION = "0.14.0"
 
 
 def frontend_binary(odin):

@@ -52,7 +52,7 @@ class EvaluationCache:
             digest.update(canonical([command,result.stdout.hex()]))
             if command == 'root': native_root = Path(result.stdout.decode().strip())
         # Locally edited stdlib/compiler support invalidates unchanged binaries.
-        for tree in [root/'thorlang', root/'frontend', root/'runtime', native_root/'base', native_root/'core']:
+        for tree in [root/'thorlang', root/'frontend', root/'runtime', native_root/'base', native_root/'core', native_root/'vendor']:
             for path in sorted(tree.rglob('*')):
                 if path.suffix in {'.odin', '.py'} and path.is_file():
                     digest.update(canonical([str(path),file_digest(path)]))
@@ -62,7 +62,9 @@ class EvaluationCache:
     def resources(self, project):
         """Dynamic resource paths bypass caching rather than guessing inputs."""
         digest = hashlib.sha256()
-        for source in project.sources.values():
+        native=getattr(project,'native_sources',None)
+        sources=[*project.sources.values(),*(native.sources.values() if native else [])]
+        for source in sources:
             if source.excluded: continue
             for node in source.nodes:
                 if node.kind != 'Call': continue

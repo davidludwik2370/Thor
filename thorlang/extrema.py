@@ -31,7 +31,7 @@ class Extrema:
         if node.kind == 'Selector':
             base, field = node.role('expr'), node.role('field')
             if (base.kind == 'Ident' and r.lookup(base.text, base) is None
-                    and s.imports.get(base.text) == 'core:math' and s.import_dir('core:math') is None):
+                    and s.imports.get(base.text) in {'core:math','base:builtin'} and s.import_dir(s.imports[base.text]) is None):
                 return field.text if field.text in {'min', 'max'} else None
         return None
 

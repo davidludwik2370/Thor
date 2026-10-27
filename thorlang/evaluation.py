@@ -16,15 +16,12 @@ import tempfile
 from .compiler import ThorError, unquote
 from .diagnostics import Diagnostics
 from .semantics import descendants
+from .sourcemap import Origin
 from . import values
 from .specialization import Specializations, Unresolved, type_code
 
 
 class Evaluator:
-    # These native packages are trusted compiler-distribution dependencies.
-    # Other native collections must be inspectable project sources; an opaque
-    # type-only import must not sneak unverified package initializers into #run.
-    native_imports={'base:intrinsics','core:strings','core:slice','core:math'}
     def __init__(self,project,odin,timeout=5,cache=None):
         self.p=project;self.odin=odin;self.timeout=timeout
         self.results={};self.busy=set();self.guard_busy=set();self.skipped=set();self.unchecked=set()
@@ -36,6 +33,9 @@ class Evaluator:
         self.result_bindings={}
         self.r.evaluated_integer=self.constant_integer
         self.r.evaluation_active=True
+        from .native import NativeSources
+        self.p.native_sources=NativeSources(project)
+        self.r.native=self.p.native_sources
 
     def key(self,n):return self.specializations.key(n)
 
@@ -82,6 +82,8 @@ class Evaluator:
             # The evaluator materializes one value, matching ignored optional
             # status. Multiple constant results retain Odin's native rules.
             return self.constant_context(n) and not (declaration and declaration.kind=='Declaration' and len(declaration.group('names'))>1)
+        library=self.purity.library(n)
+        if library and n.source.import_dir(library[0]) is None:return False
         if '-debug' in self.p.flags and not self.constant_context(n):return False
         symbol=self.r.symbol(n.role('callee'))
         alternatives=symbol.candidates if symbol else []
@@ -187,8 +189,9 @@ class Evaluator:
         if self.power(call):return call.source.expressions.power_type(call)
         if call.source.expressions.extrema.plan(call):return call.source.expressions.extrema.result_type(call)
         plan=call.source.resolver.resolve_call(call)
-        if not plan:self.fail(call,'Compile-time result type requires an unambiguous resolved procedure target.')
-        if len(self.r.fields(plan.signature.role('results')))!=1:
+        if not plan and not(self.purity.approved(call) or self.purity.builtin(call)):
+            self.fail(call,'Compile-time result type requires an unambiguous resolved procedure target.')
+        if plan and len(self.r.fields(plan.signature.role('results')))!=1 and not plan.signature.data.get('optional_ok'):
             self.fail(call,'Compile-time execution requires exactly one supported result value.')
         source=call.source;source.needs_intrinsics=True
         saved=source.run_values.pop(call,None)
@@ -219,6 +222,7 @@ class Evaluator:
                 if value is None:source.run_values.pop(node,None)
                 else:source.run_values[node]=value
         meta=source.prefix+'meta'
+        if plan is None:return f'type_of({code})'
         # Native procedure_of resolves overloads and generic return types without
         # executing the call or exposing private/local type names across packages.
         return f'{meta}.type_proc_return_type(type_of({meta}.procedure_of({code})),0)'
@@ -266,7 +270,7 @@ class Evaluator:
                 return self.symbol_constant(symbol) and (symbol.value is None or self.known(symbol.value,seen))
             imported=self.purity.imported(n)
             if imported in self.purity.native_constants and n.source.import_dir(imported[0]) is None:return True
-            if n.kind=='Ident':return n.text.startswith('ODIN_')
+            if n.kind=='Ident':return n.text.startswith('ODIN_') and n.text!='ODIN_BUILD_PROJECT_NAME'
         if n.kind in {'Procedure','ProcedureGroup'}:return True
         if n.kind=='Call':
             builtin=self.purity.builtin(n)
@@ -282,7 +286,6 @@ class Evaluator:
             if builtin=='make':
                 kind=n.source.resolver.type_node(args[0]).kind if args else ''
                 if kind not in {'slice','dynamic'} or len(args)>(3 if kind=='dynamic' else 2):return False
-            if any(a.kind=='FieldValue' and a.role('field').text=='allocator' for a in args):return False
             if builtin=='#config':args=args[1:]
             targets=self.purity.targets(n)
             if not(builtin or self.purity.approved(n) or n.source.denotes_type(n.role('callee')) or targets):return False
@@ -295,7 +298,7 @@ class Evaluator:
             if n.kind=='Compound' and self.purity.source_location_dependent(n.role('type')):return False
             return all(self.known(a,seen.copy()) for a in n.group('elems' if n.kind=='Compound' else 'args'))
         if n.kind in {'Paren','Unary','Cast'}:
-            if n.kind=='Cast' and n.data['op']=='transmute' or n.kind=='Unary' and n.data['op']=='&':return False
+            if n.kind=='Cast' and n.data['op']=='transmute' and self.purity.scalar_transmute(n) is not True or n.kind=='Unary' and n.data['op']=='&':return False
             return self.known(n.role('expr'),seen)
         if n.kind=='Slice':return all(self.known(n.role(k),seen.copy()) for k in ['expr','low','high'])
         if n.kind=='Index':return self.known(n.role('expr'),seen.copy()) and self.known(n.role('index'),seen.copy())
@@ -434,7 +437,15 @@ class Evaluator:
                 self.results[key]=data;self.result_bindings[key]=self.specializations.relevant(n).copy();self.install(n,data)
                 return data
             if call.kind!='Call':self.fail(n,'#run requires a direct eligible procedure call.')
-            if not self.purity.targets(call) and not call.source.expressions.extrema.plan(call):self.fail(n,'#run requires a resolved direct call; indirect and foreign calls are not eligible.')
+            if not(self.purity.targets(call) or self.purity.approved(call) or self.purity.builtin(call)):
+                library=self.purity.library(call)
+                if library and library[0]=='base:intrinsics':
+                    self.fail(n,f"#run cannot evaluate compiler intrinsic '{call.role('callee').text}': it is not an eligible pure operation.")
+                if library:
+                    self.fail(n,f"#run cannot verify '{call.role('callee').text}': no eligible procedure body is available; foreign and unresolved implementations are not eligible.")
+                self.fail(n,'#run requires a resolved direct call; indirect and foreign calls are not eligible.')
+            if self.purity.explicit_allocator(call):
+                self.fail(call,'Compile-time calls cannot select an allocator; use the evaluation scratch allocator.')
             if n.kind=='Run':self.explicit_arguments+=1
             try:
                 for arg in call.group('args'):
@@ -454,6 +465,11 @@ class Evaluator:
         finally:self.busy.remove(key)
 
     def evaluate_all(self):
+        self.r.native_enabled=True
+        try:return self._evaluate_all()
+        finally:self.r.native_enabled=False
+
+    def _evaluate_all(self):
         if not any(n.kind=='Run' or self.power(n) or self.purity.pure(n) or source.expressions.extrema.plan(n)
                    for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
         for source in list(self.p.sources.values()):
@@ -549,12 +565,14 @@ class Evaluator:
 
     def closure(self,roots):
         keep=set();imports={};aliases={};procedures=set();visited=set();queries={}
+        calls={};external={}
         def declaration(node):
             if node in visited:return
             if node.kind=='Declaration' and (node.data.get('mutable',False) or node.data.get('immutable',False)) and node.source.scope(node).kind=='File':return
             visited.add(node);keep.add(node)
             for a in node.ancestors():
-                if a.kind=='When':keep.add(a.role('cond'))
+                if a.kind=='When':keep.add(a.role('cond'));visit(a.role('cond'))
+                if a.kind=='ForeignBlock':keep.update(a.group('attributes'))
                 if a.kind in {'CompileSwitch','CompileSwitchExpr'}:
                     if a.role('selector'):keep.add(a.role('selector'));visit(a.role('selector'))
                     for case in a.data['cases']:
@@ -574,7 +592,30 @@ class Evaluator:
                 return
             if node.kind=='Run':
                 self.evaluate(node);visit(node.role('expr'));return
-            if node.kind=='Procedure':procedures.add(node)
+            if node.kind=='Call':
+                callee=node.role('callee')
+                self.p.native_sources.verify_access(callee,self.r)
+                builtin=self.purity.builtin(node)
+                library=self.purity.library(node)
+                if builtin:
+                    calls[callee]=builtin
+                    for arg in node.group('args'):visit(arg)
+                    return
+                if library in self.purity.libraries and self.purity.approved(node):
+                    external[callee]=library
+                    for arg in node.group('args'):visit(arg)
+                    return
+                plan=self.r.resolve_call(node)
+                if plan and getattr(plan.symbol.node.source,'native_inspected',False) and self.purity.targets(node):
+                    calls[callee]=plan.symbol
+                    for proc in self.purity.targets(node):
+                        procedures.add(proc);declaration(proc.parent)
+                    for alternative in plan.symbol.candidates:
+                        if alternative is not plan.symbol and any(a.kind=='When' for a in alternative.declaration.ancestors()):
+                            declaration(alternative.declaration)
+                    for arg in node.group('args'):visit(arg)
+                    return
+            if node.kind=='Procedure' and node.role('body'):procedures.add(node)
             if node.kind=='Ident' and self.purity.reference(node):
                 s=node.source
                 if node.text in s.selected and self.r.lookup(node.text,node) is None:
@@ -590,7 +631,11 @@ class Evaluator:
                             declaration(alternative.declaration)
             if node.kind=='Selector':
                 symbol=self.r.symbol(node)
-                if symbol:declaration(symbol.declaration)
+                if symbol:
+                    declaration(symbol.declaration)
+                    for alternative in symbol.candidates:
+                        if alternative is not symbol and any(a.kind in {'When','CompileSwitch'} for a in alternative.declaration.ancestors()):
+                            declaration(alternative.declaration)
             if node.kind=='Call' and not(self.purity.builtin(node) or self.purity.approved(node) or node.source.denotes_type(node.role('callee'))):
                 targets=self.purity.targets(node)
                 for proc in targets:
@@ -604,7 +649,7 @@ class Evaluator:
         # Selected aliases need the namespace import used by their rewritten AST.
         for source,names in aliases.items():
             for name in names:imports.setdefault(source,set()).add(source.selected[name].split('.')[0])
-        return keep,imports,aliases,procedures,queries
+        return keep,imports,aliases,procedures,queries,calls,external
 
     def execute(self,n,*,condition=False,condition_case=None,extra=()):
         from .driver import Project
@@ -615,12 +660,14 @@ class Evaluator:
         roots += [b.typ.node.parent if b.typ.node.parent and b.typ.node.parent.kind=='Declaration' and
                   b.typ.node.kind in {'StructType','UnionType','EnumType','DistinctType','BitSetType'} else b.typ.node
                   for b in bindings.values() if b.typ.node]
-        keep,imports,aliases,procedures,queries=self.closure(roots)
+        keep,imports,aliases,procedures,queries,calls,external=self.closure(roots)
         flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:','-vet','-target:')) and f not in {'-keep-executable','-no-entry-point'}]
         overlays={path:s.raw for path,s in self.p.sources.items()}
-        helper=Project(self.p.entry,self.p.frontend,flags,overlays=overlays)
+        helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays)
         helper.discover(self.root/'runtime'/'eval')
-        by_original={old:new for path,old in self.p.sources.items() for new in [helper.sources[path]]}
+        self.p.native_sources.attach(helper,keep|procedures)
+        originals={**self.p.sources,**{node.source.path:node.source for node in keep|procedures}}
+        by_original={old:helper.sources[path] for path,old in originals.items()}
         def node_copy(old):
             if old is None:return None
             source=by_original[old.source]
@@ -630,23 +677,65 @@ class Evaluator:
         for query,code in queries.items():
             node=node_copy(query)
             node.source.run_values[node]=code
+        mode=next((flag.split(':',1)[1] for flag in self.p.flags if flag.startswith('-build-mode:')), 'exe')
+        modes={'exe':'Executable','test':'Executable','dll':'Dynamic','shared':'Dynamic','dynamic':'Dynamic',
+               'static':'Static','lib':'Static','obj':'Object','object':'Object',
+               'asm':'Assembly','assembly':'Assembly','assembler':'Assembly','llvm':'LLVM_IR','llvm-ir':'LLVM_IR'}
+        context={'ODIN_TEST':str(self.p.test).lower(),
+                 'ODIN_BUILD_MODE':'type_of(ODIN_BUILD_MODE).'+modes.get(mode,'Executable')}
         for old,new in by_original.items():
-            if old.path.is_relative_to(self.root/'runtime'):continue
+            if self.p.native_sources.support(old):continue
+            # File selection has already happened in the original context.
+            # The helper's executable entry name and command must not select a
+            # different set of declarations on the second native parse.
+            new.edits.extend((a,b,'') for a,b in old.info.get('selection_tags') or [])
+            for node in old.nodes:
+                name=None
+                if node.kind=='Ident' and self.purity.reference(node) and self.r.symbol(node) is None:
+                    name=node.text
+                elif node.kind=='Selector':
+                    imported=self.purity.imported(node)
+                    if imported and imported[0]=='base:builtin':name=imported[1]
+                if name in context:
+                    new.run_values[node_copy(node)]=new.mapping.wrap(context[name],old.path,node.start,node.end,'run-context')
             new.evaluation_keep={node_copy(k) for k in keep if k.source is old and
                                  (self.purity.owner(k) is None or self.purity.owner(k) in procedures)}
             new.evaluation_keep.discard(None)
             needed=imports.get(old,set())
-            for alias in needed:
-                path=old.imports.get(alias,'')
-                if ':' in path and path.split(':',1)[0] in {'core','base','vendor'} and path not in self.native_imports and path.split(':',1)[0] not in self.p.collections:
-                    imp=next((a for a in old.nodes if a.kind=='Import' and unquote(a.data['op'])==path),n)
-                    self.fail(imp,f'Compile-time execution cannot verify native package {path!r}; unverified native packages may not enter helpers.')
             for imp in new.nodes:
-                if imp.kind=='Import' and (imp.data['name'] or unquote(imp.data['op']).rsplit('/',1)[-1].rsplit(':',1)[-1]) in needed:
+                if imp.kind=='Import' and new.import_names[imp] in needed:
                     new.evaluation_keep.add(imp)
             selected=aliases.get(old,set())
             new.selected={name:target for name,target in new.selected.items() if name in selected}
             new.selected_origins={name:pos for name,pos in new.selected_origins.items() if name in selected}
+        for callee,target_symbol in calls.items():
+            caller=by_original[callee.source]
+            if isinstance(target_symbol,str):
+                if target_symbol.startswith('#') or callee.kind=='Ident' and callee.text==target_symbol and callee.text not in callee.source.selected and self.r.lookup(callee.text,callee) is None:
+                    code=target_symbol
+                else:
+                    namespace=caller.prefix+'native_builtin'
+                    caller.imports[namespace]='base:builtin'
+                    code=caller.namespace_code(namespace)+'.'+target_symbol
+                caller.run_values[node_copy(callee)]=code
+                continue
+            target_source=by_original[target_symbol.node.source]
+            name=target_symbol.name
+            if caller.path.parent!=target_source.path.parent:
+                bridge=target_source.prefix+'run_target_'+str(target_symbol.node.start)
+                key=target_source.root,bridge
+                target_source.expressions.helpers[key]=target_source.mapping.wrap(
+                    f'\n{bridge} :: proc{{{name}}}\n',target_source.path,target_symbol.node.start,target_symbol.node.end,'run-target')
+                namespace=caller.expressions.module('run_dependency_'+target_source.prefix.strip('_'),
+                    os.path.relpath(target_source.path.parent,caller.path.parent))
+                name=namespace+'.'+bridge
+            caller.run_values[node_copy(callee)]=caller.mapping.wrap(name,caller.path,callee.start,callee.end,'run-target')
+        for callee,(path,name) in external.items():
+            caller=by_original[callee.source]
+            namespace=caller.prefix+'original_library_'+str(callee.start)
+            caller.imports[namespace]=path
+            caller.evaluation_import_paths[namespace]=path
+            caller.run_values[node_copy(callee)]=caller.namespace_code(namespace)+'.'+name
         # Reconstruct already evaluated values with this helper's mapping builder.
         old_p=self.p
         try:
@@ -684,7 +773,16 @@ class Evaluator:
         alias=source.prefix+'evaluation'
         emitted='true when ('+expr+') else false' if condition or condition_case is not None else expr
         result_name=source.prefix+'evaluation_result'
-        output=f'{result_name}:={emitted}\n{alias}.emit({result_name})'
+        guards=[]
+        if n.kind=='Call' and self.purity.approved(n):
+            library=self.purity.library(n)
+            if library in self.purity.libraries:
+                source.needs_intrinsics=True
+                parameter=f'{source.prefix}meta.type_proc_parameter_type(type_of({source.prefix}meta.procedure_of({expr})),0)'
+                guards.append(f'{helper.purity.validator(source)}({parameter},false,true,0)')
+                if library[0]=='thor:format':
+                    guards.append(f'{helper.purity.module(source)}.validate_format({parameter})')
+        output='\n'.join([*guards,f'{result_name}:={emitted}\n{alias}.emit({result_name})'])
         inner=output
         for scope in n.ancestors():
             if scope.source.is_scope(scope) and scope.kind!='File':
@@ -763,7 +861,11 @@ class Evaluator:
             cached=self.cache.get(key) if self.cache else None
             def unpack(data):
                 if data.get('kind')!='specialized':return data
-                for binding,name in zip((b for b in bindings.values() if b.value is None),data['types']):binding.canonical=bytes.fromhex(name['bytes']).decode('utf-8')
+                for binding,name in zip((b for b in bindings.values() if b.value is None),data['types']):
+                    canonical=bytes.fromhex(name['bytes']).decode('utf-8')
+                    for internal,original in helper.native_package_names.items():
+                        canonical=re.sub(r'\b'+re.escape(internal)+r'\b',original,canonical)
+                    binding.canonical=canonical
                 return data['value']
             if cached is not None:return unpack(cached)
             try:built=subprocess.run(command,capture_output=True,timeout=max(30,self.timeout))
@@ -772,8 +874,27 @@ class Evaluator:
             if built.returncode:
                 try:errors=diagnostics.translate(json.loads(built.stderr).get('errors',[]))
                 except ValueError:errors=[]
-                if errors:raise ThorError('Compile-time helper compilation failed.',diagnostics=errors)
-                self.fail(error_site,label+' helper compilation failed: '+built.stderr.decode(errors='replace')[:1000])
+                if errors:
+                    native_files={str(source.path) for source in by_original if getattr(source,'native_inspected',False)}
+                    overload=any(e['msgs'] and e['msgs'][0].startswith('No procedures or ambiguous call') for e in errors)
+                    if overload:
+                        errors=[e for e in errors if not(e['msgs'] and 'Cannot determine polymorphic type' in e['msgs'][0] and 'invalid type' in e['msgs'][0])]
+                    for error in errors:
+                        for internal,original in helper.native_package_names.items():
+                            error['msgs']=[re.sub(r'\b'+re.escape(internal)+r'\b',original,msg) for msg in error['msgs']]
+                        pos=error.get('pos')
+                        if pos and pos['file'] in native_files and str(error_site.source.path) not in native_files:
+                            error['msgs'].append(f"In standard-library source: {pos['file']}({pos['line']}:{pos['column']})")
+                            error['pos']=diagnostics.locate(Origin(str(error_site.source.path),error_site.start,error_site.end))
+                        elif pos and error['msgs'] and error['msgs'][0].startswith('No procedures or ambiguous call'):
+                            caller=self.p.sources.get(Path(pos['file']))
+                            calls=[c for c in caller.nodes if c.kind=='Call' and c.role('callee').start<=pos['offset']<c.role('callee').end] if caller else []
+                            if calls:
+                                callee=min(calls,key=lambda c:c.end-c.start).role('callee')
+                                error['pos']=diagnostics.locate(Origin(str(callee.source.path),callee.start,callee.end))
+                    raise ThorError('Compile-time helper compilation failed.',diagnostics=errors)
+                detail=(built.stderr or built.stdout).decode(errors='replace').strip()[:1000]
+                self.fail(error_site,f'{label} helper compilation failed (exit {built.returncode}).'+(' '+detail if detail else ''))
             try:result=subprocess.run([str(executable)],capture_output=True,timeout=self.timeout)
             except subprocess.TimeoutExpired:self.fail(error_site,f'{label} execution exceeded the {self.timeout:g} second timeout.')
             if result.returncode:

@@ -134,6 +134,33 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_native_run_standard_math_diagnostic_clears_with_unsaved_fix(self):
+        text='package main\nimport "core:math" / round\n/* 😀 */ COUNT :: int(#run round("bad"))\nmain::proc(){data:[COUNT]int;_=data}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='No procedures or ambiguous call')
+        error=next(e for e in errors if 'No procedures or ambiguous call' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'round("bad")',0))
+        self.assertNotIn('thor_eval_',error['message'])
+        self.assertNotIn('__thor_',error['message'])
+        changed=text.replace('round("bad")','round(1000 ** .33333)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        hover=self.hover(client,main,changed,'round(1000')
+        self.assertIn('round',hover['contents']['value'])
+        self.assert_original_identifier_tokens(main,changed,self.semantic_spans(client,main,changed))
+
+    def test_native_run_foreign_diagnostic_is_on_original_source_and_clears(self):
+        text='package main\nimport "core:c/libc"\n/* 😀 */ VALUE :: #run libc.rand()\nmain::proc(){_=VALUE}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='foreign')
+        error=next(e for e in errors if 'foreign' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'#run libc.rand()',0))
+        changed=text.replace('"core:c/libc"','"core:math"').replace('libc.rand()','math.round(3.3)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_wildcard_import_public_hover_definition_completion_and_unused_state(self):
         text='package main\nimport * "library"\nmain::proc(){answer:=chosen(2);counter=3;_=answer;_=counter}\n'
         library='package library\nchosen::proc(value:int)->int{return value}\ncounter:int\nsecret_public::7\n@private\nsecret::7\n'

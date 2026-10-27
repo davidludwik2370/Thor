@@ -137,6 +137,8 @@ class Source:
             self.prefix += "x_"
         self.edits = [(e["start"], e["end"], e["text"]) for e in self.info.get("edits", [])]
         self.imports = {}
+        self.import_names = {}
+        self.evaluation_import_paths = {}
         self.blank_selections = {}
         for node in self.nodes:
             if node.kind != 'Import': continue
@@ -151,6 +153,7 @@ class Source:
                 a,b = node.data['roles']['alias']
                 self.edits.append((a,b,namespace))
             self.imports[namespace] = path
+            self.import_names[node] = namespace
         self.project: dict[Path, list[Source]] = {}
         self.collections: dict[str, Path] = {}
         self.needs_membership = False
@@ -245,8 +248,8 @@ class Source:
 
     @staticmethod
     def is_scope(n):
-        if n.kind == "Block" and n.parent and n.parent.kind in {"When","CompileSwitch"}:
-            return False  # Odin when branches do not introduce a scope.
+        if n.kind == "Block" and n.parent and n.parent.kind in {"When","CompileSwitch","ForeignBlock"}:
+            return False  # Conditional declarations and foreign blocks share the enclosing scope.
         if n.kind == 'Case' and n.parent and n.parent.parent and n.parent.parent.kind=='CompileSwitch':
             return False
         return n.kind in {"Block", "Procedure", "File", "StructType", "For", "If", "Range", "Switch", "TypeSwitch", "Case"}
@@ -565,9 +568,18 @@ class Source:
             self.hidden_namespaces[namespace] = self.prefix + "import_" + str(len(self.hidden_namespaces))
         return self.hidden_namespaces[namespace]
 
+    def import_code(self, namespace):
+        return self.evaluation_import_paths.get(namespace, self.imports[namespace])
+
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
         kind = n.kind
+        if kind == 'Import':
+            namespace = self.import_names[n]
+            path = self.import_code(namespace)
+            if path != unquote(n.data['op']):
+                a,b = n.data['roles']['path']
+                return self.splice(n, [(a,b,self.mapping.wrap(json.dumps(path),self.path,a,b,'import'))])
         if self.defaults:
             code = self.defaults.render(n)
             if code is not None:
@@ -891,7 +903,7 @@ class Source:
             operation = next(n for n in self.nodes if n.kind == "Binary" and n.data["op"] in {"in", "not_in"})
             code += self.mapping.wrap("\n" + membership_helpers(self.prefix,self.expressions.module('sets')), self.path, operation.start, operation.end, "membership-helper")
         for namespace, alias in self.hidden_namespaces.items():
-            code += self.mapping.wrap(f'\nimport {alias} {json.dumps(self.imports[namespace])}\n',
+            code += self.mapping.wrap(f'\nimport {alias} {json.dumps(self.import_code(namespace))}\n',
                                       self.path, 0, 0, "support")
         code += self.expressions.imports()
         code, self.source_map = self.mapping.finish(code)

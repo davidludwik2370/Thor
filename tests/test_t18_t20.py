@@ -149,7 +149,7 @@ outer::fn(input:[]int)->int{return inner(input)}
             ('ordinary::proc()->int{return 7}\nbad::fn()->int{return ordinary()}', 'only declared fn'),
             ('bad::fn()->int{p:=ordinary;return p()}\nordinary::proc()->int{return 7}', 'indirect'),
             ('bad::fn()->int{x:=7;_= &x;return x}', 'raw addresses'),
-            ('bad::fn()->u64{return transmute(u64)f64(1)}', 'transmute'),
+            ('bad::fn()->[8]u8{return transmute([8]u8)f64(1)}', 'transmute'),
             ('bad::fn()->int{value:int=---;return value}', 'uninitialized storage'),
             ('global:int\nnotify::proc(){global+=1}\n@(deferred_none=notify) bad::fn()->int{return 7}', 'implicit deferred procedure callbacks'),
             ('bad::fn()->int{return len(#file)}', 'Source-location-dependent constants'),
@@ -326,16 +326,16 @@ bad::fn(using input:$T)->int{data[0]=9;return 0}
     def test_imported_and_native_runtime_storage_cannot_bypass_purity(self):
         self.invoke(self.program('_=bad()','import "library"\nbad::fn()->int{return library.global}\n'),
             files={'library/main.odin':'package library\nglobal:int\n'},command='check',fail='outside the function')
-        self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{return len(os.args)}\n'),command='check',fail='unverified native package')
-        self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{using os;return len(args)}\n'),command='check',fail='unverified native package')
+        self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{return len(os.args)}\n'),command='check',fail='outside the function')
+        self.invoke(self.program('_=bad()','import "core:os"\nbad::fn()->int{using os;return len(args)}\n'),command='check',fail='resolved record schema')
         self.invoke(self.program('assert(VALUE>3&&VALUE<4)','import "core:math"\nidentity::fn(value:f64)->f64{return value}\nVALUE::#run identity(math.PI)\n'))
 
-    def test_opaque_native_packages_are_not_executed_by_run_helpers(self):
-        self.invoke(self.program('_=VALUE','''
-import "core:os"
-work::proc()->int{return int(os.ERROR_NONE)}
+    def test_native_constant_dependencies_are_inspected_for_run_helpers(self):
+        self.invoke(self.program('assert(VALUE==4)','''
+import "core:unicode/utf8"
+work::proc()->int{return utf8.UTF_MAX}
 VALUE::#run work()
-'''),command='check',fail='cannot verify native package')
+'''))
 
     def test_inactive_impure_generic_branch_is_left_to_native_selection(self):
         self.invoke(self.program('assert(VALUE==8)','''

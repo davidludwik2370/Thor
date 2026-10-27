@@ -19,6 +19,7 @@ Info :: struct {
     mutable: bool,
     using_field: bool,
     variadic: bool,
+    optional_ok: bool,
     roles: map[string]Span,
     lists: map[string][]Span,
 }
@@ -33,6 +34,7 @@ Output :: struct {
     diagnostics: []Parse_Error,
     immutables: [dynamic][2]int,
     do_tokens: [dynamic]Span,
+    selection_tags: [dynamic]Span,
     features: []parser.Feature,
 }
 Parse_Error :: struct {
@@ -163,10 +165,12 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.lists["where"] = spans(n.where_clauses)
     case ^ast.Proc_Type:
         info.kind = "ProcedureType"; info.roles["params"] = span(n.params); info.roles["results"] = span(n.results)
+        info.optional_ok = .Optional_Ok in n.tags || .Optional_Allocator_Error in n.tags
         if cc,ok:=n.calling_convention.(string);ok {info.calling_convention=strings.trim(cc,"\"`")}
         else if n.calling_convention!=nil {info.calling_convention="foreign"}
     case ^ast.Foreign_Block_Decl:
         info.kind="ForeignBlock";info.calling_convention="c"
+        if len(n.attributes)>0 {info.start=n.attributes[0].pos.offset}
         info.lists["attributes"] = make([]Span, len(n.attributes))
         for attribute, i in n.attributes { info.lists["attributes"][i] = span(attribute) }
         for attribute in n.attributes {for elem in attribute.elems {
@@ -202,6 +206,10 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Block_Stmt: info.kind = "Block"
     case ^ast.Import_Decl:
         info.kind = "Import"; info.name = n.name.text; info.op = n.relpath.text
+        if len(n.attributes)>0 {info.start=n.attributes[0].pos.offset}
+        info.lists["attributes"] = make([]Span, len(n.attributes))
+        for attribute, i in n.attributes { info.lists["attributes"][i] = span(attribute) }
+        info.roles["path"] = {n.relpath.pos.offset, n.relpath.pos.offset+len(n.relpath.text)}
         if n.name.text != "" { info.roles["alias"] = {n.name.pos.offset, n.name.pos.offset+len(n.name.text)} }
     case ^ast.If_Stmt:
         info.kind = "If"; info.roles["init"] = span(n.init); info.roles["cond"] = span(n.cond)
@@ -237,7 +245,11 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "DistinctType"; info.roles["type"] = span(n.type)
     case ^ast.Using_Stmt: info.kind = "Using"; info.lists["values"] = spans(n.list)
     case ^ast.Attribute: info.kind="Attribute";info.lists["elems"]=spans(n.elems)
-    case ^ast.Foreign_Import_Decl: info.kind = "ForeignImport"; info.lists["paths"] = spans(n.fullpaths)
+    case ^ast.Foreign_Import_Decl:
+        info.kind = "ForeignImport"; info.lists["paths"] = spans(n.fullpaths)
+        if len(n.attributes)>0 {info.start=n.attributes[0].pos.offset}
+        info.lists["attributes"] = make([]Span, len(n.attributes))
+        for attribute, i in n.attributes { info.lists["attributes"][i] = span(attribute) }
     }
     index := len(state.out.nodes)
     append(&state.out.nodes, info)
@@ -319,6 +331,12 @@ main :: proc() {
     file.end.offset = len(data)
     out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public,
                   edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
+    for tag in file.tags {
+        text := strings.trim_space(tag.text)
+        if text == "#+test" || strings.has_prefix(text, "#+build ") {
+            append(&out.selection_tags, Span{tag.pos.offset, tag.pos.offset+len(tag.text)})
+        }
+    }
     lexer: tokenizer.Tokenizer
     tokenizer.init(&lexer, file.src, file.fullpath, collect_error)
     lexer.thor = thor

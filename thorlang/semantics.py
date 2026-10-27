@@ -70,7 +70,9 @@ def binding_name(n):
 
 class Resolver:
     def __init__(self, sources):
-        self.sources = sources
+        self.sources = []
+        self.native = None
+        self.native_enabled = False
         self.scopes = {}
         self.by_decl = {}
         self.using = {}
@@ -81,6 +83,11 @@ class Resolver:
         self.integer_active = set()
         self.wrappers = {}
         self.markers = {}
+        self.add_sources(sources)
+
+    def add_sources(self, sources):
+        sources = [source for source in sources if source not in self.sources]
+        self.sources.extend(sources)
         for source in sources:
             source.resolver = self
         for source in sources:
@@ -172,6 +179,12 @@ class Resolver:
         symbols = self.scopes.get((directory, "package"), {}).get(name, [])
         return next((s for s in symbols if s.immutable), symbols[0] if symbols else None)
 
+    def import_directory(self, source, path):
+        directory = source.import_dir(path)
+        if directory is None and self.native_enabled and self.native:
+            directory = self.native.load(source, path)
+        return directory
+
     def symbol(self, n, seen=None):
         if n is None:
             return None
@@ -187,13 +200,13 @@ class Resolver:
                 return local
             if n.text in n.source.selected:
                 namespace, member = n.source.selected[n.text].split(".", 1)
-                return self.package_symbol(n.source.import_dir(n.source.imports[namespace]), member)
+                return self.package_symbol(self.import_directory(n.source, n.source.imports[namespace]), member)
         if n.kind == "Selector":
             base, member = n.role("expr"), n.role("field")
             if base and base.kind == "Ident" and not self.lookup(base.text, base):
                 imported = n.source.imports.get(base.text)
                 if imported:
-                    return self.package_symbol(n.source.import_dir(imported), member.text)
+                    return self.package_symbol(self.import_directory(n.source, imported), member.text)
         return None
 
     def declaration_for(self, n):
@@ -658,7 +671,7 @@ class Resolver:
         if caller.path.parent == owner.path.parent:
             return name
         for namespace, imported in caller.imports.items():
-            if caller.import_dir(imported) == owner.path.parent:
+            if self.import_directory(caller, imported) == owner.path.parent:
                 return caller.namespace_code(namespace) + "." + name
         return name
 

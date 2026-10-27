@@ -851,3 +851,63 @@ checkout's build example. An isolated launcher fixture exercises this guard
 without putting the real compiler at risk. All 14 focused build, run/test,
 basic-input and project-template regressions pass; the playground executable
 also builds and prints `hello` under its new name.
+
+## Inspect standard-library bodies for #run: compiler 0.14.0
+
+Replace the installed-package allowlist with on-demand source inspection from
+the selected Odin compiler's reported SDK root. NativeSources keeps parsed
+base/core/vendor metadata separate from the ordinary project emission. Resolve
+overloads, generics, immutable aliases and transitive constant/type/procedure
+dependencies through the same resolver used for project code. Custom collection
+overrides remain ordinary inspectable project packages.
+
+Build isolated helper copies containing only required declarations. Redirect
+native dependency imports into those copies, rename copied package identities
+to coexist with the runtime support's installed-library imports, and expose
+selected private implementations through public procedure-group bridges. Check
+API privacy before adding bridges. Unused initializers, impure overloads and
+runtime globals cannot enter evaluation merely because their package is used.
+The user's final build still imports the installed Odin libraries normally.
+
+Eligible ordinary procedures may have non-Odin calling conventions when their
+bodies are available. Bodyless foreign calls and indirect calls remain excluded.
+Retain the existing input/result/borrow/ownership contracts, including no owned
+string/slice result from procedures without an Odin context. Permit scalar
+numeric/boolean/enum/bit-set transmute, with native generic structural guards;
+continue rejecting pointer and aggregate representation casts. Deterministic
+compiler primitives and known SDK LLVM math declarations are explicit leaves,
+separate from inspected source bodies. Source/type identity queries and metadata
+APIs exposing pointer/procedure values are not approved leaves. Declared fn
+procedures retain their stricter declared-fn/approved-helper call rule.
+
+Single-value #run calls accept a procedure's optional second return value under
+the native ignored-status convention. Root calls to approved allocation/format
+helpers retain input validation, even without an enclosing checked procedure.
+Actual allocator overrides remain excluded; scalar parameters merely named
+allocator work normally. Preserve ODIN_TEST and ODIN_BUILD_MODE in copied code,
+respect lexical shadowing, and retain originally selected test-tagged files in
+the executable helper. Source-dependent project names remain excluded alongside
+file/line/type identity and #defined-dependent constants. Preserve import/foreign
+attribute spans so pruning removes attributes with their declarations.
+
+SDK compiler errors attach to the original #run with the native source location
+in a note. Overload failures highlight the original callee, use public package
+names and omit the resulting invalid-type cascade. Normalize copied SDK package
+names in compiler-managed generic identity records, including cache hits. Cache
+identity includes installed vendor code, loaded native overlays and referenced
+resource contents. Cached results do not bypass eligibility checks.
+
+The commented walkthrough is examples/native_run/demo.thor with ordinary Odin
+bodies in eligible.odin. The original thor-playground/pg.thor now runs unchanged:
+int(#run round(SIZE ** .33333)) yields a usable constant array length. JSON,
+stdio TLS and actual VS Code tests check invalid native calls, exact original
+ranges, public diagnostic names and clearing after unsaved correction. No TLS
+syntax/client update or extension reinstall is required.
+
+Validation: the full Python regression run passed 632 tests with one existing
+expected failure. After the final build-context refinements, all 29 native #run
+tests and four focused compiler/TLS diagnostic cases pass. All 1,118 native TLS
+tests, 86 Node tests and actual VS Code integration pass. The new walkthrough
+and the user's playground execute successfully. A final 74-test purity,
+allocation, cache and test-mode regression run also passes. User playground moves, table
+work, demo edits and specification deletion remain outside this feature commit.

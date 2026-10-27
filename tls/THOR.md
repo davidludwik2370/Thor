@@ -48,6 +48,12 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   spelling and explains purity; call results, including concrete generic results,
   retain type inference and completion through `#run`. Live compiler checks
   enforce purity/evaluation rules against unsaved source and dependencies.
+- Compiler checks inspect eligible standard-library procedure bodies for `#run`,
+  including ordinary Odin and non-Odin-convention bodies. Native overload errors
+  retain their public names and original callee ranges; rejected native effects
+  highlight the `#run` expression with a library source note. Diagnostics clear
+  after unsaved correction. This uses the existing compiler-check transport and
+  native symbol/type index, so no new syntax or extension installation is needed.
 - Automatic calls retain normal return-type inference, completion and semantic
   token positions. Hover explains known-argument folding and constant/runtime
   ownership. Live compiler checks schedule automatic constants and generic-dependent

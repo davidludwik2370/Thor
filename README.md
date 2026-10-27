@@ -765,11 +765,13 @@ Inputs may contain scalar values, enums, strings, slices, fixed arrays, records,
 bit sets and tagged unions. Borrowed contents are protected through aliases,
 fields, slices, shallow copies, loops, union matches/assertions and calls. Local fixed-array
 copies and fresh buffers can be mutated. Pointers, maps, dynamic-array inputs,
-`any`, procedure values, globals, ambient context, foreign/indirect calls, raw
-addresses, unsafe casts, uninitialized storage and unapproved operations are rejected. Checks inside
+`any`, procedure values, runtime global storage, ambient context, uninspectable
+foreign/indirect calls, raw addresses, pointer/aggregate bit casts, uninitialized
+storage and unapproved operations are rejected. Numeric, boolean, enum and bit-set
+scalar bit casts are eligible. Checks inside
 inactive native `when` branches remain inactive.
 
-The initial deterministic whitelist includes numeric conversions/operations,
+Compiler-controlled deterministic operations include numeric conversions/operations,
 length/type/size queries, `make` for local slice/dynamic buffers, `copy`, `delete`,
 assertions, `core:strings.clone`, `core:slice.clone`, and Thor's scalar/string
 formatters. A declared `fn` otherwise calls declared `fn` targets only. Explicit
@@ -798,7 +800,8 @@ accept an explicit allocator outside pure code. Ordinary assignments remain
 shallow: destroy an owner once; free an owned field before overwriting it. Do not
 use recursive destruction on borrowed literals or shallow native containers.
 Arbitrary user procedure results and anonymous arguments remain manual Odin
-ownership. Eligible `proc "contextless"` targets cannot promote allocated returns;
+ownership. Procedures without an Odin context, including `proc "contextless"`
+and C-convention bodies, cannot promote allocated returns;
 use `fn` or a contextful `proc` for those results.
 
 Runtime `x := #run work()` and automatically folded calls materialize fresh owned storage on every execution,
@@ -811,14 +814,44 @@ The value protocol preserves arbitrary string bytes, nil/non-nil empty slices,
 zero-sized slice elements, fields, active union variants and exact float bits. It
 serializes contents without padding or process addresses.
 
+Explicit `#run` can execute an eligible ordinary Odin or Thor procedure,
+including procedures in the installed `base`, `core` and `vendor` collections.
+Thor discovers their source on demand and checks the implementation and required
+dependencies under the same rules as project code. Library names do not confer
+purity or require an allowlist entry. For example:
+
+```odin
+import "core:math" / round
+
+SIZE :: 1_000
+ARY_SIZE :: int(#run round(SIZE ** .33333))
+values: [ARY_SIZE]int
+```
+
+Eligible overloads, generics, immutable procedure aliases and selected/wildcard
+imports use the same path. Immutable library constants are inspected as
+dependencies; mutable runtime state remains forbidden. Compiler intrinsics are
+separate leaf operations: deterministic numeric/structural queries and known LLVM
+math operations are supported, while clock/cycle counters, memory operations and
+source identity queries such as `type_canonical_name` are not eligible user calls.
+A procedure with an inspectable Odin body can use a non-Odin calling convention;
+an external declaration without a body remains uninspectable. Existing input,
+result and ownership constraints still apply. An optional second return value is
+ignored by a single-value `#run`; non-optional multiple results need a consumer
+that returns one supported value.
+
 Each ready evaluation is compiled in a temporary native helper containing only
 its required declarations/imports. User entry points, unrelated runtime globals
 and package initializers are excluded; referenced runtime storage is rejected.
-Opaque native imports are restricted to `base:intrinsics`, `core:math`,
-`core:strings` and `core:slice`; user collections are inspected as project source.
-Native value reads are limited to explicitly approved `core:math` constants;
-an import name or a collection override does not confer purity.
-Helpers use the same native defines/configuration as the final build. Cross-target
+Only selected native overload implementations enter the helper, with private
+implementations kept behind public evaluation bridges. Native source failures
+highlight the original `#run` and include their library source location. Public
+names and overload notes retain their original spelling.
+
+Run the [commented native-call walkthrough](examples/native_run/demo.thor) with
+`./thor run examples/native_run`.
+Helpers preserve the original defines, `ODIN_TEST` and `ODIN_BUILD_MODE`, including
+dependencies in test-tagged files. Cross-target
 evaluation is rejected. Compilation errors map to original source; execution failures
 point to the original call or `#run` expression. Helpers are deleted after use. Execution defaults
 to five seconds per helper; set `--run-timeout 10` to change it (maximum 300).
@@ -827,7 +860,7 @@ Independent-call batching remains future work.
 Successful helper results are cached in `.thor-cache/eval-v1` beside the entry
 package. Keys include emitted transitive code/types/constants/arguments, native
 flags/defines, compiler binary/version, Thor/frontend/runtime and installed
-base/core source contents, plus static resource contents/existence. Keys are
+base/core/vendor source contents, plus static resource contents/existence. Keys are
 conservative: equivalent calls at different sites or irrelevant source edits may
 miss. Dynamic resource paths bypass caching. Partial, corrupt or incompatible
 entries recompute; publication is atomic. Cache storage failures do not prevent
@@ -855,9 +888,11 @@ runtime behavior. The scheduler uses Thor's partial resolver, so unsupported or
 ambiguous specializations may still need an explicit type or simpler wrapper.
 Enum-indexed array constants support declared keys and zeroed
 unnamed slots; nonzero unnamed slots fail rather than being changed on output.
-Source-location-dependent `#file`, `#directory` and `#line` values, including
+Source-location-dependent `#file`, `#directory`, `#line`, `#caller_location`,
+`ODIN_BUILD_PROJECT_NAME` and source/type identity queries, including
 constants derived from them, are rejected in pure execution until their values
-can be kept identical across generated runtime code and helpers. Implicit deferred
+can be kept identical across generated runtime code and helpers. `#defined`
+depends on the declarations in scope and is also excluded. Implicit deferred
 procedure callbacks are also rejected; make eligible calls explicit in the body.
 TLS infers call result types but does not execute procedures for hover values or
 its own branch selection; live compiler checks perform the actual evaluation.

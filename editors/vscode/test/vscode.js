@@ -190,6 +190,16 @@ async function run() {
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
             testDocument.positionAt(suppressedSource.indexOf('sorted(')+2)),values=>hoverText(values||[]).includes('less')&&!hoverText(values||[]).includes('__thor_'));
+        const nativeBad='package main\nimport "core:math" / round\nCOUNT::int(#run round("bad"))\nmain::proc(){values:[COUNT]int;_=values}\n';
+        await replace(nativeBad);
+        const nativeErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),
+            values=>values.some(value=>value.message.includes('No procedures or ambiguous call')));
+        const nativeError=nativeErrors.find(value=>value.message.includes('No procedures or ambiguous call'));
+        assert.equal(testDocument.getText(nativeError.range),'round');
+        assert.ok(!nativeError.message.includes('thor_eval_')&&!nativeError.message.includes('__thor_'));
+        const nativeGood=nativeBad.replace('round("bad")','round(1000 ** .33333)');
+        await replace(nativeGood);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -357,6 +367,7 @@ async function run() {
             'callback values use parameter color and a one-letter parameter renames at its end boundary',
             'spread min/max element and status hover, original argument error ranges and unsaved correction',
             'wildcard and namespace-free imports compile and provide source hovers',
+            'standard-library #run checks original overload ranges and clears after unsaved correction',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

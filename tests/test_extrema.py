@@ -154,11 +154,11 @@ REPORT::#run summary([]int{})
             with self.subTest(body=body):
                 self.invoke(self.program(body), command='check', fail=message)
 
-    def test_selected_native_helper_keeps_existing_purity_boundary(self):
-        self.invoke(self.program('_=X', '''import "core:slice" / min
-work::fn(values:[]int)->int{return min(values)}
+    def test_selected_native_helper_can_be_forced_by_run(self):
+        self.invoke(self.program('assert(X==1)', '''import "core:slice" / min
+work::proc(values:[]int)->int{return min(values)}
 X::#run work([]int{1,2})
-'''), command='check', fail='unverified native')
+'''))
 
     def test_required_constants_and_direct_run(self):
         self.invoke(self.program('''
