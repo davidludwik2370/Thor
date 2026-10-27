@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.13.1"
+VERSION = "0.13.2"
 
 
 def frontend_binary(odin):
@@ -291,9 +291,14 @@ def _main(argv=None):
             command.append("-file")
         command.extend(project.odin_flags())
         binary_directory = Path.cwd() if options.command == "build" else project.destination
-        executable = Path(next((f[len("-out:"):] for f in flags if f.startswith("-out:")),
-                               str(binary_directory / ('program.exe' if os.name == 'nt' else 'program')))).resolve()
-        if options.command in {"build", "run", "test"} and not any(f.startswith("-out:") for f in flags):
+        binary_name = (binary_directory.name or 'program') if options.command == "build" else 'program'
+        if os.name == 'nt':
+            binary_name += '.exe'
+        explicit_output = next((f[len("-out:"):] for f in flags if f.startswith("-out:")), None)
+        executable = Path(explicit_output if explicit_output is not None else binary_directory / binary_name).resolve()
+        if options.command == 'build' and explicit_output is None and executable == (ROOT / 'thor').resolve():
+            raise ThorError('The default output would overwrite the Thor launcher; choose another name with -out:name.')
+        if options.command in {"build", "run", "test"} and explicit_output is None:
             command.append(f"-out:{executable}")
         if options.command == "test":
             command.append("-build-mode:test")

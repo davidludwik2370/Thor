@@ -139,7 +139,7 @@ empty, err := basic.input()
 assert(empty == "" && err == .EOF)
 delete(empty)
 ''', 'import "thor:basic"\n'), command='build')
-        result = subprocess.run([str(root / ('program.exe' if os.name == 'nt' else 'program'))], input='first\n\né😀\r\nlast',
+        result = subprocess.run([str(root / (root.name + ('.exe' if os.name == 'nt' else '')))], input='first\n\né😀\r\nlast',
                                 capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

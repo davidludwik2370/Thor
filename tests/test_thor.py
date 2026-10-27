@@ -1,12 +1,15 @@
 """Behavioral acceptance tests: generated code is checked/run by real Odin."""
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 THOR = ROOT / "thor"
@@ -65,7 +68,7 @@ class ThorTests(unittest.TestCase):
 
     def test_cli_build(self):
         root, _ = self.invoke(self.program('fmt.println("built")', 'import "core:fmt"\n'), command="build", flags=['-debug'])
-        executable = root / ("program.exe" if os.name == "nt" else "program")
+        executable = root / (root.name + ('.exe' if os.name == 'nt' else ''))
         manifest = json.loads((root / "output" / "thor-manifest.json").read_text())
         self.assertEqual(manifest['debug_program']['path'], str(executable.resolve()))
         self.assertFalse((root / "output" / executable.name).exists())
@@ -79,16 +82,48 @@ class ThorTests(unittest.TestCase):
         result = subprocess.run([str(THOR), 'build', '.'], cwd=directory,
                                 capture_output=True, text=True, timeout=40)
         self.assertEqual(result.returncode, 0, result.stderr)
-        executable = directory / ('program.exe' if os.name == 'nt' else 'program')
+        executable = directory / (directory.name + ('.exe' if os.name == 'nt' else ''))
         self.assertTrue(executable.is_file())
         self.assertTrue((directory / '.thor-build' / 'input' / 'thor-manifest.json').is_file())
         self.assertEqual(subprocess.run([str(executable)], capture_output=True).returncode, 0)
+
+    def test_cli_build_directory_name_with_spaces_and_dots(self):
+        root, _ = self.invoke(self.program('assert(true)'), command='transpile')
+        directory = root / 'my app.v1'
+        directory.mkdir()
+        (directory / 'main.thor').write_text(self.program('assert(true)'))
+        result = subprocess.run([str(THOR), 'build', '.'], cwd=directory,
+                                capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        executable = directory / (directory.name + ('.exe' if os.name == 'nt' else ''))
+        self.assertEqual(subprocess.run([str(executable)], capture_output=True).returncode, 0)
+
+    @unittest.skipIf(os.name == 'nt', 'The Unix launcher has no .exe suffix')
+    def test_cli_default_build_cannot_overwrite_the_launcher(self):
+        from thorlang import driver
+        frontend, odin = driver.frontend_binary(os.environ.get('THOR_ODIN', 'odin'))
+        with tempfile.TemporaryDirectory(prefix='thor-launcher-protection-') as temporary:
+            directory = Path(temporary) / 'thor'
+            directory.mkdir()
+            launcher = directory / 'thor'
+            launcher.write_text('keep this launcher')
+            source = directory / 'main.thor'
+            source.write_text(self.program(''))
+            errors = io.StringIO()
+            with patch.object(driver, 'ROOT', directory), \
+                 patch.object(driver, 'frontend_binary', return_value=(frontend, odin)), \
+                 patch.object(driver.Path, 'cwd', return_value=directory), \
+                 contextlib.redirect_stderr(errors):
+                status = driver._main(['build', str(source), '--output-dir', str(directory / 'generated')])
+            self.assertEqual(status, 1)
+            self.assertIn('overwrite the Thor launcher', errors.getvalue())
+            self.assertEqual(launcher.read_text(), 'keep this launcher')
 
     def test_cli_build_explicit_output_overrides_default(self):
         name = 'chosen.exe' if os.name == 'nt' else 'chosen'
         root, _ = self.invoke(self.program('assert(true)'), command='build', flags=['-out:'+name])
         self.assertTrue((root / name).is_file())
-        self.assertFalse((root / ('program.exe' if os.name == 'nt' else 'program')).exists())
+        self.assertFalse((root / (root.name + ('.exe' if os.name == 'nt' else ''))).exists())
         self.assertEqual(subprocess.run([str(root / name)], capture_output=True).returncode, 0)
 
     def test_cli_run_keeps_its_temporary_binary_in_generated_tree(self):
@@ -96,12 +131,13 @@ class ThorTests(unittest.TestCase):
         name = 'program.exe' if os.name == 'nt' else 'program'
         self.assertTrue((root / 'output' / name).is_file())
         self.assertFalse((root / name).exists())
-        (root / name).write_bytes(b'preserve the existing build artifact')
+        build_name = root.name + ('.exe' if os.name == 'nt' else '')
+        (root / build_name).write_bytes(b'preserve the existing build artifact')
         result = subprocess.run([str(THOR), 'run', str(root / 'input' / 'main.thor'),
                                  '--output-dir', str(root / 'output')], cwd=root,
                                 capture_output=True, text=True, timeout=40)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((root / name).read_bytes(), b'preserve the existing build artifact')
+        self.assertEqual((root / build_name).read_bytes(), b'preserve the existing build artifact')
         self.assertFalse((root / 'output' / name).exists())
 
     def test_cli_run_arguments(self):

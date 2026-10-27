@@ -836,3 +836,18 @@ artifact location. The user's playground builds in place and prints `hello`.
 Validation: all 100 focused CLI, basic-library, project-template and test-mode
 build regressions pass. An additional run check confirms that a pre-existing
 `program` in the working directory survives temporary executable cleanup.
+
+## Default artifact name follows the working folder: compiler 0.13.2
+
+Name the default `build` artifact after the working directory, preserving the
+entire folder name (including spaces and dots) and appending `.exe` on Windows.
+For example, `thor build .` in thor-playground produces ./thor-playground.
+Explicit `-out:` overrides, generated output locations, debug manifest identity
+and temporary `run`/`test` executable handling retain their existing behavior.
+
+The checkout's folder and launcher are both named thor. Reject a default output
+that would overwrite that launcher, and show an explicit output name in the
+checkout's build example. An isolated launcher fixture exercises this guard
+without putting the real compiler at risk. All 14 focused build, run/test,
+basic-input and project-template regressions pass; the playground executable
+also builds and prints `hello` under its new name.
