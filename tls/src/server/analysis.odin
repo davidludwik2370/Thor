@@ -4614,6 +4614,7 @@ get_pkg_name :: proc(ast_context: ^AstContext, pkg: string) -> string {
 	name := path.base(pkg, false, context.temp_allocator)
 	for imp in ast_context.imports {
 		if imp.base_original == name {
+			if imp.import_decl != nil && imp.import_decl.name.text == "_" { return name }
 			return imp.base
 		}
 	}

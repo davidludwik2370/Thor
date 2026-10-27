@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 
 
 def frontend_binary(odin):
@@ -79,6 +79,8 @@ class Project:
         for source in self.sources.values():
             source.project = self.packages
             source.collections = self.collections
+        from .imports import prepare
+        prepare(self)
         self.resolver = Resolver(list(self.sources.values()))
         from .defaults import DefaultCallbacks
         for source in self.sources.values():

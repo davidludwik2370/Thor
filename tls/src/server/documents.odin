@@ -27,6 +27,7 @@ ParserError :: struct {
 }
 
 Package :: struct {
+	wildcard:      bool,
 	name:          string, //the entire absolute path to the directory
 	base:          string,
 	base_original: string,
@@ -501,7 +502,15 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 
 	imports := make([dynamic]Package)
 	selection_ends := make(map[int]common.Position, context.temp_allocator)
+	selection_namespaces := make(map[int]string, context.temp_allocator)
+	wildcards := make(map[int]bool, context.temp_allocator)
 	for selection in selections {
+		if selection.wildcard {
+			for imp in document.ast.imports {
+				if imp.pos.offset <= selection.start && selection.start < imp.end.offset { wildcards[imp.pos.offset] = true }
+			}
+			continue
+		}
 		import_decl: ^ast.Import_Decl
 		for imp in document.ast.imports {
 			if imp.end.offset <= selection.start && (import_decl == nil || imp.end.offset > import_decl.end.offset) {
@@ -509,6 +518,9 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 			}
 		}
 		if import_decl != nil && len(selection.names) > 0 {
+			if selection.package_name == "_" {
+				selection_namespaces[import_decl.pos.offset] = thor_selection_namespace(selection, document.ast)
+			}
 			last := len(selection.names)-1
 			end := selection.positions[last]
 			end.offset += len(selection.names[last])
@@ -547,6 +559,7 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 			import_.range = range
 			import_.declaration_range = declaration_range
 			import_.import_decl = imp
+			import_.wildcard = wildcards[imp.pos.offset]
 
 			if imp.name.text != "" {
 				import_.base = imp.name.text
@@ -555,6 +568,7 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 				import_.base = path.base(import_.name, false)
 			}
 
+			if namespace, hidden := selection_namespaces[imp.pos.offset]; hidden { import_.base = namespace }
 			append(&imports, import_)
 		} else {
 			//relative
@@ -572,6 +586,7 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 			import_.range = range
 			import_.declaration_range = declaration_range
 			import_.import_decl = imp
+			import_.wildcard = wildcards[imp.pos.offset]
 
 			if imp.name.text != "" {
 				import_.base = imp.name.text
@@ -580,6 +595,7 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 				import_.base = path.base(import_.name, false)
 			}
 
+			if namespace, hidden := selection_namespaces[imp.pos.offset]; hidden { import_.base = namespace }
 			append(&imports, import_)
 		}
 	}

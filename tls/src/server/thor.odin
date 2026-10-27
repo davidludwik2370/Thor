@@ -223,15 +223,23 @@ thor_is_import_alias_attributes :: proc(attributes: []^ast.Attribute) -> bool {
     return false
 }
 
+thor_selection_namespace :: proc(selection: parser.Selection, file: ast.File) -> string {
+    namespace := selection.package_name
+    if namespace == "_" {
+        namespace = fmt.aprintf("__thor_import_%d", selection.start)
+        for strings.contains(file.src, namespace) { namespace = strings.concatenate({namespace, "_"}) }
+    } else if namespace == "" {
+        namespace = strings.trim(selection.path, "\"`")
+        slash := max(strings.last_index(namespace, "/"), strings.last_index(namespace, ":"))
+        namespace = namespace[slash+1:]
+    }
+    return namespace
+}
+
 thor_add_import_aliases :: proc(p: ^parser.Parser, file: ^ast.File) {
     for selection in p.selections {
-        namespace := selection.package_name
-        if namespace == "" {
-            namespace = strings.trim(selection.path, "\"`")
-            slash := max(strings.last_index(namespace, "/"), strings.last_index(namespace, ":"))
-            namespace = namespace[slash+1:]
-        }
-        if namespace == "_" { continue }
+        if selection.wildcard { continue }
+        namespace := thor_selection_namespace(selection, file^)
         for name, i in selection.names {
             ident := thor_ident(name, selection.positions[i])
             selector := ast.new(ast.Selector_Expr, ident.pos, ident.end)

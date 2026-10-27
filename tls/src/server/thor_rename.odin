@@ -154,6 +154,7 @@ thor_rename_target :: proc(document: ^Document, position: common.Position) -> (T
 	if document.ast.syntax_error_count > 0 {return {}, "Fix syntax errors in this file before renaming a symbol."}
 	token, ok := thor_rename_token(document, position)
 	if !ok {return {}, "Select an identifier to rename."}
+	if token.name == "_" {return {}, "The blank import marker is not a namespace to rename."}
 	ctx := make_ast_context(
 		document.ast,
 		document.imports,
@@ -198,6 +199,7 @@ thor_rename_target :: proc(document: ^Document, position: common.Position) -> (T
 		if target.symbol.type == .Package {
 			for imp in document.imports {
 				if imp.base == token.name && imp.range == target.symbol.range && imp.name == target.symbol.pkg {
+					if imp.wildcard { return {}, "A wildcard import keeps its default package name; use a selected import to choose another namespace." }
 					target.namespace = true
 					target.import_ = imp
 					break

@@ -41,6 +41,14 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_wildcard_import_errors_map_to_original_names_and_marker(self):
+        self.at('package main\nimport * "lib"\n/* 😀 */ VALUE::8\nmain::proc(){}\n','VALUE::',
+            files={'lib/main.odin':'package lib\nVALUE::7\n'},message='conflicts with wildcard import')
+        self.at('package main\nimport * "one"\nimport * "two"\nmain::proc(){}\n','* "two"',
+            files={'one/main.odin':'package one\nVALUE::7\n','two/main.odin':'package two\nVALUE::8\n'},
+            message='Conflicting wildcard import')
+        self.at('package main\nimport _ "lib" / work\nmain::proc(){_=work("wrong")}\n','"wrong"',
+            files={'lib/main.thor':'package lib\nwork::proc(value:int)->int{return value}\n'},message='Cannot convert')
     def test_spread_extrema_errors_retain_original_argument_ranges(self):
         self.at('package main\nmain::proc(){/* 😀 */ _=min(**[0]int{})}\n', '[0]int{}', message='empty fixed array')
         self.at('package main\nmain::proc(){_=max(..[2]int{1,2})}\n', '[2]int{1,2}', message='must be a slice')

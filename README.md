@@ -52,7 +52,8 @@ branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
 ## Basic library
 
 The bundled [`thor:basic` package](runtime/basic/README.md) works from any Thor
-project without additional collection flags:
+project without additional collection flags. Its canonical source is
+[runtime/basic/basic.thor](runtime/basic/basic.thor):
 
 ```odin
 import "thor:basic"
@@ -64,7 +65,25 @@ basic.print(result)
 ```
 
 Use `import "thor:basic" / sorted, print` for selected unqualified names.
-Its canonical source is [runtime/basic/basic.thor](runtime/basic/basic.thor).
+Use these forms to expose every public name, or select names without also
+introducing the package namespace:
+
+```odin
+import * "thor:basic"                // All public names; basic.name also works.
+// Alternatively:
+import _ "thor:basic" / sorted, print // Only sorted and print; no basic namespace.
+```
+
+The unqualified names are local to the importing file. They are not re-exported,
+and private declarations and internal imports stay hidden. Wildcard imports
+preserve live access to exported variables, including assignments. Local
+variables may shadow imported names; conflicting file-scope declarations and
+imports are errors. Public names in conditional branches reserve their names
+even when inactive, so two wildcard imports with overlapping potential exports
+are rejected. An unused conditional export is not forced to exist.
+
+Run the [import walkthrough](examples/imports/demo.thor) with
+`thor run /path/to/thor/examples/imports`.
 Run the [commented example](examples/basic/demo.thor) with
 `thor run /path/to/thor/examples/basic`.
 

@@ -23,14 +23,21 @@ inline generic default callbacks, so build consumers with Thor. The other
 support packages written entirely in Odin remain usable directly with Odin.
 
 A plain import keeps names under `basic`. Select unqualified names explicitly,
-or choose a different namespace:
+import every public name, or choose a different namespace:
 
 ```odin
 import "thor:basic" / sorted, print
+// or: import * "thor:basic"
+// or: import _ "thor:basic" / sorted, print
 // or: import b "thor:basic"
 ```
 
-Selected imports retain their namespace as well. Internal imports such as `fmt`
+Selected and wildcard imports retain their namespace as well. The `_` form
+exposes only the selected names and does not introduce `basic`. Each import's
+unqualified names are visible only in that file and are not re-exported. Local
+bindings may shadow them; conflicting file-scope declarations are errors.
+Wildcard imports also reject overlapping public names from different packages,
+including names in conditional branches. Internal imports such as `fmt`
 and the private `_parse_int` helper are not exported. Leading underscores alone
 do not mark names private, so `_int` and the other conversion helpers are public.
 

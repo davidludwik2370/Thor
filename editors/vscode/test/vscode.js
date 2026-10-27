@@ -180,6 +180,16 @@ async function run() {
         assert.equal(testDocument.getText(extremaErrors.find(value=>value.message.includes('empty fixed array')).range),'[0]f32{}');
         await replace(extremaSource);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const wildcardSource='package main\nimport * "thor:basic"\nmain::proc(){result:=sorted([]int{2,1});defer delete(result);print(result)}\n';
+        await replace(wildcardSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(wildcardSource.indexOf('sorted(')+2)),values=>hoverText(values||[]).includes('less'));
+        const suppressedSource=wildcardSource.replace('import * "thor:basic"','import _ "thor:basic" / sorted, print');
+        await replace(suppressedSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(suppressedSource.indexOf('sorted(')+2)),values=>hoverText(values||[]).includes('less')&&!hoverText(values||[]).includes('__thor_'));
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -346,6 +356,7 @@ async function run() {
             'generic inline defaults compile and body errors highlight original source', 'hidden Set imports do not hover on comments',
             'callback values use parameter color and a one-letter parameter renames at its end boundary',
             'spread min/max element and status hover, original argument error ranges and unsaved correction',
+            'wildcard and namespace-free imports compile and provide source hovers',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

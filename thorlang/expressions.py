@@ -497,6 +497,12 @@ class Expressions:
             return s.splice(n,[(c.start,c.end,f'{self.module("sets")}.entries({s.render(c)})' if c is expr else s.render(c)) for c in n.children])
         if n.kind=='Range' and self.shape(n.role('expr')).kind in {'generic','unknown'} and not any(name.kind=='Unary' and name.data['op']=='&' for name in n.group('names')):
             expr=n.role('expr')
+            # A native iterator call produces (values..., ok) repeatedly. An
+            # ordinary value wrapper would evaluate it once and lose that
+            # protocol. Keep opaque native calls under Odin's range checker.
+            imported = s.purity.imported(expr.role('callee')) if s.purity and expr.kind=='Call' else None
+            if imported and s.import_dir(imported[0]) is None:
+                return None
             return s.splice(n,[(c.start,c.end,f'{self.module("sets")}.compiler_iterate({s.render(c)})' if c is expr else s.render(c)) for c in n.children])
         return None
 

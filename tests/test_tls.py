@@ -134,6 +134,80 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_wildcard_import_public_hover_definition_completion_and_unused_state(self):
+        text='package main\nimport * "library"\nmain::proc(){answer:=chosen(2);counter=3;_=answer;_=counter}\n'
+        library='package library\nchosen::proc(value:int)->int{return value}\ncounter:int\nsecret_public::7\n@private\nsecret::7\n'
+        client,main=self.open(text,{'library/main.thor':library},unused_imports=True)
+        hover=self.hover(client,main,text,'chosen(2)')
+        self.assertIn('proc(value: int) -> int',hover['contents']['value'])
+        params={'textDocument':{'uri':main.as_uri()},'position':self.position(text,'chosen(2)')}
+        definition=client.request('textDocument/definition',params)
+        self.assertTrue(definition['uri'].endswith('/library/main.thor'),definition)
+        self.assertIn(': int',self.hover(client,main,text,'counter=')['contents']['value'])
+        self.assertEqual(self.unused_imports(client,main),[])
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        changed='package main\nimport * "library"\nmain::proc(){ cho }\n'
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(changed,'cho }',len('cho')),'context':{'triggerKind':1}})
+        self.assertIn('chosen',[item['label'] for item in completion['items']])
+        changed=changed.replace(' cho }',' sec }')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':changed}]})
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(changed,'sec }',len('sec')),'context':{'triggerKind':1}})
+        labels=[item['label'] for item in completion['items']]
+        self.assertIn('secret_public',labels)
+        self.assertNotIn('secret',labels)
+        changed='package main\nimport * "library"\nmain::proc(){chosen:=2;_=chosen}\n'
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':4},'contentChanges':[{'text':changed}]})
+        self.assertEqual(len(self.unused_imports(client,main)),1)
+
+    def test_namespace_free_selections_resolve_distinct_imports_without_namespace(self):
+        text='package main\nimport _ "one" / first\nimport _ "two" / second\nmain::proc(){_=first(1);_=second(2)}\n'
+        files={'one/main.thor':'package one\nfirst::proc(value:int)->int{return value}\n',
+               'two/main.thor':'package two\nsecond::proc(value:int)->int{return value}\n'}
+        client,main=self.open(text,files,unused_imports=True)
+        for name,folder in [('first','one'),('second','two')]:
+            params={'textDocument':{'uri':main.as_uri()},'position':self.position(text,name+'(',2)}
+            hover=client.request('textDocument/hover',params)
+            self.assertIn('proc(value: int) -> int',hover['contents']['value'])
+            self.assertNotIn('__thor_',hover['contents']['value'])
+            definition=client.request('textDocument/definition',params)
+            self.assertTrue(definition['uri'].endswith('/'+folder+'/main.thor'),definition)
+        self.assertEqual(self.unused_imports(client,main),[])
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        completed=text[:text.index('main::')]+"main::proc(){\n    \n}\n"
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':completed}]})
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':{'line':4,'character':4},'context':{'triggerKind':1}})
+        labels=[item['label'] for item in completion['items']]
+        self.assertNotIn('one',labels)
+        self.assertNotIn('two',labels)
+        self.assertFalse(any('__thor_' in label for label in labels),labels)
+        for version,prefix,wanted in [(3,'fir','first'),(4,'sec','second'),(5,'__thor',None)]:
+            partial=completed.replace('    \n','    '+prefix+'\n')
+            client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':version},'contentChanges':[{'text':partial}]})
+            completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+                'position':{'line':4,'character':4+len(prefix)},'context':{'triggerKind':1}})
+            labels=[item['label'] for item in completion['items']]
+            if wanted: self.assertIn(wanted,labels)
+            self.assertFalse(any('__thor_' in label for label in labels),labels)
+        changed=text.replace('_=first(1);_=second(2)','_=one.first(1);_=two.second(2)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':6},'contentChanges':[{'text':changed}]})
+        self.assertIsNone(self.hover(client,main,changed,'one.first'))
+        self.assertIsNone(self.hover(client,main,changed,'two.second'))
+
+    def test_wildcard_collision_diagnostic_clears_after_unsaved_correction(self):
+        text='package main\nimport * "library"\n/* 😀 */ chosen::9\nmain::proc(){}\n'
+        client,main=self.open(text,{'library/main.thor':'package library\nchosen::7\n'})
+        errors=client.diagnostic(main.as_uri(),contains='conflicts with wildcard import')
+        error=next(e for e in errors if 'conflicts with wildcard import' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'chosen::',0))
+        changed=text.replace('chosen::9','other::9')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_extrema_spread_hover_types_and_optional_status(self):
         text = '''package main
 import "core:math"

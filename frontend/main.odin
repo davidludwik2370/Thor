@@ -23,6 +23,8 @@ Info :: struct {
     lists: map[string][]Span,
 }
 Output :: struct {
+    odin_root: string,
+    private: bool,
     excluded: bool,
     nodes: [dynamic]Info,
     edits: [dynamic]parser.Edit,
@@ -165,6 +167,8 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         else if n.calling_convention!=nil {info.calling_convention="foreign"}
     case ^ast.Foreign_Block_Decl:
         info.kind="ForeignBlock";info.calling_convention="c"
+        info.lists["attributes"] = make([]Span, len(n.attributes))
+        for attribute, i in n.attributes { info.lists["attributes"][i] = span(attribute) }
         for attribute in n.attributes {for elem in attribute.elems {
             field:=elem.derived.(^ast.Field_Value) or_continue
             name:=field.field.derived.(^ast.Ident) or_continue
@@ -198,6 +202,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Block_Stmt: info.kind = "Block"
     case ^ast.Import_Decl:
         info.kind = "Import"; info.name = n.name.text; info.op = n.relpath.text
+        if n.name.text != "" { info.roles["alias"] = {n.name.pos.offset, n.name.pos.offset+len(n.name.text)} }
     case ^ast.If_Stmt:
         info.kind = "If"; info.roles["init"] = span(n.init); info.roles["cond"] = span(n.cond)
         info.roles["body"] = span(n.body); info.roles["else"] = span(n.else_stmt)
@@ -312,7 +317,8 @@ main :: proc() {
         os.exit(1)
     }
     file.end.offset = len(data)
-    out := Output{edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
+    out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public,
+                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
     lexer: tokenizer.Tokenizer
     tokenizer.init(&lexer, file.src, file.fullpath, collect_error)
     lexer.thor = thor

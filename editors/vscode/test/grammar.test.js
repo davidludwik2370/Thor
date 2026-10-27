@@ -70,6 +70,7 @@ function themedTokens(source) {
 for (const [name, source, word, scope, line] of [
     ['package', 'package main', 'main', 'entity.name.namespace'],
     ['selective import', 'import "core:math" / sin, cos', 'import', 'keyword.control.import'],
+    ['wildcard import', 'import * "thor:basic"', 'import', 'keyword.control.import'],
     ['named import', 'import math "core:math" / sin', 'math', 'variable.other.namespace'],
     ['multiline import ends', 'import "core:math" / sin,\n cos\nmain :: proc() {}', 'main', 'entity.name.function', 2],
     ['comma continuation', 'import "core:math" /\n sin, // comment\n cos', 'cos', 'variable', 2],
@@ -195,6 +196,8 @@ test('whole import paths retain string scopes', () => {
         ['import "core:fmt" / println', 'core:fmt'],
         ['import math "core:math" / sin', 'core:math'],
         ['import "library" / Record', 'library'],
+        ['import * "thor:basic"', 'thor:basic'],
+        ['import _ "thor:basic" / print', 'thor:basic'],
     ]) {
         check(source, value, 'string.quoted.double');
     }

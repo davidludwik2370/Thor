@@ -61,6 +61,7 @@ Parser :: struct {
 Edit :: struct {start, end: int, text: string}
 Selection :: struct {
 	start, end: int,
+	wildcard: bool,
 	package_name: string,
 	path: string,
 	names: [dynamic]string,
@@ -3987,10 +3988,16 @@ parse_import_decl :: proc(p: ^Parser, kind := Import_Decl_Kind.Standard) -> ^ast
 
 	import_name: tokenizer.Token
 	is_using := kind != Import_Decl_Kind.Standard
+	wildcard: tokenizer.Token
+	if p.thor && p.curr_tok.kind == .Mul {
+		wildcard = advance_token(p)
+		is_using = true // Tooling can reuse Odin's namespace-using lookup.
+	}
 
 	#partial switch p.curr_tok.kind {
 	case .Ident:
 		import_name = advance_token(p)
+		if wildcard.pos.line != 0 { error(p, import_name.pos, "a wildcard import uses the package's default name") }
 	case:
 		import_name.pos = p.curr_tok.pos
 	}
@@ -4004,7 +4011,12 @@ parse_import_decl :: proc(p: ^Parser, kind := Import_Decl_Kind.Standard) -> ^ast
 	decl.name       = import_name
 	decl.relpath    = path
 	decl.fullpath   = path.text
+	if wildcard.pos.line != 0 && !p.peeking {
+		append(&p.selections, Selection{start=wildcard.pos.offset, end=wildcard.pos.offset+1,
+			wildcard=true, path=path.text})
+	}
 	if p.thor && p.curr_tok.kind == .Quo {
+		if wildcard.pos.line != 0 { error(p, p.curr_tok.pos, "a wildcard import cannot also select names") }
 		start := advance_token(p).pos.offset
 		selection := Selection{start=start, package_name=import_name.text, path=path.text}
 		for {

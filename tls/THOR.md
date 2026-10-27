@@ -69,6 +69,11 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   report temporary-view lifetime errors at original unsaved source ranges.
 - Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
   bracket array literals, and membership in generic constraints.
+- Resolve `import * "package"` public names through namespace-using lookup,
+  retaining qualified access, navigation, hover, completion and symbol renaming.
+  `import _ "package" / names` exposes only selected names without introducing
+  the default package namespace; generated namespaces stay out of hover text.
+  Compiler checks map import collisions to the original marker or declaration.
 - Present the actual `thor:sets.Set` as `set[T]` throughout hover, signature
   help and completion type labels, including pointers/containers, nested generic
   arguments and imported procedures. Temporary display ASTs preserve indexed

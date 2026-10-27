@@ -2115,6 +2115,7 @@ get_identifier_completion :: proc(
 		if position_context.global_lhs_stmt {
 			break
 		}
+		if pkg.import_decl != nil && pkg.import_decl.name.text == "_" { continue }
 
 		symbol := Symbol {
 			name  = pkg.base,

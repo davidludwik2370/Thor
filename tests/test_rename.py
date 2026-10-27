@@ -11,6 +11,31 @@ from tests.test_tls import Client, ROOT
 
 
 class RenameTests(unittest.TestCase):
+    def test_public_symbol_rename_through_wildcard_and_namespace_free_imports(self):
+        for declaration in ['import * "library"', 'import _ "library" / work']:
+            with self.subTest(declaration=declaration):
+                text='package main\n'+declaration+'\nmain::proc(){_=work(2)}\n'
+                files={'main.thor':text,'library/main.thor':'package library\nwork::proc(value:int)->int{return value}\n'}
+                client,root,main=self.project(files)
+                edit=self.rename(client,main,text,'work(2)','compute',1)
+                expected={name:value.replace('work','compute') for name,value in files.items()}
+                self.assertEqual(self.apply(root,files,edit),expected)
+                self.assert_builds(root,expected)
+
+    def test_new_import_markers_cannot_be_renamed_as_namespaces(self):
+        for declaration,needle,message in [
+            ('import * "core:fmt"','fmt.println','default package name'),
+            ('import _ "core:fmt" / println','_ "core:fmt"','blank import marker'),
+        ]:
+            with self.subTest(declaration=declaration):
+                call='fmt.println("hello")' if '*' in declaration else 'println("hello")'
+                text='package main\n'+declaration+'\nmain::proc(){'+call+'}\n'
+                client,root,main=self.project({'main.thor':text})
+                params={'textDocument':{'uri':main.as_uri()},'position':self.pos(text,needle)}
+                self.assertIsNone(client.request('textDocument/prepareRename',params))
+                with self.assertRaisesRegex(AssertionError,message):
+                    client.request('textDocument/rename',{**params,'newName':'format'})
+
     @classmethod
     def setUpClass(cls):
         if not shutil.which(os.environ.get('THOR_ODIN', 'odin')):

@@ -760,3 +760,60 @@ expected failure, including the real debugger tests. The final fifteen extrema
 tests and focused updated diagnostic test also pass. All 1,118 native TLS tests,
 85 Node tests and actual VS Code integration pass. Rebuild the local TLS server
 with version 0.11.0; the client remains 0.10.3. The new demo runs successfully.
+
+## Wildcard and namespace-free imports: compiler 0.13.0 / TLS 0.12.0
+
+Parse `import * "package"` as a Thor wildcard import, retaining the default
+package namespace. Enumerate public declarations from the original package
+sources before constructing the resolver. Reuse selected-name resolution to
+rewrite unqualified references into qualified package accesses; this preserves
+live mutable globals, types, overload groups, generic functions, default
+callbacks and pure compile-time calls without copying values or re-exporting
+imports. Native core/base/vendor export discovery uses the Odin root reported
+by the frontend built with the selected compiler. Build-tag exclusions and
+file/declaration privacy are read from native parser metadata.
+
+Do not eagerly instantiate wildcard exports: a name in an inactive conditional
+branch need not exist unless used. Name reservation is conservative across
+conditional declarations; overlapping potential public names from different
+wildcard imports conflict. Report collisions at the second wildcard marker or
+the importing file's own declaration, and defer conditional local collisions
+to the native active-branch checker. Procedure locals may shadow imported names.
+
+Allow `import _ "package" / first, second` by emitting a hygienic internal
+package alias. Only the selected names are exposed; the default package name
+is absent. Each blank selection has an independent alias, even when selecting
+from the same package more than once. Existing explicit-selection validation
+still checks unused missing/private names and retains its mutable-variable
+restriction. Wildcard access to mutable public variables has no such restriction.
+
+TLS reuses the AST's namespace-using lookup for wildcard imports and its existing
+file-private synthetic aliases for explicit selections. Blank selections use
+hidden namespaces, omitted from namespace completion and hover presentation.
+Original-source hover, definitions, semantic tokens, completion, unused-import
+dimming and public-symbol renaming are exercised over stdio. Wildcard package
+namespace renaming is rejected because this syntax retains the default name;
+public declarations reached through either import form can still be renamed.
+Compiler JSON diagnostics and live unsaved corrections preserve original ranges.
+
+Calling the user's newly copied table helper exposed a native iterator lowering
+bug: opaque native iterator calls were wrapped as ordinary sequence values.
+Leave those calls to Odin's native range checker so repeated `(values..., ok)`
+iteration retains its protocol. Also add the missing UTF-8 import required by
+that helper. The user's table body, playground moves and existing demo changes
+remain outside this feature's commit.
+
+The runnable walkthrough is examples/imports/demo.thor, with a second file
+demonstrating independent blank selections. The VS Code client and grammar need
+no update; restart TLS to load the rebuilt server.
+
+Validation: the full Python run exercised 597 tests, with one existing expected
+failure and one unexpected native helper-build failure in the existing warm-cache
+test. Odin exited without a diagnostic during that test's first compilation.
+All eight cache tests, including that case, passed on rerun; the cause was not
+reproduced. A final 15-test import/rename/completion run also passes, including
+additional excluded-file, conditional-collision and hidden-namespace checks.
+All 1,118 native TLS tests, 86 Node tests and actual VS Code integration pass.
+The new import walkthrough, main T01-T23 demo and user's playground program run
+successfully. A direct call to the user's table helper through a wildcard import
+also prints the expected aligned table.

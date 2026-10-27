@@ -131,10 +131,26 @@ class Source:
                 n.parent = self.nodes[parent]
                 n.parent.children.append(n)
         self.root = self.nodes[0]
-        self.imports = {
-            n.data["name"] or unquote(n.data["op"]).rsplit("/", 1)[-1].rsplit(":", 1)[-1]:
-            unquote(n.data["op"]) for n in self.nodes if n.kind == "Import"
-        }
+        digest = hashlib.sha256(str(self.path).encode()).hexdigest()[:12]
+        self.prefix = f"__thor_{digest}_"
+        while self.prefix.encode() in self.raw:
+            self.prefix += "x_"
+        self.edits = [(e["start"], e["end"], e["text"]) for e in self.info.get("edits", [])]
+        self.imports = {}
+        self.blank_selections = {}
+        for node in self.nodes:
+            if node.kind != 'Import': continue
+            path = unquote(node.data['op'])
+            namespace = node.data['name'] or path.rsplit('/', 1)[-1].rsplit(':', 1)[-1]
+            selection = next((item for item in self.info.get('selections') or []
+                              if item['package_name']=='_' and item['path']==node.data['op'] and item['start']>=node.end
+                              and not any(n.kind=='Import' and node.end<n.start<item['start'] for n in self.nodes)), None)
+            if namespace == '_' and selection:
+                namespace = self.prefix+f'import_{node.start}'
+                self.blank_selections[selection['start']] = namespace
+                a,b = node.data['roles']['alias']
+                self.edits.append((a,b,namespace))
+            self.imports[namespace] = path
         self.project: dict[Path, list[Source]] = {}
         self.collections: dict[str, Path] = {}
         self.needs_membership = False
@@ -158,19 +174,20 @@ class Source:
         self.expressions = Expressions(self)
         self.selected = {}
         self.selected_origins = {}
+        self.wildcards = []
+        self.wildcard_names = set()
         self.conditional_conflicts = set()
-        digest = hashlib.sha256(str(self.path).encode()).hexdigest()[:12]
-        self.prefix = f"__thor_{digest}_"
-        while self.prefix.encode() in self.raw:
-            self.prefix += "x_"
-        self.edits = [(e["start"], e["end"], e["text"]) for e in self.info.get("edits", [])]
         for selection in self.info.get("selections", []) or []:
+            if selection.get('wildcard'):
+                self.wildcards.append(selection)
+                self.edits.append((selection['start'], selection['end'], ''))
+                continue
             names = selection["names"]
             if len(names) != len(set(names)):
                 self.error("duplicate name in selective import", selection["start"], selection["end"])
             package = selection["package_name"] or unquote(selection["path"]).rsplit("/", 1)[-1].rsplit(":", 1)[-1]
             if package == "_":
-                self.error("selective import requires a package namespace", selection["start"], selection["end"])
+                package = self.blank_selections[selection['start']]
             comments = self.comments(selection["start"], selection["end"])
             for i, name in enumerate(names):
                 start = selection["positions"][i]["offset"]
@@ -783,7 +800,8 @@ class Source:
         if self.defaults and kind == 'Declaration':
             result = self.defaults.helpers(n) + result
         if n in self.conditional_conflicts:
-            result = '#panic("declaration conflicts with selective import")\n' + result
+            flavor = 'wildcard' if any(name.text in self.wildcard_names for name in n.group('names')) else 'selective'
+            result = f'#panic("declaration conflicts with {flavor} import")\n' + result
         if kind=='Case':
             declarations=self.expressions.declarations(n)
             if declarations:
@@ -859,12 +877,13 @@ class Source:
         array_span = (arrays[0].start, arrays[0].end) if arrays else (0, 0)
         if self.needs_intrinsics:
             code += self.mapping.wrap(f'\nimport {self.prefix}meta "base:intrinsics"\n', self.path, *array_span, "support")
-        if self.selected:
+        explicit = {name:target for name,target in self.selected.items() if name not in self.wildcard_names}
+        if explicit:
             # Odin does not allow privacy attributes on every kind of alias.
             # Resolve file-local names in the AST and validate even unused imports
             # through local constant aliases in an otherwise empty private init.
             checks = "\n".join(self.mapping.wrap(f"    checked_{i} :: {self.namespace_code(target.split('.')[0])}.{name}", self.path,
-                                *self.selected_origins[name], "import") for i, (name, target) in enumerate(self.selected.items()))
+                                *self.selected_origins[name], "import") for i, (name, target) in enumerate(explicit.items()))
             code += self.mapping.wrap(f'\n@(private="file", init)\n{self.prefix}validate_imports :: proc "contextless" () {{\n{checks}\n}}\n', self.path, *next(iter(self.selected_origins.values())), "support")
         if self.needs_default:
             code += self.mapping.wrap(f'\n@(private="file")\n{self.prefix}default_value :: proc "contextless" (value: $T) -> T {{ return value }}\n', self.path, *array_span, "support")
