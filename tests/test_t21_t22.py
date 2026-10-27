@@ -61,15 +61,19 @@ class CacheStorageTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
-    invoke=base.ThorTests.invoke
     program=base.ThorTests.program
+
+    def invoke(self, source, *, flags=(), **kwargs):
+        # These cases exercise the evaluation-result cache independently of the
+        # complete-transpilation cache tested in test_build_cache.py.
+        return base.ThorTests.invoke(self,source,flags=['--no-transpile-cache',*flags],**kwargs)
 
     def report(self,result):
         return next(json.loads(line)['thor_cache'] for line in result.stdout.splitlines() if line.startswith('{"thor_cache"'))
 
     def again(self,root,*,flags=(),fail=None):
         result=subprocess.run([str(base.THOR),'run',str(root/'input'),'--output-dir',str(root/'output'),
-                               '--cache-report',*flags],capture_output=True,text=True,timeout=45)
+                               '--cache-report','--no-transpile-cache',*flags],capture_output=True,text=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0);self.assertIn(fail,result.stderr)
         else:self.assertEqual(result.returncode,0,result.stderr)
         return result

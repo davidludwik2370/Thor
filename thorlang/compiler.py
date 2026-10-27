@@ -76,7 +76,7 @@ class Hint:
 
 
 class Source:
-    def __init__(self, path: Path, frontend: Path, *, thor=True, package=False, test=False, project_name="", mapping=None, raw=None, target=()):
+    def __init__(self, path: Path, frontend: Path, *, thor=True, package=False, test=False, project_name="", mapping=None, raw=None, target=(), cache=True):
         self.path = path.resolve()
         self.thor = thor
         self.raw = path.read_bytes() if raw is None else raw
@@ -91,7 +91,8 @@ class Source:
             args.extend([f"--target-os={target[0]}", f"--target-arch={target[1]}"])
         args.append("--stdin")
         try:
-            result = subprocess.run(args, input=self.raw, capture_output=True, timeout=30)
+            from . import parsecache
+            result = parsecache.run(args,self.raw,enabled=cache)
         except subprocess.TimeoutExpired as exc:
             raise ThorError(f"parser timed out: {path}") from exc
         if result.returncode:
@@ -168,6 +169,7 @@ class Source:
         self.converted_do_blocks = set()
         self.guard_messages = {}
         self.resolver = None
+        self._fallback_symbols = None
         self.defaults = None
         self.purity = None
         self.run_values = {}
@@ -267,29 +269,29 @@ class Source:
         if self.root not in scopes:
             scopes.append(self.root)
         for scope in scopes:
-            for n in self.nodes:
-                if n.kind == "Declaration" and self.scope(n) is scope:
-                    if any(x and x.text == name for x in n.group("names")):
-                        if name in self.selected and scope.kind == "File" and any(a.kind == "When" for a in n.ancestors()):
-                            continue
-                        return n
-                if n.kind == "Range" and scope is n:
-                    if any(x.text == name for x in n.group("names")):
-                        return n
-                if n.kind == "PolyType" and self.scope(n) is scope and n.data["name"] == name:
-                    return n
-                if n.kind == "Field" and scope.kind in {"Procedure", "StructType"} and self.scope(n) is scope:
-                    if any(x and x.text.lstrip("$") == name for x in n.group("names")):
-                        return n
+            for n in self.fallback_symbols().get((scope,name),[]):
+                if n.kind=='Declaration' and name in self.selected and scope.kind=='File' and any(a.kind=='When' for a in n.ancestors()):
+                    continue
+                return n
         # Other source files in the same package share top-level declarations.
         for other in self.project.get(self.path.parent, []):
             if other is self:
                 continue
-            for n in other.nodes:
-                if n.kind == "Declaration" and other.scope(n).kind == "File":
-                    if any(x and x.text == name for x in n.group("names")):
-                        return n
+            for n in other.fallback_symbols().get((other.root,name),[]):
+                if n.kind=='Declaration':return n
         return None
+
+    def fallback_symbols(self):
+        if self._fallback_symbols is None:
+            result={}
+            for n in self.nodes:
+                if n.kind not in {'Declaration','Range','PolyType','Field'}:continue
+                scope=n if n.kind=='Range' else self.scope(n)
+                if n.kind=='Field' and scope.kind not in {'Procedure','StructType'}:continue
+                names=[n.data['name']] if n.kind=='PolyType' else [x.text.lstrip('$') if n.kind=='Field' else x.text for x in n.group('names')]
+                for name in names:result.setdefault((scope,name),[]).append(n)
+            self._fallback_symbols=result
+        return self._fallback_symbols
 
     def declaration_for(self, expression):
         if expression is None:

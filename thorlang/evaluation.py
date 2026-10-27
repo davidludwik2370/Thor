@@ -76,6 +76,9 @@ class Evaluator:
         if self.power(n):
             return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
         if n.kind!='Call' or n.parent and n.parent.kind=='Run':return False
+        library=self.purity.library(n)
+        if library and n.source.import_dir(library[0]) is None and not (
+            library[0] in {'core:math','base:builtin'} and library[1] in {'min','max'}):return False
         if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
         if n.source.expressions.extrema.plan(n):
             declaration = n.parent
@@ -501,7 +504,7 @@ class Evaluator:
                     pending.setdefault(key,[]).append(b)
         if not pending:return
         flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:')) and f!='-keep-executable']
-        probe=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays={p:s.raw for p,s in self.p.sources.items()})
+        probe=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays={p:s.raw for p,s in self.p.sources.items()},cache_frontend=self.p.cache_frontend)
         def copy(node):return next((n for n in probe.sources[node.source.path].by_span.get((node.start,node.end),[]) if n.kind==node.kind),None)
         old_p=self.p
         try:
@@ -663,7 +666,7 @@ class Evaluator:
         keep,imports,aliases,procedures,queries,calls,external=self.closure(roots)
         flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:','-vet','-target:')) and f not in {'-keep-executable','-no-entry-point'}]
         overlays={path:s.raw for path,s in self.p.sources.items()}
-        helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays)
+        helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays,cache_frontend=self.p.cache_frontend)
         helper.discover(self.root/'runtime'/'eval')
         self.p.native_sources.attach(helper,keep|procedures)
         originals={**self.p.sources,**{node.source.path:node.source for node in keep|procedures}}

@@ -20,6 +20,7 @@ class NativeSources:
         self.root = root or next((Path(s.info['odin_root']) for s in project.sources.values() if s.info.get('odin_root')), None)
         self.packages = {}
         self.sources = {}
+        self.discovery_scope = None
 
     def directory(self, source, path):
         if source.import_dir(path) is not None:
@@ -34,18 +35,24 @@ class NativeSources:
         directory = self.directory(source, path)
         if directory is None or path in self.compiler_packages:
             return None
+        if directory not in self.packages and self.discovery_scope is not None and directory not in self.discovery_scope:
+            return None
         if directory not in self.packages:
             members = []
             self.packages[directory] = members
             p = self.project
             files=set(directory.glob('*.odin')) | {path for path in p.overlays if path.parent==directory and path.suffix=='.odin'}
+            if getattr(p,'inputs',None) is not None:
+                p.inputs.package(directory,files,suffixes=('.odin',))
             for file in sorted(files):
                 member = Source(file, p.frontend, thor=False, package=True, test=p.test,
-                                project_name=p.entry.stem, raw=p.overlays.get(file), target=p.target, mapping=p.mapping)
+                                project_name=p.entry.stem, raw=p.overlays.get(file), target=p.target, mapping=p.mapping,cache=p.cache_frontend)
                 member.native_inspected = True
                 member.project = p.packages
                 member.collections = p.collections
                 member.purity = p.purity
+                if getattr(p,'inputs',None) is not None:
+                    p.inputs.source(member)
                 members.append(member)
                 self.sources[file] = member
             p.resolver.add_sources(members)
@@ -75,7 +82,7 @@ class NativeSources:
         for original in sorted(originals, key=lambda s: str(s.path)):
             member = Source(original.path, helper.frontend, thor=False, package=True, test=helper.test,
                             project_name=helper.entry.stem, mapping=helper.mapping,
-                            raw=original.raw, target=helper.target)
+                            raw=original.raw, target=helper.target,cache=helper.cache_frontend)
             member.native_inspected = True
             member.project = helper.packages
             member.collections = helper.collections
@@ -90,6 +97,12 @@ class NativeSources:
             members.append(member)
         helper.resolver.add_sources(members)
         helper.resolver.native = NativeSources(helper, self.root)
+        # The closure already selected every SDK declaration required for
+        # evaluation. Runtime support emitted around it must not expand that
+        # closure by inspecting its own ordinary fmt/reflect/memory calls.
+        # Previously inspected packages remain available as metadata, including
+        # mutable declarations that must be diagnosed but never emitted.
+        helper.resolver.native.discovery_scope = frozenset(self.packages)
         helper.resolver.native_enabled = True
         # Existing attached sources must retain the exact ASTs used by pruning.
         for member in members:

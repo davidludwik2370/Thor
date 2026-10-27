@@ -911,3 +911,71 @@ tests, 86 Node tests and actual VS Code integration pass. The new walkthrough
 and the user's playground execute successfully. A final 74-test purity,
 allocation, cache and test-mode regression run also passes. User playground moves, table
 work, demo edits and specification deletion remain outside this feature commit.
+
+## Reuse complete transpilation artifacts: compiler 0.15.0
+
+Profiled the user's playground at 5.4-6.0 seconds per unchanged build. Both
+compile-time operations hit the evaluation cache, but its lookup occurred after
+reconstructing helper projects and emitting their sources/maps. The build still
+launched 212 parser processes for 154 distinct source files. Parsing and Python
+AST construction dominated; final Odin compilation/linking took about 0.3 seconds.
+
+Add a complete-transpilation cache before frontend selection, project discovery
+and evaluation. Validate source contents, package membership, static resources,
+collection/path bindings, native flags/test mode, toolchain identities and the
+generated artifacts. Reuse the existing target, mapped native flags, source maps
+and diagnostic bookkeeping on a hit. Odin still runs for every check/build.
+Load source-map/diagnostic objects only when needed to translate a diagnostic.
+Retain the original prefixes, immutable guards, public namespace names, source
+snapshots and operation spans. Debug builds refresh the executable identity
+without invalidating unchanged generated source artifacts.
+
+Track project and inspected SDK sources/resources by content. Check broad
+compiler/runtime/SDK inventories through file identities, sizes and nanosecond
+modification/change times, including directory changes for additions/removals.
+Record input state before evaluation and revalidate before publication; a source
+snapshot differing from current disk contents cannot be published. Keep cache
+files atomic, checksummed and optional. Changed/damaged generated files or maps
+fall back to normal compilation. Preserve generated-output ownership checks.
+Editor overlays bypass complete reuse and replace generated artifacts normally;
+the next disk build rejects artifacts from different unsaved contents. Dynamic
+or unresolved resource paths bypass complete reuse.
+
+Separately cache successful frontend JSON by source bytes, path/configuration and
+frontend binary identity. Deserialize fresh ASTs for each consumer so helper
+pruning, feature annotations and overlays cannot mutate a shared cached AST.
+Do not cache parser failures. Replace fallback full-tree symbol scans with a
+lazy lexical index. Avoid resolving ordinary calls as spread min/max operations
+and avoid traversing installed Odin bodies for Thor generic specialization; their
+explicit #run dependency inspection remains unchanged. Helper emission may use
+metadata from already inspected SDK packages, including rejected runtime globals,
+without discovering new SDK packages through ordinary runtime-support calls.
+
+Complete artifacts live under the selected cache root's transpile-v1 directory;
+frontend JSON lives under the checkout's .thor-cache/parse-v1. --cache-report
+distinguishes evaluation and transpilation counters. --no-transpile-cache keeps
+the parser/evaluation layers while bypassing complete reuse. --no-cache bypasses
+all three; --clear-cache clears their owned records. Existing evaluation-cache
+tests explicitly disable complete reuse to keep exercising that layer.
+
+Acceptance tests cover skipping the frontend/evaluator/emitter on a warm build,
+same-size edits with preserved modification times, imported and entry-file
+additions/deletions, defines/test mode, resource bytes/existence/directory contents,
+retargeted collection symlinks, compiler changes, corrupted output/maps/manifests
+and cache packets, unavailable cache storage, overlay recovery, cached Unicode
+diagnostics/support contracts, debug manifest identity and parser configuration.
+
+Validation: the full Python regression run passed 659 tests with one existing
+expected failure, including real CodeLLDB/debugger tests. A final 53-test native
+#run/parser/transpilation-cache run passes after publication and SDK-discovery
+refinements; the two affected runtime-storage diagnostic cases also pass.
+All 86 Node tests and actual VS Code integration pass. The original playground
+source is unchanged and its executable prints the table and array length 10.
+
+Five final alternating warm Thor/native Odin builds of the playground measured
+Thor at 0.243-0.253 seconds (median 0.249) and native Odin at 0.166-0.177 seconds
+(median 0.177), approximately 72 ms additional overhead. Every warm Thor sample
+reports one complete-transpilation hit and no evaluation-cache lookups. These
+are unchanged-build measurements; changed inputs still require transpilation,
+using the parser and evaluation caches where possible. Existing playground moves,
+table work, demo edits and specification deletion remain outside this commit.

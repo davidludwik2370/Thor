@@ -38,9 +38,6 @@ class Extrema:
     def plan(self, call):
         if not self.s.thor or call.kind != 'Call':
             return None
-        name = self.builtin(call.role('callee'))
-        if not name:
-            return None
         ellipsis = call.data.get('roles', {}).get('ellipsis')
         parts = []
         for arg in call.group('args'):
@@ -53,7 +50,12 @@ class Extrema:
                 parts.append(('array', value.role('expr')))
             else:
                 parts.append(('scalar', arg))
-        return (name, parts, bool(ellipsis)) if any(k != 'scalar' for k, _ in parts) else None
+        # Ordinary calls do not need min/max resolution. Resolving them here
+        # needlessly discovers SDK packages while preparing evaluation helpers.
+        if not any(k != 'scalar' for k, _ in parts):
+            return None
+        name = self.builtin(call.role('callee'))
+        return (name, parts, bool(ellipsis)) if name else None
 
     def element(self, call):
         plan = self.plan(call)

@@ -191,6 +191,35 @@ A few options receive additional handling:
   helper builds. Helpers execute natively; a cross-target build requiring Thor
   compile-time execution currently reports an unsupported-target error.
 
+Unchanged builds reuse the complete generated Odin tree and source maps.
+Thor checks recorded inputs before starting its parser: source contents,
+package membership, compiler configuration, resources, and compiler/runtime/SDK
+file identities. A valid hit skips parsing, Thor analysis, compile-time helper
+preparation and emission. Odin still performs the requested check or build on
+every invocation. Compiler diagnostics keep their original Thor locations on
+both paths, and debug builds refresh the executable identity in the manifest.
+
+Changed inputs or missing/modified generated artifacts take the normal path.
+Successful frontend JSON is separately cached by source contents, parser binary
+and parser configuration, so an edited build can reuse parsing of unchanged
+files. Editor overlays bypass complete-transpilation reuse; their actual text
+still participates in the parser cache. Dynamic resource paths bypass complete
+reuse rather than guessing which files they read.
+
+The complete-transpilation cache lives in `.thor-cache/transpile-v1` beside the
+entry package (or the selected cache root). Parser results live in the checkout's
+`.thor-cache/parse-v1`. Cache records contain data, not executable helpers.
+Project sources, resources and generated artifacts are content-checked. Broad
+compiler/SDK inventories use file identities, sizes and nanosecond modification
+and change times to detect changes without rereading the whole SDK each build.
+
+`--cache-report` prints separate `thor_cache` evaluation counters and
+`thor_transpile_cache` counters. A complete-transpilation hit leaves evaluation
+counters at zero because evaluation was skipped. `--no-transpile-cache` bypasses
+complete reuse while retaining parser/evaluation caches. `--no-cache` bypasses
+all three layers; `--clear-cache` clears their entries before compiling.
+`--cache-dir` and `THOR_CACHE_DIR` select the evaluation/transpilation cache root.
+
 Thor's own options use long names, such as `--output-dir`, `--odin`,
 `--run-timeout`, `--no-cache`, and `--cache-report`. Run `./thor --help` for the
 complete list. `--odin /path/to/odin` or `THOR_ODIN` selects the Odin executable.
@@ -875,7 +904,9 @@ compilation. Cached entries contain typed contents, never executables or address
 
 `THOR_CACHE_DIR` supplies a default cache root; `--cache-dir` overrides it.
 `--cache-report` prints opt-in JSON counters on stdout, leaving compiler diagnostics
-on stderr. Eligibility checks still run before a cache lookup.
+on stderr. Evaluation-cache lookups follow eligibility checks. Complete
+transpilation reuse skips rechecking an unchanged, previously checked input;
+changes to checked code or its dependencies invalidate that reuse.
 
 Current conservative boundaries: the native compiler cannot reflect record
 fields at compile time, so Thor supplies checked source field schemas. Unknown

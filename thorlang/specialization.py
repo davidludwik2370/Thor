@@ -118,11 +118,17 @@ class Specializations:
 
     def process(self,call):
         e=self.e;r=e.r
+        library=e.purity.library(call)
+        # Installed Odin bodies cannot contain Thor fn/#run syntax. Their
+        # generic runtime calls need no Thor specialization traversal; explicit
+        # #run inspects them through the evaluator's dependency closure instead.
+        if library and call.source.import_dir(library[0]) is None:return
         if e.unbound_generic(call):return
         plan=r.resolve_call(call)
         if not plan:return
         proc=plan.signature.parent
         if not proc or proc.kind!='Procedure' or not proc.role('body'):return
+        if getattr(proc.source,'native_inspected',False):return
         if proc.source.path.is_relative_to(e.root/'runtime'):return
         parameters=r.generic_parameters(plan.signature)
         if not parameters:return
