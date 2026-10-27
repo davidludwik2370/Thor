@@ -4,6 +4,44 @@ import "core:fmt"
 import "core:odin/ast"
 import "core:odin/tokenizer"
 import "core:strconv"
+import "core:strings"
+
+// Preserve the original call AST: only Thor's builtin spread forms gain an
+// element result and, for '..', an optional boolean result.
+thor_extrema_return :: proc(ast_context: ^AstContext, symbol: Symbol, call: ^ast.Call_Expr) -> (element: ^ast.Expr, optional: bool, ok: bool) {
+    if !strings.has_suffix(ast_context.fullpath, ".thor") ||
+       (symbol.pkg != "$builtin" && .Builtin not_in symbol.flags) { return }
+    name := symbol.name
+    if name != "min" && name != "max" && symbol.value_expr != nil {
+        #partial switch original in ast.unparen_expr(symbol.value_expr).derived {
+        case ^ast.Ident: name = original.name
+        case ^ast.Selector_Expr:
+            if member, found := original.field.derived.(^ast.Ident); found { name = member.name }
+        }
+    }
+    if name != "min" && name != "max" { return }
+    optional = call.ellipsis.pos.line != 0
+    for arg in call.args {
+        value := ast.unparen_expr(arg)
+        expanded := false
+        if unary, found := value.derived.(^ast.Unary_Expr); found && unary.op.kind == .Mul_Mul {
+            value, expanded = unary.expr, true
+        } else if optional && arg.pos.offset >= call.ellipsis.pos.offset+2 {
+            expanded = true
+        }
+        if !expanded { continue }
+        argument_context := ast_context^
+        argument_context.use_locals = true
+        container, found := resolve_type_expression(&argument_context, value)
+        if !found { return }
+        #partial switch item in container.value {
+        case SymbolSliceValue: return item.expr, optional, true
+        case SymbolFixedArrayValue: return item.expr, optional, true
+        }
+        return
+    }
+    return
+}
 
 // Attempts to resolve the type of the builtin proc by following the rules of the odin type checker
 // defined in `check_builtin.cpp`.
@@ -24,6 +62,7 @@ check_builtin_proc_return_type :: proc(
 	^ast.Expr,
 	bool,
 ) {
+	if element, _, found := thor_extrema_return(ast_context, symbol, call); found { return element, true }
 	if symbol.pkg == "$builtin" {
 		switch symbol.name {
 		case "max", "min":

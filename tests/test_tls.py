@@ -134,6 +134,43 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_extrema_spread_hover_types_and_optional_status(self):
+        text = '''package main
+import "core:math"
+largest :: max
+main::proc(){
+ values:=[]i16{2,7}
+ low, present:=min(..values)
+ high:=max(**[2]f32{1,3})
+ seeded, seeded_ok:=max(9,..values)
+ alias_value, alias_ok:=largest(..values)
+ qualified, qualified_ok:=math.min(..values)
+ _=low;_=present;_=high;_=seeded;_=seeded_ok;_=alias_value;_=alias_ok;_=qualified;_=qualified_ok
+}
+'''
+        client, main = self.open(text)
+        for word, expected in [('low,', 'i16'), ('present:=', 'bool'), ('high:=', 'f32'),
+                               ('seeded,', 'i16'), ('seeded_ok:=', 'bool'),
+                               ('alias_value,', 'i16'), ('alias_ok:=', 'bool'),
+                               ('qualified,', 'i16'), ('qualified_ok:=', 'bool')]:
+            hover = self.hover(client, main, text, word)
+            self.assertIsNotNone(hover, word)
+            self.assertIn(': '+expected, hover['contents']['value'], (word, hover))
+        self.assert_original_identifier_tokens(main, text, self.semantic_spans(client, main, text))
+
+    def test_extrema_live_error_at_original_spread_and_unsaved_fix(self):
+        text = 'package main\nmain::proc(){/* 😀 */ value:=max(**[0]int{});_=value}\n'
+        client, main = self.open(text)
+        errors = client.diagnostic(main.as_uri(), contains='empty fixed array')
+        error = next(e for e in errors if 'empty fixed array' in e['message'])
+        self.assertEqual(error['range']['start'], self.position(text, '[0]int{}', 0))
+        changed = text.replace('[0]int{}', '[1]int{7}')
+        client.notifications.clear()
+        client.send('textDocument/didChange', {'textDocument': {'uri': main.as_uri(), 'version': 2},
+                    'contentChanges': [{'text': changed}]})
+        client.diagnostic(main.as_uri(), empty=True)
+        self.assertIn(': int', self.hover(client, main, changed, 'value:=')['contents']['value'])
+
     @classmethod
     def setUpClass(cls):
         if not shutil.which(os.environ.get('THOR_ODIN', 'odin')):

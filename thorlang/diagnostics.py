@@ -111,6 +111,10 @@ class Diagnostics:
                 contract = "Set elements must be valid Odin map keys."
             elif origin and Path(origin.file) == runtime / 'numeric' / 'numeric.odin':
                 contract = "Power ('**') requires integer or floating-point operands of matching types."
+            elif origin and Path(origin.file) == runtime / 'sequence' / 'sequence.odin' and any(
+                'type_is_ordered(T)' in m for m in msgs
+            ):
+                contract = 'Spread min/max requires ordered numeric, enum, or string elements.'
             if contract:
                 caller = None
                 for message in msgs:

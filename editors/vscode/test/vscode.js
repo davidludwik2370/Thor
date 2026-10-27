@@ -166,6 +166,20 @@ async function run() {
         assert.ok(await vscode.workspace.applyEdit(parameterEdit));
         assert.equal(testDocument.getText(),comparatorSource.replace('a:$T','data:$T').replace('len(a)','len(data)').replace('copy(ret,a)','copy(ret,data)'));
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const extremaSource='package main\nmain::proc(){values:=[]i16{3,1};low,present:=min(..values);high:=max(**[2]f32{1,3});_=low;_=present;_=high}\n';
+        await replace(extremaSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        for(const [word,type] of [['low,present','i16'],['present:=','bool'],['high:=','f32']]){
+            await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+                testDocument.positionAt(extremaSource.indexOf(word)+1)),values=>hoverText(values||[]).includes(': '+type));
+        }
+        const invalidExtrema=extremaSource.replace('[2]f32{1,3}','[0]f32{}');
+        await replace(invalidExtrema);
+        const extremaErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),
+            values=>values.some(value=>value.message.includes('empty fixed array')));
+        assert.equal(testDocument.getText(extremaErrors.find(value=>value.message.includes('empty fixed array')).range),'[0]f32{}');
+        await replace(extremaSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         await replace(changed);
         const diagnostics = await eventually(() => vscode.languages.getDiagnostics(testDocument.uri),
             values => values.some(value => value.code === 'thor' && value.message.includes('Cannot convert')));
@@ -331,6 +345,7 @@ async function run() {
             'generic loop variables remain values in semantic tokens and hover',
             'generic inline defaults compile and body errors highlight original source', 'hidden Set imports do not hover on comments',
             'callback values use parameter color and a one-letter parameter renames at its end boundary',
+            'spread min/max element and status hover, original argument error ranges and unsaved correction',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',

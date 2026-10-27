@@ -84,6 +84,17 @@ before native machine-index conversion. Unsigned values retain their original
 type. The emitter applies this only to ordinary sequences, preserves storage for
 writes/addresses, and leaves map/pointer/enumerated-array indexing native.
 
+The same support package implements min/max reductions used by Thor's spread
+forms. Slice helpers return `(value, ok)` with optional status; an empty slice
+without an initial candidate returns the element type's zero value and false.
+Fixed-array helpers require a positive length and return one element value.
+Seeded helpers carry the running candidate and presence flag across original
+arguments without concatenating containers. Comparisons use native min/max for
+numeric types and equivalent explicit comparisons for strings, avoiding an Odin
+backend dependency-registration bug in imported generic string min/max calls.
+They use no allocator or mutable global state. These helpers are compiler support;
+the public syntax and examples are documented in the root README.
+
 ## Pure scratch storage and value protocol (T18–T20)
 
 `thor:pure` and `thor:eval` are compiler support, not general-purpose purity

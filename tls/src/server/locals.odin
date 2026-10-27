@@ -231,7 +231,8 @@ get_generic_assignment :: proc(
 		if symbol, ok := resolve_type_expression(ast_context, v.expr); ok {
 			#partial switch symbol_value in symbol.value {
 			case SymbolProcedureValue:
-				if symbol.pkg == "$builtin" && !is_mutable {
+				_, _, extrema := thor_extrema_return(ast_context, symbol, v)
+				if symbol.pkg == "$builtin" && !is_mutable && !extrema {
 					append(results, value)
 				} else {
 					returns := get_proc_return_types(ast_context, symbol, v, is_mutable)

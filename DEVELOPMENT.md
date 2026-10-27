@@ -702,3 +702,61 @@ failure. The ten basic acceptance tests include real Odin execution, an
 allocation-tracked test run, stdin through a pipe, and the commented example.
 Checking runtime/basic with -no-entry-point also passes. No extension reinstall
 is required. Existing edits in demo/main.thor and thor.odin remain uncommitted.
+
+## Spread min/max: compiler 0.12.0 / TLS 0.11.0
+
+Export the native call ellipsis token span from the shared frontend, preserving
+the original AST and all argument offsets. thorlang/extrema.py resolves genuine
+builtins through lexical scope, immutable aliases and installed core:math
+imports. Native Odin inputs, shadowing procedures and ordinary scalar/type-limit
+calls retain their original handling. Fixed-array ** expansion returns one
+element value and rejects empty arrays. Calls with a final slice spread return
+(value, ok) with #optional_ok: empty input yields a typed zero and false; scalar
+candidates or nonempty array segments make the result present even when the
+final slice is empty. The full scalar/array/slice candidate stream folds in
+source order rather than reducing segments independently.
+
+Lower single-container calls directly to contextless sequence helpers. Mixed
+calls use existing expression helpers, extended with optional boolean returns.
+Bind each expression once in original order before reducing; fixed arrays are
+snapshots and slices retain borrowed storage. Scalar annotations use the
+sequence element type, preserving untyped literal conversion and rejecting typed
+mismatches. No concatenated array or heap allocation is needed. Scope helpers,
+captures, debug metadata and original argument maps use the existing machinery.
+Runtime helpers preserve native numeric min/max, including floating-point NaN
+and signed-zero behavior. This Odin backend misses the string comparison runtime
+dependency in imported generic min/max; equivalent explicit string comparisons
+register that dependency and retain the native equal-value selection rule.
+
+Integrate required constant reductions with the existing native evaluator and
+dependency graph. Pure function bodies, direct #run reductions, generic constant
+instantiations, compile-time branches and unevaluated type queries are covered.
+The evaluator retains its single-result contract; code needing both value and
+status at compile time returns a record from a function. Keep the existing
+native-library purity whitelist: only resolved builtin reductions gain this
+approval, rather than every selected native symbol with a builtin-like name.
+
+TLS infers the element type plus optional bool from the original call, including
+qualified calls and builtin aliases. Alias lookup can disable locals in the
+resolution context; resolve container arguments using a temporary context that
+restores local lookup. Native buffers retain their prior handling. Compiler
+errors identify the actual invalid container or scalar argument, and ordered
+element constraint failures use a public Thor diagnostic. No grammar change or
+extension reinstall is required; restart TLS to load the rebuilt server.
+
+The commented example is examples/extrema/demo.thor. Fifteen acceptance tests
+cover result/status rules, fallbacks, mixed expansions, evaluation order, array
+snapshots, aliases/shadowing, exact types and literal conversion, strings/enums,
+generic and contextless calls, zero allocation counts, pure/#run results,
+required and generic constants, compile-time branches, floating-point edge
+values, invalid arguments and the retained native purity boundary. Additional
+stdio, JSON diagnostics, actual VS Code and CodeLLDB tests verify hover,
+semantic tokens, argument error ranges, unsaved correction, stepping and locals.
+Existing playground moves, table work, demo edits and specification edits are
+outside this feature's commit.
+
+Validation: the full Python regression run passed 579 tests with one existing
+expected failure, including the real debugger tests. The final fifteen extrema
+tests and focused updated diagnostic test also pass. All 1,118 native TLS tests,
+85 Node tests and actual VS Code integration pass. Rebuild the local TLS server
+with version 0.11.0; the client remains 0.10.3. The new demo runs successfully.

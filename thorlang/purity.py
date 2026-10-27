@@ -111,6 +111,8 @@ class Purity:
         return package is None # installed native package, not a user override
 
     def builtin(self,call):
+        extrema=call.source.expressions.extrema.plan(call)
+        if extrema:return extrema[0]
         callee=call.role('callee')
         if callee.kind=='Directive' and callee.data['name'] in {'assert','config'}:return '#'+callee.data['name']
         if callee.kind=='Ident' and self.r.symbol(callee) is None and callee.text in self.builtins:return callee.text
@@ -370,7 +372,8 @@ class Purity:
                 imported=self.imported(n)
                 if imported and n.source.import_dir(imported[0]) is None and imported not in self.native_constants:
                     call=n.parent
-                    if not(call and call.kind=='Call' and call.role('callee') is n and self.approved(call)):
+                    if not(call and call.kind=='Call' and call.role('callee') is n and
+                           (self.approved(call) or call.source.expressions.extrema.plan(call))):
                         self.problem(n,'Pure code cannot read unverified native package storage or values; only approved constants/helpers are eligible.')
             if n.kind=='Implicit':self.problem(n,'Pure code cannot access the ambient context or implicit runtime state.')
             if n.kind=='Unsafe':self.problem(n,'Assembly, uninitialized storage and unsafe operations are not permitted in pure code.')

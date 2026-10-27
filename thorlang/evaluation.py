@@ -77,6 +77,11 @@ class Evaluator:
             return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
         if n.kind!='Call' or n.parent and n.parent.kind=='Run':return False
         if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
+        if n.source.expressions.extrema.plan(n):
+            declaration = n.parent
+            # The evaluator materializes one value, matching ignored optional
+            # status. Multiple constant results retain Odin's native rules.
+            return self.constant_context(n) and not (declaration and declaration.kind=='Declaration' and len(declaration.group('names'))>1)
         if '-debug' in self.p.flags and not self.constant_context(n):return False
         symbol=self.r.symbol(n.role('callee'))
         alternatives=symbol.candidates if symbol else []
@@ -180,6 +185,7 @@ class Evaluator:
 
     def result_type(self,call):
         if self.power(call):return call.source.expressions.power_type(call)
+        if call.source.expressions.extrema.plan(call):return call.source.expressions.extrema.result_type(call)
         plan=call.source.resolver.resolve_call(call)
         if not plan:self.fail(call,'Compile-time result type requires an unambiguous resolved procedure target.')
         if len(self.r.fields(plan.signature.role('results')))!=1:
@@ -428,7 +434,7 @@ class Evaluator:
                 self.results[key]=data;self.result_bindings[key]=self.specializations.relevant(n).copy();self.install(n,data)
                 return data
             if call.kind!='Call':self.fail(n,'#run requires a direct eligible procedure call.')
-            if not self.purity.targets(call):self.fail(n,'#run requires a resolved direct call; indirect and foreign calls are not eligible.')
+            if not self.purity.targets(call) and not call.source.expressions.extrema.plan(call):self.fail(n,'#run requires a resolved direct call; indirect and foreign calls are not eligible.')
             if n.kind=='Run':self.explicit_arguments+=1
             try:
                 for arg in call.group('args'):
@@ -448,7 +454,8 @@ class Evaluator:
         finally:self.busy.remove(key)
 
     def evaluate_all(self):
-        if not any(n.kind=='Run' or self.power(n) or self.purity.pure(n) for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
+        if not any(n.kind=='Run' or self.power(n) or self.purity.pure(n) or source.expressions.extrema.plan(n)
+                   for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
         for source in list(self.p.sources.values()):
             if source.excluded:continue
             for node in source.nodes:

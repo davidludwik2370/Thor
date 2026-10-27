@@ -41,6 +41,13 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_spread_extrema_errors_retain_original_argument_ranges(self):
+        self.at('package main\nmain::proc(){/* 😀 */ _=min(**[0]int{})}\n', '[0]int{}', message='empty fixed array')
+        self.at('package main\nmain::proc(){_=max(..[2]int{1,2})}\n', '[2]int{1,2}', message='must be a slice')
+        self.at('package main\nmain::proc(){x:int=3;_=max(x,..[]f64{1,2})}\n', 'x,..', message='Cannot assign')
+        errors=self.at('package main\nmain::proc(){_=min(..[]bool{true})}\n', 'min(..', message='Spread min/max requires ordered')
+        self.assertNotIn('runtime/sequence',json.dumps(errors))
+
     def test_bundled_basic_call_error_maps_to_original_argument(self):
         self.at('package main\nimport "thor:basic"\nmain::proc(){data:=basic.sorted([]int{2,1},less=7);delete(data)}\n',
                 '7', message='Cannot convert')

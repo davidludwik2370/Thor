@@ -28,3 +28,59 @@ string_element :: proc "contextless"(value: $S/string) -> u8 { return 0 }
 multi_element :: proc "contextless"(value: [^]$E) -> E { return {} }
 pointer_array_element :: proc "contextless"(value: ^[$N]$E) -> E { return {} }
 element :: proc{array_element,slice_element,dynamic_element,fixed_element,map_element,string_element,multi_element,pointer_array_element}
+
+// Reductions use native scalar operations, including their floating-point rules.
+// A supplied initial value is an actual candidate, not an identity/sentinel.
+// Explicit string comparisons also register the runtime comparison dependency:
+// this Odin release misses it when min/max are instantiated in imported generics.
+min_value :: proc "contextless" (a, b: $T) -> T {
+    when intrinsics.type_is_string(T) { return a < b ? a : b }
+    else { return min(a, b) }
+}
+max_value :: proc "contextless" (a, b: $T) -> T {
+    when intrinsics.type_is_string(T) { return a > b ? a : b }
+    else { return max(a, b) }
+}
+min_slice_seeded :: proc "contextless" (values: $S/[]$T, initial: T, has_initial: bool) -> (value: T, ok: bool)
+where intrinsics.type_is_ordered(T) #optional_ok {
+    value, ok = initial, has_initial
+    for item in values {
+        if ok { value = min_value(value, item) } else { value, ok = item, true }
+    }
+    return
+}
+max_slice_seeded :: proc "contextless" (values: $S/[]$T, initial: T, has_initial: bool) -> (value: T, ok: bool)
+where intrinsics.type_is_ordered(T) #optional_ok {
+    value, ok = initial, has_initial
+    for item in values {
+        if ok { value = max_value(value, item) } else { value, ok = item, true }
+    }
+    return
+}
+min_array_seeded :: proc "contextless" (values: $A/[$N]$T, initial: T, has_initial: bool) -> T
+where intrinsics.type_is_ordered(T) {
+    #assert(N > 0, "An empty fixed array cannot be expanded into min/max.")
+    value, ok := initial, has_initial
+    for item in values {
+        if ok { value = min_value(value, item) } else { value, ok = item, true }
+    }
+    return value
+}
+max_array_seeded :: proc "contextless" (values: $A/[$N]$T, initial: T, has_initial: bool) -> T
+where intrinsics.type_is_ordered(T) {
+    #assert(N > 0, "An empty fixed array cannot be expanded into min/max.")
+    value, ok := initial, has_initial
+    for item in values {
+        if ok { value = max_value(value, item) } else { value, ok = item, true }
+    }
+    return value
+}
+
+min_slice :: proc "contextless" (values: $S/[]$T) -> (value: T, ok: bool) #optional_ok {
+    return min_slice_seeded(values, T{}, false)
+}
+max_slice :: proc "contextless" (values: $S/[]$T) -> (value: T, ok: bool) #optional_ok {
+    return max_slice_seeded(values, T{}, false)
+}
+min_array :: proc "contextless" (values: $A/[$N]$T) -> T { return min_array_seeded(values, T{}, false) }
+max_array :: proc "contextless" (values: $A/[$N]$T) -> T { return max_array_seeded(values, T{}, false) }

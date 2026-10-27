@@ -117,6 +117,9 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["expr"] = span(n.expr); info.roles["field"] = span(n.field)
     case ^ast.Call_Expr:
         info.kind = "Call"; info.roles["callee"] = span(n.expr); info.lists["args"] = spans(n.args)
+        if n.ellipsis.pos.line != 0 {
+            info.roles["ellipsis"] = {n.ellipsis.pos.offset, n.ellipsis.pos.offset+2}
+        }
     case ^ast.Index_Expr: info.kind = "Index"; info.roles["expr"] = span(n.expr); info.roles["index"] = span(n.index)
     case ^ast.Slice_Expr:
         info.kind = "Slice"; info.roles["expr"] = span(n.expr)

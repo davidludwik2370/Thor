@@ -21,6 +21,8 @@ class Expressions:
         self.assigning = set()
         from .ownership import Ownership
         self.ownership = Ownership(self)
+        from .extrema import Extrema
+        self.extrema = Extrema(self)
 
     def module(self, name, path=None):
         alias = self.source.prefix + name
@@ -68,7 +70,7 @@ class Expressions:
             return None
         return symbol
 
-    def closed(self,node,builder,result='string',pointer=False,flavor='value'):
+    def closed(self,node,builder,result='string',pointer=False,flavor='value',optional_ok=False):
         from .compiler import Hint
         from .semantics import descendants
         s=self.source
@@ -107,7 +109,7 @@ class Expressions:
             finally:
                 self.captures.pop()
             convention=' "odin"' if self.has_context(node) else ' "contextless"'
-            returns=' -> '+result_type if result_type else ''
+            returns=(' -> (value: '+result_type+', ok: bool) #optional_ok' if optional_ok else ' -> '+result_type) if result_type else ''
             privacy='@(private="file")\n' if scope is s.root else ''
             self.helpers[key]=s.mapping.wrap(f'\n{privacy}{name} :: proc{convention}({", ".join(params)}){returns} {{\n{body}\n}}\n',
                                              s.path,node.start,node.end,'expression-helper')
@@ -210,6 +212,9 @@ class Expressions:
             return None
         if n.kind=='Binary' and n.data['op']=='**':
             return self.power(n,constant)
+        if n.kind == 'Call':
+            code = self.extrema.render(n, constant)
+            if code is not None: return code
         code=self.ownership.discard(n)
         if code is not None: return code
         if n.kind=='Unary' and n.data['op']=='&' and not self.ownership.querying:

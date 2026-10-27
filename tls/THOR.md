@@ -36,6 +36,14 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 
 ## Current support
 
+- Infer min/max element results through fixed-array expansion and slice spreads,
+  including immutable builtin aliases and qualified core:math calls. Slice spread
+  status bindings infer bool, and single-result uses retain their element type.
+  Original argument tokens and compiler error ranges are preserved; fixing an
+  invalid spread in an unsaved document clears its error. Existing Odin buffers
+  and locally defined min/max procedures retain native behavior. TLS 0.11.0 loads
+  after **Thor: Restart Language Server**; no grammar/client update is needed.
+
 - Parse `fn` and `#run` through the shared frontend. Hover retains the `fn`
   spelling and explains purity; call results, including concrete generic results,
   retain type inference and completion through `#run`. Live compiler checks

@@ -68,6 +68,46 @@ Its canonical source is [runtime/basic/basic.thor](runtime/basic/basic.thor).
 Run the [commented example](examples/basic/demo.thor) with
 `thor run /path/to/thor/examples/basic`.
 
+## Spread minimum and maximum
+
+Thor extends Odin's builtins with fixed-array expansion and slice spreading:
+
+```odin
+a := [?]int{1, 2, 3}
+maximum := max(**a)         // int: 3
+minimum, ok := min(..a[:]) // int: 1, bool: true
+lowest := min(..a[:])      // The presence flag is optional.
+
+empty: []int
+missing, found := min(..empty) // 0, false
+fallback, valid := max(7, ..empty) // 7, true
+```
+
+Every call containing a slice spread returns `(value, ok)` with Odin's
+`#optional_ok` behavior. `ok` reports whether the whole call has at least one
+candidate, including scalar starting values. Empty slices without starting values
+return the element type's zero value and false. `or_else` and `or_return` work
+with the status. A fixed-array expansion produces a single value; expanding a
+zero-length array is a compile error.
+
+Arguments execute once in source order. Fixed-array expansion snapshots its
+elements; a slice borrows its backing storage. Reductions allocate no heap
+storage or mutate their inputs. Results preserve the element type. Untyped scalar
+literals can adapt to it; typed mismatches are errors. Ordered numbers, strings,
+enums and their distinct aliases retain native comparison semantics. Selected
+strings remain borrowed from the input.
+
+Scalar calls such as `min(x,y)` and type limits such as `max(int)` retain their
+native behavior. User-defined procedures named min/max remain ordinary calls.
+Immutable aliases of the actual builtins and `core:math.min/max` also support the
+new forms. Declared `fn`/`#run` bodies can reduce sequences, and required constants
+with known inputs are evaluated. The existing single-result compile-time rule
+still applies: return a record containing both value and status from a function
+when both must be retained at compile time.
+
+Run the [commented example](examples/extrema/demo.thor) with
+`./thor run examples/extrema`.
+
 ## Compilation and Odin flags
 
 Thor uses Odin as its native backend. For a single-file build:

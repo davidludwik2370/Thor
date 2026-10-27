@@ -109,6 +109,29 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_spread_extrema_step_over_and_optional_status_locals(self):
+        text='''package main
+main::proc(){
+    values:=[]int{5,2,7}
+    lowest,ok:=min(9,..values)
+    after:=lowest+1
+    assert(after==3&&ok)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[4])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),4))
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],5,frame)
+        scopes=client.request('scopes',{'frameId':frame['id']})['scopes']
+        variables=[v for scope in scopes if not scope['expensive'] for v in client.request('variables',{'variablesReference':scope['variablesReference']})['variables']]
+        self.assertTrue(any(v['name']=='lowest' and v['value']=='2' for v in variables),variables)
+        self.assertTrue(any(v['name']=='ok' and v['value']=='true' for v in variables),variables)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def build(self, text, files=None):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
         self.addCleanup(temporary.cleanup)

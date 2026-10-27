@@ -1534,6 +1534,11 @@ get_proc_return_types :: proc(
 	spall.trace(#procedure, symbol.name)
 
 	return_types := make([dynamic]^ast.Expr, context.temp_allocator)
+	if element, optional, found := thor_extrema_return(ast_context, symbol, call); found {
+		append(&return_types, element)
+		if optional { append(&return_types, make_bool_ast(ast_context, call.pos, call.end)) }
+		return return_types[:]
+	}
 	if ret, ok := check_builtin_proc_return_type(ast_context, symbol, call, is_mutable); ok {
 		appended := false
 		if call, ok := ret.derived.(^ast.Call_Expr); ok {

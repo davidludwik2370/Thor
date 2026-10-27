@@ -189,10 +189,12 @@ class Source:
                             self.error(f"declaration conflicts with selective import: {name.text}", name.start, name.end)
         # Discover support packages before emission so their dependencies and
         # source maps participate in the same project graph.
+        spreading = self.thor and any(n.kind=='Call' and (n.data.get('roles',{}).get('ellipsis') or
+            any(a.kind=='Unary' and a.data['op']=='**' for a in n.group('args'))) for n in self.nodes)
         for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
-                              ('pure',any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
+                              ('pure',spreading or any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call'} for n in self.nodes)),
-                              ('sequence',self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes)),
+                              ('sequence',spreading or self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes)),
                               ('numeric',self.thor and any(n.kind=='Binary' and n.data['op']=='**' for n in self.nodes))]:
             if needed:
                 self.imports[self.prefix+module]='thor:'+module
