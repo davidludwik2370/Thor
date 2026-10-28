@@ -664,6 +664,26 @@ named operands remain untouched. `clear(s)` keeps the table allocation;
 `delete(s)` releases it. Keys retain their ordinary shallow
 ownership. Native operations on other types keep their Odin meaning.
 
+`to_set` and `to_slice` are available from both `thor:sets` and `thor:basic`:
+
+```odin
+import * "thor:basic"
+
+unique := to_set([1, 2, 2, 3])
+defer delete(unique)
+values := to_slice(unique)
+defer delete(values)
+```
+
+`to_set` accepts fixed arrays, slices and dynamic arrays, including distinct
+sequence types. Duplicates become one key. `to_slice` returns an allocated `[]T`
+with one copy of each key in unspecified order; sort it separately if needed.
+Both produce independent container storage and accept `allocator=` (defaulting
+to `context.allocator`). Element copies are shallow: separately owned strings
+and pointees retain their existing lifetimes. Empty inputs are supported.
+Sets retain their allocator for later insertion and deletion; delete slices
+with the allocator that created them when supplying a custom allocator.
+
 Automatic cleanup covers Thor-owned expressions consumed by operators, queries,
 formatting, indexing, iteration, unused expressions and blank destinations. Loop
 temporaries survive through the loop and are released on exit. Assigning or returning an owned result

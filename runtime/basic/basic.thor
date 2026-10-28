@@ -11,6 +11,12 @@ import "core:os"
 import "core:io"
 import "base:runtime"
 import "core:slice"
+import "thor:sets"
+
+// Allocating, shallow collection conversions. Free each returned container;
+// to_slice returns keys in unspecified order. Both accept allocator=.
+to_set :: sets.to_set
+to_slice :: sets.to_slice
 
 // Print each argument with sep between values, followed by end.
 print :: proc(args:..any, sep:=" ", flush:=true, end:="\n"){

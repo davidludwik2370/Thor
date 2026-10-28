@@ -11,6 +11,62 @@ class BasicTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_set_conversions_through_both_packages_and_all_sequence_inputs(self):
+        self.invoke(self.program('''
+data := [3, 1, 3, 2]
+a := basic.to_set(data)
+b := sets.to_set(data[:])
+growing := make([dynamic]int)
+defer delete(growing)
+append(&growing,3,1,3,2)
+c := sets.to_set(growing)
+defer delete(a); defer delete(b); defer delete(c)
+assert(len(a)==3 && a==b && b==c)
+literal := basic.to_set([3,1,3,2])
+defer delete(literal)
+assert(literal==a)
+values := basic.to_slice(a)
+other := sets.to_slice(b)
+defer delete(values); defer delete(other)
+round_trip := sets.to_set(values)
+defer delete(round_trip)
+assert(round_trip==a && len(other)==3)
+data[0]=99;values[0]=77
+assert(3 in a && 99 not_in a && 77 not_in a)
+clear(a)
+assert(len(a)==0 && len(round_trip)==3)
+''','import "thor:basic"\nimport "thor:sets"\n'))
+
+    def test_set_conversion_reexports_work_with_wildcard_and_selected_imports(self):
+        for declaration in ['import * "thor:basic"','import _ "thor:basic" / to_set, to_slice',
+                            'import _ "thor:sets" / to_set, to_slice']:
+            with self.subTest(declaration=declaration):
+                self.invoke(self.program('''
+unique := to_set(["oak","elm","oak"])
+defer delete(unique)
+values := to_slice(unique)
+defer delete(values)
+assert(len(unique)==2 && len(values)==2 && "oak" in unique && "elm" in unique)
+''',declaration+'\n'))
+
+    def test_set_conversions_reject_invalid_inputs(self):
+        for expression in ['basic.to_set(42)','basic.to_set("abc")','basic.to_set([][]int{})','basic.to_slice([]int{})']:
+            with self.subTest(expression=expression):
+                self.invoke(self.program('_='+expression,'import "thor:basic"\n'),command='check',fail='Error:')
+
+    def test_set_conversion_aliases_from_native_odin(self):
+        self.invoke(self.program('assert(native())'),directory=True,files={'native.odin':'''package main
+import "thor:basic"
+import "thor:sets"
+native::proc()->bool{
+    unique:=basic.to_set([3]int{1,2,1})
+    defer sets.destroy(unique)
+    values:=basic.to_slice(unique)
+    defer delete(values)
+    return len(values)==2 && sets.contains(unique,1) && sets.contains(unique,2)
+}
+'''})
+
     def test_default_import_sorting_and_explicit_comparators(self):
         self.invoke(self.program('''
 data := []int{3, 1, 2}

@@ -28,6 +28,30 @@ clone :: proc(set: Set($T), allocator := context.allocator) -> Set(T) {
     return result
 }
 
+// Allocate an independent set from a fixed array, slice or dynamic array.
+// Duplicate values collapse to one key. Elements retain shallow ownership;
+// destroy the returned table once (its allocator is stored in the table).
+to_set :: proc{to_set_slice, to_set_array, to_set_dynamic_array}
+
+@(private="file")
+to_set_slice :: proc(values: $S/[]$T, allocator := context.allocator) -> Set(T) {
+    result := Set(T){table=make(map[T]struct{}, len(values), allocator)}
+    for value in values { insert(&result, value) }
+    return result
+}
+
+@(private="file")
+to_set_array :: proc(values: $A/[$N]$T, allocator := context.allocator) -> Set(T) {
+    result := Set(T){table=make(map[T]struct{}, len(values), allocator)}
+    for value in values { insert(&result, value) }
+    return result
+}
+
+@(private="file")
+to_set_dynamic_array :: proc(values: $A/[dynamic]$T, allocator := context.allocator) -> Set(T) {
+    return to_set_slice(values[:], allocator)
+}
+
 equal :: proc "contextless"(a, b: Set($T)) -> bool {
     if len(a.table) != len(b.table) { return false }
     for value in a.table { if value not_in b.table { return false } }
@@ -39,29 +63,31 @@ union_assign :: proc(target: ^Set($T), other: Set(T)) {
     for value in other.table { target.table[value] = {} }
 }
 
-@(private="file")
-snapshot :: proc(set: Set($T), allocator := context.allocator) -> []T {
+// Allocate a slice containing every key, in unspecified iteration order.
+// The slice storage is independent; its elements are shallow copies. Delete
+// the result with the allocator passed here, keeping any borrowed keys alive.
+to_slice :: proc(set: Set($T), allocator := context.allocator) -> []T {
     values := make([]T, len(set.table), allocator)
-    assert(len(values) == len(set.table), "set snapshot allocation failed")
+    assert(len(values) == len(set.table), "set-to-slice allocation failed")
     i := 0
     for value in set.table { values[i] = value; i += 1 }
     return values
 }
 
 intersection_assign :: proc(target: ^Set($T), other: Set(T)) {
-    values := snapshot(target^)
+    values := to_slice(target^)
     defer delete(values)
     for value in values { if value not_in other.table { delete_key(&target.table, value) } }
 }
 
 difference_assign :: proc(target: ^Set($T), other: Set(T)) {
-    values := snapshot(other)
+    values := to_slice(other)
     defer delete(values)
     for value in values { delete_key(&target.table, value) }
 }
 
 symmetric_difference_assign :: proc(target: ^Set($T), other: Set(T)) {
-    values := snapshot(other)
+    values := to_slice(other)
     defer delete(values)
     for value in values {
         if value in target.table { delete_key(&target.table, value) }

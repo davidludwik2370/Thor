@@ -1318,3 +1318,28 @@ and rename that leaves another enum's Red untouched. The former expected
 failure is closed; complex semantic cases still retain the documented partial
 OLS-resolver boundaries. Restart TLS to load the rebuilt server; no grammar or
 extension reinstall is required for this update.
+
+## Allocating Set/sequence conversions
+
+Add public to_set and to_slice procedures to thor:sets and re-export their
+identities from thor:basic. to_set accepts fixed arrays, slices and dynamic
+arrays, including distinct sequences and enum-indexed fixed arrays. Its
+independent table collapses duplicates and preserves the selected allocator,
+including for insertion after an empty conversion. to_slice exposes the former
+private snapshot operation as a public owned slice with unspecified key order;
+Set mutation operations reuse it for their temporary snapshots. Both operations
+copy elements shallowly and default to context.allocator. Existing pure-code
+restrictions on Sets remain in effect.
+
+Keep basic's exports as aliases, with one implementation in runtime/sets, and
+retain the user's unrelated in-progress basic library additions. Document
+ownership, custom allocator cleanup and empty inputs in README.md; extend the
+commented examples/basic demo with conversion, deduplication and explicit sort.
+
+Validation: all 81 basic/installation/expression regression tests, 82 complete
+stdio TLS tests and seven allocation-tracked native Set tests pass. Cover every
+input shape, native Odin consumers, wildcard/selected imports, invalid input
+rejections, empty/nil inputs, allocator retention and shallow string/pointer
+ownership. TLS infers set[int], set[string], set[f64] and corresponding slices,
+finds the exports and offers both names in namespace completion. The shared
+runtime view is prepared successfully and the updated commented demo runs.

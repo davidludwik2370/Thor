@@ -134,6 +134,41 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_collection_conversion_hovers_and_exports_from_sets_and_basic(self):
+        text='''package main
+import "thor:basic"
+import "thor:sets"
+main::proc(){
+    numbers := [1,2,2]
+    unique := basic.to_set(numbers)
+    copied := basic.to_slice(unique)
+    strings := []string{"oak","elm"}
+    words := sets.to_set(strings)
+    word_values := sets.to_slice(words)
+    growing := make([dynamic]f64)
+    append(&growing,1.0,2.0)
+    floats := sets.to_set(growing)
+    delete(unique);delete(copied);delete(words);delete(word_values);delete(growing);delete(floats)
+}
+'''
+        client,main=self.open(text)
+        for name,expected in [('unique :=','set[int]'),('copied :=','[]int'),('words :=','set[string]'),
+                              ('word_values :=','[]string'),('floats :=','set[f64]')]:
+            with self.subTest(name=name):
+                hover=self.hover(client,main,text,name)
+                self.assertIsNotNone(hover)
+                self.assertIn(expected,hover['contents']['value'])
+        for fragment in ['basic.to_slice','sets.to_set']:
+            position=self.position(text,fragment,fragment.index('.')+2)
+            target=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},'position':position})
+            self.assertTrue(target)
+        changed=text.replace('basic.to_slice(unique)','basic.to_')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(changed,'copied := basic.to_',len('copied := basic.to_')),'context':{'triggerKind':1}})
+        labels={i['label'] for i in completion['items']}
+        self.assertTrue({'to_set','to_slice'}<=labels,labels)
+
     def test_fn_ordinary_call_graph_checks_unsaved_leaf_and_clears(self):
         text='package main\nstate:int\nleaf::proc(n:int)->int{/* 😀 */return n+1}\nmid::proc(n:int)->int{return leaf(n)}\nwork::fn(n:int)->int{return mid(n)}\nmain::proc(){n:=3;_=work(n)}\n'
         client,main=self.open(text)

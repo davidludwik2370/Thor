@@ -26,6 +26,24 @@ main :: proc() {
     assert(numbers[0] == 8)
     basic.print("ascending:", ascending)
 
+    // Collection conversion allocates independent storage in both directions.
+    // Duplicates collapse when making a set; converting back gives an owned
+    // slice in unspecified order. The element values themselves are shallow
+    // copies, so separately allocated strings/pointees keep their own owners.
+    unique := basic.to_set(numbers)
+    defer delete(unique)
+    values := basic.to_slice(unique)
+    defer delete(values)
+    assert(len(unique) == 3 && len(values) == 3)
+    assert(8 in unique && 3 in unique && 5 in unique)
+
+    // Sort a converted slice when order matters. Neither conversion changes
+    // numbers. The same two functions are available from import "thor:sets".
+    ordered_values := basic.sorted(values)
+    defer delete(ordered_values)
+    assert(ordered_values[0] == 3 && ordered_values[2] == 8)
+    basic.print("unique, sorted:", ordered_values)
+
     // Passing a comparator overrides that default. Both outputs belong to us.
     descending := basic.sorted(numbers, proc(a, b: int) -> bool {
         return a > b
