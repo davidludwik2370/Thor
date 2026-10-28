@@ -39,6 +39,10 @@ branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
 
 ## Commands
 
+The canonical local toolchain is `/Users/davidludwik/Thor`. Its compiler, TLS,
+frontend and shared libraries live there; projects keep their own caches and
+generated application code. See [INSTALLATION.md](INSTALLATION.md).
+
 ```sh
 ./thor transpile demo                  # Print the generated package path.
 ./thor check demo
@@ -169,7 +173,9 @@ Odin's other native build modes can be selected with `-build-mode:...`.
 | `test` | Build with Odin's `-build-mode:test`, then run the test executable. |
 
 `run` and `test` remove their executable afterward unless `-keep-executable` is
-passed. The generated sources and maps remain available for inspection.
+passed. Generated sources remain available for inspection. Source-map files are
+saved for `-debug` builds and the explicit `transpile` command; ordinary compiler
+diagnostics use mappings held in memory.
 
 Thor forwards flags it does not handle itself to the final Odin invocation.
 Use Odin's usual `-flag:value` spelling, including `-o:speed`, `-debug`,
@@ -193,8 +199,11 @@ A few options receive additional handling:
 
 Thor caches compile-time execution results and per-file parser output. Every
 invocation discovers the current source files, performs fresh Thor analysis,
-regenerates Odin and source maps, and runs the requested Odin check or build.
+regenerates project Odin and in-memory source maps, and runs the requested Odin check or build.
 There is no whole-project or generated-output cache.
+Common native libraries are read from the installation. Project-independent Thor
+library translations live under the installation's `lib/`; checked or
+configuration-dependent versions remain in the project.
 
 Compile-time results live under `.thor-cache/eval-v1` beside the entry package
 (or the cache root selected by `--cache-dir` or `THOR_CACHE_DIR`). Records contain
@@ -212,7 +221,7 @@ conditional, `using` and overlay cases retain the conservative helper path when
 these early checks cannot establish reuse. Dynamic resource paths bypass result
 caching when their inputs cannot be established safely.
 
-The parser cache lives in the checkout's `.thor-cache/parse-v1`. Successful
+The parser cache lives in the project's `.thor-cache/parse-v1` (or selected cache root). Successful
 frontend JSON is keyed by source contents, parser binary and parsing options.
 Editing one file reuses parsing of unchanged imports; each consumer constructs
 fresh syntax objects and performs fresh analysis. Editor overlays participate
@@ -368,7 +377,9 @@ while editing, even without compiler checking, with the duplicate name underline
 and the earlier declaration's line. Conditional declarations, tagged files,
 cross-file conflicts and other type checks still use the backend.
 
-Each generated `.odin` file has a `.odin.map.json` sidecar. These versioned maps
+With `-debug` or `thor transpile`, generated `.odin` files have `.odin.map.json`
+sidecars. Ordinary builds retain mappings in memory without writing these files.
+Shared translated libraries keep their common maps in the installation. These versioned maps
 record exact copied byte ranges, source ranges for generated constructs, and
 original source snapshots. Nested, reordered, and duplicated expressions retain
 their origins. Compiler messages also translate embedded declaration/caller
@@ -935,9 +946,10 @@ compilation. Cached entries contain typed contents, never executables or address
 
 `THOR_CACHE_DIR` supplies a default cache root; `--cache-dir` overrides it.
 `--cache-report` prints opt-in JSON counters on stdout, leaving compiler diagnostics
-on stderr. Evaluation-cache lookups follow eligibility checks. Complete
-transpilation reuse skips rechecking an unchanged, previously checked input;
-changes to checked code or its dependencies invalidate that reuse.
+on stderr. Evaluation-cache lookups follow eligibility checks. Project analysis
+and final Odin checking still run on every invocation. Late result-cache hits
+hash generated evaluator code in memory and skip writing or compiling the
+temporary evaluator project.
 
 Current conservative boundaries: the native compiler cannot reflect record
 fields at compile time, so Thor supplies checked source field schemas. Unknown

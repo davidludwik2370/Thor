@@ -1,5 +1,6 @@
 .thor-cache/
 .thor-build/
+/lib/
 __pycache__/
 *.pyc
 editors/vscode/node_modules/

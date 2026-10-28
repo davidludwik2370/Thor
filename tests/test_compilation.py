@@ -46,7 +46,7 @@ class CompilationTests(unittest.TestCase):
         self.assertFalse((self.app/'.thor-cache/transpile-v1').exists())
         return errors
 
-    def test_every_build_runs_analysis_and_emits_fresh_sources_and_maps(self):
+    def test_every_build_runs_analysis_and_keeps_normal_maps_in_memory(self):
         self.write('package main\nmain::proc(){values:=[1,2];assert(values[0]==1)}\n')
         self.checked(command='build')
         from thorlang.evaluation import Evaluator
@@ -58,7 +58,7 @@ class CompilationTests(unittest.TestCase):
         self.assertEqual(emitted.call_count,1)
         self.assertEqual(analyzed.call_count,1)
         self.assertTrue((self.root/self.root.name).is_file())
-        self.assertTrue(all(Path(str(path)+'.map.json').is_file() for path in self.output.rglob('*.odin')))
+        self.assertFalse(list(self.output.rglob('*.map.json')))
 
     def test_edit_parses_only_the_changed_file_and_bypass_reparses_imports(self):
         self.write('package main\nimport "library"\nmain::proc(){x:=library.VALUE;_=x}\n',
@@ -180,9 +180,9 @@ main::proc(){}
 
     def test_generated_sources_maps_and_manifest_are_rebuilt(self):
         self.write('package main\nmain::proc(){value:=[1,2];assert(value[0]==1)}\n')
-        self.checked()
-        self.checked()
-        source = next(p for p in self.output.rglob('main.odin') if 'app' in p.parts)
+        self.checked(flags=['-debug'])
+        self.checked(flags=['-debug'])
+        source = self.output/'main.odin'
         for path in [source, Path(str(source)+'.map.json'), self.output/'thor-manifest.json']:
             original = path.read_bytes()
             # A valid ownership manifest with a changed entry is recoverable;
@@ -191,7 +191,7 @@ main::proc(){}
                 manifest=json.loads(original);manifest['entry']='changed';path.write_text(json.dumps(manifest))
             else:
                 path.write_text('damaged')
-            self.checked()
+            self.checked(flags=['-debug'])
             self.assertEqual(path.read_bytes(),original)
 
     def test_repeated_backend_errors_keep_original_unicode_ranges_and_messages(self):
@@ -288,7 +288,7 @@ work::fn(x:f64)->int{return int(math.floor(x))}
 VALUE::work(23.5)
 main::proc(){x:=4.5;assert(work(x)==4&&VALUE==23&&math.floor(x)==4)}
 ''')
-        self.checked(command='build')
+        self.checked(command='build',flags=['-debug'])
         manifest=json.loads((self.output/'thor-manifest.json').read_text())
         sdk=Path(manifest['odin_environment']['ODIN_ROOT'])
         generated=[p for p in sdk.rglob('*.odin') if not p.is_symlink()]

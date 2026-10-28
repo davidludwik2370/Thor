@@ -76,11 +76,12 @@ class Hint:
 
 
 class Source:
-    def __init__(self, path: Path, frontend: Path, *, thor=True, package=False, test=False, project_name="", mapping=None, raw=None, target=(), cache=True):
+    def __init__(self, path: Path, frontend: Path, *, thor=True, package=False, test=False, project_name="", mapping=None, raw=None, target=(), cache=True, cache_dir=None):
         self.path = path.resolve()
         self.thor = thor
         self.raw = path.read_bytes() if raw is None else raw
         self.mapping = mapping or MappingBuilder()
+        self.cache_dir=cache_dir
         args = [str(frontend), str(path)] + ([] if thor else ["--odin"])
         if package:
             args.append("--package")
@@ -92,7 +93,7 @@ class Source:
         args.append("--stdin")
         try:
             from . import parsecache
-            result = parsecache.run(args,self.raw,enabled=cache)
+            result = parsecache.run(args,self.raw,enabled=cache,directory=cache_dir)
         except subprocess.TimeoutExpired as exc:
             raise ThorError(f"parser timed out: {path}") from exc
         if result.returncode:
@@ -571,7 +572,11 @@ class Source:
         return self.hidden_namespaces[namespace]
 
     def import_code(self, namespace):
-        return self.evaluation_import_paths.get(namespace, self.imports[namespace])
+        return self.output_import(self.evaluation_import_paths.get(namespace, self.imports[namespace]))
+
+    def output_import(self,path):
+        mapper=getattr(self,'backend_import',None)
+        return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}

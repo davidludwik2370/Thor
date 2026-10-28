@@ -546,7 +546,7 @@ class Evaluator:
                     pending.setdefault(key,[]).append(b)
         if not pending:return
         flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:')) and f!='-keep-executable']
-        probe=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays={p:s.raw for p,s in self.p.sources.items()},cache_frontend=self.p.cache_frontend)
+        probe=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays={p:s.raw for p,s in self.p.sources.items()},cache_frontend=self.p.cache_frontend,cache_directory=self.p.cache_directory,use_shared=False)
         def copy(node):return next((n for n in probe.sources[node.source.path].by_span.get((node.start,node.end),[]) if n.kind==node.kind),None)
         old_p=self.p
         try:
@@ -566,7 +566,7 @@ class Evaluator:
             source.expressions.helpers[scope,marker]=source.mapping.wrap('\n'+code+'\n',source.path,node.start,node.end,'type-probe')
             markers[marker]=bindings
         with tempfile.TemporaryDirectory(prefix='thor-type-probe-') as directory:
-            target=probe.emit(Path(directory)/'source')
+            target=probe.emit(Path(directory)/'source',persist_maps=False)
             command=[self.odin,'build' if probe.test else 'check',str(target),*probe.odin_flags(),'-json-errors','-max-error-count:10000']
             if probe.test:command.extend(['-build-mode:test',f'-out:{directory}/probe'])
             if probe.file_entry:command.append('-file')
@@ -745,7 +745,7 @@ class Evaluator:
                 return cached
         flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:','-vet','-target:')) and f not in {'-keep-executable','-no-entry-point'}]
         overlays={path:s.raw for path,s in self.p.sources.items()}
-        helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays,cache_frontend=self.p.cache_frontend)
+        helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays,cache_frontend=self.p.cache_frontend,cache_directory=self.p.cache_directory,use_shared=False)
         helper.discover(self.root/'runtime'/'eval')
         self.p.native_sources.attach(helper,keep|procedures)
         originals={**self.p.sources,**{node.source.path:node.source for node in keep|procedures}}
@@ -939,7 +939,7 @@ class Evaluator:
             if span:unit.edits.append((*span,'main'))
         with tempfile.TemporaryDirectory(prefix='thor-run-') as directory:
             directory=Path(directory)
-            helper.emit(directory/'source')
+            helper.emit(directory/'source',persist_maps=False,materialize=False)
             target=helper.outputs[entry_source.path].parent
             executable=directory/('helper.exe' if sys.platform=='win32' else 'helper')
             command=[self.odin,'build',str(target),*helper.odin_flags(),f'-out:{executable}','-json-errors']
@@ -957,6 +957,7 @@ class Evaluator:
             if cached is not None:
                 if self.cache:self.cache.remember(prepared,key)
                 return unpack(cached)
+            helper.write()
             try:built=subprocess.run(command,capture_output=True,timeout=max(30,self.timeout))
             except subprocess.TimeoutExpired:self.fail(error_site,label+' helper compilation timed out.')
             diagnostics=Diagnostics(helper.sources,helper.maps,helper.generated)

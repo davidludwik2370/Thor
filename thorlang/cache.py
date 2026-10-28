@@ -160,8 +160,10 @@ class EvaluationCache:
             normalize = lambda text: str(text).replace(str(helper.destination), '<helper>')
             digest = hashlib.sha256(canonical(dict(identity=self.identity(odin, root), resources=resources,
                 flags=[normalize(flag) for flag in helper.odin_flags()], target=normalize(target))))
-            for path in sorted(helper.destination.rglob('*.odin')):
-                digest.update(canonical([str(path.relative_to(helper.destination)),normalize(path.read_text())]))
+            for filename,raw in sorted(helper.generated.items()):
+                path=Path(filename)
+                if path.suffix=='.odin':
+                    digest.update(canonical([str(path.relative_to(helper.destination)),normalize(raw.decode())]))
             return digest.hexdigest()
         except (OSError, ValueError, subprocess.SubprocessError):
             self.stats['bypasses'] += 1;return None

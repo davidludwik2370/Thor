@@ -34,7 +34,8 @@ def extend(project,destination,generated):
         project.generated[str(output)]=raw
         data=mapping.json(output,{path:source})
         data['generated_sha256']=hashlib.sha256(raw).hexdigest()
-        generated[output.relative_to(destination).as_posix()+'.map.json']=json.dumps(data,ensure_ascii=False,separators=(',',':'))+'\n'
+        if project.persist_maps:
+            generated[output.relative_to(destination).as_posix()+'.map.json']=json.dumps(data,ensure_ascii=False,separators=(',',':'))+'\n'
     parents={parent for path in changed for parent in path.parents if parent==root or root in parent.parents}
 
     def include(path):

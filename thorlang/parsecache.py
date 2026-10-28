@@ -10,8 +10,8 @@ HEADER = b'thor-ast-v1\n'
 MAX_PACKET = 64 * 1024 * 1024
 
 
-def clear(frontend):
-    directory = Path(frontend).parent/'parse-v1'
+def clear(frontend, directory=None):
+    directory = (Path(directory) if directory is not None else Path(frontend).parent)/'parse-v1'
     try:
         for path in directory.glob('*.ast'):
             if len(path.stem)==64 and all(c in '0123456789abcdef' for c in path.stem) and not path.is_symlink():
@@ -20,7 +20,7 @@ def clear(frontend):
         pass
 
 
-def run(args, raw, *, enabled=True):
+def run(args, raw, *, enabled=True, directory=None):
     path = None
     if enabled:
         try:
@@ -29,7 +29,7 @@ def run(args, raw, *, enabled=True):
             identity = [str(frontend.resolve()), stat.st_dev, stat.st_ino, stat.st_size,
                         stat.st_mtime_ns, stat.st_ctime_ns, [str(arg) for arg in args]]
             key = hashlib.sha256(json.dumps(identity,separators=(',',':')).encode()+b'\0'+raw).hexdigest()
-            path = frontend.parent/'parse-v1'/(key+'.ast')
+            path = (Path(directory) if directory is not None else frontend.parent)/'parse-v1'/(key+'.ast')
             if path.stat().st_size <= MAX_PACKET:
                 packet = path.read_bytes()
                 checksum, separator, output = packet[len(HEADER):].partition(b'\n')

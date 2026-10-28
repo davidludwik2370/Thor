@@ -44,7 +44,7 @@ class NativeSources:
             files=set(directory.glob('*.odin')) | {path for path in p.overlays if path.parent==directory and path.suffix=='.odin'}
             for file in sorted(files):
                 member = Source(file, p.frontend, thor=False, package=True, test=p.test,
-                                project_name=p.entry.stem, raw=p.overlays.get(file), target=p.target, mapping=p.mapping,cache=p.cache_frontend)
+                                project_name=p.entry.stem, raw=p.overlays.get(file), target=p.target, mapping=p.mapping,cache=p.cache_frontend,cache_dir=p.cache_directory)
                 member.native_inspected = True
                 member.project = p.packages
                 member.collections = p.collections
@@ -80,7 +80,7 @@ class NativeSources:
         for original in sorted(originals, key=lambda s: str(s.path)):
             member = Source(original.path, helper.frontend, thor=False, package=True, test=helper.test,
                             project_name=helper.entry.stem, mapping=helper.mapping,
-                            raw=original.raw, target=helper.target,cache=helper.cache_frontend)
+                            raw=original.raw, target=helper.target,cache=helper.cache_frontend,cache_dir=helper.cache_directory)
             member.native_inspected = True
             member.project = helper.packages
             member.collections = helper.collections

@@ -30,7 +30,7 @@ class Expressions:
         return alias
 
     def imports(self):
-        return ''.join(self.source.mapping.wrap(f'\nimport {alias} {json.dumps(path)}\n',self.source.path,0,0,'support') for alias,path in self.modules.items())
+        return ''.join(self.source.mapping.wrap(f'\nimport {alias} {json.dumps(self.source.output_import(path))}\n',self.source.path,0,0,'support') for alias,path in self.modules.items())
 
     def declarations(self, scope):
         return ''.join(code for (owner,_),code in list(self.helpers.items()) if owner is scope)

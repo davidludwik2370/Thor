@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.10.4",
+  "version": "0.11.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -72,7 +72,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "description": "TLS executable. Relative paths resolve against the workspace; defaults to tls/bin/tls in the workspace."
+          "description": "TLS executable. Defaults to the Thor installation at THOR_ROOT or ~/Thor, or the current toolchain checkout. Relative paths resolve against the workspace."
         },
         "tls.compiler.path": {
           "type": "string",

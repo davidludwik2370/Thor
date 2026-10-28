@@ -27,8 +27,9 @@ command, then run **Developer: Reload Window** after an update to load the new
 grammar and theme mappings. Restarting TLS only reloads the server. The grammar
 works independently of TLS. No Marketplace account or publication is needed.
 
-The client defaults to `tls/bin/tls` inside the workspace. To use this fork from
-another workspace, configure `tls.server.path` with the absolute executable path.
+The client discovers the toolchain in `THOR_ROOT`, the current toolchain checkout,
+or `~/Thor`. Ordinary projects use that shared TLS installation without a local
+server copy. Set `tls.server.path` to select another executable explicitly.
 `tls.odinRoot` can point to an Odin installation when it cannot be discovered.
 The compiler launcher defaults to `thor` beside the TLS checkout. Set
 `tls.compiler.path` to its absolute path if your compiler lives elsewhere.

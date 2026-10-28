@@ -22,9 +22,10 @@ class Origin:
 
 
 class MappingBuilder:
-    def __init__(self):
+    def __init__(self, *, debug=True):
         self.prefix = "\0thor-map-" + uuid.uuid4().hex + ":"
         self.origins = []
+        self.debug=debug
 
     def wrap(self, text, path, start, end, kind="generated", *, exact=False):
         if not text:
@@ -47,7 +48,11 @@ class MappingBuilder:
                 start = origin.start + offset - opened if origin.exact else origin.start
                 end = start + size if origin.exact else origin.end
                 kind='pure-procedure' if origin.kind.startswith('pure-procedure|') else origin.kind
-                segments.append([offset, offset + size, origin.file, start, end, kind, origin.exact])
+                row=[offset, offset + size, origin.file, start, end, kind, origin.exact]
+                previous=segments[-1] if segments else None
+                if previous and origin.exact and previous[6] and previous[1]==offset and previous[2]==origin.file and previous[4]==start and previous[5]==kind:
+                    previous[1]=offset+size;previous[4]=end
+                else:segments.append(row)
                 output.append(chunk)
                 offset += size
             index = int(match[1])
@@ -56,11 +61,14 @@ class MappingBuilder:
             else:
                 assert stack and stack[-1][0] == self.origins[index], "unbalanced emission annotations"
                 origin, opened = stack.pop()
-                if not origin.exact and origin.kind in {"array", "Binary", "Ternary", "Ident", "pure-call-target"}:
+                last=segments[-1] if segments else None
+                identity=bool(last and last[6] and last[2]==origin.file and last[0]<=opened and last[1]>=offset
+                              and last[3]+opened-last[0]==origin.start and origin.end-origin.start==offset-opened)
+                if not origin.exact and not identity and origin.kind in {"array", "Binary", "Ternary", "Ident", "pure-call-target"}:
                     expansions.append([opened, offset, origin.file, origin.start, origin.end])
-                if origin.kind in {"expression-helper", "debug-capture"}:
+                if self.debug and origin.kind in {"expression-helper", "debug-capture"}:
                     regions.append([opened, offset, origin.kind, origin.file, origin.start, origin.end])
-                if origin.kind.startswith('pure-procedure|'):
+                if self.debug and origin.kind.startswith('pure-procedure|'):
                     _,name,variant=origin.kind.split('|')
                     regions.append([opened,offset,'pure-procedure',origin.file,origin.start,origin.end,name,variant])
             cursor = match.end()

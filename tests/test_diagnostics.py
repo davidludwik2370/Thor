@@ -500,7 +500,7 @@ class DiagnosticTests(unittest.TestCase):
         self.invoke('package main\nmain :: proc(){ #if false { a := []; _ = a; _ = missing } }\n', success=True)
 
     def test_source_map_sidecar_is_complete_and_round_trips(self):
-        entry, output, _, _ = self.invoke('package main\nmain :: proc(){ a := [1,2]; _ = a }\n', success=True)
+        entry, output, _, _ = self.invoke('package main\nmain :: proc(){ a := [1,2]; _ = a }\n', success=True,flags=['-debug'])
         data = json.loads((output / 'main.odin.map.json').read_text())
         self.assertEqual(data['version'], 1)
         self.assertEqual(data['sources'][str(entry)], entry.read_text())

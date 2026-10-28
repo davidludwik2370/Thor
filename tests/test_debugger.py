@@ -109,6 +109,16 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_breakpoint_in_shared_basic_uses_its_installed_source_map(self):
+        directory,_=self.build('package main\nimport "thor:basic"\nmain::proc(){basic.print("shared breakpoint")}\n')
+        basic=ROOT/'runtime/basic/basic.thor'
+        line=next(i for i,text in enumerate(basic.read_text().splitlines(),1) if 'writer := os.to_stream(os.stdout)' in text)
+        client=self.launch(directory,basic,[line])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(basic),line),frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_checked_ordinary_procedure_keeps_its_frame_and_locals(self):
         text='''package main
 leaf::proc(n:int)->int{

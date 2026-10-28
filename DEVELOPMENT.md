@@ -1204,3 +1204,74 @@ checks and two real CodeLLDB breakpoint/stepping checks pass. New regressions
 cover sparse native emission, stable type identity, layout cleanup, unchanged SDK
 inputs, unsaved SDK files/resources, linked overload-note paths, and result reuse
 after runtime edits with transitive dependency invalidation.
+
+## Shared installation and output simplification: compiler 0.18.0
+
+Move the complete checkout, including Git history and existing user work, to
+/Users/davidludwik/Thor. Keep the former /Users/davidludwik/Code/Odin/thor path as
+a compatibility symlink, and point the shell PATH at ~/Thor. Installation-owned
+compiler/frontend/TLS binaries, runtime sources and common library translations
+live there. Application parsing data, compile-time results, adapted code and
+generated output belong to the application project. Document the layout and
+setup in INSTALLATION.md. Protect the launcher when the default executable name
+matches it on a case-insensitive filesystem; retain the normal working-directory
+executable name and explicit -out: behavior.
+
+Publish versioned common runtime views atomically under lib/. Native packages
+link to their original sources without importing their native test files. The
+current single-file basic package has an isolated generic Thor-to-Odin
+translation shared by callers. Keep native when/generic specialization in Odin.
+Library overlays, configuration-dependent Thor syntax, compile-time execution
+and checked procedure variants retain project-local output. If any file needs
+adaptation, emit the whole package together. Do not share partially specialized
+or caller-dependent code. Custom collections retain their existing semantics.
+
+Keep compact mappings in memory for compiler diagnostics on every build. Persist
+project source-map sidecars only for -debug and explicit transpile commands;
+shared library maps live once beside their common translation. Merge adjacent
+exact spans, omit identity-only expansion records and skip debug-only frame
+metadata during ordinary compilation. The debug manifest references common maps
+without copying them into projects. VS Code extension 0.11.0 reads these maps and
+discovers the shared toolchain through THOR_ROOT, a toolchain workspace or ~/Thor.
+Explicit settings still override discovery. Rebuild and install the local TLS
+and extension after relocation; existing editor windows require a reload.
+
+Plan evaluator output in memory, check the typed result cache against that code,
+and only materialize a temporary project on a cache miss. Native compiler
+support passes through without re-rendering when unchanged. Parser packets now
+use the application's cache directory, including unsaved new-file overlays;
+clearing one project's cache does not clear another project's data. There is no
+whole-project cache. Unnecessary older frontend/parser and manifest-owned output
+artifacts were removed during migration, reclaiming about 197 MB while preserving
+project evaluation results and all source files.
+
+Defer independent-call batching, nested evaluation fusion and a faster cache
+index. They require additional semantic/dependency work; the shared library,
+map persistence and evaluator write changes already remove repeated work without
+changing which computations execute or which source inputs invalidate results.
+
+Final measurements use a temporary copy of the current playground, with five
+runtime edits, unchanged builds and direct native builds. Runtime edits take
+0.671-0.715 seconds (median 0.687); unchanged builds take 0.669-0.693 seconds
+(median 0.677); native Odin takes 0.173-0.183 seconds (median 0.177). Every warm
+Thor build reports two early evaluation-result hits and zero misses. An empty
+project result cache takes 4.339 seconds. Normal output contains two generated
+Odin files (98,857 bytes) and 59 SDK links, plus its ownership manifest; there
+are no project map sidecars or common runtime copies. The program's table,
+array length 3 and floor result 23 are unchanged, and the original playground
+source hash remains unchanged.
+
+Validation: the final complete Python run passes 712 tests in 721.754 seconds,
+with the existing expected TLS contextual enum-navigation failure. All 1,118
+native TLS tests, 13 allocation-tracked native runtime tests and 89 Node tests
+pass. Actual VS Code integration passes hover, rename, highlighting, unsaved
+mapped diagnostics, imports, compile-time execution and canonical type displays.
+Its first attempt encountered an intermittent native Odin helper compiler crash
+(exit -11); the complete rerun passed without adding production retries.
+End-to-end VS Code debugging passes mkthor scaffolding, Cmd+Shift+R, the build
+task, breakpoints, stepping, locals, watches, restart/rebuild and clean exit.
+A real CodeLLDB regression also stops in the common basic library through its
+installed source map. Fresh projects build/run from the new installation, and
+building a source from another working directory still uses that directory's
+executable location/name. The final 55-test focused run covers package fallback,
+project cache isolation, unsaved files, diagnostics and ordinary pure calls.

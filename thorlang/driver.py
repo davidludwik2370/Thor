@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.17.1"
+VERSION = "0.18.0"
 
 
 def frontend_binary(odin):
@@ -46,12 +46,15 @@ def frontend_binary(odin):
 
 
 class Project:
-    def __init__(self, entry, frontend, flags, *, test=False, overlays=None, cache_frontend=True):
+    def __init__(self, entry, frontend, flags, *, test=False, overlays=None, cache_frontend=True,
+                 cache_directory=None,use_shared=True,debug_maps=None):
         self.entry = Path(entry).resolve()
         self.overlays = overlays or {}
         self.cache_frontend = cache_frontend
+        self.cache_directory=Path(cache_directory) if cache_directory is not None else (self.entry.parent if self.entry.is_file() or self.entry in self.overlays else self.entry)/'.thor-cache'
+        self.use_shared=use_shared
         self.file_entry = self.entry.is_file() or self.entry in self.overlays
-        self.mapping = MappingBuilder()
+        self.mapping = MappingBuilder(debug=('-debug' in flags if debug_maps is None else debug_maps))
         if not self.entry.exists() and self.entry not in self.overlays:
             raise ThorError(f"source does not exist: {self.entry}")
         if self.file_entry and self.entry.suffix not in {".thor", ".odin"}:
@@ -75,7 +78,9 @@ class Project:
         self.discover(self.entry)
         if not self.sources:
             raise ThorError(f"no .thor or .odin sources found: {self.entry}")
-        roots = [p.parent for p in self.sources] + list(self.collections.values())
+        roots = [self.entry.parent if self.file_entry else self.entry]
+        roots += [p.parent for p in self.sources if not (use_shared and p.is_relative_to(ROOT/'runtime') and 'thor' in self.default_collections)]
+        roots += [p for name,p in self.collections.items() if not(use_shared and name in self.default_collections)]
         self.common = Path(os.path.commonpath(roots))
         for source in self.sources.values():
             source.project = self.packages
@@ -105,14 +110,14 @@ class Project:
         # Compiler support has its own native test command. Importing its test
         # files into a program can add core-library dependencies to bootstrap
         # support used by checked versions of those same libraries.
-        if entry.parent==ROOT/'runtime' and entry.name in {'pure','eval','format','numeric','sequence','sets'} and entry!=self.entry:
+        if entry.parent==ROOT/'runtime' and entry.name in {'basic','pure','eval','format','numeric','sequence','sets'} and entry!=self.entry:
             paths=[path for path in paths if not path.name.endswith('_test.odin')]
         for path in paths:
             if path in self.sources:
                 continue
             source = Source(path, self.frontend, thor=path.suffix == ".thor", package=entry.is_dir(),
                             test=self.test, project_name=self.entry.stem, mapping=self.mapping,
-                            raw=self.overlays.get(path), target=self.target,cache=self.cache_frontend)
+                            raw=self.overlays.get(path), target=self.target,cache=self.cache_frontend,cache_dir=self.cache_directory)
             self.sources[path] = source
             self.packages.setdefault(path.parent, []).append(source)
         for path in paths:
@@ -137,8 +142,9 @@ class Project:
                     source.error(f"imported package does not exist: {dependency}", node.start, node.end)
                 self.discover(dependency)
 
-    def emit(self, destination):
+    def emit(self, destination, *, persist_maps=None, materialize=True):
         self.purity.calls.prepare()
+        self.persist_maps='-debug' in self.flags if persist_maps is None else persist_maps
         destination = Path(destination).resolve()
         if any(destination == path.parent or destination in path.parents for path in self.sources):
             raise ThorError("output directory must not contain or replace source files")
@@ -155,32 +161,104 @@ class Project:
         self.outputs = {}
         self.maps = {}
         self.generated = {}
+        self.shared_maps=[]
+        self.backend_collections={name:destination/path.relative_to(self.common) for name,path in self.collections.items()
+                                  if name not in self.default_collections}
+        self._old_manifest=old_manifest
+        self._planned=generated
+        from .shared import Runtime
+        runtime=Runtime(self,ROOT) if self.use_shared and not self.purity.eval_mode else None
+        runtime_base=ROOT/'runtime'
+        if runtime and 'thor' in self.default_collections:
+            runtime_base=runtime.prepare(with_basic=any(runtime.eligible(source) and not
+                (path==self.entry if self.file_entry else path.parent==self.entry) for path,source in self.sources.items()))
+        local_runtime=set()
+        adapted={path.parent for path,source in self.sources.items() if runtime and runtime.bundled(source)
+                 and not (path==self.entry if self.file_entry else path.parent==self.entry)
+                 and (not runtime.native(source) and not runtime.eligible(source) or path in self.overlays
+                      or any(d.source is source for d in self.purity.calls.declarations))}
+        regular=[]
         for path, source in self.sources.items():
-            relative = (Path(self.pure_sdk_subdir)/path.relative_to(self.pure_sdk_root)
+            entry_source=path==self.entry if self.file_entry else path.parent==self.entry
+            checked=any(d.source is source for d in self.purity.calls.declarations)
+            if runtime and runtime.bundled(source) and not entry_source:
+                if path.parent not in adapted and runtime.eligible(source):
+                    runtime.attach(source,self)
+                    runtime_base=runtime.directory
+                    continue
+                if path.parent not in adapted and runtime.native(source) and not checked and path not in self.overlays:
+                    self.outputs[path]=runtime_base/path.relative_to(ROOT/'runtime')
+                    continue
+                local_runtime.add(path.parent.name)
+                relative=Path('.thor-runtime')/path.relative_to(ROOT/'runtime')
+            else:
+                relative = (Path(self.pure_sdk_subdir)/path.relative_to(self.pure_sdk_root)
                         if getattr(source,'native_inspected',False) and getattr(self,'pure_sdk_collections',None)
                         else path.relative_to(self.common)).with_suffix(".odin")
+            relative=relative.with_suffix('.odin')
             if relative.as_posix() in generated:
                 raise ThorError(f"generated filename collision: {relative}")
-            generated[relative.as_posix()] = source.transpile(preserve_native=bool(
+            self.outputs[path]=destination/relative
+            # Reserve names before lowering, including .thor/.odin collisions.
+            generated[relative.as_posix()]=''
+            regular.append((path,source,relative))
+        if 'thor' in self.default_collections:
+            if runtime and local_runtime:
+                for package in (ROOT/'runtime').iterdir():
+                    if package.is_dir() and package.name not in local_runtime:
+                        generated['.thor-runtime/'+package.name]=runtime_base/package.name
+                runtime_base=destination/'.thor-runtime'
+            self.backend_collections['thor']=runtime_base if runtime else destination/self.collections['thor'].relative_to(self.common)
+        self.runtime_alias=(runtime.directory,ROOT/'runtime') if runtime and runtime.directory else None
+        directories={path.parent:output.parent for path,output in self.outputs.items()}
+        def import_path(source,path):
+            if path.startswith('thor:') and 'thor' in self.default_collections:return path
+            original=source.import_dir(path)
+            target=directories.get(original)
+            return os.path.relpath(target,self.outputs[source.path].parent).replace(os.sep,'/') if target else path
+        for path,source,relative in regular:
+            if runtime:source.backend_import=import_path
+            native_support=(path.suffix=='.odin' and path.is_relative_to(ROOT/'runtime') and not source.edits
+                and not source.run_values and not any(self.purity.checked(n) for n in source.nodes if n.kind=='Procedure'))
+            if native_support:
+                from .sourcemap import SourceMap
+                code=source.raw.decode()
+                source.source_map=SourceMap([[0,len(source.raw),str(path),0,len(source.raw),'source',True]])
+            else:code=source.transpile(preserve_native=bool(
                 getattr(source,'native_inspected',False) and not self.purity.eval_mode))
-            self.outputs[path] = destination / relative
+            generated[relative.as_posix()]=code
             self.maps[str(destination / relative)] = source.source_map
-            self.generated[str(destination / relative)] = generated[relative.as_posix()].encode()
-            # Each sidecar is self-contained, including original source snapshots.
-            map_data=source.source_map.json(destination / relative, self.sources)
-            map_data['generated_sha256']=hashlib.sha256(generated[relative.as_posix()].encode()).hexdigest()
-            generated[relative.as_posix() + ".map.json"] = json.dumps(
-                map_data, ensure_ascii=False, separators=(",", ":")) + "\n"
+            self.generated[str(destination / relative)] = code.encode()
+            if self.persist_maps:
+                map_data=source.source_map.json(destination / relative, self.sources)
+                map_data['generated_sha256']=hashlib.sha256(code.encode()).hexdigest()
+                generated[relative.as_posix() + ".map.json"] = json.dumps(
+                    map_data, ensure_ascii=False, separators=(",", ":")) + "\n"
         from .sdkmirror import extend
         extend(self,destination,generated)
+        self.destination = destination
+        manifest = {"thor_version": VERSION, "entry": str(self.entry), "source_map_version": 1,
+                    "generated": sorted(generated), "odin_flags": self.odin_flags(),
+                    "odin_environment": {'ODIN_ROOT':str(self.sdk_backend_root)} if self.sdk_backend_root else {},
+                    "debug_roots": getattr(self,"debug_roots",[]), "debug_map_version": 1,
+                    "shared_maps":self.shared_maps if self.persist_maps else []}
+        self.manifest = manifest
+        if materialize:self.write()
+        return self.outputs[self.entry] if self.file_entry else directories[self.entry]
+
+    def write(self):
+        destination=self.destination
+        manifest_path=destination/'thor-manifest.json'
+        generated=self._planned
+        old_manifest=self._old_manifest
         # Do all parsing/lowering before updating any generated source.
         destination.mkdir(parents=True, exist_ok=True)
         if not manifest_path.exists():
             # Mark the tree before its first source-file event reaches editors.
             # Retain planned ownership if an initial emission is interrupted.
             manifest_path.write_text(json.dumps({'generated':sorted(generated)},indent=2)+'\n')
-        for collection in self.collections.values():
-            (destination / collection.relative_to(self.common)).mkdir(parents=True, exist_ok=True)
+        for collection in self.backend_collections.values():
+            if destination==collection or destination in collection.parents:collection.mkdir(parents=True,exist_ok=True)
         for relative, code in generated.items():
             output = destination / relative
             output.parent.mkdir(parents=True, exist_ok=True)
@@ -200,26 +278,19 @@ class Project:
             obsolete = original.resolve()
             if destination in obsolete.parents and obsolete.is_file():
                 obsolete.unlink()
-        self.destination = destination
-        manifest = {"thor_version": VERSION, "entry": str(self.entry), "source_map_version": 1,
-                    "generated": sorted(generated), "odin_flags": self.odin_flags(),
-                    "odin_environment": {'ODIN_ROOT':str(self.sdk_backend_root)} if self.sdk_backend_root else {},
-                    "debug_roots": getattr(self,"debug_roots",[]), "debug_map_version": 1}
-        self.manifest = manifest
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-        return self.outputs[self.entry] if self.file_entry else destination / self.entry.relative_to(self.common)
+        manifest_path.write_text(json.dumps(self.manifest, indent=2) + "\n")
 
     def odin_flags(self):
         result = []
         for flag in self.flags:
             if flag.startswith("-collection:"):
                 name = flag[len("-collection:"):].split("=", 1)[0]
-                mapped = self.destination / self.collections[name].relative_to(self.common)
+                mapped = self.backend_collections[name]
                 result.append(f"-collection:{name}={mapped}")
             else:
                 result.append(flag)
         for name in self.default_collections:
-            result.append(f"-collection:{name}={self.destination / self.collections[name].relative_to(self.common)}")
+            result.append(f"-collection:{name}={self.backend_collections[name]}")
         for source in [*self.sources.values(),*getattr(self,'sdk_sources',{}).values()]:
             for name, directory in source.asset_collections.items():
                 result.append(f"-collection:{name}={directory}")
@@ -227,6 +298,7 @@ class Project:
 
     def diagnostic_adapter(self):
         aliases={str(self.sdk_backend_root)+os.sep:str(self.pure_sdk_root)+os.sep} if self.sdk_backend_root else {}
+        if self.runtime_alias:aliases[str(self.runtime_alias[0])+os.sep]=str(self.runtime_alias[1])+os.sep
         return Diagnostics({**self.sources,**getattr(self,'sdk_sources',{})}, self.maps, self.generated,path_aliases=aliases)
 
 
@@ -306,14 +378,14 @@ def _main(argv=None):
             frontend, odin = frontend_binary(options.odin)
             if options.clear_cache:
                 from . import parsecache
-                parsecache.clear(frontend)
+                parsecache.clear(frontend,cache_root)
             project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
-                              cache_frontend=not options.no_cache)
+                              cache_frontend=not options.no_cache,cache_directory=cache_root)
             if '-debug' in flags:
                 odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
                 project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
             Evaluator(project,odin,options.run_timeout,cache).evaluate_all()
-            target = project.emit(destination)
+            target = project.emit(destination,persist_maps=options.command=='transpile' or '-debug' in flags)
             diagnostics = project.diagnostic_adapter()
             frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
         finally:
@@ -336,7 +408,9 @@ def _main(argv=None):
             binary_name += '.exe'
         explicit_output = next((f[len("-out:"):] for f in flags if f.startswith("-out:")), None)
         executable = Path(explicit_output if explicit_output is not None else binary_directory / binary_name).resolve()
-        if options.command == 'build' and explicit_output is None and executable == (ROOT / 'thor').resolve():
+        launcher=(ROOT/'thor').resolve()
+        same_launcher=executable==launcher or executable.exists() and launcher.exists() and os.path.samefile(executable,launcher)
+        if options.command == 'build' and explicit_output is None and same_launcher:
             raise ThorError('The default output would overwrite the Thor launcher; choose another name with -out:name.')
         if options.command in {"build", "run", "test"} and explicit_output is None:
             command.append(f"-out:{executable}")

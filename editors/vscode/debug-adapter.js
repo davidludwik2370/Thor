@@ -87,8 +87,9 @@ class DebugMaps {
         }
         this.debugRoots = (listing.debug_roots || []).map(canonical);
         this.program=listing.debug_program;
-        for (const name of listing.generated.filter(name => name.endsWith('.odin.map.json'))) {
-            const map = JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8'));
+        const mapFiles = [...listing.generated.filter(name => name.endsWith('.odin.map.json')), ...(listing.shared_maps || [])];
+        for (const name of mapFiles) {
+            const map = JSON.parse(fs.readFileSync(path.isAbsolute(name) ? name : path.join(directory, name), 'utf8'));
             if (map.version !== 1) throw new Error(`Unsupported Thor source-map version: ${map.version}`);
             const file = canonical(map.generated);
             const bytes = fs.readFileSync(file);

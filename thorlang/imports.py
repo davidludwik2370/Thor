@@ -53,7 +53,7 @@ def prepare(project):
                 if directory not in native:
                     native[directory] = [Source(file, project.frontend, thor=False, package=True,
                         test=project.test, target=project.target, project_name=project.entry.stem,
-                        raw=project.overlays.get(file),cache=project.cache_frontend) for file in sorted(directory.glob('*.odin'))]
+                        raw=project.overlays.get(file),cache=project.cache_frontend,cache_dir=project.cache_directory) for file in sorted(directory.glob('*.odin'))]
                 sources = native[directory]
             names = set().union(*(exports(member) for member in sources))
             for name in sorted(names):

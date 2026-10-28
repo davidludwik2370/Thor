@@ -5,6 +5,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { isBuildOutput } = require('./workspace-files');
+const { findToolchain } = require('./toolchain');
 
 let client;
 let output;
@@ -38,9 +39,10 @@ async function start(context) {
     const config = vscode.workspace.getConfiguration('tls', folder?.uri);
     if (!folder || !config.get('enabled', true)) return;
     const configured = config.get('server.path', '');
+    const toolchain = findToolchain(folder.uri.fsPath) || folder.uri.fsPath;
     const executable = configured
         ? path.resolve(folder.uri.fsPath, configured)
-        : path.join(folder.uri.fsPath, 'tls', 'bin', process.platform === 'win32' ? 'tls.exe' : 'tls');
+        : path.join(toolchain, 'tls', 'bin', process.platform === 'win32' ? 'tls.exe' : 'tls');
     if (!fs.existsSync(executable)) {
         output.appendLine(`TLS not found at ${executable}. Syntax highlighting is available. Build TLS with python3 tools/build_tls.py, or set tls.server.path.`);
         return;
