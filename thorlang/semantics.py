@@ -153,6 +153,10 @@ class Resolver:
         try:
             for scope in self.lexical_scopes(context):
                 symbols = self.scopes.get(self.scope_key(scope), {}).get(name, [])
+                if scope.kind=='File':
+                    from .imports import file_private
+                    visible=[s for s in symbols if s.node.source is context.source or not file_private(s.declaration)]
+                    if visible:symbols=visible
                 if scope.kind == "File" and (name in context.source.selected or name in context.source.imports):
                     symbols = [s for s in symbols if s.node.source is context.source and
                                s.declaration not in context.source.conditional_conflicts]

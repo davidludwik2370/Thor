@@ -60,6 +60,25 @@ main::proc(){}
         self.assertEqual(report['thor_prepared_hits'],0)
         self.assertIn('ambient context',errors)
 
+    def test_fn_transitive_proc_dependencies_are_revalidated_after_cache_hits(self):
+        source='''package main
+leaf::proc(value:int)->int{return value+1}
+middle::proc(value:int)->int{return leaf(value)}
+work::fn(value:int)->int{return middle(value)}
+VALUE::work(2)
+#assert(VALUE==3)
+main::proc(){}
+'''
+        self.write(source);self.compile()
+        report,_=self.compile()
+        self.assertGreater(report['thor_cache']['hits'],0)
+        self.source.write_text(source.replace('return value+1','return value+2'))
+        _,errors=self.compile(status=1)
+        self.assertIn('VALUE==3',errors)
+        self.source.write_text(source.replace('return value+1','_=context;return value+1'))
+        _,errors=self.compile(status=1)
+        self.assertIn('ambient context',errors)
+
     def test_constant_type_and_overload_changes_invalidate(self):
         source='''package main
 Item::int

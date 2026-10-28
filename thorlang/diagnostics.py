@@ -17,6 +17,8 @@ class Diagnostics:
         self.namespace_aliases = {alias: name for s in (sources or {}).values() for name, alias in s.hidden_namespaces.items()}
         self.guard_messages = {(str(path), start, end): message for path, s in (sources or {}).items()
                                for (start, end), message in s.guard_messages.items()}
+        self.hidden_parameters={calls.marker for s in (sources or {}).values()
+            if (calls:=getattr(getattr(s,'purity',None),'calls',None)) and calls.names}
         self.raw.update({str(p): b for p, b in (overlays or {}).items()})
         self.maps = maps or {}
         self.generated = generated or {}
@@ -64,6 +66,8 @@ class Diagnostics:
         result, seen = [], set()
         for error in errors:
             msgs = list(error.get("msgs") or [])
+            for name in self.hidden_parameters:
+                msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false))?', '',m) for m in msgs]
             for token, message in self.error_messages.items():
                 if any(token in m for m in msgs):
                     msgs = [message]
@@ -198,6 +202,8 @@ class Diagnostics:
                         if generated_text and generated_text != original_text:
                             msgs = [m.replace(generated_text, original_text) for m in msgs]
                 # Generated implementation names never belong in user diagnostics.
+                for name in self.hidden_parameters:
+                    msgs=[re.sub(r'(?:,\s*)?'+re.escape(name)+r'\s*=\s*true\b','',m) for m in msgs]
                 for alias, name in self.namespace_aliases.items():
                     msgs = [m.replace(alias, name) for m in msgs]
                 for prefix in self.prefixes:

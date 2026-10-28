@@ -13,6 +13,13 @@ def private(node):
     return False
 
 
+def file_private(node):
+    return bool(node.source.info.get('private_file') or any(
+        item.kind=='FieldValue' and item.role('field').text=='private' and item.role('value').text.strip('"')=='file'
+        for declaration in [node,*[a for a in node.ancestors() if a.kind=='ForeignBlock']]
+        for attribute in declaration.group('attributes') for item in attribute.group('elems')))
+
+
 def exports(source):
     if source.excluded or source.info.get('private'):
         return set()

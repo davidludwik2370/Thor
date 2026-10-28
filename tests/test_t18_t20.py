@@ -146,7 +146,6 @@ outer::fn(input:[]int)->int{return inner(input)}
             ('global:int\nbad::fn()->int{return global}', 'outside the function'),
             ('global:>7\nbad::fn()->int{return global}', 'outside the function'),
             ('bad::fn()->int{_=context;return 0}', 'ambient context'),
-            ('ordinary::proc()->int{return 7}\nbad::fn()->int{return ordinary()}', 'only declared fn'),
             ('bad::fn()->int{p:=ordinary;return p()}\nordinary::proc()->int{return 7}', 'indirect'),
             ('bad::fn()->int{x:=7;_= &x;return x}', 'raw addresses'),
             ('bad::fn()->[8]u8{return transmute([8]u8)f64(1)}', 'transmute'),

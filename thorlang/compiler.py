@@ -799,6 +799,8 @@ class Source:
         inserts = []
         if self.defaults and kind == 'Call':
             inserts.extend(self.defaults.arguments(n))
+        if self.purity and kind=='Call':
+            inserts.extend(self.purity.calls.arguments(n))
         guards = self.block_guards.get(n)
         real_block = kind == "Block" and self.raw[n.start:n.start+1] == b"{"
         if guards and real_block:
@@ -813,6 +815,8 @@ class Source:
             result += self.resolver.declaration_support(n)
         if self.defaults and kind == 'Declaration':
             result = self.defaults.helpers(n) + result
+        if self.purity and kind=='Declaration':
+            result += self.purity.calls.helpers(n)
         if n in self.conditional_conflicts:
             flavor = 'wildcard' if any(name.text in self.wildcard_names for name in n.group('names')) else 'selective'
             result = f'#panic("declaration conflicts with {flavor} import")\n' + result

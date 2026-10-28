@@ -772,6 +772,23 @@ passes the same checks. Recursion, concrete generic calls, local constants,
 overloads, defaults, named arguments and forward/dependent results are supported.
 Explicit `#run` requires known inputs and reports a runtime argument as an error.
 
+A `fn` may directly call an ordinary Odin or Thor `proc` when that procedure
+and its transitive callees satisfy the pure rules. This applies to runtime calls
+as well as compile-time evaluation:
+
+```odin
+square :: proc(n: int) -> int { return n*n }
+adjusted :: proc(n: int) -> int { return square(n)+1 }
+calculate :: fn(n: int) -> int { return adjusted(n) }
+VALUE :: calculate(3) // 10
+```
+
+Calls from `fn` use checked versions of ordinary bodies, including the same
+scratch cleanup and independent returned storage as `fn`. Direct ordinary calls
+retain their original behavior and ownership; their known arguments alone do
+not trigger automatic compile-time evaluation. See
+[the transitive-call demo](examples/pure_calls/demo.thor).
+
 Generic `$T`/`$N` bindings are scheduled separately for each resolved instantiation,
 including forwarding through imported procedures and inferred fixed-array counts.
 A normal parameter is still runtime storage inside a generic body. For example:
@@ -807,7 +824,7 @@ inactive native `when` branches remain inactive.
 Compiler-controlled deterministic operations include numeric conversions/operations,
 length/type/size queries, `make` for local slice/dynamic buffers, `copy`, `delete`,
 assertions, `core:strings.clone`, `core:slice.clone`, and Thor's scalar/string
-formatters. A declared `fn` otherwise calls declared `fn` targets only. Explicit
+formatters. Other direct calls require inspectable, transitively eligible bodies. Explicit
 allocator overrides and custom record formatters are rejected. Each checked
 function uses private tracking scratch storage, including for interpolation;
 all outstanding internal allocations are released on every return. Ordinary
@@ -880,6 +897,13 @@ Only selected native overload implementations enter the helper, with private
 implementations kept behind public evaluation bridges. Native source failures
 highlight the original `#run` and include their library source location. Public
 names and overload notes retain their original spelling.
+
+For runtime checked calls into installed Odin libraries, Thor writes an augmented
+SDK snapshot under generated output and selects it for the backend compilation.
+Ordinary and checked library calls therefore share the same nominal types;
+the installed SDK is unchanged. The manifest's `odin_environment` records the
+required `ODIN_ROOT`; use it alongside `odin_flags` when compiling generated Odin
+manually. Ordinary project-only call graphs do not need this SDK snapshot.
 
 Run the [commented native-call walkthrough](examples/native_run/demo.thor) with
 `./thor run examples/native_run`.

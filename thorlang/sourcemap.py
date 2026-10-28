@@ -46,7 +46,8 @@ class MappingBuilder:
                 size = len(chunk.encode("utf-8"))
                 start = origin.start + offset - opened if origin.exact else origin.start
                 end = start + size if origin.exact else origin.end
-                segments.append([offset, offset + size, origin.file, start, end, origin.kind, origin.exact])
+                kind='pure-procedure' if origin.kind.startswith('pure-procedure|') else origin.kind
+                segments.append([offset, offset + size, origin.file, start, end, kind, origin.exact])
                 output.append(chunk)
                 offset += size
             index = int(match[1])
@@ -55,10 +56,13 @@ class MappingBuilder:
             else:
                 assert stack and stack[-1][0] == self.origins[index], "unbalanced emission annotations"
                 origin, opened = stack.pop()
-                if not origin.exact and origin.kind in {"array", "Binary", "Ternary", "Ident"}:
+                if not origin.exact and origin.kind in {"array", "Binary", "Ternary", "Ident", "pure-call-target"}:
                     expansions.append([opened, offset, origin.file, origin.start, origin.end])
                 if origin.kind in {"expression-helper", "debug-capture"}:
                     regions.append([opened, offset, origin.kind, origin.file, origin.start, origin.end])
+                if origin.kind.startswith('pure-procedure|'):
+                    _,name,variant=origin.kind.split('|')
+                    regions.append([opened,offset,'pure-procedure',origin.file,origin.start,origin.end,name,variant])
             cursor = match.end()
         assert not stack and cursor == len(annotated), "unbalanced emission annotations"
         return "".join(output), SourceMap(segments, expansions, regions)

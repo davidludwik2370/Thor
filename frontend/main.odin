@@ -26,6 +26,7 @@ Info :: struct {
 Output :: struct {
     odin_root: string,
     private: bool,
+    private_file: bool,
     excluded: bool,
     nodes: [dynamic]Info,
     edits: [dynamic]parser.Edit,
@@ -329,7 +330,7 @@ main :: proc() {
         os.exit(1)
     }
     file.end.offset = len(data)
-    out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public,
+    out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public, private_file=tags.private==.File,
                   edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
     for tag in file.tags {
         text := strings.trim_space(tag.text)

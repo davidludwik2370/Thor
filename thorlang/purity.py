@@ -82,6 +82,8 @@ class Purity:
         self.contracts={}
         self.inner_bodies=set()
         self.scalar_casts=set()
+        from .purecalls import PureCalls
+        self.calls=PureCalls(self)
         for source in self.r.sources:source.purity=self
 
     @staticmethod
@@ -98,7 +100,7 @@ class Purity:
             cc=foreign.data.get('calling_convention','c') if foreign else 'c'
         return cc in {'','odin'}
 
-    def checked(self,proc):return bool(proc and (self.pure(proc) or self.eval_mode and proc in self.active))
+    def checked(self,proc):return bool(proc and (self.pure(proc) or self.eval_mode and proc in self.active or proc in self.calls.emitting))
 
     def module(self,source):return source.expressions.module('pure')
 
@@ -191,6 +193,7 @@ class Purity:
         return False if False in allowed else None if None in allowed else True
 
     def targets(self,call):
+        if self.eval_mode and call in self.calls.targets:return self.calls.targets[call]
         direct=self.r.symbol(call.role('callee'))
         if direct and direct.declaration.data.get('mutable',False):return []
         plan=self.r.resolve_call(call)
@@ -465,7 +468,7 @@ class Purity:
                 if imported and symbol is None and n.source.import_dir(imported[0]) is None and imported not in self.native_constants:
                     call=n.parent
                     if not(call and call.kind=='Call' and call.role('callee') is n and
-                           (self.approved(call) or self.builtin(call))):
+                           (self.approved(call) or self.builtin(call) or self.targets(call))):
                         self.problem(n,'Pure code cannot read unverified native package storage or values; only approved constants/helpers are eligible.')
             if n.kind=='Implicit':self.problem(n,'Pure code cannot access the ambient context or implicit runtime state.')
             if n.kind=='Unsafe':self.problem(n,'Assembly, uninitialized storage and unsafe operations are not permitted in pure code.')
@@ -512,8 +515,6 @@ class Purity:
                 else:
                     targets=self.targets(n)
                     if not targets:self.problem(n,'Pure code requires a resolved direct call to an eligible procedure; indirect, foreign and unknown calls are forbidden.')
-                    elif self.pure(proc) and any(not self.pure(p) for p in targets):
-                        self.problem(n,'A declared fn may call only declared fn targets or approved deterministic built-ins/helpers.')
             if n.kind=='Assignment':
                 for lhs in n.group('lhs'):
                     checks=self.borrowed_write(lhs,env)
@@ -541,11 +542,18 @@ class Purity:
         if not self.checked(proc):return None
         self.analyze(proc)
         if n in self.rendering:return None
+        checked_body=self.calls.body(n,expected,constant)
+        if checked_body is not None:return checked_body
         if n is proc.role('body') and proc in self.contracts:
             site,message=self.contracts[proc]
             return n.source.mapping.wrap('{#panic('+json.dumps(message)+')}',site.source.path,site.start,site.end,'pure-contract')
         if n.kind=='Directive' and n.data['name']=='procedure' and proc in self.inner_bodies:
+            original=self.calls.procedure_name(n)
+            if original is not None:return original
             return n.source.prefix+'procedure_name_'+str(proc.start)
+        if n.kind=='Directive' and n.data['name']=='procedure':
+            original=self.calls.procedure_name(n)
+            if original is not None:return original
         if (n.kind=='Ident' and n.text=='_' and n.parent and n.parent.kind=='Field'
                 and n.parent.parent is proc.role('type').role('params') and n in n.parent.group('names')):
             return self.parameter_name(n)
@@ -560,6 +568,10 @@ class Purity:
                 finally:self.rendering.difference_update(added)
                 return code+'\n#panic('+json.dumps(message)+')\n'
             return n.source.expressions.error(n,message)
+        checked_callee=self.calls.callee(n)
+        if checked_callee is not None:return checked_callee
+        checked_params=self.calls.parameters(n)
+        if checked_params is not None:return checked_params
         if n in self.scalar_casts:
             self.rendering.add(n)
             try:

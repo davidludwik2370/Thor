@@ -109,6 +109,27 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_checked_ordinary_procedure_keeps_its_frame_and_locals(self):
+        text='''package main
+leaf::proc(n:int)->int{
+    value:=n+1
+    return value
+}
+work::fn(n:int)->int{return leaf(n)}
+main::proc(){n:=3;result:=work(n);assert(result==4)}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[3])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['name'],frame['line']),('leaf',3),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'n','context':'watch'})
+        self.assertEqual(value['result'],'3')
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],4,frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_spread_extrema_step_over_and_optional_status_locals(self):
         text='''package main
 main::proc(){

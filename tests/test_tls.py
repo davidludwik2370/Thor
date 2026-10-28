@@ -134,6 +134,21 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_fn_ordinary_call_graph_checks_unsaved_leaf_and_clears(self):
+        text='package main\nstate:int\nleaf::proc(n:int)->int{/* 😀 */return n+1}\nmid::proc(n:int)->int{return leaf(n)}\nwork::fn(n:int)->int{return mid(n)}\nmain::proc(){n:=3;_=work(n)}\n'
+        client,main=self.open(text)
+        self.assertIn('proc(n: int) -> int',self.hover(client,main,text,'leaf(n)')['contents']['value'])
+        changed=text.replace('return n+1','return state+n')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='outside the function')
+        error=next(e for e in errors if 'outside the function' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'state+n',0))
+        self.assertNotIn('__thor_',json.dumps(errors))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertIn('proc(n: int) -> int',self.hover(client,main,text,'leaf(n)')['contents']['value'])
+        self.assertEqual(main.read_text(),text)
+
     def test_native_run_standard_math_diagnostic_clears_with_unsaved_fix(self):
         text='package main\nimport "core:math" / round\n/* 😀 */ COUNT :: int(#run round("bad"))\nmain::proc(){data:[COUNT]int;_=data}\n'
         client,main=self.open(text)

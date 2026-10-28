@@ -3,29 +3,58 @@ package thor_pure
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:mem"
-import "core:reflect"
 
-Scratch :: struct { tracker: mem.Tracking_Allocator }
-scratch_init :: proc(s:^Scratch) {
-    mem.tracking_allocator_init(&s.tracker,context.allocator,context.allocator)
+// Compiler scratch must not import core:mem/core:reflect: checked SDK bodies
+// can belong to those packages or their dependencies. Keep tracking local to
+// one pure call and allocate the bookkeeping through the saved backing allocator.
+Scratch :: struct {
+    backing: runtime.Allocator,
+    allocations: map[rawptr]Scratch_Entry,
 }
-scratch_allocator :: proc(s:^Scratch)->mem.Allocator {return {procedure=scratch_allocate,data=s}}
-scratch_allocate :: proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,
-                         old_memory:rawptr,old_size:int,loc:=#caller_location)->([]byte,mem.Allocator_Error) {
-    scratch:=cast(^Scratch)data
-    result,err:=mem.tracking_allocator_proc(&scratch.tracker,mode,size,alignment,old_memory,old_size,loc)
+Scratch_Entry :: struct {size,alignment:int}
+scratch_init :: proc(s:^Scratch) {
+    s.backing=context.allocator
+    s.allocations.allocator=s.backing
+}
+scratch_allocator :: proc(s:^Scratch)->runtime.Allocator {return {procedure=scratch_allocate,data=s}}
+scratch_allocate :: proc(data:rawptr,mode:runtime.Allocator_Mode,size,alignment:int,
+                         old_memory:rawptr,old_size:int,loc:=#caller_location)->([]byte,runtime.Allocator_Error) {
+    s:=cast(^Scratch)data
+    #partial switch mode {
+    case .Query_Features:
+        if old_memory!=nil {(cast(^runtime.Allocator_Mode_Set)old_memory)^={.Alloc,.Alloc_Non_Zeroed,.Free,.Free_All,.Resize,.Resize_Non_Zeroed,.Query_Features,.Query_Info}}
+        return nil,.None
+    case .Query_Info:
+        query:=cast(^runtime.Allocator_Query_Info)old_memory
+        if query!=nil {
+            if entry,ok:=s.allocations[query.pointer];ok {query.size=entry.size;query.alignment=entry.alignment}
+            query.pointer=nil
+        }
+        return nil,.None
+    case .Free_All:
+        for pointer in s.allocations {runtime.mem_free(pointer,s.backing)}
+        clear(&s.allocations)
+        return nil,.None
+    }
+    if old_memory!=nil && (mode==.Free||mode==.Resize||mode==.Resize_Non_Zeroed) && old_memory not_in s.allocations {
+        panic("Pure scratch received an invalid or already freed pointer",loc)
+    }
+    if s.backing.procedure==nil {panic("Pure scratch allocation failed",loc)}
+    result,err:=s.backing.procedure(s.backing.data,mode,size,alignment,old_memory,old_size,loc)
     #partial switch mode {
     case .Alloc,.Alloc_Non_Zeroed,.Resize,.Resize_Non_Zeroed:
-        if err!=.None||(size>0&&raw_data(result)==nil) {panic("Pure scratch allocation failed")}
+        if err!=.None||(size>0&&raw_data(result)==nil) {panic("Pure scratch allocation failed",loc)}
+        if (mode==.Resize||mode==.Resize_Non_Zeroed) && old_memory!=raw_data(result) {delete_key(&s.allocations,old_memory)}
+        if raw_data(result)!=nil {s.allocations[raw_data(result)]={size,alignment}}
+    case .Free:
+        if err==.None {delete_key(&s.allocations,old_memory)}
     }
     return result,err
 }
 scratch_destroy :: proc(s:^Scratch) {
-    // The metadata map uses the saved backing allocator and must outlive these
-    // frees. Free directly through backing so iteration does not alter the map.
-    for pointer in s.tracker.allocation_map {free(pointer,s.tracker.backing)}
-    mem.tracking_allocator_destroy(&s.tracker)
+    for pointer in s.allocations {runtime.mem_free(pointer,s.backing)}
+    delete(s.allocations)
+    s^={}
 }
 
 validate :: proc "contextless"($T:typeid,$Result:bool,$Depth:int) {
@@ -85,35 +114,35 @@ allocate_slice :: proc($T:typeid/[]$E,count:int,nonnull:bool=true)->T {
         assert(count==0||size_of(E)==0,"Null slice storage requires zero-sized elements")
         return T((cast([^]E)nil)[:count])
     }
-    storage,err:=mem.alloc_bytes(max(1,count*size_of(E)),align_of(E))
+    storage,err:=runtime.mem_alloc_bytes(max(1,count*size_of(E)),align_of(E))
     if err!=.None||raw_data(storage)==nil {panic("Pure result allocation failed")}
     return T((cast([^]E)raw_data(storage))[:count])
 }
 
 // dst carries a pointer so its type and address remain explicit in this
 // trusted runtime. User fn code cannot call or expose these pointer operations.
-clone_fields :: proc(dst:any,src:any,allocator:mem.Allocator,depth:int) {
+clone_fields :: proc(dst:any,src:any,allocator:runtime.Allocator,depth:int) {
     pointer_info:=runtime.type_info_base(type_info_of(dst.id)).variant.(runtime.Type_Info_Pointer)
     clone_at((cast(^rawptr)dst.data)^,src.data,pointer_info.elem,allocator,depth)
 }
 
 offset :: proc "contextless"(pointer:rawptr,amount:int)->rawptr {return rawptr(uintptr(pointer)+uintptr(amount))}
 
-clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,depth:int) {
+clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocator,depth:int) {
     if depth>24 {panic("Pure result nesting limit exceeded")}
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
     case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,
          runtime.Type_Info_Complex,runtime.Type_Info_Quaternion,runtime.Type_Info_Enum,runtime.Type_Info_Bit_Set:
-        mem.copy_non_overlapping(dst,src,info.size)
+        runtime.mem_copy_non_overlapping(dst,src,info.size)
     case runtime.Type_Info_String:
         if item.is_cstring||item.encoding!=.UTF_8 {panic("Unsupported pure string result")}
         value:=(cast(^string)src)^
         result:string
         if len(value)>0 {
-            data,err:=mem.alloc_bytes(len(value),1,allocator)
+            data,err:=runtime.mem_alloc_bytes(len(value),1,allocator)
             if err!=.None||len(data)<len(value)||raw_data(data)==nil {panic("Pure result allocation failed")}
-            mem.copy_non_overlapping(raw_data(data),raw_data(value),len(value))
+            runtime.mem_copy_non_overlapping(raw_data(data),raw_data(value),len(value))
             result=string(data)
         }
         (cast(^string)dst)^=result
@@ -123,7 +152,7 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,
         if value.data==nil&&value.len!=0&&item.elem_size!=0 {panic("Invalid pure slice result")}
         if value.data!=nil {
             if value.len<0||value.len>max(int)/max(1,item.elem_size) {panic("Pure result allocation size overflow")}
-            data,err:=mem.alloc_bytes(max(1,value.len*item.elem_size),item.elem.align,allocator)
+            data,err:=runtime.mem_alloc_bytes(max(1,value.len*item.elem_size),item.elem.align,allocator)
             if err!=.None||raw_data(data)==nil {panic("Pure result allocation failed")}
             result={raw_data(data),value.len}
             for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
@@ -137,9 +166,9 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
         for i in 0..<int(item.field_count) {clone_at(offset(dst,int(item.offsets[i])),offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)}
     case runtime.Type_Info_Union:
-        mem.copy_non_overlapping(dst,src,info.size)
-        value:=reflect.get_union_variant(any{src,info.id})
-        if value!=nil {clone_at(dst,value.data,type_info_of(value.id),allocator,depth+1)}
+        runtime.mem_copy_non_overlapping(dst,src,info.size)
+        variant:=union_variant(src,item)
+        if variant!=nil {clone_at(dst,src,variant,allocator,depth+1)}
     case:panic("Unsupported pure result type")
     }
 }
@@ -148,7 +177,7 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,
 // alias its buffers; destroying two aliases is a programmer ownership error.
 destroy :: proc(value:$T,allocator:=context.allocator) {destroy_at(any(value).data,type_info_of(T),allocator,0)}
 
-destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,depth:int) {
+destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocator,depth:int) {
     if depth>24 {panic("Pure result nesting limit exceeded")}
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
@@ -160,7 +189,7 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,de
         value:=(cast(^runtime.Raw_Slice)src)^
         if value.data!=nil {
             for i in 0..<value.len {destroy_at(offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
-            free(value.data,allocator)
+            runtime.mem_free(value.data,allocator)
         }
     case runtime.Type_Info_Array:
         for i in 0..<item.count {destroy_at(offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
@@ -170,8 +199,27 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:mem.Allocator,de
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
         for i in 0..<int(item.field_count) {destroy_at(offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)}
     case runtime.Type_Info_Union:
-        value:=reflect.get_union_variant(any{src,info.id})
-        if value!=nil {destroy_at(value.data,type_info_of(value.id),allocator,depth+1)}
+        variant:=union_variant(src,item)
+        if variant!=nil {destroy_at(src,variant,allocator,depth+1)}
     case:panic("Unsupported pure result type")
     }
+}
+
+// Pure unions cannot contain pointer representations, including pointer-only
+// Maybe unions. Their native integer tag selects the recursively owned payload.
+union_variant :: proc(value:rawptr,info:runtime.Type_Info_Union)->^runtime.Type_Info {
+    if len(info.variants)==0 {return nil}
+    assert(info.tag_type!=nil,"Unsupported pure union representation")
+    pointer:=offset(value,int(info.tag_offset))
+    tag:u64
+    switch info.tag_type.size {
+    case 1:tag=u64((cast(^u8)pointer)^)
+    case 2:tag=u64((cast(^u16)pointer)^)
+    case 4:tag=u64((cast(^u32)pointer)^)
+    case 8:tag=(cast(^u64)pointer)^
+    case:panic("Unsupported pure union tag")
+    }
+    if !info.no_nil {if tag==0{return nil};tag-=1}
+    assert(tag<u64(len(info.variants)),"Invalid pure union tag")
+    return info.variants[int(tag)]
 }

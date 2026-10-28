@@ -54,22 +54,24 @@ class NativeSources:
             p.resolver.add_sources(members)
         return directory
 
-    def verify_access(self, node, resolver, seen=None):
-        from .imports import private
+    def verify_access(self, node, resolver, seen=None, *, context='#run'):
+        from .imports import private,file_private
         seen=set() if seen is None else seen
         if node is None or node in seen:return
         seen.add(node)
         symbol=resolver.symbol(node)
         if not symbol:return
         owner=symbol.node.source
-        if getattr(owner,'native_inspected',False) and node.source.path.parent!=owner.path.parent:
+        if node.source.path.parent!=owner.path.parent:
             hidden=owner.info.get('private') or private(symbol.declaration) or any(
                 a.kind=='ForeignBlock' and private(a) for a in symbol.declaration.ancestors())
-            if hidden:node.source.error(f"'{symbol.name}' is private to its package and cannot be used by #run.",node.start,node.end)
+            if hidden:node.source.error(f"'{symbol.name}' is private to its package and cannot be used by {context}.",node.start,node.end)
+        if node.source.path!=owner.path and file_private(symbol.declaration):
+            node.source.error(f"'{symbol.name}' is private to its file and cannot be used by {context}.",node.start,node.end)
         if symbol.value and symbol.value.kind in {'Ident','Selector','ProcedureGroup','Paren'}:
             if symbol.value.kind in {'ProcedureGroup','Paren'}:
-                for child in symbol.value.children:self.verify_access(child,resolver,seen)
-            else:self.verify_access(symbol.value,resolver,seen)
+                for child in symbol.value.children:self.verify_access(child,resolver,seen,context=context)
+            else:self.verify_access(symbol.value,resolver,seen,context=context)
 
     def attach(self, helper, retained):
         originals = {node.source for node in retained if getattr(node.source, 'native_inspected', False)}

@@ -795,6 +795,10 @@ class Evaluator:
                 caller.run_values[node_copy(callee)]=code
                 continue
             target_source=by_original[target_symbol.node.source]
+            signature=next((signature for symbol,signature in self.r.procedure_candidates(callee) if symbol is target_symbol),None)
+            target=signature.parent if signature else target_symbol.value
+            if target and target in procedures:
+                helper.purity.calls.targets[node_copy(callee.parent)]=[node_copy(target)]
             name=target_symbol.name
             if caller.path.parent!=target_source.path.parent:
                 bridge=target_source.prefix+'run_target_'+str(target_symbol.node.start)

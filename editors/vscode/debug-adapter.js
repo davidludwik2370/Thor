@@ -37,7 +37,7 @@ function byteOffset(unit, line, column = 1, native = false) {
     return start + Buffer.byteLength(prefix);
 }
 const generatedKinds = new Set(['expression-helper', 'support', 'import', 'pure-contract',
-    'pure-type-validator', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture']);
+    'pure-type-validator', 'pure-procedure', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture']);
 
 function typeQueryRanges(bytes) {
     // Generated type witnesses repeat source expressions without executing
@@ -131,6 +131,7 @@ class DebugMaps {
         }
         const helper = (unit.map.regions || []).some(([a, b, kind]) => kind === 'expression-helper' && a <= offset && offset < b);
         const capture = (unit.map.regions || []).find(([a,b,kind]) => kind === 'debug-capture' && a <= offset && offset < b);
+        const procedure = (unit.map.regions || []).find(([a,b,kind]) => kind === 'pure-procedure' && a <= offset && offset < b);
         if (capture) segment = [capture[0],capture[1],capture[3],capture[4],capture[5],'debug-capture',false];
         if (helper && !segment[6] && ['SwitchExpr', 'CompileSwitchExpr', 'expression-helper'].includes(segment[5])) {
             // A generated `return` belongs to the whole switch, but the code
@@ -153,7 +154,7 @@ class DebugMaps {
         return {source: {name: path.basename(original), path: original}, ...p,
             internal: generatedKinds.has(kind) || !sourceLine || /^[{};]+$/.test(sourceLine) || sourceLine.startsWith('//')
                 || /^[{};]+$/.test(generatedLine) || kind==='Block' && /__thor_[a-f0-9]{12}_/.test(generatedLine),
-            helper, kind};
+            helper, kind, procedure: procedure?.[6], checkedVariant: procedure?.[7]};
     }
     candidates(file, line, column) {
         const original = this.originals.get(canonical(file));
@@ -443,14 +444,21 @@ class ThorDebugAdapter {
     }
     mapFrames(raw) {
         const result = [];
+        const checked = (frame, point) => point?.checkedVariant &&
+            frame.name.split('(')[0].replace(/:proc$/, '').trim().endsWith(point.checkedVariant);
+        const generatedFrame = frame => {
+            const point = frame.source?.path && this.maps?.location(frame.source.path, frame.line, frame.column);
+            return /__thor_[a-f0-9]+_/.test(frame.name) && !checked(frame, point);
+        };
         for (let i = 0; i < raw.length; i++) {
             const frame = raw[i];
-            const generated = /__thor_[a-f0-9]+_/.test(frame.name);
             const point = frame.source?.path && this.maps?.location(frame.source.path, frame.line, frame.column);
+            const generated = /__thor_[a-f0-9]+_/.test(frame.name) && !checked(frame, point);
             if (generated && i > 0) continue;
-            const base = generated ? raw.slice(i + 1).find(f => !/__thor_[a-f0-9]+_/.test(f.name)) : frame;
+            const base = generated ? raw.slice(i + 1).find(f => !generatedFrame(f)) : frame;
+            const basePoint = base?.source?.path && this.maps?.location(base.source.path, base.line, base.column);
             const mapped = {...frame, ...(point ? {source: this.presentSource(point.source), line: point.line, column: point.column} : {}),
-                name: generated && base ? base.name : frame.name};
+                name: checked(frame, point) ? point.procedure : generated && base ? (basePoint?.procedure || base.name) : frame.name};
             this.frames.set(frame.id, {raw: frame, base, point, generated});
             if (generated && base) {
                 // Keep the current frame's id/locals while presenting one user

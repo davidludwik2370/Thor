@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.16.0"
+VERSION = "0.17.0"
 
 
 def frontend_binary(odin):
@@ -102,6 +102,11 @@ class Project:
         paths = [entry] if entry.is_file() or entry in self.overlays else sorted(
             {p for p in entry.iterdir() if p.is_file() and p.suffix in {".thor", ".odin"}} |
             {p for p in self.overlays if p.parent == entry and p.suffix in {".thor", ".odin"}})
+        # Compiler support has its own native test command. Importing its test
+        # files into a program can add core-library dependencies to bootstrap
+        # support used by checked versions of those same libraries.
+        if entry.parent==ROOT/'runtime' and entry.name in {'pure','eval','format','numeric','sequence','sets'} and entry!=self.entry:
+            paths=[path for path in paths if not path.name.endswith('_test.odin')]
         for path in paths:
             if path in self.sources:
                 continue
@@ -133,6 +138,7 @@ class Project:
                 self.discover(dependency)
 
     def emit(self, destination):
+        self.purity.calls.prepare()
         destination = Path(destination).resolve()
         if any(destination == path.parent or destination in path.parents for path in self.sources):
             raise ThorError("output directory must not contain or replace source files")
@@ -150,7 +156,9 @@ class Project:
         self.maps = {}
         self.generated = {}
         for path, source in self.sources.items():
-            relative = path.relative_to(self.common).with_suffix(".odin")
+            relative = (Path(self.pure_sdk_subdir)/path.relative_to(self.pure_sdk_root)
+                        if getattr(source,'native_inspected',False) and getattr(self,'pure_sdk_collections',None)
+                        else path.relative_to(self.common)).with_suffix(".odin")
             if relative.as_posix() in generated:
                 raise ThorError(f"generated filename collision: {relative}")
             generated[relative.as_posix()] = source.transpile()
@@ -162,6 +170,8 @@ class Project:
             map_data['generated_sha256']=hashlib.sha256(generated[relative.as_posix()].encode()).hexdigest()
             generated[relative.as_posix() + ".map.json"] = json.dumps(
                 map_data, ensure_ascii=False, separators=(",", ":")) + "\n"
+        from .sdkmirror import extend
+        extend(self,destination,generated)
         # Do all parsing/lowering before updating any generated source.
         destination.mkdir(parents=True, exist_ok=True)
         if not manifest_path.exists():
@@ -173,15 +183,26 @@ class Project:
         for relative, code in generated.items():
             output = destination / relative
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(code.encode("utf-8"))
+            if isinstance(code,Path):
+                if output.is_symlink():output.unlink()
+                output.symlink_to(code,target_is_directory=code.is_dir())
+            else:output.write_bytes(code.encode("utf-8") if isinstance(code,str) else code)
         # Delete only files explicitly owned by the previous manifest.
         for relative in set(old_manifest.get("generated", [])) - set(generated):
-            obsolete = (destination / relative).resolve()
+            if Path(relative).is_absolute() or '..' in Path(relative).parts:continue
+            original=destination/relative
+            parent=original.parent.resolve()
+            if parent!=destination and destination not in parent.parents:continue
+            if original.is_symlink():
+                original.unlink()
+                continue
+            obsolete = original.resolve()
             if destination in obsolete.parents and obsolete.is_file():
                 obsolete.unlink()
         self.destination = destination
         manifest = {"thor_version": VERSION, "entry": str(self.entry), "source_map_version": 1,
                     "generated": sorted(generated), "odin_flags": self.odin_flags(),
+                    "odin_environment": {'ODIN_ROOT':str(self.sdk_backend_root)} if self.sdk_backend_root else {},
                     "debug_roots": getattr(self,"debug_roots",[]), "debug_map_version": 1}
         self.manifest = manifest
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
@@ -198,13 +219,13 @@ class Project:
                 result.append(flag)
         for name in self.default_collections:
             result.append(f"-collection:{name}={self.destination / self.collections[name].relative_to(self.common)}")
-        for source in self.sources.values():
+        for source in [*self.sources.values(),*getattr(self,'sdk_sources',{}).values()]:
             for name, directory in source.asset_collections.items():
                 result.append(f"-collection:{name}={directory}")
         return result
 
     def diagnostic_adapter(self):
-        return Diagnostics(self.sources, self.maps, self.generated)
+        return Diagnostics({**self.sources,**getattr(self,'sdk_sources',{})}, self.maps, self.generated)
 
 
 def _main(argv=None):
@@ -322,10 +343,11 @@ def _main(argv=None):
         if options.raw_diagnostics:
             if frontend_diagnostics:
                 report(frontend_diagnostics)
-            result = subprocess.run(command)
+            result = subprocess.run(command,env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
         else:
             command.append("-json-errors")
-            result = subprocess.run(command, stderr=subprocess.PIPE)
+            result = subprocess.run(command, stderr=subprocess.PIPE,
+                env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
             if result.stderr:
                 try:
                     native = json.loads(result.stderr)

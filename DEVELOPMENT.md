@@ -1088,3 +1088,70 @@ The initially empty evaluation cache took 3.509 seconds to warm. The copied
 program prints its table and array length 10, and the original source hash
 remains unchanged. Removing complete reuse intentionally gives unchanged builds
 the same analysis/emission path as edited builds.
+
+## Transitive ordinary calls from fn: compiler 0.17.0
+
+Allow fn bodies to call inspectable Odin/Thor procedures when the relevant
+transitive graph satisfies the same effect, type and ownership rules. This works
+for runtime fn calls, automatic known-argument evaluation and explicit #run.
+Ordinary direct calls retain their original behavior and do not automatically
+evaluate merely because some fn also calls them.
+
+The existing native evaluation closure already checks ordinary bodies. Remove
+the declared-fn-only restriction and retain its resolved native call targets in
+helper metadata, including overload implementations whose original group was
+pruned from the helper. Runtime calls need separate checked versions: merely
+allowing the ordinary call would let borrowed return views bypass provenance
+tracking and scratch cleanup. thorlang/purecalls.py emits checked procedures
+beside their original declarations and rewrites only checked call paths.
+
+Keep native generic/where/default/overload semantics, conditional declarations,
+recursion, variadic forwarding, named arguments, void/multiple runtime results,
+calling conventions and #procedure names. A defaulted hidden argument with an
+inferred type delays native body checks until use, including after variadics;
+its generic when guard preserves inactive branches. Original procedure types,
+ordinary calls and ownership remain intact. Preserve require_results/deprecation
+attributes and native privacy. The frontend exposes private_file file tags, and
+the resolver prefers the current file's private declarations when names repeat.
+Reject inaccessible originals before a generated public name can bypass privacy.
+
+Checked SDK procedures are added to generated copies of their original packages.
+The backend selects a local SDK root for both ordinary and checked calls, keeping
+public/private nominal type identities unified. Untouched SDK collections and
+toolchain directories are referenced through managed links; originals are never
+written. thorlang/sdkmirror.py preserves resources and supplies identity maps for
+untouched copied Odin files. Record ODIN_ROOT in manifest odin_environment for
+manual backend builds. This is generated input, not a whole-project cache.
+
+Decouple compiler scratch/deep-copy support from core:mem and core:reflect to
+avoid cycles when those libraries or their dependencies call compiler support.
+Use the base runtime allocator/type-info APIs, a per-call allocation map backed
+by the saved caller allocator, and direct union-tag inspection. Retain independent
+result promotion, nil/non-nil empty descriptors and allocator failure behavior.
+Keep compiler support's native test files out of imported program dependencies;
+run those tests through their own native package test commands.
+
+Source maps retain original procedure body locations and record checked frame
+names. VS Code extension 0.10.4 presents checked procedures as their original
+frames, with their own locals and breakpoints. TLS needs no new syntax; the live
+compiler check reports an unsaved transitive impurity at the original leaf and
+clears it after correction. Map checked callee names back to their original
+source spelling and hide synthetic arguments in signatures and quoted calls,
+including ordinary return-type errors involving an SDK call.
+
+Add examples/pure_calls/demo.thor and acceptance tests covering runtime/automatic/
+explicit execution, nested allocations/borrowed views, ordinary alias behavior,
+recursion, overloads/generics/defaults, inactive branches, private types/access,
+file-private duplicate names, SDK math/nominal types/test mode, calling conventions,
+procedure names, result requirements, variadics, multiple results, Unicode source
+locations, transitive cache invalidation and actual LSP/debugger behavior.
+
+Validation: the full run passed 696 tests with one existing expected TLS enum
+navigation failure. A final two-test privacy run covers the late file-private
+resolver refinement. All six allocation-tracked native pure-runtime tests and
+all 86 Node tests pass, as does actual VS Code integration. The new demo runs
+successfully. A prior focused 119-test run encountered an intermittent Odin
+compiler array assertion; the exact rerun and subsequent full run both pass.
+The final 94-test review also exercises return-type diagnostic cleanup. Its
+compiler, source-map and TLS cases pass; the debugger case passes separately
+with local loopback access, which the sandbox denies.

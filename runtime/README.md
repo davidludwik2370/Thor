@@ -107,18 +107,31 @@ Every checked function saves its caller allocator in a tracking scratch allocato
 Its ordinary and temporary allocator slots both refer to that scratch allocator.
 Explicit frees remove tracked allocations; every remaining allocation is freed
 on return. Nested calls have separate trackers backed by the outer scratch
-allocator. No allocated result may escape this initial implementation: strings,
-slices and nested allocation-bearing results are rejected. Ordinary `proc`
-interpolation remains allocated with the current allocator and caller-managed.
+allocator. Tracking and type inspection use `base:runtime` and `base:intrinsics`,
+so checked standard-library procedures do not introduce import cycles through
+`core:mem` or `core:reflect`. The tracker belongs to one pure call; pure code
+cannot expose it or share its allocator with another thread.
+
+Contextful results containing strings/slices are copied into saved caller storage
+after user defers and before scratch/local storage expires. Each returned
+occurrence has independent backing storage. Delete a visible string/slice result
+once, or use `pure.destroy(result)` for nested owned aggregates. Constant strings
+and fixed aggregates remain borrowed native constants; slice-containing results
+need runtime storage. Contextless procedures retain the existing restriction on
+string/slice results.
+
+A declared `fn` can call ordinary procedures transitively when their bodies obey
+the same rules. Such calls use checked versions with this scratch/return policy.
+Direct ordinary calls retain their original shallow ownership and allocation
+behavior; ordinary `proc` interpolation remains caller-managed.
 
 The native helper serializes a versioned JSON value tree before its storage
 expires. Integers use decimal strings; floats carry raw bytes and endianness;
 strings carry byte hex; aggregates carry individual fields/elements and union
 variants. Nil and nonnil empty slice descriptors are distinct in the protocol.
 Padding and addresses are excluded. Reconstruction validates the packet and emits
-typed native constants. The current result policy intentionally exposes only
-scalar and pointer-free fixed aggregate results. See the root README for native
-execution limits and conservative schema boundaries.
+typed native constants or fresh runtime materializers for owned results. See the
+root README for native execution limits and conservative schema boundaries.
 
 ## Numeric power
 
