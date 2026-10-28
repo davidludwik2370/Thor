@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.17.0"
+VERSION = "0.17.1"
 
 
 def frontend_binary(odin):
@@ -161,7 +161,8 @@ class Project:
                         else path.relative_to(self.common)).with_suffix(".odin")
             if relative.as_posix() in generated:
                 raise ThorError(f"generated filename collision: {relative}")
-            generated[relative.as_posix()] = source.transpile()
+            generated[relative.as_posix()] = source.transpile(preserve_native=bool(
+                getattr(source,'native_inspected',False) and not self.purity.eval_mode))
             self.outputs[path] = destination / relative
             self.maps[str(destination / relative)] = source.source_map
             self.generated[str(destination / relative)] = generated[relative.as_posix()].encode()
@@ -183,8 +184,8 @@ class Project:
         for relative, code in generated.items():
             output = destination / relative
             output.parent.mkdir(parents=True, exist_ok=True)
+            if output.is_symlink():output.unlink()
             if isinstance(code,Path):
-                if output.is_symlink():output.unlink()
                 output.symlink_to(code,target_is_directory=code.is_dir())
             else:output.write_bytes(code.encode("utf-8") if isinstance(code,str) else code)
         # Delete only files explicitly owned by the previous manifest.
@@ -225,7 +226,8 @@ class Project:
         return result
 
     def diagnostic_adapter(self):
-        return Diagnostics({**self.sources,**getattr(self,'sdk_sources',{})}, self.maps, self.generated)
+        aliases={str(self.sdk_backend_root)+os.sep:str(self.pure_sdk_root)+os.sep} if self.sdk_backend_root else {}
+        return Diagnostics({**self.sources,**getattr(self,'sdk_sources',{})}, self.maps, self.generated,path_aliases=aliases)
 
 
 def _main(argv=None):

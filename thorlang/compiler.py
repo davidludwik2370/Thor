@@ -885,11 +885,18 @@ class Source:
             literal = f"cast({target_type})({literal})"
         return f"({literal})"
 
-    def transpile(self):
+    def transpile(self, *, preserve_native=False):
         if self.excluded:
             code, self.source_map = self.mapping.finish(self.copy(0, len(self.raw)))
             return code
-        code = self.render(self.root)
+        if preserve_native:
+            # Installed Odin already has valid native syntax. Only checked
+            # variants need lowering; leave the rest of this file verbatim.
+            inserts=[(declaration.end,self.purity.calls.helpers(declaration))
+                     for declaration in self.purity.calls.declarations if declaration.source is self]
+            code=self.splice(self.root,[],inserts)
+        else:
+            code = self.render(self.root)
         code += self.expressions.declarations(self.root)
         arrays = [n for n in self.nodes if self.is_array(n)]
         array_span = (arrays[0].start, arrays[0].end) if arrays else (0, 0)

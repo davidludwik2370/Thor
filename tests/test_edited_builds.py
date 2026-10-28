@@ -79,6 +79,29 @@ main::proc(){}
         _,errors=self.compile(status=1)
         self.assertIn('ambient context',errors)
 
+    def test_fn_sdk_results_skip_helper_projects_after_runtime_edits(self):
+        source='''package main
+import "core:math"
+leaf::proc(x:f64)->int{return int(math.floor(x))}
+work::fn(x:f64)->int{return leaf(x)}
+VALUE::work(23.5)
+#assert(VALUE==23)
+main::proc(){}
+'''
+        self.write(source);self.compile(command='build')
+        self.source.write_text(source.replace('main::proc(){}','main::proc(){s:=1;_=s}'))
+        original=driver.Project.__init__
+        def without_helpers(project,*args,**kwargs):
+            self.assertFalse(kwargs.get('overlays'),'runtime edit reconstructed a cached fn helper')
+            return original(project,*args,**kwargs)
+        with patch.object(driver.Project,'__init__',without_helpers):
+            report,_=self.compile(command='build')
+        self.assertGreater(report['thor_prepared_hits'],0,report)
+        self.assertEqual(report['thor_cache']['misses'],0,report)
+        self.source.write_text(source.replace('int(math.floor(x))','int(math.floor(x))+1'))
+        _,errors=self.compile(status=1)
+        self.assertIn('VALUE==23',errors)
+
     def test_constant_type_and_overload_changes_invalidate(self):
         source='''package main
 Item::int

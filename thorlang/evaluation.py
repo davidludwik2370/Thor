@@ -97,8 +97,8 @@ class Evaluator:
         library=self.purity.library(n)
         if library and n.source.import_dir(library[0]) is None and not (
             library[0] in {'core:math','base:builtin'} and library[1] in {'min','max'}):return False
-        if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
         if n.source.expressions.extrema.plan(n):
+            if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
             declaration = n.parent
             # The evaluator materializes one value, matching ignored optional
             # status. Multiple constant results retain Odin's native rules.
@@ -107,10 +107,17 @@ class Evaluator:
         if library and n.source.import_dir(library[0]) is None:return False
         if '-debug' in self.p.flags and not self.constant_context(n):return False
         symbol=self.r.symbol(n.role('callee'))
-        alternatives=symbol.candidates if symbol else []
+        if symbol is None:return False
+        alternatives=symbol.candidates
         if len(alternatives)>1 and any(any(a.kind in {'When','CompileSwitch'} for a in s.declaration.ancestors()) for s in alternatives):
             selected=[s.value for s in alternatives if s.value and s.value.kind=='Procedure' and self.active(s.value) is True]
-            return len(selected)==1 and self.purity.pure(selected[0]) and len(self.r.fields(selected[0].role('type').role('results')))==1
+            eligible=len(selected)==1 and self.purity.pure(selected[0]) and len(self.r.fields(selected[0].role('type').role('results')))==1
+            return eligible and not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
+        # Ordinary calls cannot trigger automatic evaluation. Do not resolve
+        # their argument types or inspect surrounding SDK calls just because
+        # an unrelated fn exists elsewhere in the project.
+        if not any(self.purity.pure(signature.parent) for _,signature in self.r.procedure_candidates(n.role('callee'))):return False
+        if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
         targets=self.purity.targets(n)
         if len(targets)!=1 or not self.purity.pure(targets[0]):return False
         return len(self.r.fields(targets[0].role('type').role('results')))==1

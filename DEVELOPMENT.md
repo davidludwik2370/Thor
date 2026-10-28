@@ -1155,3 +1155,52 @@ compiler array assertion; the exact rerun and subsequent full run both pass.
 The final 94-test review also exercises return-type diagnostic cleanup. Its
 compiler, source-map and TLS cases pass; the debugger case passes separately
 with local loopback access, which the sandbox denies.
+
+## SDK overlay performance: compiler 0.17.1
+
+Profile the current playground including its fn wrapper around math.floor and
+both automatic and explicit compile-time calls. Compiler 0.17.0 repeatedly emits
+2,710 managed entries (64,488,211 bytes) after evaluation results are already
+cached. It renders whole inspected SDK packages and reads/parses unrelated SDK
+files just to preserve their resources and identity maps. Warm builds reproduce
+4.317-4.467 seconds (median 4.360).
+
+Replace that snapshot with a sparse SDK overlay. Generate only source files
+containing checked versions, preserve ordinary native text verbatim, and insert
+the checked declarations at their original lexical scopes. Keep one ODIN_ROOT
+for ordinary/checked nominal identities. Link untouched source files, packages,
+assets and toolchain directories directly to their installed inputs. Relative
+resources retain their layout without parsing unrelated files. Emit source maps
+for generated files and SDK editor replacements; translate diagnostic references
+through linked paths back to installed SDK paths.
+
+The overlay layout name fingerprints its generated/replaced file paths. A new
+layout therefore cannot write through an older directory link. Unlink output
+symlinks before replacing files, and clean only manifest-owned entries. Cover
+layout changes and overlay removal while checking installed source bytes remain
+unchanged. Unsaved native files and relative resources supplied by an editor
+remain part of the selected overlay, including newly added SDK files.
+
+Avoid argument/type-query analysis for ordinary automatic-evaluation candidates
+before verifying that a fn target exists. Preserve native conditional fn selection,
+aliases, overloads, extrema and genuine type-query behavior. Keep fresh project
+analysis/emission and the existing compile-time result and parser caches; no
+whole-project cache or persistent generated-SDK cache is introduced.
+
+Measurements use a temporary copy of the current playground, with five alternating
+runtime edits, unchanged builds and direct native Odin builds. Runtime edits take
+1.005-1.040 seconds (median 1.023); unchanged builds take 1.007-1.038 seconds
+(median 1.020); native Odin takes 0.216-0.227 seconds (median 0.221). Each warm
+Thor build reports two early result hits and zero evaluation misses. An initially
+empty result cache takes 4.684 seconds to compile/evaluate the three helpers.
+Generated output falls to 75 entries, including 59 links, with 1,858,085 written
+bytes. The program prints its table, array length 3 and compiled floor value 23;
+the original playground source hash remains unchanged. Direct warm builds in the
+original playground additionally measure 0.942-0.946 seconds.
+
+Validation: 66 pure-function/ownership/protocol cases, 38 compilation/result-cache
+cases, 132 generic/native-evaluation/diagnostic/parser-cache cases, two live TLS
+checks and two real CodeLLDB breakpoint/stepping checks pass. New regressions
+cover sparse native emission, stable type identity, layout cleanup, unchanged SDK
+inputs, unsaved SDK files/resources, linked overload-note paths, and result reuse
+after runtime edits with transitive dependency invalidation.

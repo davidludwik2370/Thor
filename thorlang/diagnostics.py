@@ -9,7 +9,7 @@ from .sourcemap import Origin, position
 
 
 class Diagnostics:
-    def __init__(self, sources=None, maps=None, generated=None, overlays=None):
+    def __init__(self, sources=None, maps=None, generated=None, overlays=None, *, path_aliases=None):
         self.sources = {str(p): s for p, s in (sources or {}).items()}
         self.raw = {str(p): s.raw for p, s in (sources or {}).items()}
         self.prefixes = [s.prefix for s in (sources or {}).values()]
@@ -22,6 +22,7 @@ class Diagnostics:
         self.raw.update({str(p): b for p, b in (overlays or {}).items()})
         self.maps = maps or {}
         self.generated = generated or {}
+        self.path_aliases=path_aliases or {}
         self.reference_patterns = [(file, re.compile(re.escape(file) + r"(?:\((\d+):(\d+)\)|:(\d+):(\d+):)"))
                                    for file in self.maps]
 
@@ -211,6 +212,8 @@ class Diagnostics:
             # Rewrite locations embedded in overloads, declarations and generic notes.
             for generated_file, pattern in self.reference_patterns:
                 msgs = [pattern.sub(lambda m: self.reference(generated_file, *reference_coordinates(m)), text) for text in msgs]
+            for generated_prefix,original_prefix in self.path_aliases.items():
+                msgs=[text.replace(generated_prefix,original_prefix) for text in msgs]
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             diagnostic["_cascade"] = bool(origin and not origin.exact and (

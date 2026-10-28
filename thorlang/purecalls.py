@@ -91,16 +91,19 @@ class PureCalls:
             while any(self.marker.encode() in source.raw for source in r.sources):self.marker+='_'
             native=getattr(p,'native_sources',None)
             if native:
-                packages={proc.source.path.parent for proc in self.names if getattr(proc.source,'native_inspected',False)}
-                for directory in packages:
-                    for source in native.packages[directory]:
-                        p.sources[source.path]=source
-                        p.packages.setdefault(directory,[])
-                        if source not in p.packages[directory]:p.packages[directory].append(source)
-                if packages:
+                units={proc.source for proc in self.names if getattr(proc.source,'native_inspected',False)}
+                for source in sorted(units,key=lambda source:str(source.path)):
+                    p.sources[source.path]=source
+                    p.packages.setdefault(source.path.parent,list(native.packages[source.path.parent]))
+                if units:
                     p.pure_sdk_root=Path(native.root).resolve()
-                    p.pure_sdk_collections={directory.relative_to(p.pure_sdk_root).parts[0] for directory in packages}
-                    p.pure_sdk_subdir='.thor-sdk-'+'-'.join(sorted(p.pure_sdk_collections))
+                    paths={source.path for source in units}|{path for path in p.overlays if p.pure_sdk_root in path.parents}
+                    files=sorted(path.relative_to(p.pure_sdk_root).as_posix() for path in paths)
+                    p.pure_sdk_collections={Path(file).parts[0] for file in files}
+                    # Distinct layouts keep an old linked directory from ever
+                    # becoming the parent of a newly generated source file.
+                    layout=hashlib.sha256(json.dumps(files).encode()).hexdigest()[:12]
+                    p.pure_sdk_subdir='.thor-sdk-linked-'+layout
         finally:r.native_enabled=enabled
 
     def access(self,caller,proc):

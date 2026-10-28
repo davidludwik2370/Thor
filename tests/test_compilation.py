@@ -281,6 +281,88 @@ main::proc(){}
         self.assertEqual(program['sha256'],hashlib.sha256(Path(program['path']).read_bytes()).hexdigest())
         self.assertTrue(all(Path(str(path)+'.map.json').is_file() for path in self.output.rglob('*.odin')))
 
+    def test_sdk_overlay_generates_only_augmented_files_and_preserves_linked_inputs(self):
+        self.write('''package main
+import "core:math"
+work::fn(x:f64)->int{return int(math.floor(x))}
+VALUE::work(23.5)
+main::proc(){x:=4.5;assert(work(x)==4&&VALUE==23&&math.floor(x)==4)}
+''')
+        self.checked(command='build')
+        manifest=json.loads((self.output/'thor-manifest.json').read_text())
+        sdk=Path(manifest['odin_environment']['ODIN_ROOT'])
+        generated=[p for p in sdk.rglob('*.odin') if not p.is_symlink()]
+        self.assertTrue(generated)
+        originals=set()
+        for path in generated:
+            mapping=json.loads(Path(str(path)+'.map.json').read_text())
+            originals.update(Path(name) for name in mapping['sources'])
+        native=Path(subprocess.check_output([shutil.which('odin'),'root'],text=True).strip()).resolve()
+        self.assertTrue((sdk/'core/fmt').is_symlink())
+        for original in originals:
+            for sibling in original.parent.iterdir():
+                if sibling in originals:continue
+                linked=sdk/sibling.relative_to(native)
+                self.assertTrue(linked.is_symlink(),linked)
+                self.assertEqual(linked.resolve(),sibling.resolve())
+        self.assertFalse(any('.thor-sdk-maps' in name for name in manifest['generated']))
+        run=subprocess.run([str(self.root/self.root.name)],capture_output=True,text=True)
+        self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_sdk_overlay_layout_changes_do_not_write_or_delete_installed_inputs(self):
+        source='''package main
+import "core:math"
+work::fn(x:f64)->f64{return math.floor(x)}
+main::proc(){x:=4.5;_=work(x)}
+'''
+        self.write(source);self.checked()
+        manifest=json.loads((self.output/'thor-manifest.json').read_text())
+        old_sdk=Path(manifest['odin_environment']['ODIN_ROOT'])
+        native=(old_sdk/'base').resolve().parent
+        originals={p:p.read_bytes() for p in (native/'core/math').glob('*.odin')}
+        old_links=[self.output/name for name in manifest['generated'] if (self.output/name).is_symlink()]
+        self.source.write_text(source.replace('math.floor(x)','math.sqrt(x)'))
+        self.checked()
+        self.source.write_text('package main\nmain::proc(){}\n')
+        self.checked()
+        self.assertTrue(all(not p.is_symlink() for p in old_links))
+        self.assertTrue(all(p.read_bytes()==raw for p,raw in originals.items()))
+        self.assertEqual(json.loads((self.output/'thor-manifest.json').read_text())['odin_environment'],{})
+
+    def test_sdk_overlay_preserves_unsaved_native_files_and_relative_resources(self):
+        self.write('''package main
+import "core:math"
+import sample "core:thor_overlay_fixture"
+work::fn(x:f64)->int{return int(math.floor(x))}
+main::proc(){x:=4.5;assert(work(x)==4&&sample.TEXT=="overlay")}
+''')
+        native=Path(subprocess.check_output([shutil.which('odin'),'root'],text=True).strip()).resolve()
+        package=native/'core/thor_overlay_fixture'
+        self.assertFalse(package.exists())
+        replacements={}
+        for name,raw in [('main.odin',b'package sample\nTEXT::#load("data.txt",string)\n'),('data.txt',b'overlay')]:
+            replacement=self.root/('replacement-'+name)
+            replacement.write_bytes(raw)
+            replacements[str(package/name)]=str(replacement)
+        overlay=self.root/'overlay.json'
+        overlay.write_text(json.dumps({'Replace':replacements}))
+        self.checked(command='build',flags=['--overlay',str(overlay)])
+        run=subprocess.run([str(self.root/self.root.name)],capture_output=True,text=True)
+        self.assertEqual(run.returncode,0,run.stderr)
+        self.assertFalse(package.exists())
+
+    def test_linked_sdk_overload_notes_keep_original_library_paths(self):
+        self.write('''package main
+import "core:math"
+work::fn(x:f64)->int{return int(math.floor(x))}
+main::proc(){_=math.cos("bad")}
+''')
+        errors=self.checked(status=1,flags=['--diagnostic-format','json'])
+        self.assertIn('No procedures or ambiguous call',errors)
+        self.assertIn('math_basic.odin',errors)
+        self.assertNotIn('.thor-sdk-',errors)
+        self.assertNotIn('__thor_',errors)
+
 
 class InputSnapshotTests(unittest.TestCase):
     def test_sdk_and_support_edits_additions_deletions_and_preserved_times(self):

@@ -898,12 +898,15 @@ implementations kept behind public evaluation bridges. Native source failures
 highlight the original `#run` and include their library source location. Public
 names and overload notes retain their original spelling.
 
-For runtime checked calls into installed Odin libraries, Thor writes an augmented
-SDK snapshot under generated output and selects it for the backend compilation.
+For runtime checked calls into installed Odin libraries, Thor writes a sparse
+SDK overlay under generated output and selects it for the backend compilation.
+Only files containing checked procedures are augmented; untouched packages,
+source files and resources link directly to the installed SDK. Unsaved SDK
+replacements supplied by an editor are emitted into the overlay as well.
 Ordinary and checked library calls therefore share the same nominal types;
 the installed SDK is unchanged. The manifest's `odin_environment` records the
 required `ODIN_ROOT`; use it alongside `odin_flags` when compiling generated Odin
-manually. Ordinary project-only call graphs do not need this SDK snapshot.
+manually. Ordinary project-only call graphs do not need this SDK overlay.
 
 Run the [commented native-call walkthrough](examples/native_run/demo.thor) with
 `./thor run examples/native_run`.
