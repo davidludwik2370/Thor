@@ -5,13 +5,58 @@ import parser "thor:parser"
 import "core:odin/tokenizer"
 import "core:os"
 import "core:testing"
+import "core:mem/virtual"
+import "core:sync"
+import "core:thread"
 import "src:server"
+import "src:common"
 import test "src:testing"
 
 thor_source :: proc(source: string) -> test.Source {
     files := make([]test.File, 1, context.temp_allocator)
     files[0] = {"main.thor", source}
     return {files=files}
+}
+
+@(test)
+thor_parallel_parser_diagnostics_keep_their_document :: proc(t:^testing.T) {
+    Job :: struct {
+        barrier: ^sync.Barrier,
+        path, text: string,
+        failed: bool,
+    }
+    worker :: proc(job:^Job) {
+        builtin := server.get_builtin_path()
+        defer delete(builtin)
+        server.setup_index(builtin)
+        defer server.free_index()
+        arena: virtual.Arena
+        _ = virtual.arena_init_growing(&arena)
+        defer virtual.arena_destroy(&arena)
+        document := server.Document{
+            fullpath=job.path, text=transmute([]u8)job.text,
+            used_text=len(job.text), allocator=&arena, package_name="test",
+        }
+        config: common.Config
+        for _ in 0..<32 {
+            sync.barrier_wait(job.barrier)
+            errors, ok := server.parse_document(&document, &config)
+            if !ok || len(errors)==0 { job.failed=true }
+            for error in errors {
+                if error.file!=job.path { job.failed=true }
+            }
+            sync.barrier_wait(job.barrier)
+        }
+    }
+    text := "package test\nbroken::proc(){value:=}\n"
+    barrier: sync.Barrier
+    sync.barrier_init(&barrier,2)
+    jobs := [2]Job{{&barrier,"test/parser_one.odin",text,false},{&barrier,"test/parser_two.odin",text,false}}
+    first := thread.create_and_start_with_poly_data(&jobs[0],worker)
+    second := thread.create_and_start_with_poly_data(&jobs[1],worker)
+    thread.join(first); thread.join(second)
+    thread.destroy(first); thread.destroy(second)
+    testing.expect(t,!jobs[0].failed && !jobs[1].failed,"parallel parser diagnostics crossed source documents")
 }
 
 @(test)
@@ -159,6 +204,76 @@ thor_hover_runtime_switch_expression :: proc(t:^testing.T){
 main::proc(){choice:=switch 1{case 1:2;case:3};cho{*}ice}
 `)
     test.expect_hover_contains(t,&source,"choice: int")
+}
+
+@(test)
+thor_contextual_switch_array_hover :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+main::proc(){choice:[2]Color=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]};_=choice}
+`)
+    test.expect_hover_contains(t,&source,"Color: .Red")
+}
+
+@(test)
+thor_contextual_nested_switch_return_hover :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+work::proc()->[1][2]Color{return [switch{case true:[.R{*}ed,.Blue];case:[.Blue,.Red]}]}
+`)
+    test.expect_hover_contains(t,&source,"Color: .Red")
+}
+
+@(test)
+thor_contextual_switch_selector_hover :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+Other::enum{Red,Green}
+main::proc(){mode:Other=.Green;choice:[2]Color=switch mode{case .R{*}ed:[.Red,.Blue];case .Green:[.Blue,.Red];case:[.Red,.Red]};_=choice}
+`)
+    test.expect_hover_contains(t,&source,"Other: .Red")
+}
+
+@(test)
+thor_contextual_switch_array_repeated_completion :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+Other::enum{Red,Green}
+main::proc(){choice:[2]Color=switch 1{case 1:[.Red,.{*}];case:[.Blue,.Red]};_=choice}
+`)
+    test.expect_completion_labels(t,&source,".",{"Red","Blue"},{"Green"})
+}
+
+@(test)
+thor_contextual_switch_bitset_completion :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+main::proc(){choice:bit_set[Color]=switch 1{case 1:{.Red,.{*}};case:{.Blue}};_=choice}
+`)
+    test.expect_completion_labels(t,&source,".",{"Blue"},{"Red"})
+}
+
+@(test)
+thor_contextual_switch_record_completion :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+Box::struct{colors:[2]Color}
+main::proc(){choice:Box=switch 1{case 1:{co{*}};case:{colors=[.Red,.Blue]}};_=choice}
+`)
+    test.expect_completion_labels(t,&source,"",{"colors"})
+}
+
+@(test)
+thor_contextual_switch_overload_argument :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+Color::enum{Red,Blue}
+Other::enum{Red,Green}
+take::proc{take_color,take_other}
+take_color::proc(n:int,x:[2]Color){}
+take_other::proc(n:string,x:[2]Other){}
+main::proc(){take(1,switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}
+`)
+    test.expect_hover_contains(t,&source,"Color: .Red")
 }
 
 @(test)

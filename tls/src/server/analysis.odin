@@ -861,6 +861,12 @@ expand_call_args :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -> ([]C
 			append(results, call_arg)
 			return true
 		}
+		if thor_context_dependent_switch(ast_context, call_arg.value_expr) {
+			// Like an implicit compound literal, this argument needs the
+			// parameter's type. Let other arguments select the overload first.
+			append(results, call_arg)
+			return true
+		}
 
 		if symbol, ok := resolve_call_arg_type_expression(ast_context, call_arg.value_expr); ok {
 			call_arg.symbol = symbol
@@ -3273,6 +3279,9 @@ internal_resolve_comp_literal :: proc(
 	symbol: Symbol,
 	ok: bool,
 ) {
+	if symbol, ok := thor_resolve_expected_type(ast_context, position_context, position_context.comp_lit); ok {
+		return symbol, true
+	}
 	if position_context.parent_comp_lit != nil && position_context.parent_comp_lit.type != nil {
 		symbol = resolve_proc(ast_context, position_context.parent_comp_lit.type) or_return
 	} else if position_context.call != nil {
@@ -3519,6 +3528,12 @@ resolve_implicit_selector :: proc(
 	Symbol,
 	bool,
 ) {
+	if symbol, ok := thor_resolve_expected_type(ast_context, position_context, position_context.implicit_selector_expr); ok {
+		#partial switch _ in symbol.value {
+		case SymbolEnumValue, SymbolUnionValue, SymbolBitSetValue:
+			return symbol, true
+		}
+	}
 	if position_context.binary != nil {
 		if position_in_node(position_context.binary, position_context.position) {
 			// We resolve whichever is not the implicit_selector
@@ -5304,8 +5319,9 @@ is_lhs_comp_lit :: proc(position_context: ^DocumentPositionContext) -> bool {
 	return true
 }
 
-field_exists_in_comp_lit :: proc(comp_lit: ^ast.Comp_Lit, name: string) -> bool {
+field_exists_in_comp_lit :: proc(comp_lit: ^ast.Comp_Lit, name: string, except_position := -1) -> bool {
 	for elem in comp_lit.elems {
+		if position_in_node(elem, except_position) { continue }
 		if field, ok := elem.derived.(^ast.Field_Value); ok {
 			if field.field != nil {
 				if ident, ok := field.field.derived.(^ast.Ident); ok {

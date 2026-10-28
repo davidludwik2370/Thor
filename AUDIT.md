@@ -108,20 +108,24 @@ The new compiler interaction cases are in `tests/test_interactions.py`. An
 allocation-tracked combined test uses switch-arm arrays, negative indexing,
 nested interpolation and anonymous Set unions in both selected branches.
 
+## Contextual enum follow-up
+
+The previously recorded switch-arm array gap is resolved. The former expected
+failure is now `test_contextual_enum_navigation_in_switch_array_arm`, a regular
+passing regression. Expected types flow through switch results and nested
+aggregates in declarations, assignments, returns and procedure arguments.
+Coverage includes hover, definition, completion, rename, incomplete edits and
+mapped diagnostics. Switch selectors and inner calls keep their own enum types.
+
 ## Remaining boundaries
 
-1. **Contextual enum navigation in switch-arm arrays is incomplete.** For
-   `choice:[2]Color=switch x{case 1:[.Red,.Blue];case:[.Blue,.Red]}`, compilation
-   and highlighting work, but hover and definition on `.Red` do not resolve.
-   OLS's expected-element-type propagation through the adapted switch is
-   incomplete. `test_known_gap_contextual_enum_navigation_in_switch_array_arm`
-   is an explicit expected failure, not a passing claim of navigation support.
-2. **TLS still has a partial resolver.** Complex overload/generic/expected-type
+1. **TLS still has a partial resolver.** Complex overload/generic/expected-type
    contexts can lack editor information even when the native checker accepts the
    code. TLS does not execute procedures for hover values or its own selection
-   of `#run`-dependent branches. Rename, formatting and automatic import edits
-   remain disabled. These are existing boundaries, separate from token integrity.
-3. **Compiler limits agreed in the specification remain.** Examples include
+   of `#run`-dependent branches. Rename validates original-source edits and rejects
+   unresolved related uses. Formatting and automatic import edits remain disabled.
+   These are existing boundaries, separate from token integrity.
+2. **Compiler limits agreed in the specification remain.** Examples include
    conservative implicit `using` pointer promotion through unconstrained
    generics, slice-containing compile-time results requiring runtime bindings,
    conservative pure-value schemas and unsupported raw unions. F-strings use

@@ -1581,6 +1581,32 @@ get_implicit_completion :: proc(
 
 	set_ast_package_from_symbol_scoped(ast_context, selector)
 
+	if symbol, ok := thor_resolve_expected_type(ast_context, position_context, position_context.implicit_selector_expr); ok {
+		set_ast_package_set_scoped(ast_context, symbol.pkg)
+		exclude_existing := false
+		if container, ok := thor_resolve_expected_type(ast_context, position_context, position_context.comp_lit); ok {
+			if _, bitset := container.value.(SymbolBitSetValue); bitset { exclude_existing = true }
+			if field := position_context.field_value; field != nil && position_in_node(field.field, position_context.position) {
+				exclude_existing = true
+			}
+		}
+		#partial switch value in symbol.value {
+		case SymbolEnumValue:
+			append_enum_completion_items(value, ast_context, position_context, results, exclude_existing=exclude_existing)
+			return is_incomplete
+		case SymbolUnionValue:
+			if enum_value, ok := unwrap_super_enum(ast_context, value); ok {
+				append_enum_completion_items(enum_value, ast_context, position_context, results, true, exclude_existing=exclude_existing)
+				return is_incomplete
+			}
+		case SymbolBitSetValue:
+			if enum_value, ok := unwrap_bitset(ast_context, symbol); ok {
+				append_enum_completion_items(enum_value, ast_context, position_context, results, exclude_existing=exclude_existing)
+				return is_incomplete
+			}
+		}
+	}
+
 	//value decl infer a : My_Enum = .*
 	if position_context.value_decl != nil && position_context.value_decl.type != nil {
 
@@ -2513,9 +2539,10 @@ append_enum_completion_items :: proc (
 	results:              ^[dynamic]CompletionResult,
 	unwrapped_super_enum: bool = false,
 	dot_before_label:     bool = false,
+	exclude_existing:     bool = true,
 ) {
 	for name, i in enum_value.names {
-		if position_context.comp_lit != nil && field_exists_in_comp_lit(position_context.comp_lit, name) {
+		if exclude_existing && position_context.comp_lit != nil && field_exists_in_comp_lit(position_context.comp_lit, name, position_context.position) {
 			continue
 		}
 

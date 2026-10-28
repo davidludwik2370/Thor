@@ -643,13 +643,117 @@ main::proc(){
         names=[token for *_,token,mods in self.semantic_spans(client,main,text)]
         self.assertEqual(names.count('café'),2)
 
-    @unittest.expectedFailure
-    def test_known_gap_contextual_enum_navigation_in_switch_array_arm(self):
-        # The underlying OLS resolver does not propagate the array's expected
-        # element type through Thor switch arms. Color ranges remain correct.
+    def test_contextual_enum_navigation_in_switch_array_arm(self):
         text='package main\nColor::enum{Red,Blue}\nmain::proc(){x:=1;choice:[2]Color=switch x{case 1:[.Red,.Blue];case:[.Blue,.Red]};_=choice}\n'
         client,main=self.open(text)
         self.assertIsNotNone(self.hover(client,main,text,'.Red'))
+
+    def assert_contextual_enum(self, marked, *, enum='Color', files=None):
+        before,after=marked.split('{*}')
+        text=before+after
+        position={'line':before.count('\n'),'character':len(before.rsplit('\n',1)[-1].encode('utf-16-le'))//2}
+        client,main=self.open(text,files,compiler=False)
+        params={'textDocument':{'uri':main.as_uri()},'position':position}
+        hover=client.request('textDocument/hover',params)
+        self.assertIsNotNone(hover,marked)
+        self.assertIn(enum+': .Red',hover['contents']['value'])
+        definition=client.request('textDocument/definition',params)
+        target=definition[0] if isinstance(definition,list) else definition
+        self.assertIsNotNone(target,marked)
+        declaration=(files or {}).get('library/main.thor',text)
+        enum_start=declaration.index(enum+'::enum')
+        offset=declaration.index('Red',enum_start)
+        prefix=declaration[:offset]
+        expected={'line':prefix.count('\n'),'character':len(prefix.rsplit('\n',1)[-1].encode('utf-16-le'))//2}
+        self.assertEqual(target['range']['start'],expected,definition)
+        self.assertEqual(target['range']['end'],{**expected,'character':expected['character']+3})
+        self.assertTrue(target['uri'].endswith('/library/main.thor' if files else '/main.thor'),target)
+        completion=client.request('textDocument/completion',{**params,'context':{'triggerKind':2,'triggerCharacter':'.'}})
+        items=completion.get('items',[]) if isinstance(completion,dict) else completion or []
+        labels={item['label'] for item in items}
+        self.assertIn('Red',labels)
+        self.assertNotIn('Green' if enum=='Color' else 'Blue',labels)
+
+    def test_contextual_enum_switch_arrays_across_expression_contexts(self):
+        header='package main\nColor::enum{Red,Blue}\nOther::enum{Red,Green}\nBox::struct{colors:[2]Color}\n'
+        cases={
+            'declaration':'main::proc(){choice:[2]Color=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]};_=choice}',
+            'assignment':'main::proc(){choice:[2]Color;choice=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}}',
+            'return':'work::proc()->[2]Color{return switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}}',
+            'argument':'take::proc(x:[2]Color){}\nmain::proc(){take(switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}',
+            'named argument':'take::proc(count:int,x:[2]Color){}\nmain::proc(){take(x=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]},count=1)}',
+            'grouped parameters':'take::proc(a,b:[2]Color){}\nmain::proc(){take([.Blue,.Blue],switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}',
+            'slice':'main::proc(){choice:[]Color=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]};_=choice}',
+            'nested arrays':'main::proc(){choice:[1][2]Color=[switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}];_=choice}',
+            'named field':'main::proc(){choice:=Box{colors=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}};_=choice}',
+            'positional field':'main::proc(){choice:=Box{switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}};_=choice}',
+            'nested switches':'main::proc(){choice:[2]Color=switch 1{case 1:switch{case true:[.R{*}ed,.Blue];case:[.Blue,.Red]};case:[.Blue,.Red]};_=choice}',
+            'compile switch':'main::proc(){choice:[2]Color=#switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]};_=choice}',
+            'ternary in array':'main::proc(){choice:[2]Color=switch 1{case 1:[true ? .R{*}ed : .Blue,.Blue];case:[.Blue,.Red]};_=choice}',
+            'multiple returns':'work::proc()->(int,[2]Color){return 1,switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}}',
+            'parentheses':'work::proc()->[2]Color{return (switch 1{case 1:([.R{*}ed,.Blue]);case:[.Blue,.Red]})}',
+            'typed arm':'main::proc(){choice:=switch 1{case 1:[.R{*}ed,.Blue];case:[2]Color{.Blue,.Red}};_=choice}',
+            'inner call':'choose::proc(x:Color)->Other{return .Green}\nmain::proc(){choice:Other=switch 1{case 1:choose(.R{*}ed);case:.Green};_=choice}',
+            'scalar switch':'main::proc(){choice:Color=switch 1{case 1:.R{*}ed;case:.Blue};_=choice}',
+            'struct result':'main::proc(){choice:Box=switch 1{case 1:{colors=[.R{*}ed,.Blue]};case:{colors=[.Blue,.Red]}};_=choice}',
+            'generic argument':'take::proc($T:typeid,x:[2]T){}\nmain::proc(){take(Color,switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}',
+            'overload argument':'take::proc{take_color,take_other}\ntake_color::proc(n:int,x:[2]Color){}\ntake_other::proc(n:string,x:[2]Other){}\nmain::proc(){take(1,switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}',
+            'compile switch overload':'take::proc{take_color,take_other}\ntake_color::proc(n:int,x:[2]Color){}\ntake_other::proc(n:string,x:[2]Other){}\nmain::proc(){take(1,#switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}',
+            'map value':'main::proc(){choice:=map[string][2]Color{"a"=switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]}};delete(choice)}',
+            'map key':'main::proc(){choice:=map[Color]int{.R{*}ed=1};delete(choice)}',
+            'enum indexed key':'main::proc(){choice:=[Color]int{.R{*}ed=1};_=choice}',
+            'bitset':'main::proc(){choice:bit_set[Color]=switch 1{case 1:{.R{*}ed};case:{.Blue}};_=choice}',
+            'comparison':'main::proc(){color:Color=.Blue;choice:bool=color==.R{*}ed;_=choice}',
+        }
+        for name,body in cases.items():
+            with self.subTest(context=name):self.assert_contextual_enum(header+body+'\n')
+
+    def test_contextual_switch_cases_keep_the_selector_type(self):
+        self.assert_contextual_enum('package main\nColor::enum{Red,Blue}\nOther::enum{Red,Green}\nmain::proc(){mode:Other=.Green;choice:[2]Color=switch mode{case .R{*}ed:[.Red,.Blue];case .Green:[.Blue,.Red];case:[.Red,.Red]};_=choice}\n',enum='Other')
+
+    def test_contextual_enum_through_imported_parameter_type(self):
+        self.assert_contextual_enum('package main\nimport "library"\nmain::proc(){library.take(switch 1{case 1:[.R{*}ed,.Blue];case:[.Blue,.Red]})}\n',files={'library/main.thor':'package library\nColor::enum{Red,Blue}\ntake::proc(x:[2]Color){}\n'})
+
+    def test_contextual_completion_in_incomplete_switch_expressions(self):
+        cases={
+            'array':'choice:[2]Color=switch 1{case 1:[.Red,.{*}];case:[.Blue,.Red]}',
+            'partial array member':'choice:[2]Color=switch 1{case 1:[.Red,.R{*}];case:[.Blue,.Red]}',
+            'bitset':'choice:bit_set[Color]=switch 1{case 1:{.Red,.{*}};case:{.Blue}}',
+            'struct field':'choice:Box=switch 1{case 1:{co{*}};case:{colors=[.Red,.Blue]}}',
+        }
+        for name,body in cases.items():
+            with self.subTest(context=name):
+                before,after=('package main\nColor::enum{Red,Blue}\nOther::enum{Red,Green}\nBox::struct{colors:[2]Color}\nmain::proc(){'+body+';_=choice}\n').split('{*}')
+                client,main=self.open(before+after,compiler=False)
+                position={'line':before.count('\n'),'character':len(before.rsplit('\n',1)[-1].encode('utf-16-le'))//2}
+                result=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},'position':position,'context':{'triggerKind':1}})
+                items=result.get('items',[]) if isinstance(result,dict) else result or []
+                labels={i['label'] for i in items}
+                if name=='struct field':self.assertIn('colors',labels)
+                else:
+                    self.assertIn('Blue',labels)
+                    self.assertNotIn('Green',labels)
+                    if name=='bitset':self.assertNotIn('Red',labels)
+                    else:self.assertIn('Red',labels)
+
+    def test_contextual_enum_unsaved_diagnostics_and_navigation_update(self):
+        text='package main\nColor::enum{Red,Blue}\nmain::proc(){/* 😀 */choice:[2]Color=switch 1{case 1:[.Red,.Blue];case:[.Blue,.Red]};_=choice}\n'
+        client,main=self.open(text)
+        changed=text.replace('1:[.Red','1:[.Missing')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='Missing')
+        error=next(e for e in errors if 'Missing' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'.Missing',1))
+        self.assertEqual(error['range']['end'],self.position(changed,'.Missing',8))
+        fixed=changed.replace('.Missing','.Blue')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        params={'textDocument':{'uri':main.as_uri()},'position':self.position(fixed,'1:[.Blue',5)}
+        self.assertIn('Color: .Blue',client.request('textDocument/hover',params)['contents']['value'])
+        target=client.request('textDocument/definition',params)
+        self.assertEqual(target['range']['start'],self.position(fixed,'Blue}',0))
+        self.assertEqual(main.read_text(),text)
 
     def test_type_query_validation_failure_maps_unsaved_text_and_clears(self):
         text='package main\nid::fn(n:int)->int{return n}\nmain::proc(){_="😀";text:="bad";N::id(size_of(text));_=N}\n'

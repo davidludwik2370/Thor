@@ -350,6 +350,20 @@ async function run() {
         assert.ok(!lifetimeError.message.includes('__thor_'));
         await replace(hardened);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const contextual = 'package main\nColor::enum{Red,Blue}\nOther::enum{Red,Green}\nmain::proc(){other:Other=.Red;choice:[2]Color=switch 1{case 1:[.Red,.Blue];case:[.Blue,.Red]};_=choice;_=other}\n';
+        await replace(contextual);
+        const memberPosition=testDocument.positionAt(contextual.indexOf('1:[.Red')+5);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,memberPosition),
+            values=>hoverText(values||[]).includes('Color: .Red'));
+        const memberDefinition=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',testDocument.uri,memberPosition);
+        assert.ok(memberDefinition.some(value=>(value.range||value.targetSelectionRange).start.isEqual(testDocument.positionAt(contextual.indexOf('Red,Blue')))));
+        const memberCompletion=await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',testDocument.uri,memberPosition,'.');
+        const memberLabels=memberCompletion.items.map(value=>typeof value.label==='string'?value.label:value.label.label);
+        assert.ok(memberLabels.includes('Red')&&memberLabels.includes('Blue')&&!memberLabels.includes('Green'),JSON.stringify(memberLabels));
+        const memberRename=await vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',testDocument.uri,memberPosition,'Crimson');
+        assert.ok(await vscode.workspace.applyEdit(memberRename));
+        assert.equal(testDocument.getText(),contextual.replace('Color::enum{Red','Color::enum{Crimson').replaceAll('.Red','.Crimson').replace('other:Other=.Crimson','other:Other=.Red'));
+        await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
         await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         assert.equal(vscode.window.activeTextEditor, undefined);
@@ -365,6 +379,7 @@ async function run() {
             'generic loop variables remain values in semantic tokens and hover',
             'generic inline defaults compile and body errors highlight original source', 'hidden Set imports do not hover on comments',
             'callback values use parameter color and a one-letter parameter renames at its end boundary',
+            'contextual switch-array enum hover, definition, repeated-value completion and precise rename',
             'spread min/max element and status hover, original argument error ranges and unsaved correction',
             'wildcard and namespace-free imports compile and provide source hovers',
             'standard-library #run checks original overload ranges and clears after unsaved correction',

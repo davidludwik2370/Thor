@@ -420,6 +420,9 @@ document_refresh :: proc(document: ^Document, config: ^common.Config, writer: ^W
 	return .None
 }
 
+// Parsing/indexing can run on different workers. Each parse's callback must
+// append to its own diagnostic buffer, never another thread's scratch array.
+@(thread_local)
 current_errors: [dynamic]ParserError
 
 parser_error_range :: proc(document:^Document,error:ParserError)->common.Range {

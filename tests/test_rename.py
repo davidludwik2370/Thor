@@ -286,10 +286,33 @@ sorted :: proc(
             self.rename(client, main, files['main.thor'], 'work::', 'compute')
 
     def test_unresolved_contextual_member_does_not_produce_partial_edits(self):
-        text = 'package main\nColor::enum{Red,Blue}\nmain::proc(){colors:[2]Color=switch 1{case 1:[.Red,.Blue];case:[.Blue,.Red]};_=colors}\n'
+        text = 'package main\nColor::enum{Red,Blue}\nmain::proc(){colors:=[.Red,.Blue];_=colors}\n'
         client, root, main = self.project({'main.thor': text})
         with self.assertRaisesRegex(AssertionError, 'Cannot safely resolve'):
             self.rename(client, main, text, 'Red,Blue', 'Crimson')
+
+    def test_contextual_enum_rename_updates_switch_arrays_and_preserves_other_enums(self):
+        text='''package main
+Color::enum{Red,Blue}
+Other::enum{Red,Green}
+take::proc(colors:[2]Color){}
+main::proc(){/* 😀 */mode:Other=.Red
+    colors:[2]Color=switch mode{case .Green:[.Red,.Blue];case .Red:[.Blue,.Red];case:[.Blue,.Blue]}
+    take(switch 1{case 1:[.Red,.Blue];case:[.Blue,.Red]})
+    _=colors
+}
+'''
+        expected=text.replace('Color::enum{Red','Color::enum{Crimson').replace('[.Red','[.Crimson').replace(',.Red]',',.Crimson]')
+        for needle,offset in [('Red,Blue',0),('Green:[.Red',8)]:
+            with self.subTest(origin=needle):
+                files={'main.thor':text}
+                client,root,main=self.project(files)
+                edit=self.rename(client,main,text,needle,'Crimson',offset)
+                self.assertEqual(self.apply(root,files,edit),{'main.thor':expected})
+                references=client.request('textDocument/references',{'textDocument':{'uri':main.as_uri()},'position':self.pos(text,needle,offset),'context':{'includeDeclaration':True}})
+                ranges=lambda items:{(e['range']['start']['line'],e['range']['start']['character'],e['range']['end']['character']) for e in items}
+                self.assertEqual(ranges(references),ranges(edit['changes'][main.as_uri()]))
+                self.assert_builds(root,{'main.thor':expected})
 
     def test_generated_outputs_are_not_renamed(self):
         text = 'package main\nwork::proc(){}\nmain::proc(){work()}\n'

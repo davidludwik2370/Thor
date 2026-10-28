@@ -1143,6 +1143,10 @@ construct_bit_field_field_symbol :: proc(
 
 construct_enum_field_symbol :: proc(symbol: ^Symbol, value: SymbolEnumValue, index: int) {
 	symbol.type = .Field
+	// A contextual enum may come from a variable. Its declared type must not
+	// replace the member signature (e.g. `Color: .Red`) in Thor's type display.
+	symbol.type_expr, symbol.value_expr = nil, nil
+	symbol.type_name, symbol.type_pkg = "", ""
 	symbol.doc = get_comment(value.docs[index], context.temp_allocator)
 	symbol.comment = get_comment(value.comments[index], context.temp_allocator)
 	symbol.signature = get_enum_field_signature(value, index)

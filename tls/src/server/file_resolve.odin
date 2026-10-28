@@ -76,7 +76,9 @@ resolve_entire_file_internal :: proc(
 	)
 
 	position_context: DocumentPositionContext
+	position_context.file = document.ast
 	position_context.functions = make([dynamic]^ast.Proc_Lit, context.temp_allocator)
+	position_context.calls = make([dynamic]^ast.Call_Expr, context.temp_allocator)
 
 	get_globals(document.ast, &ast_context)
 
@@ -126,7 +128,9 @@ resolve_entire_file_for_references :: proc(
 	)
 
 	position_context: DocumentPositionContext
+	position_context.file = document.ast
 	position_context.functions = make([dynamic]^ast.Proc_Lit, context.temp_allocator)
+	position_context.calls = make([dynamic]^ast.Call_Expr, context.temp_allocator)
 
 	get_globals(document.ast, &ast_context)
 
@@ -513,12 +517,15 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 		resolve_node(n.expr, data)
 	case ^ast.Call_Expr:
 		old_call := data.ast_context.call
+		old_position_call := data.position_context.call
+		append(&data.position_context.calls, n)
 
 		data.position_context.call = n
 		data.ast_context.call = n
 
 		defer {
-			data.position_context.call = old_call
+			data.position_context.call = old_position_call
+			pop(&data.position_context.calls)
 		}
 
 		resolve_node(n.expr, data)

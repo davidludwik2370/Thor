@@ -1275,3 +1275,46 @@ installed source map. Fresh projects build/run from the new installation, and
 building a source from another working directory still uses that directory's
 executable location/name. The final 55-test focused run covers package fallback,
 project cache isolation, unsaved files, diagnostics and ordinary pure calls.
+
+## TLS expected-type propagation and parser isolation
+
+Replace the expected failure for contextual enum members in Thor switch-arm
+arrays with a normal passing test. Follow expected types through runtime switch
+adapters, compile-time switch/ternary branches, bracket arrays and nested
+aggregates. Resolve the nearest real procedure argument independently of its
+surrounding result type, preserving named/grouped/generic/imported parameter
+types. Treat unresolved contextual switch arguments like implicit literals
+while other arguments select an overload. Scope package/local lookup for each
+query so reading a global type does not hide the switch's local selector.
+
+Share this resolution between hover, definitions, aggregate completion and
+enum completion. Completion can reparse a partial member, so match its original
+source position as well as its AST identity. Arrays permit repeated values;
+bitsets and explicit keys continue filtering duplicates, without excluding the
+member currently being edited. Strip inherited variable type-display metadata
+when constructing an enum-member hover so its member signature remains visible.
+Give whole-file/reference resolution the same source file and enclosing-call
+context as cursor queries. Rename and Find References now resolve contextual
+members completely while preserving same-named members of other enums. Truly
+unresolved uses still cancel rename rather than produce partial edits.
+
+Expanded parallel native testing exposed a separate parser race: current_errors
+was process-global while parsers on independent workers replaced/appended to it
+using different scratch allocators. Make the callback collector thread-local.
+A two-worker regression repeatedly parses broken documents and verifies every
+diagnostic retains its own document path. An isolated temporary copy with the
+thread-local annotation removed fails this regression; repository sources and
+the installed server are not modified by that negative check. The fixed suite
+also passes repeated runs with the seed that previously exposed crashes.
+
+Validation: 106 complete stdio LSP/rename tests pass with no expected failures.
+The context matrix covers 27 expression cases plus imported parameter types,
+selector enums, incomplete literals, Unicode diagnostic ranges, unsaved fixes,
+rename and references. All 1,126 allocation-tracked native TLS tests pass with
+the recorded failure seed; two final complete replays also pass. The 89 Node
+extension tests pass. Actual VS Code integration passes after rebuilding TLS,
+including contextual enum hover, Go to Definition, repeated-value completion
+and rename that leaves another enum's Red untouched. The former expected
+failure is closed; complex semantic cases still retain the documented partial
+OLS-resolver boundaries. Restart TLS to load the rebuilt server; no grammar or
+extension reinstall is required for this update.

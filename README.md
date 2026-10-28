@@ -711,7 +711,8 @@ mixed packages, command behavior, and the main demo. Each test uses an isolated
 temporary source and output directory.
 The suite also builds TLS and runs stdio LSP tests against the actual executable.
 The [post-v1 audit](AUDIT.md) records cross-feature fixes, coverage and concrete
-remaining editor limitations, including contextual enum navigation in switch arms.
+remaining editor limitations. Contextual enum navigation, completion and rename
+through switch-arm arrays have dedicated regression coverage.
 
 Readable rejection examples are under [tests/fixtures](tests/fixtures). Each
 directory includes `main.thor` and the expected diagnostic fragment:

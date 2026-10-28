@@ -132,10 +132,14 @@ type contexts remain limited. The conditional evaluator is also a subset of
 Odin's constant evaluator; it does not execute arbitrary procedures. It does not
 execute procedures to populate hover values or choose `#run`-dependent branches;
 the compiler checker performs explicit and automatic compile-time execution.
-One confirmed expected-type gap is `.Red` inside a contextual switch-arm array
-such as `choice:[2]Color=switch x{case 1:[.Red,.Blue];case:[.Blue,.Red]}`:
-highlighting and compilation work, but hover/definition do not resolve. The stdio
-suite records this as an expected failure. See [the audit](../AUDIT.md).
+Expected types propagate through Thor switch results, bracket arrays, nested
+aggregates and ternaries in declarations, assignments, returns and procedure
+arguments. This includes imported/generic parameter types and overloads selected
+by other arguments. Contextual enum members such as `.Red` in
+`choice:[2]Color=switch x{case 1:[.Red,.Blue];case:[.Blue,.Red]}` support hover,
+definition, completion and rename. Switch case labels use the selector's type;
+real calls inside arms use their own parameter types. Arrays allow repeated enum
+values in completion; bitsets and explicit keys retain duplicate filtering.
 
 Semantic tokens are collected in absolute original-source ranges, sorted and
 deduplicated before encoding UTF-16 LSP deltas. Adapted switch traversal order and
@@ -206,9 +210,8 @@ renamed from an imported use. Renaming a package declaration itself is not
 supported.
 
 Rename rejects invalid identifiers, detected name collisions, and unresolved
-same-name uses in related files rather than returning known partial edits. This
-includes the contextual `.Red` in switch-arm arrays mentioned above: that member
-rename is refused until the resolver can locate every use. Resolve related syntax
+same-name uses in related files rather than returning known partial edits. An
+implicit member without enough type context is still unresolved. Resolve related syntax
 errors before a global rename. The search is limited to workspace/open sources;
 references in other projects are outside its scope. References/highlights retain
 their existing OLS limitations independently of rename.
