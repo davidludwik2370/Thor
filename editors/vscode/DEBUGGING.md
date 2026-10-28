@@ -59,6 +59,13 @@ Optional launch properties include `stopOnEntry`, `terminal`, `env`,
 Reinstall the VSIX and reload the window after extension updates. Rebuilding TLS
 or restarting the language server alone does not update the debug adapter.
 
+Native macOS debug executable builds now also enable allocation tracking and
+AddressSanitizer. Their runtime reports use original Thor locations, including
+when the executable is launched directly. Other platforms retain ordinary debug
+builds and source-mapped breakpoints without these automatic memory checks.
+Use `--track-allocations=off` and/or `--no-sanitize` in the build task to disable
+the macOS defaults. See [memory debugging](../../docs/memory-debugging.md).
+
 ## Why an adapter bridge
 
 The prototype verified native breakpoint resolution, selected switch arms,
@@ -121,7 +128,7 @@ captured-name adaptation where needed. Arbitrary Thor syntax such as a new
 fstring or Set operation is not interpreted in the Watch panel. Advanced mapped
 step targets, hardware data breakpoints, jump-to-location and restart-frame
 requests are disabled. Native
-panic output and debugging directly with the `lldb` CLI still show native Odin
+panic output outside the memory tracker and debugging directly with the `lldb` CLI still show native Odin
 locations. Use the `thor-lldb` configuration for Thor source mapping.
 
 ## Validation

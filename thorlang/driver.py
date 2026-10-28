@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.18.0"
+VERSION = "0.19.0"
 
 
 def frontend_binary(odin):
@@ -294,6 +294,7 @@ class Project:
         for source in [*self.sources.values(),*getattr(self,'sdk_sources',{}).values()]:
             for name, directory in source.asset_collections.items():
                 result.append(f"-collection:{name}={directory}")
+        result.extend(getattr(self, 'memory_flags', ()))
         return result
 
     def diagnostic_adapter(self):
@@ -322,6 +323,9 @@ def _main(argv=None):
     parser.add_argument('--no-cache',action='store_true',help='bypass compile-time result and per-file parser caching')
     parser.add_argument('--clear-cache',action='store_true',help='clear compile-time result and per-file parser entries before compiling')
     parser.add_argument('--cache-report',action='store_true',help='print compile-time evaluation cache counters as JSON on stdout')
+    parser.add_argument('--track-allocations', choices=['auto', 'off', 'basic', 'trace'], default='auto',
+                        help='allocation tracker (auto: basic for native macOS debug executables)')
+    parser.add_argument('--no-sanitize', action='store_true', help='disable automatic debug AddressSanitizer; explicit Odin sanitizer flags still apply')
     options, flags = parser.parse_known_args(argv)
     if not 0<options.run_timeout<=300:parser.error('--run-timeout must be greater than 0 and at most 300 seconds')
     if any(not flag.startswith("-") for flag in flags):
@@ -385,7 +389,17 @@ def _main(argv=None):
                 odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
                 project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
             Evaluator(project,odin,options.run_timeout,cache).evaluate_all()
-            target = project.emit(destination,persist_maps=options.command=='transpile' or '-debug' in flags)
+            memory = None
+            if '-debug' in flags or options.track_allocations not in {'auto', 'off'}:
+                from .memory_debug import MemoryDebug
+                memory = MemoryDebug.select(options.command, flags, options.track_allocations, options.no_sanitize)
+                if memory.enabled:
+                    memory.prepare(project, ROOT)
+            target = project.emit(destination,persist_maps=options.command=='transpile' or '-debug' in flags,
+                                  materialize=not (memory and memory.enabled))
+            if memory and memory.enabled:
+                memory.finish(project)
+                project.write()
             diagnostics = project.diagnostic_adapter()
             frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
         finally:

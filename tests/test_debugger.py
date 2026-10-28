@@ -116,6 +116,8 @@ class DebuggerTests(unittest.TestCase):
         client=self.launch(directory,basic,[line])
         thread,frame=self.frame(client)
         self.assertEqual((frame['source']['path'],frame['line']),(str(basic),line),frame)
+        arguments=client.request('evaluate',{'frameId':frame['id'],'expression':'args.len','context':'watch'})
+        self.assertEqual(arguments['result'],'1',arguments)
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 

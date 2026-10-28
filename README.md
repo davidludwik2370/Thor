@@ -317,6 +317,14 @@ The generated task runs `thor build . -debug -o:none`, keeps the executable in
 does not depend on picking up your interactive shell's PATH. Existing project
 folders are never overwritten.
 
+On native macOS, debug executable builds also enable allocation tracking and
+AddressSanitizer, with runtime reports mapped to the original Thor source even
+when the executable is launched directly. Use `--track-allocations=off` and/or
+`--no-sanitize` to disable them; `--track-allocations=trace` adds allocation call
+stacks. Normal builds and debugging on other platforms retain their existing
+behavior. See [memory debugging](docs/memory-debugging.md) for ownership,
+configuration and tool dependencies.
+
 The `thor-lldb` debug adapter reads those maps and uses ordinary Odin and CodeLLDB.
 Breakpoints, stack frames, Step Over/Into/Out, watches and local inspection refer
 to original Thor files; generated expression helpers are presented as their

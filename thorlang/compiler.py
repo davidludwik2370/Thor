@@ -813,6 +813,9 @@ class Source:
         if real_block and self.purity:
             prologue=self.purity.prologue(n)
             if prologue:inserts.append((n.start+1,prologue))
+        if real_block and n in getattr(self, 'memory_prologues', ()):
+            inserts.append((n.start+1, self.mapping.wrap(self.memory_prologues[n], self.path,
+                                                       n.start, n.start+1, 'memory-debug')))
         result = self.splice(n, replacements, inserts)
         if guards and not real_block:
             result = "{" + self.guard_code(guards) + result + "}"
@@ -924,6 +927,8 @@ class Source:
             code += self.mapping.wrap(f'\nimport {alias} {json.dumps(self.import_code(namespace))}\n',
                                       self.path, 0, 0, "support")
         code += self.expressions.imports()
+        if getattr(self, 'memory_import', None):
+            code += self.mapping.wrap(self.memory_import, self.path, 0, 0, 'memory-debug')
         code, self.source_map = self.mapping.finish(code)
         return code
 
