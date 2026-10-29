@@ -34,6 +34,37 @@ EVEN::is_even(10)
 TOTAL::work(6)
 '''))
 
+    def test_single_statement_returns_promote_owned_values(self):
+        self.memory('''
+for flag in [false,true] {
+    value:=work(flag)
+    testing.expect(t,value==(flag ? "yes" : "no"))
+    delete(value)
+}
+''','''
+leaf::proc(flag:bool)->string{if flag do return f"yes";return "no"}
+work::fn(flag:bool)->string{return leaf(flag)}
+''')
+        self.invoke(self.program('assert(VALUE=="yes")','''
+leaf::fn(flag:bool)->string{if flag do return f"yes";return "no"}
+VALUE::leaf(true)
+'''))
+
+    def test_owned_variadic_results_forward_named_only_parameters(self):
+        self.memory('''
+n:=3
+result:=work(n)
+testing.expect(t,result[0]==9 && result[1]==12)
+delete(result)
+''','''
+leaf::proc(values:..int, scale:int=2)->[]int {
+    ret:=make([]int,len(values))
+    for v,i in values {ret[i]=v*scale}
+    return ret
+}
+work::fn(n:int)->[]int{return leaf(n,n+1,scale=3)}
+''')
+
     def test_generics_overloads_aliases_and_named_defaults(self):
         self.invoke(self.program('x:=3;y:=f64(4);assert(work(x)==9&&work(y)==16&&DEFAULT==25)', '''
 integer::proc(value:int)->int{return value*value}

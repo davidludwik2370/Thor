@@ -15,6 +15,73 @@ class InteractionTests(unittest.TestCase):
     invoke=base.ThorTests.invoke
     program=base.ThorTests.program
 
+    def test_generic_map_lookups_retain_optional_status_and_fallback(self):
+        self.invoke('''package main
+Box::struct{items:map[int]int}
+read::proc(box:$B,key:int)->(int,bool){return box.items[key]}
+fallback::proc(box:$B,key:int)->int{return box.items[key] or_else -1}
+propagate::proc(box:$B,key:int)->(value:int,ok:bool){
+    value=box.items[key] or_return
+    return value,true
+}
+local::proc(box:$B,key:int)->bool{
+    value,ok:=box.items[key]
+    var:int;found:bool
+    var,found=box.items[key]
+    return ok && found && value==var
+}
+main::proc(){
+    box:=Box{items=make(map[int]int)};defer delete(box.items)
+    box.items[-1]=7
+    value,ok:=read(box,-1);assert(ok && value==7 && local(box,-1))
+    missing,exists:=read(box,2);assert(!exists && missing==0)
+    assert(fallback(box,2)==-1 && fallback(box,-1)==7)
+    found,success:=propagate(box,-1);assert(success && found==7)
+    absent,failed:=propagate(box,2);assert(!failed && absent==0)
+}
+''')
+
+    def test_run_retains_only_resolved_local_and_imported_overload_bodies(self):
+        self.invoke('''package main
+import "lib"
+integer::proc(n:int)->int{return n+1}
+text::proc(s:string)->int{_=context;return len(s)}
+choose::proc{integer,text}
+A::#run choose(4)
+B::#run lib.choose('界')
+main::proc(){assert(A==5 && B==0x754c)}
+''',files={'lib/lib.thor':'''package lib
+runes::proc(r:rune)->int{return int(r)}
+strings::proc(s:string)->int{_=context;return len(s)}
+choose::proc{runes,strings}
+'''})
+
+    def test_basic_collections_power_switches_and_owned_strings_in_debug_test_mode(self):
+        self.invoke('''package integration
+import _ "thor:basic" / range, filter, sum, to_set, to_slice
+import "core:testing"
+leaf::proc(n:int)->string{if n==0 do return "zero";return f"value {n ** 2}"}
+report::fn(n:int)->string{return leaf(n)}
+SEED::#run sum([]int{1,2,3})
+Color::enum{Red,Blue}
+CHOSEN:[2]Color:#switch SEED{case 6:[.Red,.Blue];case:[.Blue,.Red]}
+@(test) combined::proc(t:^testing.T){
+    data:=range(1,8);defer delete(data)
+    selected:=filter(data,proc(n:int)->bool{return n in 2..=6 && n%2==0})
+    defer delete(selected)
+    unique:=to_set(selected);defer delete(unique)
+    values:=to_slice(unique);defer delete(values)
+    lowest,ok:=min(..values)
+    largest:=max(..values)
+    testing.expect(t,ok && lowest==2 && largest==6 && sum(values)==12)
+    testing.expect(t,CHOSEN[-1]==.Blue)
+    label:=report(largest);defer delete(label)
+    text:=f"{switch lowest {case 2:f"{label} / {2 ** 3}";case:f"bad"}}"
+    defer delete(text)
+    testing.expect(t,text=="value 36 / 8")
+}
+''',command='test',flags=['-debug','-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'])
+
     def test_duplicate_file_declaration_precedes_compile_time_execution(self):
         declaration='allowed_size::proc($N:int)->int where N in [2,4,8]{return N}\n'
         _,result=self.invoke('package main\nspin::fn()->int{for{};return 0}\nWAIT::spin()\n'+

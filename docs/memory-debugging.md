@@ -83,6 +83,19 @@ ASan configuration remains available through `ASAN_OPTIONS` and
 control of that hook. If the helper is unavailable, ASan still detects errors,
 but its output can lose source locations. Clean runs do not start the helper.
 
+Hook detection excludes platform/test files not compiled for the current build.
+Within an included file it is conservative: even a hook inside an inactive
+`when` branch suppresses Thor's default hook. This affects automatic symbolizer
+selection, not instrumentation, allocation tracking or debugger source maps.
+For such a program, select the helper explicitly when running it:
+
+```sh
+ASAN_SYMBOLIZER_PATH=/path/to/Thor/llvm-symbolizer-thor ./program
+```
+
+The embedded map still supplies original Thor locations. Automatic selection of
+conditionally declared user hooks remains a refinement for a later pass.
+
 Source mapping cannot recreate caller frames omitted by the native unwinder.
 Some Odin allocation/free stacks omit callers even with ASan's slow unwinding
 enabled. Basic tracker locations and the fault's available frames remain useful;

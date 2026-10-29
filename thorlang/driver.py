@@ -18,7 +18,18 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.19.0"
+VERSION = "0.19.1"
+
+
+def backend_failure(status):
+    number = -status
+    try:
+        name = signal.Signals(number).name
+    except ValueError:
+        name = str(number)
+    return {"type": "error", "stage": "toolchain", "pos": None,
+            "msgs": [f"Odin compiler terminated by {name} (signal {number}). "
+                     "This is a backend compiler failure; no source location was provided."]}
 
 
 def frontend_binary(odin):
@@ -434,11 +445,18 @@ def _main(argv=None):
             if frontend_diagnostics:
                 report(frontend_diagnostics)
             result = subprocess.run(command,env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
+            if result.returncode < 0:
+                report([backend_failure(result.returncode)])
         else:
             command.append("-json-errors")
             result = subprocess.run(command, stderr=subprocess.PIPE,
                 env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
-            if result.stderr:
+            if result.returncode < 0:
+                error = backend_failure(result.returncode)
+                if result.stderr:
+                    error['msgs'].append(result.stderr.decode(errors='replace').strip())
+                report([*frontend_diagnostics, error])
+            elif result.stderr:
                 try:
                     native = json.loads(result.stderr)
                 except ValueError:
@@ -449,13 +467,14 @@ def _main(argv=None):
                     report([*frontend_diagnostics, *diagnostics.translate(native.get("errors", []))])
             elif json_output or frontend_diagnostics:
                 report(frontend_diagnostics)
+        backend_status = 128-result.returncode if result.returncode < 0 else result.returncode
         if not result.returncode and not reported_errors and options.command in {'build','run','test'} and '-debug' in flags and executable.is_file():
             manifest_path=project.destination/'thor-manifest.json'
             manifest=json.loads(manifest_path.read_text())
             manifest['debug_program']={'path':str(executable),'sha256':hashlib.sha256(executable.read_bytes()).hexdigest()}
             manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
         if result.returncode or reported_errors or options.command not in {"run", "test"}:
-            return result.returncode or (1 if reported_errors else 0)
+            return backend_status or (1 if reported_errors else 0)
         try:
             return subprocess.run([str(executable), *runtime_args]).returncode
         finally:

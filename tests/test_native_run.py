@@ -234,6 +234,16 @@ compute::proc(x:int)->int{return x+10 when ODIN_TEST else x}
         },test=True)
         self.assertEqual(evaluate()[0]['value'],'13')
 
+    def test_relative_sdk_dependencies_are_inspected_and_rebased(self):
+        _,_,_,evaluate=self.fixture({
+            'vendor/fixture/main.odin': '''package fixture
+import "detail"
+compute::proc(x:int)->int{return detail.twice(x)+1}
+''',
+            'vendor/fixture/detail/main.odin': 'package detail\ntwice::proc(x:int)->int{return x*2}\n',
+        })
+        self.assertEqual(evaluate()[0]['value'],'7')
+
     def test_transitive_source_edits_invalidate_cached_results(self):
         root, sdk, entry, evaluate = self.fixture({
             'vendor/fixture/main.odin': 'package fixture\nimport "core:dependency"\ncompute::proc(x:int)->int{return dependency.times(x)}\n',

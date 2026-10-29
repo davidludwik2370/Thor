@@ -46,6 +46,25 @@ class CompilationTests(unittest.TestCase):
         self.assertFalse((self.app/'.thor-cache/transpile-v1').exists())
         return errors
 
+    def test_backend_signal_is_one_toolchain_diagnostic_with_conventional_status(self):
+        self.write('package main\nmain::proc(){}\n')
+        original=subprocess.run
+        for stderr in [b'',b'native compiler context\n']:
+            for flags in [[],['--diagnostic-format=json'],['--raw-diagnostics']]:
+                with self.subTest(stderr=stderr,flags=flags):
+                    def crash(command,*args,**kwargs):
+                        if len(command)>1 and command[1]=='check':
+                            return subprocess.CompletedProcess(command,-11,stdout=b'',stderr=stderr)
+                        return original(command,*args,**kwargs)
+                    with patch.object(driver.subprocess,'run',crash):
+                        _,errors=self.compile(flags=flags,status=139)
+                    self.assertIn('Odin compiler terminated by SIGSEGV',errors)
+                    if '--diagnostic-format=json' in flags:
+                        data=json.loads(errors)
+                        self.assertEqual(len(data['errors']),1,data)
+                        self.assertIsNone(data['errors'][0]['pos'])
+                        self.assertEqual(data['errors'][0]['stage'],'toolchain')
+
     def test_every_build_runs_analysis_and_keeps_normal_maps_in_memory(self):
         self.write('package main\nmain::proc(){values:=[1,2];assert(values[0]==1)}\n')
         self.checked(command='build')

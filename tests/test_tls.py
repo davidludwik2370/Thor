@@ -134,6 +134,80 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_generic_map_optional_lookup_checks_and_unsaved_return_error(self):
+        text='''package main
+Box::struct{items:map[int]int}
+read::proc(box:$B,key:int)->int{
+    value,ok:=box.items[key]
+    if !ok{return 0}
+    return value
+}
+main::proc(){box:=Box{items=make(map[int]int)};defer delete(box.items);_=read(box,-1)}
+'''
+        client,main=self.open(text)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        changed=text.replace('return value','return "bad"')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(e for e in errors if 'Cannot' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'"bad"',0))
+        self.assertNotIn('__thor_',error['message'])
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_new_basic_helpers_hover_navigation_completion_and_callback_error(self):
+        text='''package main
+import "thor:basic"
+main::proc(){
+    numbers:=basic.range(1,8,2)
+    kept:=basic.filter(numbers,proc(x:int)->bool{return x>2})
+    total:=basic.sum(kept)
+    letter:=basic.chr(total)
+    code:=basic.ord('界')
+    sample:=basic.random(f64,0,1)
+    table:=basic.table([]struct{n:int}{{total}})
+    delete(numbers);delete(kept);delete(table)
+    _=letter;_=code;_=sample
+}
+'''
+        client,main=self.open(text)
+        for name,typ in [('numbers:=','[]int'),('kept:=','[]int'),('total:=','int'),
+                         ('letter:=','rune'),('code:=','int'),('sample:=','f64'),('table:=','string')]:
+            with self.subTest(name=name):
+                hover=self.hover(client,main,text,name)
+                self.assertIsNotNone(hover)
+                self.assertIn(typ,hover['contents']['value'])
+        for helper in ['range','filter','sum','chr','ord','random','table']:
+            target=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,'basic.'+helper,len('basic.')+1)})
+            targets=target if isinstance(target,list) else [target]
+            self.assertTrue(any(t and t['uri'].endswith('/runtime/basic/basic.thor') for t in targets),target)
+            completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,'basic.'+helper,len('basic.')+len(helper)), 'context':{'triggerKind':1}})
+            self.assertIn(helper,{i['label'] for i in completion['items']})
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        changed=text.replace('proc(x:int)','proc(x:string)').replace('return x>2','return true')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot assign')
+        error=next(e for e in errors if 'Cannot assign' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'proc(x:string)',0))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_run_overload_diagnostic_follows_unsaved_argument_and_clears(self):
+        text='package main\nimport "thor:basic"\n/* 😀 */ CODE::#run basic.ord("界")\nmain::proc(){_=CODE}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='runtime storage')
+        error=next(e for e in errors if 'runtime storage' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'#run basic.ord',0))
+        self.assertNotIn('__thor_',error['message'])
+        changed=text.replace('ord("界")',"ord('界')")
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_collection_conversion_hovers_and_exports_from_sets_and_basic(self):
         text='''package main
 import "thor:basic"

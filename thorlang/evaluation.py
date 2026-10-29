@@ -651,7 +651,11 @@ class Evaluator:
                     for arg in node.group('args'):visit(arg)
                     return
                 plan=self.r.resolve_call(node)
-                if plan and getattr(plan.symbol.node.source,'native_inspected',False) and self.purity.targets(node):
+                # A resolved call needs only its selected implementation, whether
+                # it lives in the SDK or the project. Retaining a local overload
+                # group pulled unused impure bodies into the helper and rejected
+                # eligible calls (e.g. basic.ord(rune) alongside ord(string)).
+                if plan and self.purity.targets(node):
                     calls[callee]=plan.symbol
                     for proc in self.purity.targets(node):
                         procedures.add(proc);declaration(proc.parent)

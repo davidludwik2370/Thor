@@ -34,7 +34,11 @@ class Runtime:
         if source.info.get('selection_tags'):return False
         # Start with syntax whose translation is independent of caller types,
         # defines, platform selection and compile-time execution.
-        if any(n.kind in {'Run','CompileSwitch','CompileSwitchExpr','WhenExpr'} or n.data.get('pure')
+        # Native when expressions remain native code, including type-dependent
+        # constants inside generic procedures. Only Thor's evaluated forms must
+        # stay project-local; excluding ordinary when expressions duplicated
+        # basic as soon as its random helper selected a floating-point width.
+        if any(n.kind in {'Run','CompileSwitch','CompileSwitchExpr'} or n.data.get('pure')
                or n.kind=='Binary' and n.data.get('op')=='**'
                or n.kind=='Directive' and n.data.get('name') in {'config','load','exists','defined'}
                for n in source.nodes):return False

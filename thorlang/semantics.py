@@ -185,8 +185,8 @@ class Resolver:
 
     def import_directory(self, source, path):
         directory = source.import_dir(path)
-        if directory is None and self.native_enabled and self.native:
-            directory = self.native.load(source, path)
+        if self.native_enabled and self.native and (directory is None or getattr(source, 'native_inspected', False)):
+            directory = self.native.load(source, path) or directory
         return directory
 
     def symbol(self, n, seen=None):

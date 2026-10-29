@@ -2,7 +2,7 @@
 
 Work through the numbered T tasks in coherent batches. Each batch includes its
 compiler behavior, editor support, diagnostic quality, tests, and evaluation demo.
-The specification in `thor.odin` defines the language contract.
+The [language specification](docs/language-spec.md) defines the numbered language contract.
 
 1. Commit the working baseline. Read each task's corresponding spec sections and
    list accepted/rejected cases, ownership rules, and cross-feature interactions.
@@ -1343,3 +1343,76 @@ rejections, empty/nil inputs, allocator retention and shallow string/pointer
 ownership. TLS infers set[int], set[string], set[f64] and corresponding slices,
 finds the exports and offers both names in namespace completion. The shared
 runtime view is prepared successfully and the updated commented demo runs.
+
+## Debug memory checks: compiler 0.19.0 / client 0.12.0
+
+Native macOS executable `-debug` builds select basic allocation tracking and
+AddressSanitizer by default. Support `--track-allocations=off|basic|trace` and
+`--no-sanitize`, preserving explicit Odin sanitizer/module flags. Other-platform
+debug builds keep their ordinary debugger/source-map behavior. Native tests keep
+Odin's per-test allocator. Normal builds and compile-time helper/probe executables
+do not receive these defaults.
+
+Tracking uses stable state and reports after main defers and Odin finalizers.
+Allocation reports use generated-to-original location tables. ASan resolves
+addresses through `llvm-symbolizer-thor`, using a compact map embedded in a
+Mach-O section, including direct execution and moved executable/dSYM pairs.
+Generated entry markers keep sanitizer setup from exposing uninitialized
+parameter homes during source stepping. The adapter skips their synthetic spans.
+Custom allocators and ASan hooks retain their explicit ownership/control rules.
+See [the memory guide](docs/memory-debugging.md) for commands, deployment needs,
+platform scope and allocation/unwinding boundaries.
+
+## Compiler, library and editor hardening: compiler 0.19.1
+
+Review the post-v1 changes, document their current contracts and inspect the new
+filter/sum/range/Unicode/random/table helpers in basic. Preserve unrelated
+playground edits and source-file moves. Recover the numbered specification in
+`docs/language-spec.md`, and expand the basic API guide and commented demo.
+
+[The audit report](docs/hardening-2026-10.md) inventories the reviewed features,
+documentation, coverage, eleven corrected defects and remaining limitations.
+Fix local overload extraction, relative SDK dependencies, owned `do` returns,
+variadic forwarding, shared native `when` expressions, optional map status,
+conditional main tracking, excluded ASan hooks and missing random imports.
+Return exact-size input strings for sized allocators, and identify fatal Odin
+signals as toolchain errors rather than silent unusual exit codes.
+
+One native Odin code-generation SIGSEGV was recorded during the long test run;
+it was not reproduced in isolation, 100 executable runs or ten fresh normal/debug
+builds. Keep this distinct from the corrected Thor defects. Conditional ASan
+hook selection also remains conservative; the documented explicit-symbolizer
+workaround has a real runtime test. Pure library eligibility retains the current
+implementation/effect rules, including the UTF-8 decoder's mutable-table limit.
+
+Verification commands for this pass:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 tools/build_tls.py test
+odin test runtime/format -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+odin test runtime/sets -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+odin test runtime/pure -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+odin test runtime/eval -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+cd editors/vscode && npm test
+# From the repository root, in a desktop session:
+python3 tools/test_vscode.py
+python3 tools/test_vscode_debug.py
+```
+
+Validation: a clean full run passes 752 Python compiler/runtime/cache/stdio-TLS
+tests. Four final added cases pass in focused revalidation (generic optional map
+lookup, its unsaved TLS diagnostic, sized input frees and input allocation
+failure); all 13 real CodeLLDB/DAP tests pass. This covers all 769 available
+Python cases in this workspace, including the pre-existing local Odin playground
+table wrapper. The maintained suite has no expected failures. A separate 187-test
+run revalidates the final compiler/library changes and related diagnostics.
+
+All 1,126 allocation-tracked native TLS tests, 89 Node grammar/client/adapter
+tests, and 17 native runtime tests pass. Both isolated real VS Code workflows
+pass, including a new mkthor project's shortcut, breakpoints, stepping, watches
+and restart. The expanded basic demo and full language walkthrough pass in normal
+and debug builds with empty stderr and no leak reports. Shared runtime reuse and
+the normal-build absence of memory instrumentation retain their tests. The local
+TLS/client implementation and versions are unchanged; no extension reinstall is
+needed for these compiler/library fixes.

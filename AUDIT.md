@@ -1,5 +1,8 @@
 # Post-v1 correctness and TLS audit
 
+For the later compiler/library/debugger audit, see
+[the October 2026 hardening report](docs/hardening-2026-10.md).
+
 Audit date: 2026-10-25. Baseline: `dd73068` (0.7.0). Fixes: 0.7.1.
 This is a review of the implemented T01–T23 features, their existing tests and
 selected cross-feature interactions. It is not a proof over every combination

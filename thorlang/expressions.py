@@ -333,6 +333,24 @@ class Expressions:
         s=self.source
         base=n.role('expr')
         if not self.sequence_type(base): return None
+        if n.kind == 'Index':
+            # Only native map lookups supply an optional status. If an unknown
+            # generic/imported record holds the map, wrapping the lookup in a
+            # single-result sequence helper would discard that status. Leave
+            # optional contexts native; Odin still rejects sequence lookups in
+            # those contexts, and map keys need no negative-index normalization.
+            value=n
+            while value.parent and value.parent.kind=='Paren':value=value.parent
+            parent=value.parent
+            optional=parent and parent.kind in {'OrElse','OrReturn','OrBranch'}
+            if parent and parent.kind in {'Declaration','Assignment'}:
+                names=parent.group('names' if parent.kind=='Declaration' else 'lhs')
+                values=parent.group('values' if parent.kind=='Declaration' else 'rhs')
+                optional=len(names)>1 and len(values)==1
+            if parent and parent.kind=='Return' and len(parent.group('values'))==1:
+                proc=next((a for a in parent.ancestors() if a.kind=='Procedure'),None)
+                optional=bool(proc and len(s.resolver.fields(proc.role('type').role('results')))>1)
+            if optional:return None
         bounds=[n.role('index')] if n.kind=='Index' else [n.role('low'),n.role('high')]
         # Positive constants and narrow unsigned indices stay native. Wide
         # unsigned runtime indices need a check before Odin narrows to int.

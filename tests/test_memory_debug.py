@@ -133,6 +133,23 @@ main :: proc() {
         self.assertEqual(result.stdout.strip(), 'clean 7')
         self.assertEqual(result.stderr, '')
 
+    def test_each_conditional_main_installs_tracking(self):
+        text = '''package main
+FIRST :: #config(FIRST, true)
+when FIRST {
+    main :: proc() { pointer:=new(int); _=pointer }
+} else {
+    main :: proc() { values:=make([]int,3); _=values }
+}
+'''
+        for first, size, line in [(True, 8, 4), (False, 24, 6)]:
+            with self.subTest(first=first):
+                self.build(text, flags=('-debug', '-define:FIRST='+str(first).lower()))
+                result = self.run_program()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'1 allocation(s), {size} byte(s)', result.stderr)
+                self.assertIn(str(self.source)+f':{line}:', result.stderr)
+
     def test_leaks_basic_without_debug_and_tracking_off(self):
         source = 'package main\nmain :: proc() {\n    pointer := new(int)\n    _ = pointer\n}\n'
         self.build(source, ['--track-allocations=basic'])
@@ -237,6 +254,35 @@ main :: proc() { pointer:=new(int); free(rawptr(pointer)); assert(pointer^==0) }
         result = self.run_program()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(str(self.source)+':3:', result.stderr)
+
+    def test_excluded_platform_hook_does_not_disable_automatic_mapping(self):
+        self.build('''package main
+import "hooks"
+main::proc(){assert(hooks.VALUE==0);p:=new(int);free(rawptr(p));assert(p^==1)}
+''', files={
+            'hooks/hooks.thor':'package hooks\nVALUE::0\n',
+            'hooks/hooks_linux.thor':'''package hooks
+@(export,no_sanitize_address,link_name="__asan_default_options")
+options::proc "c" ()->cstring{return "symbolize=0"}
+''',
+        })
+        result=self.run_program()
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('heap-use-after-free',result.stderr)
+        self.assertIn(str(self.source)+':3:',result.stderr)
+
+    def test_explicit_symbolizer_with_a_conditional_user_hook(self):
+        self.build('''package main
+when false {
+    @(export,no_sanitize_address,link_name="__asan_default_options")
+    options::proc "c" ()->cstring{return "symbolize=0"}
+}
+main::proc(){p:=new(int);free(rawptr(p));assert(p^==1)}
+''')
+        result=self.run_program(env={'ASAN_SYMBOLIZER_PATH':str(ROOT/'llvm-symbolizer-thor')})
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('heap-use-after-free',result.stderr)
+        self.assertIn(str(self.source)+':6:',result.stderr)
 
     def test_debug_compiler_errors_and_compile_time_cache_are_unchanged(self):
         self.source.write_text('package main\nmain :: proc() {\n    value: int = "wrong"\n    _ = value\n}\n')

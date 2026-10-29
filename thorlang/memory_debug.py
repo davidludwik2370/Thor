@@ -17,6 +17,8 @@ def attributes(declaration):
 
 def has_asan_options(project):
     for source in project.sources.values():
+        if source.excluded:
+            continue
         for node in source.nodes:
             if node.kind != 'Declaration':
                 continue
@@ -103,7 +105,9 @@ class MemoryDebug:
                 alias = source.prefix + "memory_start"
                 package = "debug_memory_trace" if self.tracking == "trace" else "debug_memory"
                 source.memory_import = f'\nimport {alias} "{collection}:{package}"\n'
-                source.memory_prologues = {body: f"\ncontext.allocator = {alias}.begin({prefix}map)\n"}
+                prologues = getattr(source, 'memory_prologues', {})
+                prologues[body] = f"\ncontext.allocator = {alias}.begin({prefix}map)\n"
+                source.memory_prologues = prologues
         if self.address:
             for source in project.sources.values():
                 if source.excluded or source.path.is_relative_to(root / 'runtime') or getattr(source, 'native_inspected', False):

@@ -58,6 +58,14 @@ do not mark names private, so `_int` and the other conversion helpers are public
 | `fmap(values, callback, allocator=...)` | Allocate an element-wise mapped slice with the same element type. |
 | `split(text, sep="\n", allocator=...)` | Allocate a slice of borrowed string views into `text`. |
 | `join(values, sep="", allocator=...)` | Allocate a joined string. |
+| `to_set(values, allocator=...)`, `to_slice(set, allocator=...)` | Allocate independent containers; element copies are shallow and set order is unspecified. Also exported by `thor:sets`. |
+| `filter(values, predicate, allocator=...)` | Allocate a slice of matching elements in input order. The predicate runs once per element; copies are shallow. Empty/no-match inputs yield an empty slice. |
+| `sum(values)` | Sum a numeric slice with Odin's arithmetic/overflow rules; empty input returns the element type's zero value. Supports distinct numeric, complex and quaternion types. |
+| `range(end)`, `range(start, end)`, `range(start, end, step)` | Allocate a half-open `[]int`, with a default start of zero and step of one. Descending ranges need a negative step. Zero step, equal bounds and the wrong direction yield an empty slice. Bounds/count arithmetic is widened before allocation. |
+| `chr(code_point)` | Return one Unicode scalar as a `rune`, without allocating. Negative, surrogate and out-of-range values assert. |
+| `ord(value)` | Return a single-rune/single-code-point string's Unicode value, or the byte from a one-element `[]u8`. Empty/multiple/invalid input asserts. A combining sequence such as `"e\u0301"` has two code points. |
+| `random(T, lo=..., hi=..., gen=...)` | Sample integer/float values with both bounds inclusive. Omitted bounds are `min(T)`/`max(T)`; explicit zero stays zero. Requires ordered bounds and finite floats. Uses `context.random_generator` unless `gen` is supplied. |
+| `table(rows, max_col_width=0, float_format="%.2f")` | Allocate an ASCII-bordered table from a slice of structs. Field tags override headings; numeric values align right, other values and headings left. |
 
 Allocating helpers default to `context.allocator`. Delete each owned result once
 using its allocator. For `split`, delete the outer slice and keep the input text
@@ -66,6 +74,39 @@ it does not make independent backing storage for slices, strings, maps or sets.
 Use the corresponding collection/string clone operation when that is needed.
 The allocation-error tuples on `clone`, `fmap`, `split` and `join` keep their
 original optional-error behavior.
+
+`input` retains the capacity of its temporary read buffer until cleanup and
+returns an exact-size string, so trimming LF/CRLF does not invalidate a sized
+allocator's free operation. Allocation failure returns `io.Error.Unknown`, since
+its I/O error type has no allocator-error variant. Partial lines at EOF remain
+caller-owned and accompany `.EOF`.
+
+`filter` and `range` results follow the same deletion rule. `filter` shrinks its
+dynamic buffer before returning a slice, or copies to an exact-size allocation
+if shrinking is unsupported. This makes deleting the slice valid for allocators
+that check the size supplied to `delete`.
+
+`range` produces machine-sized integers. Its `#any_int` arguments follow Odin's
+integer conversion rules; use representable bounds/steps. The maximum result
+length is checked against the allocation's byte size. A very large valid range
+can still exhaust memory; it is not a lazy iterator.
+
+`table` uses the current allocator for its final string and all internal work;
+delete its final string once. It releases its temporary strings and arrays.
+Widths count terminal display cells, including wide Unicode and intact grapheme
+clusters. Each column has one space on either side; continuation lines indent by
+up to two spaces, reduced for narrow columns. Newlines in headings/cells are
+preserved, tabs become four spaces and ASCII controls are escaped. A positive
+`max_col_width` must fit the widest displayed character; zero uses measured
+widths. A table with no rows still prints headings; a struct with no fields
+produces `""`. The returned table includes its final newline.
+
+Pure eligibility depends on the actual implementation. `sum`, `chr` and
+`ord(rune)` can be used from `fn`/`#run`. `ord(string)` currently calls Odin's
+UTF-8 decoder, whose mutable lookup tables are excluded by the purity contract.
+The allocation/context/callback/reflection requirements of `range`, `filter`,
+`random` and `table` also keep those implementations outside that subset.
+Use them as ordinary runtime procedures; no library import bypasses purity rules.
 
 For a runnable walkthrough, see [the example](../../examples/basic/demo.thor):
 

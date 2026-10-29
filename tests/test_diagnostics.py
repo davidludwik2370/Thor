@@ -41,6 +41,12 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_owned_do_return_error_is_original_token_not_generated_block(self):
+        source='package main\nwork::fn(flag:bool)->string{if flag do return "yes";return 10}\nmain::proc(){flag:=false;text:=work(flag);delete(text)}\n'
+        errors=self.at(source,'10',flags=('-debug',),message='Cannot')
+        self.assertNotIn('Syntax Error',json.dumps(errors))
+        self.assertNotIn('__thor_',json.dumps(errors))
+
     def test_native_run_overload_error_uses_public_name_and_original_callee(self):
         source='package main\nimport "core:math"\n/* 😀 */ VALUE :: #run math.round("bad")\nmain::proc(){}\n'
         errors=self.at(source,'math.round',message='No procedures or ambiguous call')

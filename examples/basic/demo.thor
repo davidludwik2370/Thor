@@ -94,5 +94,42 @@ main :: proc() {
 
     assert(basic.type(numbers) == []int)
     assert(basic.size(numbers) == size_of([]int))
+
+    // filter preserves order and creates another shallow, caller-owned slice.
+    // Even an empty result is valid to delete.
+    large := basic.filter(numbers, proc(value: int) -> bool {
+        return value > 3
+    })
+    defer delete(large)
+    assert(len(large) == 2 && large[0] == 8 && large[1] == 5)
+    assert(basic.sum(large) == 13)
+    assert(basic.sum([]int{}) == 0)
+
+    // Ranges allocate integer slices. The ending bound is excluded; negative
+    // steps walk downward. This is a collection, not a lazy loop iterator.
+    countdown := basic.range(5, 0, -2)
+    defer delete(countdown)
+    assert(len(countdown) == 3 && countdown[0] == 5 && countdown[-1] == 1)
+
+    // chr returns a rune (a Unicode scalar), not an allocated string. A string
+    // passed to ord must contain exactly one code point, not a whole grapheme.
+    assert(basic.chr(0x754c) == '界')
+    assert(basic.ord("😀") == 0x1f600)
+    assert(basic.ord([]u8{255}) == 255) // A byte is deliberately not UTF-8-decoded.
+
+    // Random bounds are inclusive; explicit zero is a real bound. Supplying a
+    // generator lets callers control reproducibility; omission uses context.
+    assert(basic.random(int, 0, 0) == 0)
+    sample := basic.random(f64, 0, 1)
+    assert(sample >= 0 && sample <= 1)
+
+    // A table uses field names or tags for headings. Numeric values align to
+    // the right, strings to the left. Long text wraps; Unicode widths are
+    // measured in terminal cells. The returned string belongs to us.
+    Row :: struct { name: string `Item`, count: int `Qty`, price: f64 `Price` }
+    report := basic.table([]Row{{"pear", 2, 2.5}, {"apple", 12, 1.25}})
+    defer delete(report)
+    basic.print(report, end="")
+
     basic.print("Basic package examples passed.")
 }

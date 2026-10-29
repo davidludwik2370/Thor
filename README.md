@@ -2,7 +2,7 @@
 
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
 milestone implements **T01–T23** from the reference specification in
-[thor.odin](thor.odin). It includes the parser and project support needed to make
+[the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
 ## Run the demo
@@ -789,8 +789,9 @@ concrete and shape-constrained records resolve pointer promotion directly.
 
 T01–T23 are implemented, including automatic constant evaluation, per-instance
 generic scheduling, persistent caching and independently owned allocated results.
-`fn` and `set` remain valid ordinary Odin identifiers. The root `thor.odin` is the
-reference specification; `demo/main.thor` is the evaluation program. Follow
+`fn` and `set` remain valid ordinary Odin identifiers. The
+[language specification](docs/language-spec.md) preserves the numbered reference;
+`demo/main.thor` is the evaluation program. Follow
 [DEVELOPMENT.md](DEVELOPMENT.md) for each compiler → TLS → diagnostics batch.
 
 ## Pure functions and compile-time execution

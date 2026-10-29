@@ -23,7 +23,13 @@ class NativeSources:
         self.discovery_scope = None
 
     def directory(self, source, path):
-        if source.import_dir(path) is not None:
+        local = source.import_dir(path)
+        if local is not None:
+            # SDK packages also import siblings/children with relative paths.
+            # They are not project packages, so resolve their source just like
+            # a core:/vendor: dependency rather than copying a dangling import.
+            if getattr(source, 'native_inspected', False) and self.root and local.is_relative_to(Path(self.root)):
+                return local
             return None
         collection, separator, relative = path.partition(':')
         root = self.root

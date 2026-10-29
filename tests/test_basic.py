@@ -199,6 +199,59 @@ delete(empty)
                                 capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_input_owned_strings_can_be_freed_by_size_checking_allocators(self):
+        source='''package main
+import "thor:basic"
+import "core:mem"
+strict::proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,
+    old:rawptr,old_size:int,loc:=#caller_location)->([]byte,mem.Allocator_Error){
+    tracker:=(^mem.Tracking_Allocator)(data)
+    if old!=nil {
+        entry,ok:=tracker.allocation_map[old]
+        assert(!ok || entry.size==old_size,"incorrect allocation size at free/resize")
+    }
+    allocator:=mem.tracking_allocator(tracker)
+    return allocator.procedure(allocator.data,mode,size,alignment,old,old_size,loc)
+}
+main::proc(){
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracker)
+    allocator:=mem.Allocator{strict,&tracker}
+    for expected in ([]string{"first","","é😀","last"}) {
+        line,err:=basic.input(allocator=allocator)
+        assert(line==expected)
+        if expected=="last" { assert(err==.EOF) } else { assert(err==nil) }
+        delete(line,allocator)
+    }
+    assert(len(tracker.allocation_map)==0,"input leaked storage")
+}
+'''
+        for flags in [(),('-debug',)]:
+            with self.subTest(flags=flags):
+                root,_=self.invoke(source,command='build',flags=flags)
+                result=subprocess.run([str(root/(root.name+('.exe' if os.name=='nt' else '')))],
+                    input='first\n\né😀\r\nlast',capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(result.stderr,'')
+
+    def test_input_allocation_failure_returns_io_error(self):
+        root,_=self.invoke('''package main
+import "thor:basic"
+import "core:mem"
+fail::proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,
+    old:rawptr,old_size:int,loc:=#caller_location)->([]byte,mem.Allocator_Error){
+    return nil,.Out_Of_Memory
+}
+main::proc(){
+    line,err:=basic.input(allocator=mem.Allocator{fail,nil})
+    assert(line=="" && err==.Unknown)
+}
+''',command='build')
+        result=subprocess.run([str(root/(root.name+('.exe' if os.name=='nt' else '')))],
+            input='hello\n',capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_private_implementation_is_not_exported(self):
         self.invoke(self.program('_, _ = basic._parse_int("7", int)', 'import "thor:basic"\n'),
                     command='check', fail='private')

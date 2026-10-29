@@ -586,6 +586,11 @@ class Purity:
             finally:self.rendering.remove(n)
         if n.kind=='Return' and proc in self.inner_bodies:
             s=n.source;results=self.r.fields(proc.role('type').role('results'))
+            if n.parent and n.parent.kind == 'Block' and s.raw[n.parent.start:n.parent.start+1] != b'{':
+                # Promotion expands a single return into a block. Odin's `do`
+                # syntax accepts a normal statement, so remove that keyword
+                # just as expression-helper lowering does for synthetic blocks.
+                s.expressions.convert_do(n.parent)
             named=self.result_names(proc)
             values_=n.group('values')
             rhs=','.join(s.render(value,expected=s.type_hint(typ) or Hint(s,typ))
@@ -676,11 +681,16 @@ class Purity:
         finally:self.inner_bodies.remove(proc)
         names=[s.prefix+'returned_'+str(proc.start)+'_'+str(i) for i in range(len(results))]
         args=['&'+value for value in names]+['#procedure',prefix+'_caller']
+        after_variadic=False
         for field in params.children:
             if field.kind!='Field':continue
             for param in field.group('names'):
                 arg=self.parameter_name(param)
-                if field.data.get('variadic'):arg='..'+arg
+                if field.data.get('variadic'):
+                    arg='..'+arg
+                    after_variadic=True
+                elif after_variadic:
+                    arg=self.parameter_name(param)+'='+arg
                 args.append(arg)
         code=self.prologue(block)+f'\n{name}::{header} {body}\n'
         code+='\n'.join(f'{value}:{s.render(typ,constant=True)}' for value,(_,typ) in zip(names,results))+'\n'

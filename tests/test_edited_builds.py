@@ -60,6 +60,27 @@ main::proc(){}
         self.assertEqual(report['thor_prepared_hits'],0)
         self.assertIn('ambient context',errors)
 
+    def test_selected_overload_cache_ignores_unused_impurity_but_rechecks_selected_body(self):
+        source='''package main
+integer::proc(n:int)->int{return n+1}
+text::proc(s:string)->int{_=context;return len(s)}
+choose::proc{integer,text}
+VALUE::#run choose(2)
+#assert(VALUE==3)
+main::proc(){}
+'''
+        self.write(source);self.compile()
+        report,_=self.compile()
+        self.assertGreater(report['thor_cache']['hits'],0,report)
+        self.source.write_text(source.replace('return len(s)','return len(s)+2'))
+        self.compile()
+        self.source.write_text(source.replace('return n+1','return n+2'))
+        _,errors=self.compile(status=1)
+        self.assertIn('VALUE==3',errors)
+        self.source.write_text(source.replace('return n+1','_=context;return n+1'))
+        _,errors=self.compile(status=1)
+        self.assertIn('ambient context',errors)
+
     def test_fn_transitive_proc_dependencies_are_revalidated_after_cache_hits(self):
         source='''package main
 leaf::proc(value:int)->int{return value+1}
