@@ -136,6 +136,10 @@ completion, original callback error ranges and clearing after an unsaved fix.
   crash is claimed. The driver now reports such failures clearly; a clean-suite
   rerun is included in the verification. If it recurs, preserve the generated
   Odin and compiler crash record for an upstream reproducer.
+  **Follow-up:** [the compiler investigation](odin-codegen-race.md) has now
+  reproduced a matching shared type-name cache race in a plain Odin program
+  using C++ ThreadSanitizer. It includes an experimental, uninstalled fix and
+  explicit workaround flags; the original native crash remains intermittent.
 - **Conditionally declared ASan hooks:** hook discovery remains conservative
   inside an included file. A user hook under an inactive `when` can suppress the
   automatic Thor symbolizer choice. Instrumentation and debugging still work.

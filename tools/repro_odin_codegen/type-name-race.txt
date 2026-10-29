@@ -1,0 +1,43 @@
+WARNING: ThreadSanitizer: data race (pid=25208)
+  Read of size 8 at 0x0001558e3150 by thread T2:
+    #0 lb_get_entity_name(lbModule*, Entity*) <temporary>/compiler/src/llvm_backend_general.cpp:2572:64 (odin:arm64+0x100251f48)
+    #1 lb_type_internal(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3136:62 (odin:arm64+0x100259be4)
+    #2 lb_type(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3517:14 (odin:arm64+0x100251298)
+    #3 lb_type_internal_for_procedures_raw(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp (odin:arm64+0x100261508)
+    #4 lb_get_procedure_raw_type(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_type.cpp:108:9 (odin:arm64+0x1002a8030)
+    #5 lb_create_procedure(lbModule*, Entity*, bool) <temporary>/compiler/src/llvm_backend_proc.cpp:158:26 (odin:arm64+0x1002a8030)
+    #6 lb_generate_procedures_and_types_per_module(void*) <temporary>/compiler/src/llvm_backend.cpp:2616:44 (odin:arm64+0x100336fdc)
+    #7 thread_pool_steal(ThreadPool*) <temporary>/compiler/src/thread_pool.cpp:203:4 (odin:arm64+0x1001bb1a0)
+    #8 thread_pool_thread_proc(Thread*) <temporary>/compiler/src/thread_pool.cpp:343:8 (odin:arm64+0x1001baeb4)
+    #9 internal_thread_proc(void*) <temporary>/compiler/src/threading.cpp:614:2 (odin:arm64+0x1001baeb4)
+
+  Previous write of size 8 at 0x0001558e3150 by thread T1:
+    #0 lb_get_entity_name(lbModule*, Entity*) <temporary>/compiler/src/llvm_backend_general.cpp (odin:arm64+0x100252168)
+    #1 lb_type_internal(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3136:62 (odin:arm64+0x100259be4)
+    #2 lb_type(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3517:14 (odin:arm64+0x100251298)
+    #3 lb_type_internal(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp (odin:arm64+0x100258758)
+    #4 lb_type(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3517:14 (odin:arm64+0x100251298)
+    #5 lb_type_internal(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3330:35 (odin:arm64+0x100259ac4)
+    #6 lb_type(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3517:14 (odin:arm64+0x100251298)
+    #7 lb_type_internal(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3143:38 (odin:arm64+0x100259c58)
+    #8 lb_type(lbModule*, Type*) <temporary>/compiler/src/llvm_backend_general.cpp:3517:14 (odin:arm64+0x100251298)
+    #9 lb_generate_procedures_and_types_per_module(void*) <temporary>/compiler/src/llvm_backend.cpp:2611:9 (odin:arm64+0x100336efc)
+    #10 thread_pool_steal(ThreadPool*) <temporary>/compiler/src/thread_pool.cpp:203:4 (odin:arm64+0x1001bb1a0)
+    #11 thread_pool_thread_proc(Thread*) <temporary>/compiler/src/thread_pool.cpp:343:8 (odin:arm64+0x1001baeb4)
+    #12 internal_thread_proc(void*) <temporary>/compiler/src/threading.cpp:614:2 (odin:arm64+0x1001baeb4)
+
+  Thread T2 (tid=71528734, running) created by main thread at:
+    #0 pthread_create <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64+0x31d84)
+    #1 thread_init_and_start(ThreadPool*, Thread*, long) <temporary>/compiler/src/threading.cpp:665:3 (odin:arm64+0x1000349e4)
+    #2 thread_pool_init(ThreadPool*, long, char const*) <temporary>/compiler/src/thread_pool.cpp:75:3 (odin:arm64+0x1000349e4)
+    #3 init_global_thread_pool() <temporary>/compiler/src/main.cpp:19:2 (odin:arm64+0x1000349e4)
+    #4 main <temporary>/compiler/src/main.cpp:4549:2 (odin:arm64+0x10001fb04)
+
+  Thread T1 (tid=71528733, running) created by main thread at:
+    #0 pthread_create <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64+0x31d84)
+    #1 thread_init_and_start(ThreadPool*, Thread*, long) <temporary>/compiler/src/threading.cpp:665:3 (odin:arm64+0x1000349e4)
+    #2 thread_pool_init(ThreadPool*, long, char const*) <temporary>/compiler/src/thread_pool.cpp:75:3 (odin:arm64+0x1000349e4)
+    #3 init_global_thread_pool() <temporary>/compiler/src/main.cpp:19:2 (odin:arm64+0x1000349e4)
+    #4 main <temporary>/compiler/src/main.cpp:4549:2 (odin:arm64+0x10001fb04)
+
+SUMMARY: ThreadSanitizer: data race <temporary>/compiler/src/llvm_backend_general.cpp:2572:64 in lb_get_entity_name(lbModule*, Entity*)

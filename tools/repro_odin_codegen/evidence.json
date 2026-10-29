@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-29",
+  "compiler": "dev-2026-10:8169255b9",
+  "odin_commit": "8169255b97b85d6a08691d99764f51fb01f92b5a",
+  "host": "macOS 15.6 arm64",
+  "original_crash": {
+    "process": "odin",
+    "signal": "SIGSEGV",
+    "location": "alloc_cstring + 896",
+    "caller": "lb_type_internal + 680",
+    "saved_string_pointer": 0,
+    "saved_string_length": 26,
+    "destination_nonnull": true
+  },
+  "ordinary_stress": {
+    "valid_compilations": 2402,
+    "crashes": 0,
+    "cases": "plain Odin print and frozen Thor-generated basic.print; LLVM IR output"
+  },
+  "candidate_release_stress": {
+    "compilations": 200,
+    "crashes": 0
+  },
+  "tsan_comparison": [
+    {
+      "compiler": "original",
+      "run": 0,
+      "name_cache_read_reports": 10
+    },
+    {
+      "compiler": "original",
+      "run": 1,
+      "name_cache_read_reports": 10
+    },
+    {
+      "compiler": "original",
+      "run": 2,
+      "name_cache_read_reports": 10
+    },
+    {
+      "compiler": "type-name-patch",
+      "run": 0,
+      "name_cache_read_reports": 0
+    },
+    {
+      "compiler": "type-name-patch",
+      "run": 1,
+      "name_cache_read_reports": 0
+    },
+    {
+      "compiler": "type-name-patch",
+      "run": 2,
+      "name_cache_read_reports": 0
+    }
+  ],
+  "controls": {
+    "thread_count_1": {
+      "name_cache_read_reports": 0,
+      "total_tsan_reports": 0
+    },
+    "single_module": {
+      "name_cache_read_reports": 0,
+      "total_tsan_reports": 72
+    }
+  },
+  "note": "TSan also reported other locations; only this name-cache race family is validated by the prototype. No installed compiler or Thor defaults were changed."
+}

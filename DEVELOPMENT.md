@@ -1416,3 +1416,21 @@ and debug builds with empty stderr and no leak reports. Shared runtime reuse and
 the normal-build absence of memory instrumentation retain their tests. The local
 TLS/client implementation and versions are unchanged; no extension reinstall is
 needed for these compiler/library fixes.
+
+## Odin backend crash investigation
+
+Follow the earlier SIGSEGV into Odin's cached LLVM type names. The crash registers
+show a null string pointer with length 26 while copying a name; parallel module
+workers access the same non-atomic two-word cache. A C++ ThreadSanitizer compiler
+reproduces those accesses when compiling a plain `fmt.println("hello")`, without
+Thor. A temporary atomic-pointer publication patch removes this type-name race
+while retaining parallel builds. The original release compiler does not repeat
+the SIGSEGV in 2,402 stress compilations; race detection is the stronger evidence.
+
+The candidate passes 200 ordinary stress compilations and plain/generated print,
+basic and full walkthrough examples. Other sanitizer reports are outside this
+narrow fix; an analogous variable/link-name race remains in a two-print example.
+The installed compiler, its source checkout and Thor's defaults stay unchanged.
+Document optional single-module/single-thread controls, and preserve the selected
+trace, test fixture, results and three-file patch under
+`tools/repro_odin_codegen`. See [the report](docs/odin-codegen-race.md).
