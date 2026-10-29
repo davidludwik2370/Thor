@@ -1,0 +1,3 @@
+$AUDIT/thor/Odin/sum_squares/sum_squares.thor(4:1): Error: Syntax Error: Path does not exist: core:sys/haiku
+    import "core:sys/haiku"
+    ^

@@ -1,0 +1,3 @@
+$AUDIT/repros/enum_iteration/main.thor(1:1): Error: Syntax Error: Unknown library collection: 'thor'
+    package main
+    ^

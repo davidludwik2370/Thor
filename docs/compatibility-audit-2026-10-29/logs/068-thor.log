@@ -1,0 +1,3 @@
+$AUDIT/thor/Odin/ui_demo/ui_demo.thor(276:52): Error: Cannot determine type for implicit selector expression '.TEXT'
+            ui.draw_icon(ctx, .CHECK, box, ctx.style.colors[.TEXT])
+                                                             ^^^^

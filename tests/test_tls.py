@@ -134,6 +134,36 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_odin_compatibility_diagnostics_follow_unsaved_fix_without_false_errors(self):
+        text='''package main
+Color::enum{Red,Blue}
+make_board::proc()->(board:[2]int){
+    i:=-1
+    board[i]="wrong"
+    return
+}
+main::proc(){
+    values:=make_board()
+    switch{case values[-1]==9:}
+    defer for i in 0..<2{_=values[i]}
+    for color in Color{_=color}
+    x:=[1,2];y:=[3,4];zipped:=soa_zip(x=x[:],y=y[:])
+    for value in zipped{_=value.x}
+}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(e for e in errors if 'Cannot' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'"wrong"',0))
+        self.assertNotIn('__thor_',error['message'])
+        fixed=text.replace('"wrong"','9')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
+                    'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assert_original_identifier_tokens(main,fixed,self.semantic_spans(client,main,fixed))
+        self.assertEqual(main.read_text(),text)
+
     def test_app_resource_helper_hover_definition_and_mapped_argument_error(self):
         text='''package main
 import "thor:app"

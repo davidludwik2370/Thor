@@ -1,0 +1,16 @@
+$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v1.odin(79:33) Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	... ilable :: proc(using piece: Piece, limb: int, g: Game) -> bool {
+	                         ^~~~~~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v1.odin(92:26) Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	isRoatated :: proc(using piece: Piece) -> bool {
+	                         ^~~~~~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v1.odin(95:22) Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	rotate :: proc(using piece: ^Piece, g: Game) {
+	                     ^~~~~~~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v1.odin(178:5) Error: 'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring
+	using rl
+	^~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'

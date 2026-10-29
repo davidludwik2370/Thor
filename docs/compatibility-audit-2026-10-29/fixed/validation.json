@@ -1,0 +1,61 @@
+{
+  "thor_version": "0.20.4",
+  "clean_python_groups": [
+    {
+      "group": 1,
+      "modules": [
+        "test_compilation",
+        "test_defaults",
+        "test_diagnostics",
+        "test_installation",
+        "test_mkthor",
+        "test_native_run",
+        "test_parse_cache",
+        "test_pure_calls",
+        "test_rename",
+        "test_t21_t22",
+        "test_t23",
+        "test_tls"
+      ],
+      "returncode": 0,
+      "seconds": 378.697,
+      "log": "/tmp/thor-compat-clean-suite-1.log"
+    },
+    {
+      "group": 2,
+      "modules": [
+        "test_basic",
+        "test_basic_extensions",
+        "test_edited_builds",
+        "test_extrema",
+        "test_hardening",
+        "test_imports",
+        "test_interactions",
+        "test_memory_debug",
+        "test_odin_compatibility",
+        "test_odin_table",
+        "test_power",
+        "test_publish",
+        "test_ranges",
+        "test_t07_t12",
+        "test_t13_t17",
+        "test_t18_t20",
+        "test_thor"
+      ],
+      "returncode": 0,
+      "seconds": 452.476,
+      "log": "/tmp/thor-compat-clean-suite-2.log"
+    }
+  ],
+  "python_cases_without_debugger": 836,
+  "optional_finder_skipped_in_clean_run": 1,
+  "debugger_tests": 13,
+  "finder_separate_tests": 1,
+  "unique_python_cases_covered": 849,
+  "native_tls_tests": 1126,
+  "node_editor_tests": 89,
+  "odin_successful_corpus_cases": 79,
+  "thor_successful_corpus_cases": 79,
+  "conversion_failures": [],
+  "original_files_changed": []
+}

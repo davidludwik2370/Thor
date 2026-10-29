@@ -1,0 +1,45 @@
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(443:3): Error: Cannot take a mutable address of an element in a temporary array.
+            key.moves[i] = moves[i]
+            ^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(443:3): Error: Missing return statement at the end of the procedure 'Thor expression'
+            key.moves[i] = moves[i]
+            ^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(449:47): Error: Cannot determine polymorphic type from parameter: 'Board_Symmetry' to '$T'
+	Suggestion: Are you trying to pass a type to a value parameter?
+        if BOARD_WIDTH == BOARD_HEIGHT do return len(Board_Symmetry)
+                                                     ^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(527:57): Error: Cannot determine polymorphic type from parameter: 'Board_Symmetry' to '$T'
+	Suggestion: Are you trying to pass a type to a value parameter?
+        if BOARD_WIDTH == BOARD_HEIGHT do symmetry_count = len(Board_Symmetry)
+                                                               ^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(590:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok do return
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(690:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok do return
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(693:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok_data {
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(925:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok do return
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(974:5): Error: Non-boolean condition in 'if' statement
+        if os.write_entire_file(path, data) {
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(1245:3): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for j in i+1..<count {
+            ^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(1245:15): Error: Unknown operator '..<'
+            for j in i+1..<count {
+                        ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(1246:56): Error: Undeclared name: j
+                priority := searchData.square_priority[int(move_buf[j])]
+                                                                    ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(1248:21): Error: Undeclared name: j
+                    best_idx      = j
+                                    ^

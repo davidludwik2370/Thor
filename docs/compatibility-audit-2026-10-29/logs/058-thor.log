@@ -1,0 +1,54 @@
+$AUDIT/thor/Odin/sudoku/sudoku.thor(169:17): Error: The element variable 'v' cannot be made addressable
+            switch &v in board[y][x] {
+                    ^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(213:28): Error: Non-boolean condition in 'if' statement
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(213:28): Error: Cannot take the pointer address of '(v)'
+	Suggestion: Did you want to pass the value to the switch statement by pointer to get addressable semantics?
+	            Prefer doing 'switch &v in ...'
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(235:28): Error: Non-boolean condition in 'if' statement
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(235:28): Error: Cannot take the pointer address of '(v)'
+	Suggestion: Did you want to pass the value to the switch statement by pointer to get addressable semantics?
+	            Prefer doing 'switch &v in ...'
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(255:21): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                        for y in start_row..<start_row+3 { // loop every cell in block
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(255:39): Error: Unknown operator '..<'
+                        for y in start_row..<start_row+3 { // loop every cell in block
+                                          ^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(256:25): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                            for x in start_col..<start_col+3 {
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(256:43): Error: Unknown operator '..<'
+                            for x in start_col..<start_col+3 {
+                                              ^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(257:41): Error: Invalid type for this type switch expression, got '$Thor expression'
+                                switch v in board[y][x] {
+                                            ^^^^^^^^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(257:47): Error: Undeclared name: y
+                                switch v in board[y][x] {
+                                                  ^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(257:50): Error: Undeclared name: x
+                                switch v in board[y][x] {
+                                                     ^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(372:9): Error: Cannot take a mutable address of an element in a temporary array.
+            solved[y][x] = i
+            ^^^^^^^^^
+$AUDIT/thor/Odin/sudoku/sudoku.thor(372:9): Error: Missing return statement at the end of the procedure 'Thor expression'
+            solved[y][x] = i
+            ^^^^^^^^^

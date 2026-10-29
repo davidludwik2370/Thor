@@ -1,0 +1,9 @@
+$AUDIT/thor/Odin_Projects/zzz_refactors/snek_refactor/snek.thor(185:15): Error: Undeclared name: Thor expression
+                        case y < g.snek.seg[i-1].y: tail = { 1, 0, 0, 0 } // up
+                                 ^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/zzz_refactors/snek_refactor/snek.thor(186:15): Error: Undeclared name: Thor expression
+                        case y > g.snek.seg[i-1].y: tail = { 0, 1, 1, 1 } // down
+                                 ^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/zzz_refactors/snek_refactor/snek.thor(187:15): Error: Undeclared name: Thor expression
+                        case x > g.snek.seg[i-1].x: tail = { 1, 1, 1, 0 } // left
+                                 ^^^^^^^^^^^^^^^

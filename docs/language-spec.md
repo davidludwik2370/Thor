@@ -433,6 +433,10 @@ Syntax:
   Union chains may reuse an anonymous owned left result as the accumulator;
   a | b | c requires only one result table, preserving operand evaluation order.
 - Preserve ordinary Odin operators on non-set operands.
+- Preserve native ranges, enum/type iteration, multi-result iterator calls and
+  SOA addressing semantics, including parenthesized operands. Set dispatch must
+  not convert those operands into ordinary procedure arguments. Native len
+  type operands and constant sequence/string lengths remain constant expressions.
 - Fixed-capacity sets/maps and pure-function set/map support are deferred.
 
 
@@ -448,6 +452,12 @@ The general formula uses addition, not n - i.
 - Support ordinary integer-indexed arrays, slices, dynamic arrays, and strings.
   Preserve enumerated-array indexing and pointer/multi-pointer behavior as Odin
   defines it; do not apply sequence normalization to those types.
+- Fixed-capacity dynamic arrays keep their inline storage identity. A generated
+  access must not return a pointer or view into a copied local buffer.
+- Named return storage is writable. Ordinary value parameters and value
+  type-switch bindings remain readonly; pointer type-switch bindings preserve
+  access to the original union payload. These rules also apply to promoted
+  `using` members and generic accesses.
 - Positive indices retain ordinary behavior. Unsigned indices do not take a
   negative-index path or get narrowed merely to support it.
 - Never normalize map keys; integer_map[-1] still accesses key -1.

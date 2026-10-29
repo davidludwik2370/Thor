@@ -1,0 +1,14 @@
+[
+  {
+    "name": "overload",
+    "returncode": -9,
+    "timeout": true,
+    "seconds": 7.007
+  },
+  {
+    "name": "predicate",
+    "returncode": 0,
+    "timeout": false,
+    "seconds": 0.375
+  }
+]

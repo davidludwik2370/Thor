@@ -1,0 +1,93 @@
+[
+  {
+    "name": "soa_len",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.424
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.319
+    }
+  },
+  {
+    "name": "soa_slice_len",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.411
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.314
+    }
+  },
+  {
+    "name": "soa_slice_range",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.146
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.257
+    }
+  },
+  {
+    "name": "soa_zip_range",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.141
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.008
+    }
+  },
+  {
+    "name": "soa_zip_print",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.263
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.006
+    }
+  },
+  {
+    "name": "soa_zip_range_index",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.181
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.008
+    }
+  },
+  {
+    "name": "soa_array_range",
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.137
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.204
+    }
+  }
+]

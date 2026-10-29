@@ -1,0 +1,3 @@
+$AUDIT/repros/type_switch_index/main.thor(6:13): Error: The element variable 'v' cannot be made addressable
+        switch &v in board[y][x] {
+                ^

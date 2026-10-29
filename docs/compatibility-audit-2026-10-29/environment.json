@@ -1,0 +1,11 @@
+{
+  "thor_version": "Thor 0.20.3",
+  "thor_commit": "feb3cb99835ca764e7d0e078a54df86b214003ba",
+  "odin_version": "/Users/davidludwik/Odin/Odin/odin version dev-2026-10:8169255b9",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "machine": "arm64",
+  "audit_temporary_directory": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-project-audit-i2a21orf",
+  "original_regular_files_hashed": 416,
+  "source_files": 122,
+  "original_files_changed": []
+}

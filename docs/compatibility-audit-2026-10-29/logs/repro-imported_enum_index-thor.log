@@ -1,0 +1,6 @@
+$AUDIT/repros/imported_enum_index/main.thor(5:27): Error: Cannot determine type for implicit selector expression '.TEXT'
+        _ = ctx.style.colors[.TEXT]
+                              ^^^^
+$AUDIT/repros/imported_enum_index/main.thor(4:5): Warning: Declaration of 'ctx' may cause a stack overflow due to its type 'Context' having a size of 271672 bytes
+        ctx: ui.Context
+        ^

@@ -1,0 +1,99 @@
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(10:1) Error: Redeclaration of 'DECK_LEN' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(8:1)
+	DECK_LEN    :: 52
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(11:1) Error: Redeclaration of 'MAX_PLAYERS' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(9:1)
+	MAX_PLAYERS :: 10
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(12:1) Error: Redeclaration of 'TRIAL_COUNT' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(10:1)
+	TRIAL_COUNT :: 1_000_000_000
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(14:1) Error: Redeclaration of 'Suit' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(12:1)
+	Suit :: enum {club, diamond, heart, spade}
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(15:1) Error: Redeclaration of 'Card' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(13:1)
+	Card :: struct {num: int, suit: Suit}
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(16:1) Error: Redeclaration of 'Deck' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(14:1)
+	Deck :: [dynamic; DECK_LEN]Card
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(17:1) Error: Redeclaration of 'Hand' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(15:1)
+	Hand :: [dynamic; 7]Card
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(18:1) Error: Redeclaration of 'Hand_Rank' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(16:1)
+	Hand_Rank :: enum {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(30:1) Error: Redeclaration of 'is_hand_sorted' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(28:1)
+	is_hand_sorted :: proc(hand: Hand) -> bool {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(40:1) Error: Redeclaration of 'sort_hand' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(38:1)
+	sort_hand :: proc(hand: ^Hand) {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(46:1) Error: Redeclaration of 'reverse' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(44:1)
+	reverse :: proc(hand: Hand) -> (rev: Hand) {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(52:1) Error: Redeclaration of 'new_deck' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(50:1)
+	new_deck :: proc(shuffle := true) -> (deck: Deck) {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(62:1) Error: Redeclaration of 'new_deal' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(60:1)
+	new_deal :: proc(deck: ^Deck, player_count: int) -> (co ...
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(75:1) Error: Redeclaration of 'last' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(73:1)
+	last :: proc(n: int, cards: []Card) -> []Card {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(81:1) Error: Redeclaration of 'highest_pair' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(79:1)
+	highest_pair :: proc(hand: Hand) -> (pair: [2]Card, ind ...
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(93:1) Error: Redeclaration of 'is_straight' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(91:1)
+	is_straight :: proc(hand: []Card) -> bool {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(101:1) Error: Redeclaration of 'ace_as_14' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(99:1)
+	ace_as_14 :: proc(hand: Hand) -> (a14: Hand) {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(116:1) Error: Redeclaration of 'print_cards' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(114:1)
+	print_cards :: proc(cards: []Card) {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(133:1) Error: Redeclaration of 'find_best_hand' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(131:1)
+	find_best_hand :: proc(hand: Hand) -> (best_hand: Hand, ...
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(284:1) Error: Redeclaration of 'judge' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(282:1)
+	judge :: proc(comm_cards: Hand, deal: []Hand) -> (winne ...
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(363:1) Error: Redeclaration of 'single_run' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(361:1)
+	single_run :: proc() {
+	^
+$AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(375:5) Error: Undeclared name: print
+	print("common: ")
+	^~~~^
+$AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(378:5) Error: Undeclared name: print
+	print("\nhands:")
+	^~~~^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(476:1) Error: Redeclaration of 'print_hand_odds' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(396:1)
+	print_hand_odds :: proc(players := MAX_PLAYERS, trials  ...
+	^
+$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin(517:1) Error: Redeclaration of 'main' in this scope
+	at $AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(475:1)
+	main :: proc() {
+	^
+	Suggestion: Is this a single-file package? If so, try compiling using the `-file` flag.

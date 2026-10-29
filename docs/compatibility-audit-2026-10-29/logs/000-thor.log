@@ -1,0 +1,47 @@
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(8:13): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                for n in smallest..<10 do append(&nums, n)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(8:30): Error: Unknown operator '..<'
+                for n in smallest..<10 do append(&nums, n)
+                                 ^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(8:39): Error: No procedures or ambiguous call for procedure group 'append' that match with the given arguments
+	Given argument types:
+	 • ^[dynamic]int
+	 • invalid type
+Did you mean one of the following overloads?
+	runtime.append_elem  :: proc(#no_alias array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (num_appended: int, err: Allocator_Error)    at /Users/davidludwik/Odin/Odin/base/runtime/core_builtin.odin(783:1)
+	runtime.append_elems :: proc(#no_alias array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (num_appended: int, err: Allocator_Error) at /Users/davidludwik/Odin/Odin/base/runtime/core_builtin.odin(891:1)
+                for n in smallest..<10 do append(&nums, n)
+                                          ^^^^^^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(8:53): Error: Undeclared name: n
+                for n in smallest..<10 do append(&nums, n)
+                                                        ^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(11:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for sd in smallest..<(11-oom) {
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(11:27): Error: Unknown operator '..<'
+            for sd in smallest..<(11-oom) {
+                              ^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(12:39): Error: Undeclared name: sd
+                for n in ascending(oom-1, sd+1) {
+                                          ^^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(14:17): Error: No procedures or ambiguous call for procedure group 'append' that match with the given arguments
+	Given argument types:
+	 • ^[dynamic]int
+	 • invalid type
+Did you mean one of the following overloads?
+	runtime.append_elem  :: proc(#no_alias array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (num_appended: int, err: Allocator_Error)    at /Users/davidludwik/Odin/Odin/base/runtime/core_builtin.odin(783:1)
+	runtime.append_elems :: proc(#no_alias array: ^$T/[dynamic]$E, #no_broadcast args: ..E, loc := #caller_location) -> (num_appended: int, err: Allocator_Error) at /Users/davidludwik/Odin/Odin/base/runtime/core_builtin.odin(891:1)
+                    append(&nums, sd*pow10 + n)
+                    ^^^^^^
+$AUDIT/thor/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.thor(14:31): Error: Undeclared name: sd
+                    append(&nums, sd*pow10 + n)
+                                  ^^

@@ -1,0 +1,104 @@
+$AUDIT/thor/Odin/poker/poker.thor(54:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • Suit
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for suit in Suit {
+            ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker.thor(55:33): Error: Undeclared name: suit
+                append(&deck, {num, suit})
+                                    ^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(328:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for b in a+1..<4 {
+            ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(328:21): Error: Unknown operator '..<'
+            for b in a+1..<4 {
+                        ^
+$AUDIT/thor/Odin/poker/poker_test.thor(329:13): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • invalid type
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                for c in b+1..<5 {
+                ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(329:22): Error: Undeclared name: b
+                for c in b+1..<5 {
+                         ^
+$AUDIT/thor/Odin/poker/poker_test.thor(330:17): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • invalid type
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                    for d in c+1..<6 {
+                    ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(330:26): Error: Undeclared name: c
+                    for d in c+1..<6 {
+                             ^
+$AUDIT/thor/Odin/poker/poker_test.thor(331:21): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • invalid type
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                        for e in d+1..<7 {
+                        ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(331:30): Error: Undeclared name: d
+                        for e in d+1..<7 {
+                                 ^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:63): Error: Cannot assign value 'Thor expression(hand, b, type_of(Thor expression.element(hand)))' of type '$Thor expression' to 'Card' in an array literal
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                  ^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:68): Error: Undeclared name: b
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                       ^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:72): Error: Cannot assign value 'Thor expression(hand, c, type_of(Thor expression.element(hand)))' of type '$Thor expression' to 'Card' in an array literal
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                           ^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:77): Error: Undeclared name: c
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                                ^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:81): Error: Cannot assign value 'Thor expression(hand, d, type_of(Thor expression.element(hand)))' of type '$Thor expression' to 'Card' in an array literal
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                                    ^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:86): Error: Undeclared name: d
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                                         ^
+$AUDIT/thor/Odin/poker/poker_test.thor(332:95): Error: Undeclared name: e
+                            score := test_evaluate_five({hand[a], hand[b], hand[c], hand[d], hand[e]}, poker_rules)
+                                                                                                  ^
+$AUDIT/thor/Odin/poker/poker.thor(512:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for hi in lo..<14 {
+            ^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker.thor(512:21): Error: Unknown operator '..<'
+            for hi in lo..<14 {
+                        ^
+$AUDIT/thor/Odin/poker/poker.thor(514:39): Error: Undeclared name: hi
+                    key := Result_Key{lo, hi, match}
+                                          ^^
+$AUDIT/thor/Odin/poker/poker_test.thor(651:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • Suit
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for suit in Suit {
+            ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(655:41): Error: Undeclared name: suit
+                    append(&hand, Card{num, suit})
+                                            ^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(691:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • Suit
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for suit in Suit {
+            ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/poker_test.thor(693:32): Error: Undeclared name: suit
+                deck[next] = {num, suit}
+                                   ^^^^

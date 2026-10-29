@@ -1,0 +1,6 @@
+$AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(375:5) Error: Undeclared name: print
+	print("common: ")
+	^~~~^
+$AUDIT/odin/Odin/poker/ref/poker_single_thread.odin(378:5) Error: Undeclared name: print
+	print("\nhands:")
+	^~~~^

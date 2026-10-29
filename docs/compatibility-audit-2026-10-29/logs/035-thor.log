@@ -1,0 +1,3 @@
+$AUDIT/thor/Odin/parallel_sum/parallel_sum.thor(42:18): Error: Undeclared name: Thor expression
+            thread.destroy(thread_ary[i])
+                           ^^^^^^^^^^^^^

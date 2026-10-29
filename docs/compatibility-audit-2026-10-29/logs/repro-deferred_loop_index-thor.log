@@ -1,0 +1,3 @@
+$AUDIT/repros/defer_index/main.thor(6:36): Error: Undeclared name: Thor expression
+        defer for i in 0..<2 { consume(values[i]) }
+                                       ^^^^^^^^^

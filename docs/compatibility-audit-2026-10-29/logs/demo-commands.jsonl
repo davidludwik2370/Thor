@@ -1,0 +1,3 @@
+{"event": "start", "time": 1793282482.2956212, "command": ["/Users/davidludwik/odin/odin/odin", "version"]}
+{"event": "finish", "time": 1793282482.412954, "command": ["/Users/davidludwik/odin/odin/odin", "version"], "code": 0}
+{"event": "start", "time": 1793282482.91414, "command": ["/Users/davidludwik/odin/odin/odin", "build", "$AUDIT/generated/12", "-out:$AUDIT/bin/demo-probe", "-collection:thor=/Users/davidludwik/Thor/lib/runtime-3ecbd6fe8494867ac5cc2e72-native", "-json-errors"]}

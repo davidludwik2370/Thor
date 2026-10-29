@@ -1,0 +1,10 @@
+$AUDIT/repros/enum_iteration_supported/main.thor(7:5): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • Color
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+        for color in Color { _ = color }
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/repros/enum_iteration_supported/main.thor(7:30): Error: Undeclared name: color
+        for color in Color { _ = color }
+                                 ^^^^^

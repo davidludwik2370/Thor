@@ -1,0 +1,4114 @@
+[
+  {
+    "index": 0,
+    "label": "Odin/ascendingPrimesOptimized",
+    "original": "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized",
+    "relative": "Odin/ascendingPrimesOptimized",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/ascendingPrimesOptimized",
+        "-out:$AUDIT/bin/000-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.642,
+      "log": "$AUDIT/logs/000-odin.log",
+      "output": "$AUDIT/bin/000-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/ascendingPrimesOptimized",
+        "--output-dir",
+        "$AUDIT/generated/0",
+        "--cache-dir",
+        "$AUDIT/cache/0",
+        "-out:$AUDIT/bin/000-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.247,
+      "log": "$AUDIT/logs/000-thor.log",
+      "output": "$AUDIT/bin/000-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 1,
+    "label": "Odin/ascendingPrimesOptimized/archive",
+    "original": "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive",
+    "relative": "Odin/ascendingPrimesOptimized/archive",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/ascendingPrimesOptimized/archive",
+        "-out:$AUDIT/bin/001-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.255,
+      "log": "$AUDIT/logs/001-odin.log",
+      "output": "$AUDIT/bin/001-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/ascendingPrimesOptimized/archive",
+        "--output-dir",
+        "$AUDIT/generated/1",
+        "--cache-dir",
+        "$AUDIT/cache/1",
+        "-out:$AUDIT/bin/001-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.376,
+      "log": "$AUDIT/logs/001-thor.log",
+      "output": "$AUDIT/bin/001-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 2,
+    "label": "Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin",
+    "original": "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin",
+    "relative": "Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin",
+    "kind": "standalone-version",
+    "file": "ascendingPrimesOptimized.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin",
+        "-out:$AUDIT/bin/002-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.256,
+      "log": "$AUDIT/logs/002-odin.log",
+      "output": "$AUDIT/bin/002-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.thor",
+        "--output-dir",
+        "$AUDIT/generated/2",
+        "--cache-dir",
+        "$AUDIT/cache/2",
+        "-out:$AUDIT/bin/002-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.247,
+      "log": "$AUDIT/logs/002-thor.log",
+      "output": "$AUDIT/bin/002-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 3,
+    "label": "Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin",
+    "original": "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin",
+    "relative": "Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin",
+    "kind": "standalone-version",
+    "file": "ascendingPrimesOptimized_ref.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin",
+        "-out:$AUDIT/bin/003-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.249,
+      "log": "$AUDIT/logs/003-odin.log",
+      "output": "$AUDIT/bin/003-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.thor",
+        "--output-dir",
+        "$AUDIT/generated/3",
+        "--cache-dir",
+        "$AUDIT/cache/3",
+        "-out:$AUDIT/bin/003-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.251,
+      "log": "$AUDIT/logs/003-thor.log",
+      "output": "$AUDIT/bin/003-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 4,
+    "label": "Odin/ascending_primes",
+    "original": "/Users/davidludwik/Code/Odin/ascending_primes",
+    "relative": "Odin/ascending_primes",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/ascending_primes",
+        "-out:$AUDIT/bin/004-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.255,
+      "log": "$AUDIT/logs/004-odin.log",
+      "output": "$AUDIT/bin/004-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/ascending_primes",
+        "--output-dir",
+        "$AUDIT/generated/4",
+        "--cache-dir",
+        "$AUDIT/cache/4",
+        "-out:$AUDIT/bin/004-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.43,
+      "log": "$AUDIT/logs/004-thor.log",
+      "output": "$AUDIT/bin/004-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 5,
+    "label": "Odin/big_ref",
+    "original": "/Users/davidludwik/Code/Odin/big_ref",
+    "relative": "Odin/big_ref",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/big_ref",
+        "-out:$AUDIT/bin/005-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.311,
+      "log": "$AUDIT/logs/005-odin.log",
+      "output": "$AUDIT/bin/005-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/big_ref",
+        "--output-dir",
+        "$AUDIT/generated/5",
+        "--cache-dir",
+        "$AUDIT/cache/5",
+        "-out:$AUDIT/bin/005-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.538,
+      "log": "$AUDIT/logs/005-thor.log",
+      "output": "$AUDIT/bin/005-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 6,
+    "label": "Odin/brc",
+    "original": "/Users/davidludwik/Code/Odin/brc",
+    "relative": "Odin/brc",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/brc",
+        "-out:$AUDIT/bin/006-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.353,
+      "log": "$AUDIT/logs/006-odin.log",
+      "output": "$AUDIT/bin/006-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/brc",
+        "--output-dir",
+        "$AUDIT/generated/6",
+        "--cache-dir",
+        "$AUDIT/cache/6",
+        "-out:$AUDIT/bin/006-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.546,
+      "log": "$AUDIT/logs/006-thor.log",
+      "output": "$AUDIT/bin/006-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 7,
+    "label": "Odin/breakout",
+    "original": "/Users/davidludwik/Code/Odin/breakout",
+    "relative": "Odin/breakout",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/breakout",
+        "-out:$AUDIT/bin/007-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.376,
+      "log": "$AUDIT/logs/007-odin.log",
+      "output": "$AUDIT/bin/007-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/breakout",
+        "--output-dir",
+        "$AUDIT/generated/7",
+        "--cache-dir",
+        "$AUDIT/cache/7",
+        "-out:$AUDIT/bin/007-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.645,
+      "log": "$AUDIT/logs/007-thor.log",
+      "output": "$AUDIT/bin/007-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 8,
+    "label": "Odin/breakout/breakout.odin",
+    "original": "/Users/davidludwik/Code/Odin/breakout/breakout.odin",
+    "relative": "Odin/breakout/breakout.odin",
+    "kind": "standalone-version",
+    "file": "breakout.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/breakout/breakout.odin",
+        "-out:$AUDIT/bin/008-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.37,
+      "log": "$AUDIT/logs/008-odin.log",
+      "output": "$AUDIT/bin/008-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/breakout/breakout.thor",
+        "--output-dir",
+        "$AUDIT/generated/8",
+        "--cache-dir",
+        "$AUDIT/cache/8",
+        "-out:$AUDIT/bin/008-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.594,
+      "log": "$AUDIT/logs/008-thor.log",
+      "output": "$AUDIT/bin/008-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 9,
+    "label": "Odin/breakout/steps.odin",
+    "original": "/Users/davidludwik/Code/Odin/breakout/steps.odin",
+    "relative": "Odin/breakout/steps.odin",
+    "kind": "standalone-version",
+    "file": "steps.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/breakout/steps.odin",
+        "-out:$AUDIT/bin/009-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.045,
+      "log": "$AUDIT/logs/009-odin.log",
+      "output": "$AUDIT/bin/009-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/breakout/steps.thor",
+        "--output-dir",
+        "$AUDIT/generated/9",
+        "--cache-dir",
+        "$AUDIT/cache/9",
+        "-out:$AUDIT/bin/009-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.142,
+      "log": "$AUDIT/logs/009-thor.log",
+      "output": "$AUDIT/bin/009-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 10,
+    "label": "Odin/cell_auto_all_rules",
+    "original": "/Users/davidludwik/Code/Odin/cell_auto_all_rules",
+    "relative": "Odin/cell_auto_all_rules",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/cell_auto_all_rules",
+        "-out:$AUDIT/bin/010-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.253,
+      "log": "$AUDIT/logs/010-odin.log",
+      "output": "$AUDIT/bin/010-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/cell_auto_all_rules",
+        "--output-dir",
+        "$AUDIT/generated/10",
+        "--cache-dir",
+        "$AUDIT/cache/10",
+        "-out:$AUDIT/bin/010-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.377,
+      "log": "$AUDIT/logs/010-thor.log",
+      "output": "$AUDIT/bin/010-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 11,
+    "label": "Odin/collatz",
+    "original": "/Users/davidludwik/Code/Odin/collatz",
+    "relative": "Odin/collatz",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/collatz",
+        "-out:$AUDIT/bin/011-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.256,
+      "log": "$AUDIT/logs/011-odin.log",
+      "output": "$AUDIT/bin/011-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/collatz",
+        "--output-dir",
+        "$AUDIT/generated/11",
+        "--cache-dir",
+        "$AUDIT/cache/11",
+        "-out:$AUDIT/bin/011-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.418,
+      "log": "$AUDIT/logs/011-thor.log",
+      "output": "$AUDIT/bin/011-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 12,
+    "label": "Odin/demo",
+    "original": "/Users/davidludwik/Code/Odin/demo",
+    "relative": "Odin/demo",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/demo",
+        "-out:$AUDIT/bin/012-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.314,
+      "log": "$AUDIT/logs/012-odin.log",
+      "output": "$AUDIT/bin/012-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/demo",
+        "--output-dir",
+        "$AUDIT/generated/12",
+        "--cache-dir",
+        "$AUDIT/cache/12",
+        "-out:$AUDIT/bin/012-thor"
+      ],
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 120.008,
+      "log": "$AUDIT/logs/012-thor.log",
+      "output": "$AUDIT/bin/012-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 13,
+    "label": "Odin/eq_parser",
+    "original": "/Users/davidludwik/Code/Odin/eq_parser",
+    "relative": "Odin/eq_parser",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/eq_parser",
+        "-out:$AUDIT/bin/013-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.261,
+      "log": "$AUDIT/logs/013-odin.log",
+      "output": "$AUDIT/bin/013-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/eq_parser",
+        "--output-dir",
+        "$AUDIT/generated/13",
+        "--cache-dir",
+        "$AUDIT/cache/13",
+        "-out:$AUDIT/bin/013-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.549,
+      "log": "$AUDIT/logs/013-thor.log",
+      "output": "$AUDIT/bin/013-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 14,
+    "label": "Odin/factorial",
+    "original": "/Users/davidludwik/Code/Odin/factorial",
+    "relative": "Odin/factorial",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/factorial",
+        "-out:$AUDIT/bin/014-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.072,
+      "log": "$AUDIT/logs/014-odin.log",
+      "output": "$AUDIT/bin/014-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/factorial",
+        "--output-dir",
+        "$AUDIT/generated/14",
+        "--cache-dir",
+        "$AUDIT/cache/14",
+        "-out:$AUDIT/bin/014-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.19,
+      "log": "$AUDIT/logs/014-thor.log",
+      "output": "$AUDIT/bin/014-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 15,
+    "label": "Odin/fibbonacci",
+    "original": "/Users/davidludwik/Code/Odin/fibbonacci",
+    "relative": "Odin/fibbonacci",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/fibbonacci",
+        "-out:$AUDIT/bin/015-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.257,
+      "log": "$AUDIT/logs/015-odin.log",
+      "output": "$AUDIT/bin/015-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/fibbonacci",
+        "--output-dir",
+        "$AUDIT/generated/15",
+        "--cache-dir",
+        "$AUDIT/cache/15",
+        "-out:$AUDIT/bin/015-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.362,
+      "log": "$AUDIT/logs/015-thor.log",
+      "output": "$AUDIT/bin/015-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 16,
+    "label": "Odin/file_tests",
+    "original": "/Users/davidludwik/Code/Odin/file_tests",
+    "relative": "Odin/file_tests",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/file_tests",
+        "-out:$AUDIT/bin/016-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.083,
+      "log": "$AUDIT/logs/016-odin.log",
+      "output": "$AUDIT/bin/016-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/file_tests",
+        "--output-dir",
+        "$AUDIT/generated/16",
+        "--cache-dir",
+        "$AUDIT/cache/16",
+        "-out:$AUDIT/bin/016-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.213,
+      "log": "$AUDIT/logs/016-thor.log",
+      "output": "$AUDIT/bin/016-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 17,
+    "label": "Odin/file_tests/goodbye.odin",
+    "original": "/Users/davidludwik/Code/Odin/file_tests/goodbye.odin",
+    "relative": "Odin/file_tests/goodbye.odin",
+    "kind": "standalone-version",
+    "file": "goodbye.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/file_tests/goodbye.odin",
+        "-out:$AUDIT/bin/017-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.26,
+      "log": "$AUDIT/logs/017-odin.log",
+      "output": "$AUDIT/bin/017-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/file_tests/goodbye.thor",
+        "--output-dir",
+        "$AUDIT/generated/17",
+        "--cache-dir",
+        "$AUDIT/cache/17",
+        "-out:$AUDIT/bin/017-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.32,
+      "log": "$AUDIT/logs/017-thor.log",
+      "output": "$AUDIT/bin/017-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 18,
+    "label": "Odin/file_tests/hello.odin",
+    "original": "/Users/davidludwik/Code/Odin/file_tests/hello.odin",
+    "relative": "Odin/file_tests/hello.odin",
+    "kind": "standalone-version",
+    "file": "hello.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/file_tests/hello.odin",
+        "-out:$AUDIT/bin/018-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.199,
+      "log": "$AUDIT/logs/018-odin.log",
+      "output": "$AUDIT/bin/018-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/file_tests/hello.thor",
+        "--output-dir",
+        "$AUDIT/generated/18",
+        "--cache-dir",
+        "$AUDIT/cache/18",
+        "-out:$AUDIT/bin/018-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.371,
+      "log": "$AUDIT/logs/018-thor.log",
+      "output": "$AUDIT/bin/018-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 19,
+    "label": "Odin/filter",
+    "original": "/Users/davidludwik/Code/Odin/filter",
+    "relative": "Odin/filter",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/filter",
+        "-out:$AUDIT/bin/019-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.245,
+      "log": "$AUDIT/logs/019-odin.log",
+      "output": "$AUDIT/bin/019-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/filter",
+        "--output-dir",
+        "$AUDIT/generated/19",
+        "--cache-dir",
+        "$AUDIT/cache/19",
+        "-out:$AUDIT/bin/019-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.722,
+      "log": "$AUDIT/logs/019-thor.log",
+      "output": "$AUDIT/bin/019-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 20,
+    "label": "Odin/foreign_exp",
+    "original": "/Users/davidludwik/Code/Odin/foreign_exp",
+    "relative": "Odin/foreign_exp",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/foreign_exp",
+        "-out:$AUDIT/bin/020-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.258,
+      "log": "$AUDIT/logs/020-odin.log",
+      "output": "$AUDIT/bin/020-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/foreign_exp",
+        "--output-dir",
+        "$AUDIT/generated/20",
+        "--cache-dir",
+        "$AUDIT/cache/20",
+        "-out:$AUDIT/bin/020-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.377,
+      "log": "$AUDIT/logs/020-thor.log",
+      "output": "$AUDIT/bin/020-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 21,
+    "label": "Odin/foreign_exp/my_lib",
+    "original": "/Users/davidludwik/Code/Odin/foreign_exp/my_lib",
+    "relative": "Odin/foreign_exp/my_lib",
+    "kind": "library",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/foreign_exp/my_lib",
+        "-out:$AUDIT/bin/021-odin",
+        "-build-mode:static",
+        "-no-entry-point"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.143,
+      "log": "$AUDIT/logs/021-odin.log",
+      "output": "$AUDIT/bin/021-odin",
+      "output_exists": true,
+      "actual_output": "$AUDIT/bin/021-odin.a"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/foreign_exp/my_lib",
+        "--output-dir",
+        "$AUDIT/generated/21",
+        "--cache-dir",
+        "$AUDIT/cache/21",
+        "-out:$AUDIT/bin/021-thor",
+        "-build-mode:static",
+        "-no-entry-point"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.201,
+      "log": "$AUDIT/logs/021-thor.log",
+      "output": "$AUDIT/bin/021-thor",
+      "output_exists": true,
+      "actual_output": "$AUDIT/bin/021-thor.a"
+    }
+  },
+  {
+    "index": 22,
+    "label": "Odin/guess",
+    "original": "/Users/davidludwik/Code/Odin/guess",
+    "relative": "Odin/guess",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/guess",
+        "-out:$AUDIT/bin/022-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.248,
+      "log": "$AUDIT/logs/022-odin.log",
+      "output": "$AUDIT/bin/022-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/guess",
+        "--output-dir",
+        "$AUDIT/generated/22",
+        "--cache-dir",
+        "$AUDIT/cache/22",
+        "-out:$AUDIT/bin/022-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.382,
+      "log": "$AUDIT/logs/022-thor.log",
+      "output": "$AUDIT/bin/022-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 23,
+    "label": "Odin/hilo",
+    "original": "/Users/davidludwik/Code/Odin/hilo",
+    "relative": "Odin/hilo",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/hilo",
+        "-out:$AUDIT/bin/023-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.301,
+      "log": "$AUDIT/logs/023-odin.log",
+      "output": "$AUDIT/bin/023-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/hilo",
+        "--output-dir",
+        "$AUDIT/generated/23",
+        "--cache-dir",
+        "$AUDIT/cache/23",
+        "-out:$AUDIT/bin/023-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.248,
+      "log": "$AUDIT/logs/023-thor.log",
+      "output": "$AUDIT/bin/023-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 24,
+    "label": "Odin/hilo/original",
+    "original": "/Users/davidludwik/Code/Odin/hilo/original",
+    "relative": "Odin/hilo/original",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/hilo/original",
+        "-out:$AUDIT/bin/024-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.261,
+      "log": "$AUDIT/logs/024-odin.log",
+      "output": "$AUDIT/bin/024-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/hilo/original",
+        "--output-dir",
+        "$AUDIT/generated/24",
+        "--cache-dir",
+        "$AUDIT/cache/24",
+        "-out:$AUDIT/bin/024-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.25,
+      "log": "$AUDIT/logs/024-thor.log",
+      "output": "$AUDIT/bin/024-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 25,
+    "label": "Odin/huffman",
+    "original": "/Users/davidludwik/Code/Odin/huffman",
+    "relative": "Odin/huffman",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/huffman",
+        "-out:$AUDIT/bin/025-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.268,
+      "log": "$AUDIT/logs/025-odin.log",
+      "output": "$AUDIT/bin/025-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/huffman",
+        "--output-dir",
+        "$AUDIT/generated/25",
+        "--cache-dir",
+        "$AUDIT/cache/25",
+        "-out:$AUDIT/bin/025-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.437,
+      "log": "$AUDIT/logs/025-thor.log",
+      "output": "$AUDIT/bin/025-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 26,
+    "label": "Odin/json_demo",
+    "original": "/Users/davidludwik/Code/Odin/json_demo",
+    "relative": "Odin/json_demo",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/json_demo",
+        "-out:$AUDIT/bin/026-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.252,
+      "log": "$AUDIT/logs/026-odin.log",
+      "output": "$AUDIT/bin/026-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/json_demo",
+        "--output-dir",
+        "$AUDIT/generated/26",
+        "--cache-dir",
+        "$AUDIT/cache/26",
+        "-out:$AUDIT/bin/026-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.363,
+      "log": "$AUDIT/logs/026-thor.log",
+      "output": "$AUDIT/bin/026-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 27,
+    "label": "Odin/kv",
+    "original": "/Users/davidludwik/Code/Odin/kv",
+    "relative": "Odin/kv",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/kv",
+        "-out:$AUDIT/bin/027-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.262,
+      "log": "$AUDIT/logs/027-odin.log",
+      "output": "$AUDIT/bin/027-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/kv",
+        "--output-dir",
+        "$AUDIT/generated/27",
+        "--cache-dir",
+        "$AUDIT/cache/27",
+        "-out:$AUDIT/bin/027-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.378,
+      "log": "$AUDIT/logs/027-thor.log",
+      "output": "$AUDIT/bin/027-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 28,
+    "label": "Odin/linked_list",
+    "original": "/Users/davidludwik/Code/Odin/linked_list",
+    "relative": "Odin/linked_list",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/linked_list",
+        "-out:$AUDIT/bin/028-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.255,
+      "log": "$AUDIT/logs/028-odin.log",
+      "output": "$AUDIT/bin/028-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/linked_list",
+        "--output-dir",
+        "$AUDIT/generated/28",
+        "--cache-dir",
+        "$AUDIT/cache/28",
+        "-out:$AUDIT/bin/028-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.387,
+      "log": "$AUDIT/logs/028-thor.log",
+      "output": "$AUDIT/bin/028-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 29,
+    "label": "Odin/matrix_exp",
+    "original": "/Users/davidludwik/Code/Odin/matrix_exp",
+    "relative": "Odin/matrix_exp",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/matrix_exp",
+        "-out:$AUDIT/bin/029-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.252,
+      "log": "$AUDIT/logs/029-odin.log",
+      "output": "$AUDIT/bin/029-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/matrix_exp",
+        "--output-dir",
+        "$AUDIT/generated/29",
+        "--cache-dir",
+        "$AUDIT/cache/29",
+        "-out:$AUDIT/bin/029-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.435,
+      "log": "$AUDIT/logs/029-thor.log",
+      "output": "$AUDIT/bin/029-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 30,
+    "label": "Odin/md5",
+    "original": "/Users/davidludwik/Code/Odin/md5",
+    "relative": "Odin/md5",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/md5",
+        "-out:$AUDIT/bin/030-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.209,
+      "log": "$AUDIT/logs/030-odin.log",
+      "output": "$AUDIT/bin/030-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/md5",
+        "--output-dir",
+        "$AUDIT/generated/30",
+        "--cache-dir",
+        "$AUDIT/cache/30",
+        "-out:$AUDIT/bin/030-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.427,
+      "log": "$AUDIT/logs/030-thor.log",
+      "output": "$AUDIT/bin/030-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 31,
+    "label": "Odin/merge_sort",
+    "original": "/Users/davidludwik/Code/Odin/merge_sort",
+    "relative": "Odin/merge_sort",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/merge_sort",
+        "-out:$AUDIT/bin/031-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.26,
+      "log": "$AUDIT/logs/031-odin.log",
+      "output": "$AUDIT/bin/031-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/merge_sort",
+        "--output-dir",
+        "$AUDIT/generated/31",
+        "--cache-dir",
+        "$AUDIT/cache/31",
+        "-out:$AUDIT/bin/031-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.203,
+      "log": "$AUDIT/logs/031-thor.log",
+      "output": "$AUDIT/bin/031-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 32,
+    "label": "Odin/modulo",
+    "original": "/Users/davidludwik/Code/Odin/modulo",
+    "relative": "Odin/modulo",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/modulo",
+        "-out:$AUDIT/bin/032-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.255,
+      "log": "$AUDIT/logs/032-odin.log",
+      "output": "$AUDIT/bin/032-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/modulo",
+        "--output-dir",
+        "$AUDIT/generated/32",
+        "--cache-dir",
+        "$AUDIT/cache/32",
+        "-out:$AUDIT/bin/032-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.412,
+      "log": "$AUDIT/logs/032-thor.log",
+      "output": "$AUDIT/bin/032-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 33,
+    "label": "Odin/new_one",
+    "original": "/Users/davidludwik/Code/Odin/new_one",
+    "relative": "Odin/new_one",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/new_one",
+        "-out:$AUDIT/bin/033-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.207,
+      "log": "$AUDIT/logs/033-odin.log",
+      "output": "$AUDIT/bin/033-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/new_one",
+        "--output-dir",
+        "$AUDIT/generated/33",
+        "--cache-dir",
+        "$AUDIT/cache/33",
+        "-out:$AUDIT/bin/033-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.417,
+      "log": "$AUDIT/logs/033-thor.log",
+      "output": "$AUDIT/bin/033-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 34,
+    "label": "Odin/pallendrome",
+    "original": "/Users/davidludwik/Code/Odin/pallendrome",
+    "relative": "Odin/pallendrome",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/pallendrome",
+        "-out:$AUDIT/bin/034-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.263,
+      "log": "$AUDIT/logs/034-odin.log",
+      "output": "$AUDIT/bin/034-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/pallendrome",
+        "--output-dir",
+        "$AUDIT/generated/34",
+        "--cache-dir",
+        "$AUDIT/cache/34",
+        "-out:$AUDIT/bin/034-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.377,
+      "log": "$AUDIT/logs/034-thor.log",
+      "output": "$AUDIT/bin/034-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 35,
+    "label": "Odin/parallel_sum",
+    "original": "/Users/davidludwik/Code/Odin/parallel_sum",
+    "relative": "Odin/parallel_sum",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/parallel_sum",
+        "-out:$AUDIT/bin/035-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.261,
+      "log": "$AUDIT/logs/035-odin.log",
+      "output": "$AUDIT/bin/035-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/parallel_sum",
+        "--output-dir",
+        "$AUDIT/generated/35",
+        "--cache-dir",
+        "$AUDIT/cache/35",
+        "-out:$AUDIT/bin/035-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.259,
+      "log": "$AUDIT/logs/035-thor.log",
+      "output": "$AUDIT/bin/035-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 36,
+    "label": "Odin/parallel_sum_refactor",
+    "original": "/Users/davidludwik/Code/Odin/parallel_sum_refactor",
+    "relative": "Odin/parallel_sum_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/parallel_sum_refactor",
+        "-out:$AUDIT/bin/036-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.258,
+      "log": "$AUDIT/logs/036-odin.log",
+      "output": "$AUDIT/bin/036-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/parallel_sum_refactor",
+        "--output-dir",
+        "$AUDIT/generated/36",
+        "--cache-dir",
+        "$AUDIT/cache/36",
+        "-out:$AUDIT/bin/036-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.262,
+      "log": "$AUDIT/logs/036-thor.log",
+      "output": "$AUDIT/bin/036-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 37,
+    "label": "Odin/pi",
+    "original": "/Users/davidludwik/Code/Odin/pi",
+    "relative": "Odin/pi",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/pi",
+        "-out:$AUDIT/bin/037-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.265,
+      "log": "$AUDIT/logs/037-odin.log",
+      "output": "$AUDIT/bin/037-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/pi",
+        "--output-dir",
+        "$AUDIT/generated/37",
+        "--cache-dir",
+        "$AUDIT/cache/37",
+        "-out:$AUDIT/bin/037-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.436,
+      "log": "$AUDIT/logs/037-thor.log",
+      "output": "$AUDIT/bin/037-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 38,
+    "label": "Odin/poker",
+    "original": "/Users/davidludwik/Code/Odin/poker",
+    "relative": "Odin/poker",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/poker",
+        "-out:$AUDIT/bin/038-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.255,
+      "log": "$AUDIT/logs/038-odin.log",
+      "output": "$AUDIT/bin/038-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/poker",
+        "--output-dir",
+        "$AUDIT/generated/38",
+        "--cache-dir",
+        "$AUDIT/cache/38",
+        "-out:$AUDIT/bin/038-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 1.335,
+      "log": "$AUDIT/logs/038-thor.log",
+      "output": "$AUDIT/bin/038-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 39,
+    "label": "Odin/poker/ref",
+    "original": "/Users/davidludwik/Code/Odin/poker/ref",
+    "relative": "Odin/poker/ref",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/poker/ref",
+        "-out:$AUDIT/bin/039-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.088,
+      "log": "$AUDIT/logs/039-odin.log",
+      "output": "$AUDIT/bin/039-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/poker/ref",
+        "--output-dir",
+        "$AUDIT/generated/39",
+        "--cache-dir",
+        "$AUDIT/cache/39",
+        "-out:$AUDIT/bin/039-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.581,
+      "log": "$AUDIT/logs/039-thor.log",
+      "output": "$AUDIT/bin/039-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 40,
+    "label": "Odin/poker/ref/poker_multi_v1.odin",
+    "original": "/Users/davidludwik/Code/Odin/poker/ref/poker_multi_v1.odin",
+    "relative": "Odin/poker/ref/poker_multi_v1.odin",
+    "kind": "standalone-version",
+    "file": "poker_multi_v1.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/poker/ref/poker_multi_v1.odin",
+        "-out:$AUDIT/bin/040-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.254,
+      "log": "$AUDIT/logs/040-odin.log",
+      "output": "$AUDIT/bin/040-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor",
+        "--output-dir",
+        "$AUDIT/generated/40",
+        "--cache-dir",
+        "$AUDIT/cache/40",
+        "-out:$AUDIT/bin/040-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.433,
+      "log": "$AUDIT/logs/040-thor.log",
+      "output": "$AUDIT/bin/040-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 41,
+    "label": "Odin/poker/ref/poker_single_thread.odin",
+    "original": "/Users/davidludwik/Code/Odin/poker/ref/poker_single_thread.odin",
+    "relative": "Odin/poker/ref/poker_single_thread.odin",
+    "kind": "standalone-version",
+    "file": "poker_single_thread.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/poker/ref/poker_single_thread.odin",
+        "-out:$AUDIT/bin/041-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.086,
+      "log": "$AUDIT/logs/041-odin.log",
+      "output": "$AUDIT/bin/041-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/poker/ref/poker_single_thread.thor",
+        "--output-dir",
+        "$AUDIT/generated/41",
+        "--cache-dir",
+        "$AUDIT/cache/41",
+        "-out:$AUDIT/bin/041-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.429,
+      "log": "$AUDIT/logs/041-thor.log",
+      "output": "$AUDIT/bin/041-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 42,
+    "label": "Odin/primeSiv",
+    "original": "/Users/davidludwik/Code/Odin/primeSiv",
+    "relative": "Odin/primeSiv",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/primeSiv",
+        "-out:$AUDIT/bin/042-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.253,
+      "log": "$AUDIT/logs/042-odin.log",
+      "output": "$AUDIT/bin/042-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/primeSiv",
+        "--output-dir",
+        "$AUDIT/generated/42",
+        "--cache-dir",
+        "$AUDIT/cache/42",
+        "-out:$AUDIT/bin/042-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.368,
+      "log": "$AUDIT/logs/042-thor.log",
+      "output": "$AUDIT/bin/042-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 43,
+    "label": "Odin/primeSiv_refactor",
+    "original": "/Users/davidludwik/Code/Odin/primeSiv_refactor",
+    "relative": "Odin/primeSiv_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/primeSiv_refactor",
+        "-out:$AUDIT/bin/043-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.246,
+      "log": "$AUDIT/logs/043-odin.log",
+      "output": "$AUDIT/bin/043-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/primeSiv_refactor",
+        "--output-dir",
+        "$AUDIT/generated/43",
+        "--cache-dir",
+        "$AUDIT/cache/43",
+        "-out:$AUDIT/bin/043-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.366,
+      "log": "$AUDIT/logs/043-thor.log",
+      "output": "$AUDIT/bin/043-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 44,
+    "label": "Odin/prime_factors",
+    "original": "/Users/davidludwik/Code/Odin/prime_factors",
+    "relative": "Odin/prime_factors",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/prime_factors",
+        "-out:$AUDIT/bin/044-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.261,
+      "log": "$AUDIT/logs/044-odin.log",
+      "output": "$AUDIT/bin/044-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/prime_factors",
+        "--output-dir",
+        "$AUDIT/generated/44",
+        "--cache-dir",
+        "$AUDIT/cache/44",
+        "-out:$AUDIT/bin/044-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.369,
+      "log": "$AUDIT/logs/044-thor.log",
+      "output": "$AUDIT/bin/044-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 45,
+    "label": "Odin/prime_factors_cli",
+    "original": "/Users/davidludwik/Code/Odin/prime_factors_cli",
+    "relative": "Odin/prime_factors_cli",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/prime_factors_cli",
+        "-out:$AUDIT/bin/045-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.263,
+      "log": "$AUDIT/logs/045-odin.log",
+      "output": "$AUDIT/bin/045-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/prime_factors_cli",
+        "--output-dir",
+        "$AUDIT/generated/45",
+        "--cache-dir",
+        "$AUDIT/cache/45",
+        "-out:$AUDIT/bin/045-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.731,
+      "log": "$AUDIT/logs/045-thor.log",
+      "output": "$AUDIT/bin/045-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 46,
+    "label": "Odin/prime_factors_cli_refactor",
+    "original": "/Users/davidludwik/Code/Odin/prime_factors_cli_refactor",
+    "relative": "Odin/prime_factors_cli_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/prime_factors_cli_refactor",
+        "-out:$AUDIT/bin/046-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.249,
+      "log": "$AUDIT/logs/046-odin.log",
+      "output": "$AUDIT/bin/046-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/prime_factors_cli_refactor",
+        "--output-dir",
+        "$AUDIT/generated/46",
+        "--cache-dir",
+        "$AUDIT/cache/46",
+        "-out:$AUDIT/bin/046-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.349,
+      "log": "$AUDIT/logs/046-thor.log",
+      "output": "$AUDIT/bin/046-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 47,
+    "label": "Odin/primes/higher_primes",
+    "original": "/Users/davidludwik/Code/Odin/primes/higher_primes",
+    "relative": "Odin/primes/higher_primes",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/primes/higher_primes",
+        "-out:$AUDIT/bin/047-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.263,
+      "log": "$AUDIT/logs/047-odin.log",
+      "output": "$AUDIT/bin/047-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/primes/higher_primes",
+        "--output-dir",
+        "$AUDIT/generated/47",
+        "--cache-dir",
+        "$AUDIT/cache/47",
+        "-out:$AUDIT/bin/047-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.423,
+      "log": "$AUDIT/logs/047-thor.log",
+      "output": "$AUDIT/bin/047-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 48,
+    "label": "Odin/primes/limited_primes",
+    "original": "/Users/davidludwik/Code/Odin/primes/limited_primes",
+    "relative": "Odin/primes/limited_primes",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/primes/limited_primes",
+        "-out:$AUDIT/bin/048-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.258,
+      "log": "$AUDIT/logs/048-odin.log",
+      "output": "$AUDIT/bin/048-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/primes/limited_primes",
+        "--output-dir",
+        "$AUDIT/generated/48",
+        "--cache-dir",
+        "$AUDIT/cache/48",
+        "-out:$AUDIT/bin/048-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.438,
+      "log": "$AUDIT/logs/048-thor.log",
+      "output": "$AUDIT/bin/048-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 49,
+    "label": "Odin/pythagorean_tripples",
+    "original": "/Users/davidludwik/Code/Odin/pythagorean_tripples",
+    "relative": "Odin/pythagorean_tripples",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/pythagorean_tripples",
+        "-out:$AUDIT/bin/049-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.201,
+      "log": "$AUDIT/logs/049-odin.log",
+      "output": "$AUDIT/bin/049-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/pythagorean_tripples",
+        "--output-dir",
+        "$AUDIT/generated/49",
+        "--cache-dir",
+        "$AUDIT/cache/49",
+        "-out:$AUDIT/bin/049-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.377,
+      "log": "$AUDIT/logs/049-thor.log",
+      "output": "$AUDIT/bin/049-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 50,
+    "label": "Odin/pythagorean_tripples_refactor",
+    "original": "/Users/davidludwik/Code/Odin/pythagorean_tripples_refactor",
+    "relative": "Odin/pythagorean_tripples_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/pythagorean_tripples_refactor",
+        "-out:$AUDIT/bin/050-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.254,
+      "log": "$AUDIT/logs/050-odin.log",
+      "output": "$AUDIT/bin/050-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/pythagorean_tripples_refactor",
+        "--output-dir",
+        "$AUDIT/generated/50",
+        "--cache-dir",
+        "$AUDIT/cache/50",
+        "-out:$AUDIT/bin/050-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.373,
+      "log": "$AUDIT/logs/050-thor.log",
+      "output": "$AUDIT/bin/050-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 51,
+    "label": "Odin/quicksort",
+    "original": "/Users/davidludwik/Code/Odin/quicksort",
+    "relative": "Odin/quicksort",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/quicksort",
+        "-out:$AUDIT/bin/051-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.253,
+      "log": "$AUDIT/logs/051-odin.log",
+      "output": "$AUDIT/bin/051-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/quicksort",
+        "--output-dir",
+        "$AUDIT/generated/51",
+        "--cache-dir",
+        "$AUDIT/cache/51",
+        "-out:$AUDIT/bin/051-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.447,
+      "log": "$AUDIT/logs/051-thor.log",
+      "output": "$AUDIT/bin/051-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 52,
+    "label": "Odin/rationalize",
+    "original": "/Users/davidludwik/Code/Odin/rationalize",
+    "relative": "Odin/rationalize",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/rationalize",
+        "-out:$AUDIT/bin/052-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.262,
+      "log": "$AUDIT/logs/052-odin.log",
+      "output": "$AUDIT/bin/052-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/rationalize",
+        "--output-dir",
+        "$AUDIT/generated/52",
+        "--cache-dir",
+        "$AUDIT/cache/52",
+        "-out:$AUDIT/bin/052-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.427,
+      "log": "$AUDIT/logs/052-thor.log",
+      "output": "$AUDIT/bin/052-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 53,
+    "label": "Odin/reactTime",
+    "original": "/Users/davidludwik/Code/Odin/reactTime",
+    "relative": "Odin/reactTime",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/reactTime",
+        "-out:$AUDIT/bin/053-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.306,
+      "log": "$AUDIT/logs/053-odin.log",
+      "output": "$AUDIT/bin/053-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/reactTime",
+        "--output-dir",
+        "$AUDIT/generated/53",
+        "--cache-dir",
+        "$AUDIT/cache/53",
+        "-out:$AUDIT/bin/053-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.495,
+      "log": "$AUDIT/logs/053-thor.log",
+      "output": "$AUDIT/bin/053-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 54,
+    "label": "Odin/script_pg",
+    "original": "/Users/davidludwik/Code/Odin/script_pg",
+    "relative": "Odin/script_pg",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/script_pg",
+        "-out:$AUDIT/bin/054-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.257,
+      "log": "$AUDIT/logs/054-odin.log",
+      "output": "$AUDIT/bin/054-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/script_pg",
+        "--output-dir",
+        "$AUDIT/generated/54",
+        "--cache-dir",
+        "$AUDIT/cache/54",
+        "-out:$AUDIT/bin/054-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.438,
+      "log": "$AUDIT/logs/054-thor.log",
+      "output": "$AUDIT/bin/054-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 55,
+    "label": "Odin/simon",
+    "original": "/Users/davidludwik/Code/Odin/simon",
+    "relative": "Odin/simon",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/simon",
+        "-out:$AUDIT/bin/055-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.312,
+      "log": "$AUDIT/logs/055-odin.log",
+      "output": "$AUDIT/bin/055-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/simon",
+        "--output-dir",
+        "$AUDIT/generated/55",
+        "--cache-dir",
+        "$AUDIT/cache/55",
+        "-out:$AUDIT/bin/055-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.536,
+      "log": "$AUDIT/logs/055-thor.log",
+      "output": "$AUDIT/bin/055-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 56,
+    "label": "Odin/simple_foreign",
+    "original": "/Users/davidludwik/Code/Odin/simple_foreign",
+    "relative": "Odin/simple_foreign",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/simple_foreign",
+        "-out:$AUDIT/bin/056-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.199,
+      "log": "$AUDIT/logs/056-odin.log",
+      "output": "$AUDIT/bin/056-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/simple_foreign",
+        "--output-dir",
+        "$AUDIT/generated/56",
+        "--cache-dir",
+        "$AUDIT/cache/56",
+        "-out:$AUDIT/bin/056-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.251,
+      "log": "$AUDIT/logs/056-thor.log",
+      "output": "$AUDIT/bin/056-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 57,
+    "label": "Odin/simple_foreign/my_lib",
+    "original": "/Users/davidludwik/Code/Odin/simple_foreign/my_lib",
+    "relative": "Odin/simple_foreign/my_lib",
+    "kind": "library",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/simple_foreign/my_lib",
+        "-out:$AUDIT/bin/057-odin",
+        "-build-mode:static",
+        "-no-entry-point"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.084,
+      "log": "$AUDIT/logs/057-odin.log",
+      "output": "$AUDIT/bin/057-odin",
+      "output_exists": true,
+      "actual_output": "$AUDIT/bin/057-odin.a"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/simple_foreign/my_lib",
+        "--output-dir",
+        "$AUDIT/generated/57",
+        "--cache-dir",
+        "$AUDIT/cache/57",
+        "-out:$AUDIT/bin/057-thor",
+        "-build-mode:static",
+        "-no-entry-point"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.145,
+      "log": "$AUDIT/logs/057-thor.log",
+      "output": "$AUDIT/bin/057-thor",
+      "output_exists": true,
+      "actual_output": "$AUDIT/bin/057-thor.a"
+    }
+  },
+  {
+    "index": 58,
+    "label": "Odin/sudoku",
+    "original": "/Users/davidludwik/Code/Odin/sudoku",
+    "relative": "Odin/sudoku",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/sudoku",
+        "-out:$AUDIT/bin/058-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.249,
+      "log": "$AUDIT/logs/058-odin.log",
+      "output": "$AUDIT/bin/058-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/sudoku",
+        "--output-dir",
+        "$AUDIT/generated/58",
+        "--cache-dir",
+        "$AUDIT/cache/58",
+        "-out:$AUDIT/bin/058-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.33,
+      "log": "$AUDIT/logs/058-thor.log",
+      "output": "$AUDIT/bin/058-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 59,
+    "label": "Odin/sum_squares",
+    "original": "/Users/davidludwik/Code/Odin/sum_squares",
+    "relative": "Odin/sum_squares",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/sum_squares",
+        "-out:$AUDIT/bin/059-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.041,
+      "log": "$AUDIT/logs/059-odin.log",
+      "output": "$AUDIT/bin/059-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/sum_squares",
+        "--output-dir",
+        "$AUDIT/generated/59",
+        "--cache-dir",
+        "$AUDIT/cache/59",
+        "-out:$AUDIT/bin/059-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.243,
+      "log": "$AUDIT/logs/059-thor.log",
+      "output": "$AUDIT/bin/059-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 60,
+    "label": "Odin/test_area",
+    "original": "/Users/davidludwik/Code/Odin/test_area",
+    "relative": "Odin/test_area",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/test_area",
+        "-out:$AUDIT/bin/060-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.253,
+      "log": "$AUDIT/logs/060-odin.log",
+      "output": "$AUDIT/bin/060-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/test_area",
+        "--output-dir",
+        "$AUDIT/generated/60",
+        "--cache-dir",
+        "$AUDIT/cache/60",
+        "-out:$AUDIT/bin/060-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.378,
+      "log": "$AUDIT/logs/060-thor.log",
+      "output": "$AUDIT/bin/060-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 61,
+    "label": "Odin/test_area_2",
+    "original": "/Users/davidludwik/Code/Odin/test_area_2",
+    "relative": "Odin/test_area_2",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/test_area_2",
+        "-out:$AUDIT/bin/061-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.256,
+      "log": "$AUDIT/logs/061-odin.log",
+      "output": "$AUDIT/bin/061-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/test_area_2",
+        "--output-dir",
+        "$AUDIT/generated/61",
+        "--cache-dir",
+        "$AUDIT/cache/61",
+        "-out:$AUDIT/bin/061-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.44,
+      "log": "$AUDIT/logs/061-thor.log",
+      "output": "$AUDIT/bin/061-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 62,
+    "label": "Odin/thread_test",
+    "original": "/Users/davidludwik/Code/Odin/thread_test",
+    "relative": "Odin/thread_test",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/thread_test",
+        "-out:$AUDIT/bin/062-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.251,
+      "log": "$AUDIT/logs/062-odin.log",
+      "output": "$AUDIT/bin/062-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/thread_test",
+        "--output-dir",
+        "$AUDIT/generated/62",
+        "--cache-dir",
+        "$AUDIT/cache/62",
+        "-out:$AUDIT/bin/062-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.429,
+      "log": "$AUDIT/logs/062-thor.log",
+      "output": "$AUDIT/bin/062-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 63,
+    "label": "Odin/tic-tac-toe",
+    "original": "/Users/davidludwik/Code/Odin/tic-tac-toe",
+    "relative": "Odin/tic-tac-toe",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/tic-tac-toe",
+        "-out:$AUDIT/bin/063-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.255,
+      "log": "$AUDIT/logs/063-odin.log",
+      "output": "$AUDIT/bin/063-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/tic-tac-toe",
+        "--output-dir",
+        "$AUDIT/generated/63",
+        "--cache-dir",
+        "$AUDIT/cache/63",
+        "-out:$AUDIT/bin/063-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.443,
+      "log": "$AUDIT/logs/063-thor.log",
+      "output": "$AUDIT/bin/063-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 64,
+    "label": "Odin/tree",
+    "original": "/Users/davidludwik/Code/Odin/tree",
+    "relative": "Odin/tree",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/tree",
+        "-out:$AUDIT/bin/064-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.199,
+      "log": "$AUDIT/logs/064-odin.log",
+      "output": "$AUDIT/bin/064-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/tree",
+        "--output-dir",
+        "$AUDIT/generated/64",
+        "--cache-dir",
+        "$AUDIT/cache/64",
+        "-out:$AUDIT/bin/064-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.375,
+      "log": "$AUDIT/logs/064-thor.log",
+      "output": "$AUDIT/bin/064-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 65,
+    "label": "Odin/triangle_solver",
+    "original": "/Users/davidludwik/Code/Odin/triangle_solver",
+    "relative": "Odin/triangle_solver",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/triangle_solver",
+        "-out:$AUDIT/bin/065-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.244,
+      "log": "$AUDIT/logs/065-odin.log",
+      "output": "$AUDIT/bin/065-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/triangle_solver",
+        "--output-dir",
+        "$AUDIT/generated/65",
+        "--cache-dir",
+        "$AUDIT/cache/65",
+        "-out:$AUDIT/bin/065-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 1.17,
+      "log": "$AUDIT/logs/065-thor.log",
+      "output": "$AUDIT/bin/065-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 66,
+    "label": "Odin/tryingagain",
+    "original": "/Users/davidludwik/Code/Odin/tryingagain",
+    "relative": "Odin/tryingagain",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/tryingagain",
+        "-out:$AUDIT/bin/066-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.201,
+      "log": "$AUDIT/logs/066-odin.log",
+      "output": "$AUDIT/bin/066-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/tryingagain",
+        "--output-dir",
+        "$AUDIT/generated/66",
+        "--cache-dir",
+        "$AUDIT/cache/66",
+        "-out:$AUDIT/bin/066-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.373,
+      "log": "$AUDIT/logs/066-thor.log",
+      "output": "$AUDIT/bin/066-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 67,
+    "label": "Odin/tyringout",
+    "original": "/Users/davidludwik/Code/Odin/tyringout",
+    "relative": "Odin/tyringout",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/tyringout",
+        "-out:$AUDIT/bin/067-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.078,
+      "log": "$AUDIT/logs/067-odin.log",
+      "output": "$AUDIT/bin/067-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/tyringout",
+        "--output-dir",
+        "$AUDIT/generated/67",
+        "--cache-dir",
+        "$AUDIT/cache/67",
+        "-out:$AUDIT/bin/067-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.254,
+      "log": "$AUDIT/logs/067-thor.log",
+      "output": "$AUDIT/bin/067-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 68,
+    "label": "Odin/ui_demo",
+    "original": "/Users/davidludwik/Code/Odin/ui_demo",
+    "relative": "Odin/ui_demo",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/ui_demo",
+        "-out:$AUDIT/bin/068-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.315,
+      "log": "$AUDIT/logs/068-odin.log",
+      "output": "$AUDIT/bin/068-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/ui_demo",
+        "--output-dir",
+        "$AUDIT/generated/68",
+        "--cache-dir",
+        "$AUDIT/cache/68",
+        "-out:$AUDIT/bin/068-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.606,
+      "log": "$AUDIT/logs/068-thor.log",
+      "output": "$AUDIT/bin/068-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 69,
+    "label": "Odin/windowexp",
+    "original": "/Users/davidludwik/Code/Odin/windowexp",
+    "relative": "Odin/windowexp",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin/windowexp",
+        "-out:$AUDIT/bin/069-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.209,
+      "log": "$AUDIT/logs/069-odin.log",
+      "output": "$AUDIT/bin/069-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin/windowexp",
+        "--output-dir",
+        "$AUDIT/generated/69",
+        "--cache-dir",
+        "$AUDIT/cache/69",
+        "-out:$AUDIT/bin/069-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.37,
+      "log": "$AUDIT/logs/069-thor.log",
+      "output": "$AUDIT/bin/069-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 70,
+    "label": "Odin_Projects/15_puzzle",
+    "original": "/Users/davidludwik/Code/Odin_Projects/15_puzzle",
+    "relative": "Odin_Projects/15_puzzle",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/15_puzzle",
+        "-out:$AUDIT/bin/070-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.313,
+      "log": "$AUDIT/logs/070-odin.log",
+      "output": "$AUDIT/bin/070-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/15_puzzle",
+        "--output-dir",
+        "$AUDIT/generated/70",
+        "--cache-dir",
+        "$AUDIT/cache/70",
+        "-out:$AUDIT/bin/070-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 1.019,
+      "log": "$AUDIT/logs/070-thor.log",
+      "output": "$AUDIT/bin/070-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 71,
+    "label": "Odin_Projects/Connect_4",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4",
+    "relative": "Odin_Projects/Connect_4",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4",
+        "-out:$AUDIT/bin/071-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.256,
+      "log": "$AUDIT/logs/071-odin.log",
+      "output": "$AUDIT/bin/071-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4",
+        "--output-dir",
+        "$AUDIT/generated/71",
+        "--cache-dir",
+        "$AUDIT/cache/71",
+        "-out:$AUDIT/bin/071-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.544,
+      "log": "$AUDIT/logs/071-thor.log",
+      "output": "$AUDIT/bin/071-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 72,
+    "label": "Odin_Projects/Connect_4/archive",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive",
+    "relative": "Odin_Projects/Connect_4/archive",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive",
+        "-out:$AUDIT/bin/072-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.047,
+      "log": "$AUDIT/logs/072-odin.log",
+      "output": "$AUDIT/bin/072-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive",
+        "--output-dir",
+        "$AUDIT/generated/72",
+        "--cache-dir",
+        "$AUDIT/cache/72",
+        "-out:$AUDIT/bin/072-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 1.518,
+      "log": "$AUDIT/logs/072-thor.log",
+      "output": "$AUDIT/bin/072-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 73,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v1.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v1.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v1.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v1.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v1.odin",
+        "-out:$AUDIT/bin/073-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.088,
+      "log": "$AUDIT/logs/073-odin.log",
+      "output": "$AUDIT/bin/073-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor",
+        "--output-dir",
+        "$AUDIT/generated/73",
+        "--cache-dir",
+        "$AUDIT/cache/73",
+        "-out:$AUDIT/bin/073-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.316,
+      "log": "$AUDIT/logs/073-thor.log",
+      "output": "$AUDIT/bin/073-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 74,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v2.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v2.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v2.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v2.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v2.odin",
+        "-out:$AUDIT/bin/074-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.078,
+      "log": "$AUDIT/logs/074-odin.log",
+      "output": "$AUDIT/bin/074-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v2.thor",
+        "--output-dir",
+        "$AUDIT/generated/74",
+        "--cache-dir",
+        "$AUDIT/cache/74",
+        "-out:$AUDIT/bin/074-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.422,
+      "log": "$AUDIT/logs/074-thor.log",
+      "output": "$AUDIT/bin/074-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 75,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v3.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v3.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v3.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v3.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v3.odin",
+        "-out:$AUDIT/bin/075-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.081,
+      "log": "$AUDIT/logs/075-odin.log",
+      "output": "$AUDIT/bin/075-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v3.thor",
+        "--output-dir",
+        "$AUDIT/generated/75",
+        "--cache-dir",
+        "$AUDIT/cache/75",
+        "-out:$AUDIT/bin/075-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.355,
+      "log": "$AUDIT/logs/075-thor.log",
+      "output": "$AUDIT/bin/075-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 76,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v4.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v4.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v4.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v4.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v4.odin",
+        "-out:$AUDIT/bin/076-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.074,
+      "log": "$AUDIT/logs/076-odin.log",
+      "output": "$AUDIT/bin/076-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v4.thor",
+        "--output-dir",
+        "$AUDIT/generated/76",
+        "--cache-dir",
+        "$AUDIT/cache/76",
+        "-out:$AUDIT/bin/076-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.376,
+      "log": "$AUDIT/logs/076-thor.log",
+      "output": "$AUDIT/bin/076-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 77,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v5.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v5.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v5.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v5.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin",
+        "-out:$AUDIT/bin/077-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.084,
+      "log": "$AUDIT/logs/077-odin.log",
+      "output": "$AUDIT/bin/077-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor",
+        "--output-dir",
+        "$AUDIT/generated/77",
+        "--cache-dir",
+        "$AUDIT/cache/77",
+        "-out:$AUDIT/bin/077-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.369,
+      "log": "$AUDIT/logs/077-thor.log",
+      "output": "$AUDIT/bin/077-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 78,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v6.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v6.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v6.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v6.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin",
+        "-out:$AUDIT/bin/078-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.085,
+      "log": "$AUDIT/logs/078-odin.log",
+      "output": "$AUDIT/bin/078-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor",
+        "--output-dir",
+        "$AUDIT/generated/78",
+        "--cache-dir",
+        "$AUDIT/cache/78",
+        "-out:$AUDIT/bin/078-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.376,
+      "log": "$AUDIT/logs/078-thor.log",
+      "output": "$AUDIT/bin/078-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 79,
+    "label": "Odin_Projects/Connect_4/archive/conect_4_v7.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v7.odin",
+    "relative": "Odin_Projects/Connect_4/archive/conect_4_v7.odin",
+    "kind": "standalone-version",
+    "file": "conect_4_v7.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin",
+        "-out:$AUDIT/bin/079-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.09,
+      "log": "$AUDIT/logs/079-odin.log",
+      "output": "$AUDIT/bin/079-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor",
+        "--output-dir",
+        "$AUDIT/generated/79",
+        "--cache-dir",
+        "$AUDIT/cache/79",
+        "-out:$AUDIT/bin/079-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.377,
+      "log": "$AUDIT/logs/079-thor.log",
+      "output": "$AUDIT/bin/079-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 80,
+    "label": "Odin_Projects/Cricles_on_dots",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Cricles_on_dots",
+    "relative": "Odin_Projects/Cricles_on_dots",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Cricles_on_dots",
+        "-out:$AUDIT/bin/080-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.367,
+      "log": "$AUDIT/logs/080-odin.log",
+      "output": "$AUDIT/bin/080-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Cricles_on_dots",
+        "--output-dir",
+        "$AUDIT/generated/80",
+        "--cache-dir",
+        "$AUDIT/cache/80",
+        "-out:$AUDIT/bin/080-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.615,
+      "log": "$AUDIT/logs/080-thor.log",
+      "output": "$AUDIT/bin/080-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 81,
+    "label": "Odin_Projects/Dijkstra_animated",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Dijkstra_animated",
+    "relative": "Odin_Projects/Dijkstra_animated",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Dijkstra_animated",
+        "-out:$AUDIT/bin/081-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.314,
+      "log": "$AUDIT/logs/081-odin.log",
+      "output": "$AUDIT/bin/081-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Dijkstra_animated",
+        "--output-dir",
+        "$AUDIT/generated/81",
+        "--cache-dir",
+        "$AUDIT/cache/81",
+        "-out:$AUDIT/bin/081-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.883,
+      "log": "$AUDIT/logs/081-thor.log",
+      "output": "$AUDIT/bin/081-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 82,
+    "label": "Odin_Projects/Othello_pvai",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Othello_pvai",
+    "relative": "Odin_Projects/Othello_pvai",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Othello_pvai",
+        "-out:$AUDIT/bin/082-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.071,
+      "log": "$AUDIT/logs/082-odin.log",
+      "output": "$AUDIT/bin/082-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Othello_pvai",
+        "--output-dir",
+        "$AUDIT/generated/82",
+        "--cache-dir",
+        "$AUDIT/cache/82",
+        "-out:$AUDIT/bin/082-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 1.315,
+      "log": "$AUDIT/logs/082-thor.log",
+      "output": "$AUDIT/bin/082-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 83,
+    "label": "Odin_Projects/Othello_pvp",
+    "original": "/Users/davidludwik/Code/Odin_Projects/Othello_pvp",
+    "relative": "Odin_Projects/Othello_pvp",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/Othello_pvp",
+        "-out:$AUDIT/bin/083-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.316,
+      "log": "$AUDIT/logs/083-odin.log",
+      "output": "$AUDIT/bin/083-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/Othello_pvp",
+        "--output-dir",
+        "$AUDIT/generated/83",
+        "--cache-dir",
+        "$AUDIT/cache/83",
+        "-out:$AUDIT/bin/083-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.68,
+      "log": "$AUDIT/logs/083-thor.log",
+      "output": "$AUDIT/bin/083-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 84,
+    "label": "Odin_Projects/breakout",
+    "original": "/Users/davidludwik/Code/Odin_Projects/breakout",
+    "relative": "Odin_Projects/breakout",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/breakout",
+        "-out:$AUDIT/bin/084-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.318,
+      "log": "$AUDIT/logs/084-odin.log",
+      "output": "$AUDIT/bin/084-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/breakout",
+        "--output-dir",
+        "$AUDIT/generated/84",
+        "--cache-dir",
+        "$AUDIT/cache/84",
+        "-out:$AUDIT/bin/084-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.567,
+      "log": "$AUDIT/logs/084-thor.log",
+      "output": "$AUDIT/bin/084-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 85,
+    "label": "Odin_Projects/breakout/breakout.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/breakout/breakout.odin",
+    "relative": "Odin_Projects/breakout/breakout.odin",
+    "kind": "standalone-version",
+    "file": "breakout.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/breakout/breakout.odin",
+        "-out:$AUDIT/bin/085-odin",
+        "-file"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.317,
+      "log": "$AUDIT/logs/085-odin.log",
+      "output": "$AUDIT/bin/085-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/breakout/breakout.thor",
+        "--output-dir",
+        "$AUDIT/generated/85",
+        "--cache-dir",
+        "$AUDIT/cache/85",
+        "-out:$AUDIT/bin/085-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.542,
+      "log": "$AUDIT/logs/085-thor.log",
+      "output": "$AUDIT/bin/085-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 86,
+    "label": "Odin_Projects/breakout/steps.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/breakout/steps.odin",
+    "relative": "Odin_Projects/breakout/steps.odin",
+    "kind": "standalone-version",
+    "file": "steps.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/breakout/steps.odin",
+        "-out:$AUDIT/bin/086-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.024,
+      "log": "$AUDIT/logs/086-odin.log",
+      "output": "$AUDIT/bin/086-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/breakout/steps.thor",
+        "--output-dir",
+        "$AUDIT/generated/86",
+        "--cache-dir",
+        "$AUDIT/cache/86",
+        "-out:$AUDIT/bin/086-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.139,
+      "log": "$AUDIT/logs/086-thor.log",
+      "output": "$AUDIT/bin/086-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 87,
+    "label": "Odin_Projects/life",
+    "original": "/Users/davidludwik/Code/Odin_Projects/life",
+    "relative": "Odin_Projects/life",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/life",
+        "-out:$AUDIT/bin/087-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.321,
+      "log": "$AUDIT/logs/087-odin.log",
+      "output": "$AUDIT/bin/087-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/life",
+        "--output-dir",
+        "$AUDIT/generated/87",
+        "--cache-dir",
+        "$AUDIT/cache/87",
+        "-out:$AUDIT/bin/087-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.59,
+      "log": "$AUDIT/logs/087-thor.log",
+      "output": "$AUDIT/bin/087-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 88,
+    "label": "Odin_Projects/react_time",
+    "original": "/Users/davidludwik/Code/Odin_Projects/react_time",
+    "relative": "Odin_Projects/react_time",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/react_time",
+        "-out:$AUDIT/bin/088-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.314,
+      "log": "$AUDIT/logs/088-odin.log",
+      "output": "$AUDIT/bin/088-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/react_time",
+        "--output-dir",
+        "$AUDIT/generated/88",
+        "--cache-dir",
+        "$AUDIT/cache/88",
+        "-out:$AUDIT/bin/088-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.481,
+      "log": "$AUDIT/logs/088-thor.log",
+      "output": "$AUDIT/bin/088-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 89,
+    "label": "Odin_Projects/sketch",
+    "original": "/Users/davidludwik/Code/Odin_Projects/sketch",
+    "relative": "Odin_Projects/sketch",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/sketch",
+        "-out:$AUDIT/bin/089-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.312,
+      "log": "$AUDIT/logs/089-odin.log",
+      "output": "$AUDIT/bin/089-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/sketch",
+        "--output-dir",
+        "$AUDIT/generated/89",
+        "--cache-dir",
+        "$AUDIT/cache/89",
+        "-out:$AUDIT/bin/089-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.549,
+      "log": "$AUDIT/logs/089-thor.log",
+      "output": "$AUDIT/bin/089-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 90,
+    "label": "Odin_Projects/snek",
+    "original": "/Users/davidludwik/Code/Odin_Projects/snek",
+    "relative": "Odin_Projects/snek",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/snek",
+        "-out:$AUDIT/bin/090-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.316,
+      "log": "$AUDIT/logs/090-odin.log",
+      "output": "$AUDIT/bin/090-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/snek",
+        "--output-dir",
+        "$AUDIT/generated/90",
+        "--cache-dir",
+        "$AUDIT/cache/90",
+        "-out:$AUDIT/bin/090-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.656,
+      "log": "$AUDIT/logs/090-thor.log",
+      "output": "$AUDIT/bin/090-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 91,
+    "label": "Odin_Projects/sudoku_gui",
+    "original": "/Users/davidludwik/Code/Odin_Projects/sudoku_gui",
+    "relative": "Odin_Projects/sudoku_gui",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/sudoku_gui",
+        "-out:$AUDIT/bin/091-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.307,
+      "log": "$AUDIT/logs/091-odin.log",
+      "output": "$AUDIT/bin/091-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/sudoku_gui",
+        "--output-dir",
+        "$AUDIT/generated/91",
+        "--cache-dir",
+        "$AUDIT/cache/91",
+        "-out:$AUDIT/bin/091-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.479,
+      "log": "$AUDIT/logs/091-thor.log",
+      "output": "$AUDIT/bin/091-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 92,
+    "label": "Odin_Projects/tetris",
+    "original": "/Users/davidludwik/Code/Odin_Projects/tetris",
+    "relative": "Odin_Projects/tetris",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/tetris",
+        "-out:$AUDIT/bin/092-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.367,
+      "log": "$AUDIT/logs/092-odin.log",
+      "output": "$AUDIT/bin/092-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/tetris",
+        "--output-dir",
+        "$AUDIT/generated/92",
+        "--cache-dir",
+        "$AUDIT/cache/92",
+        "-out:$AUDIT/bin/092-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.491,
+      "log": "$AUDIT/logs/092-thor.log",
+      "output": "$AUDIT/bin/092-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 93,
+    "label": "Odin_Projects/tetris/archive",
+    "original": "/Users/davidludwik/Code/Odin_Projects/tetris/archive",
+    "relative": "Odin_Projects/tetris/archive",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/tetris/archive",
+        "-out:$AUDIT/bin/093-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.045,
+      "log": "$AUDIT/logs/093-odin.log",
+      "output": "$AUDIT/bin/093-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/tetris/archive",
+        "--output-dir",
+        "$AUDIT/generated/93",
+        "--cache-dir",
+        "$AUDIT/cache/93",
+        "-out:$AUDIT/bin/093-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 1.127,
+      "log": "$AUDIT/logs/093-thor.log",
+      "output": "$AUDIT/bin/093-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 94,
+    "label": "Odin_Projects/tetris/archive/tetris_v1.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/tetris/archive/tetris_v1.odin",
+    "relative": "Odin_Projects/tetris/archive/tetris_v1.odin",
+    "kind": "standalone-version",
+    "file": "tetris_v1.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v1.odin",
+        "-out:$AUDIT/bin/094-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.084,
+      "log": "$AUDIT/logs/094-odin.log",
+      "output": "$AUDIT/bin/094-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor",
+        "--output-dir",
+        "$AUDIT/generated/94",
+        "--cache-dir",
+        "$AUDIT/cache/94",
+        "-out:$AUDIT/bin/094-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.475,
+      "log": "$AUDIT/logs/094-thor.log",
+      "output": "$AUDIT/bin/094-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 95,
+    "label": "Odin_Projects/tetris/archive/tetris_v2.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/tetris/archive/tetris_v2.odin",
+    "relative": "Odin_Projects/tetris/archive/tetris_v2.odin",
+    "kind": "standalone-version",
+    "file": "tetris_v2.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v2.odin",
+        "-out:$AUDIT/bin/095-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.072,
+      "log": "$AUDIT/logs/095-odin.log",
+      "output": "$AUDIT/bin/095-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor",
+        "--output-dir",
+        "$AUDIT/generated/95",
+        "--cache-dir",
+        "$AUDIT/cache/95",
+        "-out:$AUDIT/bin/095-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.486,
+      "log": "$AUDIT/logs/095-thor.log",
+      "output": "$AUDIT/bin/095-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 96,
+    "label": "Odin_Projects/tetris/archive/tetris_v3.odin",
+    "original": "/Users/davidludwik/Code/Odin_Projects/tetris/archive/tetris_v3.odin",
+    "relative": "Odin_Projects/tetris/archive/tetris_v3.odin",
+    "kind": "standalone-version",
+    "file": "tetris_v3.odin",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/tetris/archive/tetris_v3.odin",
+        "-out:$AUDIT/bin/096-odin",
+        "-file"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.079,
+      "log": "$AUDIT/logs/096-odin.log",
+      "output": "$AUDIT/bin/096-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor",
+        "--output-dir",
+        "$AUDIT/generated/96",
+        "--cache-dir",
+        "$AUDIT/cache/96",
+        "-out:$AUDIT/bin/096-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.496,
+      "log": "$AUDIT/logs/096-thor.log",
+      "output": "$AUDIT/bin/096-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 97,
+    "label": "Odin_Projects/tic-tac-toe_gui",
+    "original": "/Users/davidludwik/Code/Odin_Projects/tic-tac-toe_gui",
+    "relative": "Odin_Projects/tic-tac-toe_gui",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/tic-tac-toe_gui",
+        "-out:$AUDIT/bin/097-odin"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.07,
+      "log": "$AUDIT/logs/097-odin.log",
+      "output": "$AUDIT/bin/097-odin",
+      "output_exists": false
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/tic-tac-toe_gui",
+        "--output-dir",
+        "$AUDIT/generated/97",
+        "--cache-dir",
+        "$AUDIT/cache/97",
+        "-out:$AUDIT/bin/097-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.495,
+      "log": "$AUDIT/logs/097-thor.log",
+      "output": "$AUDIT/bin/097-thor",
+      "output_exists": false
+    }
+  },
+  {
+    "index": 98,
+    "label": "Odin_Projects/zzz_refactors/Connect_4_refactor",
+    "original": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Connect_4_refactor",
+    "relative": "Odin_Projects/zzz_refactors/Connect_4_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/zzz_refactors/Connect_4_refactor",
+        "-out:$AUDIT/bin/098-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.302,
+      "log": "$AUDIT/logs/098-odin.log",
+      "output": "$AUDIT/bin/098-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/zzz_refactors/Connect_4_refactor",
+        "--output-dir",
+        "$AUDIT/generated/98",
+        "--cache-dir",
+        "$AUDIT/cache/98",
+        "-out:$AUDIT/bin/098-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.471,
+      "log": "$AUDIT/logs/098-thor.log",
+      "output": "$AUDIT/bin/098-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 99,
+    "label": "Odin_Projects/zzz_refactors/Cricles_on_dots_refactor",
+    "original": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor",
+    "relative": "Odin_Projects/zzz_refactors/Cricles_on_dots_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor",
+        "-out:$AUDIT/bin/099-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.315,
+      "log": "$AUDIT/logs/099-odin.log",
+      "output": "$AUDIT/bin/099-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor",
+        "--output-dir",
+        "$AUDIT/generated/99",
+        "--cache-dir",
+        "$AUDIT/cache/99",
+        "-out:$AUDIT/bin/099-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.546,
+      "log": "$AUDIT/logs/099-thor.log",
+      "output": "$AUDIT/bin/099-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 100,
+    "label": "Odin_Projects/zzz_refactors/Othello_pvp_refactor",
+    "original": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Othello_pvp_refactor",
+    "relative": "Odin_Projects/zzz_refactors/Othello_pvp_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/zzz_refactors/Othello_pvp_refactor",
+        "-out:$AUDIT/bin/100-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.327,
+      "log": "$AUDIT/logs/100-odin.log",
+      "output": "$AUDIT/bin/100-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/zzz_refactors/Othello_pvp_refactor",
+        "--output-dir",
+        "$AUDIT/generated/100",
+        "--cache-dir",
+        "$AUDIT/cache/100",
+        "-out:$AUDIT/bin/100-thor"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.707,
+      "log": "$AUDIT/logs/100-thor.log",
+      "output": "$AUDIT/bin/100-thor",
+      "output_exists": true
+    }
+  },
+  {
+    "index": 101,
+    "label": "Odin_Projects/zzz_refactors/snek_refactor",
+    "original": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/snek_refactor",
+    "relative": "Odin_Projects/zzz_refactors/snek_refactor",
+    "kind": "package",
+    "file": null,
+    "odin": {
+      "command": [
+        "/Users/davidludwik/Odin/Odin/odin",
+        "build",
+        "$AUDIT/odin/Odin_Projects/zzz_refactors/snek_refactor",
+        "-out:$AUDIT/bin/101-odin"
+      ],
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.313,
+      "log": "$AUDIT/logs/101-odin.log",
+      "output": "$AUDIT/bin/101-odin",
+      "output_exists": true
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "$AUDIT/thor/Odin_Projects/zzz_refactors/snek_refactor",
+        "--output-dir",
+        "$AUDIT/generated/101",
+        "--cache-dir",
+        "$AUDIT/cache/101",
+        "-out:$AUDIT/bin/101-thor"
+      ],
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.426,
+      "log": "$AUDIT/logs/101-thor.log",
+      "output": "$AUDIT/bin/101-thor",
+      "output_exists": false
+    }
+  }
+]

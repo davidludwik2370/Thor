@@ -5,6 +5,12 @@ milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
+Odin compatibility is checked against real projects as well as focused tests.
+The [October compatibility audit](docs/compatibility-audit-2026-10-29/README.md)
+records the original failures and their regression cases; the compiler preserves
+native range/type operands, enum indices, SOA iteration and storage rules while
+adding Thor's syntax.
+
 ## Run the demo
 
 Requirements: Python 3.10+ and `odin` on `PATH`. The first invocation builds and

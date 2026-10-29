@@ -1580,3 +1580,46 @@ The focused 56-case T07–T12 suite and both immutable TLS cases also pass. The
 converted source and real debug task compile cleanly; logs are under
 /tmp/thor-dijkstra-*.log and /tmp/thor-multi-immutable-*.log. No installed Odin
 compiler or normal compiler flags were changed.
+
+
+## Odin superset compatibility (0.20.4)
+
+Convert temporary copies of all projects under Code/Odin and Code/Odin_Projects
+to .thor and compare their builds with native Odin. The 102 cases include 82
+source directories and 20 additional individual/reference versions. The initial
+audit finds 17 conversion failures among 79 Odin-successful cases. Resolve every
+one: the final corpus has 79 successes with both compilers, 23 shared baseline
+failures, and no timeout. Preserve the source/resource/configuration files in
+the original projects; all 416 before/after file hashes match.
+
+Preserve native range and enum/type operands, SDK aliases, contextual enum
+indices, multi-result iterator protocols, and SOA iteration. Select generic Set
+iteration with a compile-time branch around the original loop instead of an
+overload call. This avoids an independently reproduced Odin checker stall when
+matching a Set parameter candidate against an inferred zipped SOA type. No
+installed Odin change, threading workaround, or syntax change is required.
+
+Correct capture/addressability distinctions for writable named results, readonly
+value parameters and using projections, value versus pointer type switches,
+and fixed-capacity dynamic array inline storage. Resolve runtime locals in source
+order, retaining the outer binding in a shadowing initializer. Emit helpers
+outside case-match scope and deferred statements. The frontend now exposes
+deferred statements and fixed-capacity metadata explicitly. Generic len dispatch
+retains native constant expressions; its type witness also accepts untyped string
+constants from compile-time switches without evaluating them.
+
+Add identical-source Odin/Thor regression fixtures, runtime storage/aliasing and
+evaluation-order checks, parenthesized operands, readonly rejection, Unicode
+diagnostic ranges, unsaved TLS error recovery and parameter/local rename checks.
+Keep the original audit, all final build commands/logs, and the per-issue fixes
+in docs/compatibility-audit-2026-10-29, with the current outcome in RESOLUTION.md.
+
+Validation: both clean Python groups pass (361 and 475 cases, with the optional
+Finder test skipped in the sandbox). All 13 real CodeLLDB cases and the separate
+Finder launch pass, covering all 849 distinct Python cases in the workspace.
+All 1,126 native TLS tests and 89 Node/editor tests pass. Both Thor demos run
+successfully, including -o:speed, and the final 79-case corpus recheck passes
+without a timeout or conversion failure. The initial full run caught an untyped
+compile-switch string length regression during this work; the typed witness,
+new regression and clean rerun verify its correction. Logs and compiler hashes
+are retained in the audit's fixed directory. Unrelated user edits are preserved.

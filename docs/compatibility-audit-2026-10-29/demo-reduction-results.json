@@ -1,0 +1,255 @@
+[
+  {
+    "label": "group-1",
+    "names": [
+      "the_basics",
+      "control_flow",
+      "named_proc_return_parameters",
+      "variadic_procedures",
+      "explicit_procedure_overloading",
+      "struct_type",
+      "union_type",
+      "using_statement",
+      "implicit_context_system",
+      "parametric_polymorphism",
+      "threading_example",
+      "array_programming",
+      "map_type",
+      "implicit_selector_expression",
+      "partial_switch",
+      "cstring_example",
+      "bit_set_type",
+      "deferred_procedure_associations"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.374
+    },
+    "thor": {
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.489
+    }
+  },
+  {
+    "label": "group-2",
+    "names": [
+      "reflection",
+      "quaternions",
+      "unroll_for_statement",
+      "where_clauses",
+      "foreign_system",
+      "ranged_fields_for_array_compound_literals",
+      "deprecated_attribute",
+      "range_statements_with_multiple_return_values",
+      "soa_struct_layout",
+      "constant_literal_expressions",
+      "union_maybe",
+      "explicit_context_definition",
+      "or_else_operator",
+      "or_return_operator",
+      "or_break_and_or_continue_operators",
+      "arbitrary_precision_mathematics",
+      "matrix_type",
+      "bit_field_type"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.259
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.008
+    }
+  },
+  {
+    "label": "group-3",
+    "names": [
+      "reflection",
+      "quaternions",
+      "unroll_for_statement",
+      "where_clauses",
+      "foreign_system",
+      "ranged_fields_for_array_compound_literals",
+      "deprecated_attribute",
+      "range_statements_with_multiple_return_values",
+      "soa_struct_layout"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.254
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.003
+    }
+  },
+  {
+    "label": "group-4",
+    "names": [
+      "constant_literal_expressions",
+      "union_maybe",
+      "explicit_context_definition",
+      "or_else_operator",
+      "or_return_operator",
+      "or_break_and_or_continue_operators",
+      "arbitrary_precision_mathematics",
+      "matrix_type",
+      "bit_field_type"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.318
+    },
+    "thor": {
+      "returncode": 1,
+      "timeout": false,
+      "seconds": 0.265
+    }
+  },
+  {
+    "label": "group-5",
+    "names": [
+      "reflection",
+      "quaternions",
+      "unroll_for_statement",
+      "where_clauses"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.25
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.422
+    }
+  },
+  {
+    "label": "group-6",
+    "names": [
+      "foreign_system",
+      "ranged_fields_for_array_compound_literals",
+      "deprecated_attribute",
+      "range_statements_with_multiple_return_values",
+      "soa_struct_layout"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.263
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.007
+    }
+  },
+  {
+    "label": "group-7",
+    "names": [
+      "foreign_system",
+      "ranged_fields_for_array_compound_literals"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.258
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.366
+    }
+  },
+  {
+    "label": "group-8",
+    "names": [
+      "deprecated_attribute",
+      "range_statements_with_multiple_return_values",
+      "soa_struct_layout"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.262
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.01
+    }
+  },
+  {
+    "label": "group-9",
+    "names": [
+      "deprecated_attribute"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.293
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.36
+    }
+  },
+  {
+    "label": "group-10",
+    "names": [
+      "range_statements_with_multiple_return_values",
+      "soa_struct_layout"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.251
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.006
+    }
+  },
+  {
+    "label": "group-11",
+    "names": [
+      "range_statements_with_multiple_return_values"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.25
+    },
+    "thor": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.375
+    }
+  },
+  {
+    "label": "group-12",
+    "names": [
+      "soa_struct_layout"
+    ],
+    "odin": {
+      "returncode": 0,
+      "timeout": false,
+      "seconds": 0.252
+    },
+    "thor": {
+      "returncode": -9,
+      "timeout": true,
+      "seconds": 7.006
+    }
+  }
+]

@@ -1,0 +1,6 @@
+test_finder_gui_launch_runs_without_a_terminal_wrapper (tests.test_publish.MacPublishTests.test_finder_gui_launch_runs_without_a_terminal_wrapper) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.900s
+
+OK

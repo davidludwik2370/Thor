@@ -320,6 +320,5 @@ class Ownership:
         code = []
         value = self.evaluate(expr, code)
         self.release(value, code, deferred=True)
-        iterator = f'{self.e.module("sets")}.compiler_iterate({value.value})'
-        loop = self.s.splice(n, [(c.start,c.end,iterator if c is expr else self.s.render(c)) for c in n.children])
+        loop = self.e.iterate(n, value.value)
         return '{\n'+'\n'.join([*code,loop])+'\n}'

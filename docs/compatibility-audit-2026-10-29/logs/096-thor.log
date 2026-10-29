@@ -1,0 +1,58 @@
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(82:33): Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+    squareUnavailable :: proc(using piece: Piece, limb: int, g: Game) -> bool {
+                                    ^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(83:16): Error: 'Thor expression(&(limbs), limb, type_of(Thor expression.element(limbs)))' of type '$Thor expression' has no field 'x'
+        x := head.x + limbs[limb].x
+                      ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(83:16): Error: Cannot take the pointer address of '(limbs)'
+        x := head.x + limbs[limb].x
+                      ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(84:16): Error: 'Thor expression(&(limbs), limb, type_of(Thor expression.element(limbs)))' of type '$Thor expression' has no field 'y'
+        y := head.y + limbs[limb].y + SPAWN_HEIGHT
+                      ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(84:16): Error: Cannot take the pointer address of '(limbs)'
+        y := head.y + limbs[limb].y + SPAWN_HEIGHT
+                      ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(85:66): Error: Cannot address value '(x)' as it has not got a determined type yet
+	Suggestion: Add an explicit type to the declaration of 'x' rather than relying on type inference
+        return x<0 || x>=BOARD_WIDTH || y>=BOARD_HEIGHT+SPAWN_HEIGHT || g.board[x][y]!=.Empty
+                                                                        ^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(85:66): Error: Cannot address value '(y)' as it has not got a determined type yet
+	Suggestion: Add an explicit type to the declaration of 'y' rather than relying on type inference
+        return x<0 || x>=BOARD_WIDTH || y>=BOARD_HEIGHT+SPAWN_HEIGHT || g.board[x][y]!=.Empty
+                                                                        ^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(85:66): Error: Expected a type to assign to the type parameter
+        return x<0 || x>=BOARD_WIDTH || y>=BOARD_HEIGHT+SPAWN_HEIGHT || g.board[x][y]!=.Empty
+                                                                        ^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(85:66): Error: mismatched argument #1 in call to 'Thor expression.element'
+
+	Suggestion:
+		Thor expression.element(&Thor expression(g, &(x), type_of(Thor expression.element(g.board))))
+
+Did you mean one of the following overloads?
+	thor_sequence.array_element         :: proc(value: $A/[$N]$E) -> E          at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(22:1)
+	thor_sequence.slice_element         :: proc(value: $A/[]$E) -> E            at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(23:1)
+	thor_sequence.dynamic_element       :: proc(value: $A/[dynamic]$E) -> E     at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(24:1)
+	thor_sequence.fixed_element         :: proc(value: $A/[dynamic; $N]$E) -> E at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(25:1)
+	thor_sequence.map_element           :: proc(value: $A/map[$K]$V) -> V       at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(26:1)
+	thor_sequence.string_element        :: proc(value: $S/string) -> u8         at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(27:1)
+	thor_sequence.multi_element         :: proc(value: [^]$E) -> E              at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(28:1)
+	thor_sequence.pointer_array_element :: proc(value: ^[$N]$E) -> E            at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(29:1)
+        return x<0 || x>=BOARD_WIDTH || y>=BOARD_HEIGHT+SPAWN_HEIGHT || g.board[x][y]!=.Empty
+                                                                        ^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(85:82): Error: Invalid type '$Thor expression' for implicit selector expression '.Empty'
+        return x<0 || x>=BOARD_WIDTH || y>=BOARD_HEIGHT+SPAWN_HEIGHT || g.board[x][y]!=.Empty
+                                                                                        ^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(95:26): Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+    isRoatated :: proc(using piece: Piece) -> bool {
+                             ^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(98:22): Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+    rotate :: proc(using piece: ^Piece, g: Game) {
+                         ^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(180:2): Error: 'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+        using rl
+        ^^^^^^^^

@@ -1,0 +1,8 @@
+$AUDIT/thor/Odin/file_tests/goodbye.thor(5:1): Error: Redeclaration of the entry point procedure 'main'
+	Suggestion: Is this a single-file package? If so, try compiling using the `-file` flag.
+    main :: proc() {
+    ^
+$AUDIT/thor/Odin/file_tests/hello.thor(5:1): Error: Redeclaration of 'main' in this scope
+	at $AUDIT/thor/Odin/file_tests/goodbye.thor(5:1)
+    main :: proc() {
+    ^

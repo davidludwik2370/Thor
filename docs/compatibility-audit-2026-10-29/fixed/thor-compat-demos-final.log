@@ -1,0 +1,65 @@
+demo -o:none exit 0 log /var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-demos-final-sw5ysb_2/demo-o-none/run.log
+T01: CLI, project packages, and ordinary Odin
+T02: selective imports, multiline lists, and retained namespaces
+  The original fmt namespace still works.
+T03: multiline, nested, typed, and lazy ternaries
+T04: #if / #else if / #else, nesting, defines, and native when
+  Selected compile-time branch: second
+T05: inferred and contextual fixed-array literals
+T06: sequence membership, native maps/bit sets, and constraints
+Numeric power: precedence, literal coercion, matching types, and constant evaluation
+T07: owned integer grouping, padding, and Unicode fill
+T08: Set support library, independent results, and alias-safe operations
+T09: shared Thor frontend and ordinary Odin compatibility
+T10: native configuration, mixed packages, and original resource paths
+T11: overloaded/generic contexts and private types in imported packages
+T12: runtime-initialized immutable storage and shallow references
+T13: quoted/raw interpolation, braces, nested expressions, and formatting
+T14: runtime and compile-time switches, with and without selectors
+T15: Set syntax, operators, iteration, equality, and explicit ownership
+T16: negative sequence indices, slices, writes, and ordinary map keys
+T17: generated work stays inside lazy branches and loop iterations
+Hardening: anonymous temporaries, native xor, and C callbacks
+T18: pure runtime functions, generic/recursive calls, and scratch storage
+T19: typed records, arrays, and exact float reconstruction
+T20: explicit #run, ordinary eligible procedures, constants, and selection
+T21: persistent #run cache with transitive invalidation and controls
+T22: owned strings/slices, deep results, scratch cleanup, and fresh #run values
+T23: automatic constants, dependencies, generic instances, and lazy paths
+All T01-T23 demos passed.
+
+examples/demo -o:speed exit 0 log /var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-demos-final-sw5ysb_2/examples-demo-o-speed/run.log
+Thor: a commented, executable language tour
+
+# imports and ordinary Odin
+  Resource: Meet at the cedar gate.
+
+# fixed-array literals and contextual types
+
+# membership, intervals, and generic constraints
+
+# ternaries and runtime switch expressions
+
+# compile-time selection and ordinary when
+  Selected season: summer
+
+# immutable storage is initialized at runtime
+
+# formatting, interpolation, and string ownership
+  Meet at cedar gate; permits 00012,345
+
+# sets, mathematical operations, and shallow copies
+
+# negative indices and counted sequence views
+
+# numeric power and native expansion
+
+# lazy expressions, loops, and callbacks
+
+# fn, #run, contents, and automatic constants
+
+# owned pure results and independent storage
+
+# specialized compile-time work inside generic procedures
+
+All Thor walkthrough examples passed.

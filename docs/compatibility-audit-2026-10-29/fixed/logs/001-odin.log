@@ -1,0 +1,15 @@
+$AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin(5:1) Error: Redeclaration of 'ascendingNums' in this scope
+	at $AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin(5:1)
+	ascendingNums :: proc() -> (nums: [dynamic]int) {
+	^
+$AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin(24:1) Error: Redeclaration of the entry point procedure 'main'
+	main :: proc() {
+	^
+	Suggestion: Is this a single-file package? If so, try compiling using the `-file` flag.
+$AUDIT/odin/Odin/ascendingPrimesOptimized/archive/Library.odin(32:20) Warning: atof is deprecated: Use strconv.parse_f64() instead
+	return strconv.atof(s)
+	               ^~~^
+$AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin(35:1) Error: Redeclaration of 'main' in this scope
+	at $AUDIT/odin/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin(24:1)
+	main :: proc() {
+	^

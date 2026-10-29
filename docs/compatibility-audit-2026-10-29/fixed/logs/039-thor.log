@@ -1,0 +1,99 @@
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(10:1): Error: Redeclaration of 'DECK_LEN' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(8:1)
+    DECK_LEN    :: 52
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(11:1): Error: Redeclaration of 'MAX_PLAYERS' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(9:1)
+    MAX_PLAYERS :: 10
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(12:1): Error: Redeclaration of 'TRIAL_COUNT' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(10:1)
+    TRIAL_COUNT :: 1_000_000_000
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(14:1): Error: Redeclaration of 'Suit' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(12:1)
+    Suit :: enum {club, diamond, heart, spade}
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(15:1): Error: Redeclaration of 'Card' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(13:1)
+    Card :: struct {num: int, suit: Suit}
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(16:1): Error: Redeclaration of 'Deck' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(14:1)
+    Deck :: [dynamic; DECK_LEN]Card
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(17:1): Error: Redeclaration of 'Hand' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(15:1)
+    Hand :: [dynamic; 7]Card
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(18:1): Error: Redeclaration of 'Hand_Rank' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(16:1)
+    Hand_Rank :: enum {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(30:1): Error: Redeclaration of 'is_hand_sorted' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(28:1)
+    is_hand_sorted :: proc(hand: Hand) -> bool {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(40:1): Error: Redeclaration of 'sort_hand' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(38:1)
+    sort_hand :: proc(hand: ^Hand) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(46:1): Error: Redeclaration of 'reverse' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(44:1)
+    reverse :: proc(hand: Hand) -> (rev: Hand) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(52:1): Error: Redeclaration of 'new_deck' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(50:1)
+    new_deck :: proc(shuffle := true) -> (deck: Deck) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(62:1): Error: Redeclaration of 'new_deal' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(60:1)
+    new_deal :: proc(deck: ^Deck, player_count: int) -> (common: Hand, hands: [dynamic; MAX_PLAYERS]Hand) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(75:1): Error: Redeclaration of 'last' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(73:1)
+    last :: proc(n: int, cards: []Card) -> []Card {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(81:1): Error: Redeclaration of 'highest_pair' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(79:1)
+    highest_pair :: proc(hand: Hand) -> (pair: [2]Card, indx: Maybe(int)) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(93:1): Error: Redeclaration of 'is_straight' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(91:1)
+    is_straight :: proc(hand: []Card) -> bool {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(101:1): Error: Redeclaration of 'ace_as_14' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(99:1)
+    ace_as_14 :: proc(hand: Hand) -> (a14: Hand) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(116:1): Error: Redeclaration of 'print_cards' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(114:1)
+    print_cards :: proc(cards: []Card) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(133:1): Error: Redeclaration of 'find_best_hand' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(131:1)
+    find_best_hand :: proc(hand: Hand) -> (best_hand: Hand, rank:=Hand_Rank.high_card) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(284:1): Error: Redeclaration of 'judge' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(282:1)
+    judge :: proc(comm_cards: Hand, deal: []Hand) -> (winners: [dynamic; MAX_PLAYERS]int) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(363:1): Error: Redeclaration of 'single_run' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(361:1)
+    single_run :: proc() {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(375:5): Error: Undeclared name: print
+        print("common: ")
+        ^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(378:5): Error: Undeclared name: print
+        print("\nhands:")
+        ^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(476:1): Error: Redeclaration of 'print_hand_odds' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(396:1)
+    print_hand_odds :: proc(players := MAX_PLAYERS, trials := TRIAL_COUNT) {
+    ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(517:1): Error: Redeclaration of 'main' in this scope
+	at $AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(475:1)
+	Suggestion: Is this a single-file package? If so, try compiling using the `-file` flag.
+    main :: proc() {
+    ^

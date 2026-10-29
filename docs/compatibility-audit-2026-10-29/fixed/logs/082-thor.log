@@ -1,0 +1,15 @@
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(590:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok do return
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(690:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok do return
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(693:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok_data {
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(925:5): Error: Operator '!' is only allowed on boolean expressions
+        if !ok do return
+           ^
+$AUDIT/thor/Odin_Projects/Othello_pvai/othello.thor(974:5): Error: Non-boolean condition in 'if' statement
+        if os.write_entire_file(path, data) {
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

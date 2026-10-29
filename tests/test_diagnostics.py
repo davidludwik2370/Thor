@@ -41,6 +41,20 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_odin_compatibility_named_result_error_keeps_original_value(self):
+        self.at('package main\nmake_board::proc()->(board:[2]int){i:=-1;/* 😀 */ board[i]="wrong";return}\nmain::proc(){_=make_board()}\n',
+                '"wrong"', message='Cannot')
+
+    def test_odin_compatibility_case_and_deferred_body_errors_are_not_helpers(self):
+        self.at('package main\nmain::proc(){values:=[1,2];i:=-1;switch{case values[i]==missing:return}}\n',
+                'missing', message='Undeclared')
+        self.at('package main\nconsume::proc(value:int){}\nmain::proc(){values:=[1,2];defer for i in 0..<2{consume(values[i]);_=missing}}\n',
+                'missing', message='Undeclared')
+
+    def test_odin_compatibility_pointer_type_switch_error_keeps_original_value(self):
+        self.at('package main\nCell::union{int,[2]bool}\nmain::proc(){cells:[2]Cell;i:=0;cells[i]=[2]bool{};switch &v in cells[i]{case [2]bool:v[i]="wrong"}}\n',
+                '"wrong"', message='Cannot')
+
     def test_owned_do_return_error_is_original_token_not_generated_block(self):
         source='package main\nwork::fn(flag:bool)->string{if flag do return "yes";return 10}\nmain::proc(){flag:=false;text:=work(flag);delete(text)}\n'
         errors=self.at(source,'10',flags=('-debug',),message='Cannot')

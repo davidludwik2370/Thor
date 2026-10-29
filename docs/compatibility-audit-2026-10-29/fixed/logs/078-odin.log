@@ -1,0 +1,12 @@
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(28:31) Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	... Piece :: proc(using game: ^Game, move: int) -> (success: bool) {
+	                        ^~~~~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(56:29) Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	checkGameOver :: proc(using game: ^Game) {
+	                            ^~~~~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(73:2) Error: 'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring
+	using rl
+	^~~~~~~^
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'

@@ -1,0 +1,13 @@
+$AUDIT/repros/range_variable/main.thor(4:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for n in start..<3 { _ = n }
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/repros/range_variable/main.thor(4:23): Error: Unknown operator '..<'
+            for n in start..<3 { _ = n }
+                          ^
+$AUDIT/repros/range_variable/main.thor(4:34): Error: Undeclared name: n
+            for n in start..<3 { _ = n }
+                                     ^

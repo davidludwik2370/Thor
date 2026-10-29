@@ -35,6 +35,20 @@ class Expressions:
     def declarations(self, scope):
         return ''.join(code for (owner,_),code in list(self.helpers.items()) if owner is scope)
 
+    def helper_scope(self, node):
+        # A case's match is checked outside its body. Odin also does not collect
+        # procedure declarations inside deferred statements. Put helpers in a
+        # surrounding declaration scope; their explicit inputs keep evaluation
+        # at the original expression site.
+        ancestors = list(node.ancestors())
+        deferred = [a for a in ancestors if a.kind == 'Defer']
+        if deferred:
+            ancestors = list(deferred[-1].ancestors())
+        return next((a for a in ancestors
+                     if a.kind == 'Case' and node.start >= a.data['roles']['colon'][1]
+                     or a.kind == 'Block' and (not a.parent or a.parent.kind not in {'Switch','TypeSwitch','CompileSwitch'})),
+                    self.source.root)
+
     def convert_do(self, block):
         s=self.source
         if block in s.converted_do_blocks:
@@ -75,7 +89,7 @@ class Expressions:
         from .semantics import descendants
         s=self.source
         name=s.prefix+f'{flavor}_{node.start}_{node.end}'
-        scope=next((a for a in node.ancestors() if a.kind=='Case' or a.kind=='Block' and (not a.parent or a.parent.kind not in {'Switch','TypeSwitch','CompileSwitch'})),s.root)
+        scope=self.helper_scope(node)
         key=scope,name
         variables={}
         for child in descendants(node):
@@ -171,7 +185,7 @@ class Expressions:
                 if constant(match): matches.append(s.render(match,constant=True))
         if not matches: return 'true'
         name=s.prefix+f'validate_switch_{node.start}_{node.end}'
-        scope=next((a for a in node.ancestors() if a.kind=='Case' or a.kind=='Block' and (not a.parent or a.parent.kind not in {'Switch','TypeSwitch','CompileSwitch'})),s.root)
+        scope=self.helper_scope(node)
         parameter=s.prefix+'selector'
         cases='\n'.join('case '+m+':' for m in matches)
         privacy='@(private="file")\n' if scope is s.root else ''
@@ -192,12 +206,53 @@ class Expressions:
             self.source.needs_intrinsics=True
         return hint.expression or hint.source.render(hint.node)
 
-    @staticmethod
-    def reference_capture(symbol):
-        if symbol.projection: return True
-        if symbol.declaration.kind=='Field': return False
+    def reference_capture(self,symbol):
+        if symbol.projection:
+            owner, name = symbol.projection
+            typ = self.shape(owner)
+            member = self.source.resolver.field(typ, name)
+            if typ.kind == 'pointer' or member and member[2]: return True
+            original = self.source.resolver.symbol(owner)
+            return bool(original and self.reference_capture(original))
+        if symbol.declaration.kind=='Field':
+            field = symbol.declaration
+            signature = next((a for a in field.ancestors() if a.kind == 'ProcedureType'), None)
+            return bool(signature and field.parent is signature.role('results'))
         if symbol.declaration.kind=='Range': return symbol.node.kind=='Unary' and symbol.node.data['op']=='&'
+        if symbol.declaration.kind=='TypeSwitch':
+            return symbol.node.kind=='Unary' and symbol.node.data['op']=='&'
         return True
+
+    def opaque_native(self,node,seen=None):
+        seen = set() if seen is None else seen
+        if node is None or node in seen: return False
+        seen.add(node)
+        source = node.source
+        imported = source.purity.imported(node) if source.purity else None
+        if imported and source.import_dir(imported[0]) is None: return True
+        if node.kind == 'Paren': return self.opaque_native(node.role('expr'),seen)
+        symbol = source.resolver.symbol(node)
+        if symbol and symbol.declaration.kind == 'Declaration' and not symbol.declaration.data.get('mutable',True):
+            values = symbol.declaration.group('values')
+            if len(values) == 1 and values[0].kind in {'Ident','Selector','Paren'}:
+                return self.opaque_native(values[0],seen)
+        return False
+
+    def iterate(self,node,value):
+        """Select Set iteration without passing native iterables to overloads.
+
+        Native ranges, enum types, iterator calls and SOA values have special
+        checker semantics. A compile-time branch preserves the actual loop and
+        evaluates its iterable once, in the selected branch only.
+        """
+        s = self.source
+        expr = node.role('expr')
+        def loop(iterator):
+            return s.splice(node,[(c.start,c.end,iterator if c is expr else s.render(c))
+                                  for c in node.children])
+        selected = loop(f'{self.module("sets")}.entries({value})')
+        if self.shape(expr).kind == 'set': return selected
+        return '{\nwhen '+self.set_trait(value)+' {\n'+selected+'\n} else {\n'+loop(value)+'\n}\n}'
 
     def render(self,n,expected,constant):
         s=self.source
@@ -308,11 +363,12 @@ class Expressions:
         if node.kind not in {'Selector','Index'}: return False
         base=node.role('expr')
         typ=self.shape(base)
-        if typ.kind=='pointer' or node.kind=='Index' and typ.kind in {'slice','dynamic'}:
+        fixed = typ.kind == 'dynamic' and typ.node and typ.node.role('capacity')
+        if typ.kind=='pointer' or node.kind=='Index' and typ.kind in {'slice','dynamic'} and not fixed:
             return True
         inherited=self.addressable(base)
         if typ.kind not in {'generic','unknown'}:
-            return inherited if node.kind=='Selector' or typ.kind=='array' else False
+            return inherited if node.kind=='Selector' or typ.kind=='array' or fixed else False
         # A generic record may be a pointer, while a generic index base may be
         # an array or a reference container. Let Odin select addressability at
         # instantiation; copying readonly value parameters is valid for reads.
@@ -326,9 +382,9 @@ class Expressions:
             pointer=f'{meta}.type_is_pointer({t})'
             return f'({pointer} || ({inherited}))' if inherited else pointer
         references=' || '.join(f'{meta}.{test}({t})' for test in
-            ['type_is_slice','type_is_dynamic_array','type_is_fixed_capacity_dynamic_array','type_is_pointer','type_is_multi_pointer'])
+            ['type_is_slice','type_is_dynamic_array','type_is_pointer','type_is_multi_pointer'])
         if inherited:
-            array=f'{meta}.type_is_array({t})'
+            array=f'({meta}.type_is_array({t}) || {meta}.type_is_fixed_capacity_dynamic_array({t}))'
             references+=' || '+(array if inherited is True else f'({array} && ({inherited}))')
         return '('+references+')'
 
@@ -336,6 +392,9 @@ class Expressions:
         if node in self.addresses: return True
         for parent in node.ancestors():
             if parent.kind=='Assignment':
+                if parent.parent and parent.parent.kind == 'TypeSwitch':
+                    return any(name.kind == 'Unary' and name.data.get('op') == '&'
+                               for name in parent.parent.group('names'))
                 return any(lhs.start<=node.start and node.end<=lhs.end for lhs in parent.group('lhs'))
             if parent.kind=='Unary' and parent.data['op']=='&': return True
             if parent.kind=='Range':
@@ -386,9 +445,11 @@ class Expressions:
         # unsigned runtime indices need a check before Odin narrows to int.
         def needs(bound):
             if bound is None: return False
+            while bound.kind == 'Paren': bound = bound.role('expr')
             value=s.constant_int(bound)
             if value is not None: return value<0
             typ=self.shape(bound)
+            if bound.kind == 'ImplicitSelector' or typ.kind == 'enum': return False
             if typ.kind=='scalar' and typ.name.startswith('u128'):return True
             return not (typ.kind=='scalar' and typ.name.startswith('u'))
         if not any(needs(bound) for bound in bounds): return None
@@ -430,7 +491,7 @@ class Expressions:
             meta=s.prefix+'meta'
             s.needs_default=True
             source_type=f'type_of({s.prefix}default_value({original}))'
-            array=f'{meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type})'
+            array=f'{meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}) || {meta}.type_is_fixed_capacity_dynamic_array({source_type})'
             def branch(byref):
                 original=self.address(base) if byref else s.render(base)
                 code=[f'{value} := '+('&('+original+')' if byref else original)]
@@ -470,9 +531,13 @@ class Expressions:
     def set_trait(self,code):
         s=self.source
         s.needs_intrinsics=True
+        s.needs_default=True
         meta=s.prefix+'meta'
         sets=self.module('sets')
-        return f'(((type_of({code}) == {sets}.Set(type_of({sets}.key_witness(({code}).table)))) when {meta}.type_is_map(type_of(({code}).table)) else false) when {meta}.type_has_field(type_of({code}),"table") else false)'
+        # Native len accepts untyped string constants. Default inference gives
+        # the trait a concrete type, entirely inside unevaluated type_of.
+        typ=f'type_of({s.prefix}default_value({code}))'
+        return f'((({typ} == {sets}.Set(type_of({sets}.key_witness(({code}).table)))) when {meta}.type_is_map(type_of(({code}).table)) else false) when {meta}.type_has_field({typ},"table") else false)'
 
     def mutation(self,node,emit):
         if node.parent and node.parent.kind=='For' and node.parent.role('post') is node:
@@ -525,10 +590,13 @@ class Expressions:
             args=n.group('args')
             if callee.kind=='Ident' and s.resolver.symbol(callee) is None and len(args)==1:
                 typ=self.shape(args[0])
+                if callee.text == 'len' and (s.denotes_type(args[0]) or self.opaque_native(args[0])): return None
                 if callee.text=='len' and typ.kind in {'set','generic','unknown'}:
-                    code=self.ownership.query(n,args[0],lambda value:f'{self.module("sets")}.length({value})')
+                    def length(value):
+                        return f'(len(({value}).table) when {self.set_trait(value)} else len({value}))'
+                    code=self.ownership.query(n,args[0],length)
                     if code is not None: return code
-                    return f'{self.module("sets")}.length({s.render(args[0])})'
+                    return length(s.render(args[0]))
                 if callee.text=='len':
                     code=self.ownership.query(n,args[0],lambda value:f'len({value})')
                     if code is not None: return code
@@ -547,16 +615,24 @@ class Expressions:
                         return f'{self.module("sets")}.compiler_clear_value(&({s.render(args[0])}))'
         if n.kind=='Range' and self.shape(n.role('expr')).kind=='set':
             expr=n.role('expr')
-            return s.splice(n,[(c.start,c.end,f'{self.module("sets")}.entries({s.render(c)})' if c is expr else s.render(c)) for c in n.children])
+            return self.iterate(n,s.render(expr))
         if n.kind=='Range' and self.shape(n.role('expr')).kind in {'generic','unknown'} and not any(name.kind=='Unary' and name.data['op']=='&' for name in n.group('names')):
             expr=n.role('expr')
+            operand = expr
+            while operand.kind == 'Paren': operand = operand.role('expr')
+            if s.denotes_type(expr) or self.opaque_native(expr) or operand.kind == 'Binary' and operand.data['op'] in {'..<','..=','...'}:
+                return None
             # A native iterator call produces (values..., ok) repeatedly. An
             # ordinary value wrapper would evaluate it once and lose that
             # protocol. Keep opaque native calls under Odin's range checker.
-            imported = s.purity.imported(expr.role('callee')) if s.purity and expr.kind=='Call' else None
+            imported = s.purity.imported(operand.role('callee')) if s.purity and operand.kind=='Call' else None
             if imported and s.import_dir(imported[0]) is None:
                 return None
-            return s.splice(n,[(c.start,c.end,f'{self.module("sets")}.compiler_iterate({s.render(c)})' if c is expr else s.render(c)) for c in n.children])
+            if operand.kind == 'Call':
+                plan = s.resolver.resolve_call(operand)
+                if plan and len(s.resolver.fields(plan.signature.role('results'))) > 1:
+                    return None
+            return self.iterate(n,s.render(expr))
         return None
 
     def interpolation(self,n):

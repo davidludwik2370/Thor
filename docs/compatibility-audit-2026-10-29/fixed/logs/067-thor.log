@@ -1,0 +1,6 @@
+$AUDIT/thor/Odin/tyringout/Library.thor(32:20): Warning: atof is deprecated: Use strconv.parse_f64() instead
+        return strconv.atof(s)
+                       ^^^^
+$AUDIT/thor/Odin/tyringout/tyringout.thor(42:18): Error: 'processor_core_count' is not declared by 'os'
+        cpu_cores := os.processor_core_count()
+                     ^^^^^^^^^^^^^^^^^^^^^^^

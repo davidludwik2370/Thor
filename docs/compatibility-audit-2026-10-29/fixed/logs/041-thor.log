@@ -1,0 +1,6 @@
+$AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(375:5): Error: Undeclared name: print
+        print("common: ")
+        ^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_single_thread.thor(378:5): Error: Undeclared name: print
+        print("\nhands:")
+        ^^^^^

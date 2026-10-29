@@ -1,0 +1,33 @@
+{
+  "cases": 102,
+  "odin_success": 79,
+  "thor_success": 79,
+  "thor_regressions": [],
+  "both_fail": [
+    "Odin/ascendingPrimesOptimized/archive",
+    "Odin/breakout/steps.odin",
+    "Odin/factorial",
+    "Odin/file_tests",
+    "Odin/poker/ref",
+    "Odin/poker/ref/poker_single_thread.odin",
+    "Odin/sum_squares",
+    "Odin/tyringout",
+    "Odin_Projects/Connect_4/archive/conect_4_v1.odin",
+    "Odin_Projects/Connect_4/archive/conect_4_v2.odin",
+    "Odin_Projects/Connect_4/archive",
+    "Odin_Projects/Connect_4/archive/conect_4_v3.odin",
+    "Odin_Projects/Connect_4/archive/conect_4_v4.odin",
+    "Odin_Projects/Connect_4/archive/conect_4_v5.odin",
+    "Odin_Projects/Connect_4/archive/conect_4_v6.odin",
+    "Odin_Projects/Connect_4/archive/conect_4_v7.odin",
+    "Odin_Projects/Othello_pvai",
+    "Odin_Projects/breakout/steps.odin",
+    "Odin_Projects/tetris/archive/tetris_v1.odin",
+    "Odin_Projects/tetris/archive",
+    "Odin_Projects/tetris/archive/tetris_v2.odin",
+    "Odin_Projects/tetris/archive/tetris_v3.odin",
+    "Odin_Projects/tic-tac-toe_gui"
+  ],
+  "thor_only_success": [],
+  "original_files_changed": []
+}

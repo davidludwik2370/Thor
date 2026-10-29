@@ -153,6 +153,14 @@ class Resolver:
         try:
             for scope in self.lexical_scopes(context):
                 symbols = self.scopes.get(self.scope_key(scope), {}).get(name, [])
+                if scope.kind != 'File':
+                    # Runtime locals enter scope after their initializer. In
+                    # `x := x`, the RHS still names the enclosing binding.
+                    # Constants/procedures retain Odin's forward visibility.
+                    symbols = [s for s in symbols if s.declaration.kind != 'Declaration'
+                               or not s.declaration.data.get('mutable', True)
+                               or context.start >= s.declaration.end
+                               or context in s.declaration.group('names')]
                 if scope.kind=='File':
                     from .imports import file_private
                     visible=[s for s in symbols if s.node.source is context.source or not file_private(s.declaration)]

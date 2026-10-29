@@ -1,0 +1,6 @@
+$AUDIT/repros/using_array_read/main.thor(6:12): Error: 'Thor expression(&(points), i, type_of(Thor expression.element(points)))' of type '$Thor expression' has no field 'x'
+        return points[i].x
+               ^^^^^^^^^
+$AUDIT/repros/using_array_read/main.thor(6:12): Error: Cannot take the pointer address of '(points)'
+        return points[i].x
+               ^^^^^^^^^

@@ -1,0 +1,4 @@
+$AUDIT/repros/fixed_capacity_index/main.thor(6:5): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+        values[i] = 2
+        ^^^^^^^^^

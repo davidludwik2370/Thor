@@ -1,0 +1,631 @@
+[
+  {
+    "name": "range_nested",
+    "issue": "C01",
+    "file": "range_nested.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.371,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.209,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/range_nested/thor/build.log"
+    }
+  },
+  {
+    "name": "enum_iteration",
+    "issue": "C02",
+    "file": "enum_iteration.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.134,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.139,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_iteration/thor/build.log"
+    }
+  },
+  {
+    "name": "support_import_bootstrap",
+    "issue": "C13",
+    "file": "support_import_bootstrap.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.144,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.09,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/support_import_bootstrap/thor/build.log"
+    }
+  },
+  {
+    "name": "named_result_write",
+    "issue": "C03",
+    "file": "named_result_write.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.139,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.15,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/named_result_write/thor/build.log"
+    }
+  },
+  {
+    "name": "switch_case_index",
+    "issue": "C04",
+    "file": "switch_case_index.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.139,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.191,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/switch_case_index/thor/build.log"
+    }
+  },
+  {
+    "name": "deferred_loop_index",
+    "issue": "C05",
+    "file": "deferred_loop_index.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.142,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.204,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/deferred_loop_index/thor/build.log"
+    }
+  },
+  {
+    "name": "using_array_read",
+    "issue": "C06",
+    "file": "using_array_read.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.148,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.145,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/using_array_read/thor/build.log"
+    }
+  },
+  {
+    "name": "parameter_shadowing",
+    "issue": "C07",
+    "file": "parameter_shadowing.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.142,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.15,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/parameter_shadowing/thor/build.log"
+    }
+  },
+  {
+    "name": "type_switch_index",
+    "issue": "C08",
+    "file": "type_switch_index.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.14,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.19,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/type_switch_index/thor/build.log"
+    }
+  },
+  {
+    "name": "fixed_dynamic_index",
+    "issue": "C09",
+    "file": "fixed_dynamic_index.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.147,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.143,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_index/thor/build.log"
+    }
+  },
+  {
+    "name": "fixed_dynamic_slice",
+    "issue": "C09",
+    "file": "fixed_dynamic_slice.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.145,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.146,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/fixed_dynamic_slice/thor/build.log"
+    }
+  },
+  {
+    "name": "imported_enum_index",
+    "issue": "C10",
+    "file": "imported_enum_index.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.204,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.15,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/imported_enum_index/thor/build.log"
+    }
+  },
+  {
+    "name": "len_enum_type",
+    "issue": "C11",
+    "file": "len_enum_type.odin",
+    "thor_expected": "failure",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.141,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/thor/program"
+      ],
+      "returncode": 1,
+      "outcome": "failure",
+      "killed_by_runner": false,
+      "seconds": 0.146,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/len_enum_type/thor/build.log"
+    }
+  },
+  {
+    "name": "readonly_array_control",
+    "issue": "control",
+    "file": "readonly_array_control.odin",
+    "thor_expected": "success",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.139,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/thor/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.259,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/readonly_array_control/thor/build.log"
+    }
+  },
+  {
+    "name": "enum_array_control",
+    "issue": "control",
+    "file": "enum_array_control.odin",
+    "thor_expected": "success",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.147,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/thor/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.251,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/enum_array_control/thor/build.log"
+    }
+  },
+  {
+    "name": "soa_zip_range",
+    "issue": "C12",
+    "file": "soa_zip_range.odin",
+    "thor_expected": "timeout",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.137,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/thor/program"
+      ],
+      "returncode": -9,
+      "outcome": "timeout",
+      "killed_by_runner": true,
+      "seconds": 10.012,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_zip_range/thor/build.log"
+    }
+  },
+  {
+    "name": "soa_slice_range_control",
+    "issue": "control",
+    "file": "soa_slice_range_control.odin",
+    "thor_expected": "success",
+    "odin": {
+      "command": [
+        "/Users/davidludwik/odin/odin/odin",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/odin/main.odin",
+        "-file",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/odin/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.189,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/odin/build.log"
+    },
+    "thor": {
+      "command": [
+        "/Users/davidludwik/Thor/thor",
+        "build",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/thor/main.thor",
+        "--output-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/thor/generated",
+        "--cache-dir",
+        "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/thor/cache",
+        "-out:/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/thor/program"
+      ],
+      "returncode": 0,
+      "outcome": "success",
+      "killed_by_runner": false,
+      "seconds": 0.252,
+      "log": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-compat-repros-_2uugz3_/soa_slice_range_control/thor/build.log"
+    }
+  }
+]

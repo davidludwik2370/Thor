@@ -11,6 +11,23 @@ from tests.test_tls import Client, ROOT
 
 
 class RenameTests(unittest.TestCase):
+    def test_parameter_shadowing_in_same_block_keeps_initializer_on_outer_binding(self):
+        text='''package main
+Board::struct{values:[2]int}
+read::proc(board:Board,i:int)->int{
+    before:=board.values[i]
+    board:=board
+    return before+board.values[i]
+}
+main::proc(){_=read({},0)}
+'''
+        files={'main.thor':text}
+        client,root,main=self.project(files)
+        edits=self.rename(client,main,text,'board:Board','input_board',1)
+        expected=text.replace('board:Board','input_board:Board').replace('before:=board.values','before:=input_board.values').replace('board:=board','board:=input_board')
+        self.assertEqual(self.apply(root,files,edits),{'main.thor':expected})
+        self.assert_builds(root,{'main.thor':expected})
+
     def test_public_symbol_rename_through_wildcard_and_namespace_free_imports(self):
         for declaration in ['import * "library"', 'import _ "library" / work']:
             with self.subTest(declaration=declaration):

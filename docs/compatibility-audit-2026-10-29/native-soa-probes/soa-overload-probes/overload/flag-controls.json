@@ -1,0 +1,14 @@
+[
+  {
+    "flag": "-thread-count:1",
+    "returncode": -9,
+    "timeout": true,
+    "seconds": 7.005
+  },
+  {
+    "flag": "-use-single-module",
+    "returncode": -9,
+    "timeout": true,
+    "seconds": 7.013
+  }
+]

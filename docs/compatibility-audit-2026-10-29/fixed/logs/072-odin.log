@@ -1,0 +1,92 @@
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(4:1) Error: Redeclaration of 'WINDOW_WIDTH' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(4:1)
+	WINDOW_WIDTH  :: 700
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(5:1) Error: Redeclaration of 'WINDOW_HEIGHT' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(5:1)
+	WINDOW_HEIGHT :: 600
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(6:1) Error: Redeclaration of 'GRID_SIZE' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(6:1)
+	GRID_SIZE     :: 100
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(7:1) Error: Redeclaration of 'PIECE_RADIUS' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(7:1)
+	PIECE_RADIUS  :: 40
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(8:1) Error: Redeclaration of 'ROWS' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(8:1)
+	ROWS          :: WINDOW_HEIGHT / GRID_SIZE
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(9:1) Error: Redeclaration of 'COLUMNS' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(9:1)
+	COLUMNS       :: WINDOW_WIDTH / GRID_SIZE
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(10:1) Error: Redeclaration of 'TOTAL_SLOTS' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(10:1)
+	TOTAL_SLOTS   :: ROWS * COLUMNS
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(11:1) Error: Redeclaration of 'LIGHT_GREEN' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(11:1)
+	LIGHT_GREEN   :: rl.Color {93, 210, 103, 255}
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(13:1) Error: Redeclaration of 'Coord' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(13:1)
+	Coord :: [2]int
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(15:1) Error: Redeclaration of 'Turn' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(15:1)
+	Turn    :: enum { black, red }
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(16:1) Error: Redeclaration of 'Slot' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(16:1)
+	Slot    :: enum { empty, black, red }
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(17:1) Error: Redeclaration of 'Outcome' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(17:1)
+	Outcome :: enum { inGame, blackWon, redWon, draw }
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(19:1) Error: Redeclaration of 'Game' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(19:1)
+	Game :: struct {
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin(28:1) Error: Redeclaration of 'tryPlacingPiece' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(28:1)
+	tryPlacingPiece :: proc(using game: ^Game, move: int) - ...
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(28:1) Error: Redeclaration of 'tryPlacingPiece' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(28:1)
+	tryPlacingPiece :: proc(using game: ^Game, move: int) - ...
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin(41:1) Error: Redeclaration of 'inBounds' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(40:1)
+	inBounds :: proc(pos: Coord) -> bool {
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(41:1) Error: Redeclaration of 'inBounds' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(40:1)
+	inBounds :: proc(pos: Coord) -> bool {
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin(45:1) Error: Redeclaration of 'piecesInARow' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(44:1)
+	piecesInARow :: proc(game: Game, countDir: Coord) -> (p ...
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(45:1) Error: Redeclaration of 'piecesInARow' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(44:1)
+	piecesInARow :: proc(game: Game, countDir: Coord) -> (p ...
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin(56:1) Error: Redeclaration of 'checkGameOver' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(55:1)
+	checkGameOver :: proc(using game: ^Game) {
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(56:1) Error: Redeclaration of 'checkGameOver' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(55:1)
+	checkGameOver :: proc(using game: ^Game) {
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(66:1) Error: Redeclaration of 'resetGame' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(65:1)
+	resetGame :: proc(game: ^Game) {
+	^
+$AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin(72:1) Error: Redeclaration of 'main' in this scope
+	at $AUDIT/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin(69:1)
+	main :: proc() {
+	^

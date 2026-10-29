@@ -1,0 +1,3 @@
+$AUDIT/repros/switch_case_index/main.thor(6:10): Error: Undeclared name: Thor expression
+        case values[i] == 1:
+             ^^^^^^^^^

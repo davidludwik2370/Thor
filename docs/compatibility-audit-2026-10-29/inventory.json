@@ -1,0 +1,1044 @@
+{
+  "roots": [
+    "/Users/davidludwik/Code/Odin",
+    "/Users/davidludwik/Code/Odin_Projects"
+  ],
+  "totals": {
+    "files": 416,
+    "bytes": 36130387,
+    "sources": 122
+  },
+  "packages": [
+    {
+      "path": "/Users/davidludwik/Code/Odin/demo",
+      "files": [
+        "demo.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/primes/higher_primes",
+      "files": [
+        "primes.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/primes/limited_primes",
+      "files": [
+        "primes.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/sum_squares",
+      "files": [
+        "Library.odin",
+        "sum_squares.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/tree",
+      "files": [
+        "tree.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/merge_sort",
+      "files": [
+        "merge_sort.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/md5",
+      "files": [
+        "md5.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/tryingagain",
+      "files": [
+        "tryingagain.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/tic-tac-toe",
+      "files": [
+        "tic-tac-toe_test.odin",
+        "tic-tac-toe.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/simple_foreign",
+      "files": [
+        "simple_foreign.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/simple_foreign/my_lib",
+      "files": [
+        "my_lib.odin"
+      ],
+      "packages": [
+        "my_lib"
+      ],
+      "main": false,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/matrix_exp",
+      "files": [
+        "matrix_exp.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/kv",
+      "files": [
+        "kv.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/fibbonacci",
+      "files": [
+        "fibbonacci.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/pythagorean_tripples",
+      "files": [
+        "pythagorean_tripples.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/eq_parser",
+      "files": [
+        "eq_parser.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/poker",
+      "files": [
+        "judge_test.odin",
+        "poker.odin",
+        "simulation_test.odin",
+        "poker_test.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 4,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/poker/ref",
+      "files": [
+        "poker_single_thread.odin",
+        "poker_multi_v1.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/pallendrome",
+      "files": [
+        "pallendrome.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/factorial",
+      "files": [
+        "factorial.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/json_demo",
+      "files": [
+        "json_demo.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/linked_list",
+      "files": [
+        "linked_list.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/ui_demo",
+      "files": [
+        "ui_demo.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/parallel_sum_refactor",
+      "files": [
+        "parallel_sum.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/simon",
+      "files": [
+        "simon.odin"
+      ],
+      "packages": [
+        "simon"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/prime_factors_cli_refactor",
+      "files": [
+        "prime_factors_cli.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/reactTime",
+      "files": [
+        "reactTime.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized",
+      "files": [
+        "ascendingPrimesOptimized.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive",
+      "files": [
+        "ascendingPrimesOptimized.odin",
+        "ascendingPrimesOptimized_ref.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 3,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/prime_factors",
+      "files": [
+        "prime_factors.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/windowexp",
+      "files": [
+        "windowexp.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/sudoku",
+      "files": [
+        "sudoku.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/foreign_exp",
+      "files": [
+        "main.odin"
+      ],
+      "packages": [
+        "binding_to_c_test"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/foreign_exp/my_lib",
+      "files": [
+        "my_lib.odin"
+      ],
+      "packages": [
+        "my_lib"
+      ],
+      "main": false,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/pi",
+      "files": [
+        "pi.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/huffman",
+      "files": [
+        "huffman.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/tyringout",
+      "files": [
+        "Library.odin",
+        "tyringout.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/test_area_2",
+      "files": [
+        "test.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/cell_auto_all_rules",
+      "files": [
+        "cell_auto_all_rules.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/brc",
+      "files": [
+        "brc.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/primeSiv",
+      "files": [
+        "primeSiv.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/guess",
+      "files": [
+        "guess.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/new_one",
+      "files": [
+        "new_one.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/breakout",
+      "files": [
+        "breakout.odin",
+        "steps.odin"
+      ],
+      "packages": [
+        "breakout"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/prime_factors_cli",
+      "files": [
+        "prime_factors_cli.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/test_area",
+      "files": [
+        "test.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/collatz",
+      "files": [
+        "collatz.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/file_tests",
+      "files": [
+        "goodbye.odin",
+        "hello.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/filter",
+      "files": [
+        "random_test.odin",
+        "filter.odin",
+        "unicode_test.odin",
+        "collections_test.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 5,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/modulo",
+      "files": [
+        "modulo.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/hilo",
+      "files": [
+        "hilo.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/hilo/original",
+      "files": [
+        "hilo.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/primeSiv_refactor",
+      "files": [
+        "primeSiv.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/big_ref",
+      "files": [
+        "big_ref.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/rationalize",
+      "files": [
+        "rationalize.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/triangle_solver",
+      "files": [
+        "triangle_solver.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/pythagorean_tripples_refactor",
+      "files": [
+        "pythagorean_tripples.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/script_pg",
+      "files": [
+        "script_pg.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/ascending_primes",
+      "files": [
+        "ascending_primes.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/parallel_sum",
+      "files": [
+        "parallel_sum.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/thread_test",
+      "files": [
+        "threads.odin",
+        "Library.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin/quicksort",
+      "files": [
+        "quicksort.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/sudoku_gui",
+      "files": [
+        "sudoku.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/tetris",
+      "files": [
+        "tetris.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/tetris/archive",
+      "files": [
+        "tetris_v2.odin",
+        "tetris_v3.odin",
+        "tetris_v1.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 3,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/Dijkstra_animated",
+      "files": [
+        "Dijkstra.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/life",
+      "files": [
+        "life.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/Othello_pvp",
+      "files": [
+        "othello.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/Cricles_on_dots",
+      "files": [
+        "cricles_on_dots.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/tic-tac-toe_gui",
+      "files": [
+        "tic-tac-toe_test.odin",
+        "tic-tac-toe.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/15_puzzle",
+      "files": [
+        "15_puzzle.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/breakout",
+      "files": [
+        "breakout.odin",
+        "steps.odin"
+      ],
+      "packages": [
+        "breakout"
+      ],
+      "main": true,
+      "odin": 2,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Othello_pvp_refactor",
+      "files": [
+        "othello.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/snek_refactor",
+      "files": [
+        "snek.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor",
+      "files": [
+        "cricles_on_dots.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Connect_4_refactor",
+      "files": [
+        "conect_4.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/snek",
+      "files": [
+        "snek.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/react_time",
+      "files": [
+        "react_time.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/Connect_4",
+      "files": [
+        "conect_4.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive",
+      "files": [
+        "conect_4_v1.odin",
+        "conect_4_v7.odin",
+        "conect_4_v6.odin",
+        "conect_4_v5.odin",
+        "conect_4_v4.odin",
+        "conect_4_v3.odin",
+        "conect_4_v2.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 7,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/sketch",
+      "files": [
+        "sketch.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    },
+    {
+      "path": "/Users/davidludwik/Code/Odin_Projects/Othello_pvai",
+      "files": [
+        "othello.odin"
+      ],
+      "packages": [
+        "main"
+      ],
+      "main": true,
+      "odin": 1,
+      "thor": 0
+    }
+  ],
+  "links": [
+    {
+      "path": "/Users/davidludwik/Code/Odin/thor",
+      "target": "/Users/davidludwik/Thor"
+    }
+  ],
+  "large": []
+}

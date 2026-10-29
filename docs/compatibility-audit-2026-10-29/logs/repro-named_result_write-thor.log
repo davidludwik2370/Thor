@@ -1,0 +1,6 @@
+$AUDIT/repros/named_result_write/main.thor(4:5): Error: Cannot take a mutable address of an element in a temporary array.
+        board[i] = 7
+        ^^^^^^^^
+$AUDIT/repros/named_result_write/main.thor(4:5): Error: Missing return statement at the end of the procedure 'Thor expression'
+        board[i] = 7
+        ^^^^^^^^

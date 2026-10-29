@@ -1,0 +1,4 @@
+$AUDIT/repros/enum_len/main.thor(3:26): Error: Cannot determine polymorphic type from parameter: 'Color' to '$T'
+	Suggestion: Are you trying to pass a type to a value parameter?
+    main :: proc() { _ = len(Color) }
+                             ^^^^^

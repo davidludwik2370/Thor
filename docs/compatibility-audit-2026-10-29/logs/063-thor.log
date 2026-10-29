@@ -1,0 +1,28 @@
+$AUDIT/thor/Odin/tic-tac-toe/tic-tac-toe.thor(94:9): Error: Invalid operands for '== / !=': no matching operation.
+	Given argument types:
+	 • $Thor expression
+	 • .E (untyped)
+        assert(g.board[move.y][move.x] == .E)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/tic-tac-toe/tic-tac-toe.thor(94:9): Error: Cannot take the pointer address of '(g)' which is a procedure parameter
+        assert(g.board[move.y][move.x] == .E)
+               ^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/tic-tac-toe/tic-tac-toe.thor(94:9): Error: Expected a type to assign to the type parameter
+        assert(g.board[move.y][move.x] == .E)
+               ^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/tic-tac-toe/tic-tac-toe.thor(94:9): Error: mismatched argument #1 in call to 'Thor expression.element'
+
+	Suggestion:
+		Thor expression.element(&Thor expression(&(g), move, type_of(Thor expression.element(g.board))))
+
+Did you mean one of the following overloads?
+	thor_sequence.array_element         :: proc(value: $A/[$N]$E) -> E          at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(22:1)
+	thor_sequence.slice_element         :: proc(value: $A/[]$E) -> E            at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(23:1)
+	thor_sequence.dynamic_element       :: proc(value: $A/[dynamic]$E) -> E     at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(24:1)
+	thor_sequence.fixed_element         :: proc(value: $A/[dynamic; $N]$E) -> E at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(25:1)
+	thor_sequence.map_element           :: proc(value: $A/map[$K]$V) -> V       at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(26:1)
+	thor_sequence.string_element        :: proc(value: $S/string) -> u8         at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(27:1)
+	thor_sequence.multi_element         :: proc(value: [^]$E) -> E              at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(28:1)
+	thor_sequence.pointer_array_element :: proc(value: ^[$N]$E) -> E            at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(29:1)
+        assert(g.board[move.y][move.x] == .E)
+               ^^^^^^^^^^^^^^^

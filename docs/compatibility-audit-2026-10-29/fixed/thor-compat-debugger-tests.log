@@ -1,0 +1,18 @@
+test_allocated_fn_body_has_original_name_and_runtime_breakpoint (tests.test_debugger.DebuggerTests.test_allocated_fn_body_has_original_name_and_runtime_breakpoint) ... ok
+test_breakpoint_and_step_over_original_thor_lines (tests.test_debugger.DebuggerTests.test_breakpoint_and_step_over_original_thor_lines) ... ok
+test_breakpoint_in_shared_basic_uses_its_installed_source_map (tests.test_debugger.DebuggerTests.test_breakpoint_in_shared_basic_uses_its_installed_source_map) ... ok
+test_checked_ordinary_procedure_keeps_its_frame_and_locals (tests.test_debugger.DebuggerTests.test_checked_ordinary_procedure_keeps_its_frame_and_locals) ... ok
+test_conditional_loop_breakpoint_and_variable_edit (tests.test_debugger.DebuggerTests.test_conditional_loop_breakpoint_and_variable_edit) ... ok
+test_deep_stack_paging_counts_user_frames_after_mapping (tests.test_debugger.DebuggerTests.test_deep_stack_paging_counts_user_frames_after_mapping) ... ok
+test_helper_condition_and_edit_use_original_variable_names (tests.test_debugger.DebuggerTests.test_helper_condition_and_edit_use_original_variable_names) ... ok
+test_native_import_breakpoint_and_step_back_to_thor (tests.test_debugger.DebuggerTests.test_native_import_breakpoint_and_step_back_to_thor) ... ok
+test_no_breakpoint_on_compile_time_declaration_or_inactive_branch (tests.test_debugger.DebuggerTests.test_no_breakpoint_on_compile_time_declaration_or_inactive_branch) ... ok
+test_spread_extrema_step_over_and_optional_status_locals (tests.test_debugger.DebuggerTests.test_spread_extrema_step_over_and_optional_status_locals) ... ok
+test_step_into_user_call_inside_switch_and_inspect_helper_locals (tests.test_debugger.DebuggerTests.test_step_into_user_call_inside_switch_and_inspect_helper_locals) ... ok
+test_switch_arm_breakpoint_reports_original_source_and_outer_variables (tests.test_debugger.DebuggerTests.test_switch_arm_breakpoint_reports_original_source_and_outer_variables) ... ok
+test_unicode_inline_breakpoint_uses_utf16_editor_columns (tests.test_debugger.DebuggerTests.test_unicode_inline_breakpoint_uses_utf16_editor_columns) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 46.235s
+
+OK

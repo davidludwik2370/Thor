@@ -1,0 +1,8 @@
+$AUDIT/thor/Odin/merge_sort/merge_sort.thor(40:14): Error: Undeclared name: Thor expression
+	$AUDIT/thor/Odin/merge_sort/merge_sort.thor(69:5) instantiated as 'sort($T=int)'
+            case a[ai] < b[bi]:
+                 ^^^^^
+$AUDIT/thor/Odin/merge_sort/merge_sort.thor(40:22): Error: Undeclared name: Thor expression
+	$AUDIT/thor/Odin/merge_sort/merge_sort.thor(69:5) instantiated as 'sort($T=int)'
+            case a[ai] < b[bi]:
+                         ^^^^^

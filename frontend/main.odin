@@ -193,6 +193,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "DynamicArrayType"; info.roles["elem"] = span(n.elem)
     case ^ast.Fixed_Capacity_Dynamic_Array_Type:
         info.kind = "DynamicArrayType"; info.roles["elem"] = span(n.elem)
+        info.roles["capacity"] = span(n.capacity)
     case ^ast.Struct_Type:
         info.kind = "StructType"; info.roles["fields"] = span(n.fields); info.roles["params"] = span(n.poly_params)
         if n.is_raw_union {info.op="raw_union"}
@@ -204,6 +205,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind = "When"; info.roles["cond"] = span(n.cond)
         info.roles["body"] = span(n.body); info.roles["else"] = span(n.else_stmt)
     case ^ast.Return_Stmt: info.kind = "Return"; info.lists["values"] = spans(n.results)
+    case ^ast.Defer_Stmt: info.kind = "Defer"; info.roles["stmt"] = span(n.stmt)
     case ^ast.Block_Stmt: info.kind = "Block"
     case ^ast.Import_Decl:
         info.kind = "Import"; info.name = n.name.text; info.op = n.relpath.text

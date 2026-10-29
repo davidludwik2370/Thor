@@ -1,0 +1,6 @@
+$AUDIT/thor/Odin/hilo/original/hilo.thor(30:9): Error: Cannot take a mutable address of an element in a temporary array.
+            board[i] = pop(deck)
+            ^^^^^^^^
+$AUDIT/thor/Odin/hilo/original/hilo.thor(30:9): Error: Missing return statement at the end of the procedure 'Thor expression'
+            board[i] = pop(deck)
+            ^^^^^^^^

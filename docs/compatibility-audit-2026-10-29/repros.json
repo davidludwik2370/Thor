@@ -1,0 +1,104 @@
+[
+  {
+    "name": "range_nested",
+    "issue": "C01",
+    "file": "range_nested.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "enum_iteration",
+    "issue": "C02",
+    "file": "enum_iteration.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "support_import_bootstrap",
+    "issue": "C13",
+    "file": "support_import_bootstrap.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "named_result_write",
+    "issue": "C03",
+    "file": "named_result_write.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "switch_case_index",
+    "issue": "C04",
+    "file": "switch_case_index.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "deferred_loop_index",
+    "issue": "C05",
+    "file": "deferred_loop_index.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "using_array_read",
+    "issue": "C06",
+    "file": "using_array_read.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "parameter_shadowing",
+    "issue": "C07",
+    "file": "parameter_shadowing.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "type_switch_index",
+    "issue": "C08",
+    "file": "type_switch_index.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "fixed_dynamic_index",
+    "issue": "C09",
+    "file": "fixed_dynamic_index.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "fixed_dynamic_slice",
+    "issue": "C09",
+    "file": "fixed_dynamic_slice.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "imported_enum_index",
+    "issue": "C10",
+    "file": "imported_enum_index.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "len_enum_type",
+    "issue": "C11",
+    "file": "len_enum_type.odin",
+    "thor_expected": "failure"
+  },
+  {
+    "name": "readonly_array_control",
+    "issue": "control",
+    "file": "readonly_array_control.odin",
+    "thor_expected": "success"
+  },
+  {
+    "name": "enum_array_control",
+    "issue": "control",
+    "file": "enum_array_control.odin",
+    "thor_expected": "success"
+  },
+  {
+    "name": "soa_zip_range",
+    "issue": "C12",
+    "file": "soa_zip_range.odin",
+    "thor_expected": "timeout"
+  },
+  {
+    "name": "soa_slice_range_control",
+    "issue": "control",
+    "file": "soa_slice_range_control.odin",
+    "thor_expected": "success"
+  }
+]

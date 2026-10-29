@@ -1,0 +1,67 @@
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(54:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • Suit
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for suit in Suit {
+            ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(55:33): Error: Undeclared name: suit
+                append(&deck, {num, suit})
+                                    ^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(190:24): Error: It is unsafe to return '(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression):Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+            if is_straight(potential_straight[i:i+5]) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(192:34): Error: It is unsafe to return '(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression):Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+                append(&best_hand, ..potential_straight[i:i+5])
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(291:17): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+            append(&hands[i], ..deal[i][:])
+                    ^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(292:20): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+            sort_hand(&hands[i])
+                       ^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(306:17): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+                    best_hands[i] = a14_best
+                    ^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(307:17): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+                    ranks[i]      = a14_rank
+                    ^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(338:22): Error: Undeclared name: Thor expression
+                    case a[i].num > b[i].num: return .a
+                         ^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(338:33): Error: Undeclared name: Thor expression
+                    case a[i].num > b[i].num: return .a
+                                    ^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(339:22): Error: Undeclared name: Thor expression
+                    case a[i].num < b[i].num: return .b
+                         ^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(339:33): Error: Undeclared name: Thor expression
+                    case a[i].num < b[i].num: return .b
+                                    ^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(393:21): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+            print_cards(deal[win_index][:])
+                        ^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(415:13): Error: It is unsafe to return '&(Thor expression)[Thor expression.normalize(len(Thor expression), Thor expression)]' from a procedure, as it refers to the stack memory of the local variable 'Thor expression'
+	Suggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'
+                outcomes[i] = win_type
+                ^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(507:9): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+            for hi in lo..<14 {
+            ^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(507:21): Error: Unknown operator '..<'
+            for hi in lo..<14 {
+                        ^
+$AUDIT/thor/Odin/poker/ref/poker_multi_v1.thor(509:39): Error: Undeclared name: hi
+                    key := Result_Key{lo, hi, match}
+                                          ^^

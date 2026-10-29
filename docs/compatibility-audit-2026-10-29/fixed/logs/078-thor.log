@@ -1,0 +1,12 @@
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(28:31): Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+    tryPlacingPiece :: proc(using game: ^Game, move: int) -> (success: bool) {
+                                  ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(56:29): Error: 'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+    checkGameOver :: proc(using game: ^Game) {
+                                ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(73:2): Error: 'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring
+	If you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'
+        using rl
+        ^^^^^^^^

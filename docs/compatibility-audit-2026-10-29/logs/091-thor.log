@@ -1,0 +1,78 @@
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(206:17): Error: The element variable 'v' cannot be made addressable
+            switch &v in board[y][x] {
+                    ^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(250:28): Error: Non-boolean condition in 'if' statement
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(250:28): Error: Cannot take the pointer address of '(v)'
+	Suggestion: Did you want to pass the value to the switch statement by pointer to get addressable semantics?
+	            Prefer doing 'switch &v in ...'
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(272:28): Error: Non-boolean condition in 'if' statement
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(272:28): Error: Cannot take the pointer address of '(v)'
+	Suggestion: Did you want to pass the value to the switch statement by pointer to get addressable semantics?
+	            Prefer doing 'switch &v in ...'
+                            if v[n] {
+                               ^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(292:21): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                        for y in start_row..<start_row+3 { // loop every cell in block
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(292:39): Error: Unknown operator '..<'
+                        for y in start_row..<start_row+3 { // loop every cell in block
+                                          ^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(293:25): Error: No procedures or ambiguous call for procedure group 'Thor expression.compiler_iterate' that match with the given arguments
+	Given argument types:
+	 • int
+Did you mean one of the following overloads?
+	thor_sets.compiler_iter_native :: proc(value: $T) -> T at /Users/davidludwik/Thor/runtime/sets/compiler.odin(59:1)
+                            for x in start_col..<start_col+3 {
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(293:43): Error: Unknown operator '..<'
+                            for x in start_col..<start_col+3 {
+                                              ^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(294:41): Error: Invalid type for this type switch expression, got '$Thor expression'
+                                switch v in board[y][x] {
+                                            ^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(294:47): Error: Undeclared name: y
+                                switch v in board[y][x] {
+                                                  ^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(294:50): Error: Undeclared name: x
+                                switch v in board[y][x] {
+                                                     ^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(404:9): Error: Cannot take a mutable address of an element in a temporary array.
+            solved[y][x] = i
+            ^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(404:9): Error: Missing return statement at the end of the procedure 'Thor expression'
+            solved[y][x] = i
+            ^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(562:26): Error: Undeclared name: Thor expression
+                        case start_board[y][x]:  cell_color = RAYWHITE
+                             ^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(562:26): Error: No procedures or ambiguous call for procedure group 'Thor expression.element' that match with the given arguments
+	Given argument types:
+	 • [9]Cell
+Did you mean one of the following overloads?
+	thor_sequence.array_element         :: proc(value: $A/[$N]$E) -> E at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(22:1)
+	thor_sequence.multi_element         :: proc(value: [^]$E) -> E     at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(28:1)
+	thor_sequence.pointer_array_element :: proc(value: ^[$N]$E) -> E   at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(29:1)
+                        case start_board[y][x]:  cell_color = RAYWHITE
+                             ^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(563:26): Error: Undeclared name: Thor expression
+                        case manual_board[y][x]: cell_color = LINE_COLOR[.manual]
+                             ^^^^^^^^^^^^^^^^^^
+$AUDIT/thor/Odin_Projects/sudoku_gui/sudoku.thor(563:26): Error: No procedures or ambiguous call for procedure group 'Thor expression.element' that match with the given arguments
+	Given argument types:
+	 • [9]Cell
+Did you mean one of the following overloads?
+	thor_sequence.array_element         :: proc(value: $A/[$N]$E) -> E at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(22:1)
+	thor_sequence.multi_element         :: proc(value: [^]$E) -> E     at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(28:1)
+	thor_sequence.pointer_array_element :: proc(value: ^[$N]$E) -> E   at /Users/davidludwik/Thor/runtime/sequence/sequence.odin(29:1)
+                        case manual_board[y][x]: cell_color = LINE_COLOR[.manual]
+                             ^^^^^^^^^^^^^^^^^^

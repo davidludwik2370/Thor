@@ -1,0 +1,16 @@
+Timeout (0:00:08)!
+Thread 0x00000001f52f20c0 (most recent call first):
+  File "/Users/davidludwik/.pyenv/versions/3.11.6/lib/python3.11/subprocess.py", line 1199 in communicate
+  File "/Users/davidludwik/.pyenv/versions/3.11.6/lib/python3.11/subprocess.py", line 550 in run
+  File "/tmp/thor-audit-demo-probe.py", line 12 in traced
+  File "/Users/davidludwik/Thor/thorlang/driver.py", line 500 in _main
+  File "/Users/davidludwik/Thor/thorlang/driver.py", line 556 in main
+  File "/tmp/thor-audit-demo-probe.py", line 19 in <module>
+Timeout (0:00:08)!
+Thread 0x00000001f52f20c0 (most recent call first):
+  File "/Users/davidludwik/.pyenv/versions/3.11.6/lib/python3.11/subprocess.py", line 1199 in communicate
+  File "/Users/davidludwik/.pyenv/versions/3.11.6/lib/python3.11/subprocess.py", line 550 in run
+  File "/tmp/thor-audit-demo-probe.py", line 12 in traced
+  File "/Users/davidludwik/Thor/thorlang/driver.py", line 500 in _main
+  File "/Users/davidludwik/Thor/thorlang/driver.py", line 556 in main
+  File "/tmp/thor-audit-demo-probe.py", line 19 in <module>

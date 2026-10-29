@@ -1,0 +1,138 @@
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(6:1): Error: Redeclaration of 'WINDOW_WIDTH' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(5:1)
+    WINDOW_WIDTH  :: 600
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(6:1): Error: Redeclaration of 'WINDOW_WIDTH' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(5:1)
+    WINDOW_WIDTH  :: 600
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(7:1): Error: Redeclaration of 'WINDOW_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(6:1)
+    WINDOW_HEIGHT :: 801
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(7:1): Error: Redeclaration of 'WINDOW_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(6:1)
+    WINDOW_HEIGHT :: 801
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(8:1): Error: Redeclaration of 'GRID_SIZE' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(7:1)
+    GRID_SIZE     :: 40
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(8:1): Error: Redeclaration of 'GRID_SIZE' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(7:1)
+    GRID_SIZE     :: 40
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(9:1): Error: Redeclaration of 'SET_FPS' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(8:1)
+    SET_FPS       :: 120
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(9:1): Error: Redeclaration of 'SET_FPS' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(8:1)
+    SET_FPS       :: 120
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(10:1): Error: Redeclaration of 'BOARD_WIDTH' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(9:1)
+    BOARD_WIDTH   :: 10
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(10:1): Error: Redeclaration of 'BOARD_WIDTH' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(9:1)
+    BOARD_WIDTH   :: 10
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(11:1): Error: Redeclaration of 'BOARD_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(10:1)
+    BOARD_HEIGHT  :: 20
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(11:1): Error: Redeclaration of 'BOARD_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(10:1)
+    BOARD_HEIGHT  :: 20
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(12:1): Error: Redeclaration of 'SPAWN_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(11:1)
+    SPAWN_HEIGHT  :: 3
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(12:1): Error: Redeclaration of 'SPAWN_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(11:1)
+    SPAWN_HEIGHT  :: 3
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(14:1): Error: Redeclaration of 'PlayState' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(13:1)
+    PlayState :: enum { Live, GameOver }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(14:1): Error: Redeclaration of 'PlayState' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(13:1)
+    PlayState :: enum { Live, GameOver }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(15:1): Error: Redeclaration of 'PieceType' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(14:1)
+    PieceType :: enum { I, O, T, S, Z, J, L }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(15:1): Error: Redeclaration of 'PieceType' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(14:1)
+    PieceType :: enum { Empty, I, O, T, S, Z, J, L }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(16:1): Error: Redeclaration of 'Types' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(15:1)
+    Types     :: bit_set[PieceType]
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(16:1): Error: Redeclaration of 'Types' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(15:1)
+    Types     :: bit_set[PieceType]
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(18:1): Error: Redeclaration of 'Pos' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(17:1)
+    Pos  :: struct { x, y: int }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(18:1): Error: Redeclaration of 'Pos' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(17:1)
+    Pos  :: struct { x, y: int }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(19:1): Error: Redeclaration of 'Game' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(18:1)
+    Game :: struct {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(19:1): Error: Redeclaration of 'Game' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(18:1)
+    Game :: struct {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(31:1): Error: Redeclaration of 'Piece' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(30:1)
+    Piece :: struct {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(31:1): Error: Redeclaration of 'Piece' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(30:1)
+    Piece :: struct {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(39:1): Error: Redeclaration of 'pieceColors' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(38:1)
+    pieceColors := [8]rl.Color {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(48:1): Error: Redeclaration of 'Shapes' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(51:1)
+    Shapes := #partial [PieceType][4]Pos {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(49:1): Error: Redeclaration of 'Shapes' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(48:1)
+    Shapes := #partial [PieceType][3]Pos {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(69:1): Error: Redeclaration of 'swap' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(61:1)
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(59:1)
+    swap :: proc(x, y: ^$T) { x^, y^ = y^, x^ }
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(72:1): Error: Redeclaration of 'newPiece' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(64:1)
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(62:1)
+    newPiece :: proc(piece: ^Piece) {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v2.thor(76:1): Error: Redeclaration of 'squareUnavailable' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(82:1)
+    squareUnavailable :: proc(using piece: Piece, limb: int, g: Game) -> bool {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(79:1): Error: Redeclaration of 'squareUnavailable' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(82:1)
+    squareUnavailable :: proc(using piece: Piece, limb: int, g: Game) -> bool {
+    ^
+$AUDIT/thor/Odin_Projects/tetris/archive/tetris_v1.thor(84:1): Error: Redeclaration of 'positionValid' in this scope
+	at $AUDIT/thor/Odin_Projects/tetris/archive/tetris_v3.thor(87:1)
+    positionValid :: proc(piece: Piece, g: Game) -> bool {
+    ^

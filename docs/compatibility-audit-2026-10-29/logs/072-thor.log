@@ -1,0 +1,105 @@
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(4:1): Error: Redeclaration of 'WINDOW_WIDTH' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(4:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor(4:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(4:1)
+    WINDOW_WIDTH  :: 700
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(5:1): Error: Redeclaration of 'WINDOW_HEIGHT' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(5:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(5:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor(5:1)
+    WINDOW_HEIGHT :: 600
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(6:1): Error: Redeclaration of 'GRID_SIZE' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(6:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(6:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor(6:1)
+    GRID_SIZE     :: 100
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(7:1): Error: Redeclaration of 'PIECE_RADIUS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(7:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(7:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor(7:1)
+    PIECE_RADIUS  :: 40
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(8:1): Error: Redeclaration of 'ROWS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(8:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor(8:1)
+    ROWS          :: WINDOW_HEIGHT / GRID_SIZE
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(9:1): Error: Redeclaration of 'ROWS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(8:1)
+    ROWS          :: WINDOW_HEIGHT / GRID_SIZE
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(9:1): Error: Redeclaration of 'COLUMNS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(9:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v5.thor(9:1)
+    COLUMNS       :: WINDOW_WIDTH / GRID_SIZE
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(10:1): Error: Redeclaration of 'COLUMNS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(9:1)
+    COLUMNS       :: WINDOW_WIDTH / GRID_SIZE
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(10:1): Error: Redeclaration of 'TOTAL_SLOTS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(10:1)
+    TOTAL_SLOTS   :: ROWS * COLUMNS
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(11:1): Error: Redeclaration of 'TOTAL_SLOTS' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(10:1)
+    TOTAL_SLOTS   :: ROWS * COLUMNS
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(11:1): Error: Redeclaration of 'LIGHT_GREEN' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(11:1)
+    LIGHT_GREEN   :: rl.Color {93, 210, 103, 255}
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(13:1): Error: Redeclaration of 'Coord' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(13:1)
+    Coord :: [2]int
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(15:1): Error: Redeclaration of 'Turn' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(15:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(16:1)
+    Turn    :: enum { black, red }
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(16:1): Error: Redeclaration of 'Slot' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(16:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(13:1)
+    Slot    :: enum { empty, black, red }
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(17:1): Error: Redeclaration of 'Outcome' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(17:1)
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(19:1)
+    Outcome :: enum { inGame, blackWon, redWon, draw }
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(19:1): Error: Redeclaration of 'Game' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(19:1)
+    Game :: struct {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v1.thor(26:1): Error: Redeclaration of 'Coord' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(13:1)
+    Coord :: struct {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(28:1): Error: Redeclaration of 'tryPlacingPiece' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(28:1)
+    tryPlacingPiece :: proc(using game: ^Game, move: int) -> (success: bool) {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(41:1): Error: Redeclaration of 'inBounds' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(40:1)
+    inBounds :: proc(pos: Coord) -> bool {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(45:1): Error: Redeclaration of 'piecesInARow' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(44:1)
+    piecesInARow :: proc(game: Game, countDir: Coord) -> (piecesInARow := -1) {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(56:1): Error: Redeclaration of 'checkGameOver' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(55:1)
+    checkGameOver :: proc(using game: ^Game) {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(66:1): Error: Redeclaration of 'resetGame' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(65:1)
+    resetGame :: proc(game: ^Game) {
+    ^
+$AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v6.thor(72:1): Error: Redeclaration of 'main' in this scope
+	at $AUDIT/thor/Odin_Projects/Connect_4/archive/conect_4_v7.thor(69:1)
+    main :: proc() {
+    ^

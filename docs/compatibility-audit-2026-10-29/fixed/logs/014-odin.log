@@ -1,0 +1,3 @@
+$AUDIT/odin/Odin/factorial/factorial.odin(32:8) Error: Operator '!' is only allowed on boolean expressions
+	if !success {
+	   ^
