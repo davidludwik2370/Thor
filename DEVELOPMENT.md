@@ -1650,3 +1650,30 @@ location and diagnostic clearing after an unsaved conversion to value iteration.
 The unchanged current Dijkstra source checks cleanly and its equivalent debug
 build succeeds using temporary inputs/outputs; the project's source hash matches
 the initial snapshot. No GUI is launched and no project files are modified.
+
+
+## Reversible compile-time constant colors (TLS/editor 0.13.0)
+
+Add a separate `thorCompileTime` semantic-token modifier for compile-time value
+names, including local, imported and evaluated constants. Preserve the existing
+readonly classification and colors for runtime immutable storage, parameters and
+loop values. Types, procedures, enum members and namespaces retain their existing
+token kinds and colors. The modifier is additive and does not change language
+semantics or install a new theme.
+
+Provide `Thor: Preview Compile-Time Constant Color` and `Thor: Restore Previous
+Constant Color`. The preview defaults to blue-violet `#9B8FE8` and changes only
+the user-level `variable.thorCompileTime:thor` rule. Save the original rule in
+persistent extension state before applying the preview; preserve it across
+repeated tweaks and editor reloads. Restore just that rule, retaining unrelated
+preferences and edits made during the preview. Without an active preview, the
+original theme remains the default. Document the controls in the editor README.
+
+Validation: all 1,126 native TLS tests, 90 stdio LSP tests and 95 Node/editor tests
+pass. New cases distinguish constants from mutable/runtime immutable bindings,
+parameters, loop values, types and callable values, including imported constants.
+Preference tests cover cancellation, repeated tweaks, extension reloads, existing
+styles and exact restoration without overwriting unrelated settings. The real
+isolated VS Code extension test applies two colors and restores its original
+preference. Build and install extension 0.13.0; preserve the prior 0.12.0 VSIX in
+`.thor-cache/editor-backups/` and apply the preview through its normal command.

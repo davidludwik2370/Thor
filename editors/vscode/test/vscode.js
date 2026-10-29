@@ -36,6 +36,18 @@ async function run() {
         assert.equal(document.languageId, 'thor');
         assert.deepEqual(extension.packageJSON.contributes.semanticTokenScopes,
             [{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
+        const colorConfig=vscode.workspace.getConfiguration('editor');
+        const colorBaseline=colorConfig.inspect('semanticTokenColorCustomizations')?.globalValue;
+        try {
+            await vscode.commands.executeCommand('thor.previewConstantColor','#9B8FE8');
+            assert.equal(colorConfig.inspect('semanticTokenColorCustomizations').globalValue.rules['variable.thorCompileTime:thor'],'#9B8FE8');
+            await vscode.commands.executeCommand('thor.previewConstantColor','#8877DD');
+            assert.equal(colorConfig.inspect('semanticTokenColorCustomizations').globalValue.rules['variable.thorCompileTime:thor'],'#8877DD');
+        } finally {
+            await vscode.commands.executeCommand('thor.restoreConstantColor');
+        }
+        assert.deepEqual(colorConfig.inspect('semanticTokenColorCustomizations')?.globalValue,colorBaseline,
+            'Restoring constant colors must restore the original user preference exactly');
         const source = document.getText();
         const offset = source.indexOf('numbers :=') + 2;
         const hover = await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)),
@@ -384,6 +396,7 @@ async function run() {
             'wildcard and namespace-free imports compile and provide source hovers',
             'standard-library #run checks original overload ranges and clears after unsaved correction',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
+            'reversible compile-time constant color preview and custom color',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',

@@ -236,6 +236,7 @@ SymbolFlag :: enum {
 	Simd,
 	Parameter, //If the symbol is a procedure argument
 	PolyType,
+	CompileTime, // Value-declaration binding, independent of readonly runtime values.
 }
 
 SymbolFlags :: bit_set[SymbolFlag]

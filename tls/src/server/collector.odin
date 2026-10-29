@@ -1140,6 +1140,8 @@ collect_symbols :: proc(collection: ^SymbolCollection, file: ast.File, uri: stri
 			symbol.flags |= {.Variable}
 		}
 
+		symbol.flags -= {.CompileTime}
+		if .Mutable not_in expr.flags && .Immutable not_in expr.flags { symbol.flags |= {.CompileTime} }
 		if .Mutable in expr.flags {
 			symbol.flags |= {.Mutable}
 		}

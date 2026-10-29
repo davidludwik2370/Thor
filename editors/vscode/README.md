@@ -102,6 +102,32 @@ example, showing a Set as `set[string]` in a hover is a server presentation rule
 Recognizing string text inside nested fstrings also requires correct grammar
 rules. A change may therefore belong in the server, the grammar, or both.
 
+### Reversible constant-color preview
+
+The original theme colors remain the default. To try a different color for Thor
+compile-time value constants, use **Thor: Preview Compile-Time Constant Color**
+in the Command Palette. Press Enter to try the blue-violet `#9B8FE8`, or enter
+another `#RRGGBB` color. Run the same command to tweak it again.
+
+**Thor: Restore Previous Constant Color** restores the pre-preview rule. The
+baseline persists across editor reloads and repeated previews, so it returns to
+the color from before the first preview, rather than the last tweak. Other
+changes to your settings made during the preview are retained.
+
+This changes only the user-level semantic-color selector
+`variable.thorCompileTime:thor`. The existing theme and mutable/runtime-immutable
+variable colors are preserved, as are parameter, type, procedure, enum-member,
+keyword, string and number-literal colors. The preview applies across Thor
+projects in the current VS Code profile. With no explicit previous rule,
+restoring removes the override and follows the theme again. Changes take effect
+immediately; after installing the updated extension, reload the window once.
+
+TLS supplies the additive `thorCompileTime` semantic modifier for actual
+compile-time value declarations and references, including imported values,
+aliases and `#run` results. Runtime `:>` declarations and loop bindings retain
+their existing classification. Other themes can style the modifier directly;
+the preview is optional and does not replace a theme.
+
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS
 and the transpiler share the Thor parser, keeping their accepted syntax aligned.
 TLS uses its own partial semantic resolver for interactive features; the Thor

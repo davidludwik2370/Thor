@@ -57,7 +57,7 @@ semantic_tokens_global_consts :: proc(t: ^testing.T) {
 	test.expect_semantic_tokens(t, &src, {
 		{1, 2,  3,  .Type,      {.ReadOnly}}, // [0]  Foo
 		{0, 10, 3,  .Type,      {.ReadOnly}}, // [1]  f32
-		{1, 2,  4,  .Variable,  {.ReadOnly}}, // [2]  Foo2
+		{1, 2,  4,  .Variable,  {.ReadOnly, .CompileTime}}, // [2]  Foo2
 		{0, 11, 3,  .Type,      {.ReadOnly}}, // [3]  f32
 		{1, 2,  4,  .Type,      {.ReadOnly}}, // [4]  Foo3
 		{0, 8,  3,  .Type,      {.ReadOnly}}, // [5]  Foo
@@ -76,12 +76,12 @@ semantic_tokens_literals_with_explicit_types :: proc(t: ^testing.T) {
 	}
 
 	test.expect_semantic_tokens(t, &src, {
-		{1, 2,  3, .Variable, {.ReadOnly}}, // [0]  Foo
-		{1, 2,  4, .Variable, {.ReadOnly}}, // [1]  Foo2
+		{1, 2,  3, .Variable, {.ReadOnly, .CompileTime}}, // [0]  Foo
+		{1, 2,  4, .Variable, {.ReadOnly, .CompileTime}}, // [1]  Foo2
 		{0, 7,  3, .Type,     {.ReadOnly}}, // [2]  int
-		{1, 2,  4, .Variable, {.ReadOnly}}, // [3]  Foo3
+		{1, 2,  4, .Variable, {.ReadOnly, .CompileTime}}, // [3]  Foo3
 		{0, 13, 6, .Type,     {.ReadOnly}}, // [4]  string
-		{1, 2,  4, .Variable, {.ReadOnly}}, // [5]  Foo4
+		{1, 2,  4, .Variable, {.ReadOnly, .CompileTime}}, // [5]  Foo4
 		{0, 8,  7, .Type,     {.ReadOnly}}, // [6]  cstring
 	})
 }
@@ -276,19 +276,19 @@ semantic_tokens_const_type_cast :: proc(t: ^testing.T) {
 
 	test.expect_semantic_tokens(t, &src, {
 		// Global scope
-		{1, 2, 11, .Variable, {.ReadOnly}}, // [0]  GLOBAL_TRUE
+		{1, 2, 11, .Variable, {.ReadOnly, .CompileTime}}, // [0]  GLOBAL_TRUE
 		{0, 15, 4, .Type,     {.ReadOnly}}, // [1]  bool
-		{1, 2,  8, .Variable, {.ReadOnly}}, // [2]  GLOBAL_A
+		{1, 2,  8, .Variable, {.ReadOnly, .CompileTime}}, // [2]  GLOBAL_A
 		{0, 15, 3, .Type,     {.ReadOnly}}, // [3]  int
-		{1, 2,  8, .Variable, {.ReadOnly}}, // [4]  GLOBAL_B
+		{1, 2,  8, .Variable, {.ReadOnly, .CompileTime}}, // [4]  GLOBAL_B
 		{0, 15, 7, .Type,     {.ReadOnly}}, // [5]  cstring
 		{1, 2,  4, .Function, {.ReadOnly}}, // [6]  main
 		// Local scope
-		{1, 3,  4, .Variable, {.ReadOnly}}, // [7]  TRUE
+		{1, 3,  4, .Variable, {.ReadOnly, .CompileTime}}, // [7]  TRUE
 		{0, 8,  4, .Type,     {.ReadOnly}}, // [8]  bool
-		{1, 3,  1, .Variable, {.ReadOnly}}, // [9]  A
+		{1, 3,  1, .Variable, {.ReadOnly, .CompileTime}}, // [9]  A
 		{0, 8,  3, .Type,     {.ReadOnly}}, // [10] int
-		{1, 3,  1, .Variable, {.ReadOnly}}, // [11] B
+		{1, 3,  1, .Variable, {.ReadOnly, .CompileTime}}, // [11] B
 		{0, 8,  7, .Type,     {.ReadOnly}}, // [12] cstring
 	})
 }
@@ -309,11 +309,11 @@ semantic_tokens_const_alias_type_cast :: proc(t: ^testing.T) {
 		// Global scope
 		{1, 2,  4, .Type,     {.ReadOnly}}, // [0]  Bool
 		{0, 10, 4, .Type,     {.ReadOnly}}, // [1]  bool
-		{1, 2,  6, .Variable, {.ReadOnly}}, // [2]  G_TRUE
+		{1, 2,  6, .Variable, {.ReadOnly, .CompileTime}}, // [2]  G_TRUE
 		{0, 10, 4, .Type,     {.ReadOnly}}, // [3]  Bool
 		{1, 2,  4, .Function, {.ReadOnly}}, // [4]  main
 		// Local scope
-		{1, 3,  4, .Variable, {.ReadOnly}}, // [5]  TRUE
+		{1, 3,  4, .Variable, {.ReadOnly, .CompileTime}}, // [5]  TRUE
 		{0, 8,  4, .Type,     {.ReadOnly}}, // [6]  Bool
 	})
 }
@@ -334,11 +334,11 @@ semantic_tokens_const_array :: proc(t: ^testing.T) {
 		// Global scope
 		{1, 2,  3, .Type,     {.ReadOnly}}, // [0]  Vec
 		{0, 12, 3, .Type,     {.ReadOnly}}, // [1]  f32
-		{1, 2,  5, .Variable, {.ReadOnly}}, // [2]  G_VEC
+		{1, 2,  5, .Variable, {.ReadOnly, .CompileTime}}, // [2]  G_VEC
 		{0, 9,  3, .Type,     {.ReadOnly}}, // [3]  Vec
 		{1, 2,  4, .Function, {.ReadOnly}}, // [4]  main
 		// Local scope
-		{1, 3,  3, .Variable, {.ReadOnly}}, // [5]  VEC
+		{1, 3,  3, .Variable, {.ReadOnly, .CompileTime}}, // [5]  VEC
 		{0, 7,  3, .Type,     {.ReadOnly}}, // [6]  Vec
 	})
 }
@@ -353,8 +353,8 @@ semantic_tokens_global_binary_expr :: proc(t: ^testing.T) {
 	}
 
 	test.expect_semantic_tokens(t, &src, {
-		{1, 2, 3, .Variable, {.ReadOnly}}, // [0]  FOO
-		{1, 2, 3, .Variable, {.ReadOnly}}, // [1]  BAR
+		{1, 2, 3, .Variable, {.ReadOnly, .CompileTime}}, // [0]  FOO
+		{1, 2, 3, .Variable, {.ReadOnly, .CompileTime}}, // [1]  BAR
 		{0, 7, 3, .Type,     {.ReadOnly}}, // [2]  int
 		{0, 9, 3, .Type,     {.ReadOnly}}, // [3]  int
 	})
@@ -393,7 +393,7 @@ semantic_tokens_imported_symbols :: proc(t: ^testing.T) {
 		{1,  7, 10, .Namespace, {.ReadOnly}}, // [1]  my_package
 		{0, 11,  9, .Struct,    {.ReadOnly}}, // [2]  My_Struct
 		{1,  7, 10, .Namespace, {.ReadOnly}}, // [3]  my_package
-		{0, 11,  8, .Variable,  {.ReadOnly}}, // [4]  MY_CONST
+		{0, 11,  8, .Variable,  {.ReadOnly, .CompileTime}}, // [4]  MY_CONST
 		{1,  7, 10, .Namespace, {.ReadOnly}}, // [5]  my_package
 		{0, 11,  6, .Variable,  {}},          // [6]  my_var
 		{1,  3, 10, .Namespace, {.ReadOnly}}, // [7]  my_package
@@ -428,7 +428,7 @@ semantic_tokens_imported_comp_lit_const :: proc(t: ^testing.T) {
 		{2,  2,  4, .Function,  {.ReadOnly}}, // [0]  main
 		{1,  3,  1, .Variable,  {}},          // [1]  c
 		{0,  5,  6, .Namespace, {.ReadOnly}}, // [2]  raylib
-		{0,  7,  3, .Variable,  {.ReadOnly}}, // [3]  RED
+		{0,  7,  3, .Variable,  {.ReadOnly, .CompileTime}}, // [3]  RED
 	})
 }
 

@@ -62,9 +62,10 @@ SemanticTokenModifier :: enum u8 {
 	Definition,
 	Deprecated,
 	ReadOnly,
+	CompileTime,
 }
 // Need to be in the same order as SemanticTokenModifier
-semantic_token_modifier_names: []string = {"declaration", "defaultLibrary", "definition", "deprecated", "readonly"}
+semantic_token_modifier_names: []string = {"declaration", "defaultLibrary", "definition", "deprecated", "readonly", "thorCompileTime"}
 SemanticTokenModifiers :: bit_set[SemanticTokenModifier;u32]
 
 SemanticTokensRequest :: struct {
@@ -602,6 +603,11 @@ visit_ident :: proc(
 		callable = true
 	}
 	called := symbol_ptr == cast(rawptr)builder.call_target
+	value_modifiers := modifiers
+	if .CompileTime in symbol.flags && .Immutable not_in symbol.flags &&
+	   .Mutable not_in symbol.flags && .Parameter not_in symbol.flags && !callable {
+		value_modifiers += {.CompileTime}
+	}
 	if callable && !called &&
 	   (symbol.type == .Variable || symbol.type == .Constant || symbol.type == .Function) &&
 	   (.Parameter in symbol.flags || .Mutable in symbol.flags || .Variable in symbol.flags) {
@@ -612,7 +618,7 @@ visit_ident :: proc(
 		return
 	}
 	if .Variable in symbol.flags && !(callable && called) {
-		write_semantic_node(builder, ident, .Variable, modifiers)
+		write_semantic_node(builder, ident, .Variable, value_modifiers)
 		return
 	}
 
@@ -626,7 +632,7 @@ visit_ident :: proc(
 			if .Parameter in symbol.flags {
 				write_semantic_node(builder, ident, .Parameter, modifiers)
 			} else {
-				write_semantic_node(builder, ident, .Variable, modifiers)
+				write_semantic_node(builder, ident, .Variable, value_modifiers)
 			}
 		}
 	case .EnumMember:

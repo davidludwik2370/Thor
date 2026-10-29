@@ -134,6 +134,42 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_compile_time_color_marker_does_not_reclassify_runtime_bindings(self):
+        text='''package main
+import "library"
+COUNT::12
+ALIAS::COUNT
+Record::struct{x:int}
+VALUE::Record{x=1}
+make_record::proc()->Record{return {x=2}}
+RUN_VALUE::#run make_record()
+callback::make_record
+main::proc(pointer:^int){
+    LOCAL::7
+    immutable:>COUNT
+    mutable:=COUNT
+    frozen:>ALIAS
+    values:=[1,2]
+    for item in values{_=item}
+    for &item in values{item+=1}
+    _=pointer;_=LOCAL;_=immutable;_=mutable;_=frozen
+    _=VALUE;_=RUN_VALUE;_=callback();_=library.EXPORTED
+}
+'''
+        client,main=self.open(text,files={'library/main.odin':'package library\nEXPORTED::3\n'},compiler=False)
+        legend=client.capabilities['semanticTokensProvider']['legend']['tokenModifiers']
+        marker=1 << legend.index('thorCompileTime')
+        positive={'COUNT','ALIAS','VALUE','RUN_VALUE','LOCAL','EXPORTED'}
+        negative={'Record','make_record','callback','main','pointer','immutable','mutable','frozen','values','item','library'}
+        found=set()
+        for _,_,kind,name,modifiers in self.semantic_spans(client,main,text):
+            if name in positive:
+                self.assertEqual(kind,'variable',(name,kind))
+                self.assertTrue(modifiers & marker,(name,modifiers))
+                found.add(name)
+            if name in negative:self.assertFalse(modifiers & marker,(name,kind,modifiers))
+        self.assertEqual(found,positive)
+
     def test_immutable_array_slice_read_iteration_clears_reference_iteration_error(self):
         text='''package main
 Coord::struct{x,y:int}
