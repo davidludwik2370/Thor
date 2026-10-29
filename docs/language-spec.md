@@ -385,6 +385,11 @@ Syntax:
   decrements, and writes to directly stored fields/fixed-array elements.
 - Reject obtaining a mutable address of the binding or its directly stored
   subobjects, including implicitly through a generated Thor operation.
+- A slice of an immutable array may be consumed directly by a value-iteration
+  loop, including parenthesized slices and runtime bounds. The loop copies
+  elements into Odin's readonly, non-addressable iteration bindings; it exposes
+  no mutable slice header to user code. This does not allocate or copy the whole
+  array. Named, passed, returned and reference-iterated slices remain rejected.
 - Track actual symbols and scopes, not identifier spelling; ordinary shadowing
   rules still apply.
 - This is shallow storage immutability. It does not make data reached through an

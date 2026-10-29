@@ -636,6 +636,18 @@ inactive branches remain unchecked and reference views are distinguished from
 directly stored arrays. TLS marks immutable symbols readonly and explains them
 in hover; live compiler checks enforce mutations on unsaved text.
 
+An immutable array can be sliced directly for value iteration:
+
+```odin
+values :> [10, 20, 30]
+for value in values[:2] { fmt.println(value) }
+```
+
+This reads the original storage without allocating or copying the whole array.
+Named or passed mutable views and `for &value in values[:]` remain rejected.
+`:>` enforces storage immutability in Thor; Odin's `@(rodata)` is a storage
+placement attribute and does not provide the same compile-time checks.
+
 ## Interpolation, switches, Sets and negative indices
 
 ```odin

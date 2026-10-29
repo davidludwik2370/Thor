@@ -148,6 +148,69 @@ assert(x==3 && y==4)
             with self.subTest(body=body):
                 self.invoke(self.program(body), fail='mutable slice')
 
+    def test_immutable_array_slice_can_be_consumed_by_value_iteration(self):
+        self.invoke(self.program('''
+for diagonal in [false,true]{
+ count,sum:=0,0
+ for dir,i in searchDirs[:diagonal ? 8 : 4]{count+=1;sum+=dir.x;assert(i==count-1)}
+ assert(count==(diagonal ? 8 : 4) && sum==(diagonal ? 28 : 6))
+}
+local:>[10,20,30,40]
+calls:=0;total:=0
+for value in (local[next(&calls):-1]){total+=value}
+assert(calls==1 && total==50)
+''','''Coord::struct{x,y:int}
+searchDirs:>[8]Coord{{0,0},{1,0},{2,0},{3,0},{4,0},{5,0},{6,0},{7,0}}
+next::proc(calls:^int)->int{calls^+=1;return 1}
+'''))
+
+    def test_immutable_array_field_and_generic_readonly_iteration(self):
+        self.invoke(self.program('''
+box:>Box{values={1,2,3}}
+sum:=0
+for value in box.values[1:]{sum+=value}
+assert(sum==5 && prefix_sum([1,2,3],2)==3)
+deferred:=0
+{ local:>[2,3];defer for value in local[:]{deferred+=value} }
+assert(deferred==5)
+''','''Box::struct{values:[3]int}
+prefix_sum::proc(data:$T,n:int)->int{
+ local:>data
+ total:=0
+ for value in local[:n]{total+=value}
+ return total
+}
+'''))
+
+    def test_immutable_imported_array_supports_immediate_readonly_iteration(self):
+        self.invoke(self.program('sum:=0;for value in library.values[:2]{sum+=value};assert(sum==3)',
+                                 'import "library"\n'),
+                    files={'library/main.thor':'package library\nvalues:>[3]int{1,2,3}\n'})
+
+    def test_immutable_read_iteration_works_in_pure_runtime_and_compile_time_calls(self):
+        self.invoke(self.program('assert(VALUE==3 && runtime(2)==3)', '''
+prefix_sum::fn(n:int)->int{
+ values:>[1,2,3]
+ total:=0
+ for value in values[:n]{total+=value}
+ return total
+}
+VALUE::#run prefix_sum(2)
+runtime::proc(n:int)->int{return prefix_sum(n)}
+'''))
+
+    def test_immutable_iteration_exception_does_not_expose_mutable_aliases(self):
+        for operation in ['view:=data[:];_=view', 'consume(data[:])', 'for &value in data[:]{value=9}',
+                          'for &value in (data[:]){value=9}', 'for value in identity(data[:]){_=value}']:
+            with self.subTest(operation=operation):
+                self.invoke(self.program('data:>[1,2];'+operation,
+                    'consume::proc(values:[]int){}\nidentity::proc(values:[]int)->[]int{return values}\n'),
+                    command='check',fail='mutable slice')
+        for operation in ['value=9','_= &value']:
+            with self.subTest(operation=operation):
+                self.invoke(self.program('data:>[1,2];for value in data[:]{'+operation+'}'),
+                            command='check',fail='Cannot')
+
     def test_direct_array_mutable_iteration_is_rejected(self):
         self.invoke(self.program('x:>[1,2]; for &v in x {v=3}'), fail='mutable reference')
 

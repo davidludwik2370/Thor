@@ -815,6 +815,22 @@ class Resolver:
                 parts.append(source.mapping.wrap(code, source.path, origin.start, origin.end, "type-context"))
         return "".join(parts)
 
+    @staticmethod
+    def value_iteration_slice(node):
+        """A slice consumed directly by a value loop cannot expose its header.
+
+        Odin's value iteration bindings are readonly and non-addressable, so
+        this use cannot make the backing immutable array writable. Keep named,
+        passed, returned and reference-iterated slices under the normal checks.
+        """
+        if node.kind != 'Slice': return False
+        value = node
+        while value.parent and value.parent.kind == 'Paren': value = value.parent
+        loop = value.parent
+        return bool(loop and loop.kind == 'Range' and loop.role('expr') is value
+                    and not any(name.kind == 'Unary' and name.data.get('op') == '&'
+                                for name in loop.group('names')))
+
     def prepare_storage_checks(self):
         for source in self.sources:
             for n in source.nodes:
@@ -824,7 +840,8 @@ class Resolver:
                 elif n.kind == "Unary" and n.data["op"] == "&":
                     targets = [(n, n.role("expr"), "take a mutable address of")]
                 elif n.kind == "Slice":
-                    targets = [(n, n.role("expr"), "create a mutable slice of")]
+                    if not self.value_iteration_slice(n):
+                        targets = [(n, n.role("expr"), "create a mutable slice of")]
                 elif n.kind == "Range" and any(name.kind == "Unary" and name.data["op"] == "&" for name in n.group("names")):
                     targets = [(n.role("expr"), n.role("expr"), "iterate by mutable reference over")]
                 elif n.kind == "Call" and n.role("callee").text in {"raw_data", "soa_unzip"} and n.group("args"):

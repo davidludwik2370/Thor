@@ -1623,3 +1623,30 @@ without a timeout or conversion failure. The initial full run caught an untyped
 compile-switch string length regression during this work; the typed witness,
 new regression and clean rerun verify its correction. Logs and compiler hashes
 are retained in the audit's fixed directory. Unrelated user edits are preserved.
+
+
+## Readonly iteration over immutable array slices (0.20.5)
+
+Dijkstra changes searchDirs from native rodata to `:>` storage, exposing the
+existing rejection of `searchDirs[:g.diagonal ? 8 : 4]`. That slice normally
+provides a writable alias, so the storage checker rejects it and Odin emits
+secondary errors for the missing iteration binding. Value iteration itself can
+safely read the slice: Odin's loop values are readonly and non-addressable.
+
+Permit an explicit slice used directly as the operand of a value range loop,
+including parentheses and runtime bounds. Preserve the original array storage;
+introduce neither an array copy nor an allocation. Keep named, passed, returned,
+and reference-iterated views under the existing immutable-slice checks. This is
+a narrow immediate-use rule, not a general readonly-slice type or borrow checker.
+Document the distinction between Thor's immutable-storage enforcement and Odin's
+rodata placement attribute.
+
+Validation: 210 immutable/expression/compatibility/ownership/purity tests pass,
+including globals, locals, imported arrays, generic values, record fields,
+negative bounds, single evaluation of a bound, deferred loops, runtime fn calls
+and #run. Rejections cover escaping views, reference loops and mutation/address
+attempts on loop values. A real stdio TLS test verifies the original slice error
+location and diagnostic clearing after an unsaved conversion to value iteration.
+The unchanged current Dijkstra source checks cleanly and its equivalent debug
+build succeeds using temporary inputs/outputs; the project's source hash matches
+the initial snapshot. No GUI is launched and no project files are modified.

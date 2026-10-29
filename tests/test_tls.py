@@ -134,6 +134,26 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_immutable_array_slice_read_iteration_clears_reference_iteration_error(self):
+        text='''package main
+Coord::struct{x,y:int}
+directions:>[2]Coord{{1,0},{0,1}}
+main::proc(){
+    limit:=1
+    for &dir in directions[:limit]{dir.x=9}
+}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='mutable slice')
+        error=next(e for e in errors if 'mutable slice' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'directions[:limit]',0))
+        fixed=text.replace('for &dir','for dir').replace('dir.x=9','_=dir.x')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
+                    'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assert_original_identifier_tokens(main,fixed,self.semantic_spans(client,main,fixed))
+
     def test_odin_compatibility_diagnostics_follow_unsaved_fix_without_false_errors(self):
         text='''package main
 Color::enum{Red,Blue}
