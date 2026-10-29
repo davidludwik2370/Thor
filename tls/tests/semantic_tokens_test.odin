@@ -32,7 +32,7 @@ my_function :: proc() {
 
 	test.expect_semantic_tokens(t, &src, {
 		{1, 0, 9,  .Type,      {.ReadOnly}}, // [0]  Proc_Type
-		{0, 18, 1, .Parameter, {}},          // [1]  a
+		{0, 18, 1, .Parameter, {.ReadOnly}},          // [1]  a
 		{0, 3, 6,  .Type,      {.ReadOnly}}, // [2]  string
 		{0, 11, 3, .Type,      {.ReadOnly}}, // [3]  int
 		{1, 0, 11, .Function,  {.ReadOnly}}, // [4]  my_function
@@ -171,7 +171,7 @@ semantic_tokens_enum_member_default_param :: proc(t: ^testing.T) {
 		{1, 3,  1, .EnumMember, {}},          // [1]  A
 		{1, 3,  1, .EnumMember, {}},          // [2]  B
 		{3, 2,  3, .Function,   {.ReadOnly}}, // [3]  bar
-		{0, 12, 3, .Parameter,  {}},          // [4]  foo
+		{0, 12, 3, .Parameter,  {.ReadOnly}},          // [4]  foo
 		{0, 5,  3, .Enum,       {.ReadOnly}}, // [5]  Foo
 		{0, 7,  1, .EnumMember, {}},          // [6]  A
 	})
@@ -207,10 +207,10 @@ semantic_tokens_poly_proc :: proc(t: ^testing.T) {
 
 	test.expect_semantic_tokens(t, &src, {
 		{1, 2,  3, .Function,      {.ReadOnly}}, // [0]  foo
-		{0, 12, 1, .Parameter,     {}},          // [1]  a
+		{0, 12, 1, .Parameter,     {.ReadOnly}},          // [1]  a
 		{0, 4,  1, .TypeParameter, {}},          // [2]  A
 		{0, 6,  1, .TypeParameter, {.ReadOnly}}, // [3]  A
-		{1, 10, 1, .Parameter,     {}},          // [4]  a
+		{1, 10, 1, .Parameter,     {.ReadOnly}},          // [4]  a
 	})
 }
 
@@ -557,9 +557,9 @@ semantic_tokens_parameter_shadowing :: proc(t: ^testing.T) {
 	}
 	test.expect_semantic_tokens(t, &src, {
 		{1,  2, 3, .Function,  {.ReadOnly}}, // [0] foo
-		{0, 12, 1, .Parameter, {}},          // [1] a
+		{0, 12, 1, .Parameter, {.ReadOnly}},          // [1] a
 		{0,  3, 3, .Type,      {.ReadOnly}}, // [2] int
 		{1,  3, 1, .Variable,  {}},          // [3] a
-		{0,  5, 1, .Parameter, {}},          // [4] a
+		{0,  5, 1, .Parameter, {.ReadOnly}},          // [4] a
 	})
 }

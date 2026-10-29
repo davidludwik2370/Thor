@@ -264,7 +264,10 @@ test('declared package names are green, namespace references blue, and set/map s
         assert.ok(themedTokens(source)[0].slice(start,start+word.length).every(t=>t.color==='#569CD6'),source);
     }
     const manifest=require('../package.json');
-    assert.deepEqual(manifest.contributes.semanticTokenScopes,[{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
+    assert.deepEqual(manifest.contributes.semanticTokenScopes,[{language:'thor',scopes:{
+        namespace:['variable.other.namespace.thor'],
+        'parameter.readonly':['variable.other.constant.thor']
+    }}]);
 });
 
 test('inline comparator procedure keywords are dark blue in a multiline generic signature',()=>{

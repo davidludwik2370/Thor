@@ -274,9 +274,7 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_node(n.specialization, builder)
 	case ^ast.Range_Stmt:
 		for val in n.vals {
-			if ident, ok := val.derived.(^ast.Ident); ok {
-				write_semantic_node(builder, val, .Variable)
-			}
+			visit_range_binding(val, builder)
 		}
 
 		visit_node(n.expr, builder)
@@ -295,8 +293,8 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_node(n.post, builder)
 		visit_node(n.body, builder)
 	case ^ast.Unroll_Range_Stmt:
-		visit_node(n.val0, builder)
-		visit_node(n.val1, builder)
+		visit_range_binding(n.val0, builder)
+		visit_range_binding(n.val1, builder)
 		visit_node(n.expr, builder)
 		visit_node(n.body, builder)
 	case ^ast.Switch_Stmt:
@@ -470,6 +468,15 @@ visit_value_decl :: proc(value_decl: ast.Value_Decl, builder: ^SemanticTokenBuil
 	visit_nodes(value_decl.values, builder)
 }
 
+visit_range_binding :: proc(value: ^ast.Expr, builder: ^SemanticTokenBuilder) {
+	if value == nil { return }
+	if ident, ok := unwrap_ident(value); ok {
+		modifiers: SemanticTokenModifiers
+		if .ReadOnlyBinding in range_binding_flags(value) { modifiers += {.ReadOnly} }
+		write_semantic_node(builder, ident, .Variable, modifiers)
+	}
+}
+
 visit_proc_type :: proc(node: ^ast.Proc_Type, builder: ^SemanticTokenBuilder) {
 	if node == nil {
 		return
@@ -479,7 +486,7 @@ visit_proc_type :: proc(node: ^ast.Proc_Type, builder: ^SemanticTokenBuilder) {
 		for param in node.params.list {
 			for name in param.names {
 				if ident, ok := name.derived.(^ast.Ident); ok {
-					write_semantic_node(builder, name, .Parameter)
+					write_semantic_node(builder, name, .Parameter, {.ReadOnly})
 				}
 			}
 
@@ -588,7 +595,7 @@ visit_ident :: proc(
 		modifiers += {.DefaultLibrary}
 	}
 
-	if .Mutable not_in symbol.flags || .Immutable in symbol.flags {
+	if .Mutable not_in symbol.flags || .Immutable in symbol.flags || .ReadOnlyBinding in symbol.flags {
 		modifiers += {.ReadOnly}
 	}
 

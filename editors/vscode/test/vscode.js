@@ -35,12 +35,12 @@ async function run() {
         await vscode.window.showTextDocument(document);
         assert.equal(document.languageId, 'thor');
         assert.deepEqual(extension.packageJSON.contributes.semanticTokenScopes,
-            [{language:'thor',scopes:{namespace:['variable.other.namespace.thor']}}]);
+            [{language:'thor',scopes:{namespace:['variable.other.namespace.thor'],'parameter.readonly':['variable.other.constant.thor']}}]);
         const colorConfig=vscode.workspace.getConfiguration('editor');
         const colorBaseline=colorConfig.inspect('semanticTokenColorCustomizations')?.globalValue;
         try {
-            await vscode.commands.executeCommand('thor.previewConstantColor','#9B8FE8');
-            assert.equal(colorConfig.inspect('semanticTokenColorCustomizations').globalValue.rules['variable.thorCompileTime:thor'],'#9B8FE8');
+            await vscode.commands.executeCommand('thor.previewConstantColor','#8582DE');
+            assert.equal(colorConfig.inspect('semanticTokenColorCustomizations').globalValue.rules['variable.thorCompileTime:thor'],'#8582DE');
             await vscode.commands.executeCommand('thor.previewConstantColor','#8877DD');
             assert.equal(colorConfig.inspect('semanticTokenColorCustomizations').globalValue.rules['variable.thorCompileTime:thor'],'#8877DD');
         } finally {
@@ -108,6 +108,24 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const bindings='package main\nread::proc(input:[]int,pointer:^int){\nfor value,index in input{_=value;_=index}\nfor &cell,offset in input{cell+=1;_=cell;_=offset}\n_=pointer\n}\n';
+        await replace(bindings);
+        const bindingTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
+            value=>value?.data?.length>0);
+        const readonly=1<<legend.tokenModifiers.indexOf('readonly');
+        const constant=1<<legend.tokenModifiers.indexOf('thorCompileTime');
+        const occurrences=new Map();
+        let bindingLine=0,bindingColumn=0;
+        for(let i=0;i<bindingTokens.data.length;i+=5){
+            const [delta,char,length,,modifiers]=bindingTokens.data.slice(i,i+5);
+            bindingLine+=delta;bindingColumn=delta?char:bindingColumn+char;
+            const name=testDocument.lineAt(bindingLine).text.slice(bindingColumn,bindingColumn+length);
+            if(!['input','pointer','value','index','cell','offset'].includes(name))continue;
+            assert.equal(Boolean(modifiers&readonly),name!=='cell',name);
+            assert.equal(modifiers&constant,0,name);
+            occurrences.set(name,(occurrences.get(name)||0)+1);
+        }
+        for(const name of ['input','pointer','value','index','cell','offset'])assert.ok(occurrences.get(name)>=2,name);
         const renameSource = 'package main\nmain::proc(){_="😀";value:=2;message:=f"value {value}";delete(message);_=value}\n';
         await replace(renameSource);
         const renameEdit = await eventually(() => vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
@@ -397,6 +415,7 @@ async function run() {
             'standard-library #run checks original overload ranges and clears after unsaved correction',
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'reversible compile-time constant color preview and custom color',
+            'readonly parameter and value-loop tokens, mutable reference-loop tokens and immutable theme fallback',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',

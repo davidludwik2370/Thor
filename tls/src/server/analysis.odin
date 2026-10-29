@@ -3054,7 +3054,7 @@ resolve_local_identifier :: proc(
 		.Mutable in local.flags,
 	)
 
-	symbol.flags -= {.Parameter, .CompileTime}
+	symbol.flags -= {.Parameter, .CompileTime, .ReadOnlyBinding}
 	// Value bindings must not inherit their element type's generic-parameter
 	// flag. Actual $T parameters restore it below; type aliases retain it.
 	if .Mutable in local.flags || .Variable in local.flags {
@@ -3076,6 +3076,7 @@ resolve_local_identifier :: proc(
 	}
 	if .Immutable in local.flags { symbol.flags |= {.Immutable} }
 	if .CompileTime in local.flags { symbol.flags |= {.CompileTime} }
+	if .ReadOnlyBinding in local.flags { symbol.flags |= {.ReadOnlyBinding} }
 	if .Mutable not_in local.flags && local.type_expr == nil && is_type_alias_call(ast_context, local.value_expr) {
 		symbol.flags -= {.Variable}
 	}

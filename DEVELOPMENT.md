@@ -1677,3 +1677,34 @@ styles and exact restoration without overwriting unrelated settings. The real
 isolated VS Code extension test applies two colors and restores its original
 preference. Build and install extension 0.13.0; preserve the prior 0.12.0 VSIX in
 `.thor-cache/editor-backups/` and apply the preview through its normal command.
+
+
+## Readonly binding colors and cooler purple (TLS/editor 0.13.1)
+
+Refine the optional constant-color preview to `#8582DE`, slightly darker and
+bluer, while retaining the first preview's saved baseline. Install the updated
+extension and apply the new color through the existing preview command.
+
+Mark ordinary proc/fn parameters and value range-loop bindings readonly in both
+their declarations and uses. Include pointer parameters and pointer-valued loop
+elements: the binding is readonly even when its target can be changed. An
+explicit `&value` iteration remains mutable; its separate index/key stays
+readonly. Preserve mutable counters, named results, callback-call colors and
+compile-time value classification. Use a separate internal ReadOnlyBinding flag
+so this presentation change does not add the :> storage annotation to ordinary
+parameter/loop hovers or change resolution behavior. Clear inherited binding
+flags when resolving another local, preserving mutable copies and shadowing.
+
+Give parameter.readonly the same theme fallback as immutable variables, scoped
+to Thor. Resolve string rune/byte-offset pairs and canonical Set elements so
+their uses receive the same color as their declarations. Preserve the original
+source positions for reference-loop names rather than coloring the & operator.
+
+Validation: all 1,126 native TLS tests, 92 stdio LSP tests and 95 Node/editor tests
+pass. New checks cover default/nested callback and pure-function parameters,
+pointers and mutable copies, arrays/slices/dynamic arrays/maps/Sets/bit sets,
+enums, string literals and typed strings, ranges/unrolled ranges, generics,
+shadowing and unsaved value-to-reference loop edits. Named results and ordinary
+mutable counters are checked explicitly. The real isolated VS Code integration
+test verifies readonly declarations/uses, mutable reference bindings, theme
+mapping and reversible color controls. No compiler or project-source changes.

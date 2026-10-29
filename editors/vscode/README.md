@@ -106,7 +106,7 @@ rules. A change may therefore belong in the server, the grammar, or both.
 
 The original theme colors remain the default. To try a different color for Thor
 compile-time value constants, use **Thor: Preview Compile-Time Constant Color**
-in the Command Palette. Press Enter to try the blue-violet `#9B8FE8`, or enter
+in the Command Palette. Press Enter to try the blue-violet `#8582DE`, or enter
 another `#RRGGBB` color. Run the same command to tweak it again.
 
 **Thor: Restore Previous Constant Color** restores the pre-preview rule. The
@@ -125,7 +125,13 @@ immediately; after installing the updated extension, reload the window once.
 TLS supplies the additive `thorCompileTime` semantic modifier for actual
 compile-time value declarations and references, including imported values,
 aliases and `#run` results. Runtime `:>` declarations and loop bindings retain
-their existing classification. Other themes can style the modifier directly;
+their runtime classification. Ordinary procedure/function parameters (including
+pointer parameters) and plain `for value, index in container` bindings use the
+same readonly blue as immutable variables, on declarations and references.
+`for &value, index in container` keeps `value` light blue and `index` readonly;
+ordinary mutable loop counters and named return variables remain light blue.
+The color follows the binding, not the mutability of pointed-to data. Other
+themes can style the modifier directly;
 the preview is optional and does not replace a theme.
 
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS

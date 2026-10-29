@@ -134,6 +134,86 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_parameters_and_value_loop_bindings_are_readonly_but_reference_bindings_are_not(self):
+        text='''package main
+visit::proc(input:[]int, pointer:^int, pointers:[]^int, enabled:=true,
+            accept:=proc(candidate:int)->bool{return candidate>0})->(total:int){
+    frozen:>1
+    mutable:=1
+    copied_pointer:=pointer
+    for pointer_item in pointers { _=pointer_item }
+    for &pointer_ref in pointers { _=pointer_ref }
+    for value,index in input { _=value; _=index; total+=value }
+    for &cell,ref_index in input { cell+=1; _=cell; _=ref_index }
+    for number in 0..<3 { _=number }
+    #unroll for unrolled in 0..<3 { _=unrolled }
+    for letter,offset in "abc" { _=letter; _=offset }
+    text:string
+    for typed_letter,typed_offset in text { _=typed_letter; _=typed_offset }
+    table:map[string]int
+    for key,entry in table { _=key; _=entry }
+    for ref_key,&entry_ref in table { _=ref_key; entry_ref+=1; _=entry_ref }
+    growing:[dynamic]int
+    for dynamic_value in growing { _=dynamic_value }
+    fixed:[2]int
+    for fixed_value in fixed { _=fixed_value }
+    for &fixed_ref in fixed { fixed_ref+=1; _=fixed_ref }
+    names:set[string]
+    for set_value in names { _=set_value }
+    Shade::enum{Red,Blue}
+    flags:bit_set[Shade]
+    for shade in flags { _=shade }
+    for category in Shade { _=category }
+    for counter:=0; counter<2; counter+=1 { _=counter }
+    _=input; _=pointer; _=enabled; _=accept; _=accept(1)
+    _=frozen; _=mutable; _=copied_pointer; _=pointers
+    return
+}
+generic::proc(values:[]$T){
+    for element in values { _=element }
+    for &element_ref in values { _=element_ref }
+}
+read_pure::fn(pure_input:int)->int{return pure_input}
+'''
+        client,main=self.open(text,compiler=False)
+        legend=client.capabilities['semanticTokensProvider']['legend']['tokenModifiers']
+        readonly=1 << legend.index('readonly')
+        comptime=1 << legend.index('thorCompileTime')
+        immutable={'input','pointer','pointers','pointer_item','enabled','accept','candidate','value','index','ref_index','number','unrolled',
+                   'letter','offset','key','entry','ref_key','dynamic_value','fixed_value','values','element','frozen'}
+        immutable|={'typed_letter','typed_offset','set_value','shade','category','pure_input'}
+        mutable={'cell','entry_ref','fixed_ref','element_ref','mutable','counter','total','copied_pointer','pointer_ref'}
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        found={name:0 for name in immutable|mutable}
+        for _,_,kind,name,modifiers in spans:
+            if name not in found or kind=='function':continue # Calling a callback retains the call color.
+            self.assertIn(kind,{'variable','parameter'},(name,kind))
+            self.assertEqual(bool(modifiers & readonly),name in immutable,(name,kind,modifiers))
+            self.assertFalse(modifiers & comptime,(name,kind,modifiers))
+            found[name]+=1
+        self.assertTrue(all(count>=2 for count in found.values()),found)
+
+    def test_binding_readonly_color_follows_shadowing_and_unsaved_loop_edits(self):
+        text='''package main
+read::proc(value:int,items:[]int){
+    _=value
+    { value:=2; _=value }
+    for value in items { _=value }
+    _=value
+}
+'''
+        client,main=self.open(text,compiler=False)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        def modifiers(source):
+            return [bool(mods & readonly) for _,_,_,name,mods in self.semantic_spans(client,main,source) if name=='value']
+        self.assertEqual(modifiers(text),[True,True,False,False,True,True,True])
+        reference=text.replace('for value in','for &value in')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':reference}]})
+        self.assertEqual(modifiers(reference),[True,True,False,False,False,False,True])
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        self.assertEqual(modifiers(text),[True,True,False,False,True,True,True])
+
     def test_compile_time_color_marker_does_not_reclassify_runtime_bindings(self):
         text='''package main
 import "library"

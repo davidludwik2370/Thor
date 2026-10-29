@@ -107,6 +107,13 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   storage, semantic tokens mark declarations/uses readonly, and shadowed mutable
   bindings retain their ordinary behavior. Compiler checks enforce shallow
   storage protection, including generic instantiations and implicit addresses.
+- Mark value parameters and ordinary range-loop bindings readonly at declarations
+  and uses. Pointer parameters keep readonly bindings; explicit `&value` iteration
+  stays mutable, while its index/key binding remains readonly. Parameter fallback
+  colors match immutable variables in the VS Code extension. Named results and
+  mutable counters retain their normal color. String iteration resolves both its
+  rune and byte-offset bindings, for literals and typed strings; Set iteration
+  resolves its element binding through the canonical support type.
 - Discover `thor:format` and `thor:sets` by default beside the compiler launcher.
   Explicit collection configuration takes precedence.
 - Resolve selected import aliases with file privacy and local shadowing. Hover

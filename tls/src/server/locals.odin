@@ -11,6 +11,7 @@ LocalFlag :: enum {
 	PolyType,
 	Immutable,
 	CompileTime,
+	ReadOnlyBinding, // Parameters and value iteration; separate from :> storage
 }
 
 DocumentLocal :: struct {
@@ -803,6 +804,15 @@ get_locals_unroll_range_stmt :: proc(
 	get_locals_range_vals(file, vals, stmt.expr, stmt.body, ast_context, document_position)
 }
 
+range_binding_flags :: proc(value: ^ast.Expr) -> bit_set[LocalFlag] {
+	// A plain loop binding is readonly, including pointer-valued elements.
+	// Only an explicit &binding denotes a mutable reference into the iterable.
+	if unary, ok := value.derived.(^ast.Unary_Expr); ok && unary.op.kind == .And {
+		return {.Mutable}
+	}
+	return {.Mutable, .ReadOnlyBinding}
+}
+
 get_locals_range_vals :: proc(
 	file: ast.File,
 	vals: []^ast.Expr,
@@ -835,7 +845,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						"",
 						false,
 					)
@@ -858,6 +868,14 @@ get_locals_range_vals :: proc(
 
 	if ok {
 		#partial switch v in symbol.value {
+		case SymbolStructValue:
+			if thor_is_set_symbol(symbol) && len(v.args) == 1 && len(vals) == 1 {
+				if ident, ok := unwrap_ident(vals[0]); ok {
+					store_local(ast_context, ident, v.args[0], ident.pos.offset, ident.name,
+						ast_context.non_mutable_only, false, range_binding_flags(vals[0]),
+						get_package_from_node(v.args[0]^), false)
+				}
+			}
 		case SymbolProcedureValue:
 			calls := make(map[int]struct{}, context.temp_allocator)
 			get_generic_assignment(file, expr, ast_context, &results, &calls, {}, false)
@@ -873,51 +891,31 @@ get_locals_range_vals :: proc(
 							ident.name,
 							ast_context.non_mutable_only,
 							false,
-							{.Mutable},
+							range_binding_flags(val),
 							get_package_from_node(results[result_i]^), // TODO: this may need to be used everywhere
 							false,
 						)
 					}
 				}
 			}
-		case SymbolUntypedValue:
-			if len(vals) == 1 {
-				if ident, ok := unwrap_ident(vals[0]); ok {
-					if v.type == .String {
-						store_local(
-							ast_context,
-							ident,
-							make_rune_ast(ast_context, ident.pos, ident.end),
-							ident.pos.offset,
-							ident.name,
-							ast_context.non_mutable_only,
-							false,
-							{.Mutable},
-							symbol.pkg,
-							false,
-						)
+		case SymbolUntypedValue, SymbolBasicValue:
+			is_string := false
+			if untyped, ok := symbol.value.(SymbolUntypedValue); ok {
+				is_string = untyped.type == .String
+			} else if basic, ok := symbol.value.(SymbolBasicValue); ok {
+				is_string = basic.ident.name == "string"
+			}
+			if is_string {
+				for val, i in vals {
+					if ident, ok := unwrap_ident(val); ok {
+						type_expr := make_rune_ast(ast_context, ident.pos, ident.end)
+						if i > 0 { type_expr = make_int_ast(ast_context, ident.pos, ident.end) }
+						store_local(ast_context, ident, type_expr, ident.pos.offset, ident.name,
+							ast_context.non_mutable_only, false, range_binding_flags(val), symbol.pkg, false)
 					}
 				}
 			}
-		case SymbolBasicValue:
-			if len(vals) == 1 {
-				if ident, ok := unwrap_ident(vals[0]); ok {
-					if v.ident.name == "string" {
-						store_local(
-							ast_context,
-							ident,
-							make_rune_ast(ast_context, ident.pos, ident.end),
-							ident.pos.offset,
-							ident.name,
-							ast_context.non_mutable_only,
-							false,
-							{.Mutable},
-							symbol.pkg,
-							false,
-						)
-					}
-				}
-			}
+
 		case SymbolMapValue:
 			if len(vals) >= 1 {
 				if ident, ok := unwrap_ident(vals[0]); ok {
@@ -929,7 +927,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						symbol.pkg,
 						false,
 					)
@@ -949,7 +947,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[1]),
 						symbol.pkg,
 						false,
 					)
@@ -966,7 +964,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						symbol.pkg,
 						false,
 					)
@@ -982,7 +980,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[1]),
 						symbol.pkg,
 						false,
 					)
@@ -999,7 +997,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						symbol.pkg,
 						false,
 					)
@@ -1026,7 +1024,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[1]),
 						pkg,
 						false,
 					)
@@ -1043,7 +1041,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						symbol.pkg,
 						false,
 					)
@@ -1059,7 +1057,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[1]),
 						symbol.pkg,
 						false,
 					)
@@ -1076,7 +1074,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						symbol.pkg,
 						false,
 					)
@@ -1092,7 +1090,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[1]),
 						symbol.pkg,
 						false,
 					)
@@ -1109,7 +1107,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[0]),
 						symbol.pkg,
 						false,
 					)
@@ -1125,7 +1123,7 @@ get_locals_range_vals :: proc(
 						ident.name,
 						ast_context.non_mutable_only,
 						false,
-						{.Mutable},
+						range_binding_flags(vals[1]),
 						symbol.pkg,
 						false,
 					)
@@ -1242,7 +1240,7 @@ get_locals_proc_param_and_results :: proc(
 		get_locals_poly(file, proc_lit.type.params, ast_context)
 		for arg in proc_lit.type.params.list {
 			for name in arg.names {
-				flags: bit_set[LocalFlag] = {.Mutable}
+				flags: bit_set[LocalFlag] = {.Mutable, .ReadOnlyBinding}
 				if _, ok := name.derived.(^ast.Poly_Type); ok {
 					flags |= {.PolyType}
 				}

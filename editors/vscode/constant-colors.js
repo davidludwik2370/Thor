@@ -1,7 +1,7 @@
 'use strict';
 
 const RULE = 'variable.thorCompileTime:thor';
-const PURPLE = '#9B8FE8';
+const PURPLE = '#8582DE';
 const BACKUP = 'thor.constantColorPreview.baseline.v1';
 const LAST_COLOR = 'thor.constantColorPreview.lastColor';
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -21,7 +21,7 @@ function snapshot(raw) {
 }
 
 function preview(raw, color) {
-    if (typeof color !== 'string' || !/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(color)) throw new Error('Use a color such as #9B8FE8.');
+    if (typeof color !== 'string' || !/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(color)) throw new Error(`Use a color such as ${PURPLE}.`);
     const config = object(raw);
     const rules = object(config.rules), previous = rules[RULE];
     const style = previous && typeof previous === 'object' ? {...previous, foreground: color} : color;
