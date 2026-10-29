@@ -372,8 +372,14 @@ Syntax:
 Syntax:
     x :> expression
     y: int > rand_int()
+    a, b :> first_expression, second_expression
+    c, d :> multi_result_call()
+    e, f: int > first_expression, second_expression
 
 - Evaluate the initializer once. It may be a runtime computation.
+- Multiple bindings support either separate expressions or a multi-result call,
+  following Odin's ordinary initialization order, type and arity rules. Each
+  named binding is immutable; `_` discards a result normally.
 - Infer or check the declared type using ordinary Odin rules.
 - After initialization, reject assignment, compound assignment, increments,
   decrements, and writes to directly stored fields/fixed-array elements.
@@ -448,6 +454,11 @@ The general formula uses addition, not n - i.
 - Evaluate the base and each supplied index/bound once in source order.
 - Preserve lvalue behavior for assignment, compound assignment, and address-taking
   where the corresponding Odin access permits them.
+- Preserve mutable reference iteration over indexed array rows, including nested
+  record fields. Readonly value parameters and temporary arrays must remain
+  readable without requiring a mutable address; lowering must not make them
+  writable. Resolve generic record/pointer and array/reference-container cases
+  with native type witnesses when the frontend cannot establish addressability.
 - Normalize supplied negative slice bounds independently. Omitted bounds retain
   their normal defaults. Preserve half-open bounds and existing Odin forms.
 - Keep normal bounds checking after normalization. No Python-style clamping,

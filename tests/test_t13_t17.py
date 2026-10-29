@@ -291,6 +291,52 @@ p:=&a[i][i];p^+=1
 assert(a[1][1]==9&&a[1][0]==8)
 '''))
 
+    def test_record_parameter_array_reads_keep_native_readonly_addressability(self):
+        prefix='''Board::struct{cells:[2][2]int}
+read::proc(board:Board,row,col:int)->int{return board.cells[row][col]}
+generic_read::proc(board:$T,row,col:int)->int{return board.cells[row][col]}
+'''
+        self.invoke(self.program('''
+b:=Board{cells={{1,2},{3,4}}}
+assert(read(b,1,1)==4 && read(b,-1,-2)==3)
+assert(generic_read(b,1,0)==3 && generic_read(b,-1,-1)==4)
+assert(generic_read(&b,-1,-1)==4)
+''',prefix))
+
+    def test_reference_range_over_indexed_array_row_preserves_original_storage(self):
+        prefix='''Board::struct{cells:[2][2]int}
+write::proc(board:^Board,row:int){for &value in board.cells[row]{value+=10}}
+generic_write::proc(board:$T,row:int){for &value in board.cells[row]{value+=100}}
+'''
+        self.invoke(self.program('''
+b:=Board{cells={{1,2},{3,4}}}
+write(&b,-1)
+generic_write(&b,0)
+assert(b.cells[0][0]==101 && b.cells[0][1]==102)
+assert(b.cells[1][0]==13 && b.cells[1][1]==14)
+''',prefix))
+
+    def test_nested_temporary_array_reads_and_reference_headers_remain_valid(self):
+        prefix='''Board::struct{cells:[2][2]int}
+make_board::proc()->Board{return {cells={{1,2},{3,4}}}}
+last::proc(values:$T,row,col:int)->int{return values[row][col]}
+'''
+        self.invoke(self.program('''
+i:=-1
+assert(make_board().cells[i][i]==4)
+grid:=[2][2]int{{1,2},{3,4}}
+assert(last(grid,i,i)==4 && last(grid[:],i,i)==4)
+rows:=[2][]int{grid[0][:],grid[1][:]}
+for &value in rows[i]{value+=5}
+assert(grid[1][1]==9)
+''',prefix))
+
+    def test_reference_range_does_not_make_readonly_record_parameters_mutable(self):
+        prefix='''Board::struct{cells:[2][2]int}
+write::proc(board:Board,row:int){for &value in board.cells[row]{value=9}}
+'''
+        self.invoke(self.program('b:=Board{};write(b,0)',prefix),command='check',fail='temporary array')
+
     def test_negative_access_evaluation_order_once(self):
         self.invoke(self.program('''
 result:=get()[bound(2)]

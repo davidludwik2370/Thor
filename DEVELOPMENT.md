@@ -1538,3 +1538,45 @@ checks default/explicit optimization on all three platform flag paths and
 captures real final compiler invocations for default publish, explicit -o:none
 publish and ordinary build. Existing packaging, icons, libraries, resource and
 debug tracking tests also pass with the new default.
+
+
+## Immutable declarations and Odin-project conversion (0.20.3)
+
+Investigate Dijkstra's `x, y :> int(mousePos.x)/GRID_SIZE,
+int(mousePos.y)/GRID_SIZE`. The multi-expression declaration already works in
+Thor; the reported file was still Dijkstra.odin and the editor task invoked
+odin build directly. Preserve native .odin parsing, improve the shared parser's
+immutable-syntax diagnostic to explicitly require .thor, and document multi-name
+initialization/independent inference. Add regression cases for evaluation order,
+typed and inferred expressions, the exact coordinate calculation, all immutable
+bindings, the .odin diagnostic location, and both TLS hovers plus a mapped write
+error on the second binding.
+
+Converting the real program also exposes two sequence-lowering bugs: a reference
+range over board.cells[row] receives an array value instead of its original
+storage, and nested reads of array fields in readonly value parameters incorrectly
+try to take a mutable address. Infer addressability through selectors/indexes,
+preserve explicit reference-range lvalues, and use native generic type predicates
+for record/pointer and array/reference-container distinctions. Compute those
+predicates inside the helper's capture scope. Render reference and value branches
+separately so an inactive address-taking branch cannot contaminate readonly
+nested reads. Temporary arrays remain readable, and readonly parameter storage
+cannot become writable. Tests cover concrete/generic/pointer records, nested
+arrays and slice headers, temporary record results, negative indices and reference
+iteration. The sequence specification now explicitly preserves these properties.
+
+The user renamed the live file to Dijkstra.thor during the investigation; leave
+that current source untouched. Apply staged, backed-up VS Code task/launch/settings
+changes using the mkthor configuration, and ignore generated build/cache data.
+Dijkstra's actual build-thor-debug task succeeds with its original source content,
+producing the executable and source maps under .vscode/bin. No GUI was launched
+from that project and no existing user changes were staged in its Git repository.
+
+Validation: all 819 compiler/runtime/cache/stdio-TLS cases pass in 684.078 seconds
+(the optional Finder case is run separately outside the sandbox); all 13 real
+LLDB tests and all 1,126 native TLS tests pass. Together those cover all 832 Python
+cases available in the workspace, with the Finder launch checked separately.
+The focused 56-case T07–T12 suite and both immutable TLS cases also pass. The
+converted source and real debug task compile cleanly; logs are under
+/tmp/thor-dijkstra-*.log and /tmp/thor-multi-immutable-*.log. No installed Odin
+compiler or normal compiler flags were changed.

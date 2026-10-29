@@ -372,6 +372,11 @@ assets are referenced in place, so retain the original project when compiling
 generated output. `thor:` defaults to this checkout's [runtime](runtime/README.md)
 collection and may be overridden with an explicit collection flag.
 
+Thor additions such as `:>` belong in `.thor` files. `.odin` files retain ordinary
+Odin syntax, including when compiled through `thor`. When converting a project,
+rename its Thor source files to `.thor` and update any editor tasks that still
+invoke `odin build` to use Thor (see the [debugger setup](editors/vscode/DEBUGGING.md)).
+
 See [Compilation and Odin flags](#compilation-and-odin-flags) for flag forwarding,
 native helper builds, output locations and runtime arguments.
 

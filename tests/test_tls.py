@@ -1596,6 +1596,28 @@ raise SystemExit(bool(errors))
                 occurrences += 1
         self.assertEqual(occurrences, 2)
 
+    def test_multi_expression_immutable_coordinates_hover_and_write_diagnostic(self):
+        text='''package main
+main::proc(){
+    mousePos:=struct{x,y:f32}{175,225}
+    GRID_SIZE::50
+    x, y :> int(mousePos.x)/GRID_SIZE, int(mousePos.y)/GRID_SIZE
+    _ = x + y
+}
+'''
+        client,main=self.open(text)
+        for name,needle,offset in [('x','x + y',0),('y','+ y',2)]:
+            hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,needle,offset)})
+            self.assertIn('immutable storage',hover['contents']['value'])
+            self.assertIn(name+': int',hover['contents']['value'])
+        changed=text.replace('    _ = x + y','    y = 8\n    _ = x + y')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
+            'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),code='thor',contains="immutable storage 'y'")
+        error=next(e for e in errors if "immutable storage 'y'" in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'y = 8',0))
+
     def test_immutable_write_diagnostic_and_unsaved_mutable_fix(self):
         text = 'package main\nmain :: proc(){ value :> 7; value = 9 }\n'
         client, main = self.open(text)

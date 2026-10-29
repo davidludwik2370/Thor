@@ -83,6 +83,44 @@ c,d :> pair()
 assert(a==1 && b==2 && c==3 && d==4 && calls==4)
 ''', 'calls:int\nnext::proc()->int{calls+=1; return calls}\npair::proc()->(int,int){return next(),next()}\n'))
 
+    def test_immutable_multiple_expressions_evaluate_once_in_order(self):
+        self.invoke(self.program('''
+a, b :> next(), next()
+c, d: int > next(), next()
+number, text :> next(), "independent inferred types"
+assert(a==1 && b==2 && c==3 && d==4 && number==5 && calls==5)
+assert(text=="independent inferred types")
+''', 'calls:int\nnext::proc()->int{calls+=1; return calls}\n'))
+
+    def test_immutable_mouse_coordinates_with_multiple_cast_and_division_expressions(self):
+        self.invoke(self.program('''
+mousePos:=struct{x,y:f32}{175,225}
+GRID_SIZE::50
+x, y :> int(mousePos.x)/GRID_SIZE, int(mousePos.y)/GRID_SIZE
+assert(x==3 && y==4)
+'''))
+
+    def test_every_binding_in_multi_expression_declaration_is_immutable(self):
+        for name in ['x', 'y']:
+            for operation in [f'{name}=8', f'{name}+=1', f'_=&{name}']:
+                with self.subTest(name=name, operation=operation):
+                    self.invoke(self.program('x,y:>1,2;'+operation), fail=f"immutable storage '{name}'")
+
+    def test_immutable_odin_input_explains_required_thor_extension(self):
+        source=self.program('x,y:>1,2;assert(x==1 && y==2)')
+        root,_=self.invoke(source, command='check')
+        entry=root/'input/main.thor'
+        native=entry.with_suffix('.odin')
+        entry.rename(native)
+        result=subprocess.run([str(THOR),'check',str(native),'--output-dir',str(root/'output'),'-json-errors'],
+                              capture_output=True,text=True,timeout=40)
+        self.assertNotEqual(result.returncode,0)
+        errors=json.loads(result.stderr)['errors']
+        error=next(e for e in errors if 'immutable storage syntax requires Thor source' in str(e))
+        self.assertIn('rename this .odin file to .thor',str(error))
+        self.assertEqual(error['pos']['file'],str(native.resolve()))
+        self.assertEqual(error['pos']['offset'],source.encode().index(b':>')+1)
+
     def test_immutable_scalar_reassignments(self):
         for operation in ['x=2', 'x+=1', 'x-=1', 'x*=2', 'x/=2', 'x%=2', 'x|=2', 'x&=2', 'x~=2', 'x<<=1', 'x>>=1']:
             with self.subTest(operation=operation):

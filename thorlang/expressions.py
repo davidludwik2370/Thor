@@ -299,10 +299,38 @@ class Expressions:
 
     def addressable(self,node):
         if node.kind=='Paren': return self.addressable(node.role('expr'))
-        if node.kind=='Ident':
+        if node.kind in {'Ident','Selector'}:
             symbol=self.source.resolver.symbol(node)
-            return bool(symbol and self.reference_capture(symbol) and (symbol.declaration.kind!='Declaration' or symbol.declaration.data.get('mutable',True)))
-        return node.kind in {'Selector','Index','Deref'}
+            if symbol:
+                return bool(self.reference_capture(symbol) and (symbol.declaration.kind!='Declaration' or symbol.declaration.data.get('mutable',True)))
+        if node.kind=='Ident': return False
+        if node.kind=='Deref': return True
+        if node.kind not in {'Selector','Index'}: return False
+        base=node.role('expr')
+        typ=self.shape(base)
+        if typ.kind=='pointer' or node.kind=='Index' and typ.kind in {'slice','dynamic'}:
+            return True
+        inherited=self.addressable(base)
+        if typ.kind not in {'generic','unknown'}:
+            return inherited if node.kind=='Selector' or typ.kind=='array' else False
+        # A generic record may be a pointer, while a generic index base may be
+        # an array or a reference container. Let Odin select addressability at
+        # instantiation; copying readonly value parameters is valid for reads.
+        s=self.source
+        s.needs_intrinsics=True
+        s.needs_default=True
+        meta=s.prefix+'meta'
+        t=f'type_of({s.prefix}default_value({s.render(base)}))'
+        if node.kind=='Selector':
+            if inherited is True:return True
+            pointer=f'{meta}.type_is_pointer({t})'
+            return f'({pointer} || ({inherited}))' if inherited else pointer
+        references=' || '.join(f'{meta}.{test}({t})' for test in
+            ['type_is_slice','type_is_dynamic_array','type_is_fixed_capacity_dynamic_array','type_is_pointer','type_is_multi_pointer'])
+        if inherited:
+            array=f'{meta}.type_is_array({t})'
+            references+=' || '+(array if inherited is True else f'({array} && ({inherited}))')
+        return '('+references+')'
 
     def writes(self,node):
         if node in self.addresses: return True
@@ -310,6 +338,8 @@ class Expressions:
             if parent.kind=='Assignment':
                 return any(lhs.start<=node.start and node.end<=lhs.end for lhs in parent.group('lhs'))
             if parent.kind=='Unary' and parent.data['op']=='&': return True
+            if parent.kind=='Range':
+                return any(name.kind=='Unary' and name.data.get('op')=='&' for name in parent.group('names'))
             if parent.kind=='Slice': return True
             if parent.kind not in {'Paren','Selector','Index','Deref'}: return False
         return False
@@ -391,9 +421,9 @@ class Expressions:
             result=f'type_of({s.prefix}default_value(({b})[:]))'
         local=s.prefix+'access_'
         value,index,low,high=[local+x for x in ['base','index','low','high']]
-        addr=self.addressable(base)
         def body(_):
-            original=self.address(base) if addr else s.render(base)
+            addr=self.addressable(base)
+            original=s.render(base)
             # Fixed arrays retain their storage; reference-containing headers
             # are copied before evaluating bounds, matching base evaluation.
             s.needs_intrinsics=True
@@ -402,6 +432,7 @@ class Expressions:
             source_type=f'type_of({s.prefix}default_value({original}))'
             array=f'{meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type})'
             def branch(byref):
+                original=self.address(base) if byref else s.render(base)
                 code=[f'{value} := '+('&('+original+')' if byref else original)]
                 v=value+'^' if byref else value
                 if n.kind=='Index':
@@ -420,7 +451,11 @@ class Expressions:
                     code.append(f'when {self.sequence_trait(original)} {{ return ({v})[{l}:{h}] }} else {{ return ({v})[{low if bounds[0] else ""}:{high if bounds[1] else ""}] }}')
                 return '\n'.join(code)
             if addr:
-                return f'when {array} {{\n{branch(True)}\n}} else {{\n{branch(False)}\n}}'
+                referenced=branch(True)
+                if addr is not True:
+                    fallback=self.error(n,'Cannot take a mutable address of an element in a temporary array.') if pointer else branch(False)
+                    referenced=f'when {addr} {{\n{referenced}\n}} else {{\n{fallback}\n}}'
+                return f'when {array} {{\n{referenced}\n}} else {{\n{branch(False)}\n}}'
             if pointer:
                 error=self.error(n,'Cannot take a mutable address of an element in a temporary array.')
                 return f'when {array} {{ {error} }} else {{\n{branch(False)}\n}}'
