@@ -1495,3 +1495,30 @@ Native Windows/Linux execution remains unverified on this macOS host. The normal
 and published demo both run; Launch Services launches a real GUI package with
 argument forwarding and no Terminal wrapper. Existing user playground/basic edits
 are preserved. Logs are under /tmp/thor-publish-*.log.
+
+
+## Icon normalization (0.20.1)
+
+Accept rectangular and larger source PNG/ICO images instead of requiring an
+already-square icon with a 4096-pixel input limit. Decode RGBA, choose a square
+crop centered on the canvas, and shift it over transparent padding when all
+visible content can fit. Detect visibility from the alpha channel (including
+palette/tRNS PNGs), so hidden RGB at alpha=0 does not cause a warning and any
+nonzero alpha does. Reduce oversized squares to 1024 pixels before the existing
+platform conversion. Preserve unmodified square Windows ICO size variants;
+regenerate an ICO when its largest image was normalized. Original assets remain
+unchanged, including the original copy in the resources directory.
+
+Publish preflight warnings use the existing diagnostic reporter: text and JSON
+remain coherent, -ignore-warnings suppresses them, and -warnings-as-errors stops
+before compilation or modifying a package. Add coverage for both aspect ratios,
+off-center content, transparent/palette padding, nearly invisible edge pixels,
+odd sizes, source images above the previous size limit, ICO normalization and
+preservation, and the full warning/JSON policies.
+
+Validation: the publishing suite ran 51 cases in 9.299 seconds: 50 pass and the
+optional Finder/Launch Services test is skipped inside the sandbox. The actual
+react_time project, whose 1024x500 palette icon has 500x499 visible artwork,
+publishes successfully with empty stderr using temporary generated/cache/output
+directories. Its artwork fits a 500x500 crop and emits no warning; the source icon
+hash is unchanged. No editor changes or restart are required.

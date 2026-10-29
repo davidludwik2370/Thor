@@ -1,7 +1,7 @@
 """Local, relocatable application packages. Imported only by `thor publish`."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -61,8 +61,8 @@ def validate_name(value, description="Application name"):
     return value
 
 
-def icon_image(path):
-    """Decode PNG or the largest ICO image; keep conversion out of ordinary builds."""
+def icon_image(path, *, warn=None):
+    """Decode, crop transparent padding when possible, and bound icon resolution."""
     try:
         from PIL import Image
     except ImportError as exc:
@@ -75,17 +75,43 @@ def icon_image(path):
             if opened.format != expected:
                 raise ValueError(f"expected {expected} image data")
             image = opened.ico.getimage(max(opened.ico.sizes(), key=lambda s: s[0] * s[1])) if expected == "ICO" else opened
-            if image.width != image.height or not 1 <= image.width <= 4096:
-                raise ValueError("use a square icon between 1 and 4096 pixels wide")
-            return image.convert("RGBA")
+            image = image.convert("RGBA")
+            width, height = image.size
+            side = min(width, height)
+            left, top = (width - side) // 2, (height - side) // 2
+            visible = image.getchannel("A").getbbox()
+            if visible is not None:
+                # Shift a centered crop over transparent padding if doing so
+                # can retain all visible pixels. RGB underneath alpha=0 does
+                # not count as visible; even alpha=1 does.
+                if visible[2] - visible[0] <= side:
+                    left = min(max(left, visible[2] - side), visible[0])
+                if visible[3] - visible[1] <= side:
+                    top = min(max(top, visible[3] - side), visible[1])
+            bounds = left, top, left + side, top + side
+            cropped_visible = visible is not None and any((
+                visible[0] < left, visible[1] < top,
+                visible[2] > left + side, visible[3] > top + side))
+            if width != height:
+                image = image.crop(bounds)
+            if side > 1024:
+                image = image.resize((1024, 1024), Image.Resampling.LANCZOS)
+            if cropped_visible and warn is not None:
+                warn(f"Icon {path.name} was center-cropped from {width}x{height} to {side}x{side}; visible pixels were removed.")
+            return image
     except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as exc:
         raise PublishError(f"Cannot read icon {path.name}: {exc}") from exc
 
 
 def write_icon(image, source, destination, system):
     if system == "windows" and source.suffix.lower() == ".ico":
-        shutil.copy2(source, destination)
-        return
+        from PIL import Image
+        with Image.open(source) as original:
+            largest = max(original.ico.sizes(), key=lambda s: s[0] * s[1])
+        if largest == image.size and image.width <= 256:
+            # Preserve hand-tuned ICO sizes when no normalization was needed.
+            shutil.copy2(source, destination)
+            return
     if system == "darwin":
         # Pillow writes the multi-resolution ICNS container without Xcode.
         from PIL import Image
@@ -174,6 +200,7 @@ class Publisher:
     directories: set
     libraries: list
     linked_file: Path | None = None
+    warnings: list[str] = field(default_factory=list)
 
     @classmethod
     def prepare(cls, entry, flags, options):
@@ -224,7 +251,8 @@ class Publisher:
             icon = existing[0] if existing else None
         if icon is not None and (not icon.is_file() or not icon.resolve().is_relative_to(root)):
             raise PublishError(f"Icon must be an existing file inside the project: {icon}")
-        image = icon_image(icon) if icon is not None else None
+        warnings = []
+        image = icon_image(icon, warn=warnings.append) if icon is not None else None
         entries = [*config.get("resources", []), *options.app_resource]
         if (root / "assets").exists() or (root / "assets").is_symlink():
             if not (root / "assets").is_dir():
@@ -243,7 +271,7 @@ class Publisher:
                 raise PublishError(f"Declared library does not exist or is unsupported: {value}")
             libraries.append(path)
         publisher = cls(root, system, arch, name, executable_name, identifier, version,
-                        app_type, output, icon, image, resources, directories, libraries)
+                        app_type, output, icon, image, resources, directories, libraries, warnings=warnings)
         publisher.check_output()
         return publisher
 

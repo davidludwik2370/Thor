@@ -211,15 +211,127 @@ class PublishTests(PublishFixture):
         self.assertEqual(self.plan().icon, png)
         self.assertEqual(self.plan(app_icon=Path('assets/icon.ico')).icon, ico)
 
-    def test_corrupt_wrong_format_nonsquare_and_missing_icons(self):
+    def test_corrupt_wrong_format_and_missing_icons(self):
         self.image()
-        from PIL import Image
         self.file('bad.png')
         self.file('bad.ico', b'not an ico')
         self.file('bad.jpg')
-        Image.new('RGB', (32, 16)).save(self.project / 'wide.png')
-        for name in ('bad.png', 'bad.ico', 'bad.jpg', 'wide.png', 'missing.png'):
+        for name in ('bad.png', 'bad.ico', 'bad.jpg', 'missing.png'):
             with self.subTest(name=name), self.assertRaises(PublishError): self.plan(app_icon=Path(name))
+
+    def test_opaque_rectangular_icons_are_center_cropped_without_stretching(self):
+        path = self.image()
+        from PIL import Image
+        for width, height in [(6, 4), (4, 6)]:
+            with self.subTest(size=(width, height)):
+                original = Image.new('RGB', (width, height))
+                for y in range(height):
+                    for x in range(width): original.putpixel((x, y), (x * 20, y * 20, 100))
+                original.save(path)
+                warnings = []
+                normalized = icon_image(path, warn=warnings.append)
+                self.assertEqual(normalized.size, (4, 4))
+                self.assertEqual(normalized.getpixel((0, 0)), (20 if width == 6 else 0, 20 if height == 6 else 0, 100, 255))
+                self.assertEqual(len(warnings), 1)
+                self.assertIn('visible pixels were removed', warnings[0])
+                self.assertIn(f'{width}x{height} to 4x4', warnings[0])
+
+    def test_transparent_padding_is_cropped_quietly_for_rgba_and_palette_images(self):
+        path = self.image()
+        from PIL import Image
+        for mode in ('RGBA', 'P'):
+            with self.subTest(mode=mode):
+                if mode == 'RGBA':
+                    original = Image.new('RGBA', (8, 4), (255, 255, 255, 0))
+                    original.paste((20, 80, 200, 255), (2, 0, 6, 4))
+                else:
+                    original = Image.new('P', (8, 4), 0)
+                    original.putpalette([255, 255, 255, 20, 80, 200] + [0] * 762)
+                    original.info['transparency'] = 0
+                    original.paste(1, (2, 0, 6, 4))
+                original.save(path)
+                warnings = []
+                normalized = icon_image(path, warn=warnings.append)
+                self.assertEqual(normalized.size, (4, 4))
+                self.assertEqual(normalized.getpixel((0, 0)), (20, 80, 200, 255))
+                self.assertEqual(normalized.getchannel('A').getextrema(), (255, 255))
+                self.assertEqual(warnings, [])
+
+    def test_crop_shifts_over_transparent_padding_to_keep_off_center_artwork(self):
+        path = self.image()
+        from PIL import Image
+        for size, box in [((10, 4), (0, 0, 4, 4)), ((10, 4), (6, 0, 10, 4)),
+                          ((4, 10), (0, 0, 4, 4)), ((4, 10), (0, 6, 4, 10))]:
+            with self.subTest(box=box, size=size):
+                original = Image.new('RGBA', size, (255, 100, 50, 0))
+                original.paste((10, 20, 30, 255), box)
+                original.save(path)
+                warnings = []
+                normalized = icon_image(path, warn=warnings.append)
+                self.assertEqual(normalized.size, (4, 4))
+                self.assertEqual(normalized.getchannel('A').getextrema(), (255, 255))
+                self.assertEqual(warnings, [])
+
+    def test_fully_transparent_pixels_with_hidden_color_do_not_warn(self):
+        path = self.image()
+        from PIL import Image
+        Image.new('RGBA', (7, 4), (255, 100, 50, 0)).save(path)
+        warnings = []
+        normalized = icon_image(path, warn=warnings.append)
+        self.assertEqual(normalized.size, (4, 4))
+        self.assertEqual(normalized.getchannel('A').getextrema(), (0, 0))
+        self.assertEqual(warnings, [])
+
+    def test_cropping_a_single_barely_visible_pixel_warns_with_odd_dimensions(self):
+        path = self.image()
+        from PIL import Image
+        original = Image.new('RGBA', (5, 4), (255, 255, 255, 0))
+        original.putpixel((0, 1), (0, 0, 0, 255))
+        original.putpixel((4, 1), (255, 255, 255, 1))
+        original.save(path)
+        warnings = []
+        self.assertEqual(icon_image(path, warn=warnings.append).size, (4, 4))
+        self.assertEqual(len(warnings), 1)
+
+    def test_large_square_icon_scales_quietly_and_keeps_the_source_unchanged(self):
+        path = self.image()
+        from PIL import Image
+        Image.new('L', (4097, 4097), 200).save(path)
+        before = path.read_bytes()
+        warnings = []
+        normalized = icon_image(path, warn=warnings.append)
+        self.assertEqual(normalized.size, (1024, 1024))
+        self.assertEqual(normalized.getpixel((512, 512)), (200, 200, 200, 255))
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(warnings, [])
+
+    def test_rectangular_ico_is_normalized_instead_of_copied_on_windows(self):
+        self.image()
+        from PIL import Image
+        png = io.BytesIO()
+        Image.new('RGBA', (32, 16), (20, 80, 200, 255)).save(png, format='PNG')
+        encoded = png.getvalue()
+        source = self.file('rectangle.ico', struct.pack('<HHH', 0, 1, 1) +
+                           struct.pack('<BBBBHHII', 32, 16, 0, 0, 1, 32, len(encoded), 22) + encoded)
+        warnings = []
+        normalized = icon_image(source, warn=warnings.append)
+        self.assertEqual(normalized.size, (16, 16))
+        self.assertEqual(len(warnings), 1)
+        target = self.directory / 'normalized.ico'
+        write_icon(normalized, source, target, 'windows')
+        with Image.open(target) as icon:
+            self.assertEqual(icon.size, (256, 256))
+            self.assertTrue(all(width == height for width, height in icon.ico.sizes()))
+        self.assertNotEqual(target.read_bytes(), source.read_bytes())
+
+    def test_square_ico_keeps_its_original_size_variants_on_windows(self):
+        source = self.image('assets/icon.ico', 128)
+        warnings = []
+        normalized = icon_image(source, warn=warnings.append)
+        target = self.directory / 'unchanged.ico'
+        write_icon(normalized, source, target, 'windows')
+        self.assertEqual(target.read_bytes(), source.read_bytes())
+        self.assertEqual(warnings, [])
 
     def test_windows_native_flags_set_subsystem_and_embed_icon_and_version(self):
         self.image()
@@ -398,6 +510,40 @@ class MacPublishTests(PublishFixture):
                                 cwd=cwd or self.output, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
+
+    def test_visible_icon_crop_warning_is_structured_and_obeys_warning_flags(self):
+        path = self.image()
+        from PIL import Image
+        Image.new('RGB', (12, 6), (20, 80, 200)).save(path)
+        before = path.read_bytes()
+        for flags, status, severity in [([], 0, 'warning'), (['-ignore-warnings'], 0, None), (['-warnings-as-errors'], 1, 'error')]:
+            with self.subTest(flags=flags):
+                result = subprocess.run([str(ROOT / 'thor'), 'publish', str(self.project), '-json-errors', *flags],
+                                        cwd=self.output, capture_output=True, text=True, timeout=90)
+                self.assertEqual(result.returncode, status, result.stderr)
+                diagnostics = json.loads(result.stderr)['errors']
+                if severity is not None:
+                    self.assertEqual(len(diagnostics), 1, diagnostics)
+                    self.assertEqual(diagnostics[0]['type'], severity)
+                    self.assertIn('visible pixels were removed', str(diagnostics[0]))
+                else:
+                    self.assertEqual(diagnostics, [])
+                self.assertEqual(path.read_bytes(), before)
+                self.assertFalse(list(self.output.glob('.thor-publish-*')))
+
+    def test_palette_icon_with_only_transparent_padding_publishes_without_warning(self):
+        path = self.image()
+        from PIL import Image
+        original = Image.new('P', (10, 4), 0)
+        original.putpalette([255, 255, 255, 20, 80, 200] + [0] * 762)
+        original.info['transparency'] = 0
+        original.paste(1, (0, 0, 4, 4))
+        original.save(path)
+        before = path.read_bytes()
+        result = self.invoke(flags=['-warnings-as-errors'])
+        self.assertEqual(result.stderr, '')
+        self.assertTrue((Path(result.stdout.strip()) / 'Contents/Resources/AppIcon.icns').is_file())
+        self.assertEqual(path.read_bytes(), before)
 
     def test_real_gui_app_with_icon_moves_away_from_sources_and_preserves_arguments(self):
         self.image()

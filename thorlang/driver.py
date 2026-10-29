@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.20.0"
+VERSION = "0.20.1"
 
 
 def backend_failure(status):
@@ -411,6 +411,11 @@ def _main(argv=None):
         if options.command == 'publish':
             from .publishing import Publisher
             publisher = Publisher.prepare(entry, flags, options)
+            if publisher.warnings:
+                report([{'type': 'warning', 'stage': 'publish', 'pos': None, 'msgs': [message]}
+                        for message in publisher.warnings])
+                if reported_errors:
+                    return 1
             publisher.output.parent.mkdir(parents=True, exist_ok=True)
             publish_scratch = tempfile.TemporaryDirectory(prefix='.thor-publish-', dir=publisher.output.parent)
         destination = (options.output_dir or Path.cwd() / '.thor-build' / entry.stem).resolve()

@@ -74,8 +74,19 @@ select one explicitly. Both formats work on all three platforms: PNG or the
 largest image in an ICO becomes ICNS on macOS, an embedded ICO resource on
 Windows, and PNG on Linux. PNG/ICO conversion requires
 `python3 -m pip install Pillow`; publishing without an icon needs no image
-package. Icons must be square and 1–4096 pixels wide. A 1024-pixel PNG is a useful
-source; resizing cannot restore detail missing from a small source icon.
+package. Rectangular icons are cropped to a square without stretching. The crop
+starts centered and shifts over transparent padding when that can retain all
+visible artwork. A warning is emitted only if the crop removes pixels with
+nonzero alpha; fully transparent padding, including hidden RGB colors, is quiet.
+The warning follows `-ignore-warnings` and `-warnings-as-errors` and is included
+in structured JSON diagnostics.
+
+Large icons are reduced to at most 1024×1024 before platform conversion, without
+a warning for scaling alone. The original source file is never edited. Normal
+square ICO files retain their supplied Windows size variants; an ICO that needs
+normalization is regenerated from its largest image. A 1024-pixel PNG is a useful
+source; resizing cannot restore detail missing from a small source icon. Normal
+image-decoder limits still apply to malformed or exceptionally large inputs.
 
 Reading TOML uses Python 3.11's `tomllib`. On Python 3.10, install `tomli` to read
 `thor.toml`. Publishing without that file, and the rest of the compiler, continue
