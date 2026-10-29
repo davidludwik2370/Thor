@@ -1708,3 +1708,29 @@ shadowing and unsaved value-to-reference loop edits. Named results and ordinary
 mutable counters are checked explicitly. The real isolated VS Code integration
 test verifies readonly declarations/uses, mutable reference bindings, theme
 mapping and reversible color controls. No compiler or project-source changes.
+
+
+## Rename global immutable declarations (TLS 0.13.2)
+
+Fix Rename Symbol on a global `:>` declaration, including an enum-indexed array
+of records such as `colors :> [NodeType]rl.Color {...}`. The internal immutable
+attribute has a zero-width range at the declaration's first character. The
+top-level cursor lookup used an inclusive range check and selected that metadata
+before visiting the real identifier. Rename normalizes its cursor to the start
+of the identifier, so it failed even when invoked in the middle or at the end
+of the word. Renaming from a use already worked; local declarations did not take
+the same early-return path.
+
+Ignore zero-width attributes when choosing the top-level source declaration.
+Preserve lookup for real source attributes and keep rename's original-source
+validation, collision checks and scope rules. This repairs the shared cursor
+lookup rather than bypassing it for immutable variables.
+
+Validation: reproduce five prepareRename failures before the fix; all 28 rename
+tests pass afterward, including new declaration/use/caret-boundary cases,
+same-name local shadowing, comments/strings, mixed Thor/Odin references, Unicode
+and unsaved :>-to-:=-to-:> edits. The renamed enum-array project checks with Thor.
+All 1,126 native TLS tests and 92 stdio TLS tests pass. The isolated real VS Code
+integration test applies a rename to a fresh global immutable enum-array fixture.
+Rebuild the shared TLS binary; the installed client needs only a language-server
+restart. User project files remain unchanged.

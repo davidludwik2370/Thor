@@ -126,6 +126,13 @@ async function run() {
             occurrences.set(name,(occurrences.get(name)||0)+1);
         }
         for(const name of ['input','pointer','value','index','cell','offset'])assert.ok(occurrences.get(name)>=2,name);
+        const immutableRename='package main\nKind::enum{Empty,Wall}\nColor::struct{r:u8}\ncolors:>[Kind]Color{.Empty={0},.Wall={255}}\nmain::proc(){_=colors[.Wall]}\n';
+        await replace(immutableRename);
+        const immutableRenameEdit=await eventually(()=>vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
+            testDocument.uri,testDocument.positionAt(immutableRename.indexOf('colors:>')),'palette'),value=>value?.size>0);
+        assert.equal(immutableRenameEdit.get(testDocument.uri).length,2);
+        assert.ok(await vscode.workspace.applyEdit(immutableRenameEdit));
+        assert.equal(testDocument.getText(),immutableRename.replaceAll('colors','palette'));
         const renameSource = 'package main\nmain::proc(){_="😀";value:=2;message:=f"value {value}";delete(message);_=value}\n';
         await replace(renameSource);
         const renameEdit = await eventually(() => vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
@@ -416,6 +423,7 @@ async function run() {
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'reversible compile-time constant color preview and custom color',
             'readonly parameter and value-loop tokens, mutable reference-loop tokens and immutable theme fallback',
+            'global immutable enum-indexed array rename from its declaration',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',

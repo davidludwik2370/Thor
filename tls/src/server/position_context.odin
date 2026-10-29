@@ -89,6 +89,10 @@ get_document_position_decls :: proc(decls: []^ast.Stmt, position_context: ^Docum
 	exists_in_decl := false
 	for decl in decls {
 		for attr in get_stmt_attrs(decl) {
+			// Thor adds zero-width metadata for :> storage and import aliases.
+			// It has no source token and must not intercept the declaration's
+			// first identifier (rename consistently resolves from token.start).
+			if attr.pos.offset == attr.end.offset {continue}
 			if position_in_node(attr, position_context.position) {
 				get_document_position(attr, position_context)
 				return true

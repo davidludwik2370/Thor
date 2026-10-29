@@ -11,6 +11,51 @@ from tests.test_tls import Client, ROOT
 
 
 class RenameTests(unittest.TestCase):
+    def test_global_immutable_enum_array_renames_from_declaration_and_references(self):
+        text='''package main
+import rl "palette"
+NodeType::enum{Empty,Wall,Start,End}
+// colors in this comment and string must not be renamed.
+colors :> [NodeType]rl.Color {
+    .Empty = rl.BLACK,
+    .Wall = rl.LIGHTGRAY,
+    .Start = rl.BLUE,
+    .End = rl.YELLOW,
+}
+main::proc(){_=colors[.Start]; _="colors"}
+shadow::proc(){colors:=1; _=colors}
+'''
+        palette='''package palette
+Color::struct{r,g,b,a:u8}
+BLACK::Color{0,0,0,255}
+LIGHTGRAY::Color{200,200,200,255}
+BLUE::Color{0,0,255,255}
+YELLOW::Color{255,255,0,255}
+'''
+        files={'main.thor':text,'other.odin':'package main\nread::proc()->u8{return colors[.End].r}\n',
+               'palette/main.odin':palette}
+        client,root,main=self.project(files)
+        expected=dict(files)
+        expected['main.thor']=text.replace('colors :>','theme :>').replace('colors[','theme[')
+        expected['other.odin']=files['other.odin'].replace('colors[','theme[')
+        for needle,offset in [('colors :>',0),('colors :>',3),('colors :>',6),('colors[.Start]',2)]:
+            with self.subTest(needle=needle,offset=offset):
+                edit=self.rename(client,main,text,needle,'theme',offset)
+                self.assertEqual(self.apply(root,files,edit),expected)
+        self.assert_builds(root,expected)
+
+    def test_global_immutable_rename_tracks_unsaved_mutability_and_unicode(self):
+        saved='package main\n/* 😀 */ café :> 2\nmain::proc(){_=café}\n'
+        client,root,main=self.project({'main.thor':saved})
+        for version,operator in enumerate([':>',':=',':>'],2):
+            text=saved.replace(':>',operator)
+            client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':version},
+                                                'contentChanges':[{'text':text}]})
+            with self.subTest(operator=operator,version=version):
+                edit=self.rename(client,main,text,'café '+operator,'résultat',len('café'))
+                self.assertEqual(self.apply(root,{'main.thor':text},edit),{'main.thor':text.replace('café','résultat')})
+        self.assertEqual(main.read_text(),saved)
+
     def test_parameter_shadowing_in_same_block_keeps_initializer_on_outer_binding(self):
         text='''package main
 Board::struct{values:[2]int}

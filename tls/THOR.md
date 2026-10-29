@@ -210,6 +210,11 @@ members are supported. Global names are searched across `.thor` and `.odin`
 sources in the configured workspace, including selective import lists. Strings,
 comments and generated output directories are excluded.
 
+Global `:>` bindings support rename from the declaration as well as its uses,
+including enum-indexed aggregate initializers. Internal zero-width attributes
+are metadata and cannot intercept cursor lookup at the declaration's first
+character. Unsaved changes between `:>` and `:=` keep their source ranges.
+
 Import namespaces are file-local: renaming `fmt` from `import "core:fmt"` adds
 an explicit alias and updates its uses, leaving the path and other files alone.
 Declarations outside the editable workspace, such as SDK procedures, cannot be
