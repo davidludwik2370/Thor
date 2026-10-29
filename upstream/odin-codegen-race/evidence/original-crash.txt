@@ -29,3 +29,7 @@ This is consistent with unsafe cached-name publication, rather than destination
 allocation failure. The exact original SIGSEGV did not recur in 2,402 subsequent
 stock-compiler compilations. The race was reproduced separately with C++ TSan;
 it is a strong explanation for this crash, not proof of an exact crash recurrence.
+
+A later full regression run repeated the same crash signature with source
+length 30; see recurrence-2026-10-29.txt. The stress count above describes the
+earlier batch only.

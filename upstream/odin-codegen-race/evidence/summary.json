@@ -63,5 +63,16 @@
       "total_tsan_reports": 72
     }
   },
-  "note": "TSan also reported other locations; only this name-cache race family is validated by the prototype. No installed compiler or Thor defaults were changed."
+  "note": "TSan also reported other locations; only this name-cache race family is validated by the prototype. No installed compiler or Thor defaults were changed.",
+  "later_recurrence": {
+    "date": "2026-10-29",
+    "record": "odin-2026-10-29-065118.ips",
+    "signal": "SIGSEGV",
+    "location": "alloc_cstring + 896",
+    "caller": "lb_type_internal + 680",
+    "saved_string_pointer": 0,
+    "saved_string_length": 30,
+    "context": "stock compiler compiling a Thor demo compile-time helper during the full publishing regression run",
+    "isolated_retry_passed": true
+  }
 }

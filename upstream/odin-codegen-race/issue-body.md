@@ -29,8 +29,10 @@ different LLVM modules share the same entity. The cache is a plain two-word
 This was investigated after an intermittent compiler SIGSEGV in `alloc_cstring`
 called by `lb_type_internal`. The crash record shows a null source string pointer
 with length 26, and a non-null destination allocation. That is consistent with
-unsafe cached-name publication, but the exact SIGSEGV has not been reproduced:
-2,402 subsequent stock-compiler compilations completed successfully. The
+unsafe cached-name publication. A batch of 2,402 stock-compiler compilations
+completed successfully, but a later full regression run repeated the same
+SIGSEGV stack/offsets with a null source pointer and length 30 (crash record
+`odin-2026-10-29-065118.ips`). That failing test passed on isolated retry. The
 independently reproducible finding is the data race below.
 
 ## Steps to reproduce

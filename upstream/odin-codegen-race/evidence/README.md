@@ -2,7 +2,9 @@
 
 - `odin-report.txt`: installed compiler/OS/hardware/LLVM report.
 - `original-crash.txt`: selected crash facts, explicitly a summary rather than a
-  raw crash dump. The exact SIGSEGV did not reproduce in subsequent stress runs.
+  raw crash dump. The exact SIGSEGV did not reproduce in that stress batch.
+- `recurrence-2026-10-29.txt`: a later stock-compiler crash with the same stack
+  and offsets, a null source pointer and length 30; the isolated test retry passed.
 - `type-name-race.txt`: selected original TSan access pair with source line
   numbers; personal temporary paths are replaced with `<temporary>`.
 - `summary.json`: aggregate results from the original investigation, including

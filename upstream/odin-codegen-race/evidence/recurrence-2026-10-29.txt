@@ -1,0 +1,29 @@
+Later stock-compiler crash during Thor publish-feature regression testing.
+Personal filesystem paths are omitted. This is an extracted summary, not a raw dump.
+
+Report basename: odin-2026-10-29-065118.ips
+Compiler: dev-2026-10:8169255b9
+Commit: 8169255b97b85d6a08691d99764f51fb01f92b5a
+Process: odin (compiling a native compile-time-evaluation helper)
+Signal: SIGSEGV
+Exception: EXC_BAD_ACCESS / KERN_INVALID_ADDRESS at address 0
+
+Faulting stack:
+  alloc_cstring(gbAllocator, String)                 +896
+  lb_type_internal(lbModule*, Type*)                +680
+  lb_type(lbModule*, Type*)                         +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*)                      +636
+
+Saved source string registers:
+  x20 = 0     (source pointer)
+  x19 = 30    (source length)
+
+The stack/function offsets match the first crash; its source string was null
+with length 26 instead. This repeats the same failure signature after the
+earlier 2,402-build stress batch had not reproduced it. The cached-name race
+remains the strong explanation; this crash record alone does not identify the
+specific Entity that was concurrently accessed.
+
+The isolated failing test (ThorTests.test_main_demo) passed on retry with the
+same installed stock compiler. No installed compiler or Thor defaults changed.

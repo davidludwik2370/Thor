@@ -6,7 +6,8 @@ experimental compiler patch has not been installed.
 
 The confirmed finding is a C++ data race in Odin's cached LLVM type names at
 commit `8169255b97b85d6a08691d99764f51fb01f92b5a`. It closely matches an
-intermittent compiler crash, but the exact original SIGSEGV has not recurred.
+intermittent compiler crash. A later regression run repeated the same SIGSEGV
+signature; see `evidence/recurrence-2026-10-29.txt`.
 
 ## Report material
 

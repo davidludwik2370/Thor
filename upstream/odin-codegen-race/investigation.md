@@ -13,8 +13,10 @@ present when compiling an ordinary Odin program containing only
 
 The race matches the earlier SIGSEGV closely. The ordinary compiler did not
 repeat that exact crash during 2,402 subsequent compilations. The underlying
-race was reproduced with a C++ ThreadSanitizer build of Odin, rather than relying
-on a particular unlucky scheduling window to cause another segmentation fault.
+race was reproduced with a C++ ThreadSanitizer build of Odin. A later full
+regression run repeated the same crash stack and offsets, with a null source
+pointer and length 30; its isolated retry passed. The later record is summarized
+in `evidence/recurrence-2026-10-29.txt`.
 
 ## Original crash evidence
 

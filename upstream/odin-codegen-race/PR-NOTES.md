@@ -56,7 +56,9 @@ git apply /path/to/odin-codegen-race/type-name-cache-publication.patch
 - Prototype release compiler: 200 stress compilations, plain hello, a frozen
   Thor-generated print case and both Thor walkthrough demos passed.
 - 2,402 stock-compiler stress builds did not repeat the original SIGSEGV. This
-  does not negate the independently reproduced TSan finding.
+  does not negate the independently reproduced TSan finding. A later full
+  regression run repeated the same SIGSEGV signature (null source, length 30);
+  the failing test passed on isolated retry. See the recurrence summary.
 
 The minimal example and runner are in this folder. Aggregate historical results
 are in `evidence/summary.json`; the selected type-name access pair is in
