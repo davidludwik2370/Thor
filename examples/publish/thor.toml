@@ -1,0 +1,7 @@
+[publish]
+name = "Thor Publish Demo"
+id = "local.thor.publish-demo"
+version = "1.0.0"
+type = "gui"
+resources = ["data/defaults.txt"]
+# assets/ and its icon.png are discovered automatically.

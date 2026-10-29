@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.19.1"
+VERSION = "0.20.0"
 
 
 def backend_failure(status):
@@ -306,6 +306,15 @@ class Project:
             for name, directory in source.asset_collections.items():
                 result.append(f"-collection:{name}={directory}")
         result.extend(getattr(self, 'memory_flags', ()))
+        if any(path.parent == ROOT / 'runtime/app' for path in self.sources):
+            if any(f.startswith(('-define:THOR_APP_SOURCE_ROOT=', '-define:THOR_APP_LAYOUT=')) for f in result):
+                raise ThorError('THOR_APP_SOURCE_ROOT and THOR_APP_LAYOUT are reserved for thor:app.')
+            layout = getattr(self, 'publish_layout', '')
+            if layout:
+                result.append('-define:THOR_APP_LAYOUT=' + layout)
+            else:
+                root = self.entry.parent if self.file_entry else self.entry
+                result.append('-define:THOR_APP_SOURCE_ROOT=' + str(root))
         return result
 
     def diagnostic_adapter(self):
@@ -322,7 +331,7 @@ def _main(argv=None):
         runtime_args, argv = argv[boundary + 1:], argv[:boundary]
     parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T23: compile additive Odin syntax to Odin.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
-    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test"])
+    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test", "publish"])
     parser.add_argument("source", help="a .thor/.odin file or package directory")
     parser.add_argument("--output-dir", type=Path, help="directory for generated Odin (default: .thor-build/<source>)")
     parser.add_argument("--odin", default=os.environ.get("THOR_ODIN", "odin"), help="Odin compiler executable")
@@ -337,7 +346,20 @@ def _main(argv=None):
     parser.add_argument('--track-allocations', choices=['auto', 'off', 'basic', 'trace'], default='auto',
                         help='allocation tracker (auto: basic for native macOS debug executables)')
     parser.add_argument('--no-sanitize', action='store_true', help='disable automatic debug AddressSanitizer; explicit Odin sanitizer flags still apply')
+    packaging = parser.add_argument_group('publish options (thor publish only)')
+    packaging.add_argument('--app-name', help='application/package name (default: executable name)')
+    packaging.add_argument('--app-id', help='reverse-domain application identifier')
+    packaging.add_argument('--app-version', help='one to three numeric version components (default: 0.1.0)')
+    packaging.add_argument('--app-icon', type=Path, help='project-relative PNG or ICO (default: assets/icon.png or assets/icon.ico)')
+    packaging.add_argument('--app-type', choices=['gui', 'console'], help='application launch mode (default: gui)')
+    packaging.add_argument('--app-resource', action='append', default=[], help='additional project-relative resource file/directory; repeatable')
+    packaging.add_argument('--app-library', action='append', default=[], help='additional native library/plugin; repeatable')
+    packaging.add_argument('--publish-dir', type=Path, help='package destination (default: current directory, or parent of -out:)')
     options, flags = parser.parse_known_args(argv)
+    if options.command != 'publish' and (any(getattr(options, name) is not None for name in
+            ('app_name', 'app_id', 'app_version', 'app_icon', 'app_type', 'publish_dir'))
+            or options.app_resource or options.app_library):
+        parser.error('application packaging options are only supported by thor publish')
     if not 0<options.run_timeout<=300:parser.error('--run-timeout must be greater than 0 and at most 300 seconds')
     if any(not flag.startswith("-") for flag in flags):
         parser.error("unexpected argument; runtime arguments must follow --")
@@ -347,6 +369,7 @@ def _main(argv=None):
     json_output = options.diagnostic_format == "json" or "-json-errors" in flags
     flags = [f for f in flags if f != "-json-errors"]
     reported_errors = False
+    publish_diagnostics = []
 
     def report(errors):
         nonlocal reported_errors
@@ -365,11 +388,16 @@ def _main(argv=None):
         errors = normalized
         reported_errors |= any(d["type"] == "error" for d in errors)
         if json_output:
-            print(json.dumps(payload(errors), ensure_ascii=False), file=sys.stderr)
+            if options.command == 'publish':
+                publish_diagnostics.extend(errors)
+            else:
+                print(json.dumps(payload(errors), ensure_ascii=False), file=sys.stderr)
         else:
             for error in errors:
                 print(diagnostics.text(error, terse="-terse-errors" in flags,
                                        unix="-error-pos-style:unix" in flags), file=sys.stderr)
+    publish_scratch = None
+    publisher = None
     try:
         overlays = {}
         if options.overlay:
@@ -380,6 +408,11 @@ def _main(argv=None):
         if odin is None:
             raise ThorError(f"Odin compiler not found: {options.odin}; set THOR_ODIN or use --odin")
         entry = Path(options.source).resolve()
+        if options.command == 'publish':
+            from .publishing import Publisher
+            publisher = Publisher.prepare(entry, flags, options)
+            publisher.output.parent.mkdir(parents=True, exist_ok=True)
+            publish_scratch = tempfile.TemporaryDirectory(prefix='.thor-publish-', dir=publisher.output.parent)
         destination = (options.output_dir or Path.cwd() / '.thor-build' / entry.stem).resolve()
         test_mode = options.command == "test" or "-build-mode:test" in flags
         from .evaluation import Evaluator
@@ -396,6 +429,8 @@ def _main(argv=None):
                 parsecache.clear(frontend,cache_root)
             project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
                               cache_frontend=not options.no_cache,cache_directory=cache_root)
+            if publisher:
+                project.publish_layout = publisher.system
             if '-debug' in flags:
                 odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
                 project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
@@ -403,7 +438,7 @@ def _main(argv=None):
             memory = None
             if '-debug' in flags or options.track_allocations not in {'auto', 'off'}:
                 from .memory_debug import MemoryDebug
-                memory = MemoryDebug.select(options.command, flags, options.track_allocations, options.no_sanitize)
+                memory = MemoryDebug.select('build' if publisher else options.command, flags, options.track_allocations, options.no_sanitize)
                 if memory.enabled:
                     memory.prepare(project, ROOT)
             target = project.emit(destination,persist_maps=options.command=='transpile' or '-debug' in flags,
@@ -422,22 +457,30 @@ def _main(argv=None):
             return 1 if reported_errors else 0
         # Keep the running program's streams interactive and entirely separate
         # from structured compiler output (including test runner output).
-        native_command = "build" if options.command in {"run", "test"} else options.command
+        native_command = "build" if options.command in {"run", "test", "publish"} else options.command
         command = [odin, native_command, str(target)]
         if project.file_entry:
             command.append("-file")
-        command.extend(project.odin_flags())
+        native_flags = project.odin_flags()
+        if publisher:
+            native_flags = publisher.native_flags(native_flags, Path(publish_scratch.name))
+        command.extend(native_flags)
         binary_directory = Path.cwd() if options.command == "build" else project.destination
         binary_name = (binary_directory.name or 'program') if options.command == "build" else 'program'
         if os.name == 'nt':
             binary_name += '.exe'
         explicit_output = next((f[len("-out:"):] for f in flags if f.startswith("-out:")), None)
         executable = Path(explicit_output if explicit_output is not None else binary_directory / binary_name).resolve()
+        if publisher:
+            # Use a simple toolchain output name; the final package can safely
+            # contain display/executable names Odin rejects in its -out parser.
+            executable = Path(publish_scratch.name) / 'compiled' / ('program.exe' if publisher.system == 'windows' else 'program')
+            executable.parent.mkdir()
         launcher=(ROOT/'thor').resolve()
         same_launcher=executable==launcher or executable.exists() and launcher.exists() and os.path.samefile(executable,launcher)
         if options.command == 'build' and explicit_output is None and same_launcher:
             raise ThorError('The default output would overwrite the Thor launcher; choose another name with -out:name.')
-        if options.command in {"build", "run", "test"} and explicit_output is None:
+        if publisher or options.command in {"build", "run", "test"} and explicit_output is None:
             command.append(f"-out:{executable}")
         if options.command == "test":
             command.append("-build-mode:test")
@@ -468,6 +511,10 @@ def _main(argv=None):
             elif json_output or frontend_diagnostics:
                 report(frontend_diagnostics)
         backend_status = 128-result.returncode if result.returncode < 0 else result.returncode
+        if publisher and not result.returncode and not reported_errors:
+            output = publisher.package(executable, Path(publish_scratch.name))
+            print(output)
+            return 0
         if not result.returncode and not reported_errors and options.command in {'build','run','test'} and '-debug' in flags and executable.is_file():
             manifest_path=project.destination/'thor-manifest.json'
             manifest=json.loads(manifest_path.read_text())
@@ -484,8 +531,13 @@ def _main(argv=None):
         if isinstance(exc, ThorError) and exc.diagnostics:
             report(diagnostics.translate(exc.diagnostics, backend=False))
         else:
-            report([{"type": "error", "stage": "thor", "pos": None, "msgs": [str(exc)]}])
+            report([{"type": "error", "stage": "publish" if options.command == 'publish' else "thor", "pos": None, "msgs": [str(exc)]}])
         return 1
+    finally:
+        if publish_scratch is not None:
+            publish_scratch.cleanup()
+        if json_output and options.command == 'publish':
+            print(json.dumps(payload(publish_diagnostics), ensure_ascii=False), file=sys.stderr)
 
 
 class CompilationCancelled(BaseException):pass

@@ -34,6 +34,16 @@ An explicit `-out:` still selects another location/name. Building in the
 toolchain root requires an explicit output name to protect the `thor` launcher,
 including on a case-insensitive filesystem where the folder is named `Thor`.
 
+`thor publish .` creates a local application package instead of a loose
+executable: `.app` on macOS, `.zip` on Windows and `.tar.gz` on Linux. It discovers
+`assets/icon.png` or `assets/icon.ico`, includes `assets/`, and accepts optional
+`[publish]` settings in `thor.toml`. GUI launch mode is the default; use
+`--app-type console` to request a terminal. PNG/ICO conversion uses the optional
+Pillow package (`python3 -m pip install Pillow`); Python 3.10 additionally needs
+`tomli` to read TOML. None of these packages are needed by ordinary compilation
+or by the published executable. See [publishing](docs/publishing.md) for native
+tool requirements, extra resources, dependencies and resource lookup.
+
 ## Common libraries
 
 Native Odin runtime packages are linked directly to their installed sources;

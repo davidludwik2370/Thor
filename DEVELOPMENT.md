@@ -1434,3 +1434,64 @@ The installed compiler, its source checkout and Thor's defaults stay unchanged.
 Document optional single-module/single-thread controls, and preserve the selected
 trace, test fixture, results and three-file patch under
 `upstream/odin-codegen-race`. See [the report](docs/odin-codegen-race.md).
+
+
+## Application publishing (0.20.0)
+
+Add `thor publish` as a separate command using the existing compiler/evaluator
+pipeline, then package in a temporary staging directory. Normal commands do not
+load the publish module, read thor.toml, convert images or inspect dependencies.
+Publish-only app name/ID/version/type/icon/resource/library/output options are
+consumed by Thor. Existing Odin optimization/defines/debug options retain their
+meaning; package-only output/resource/linker settings reach only the final native
+build. Generated sources and caches retain the existing ownership/layout rules.
+
+An optional [publish] table supplies defaults. Include assets/ recursively and
+find assets/icon.png or assets/icon.ico; ambiguous automatic icons require an
+explicit selection. PNG/ICO conversion uses optional Pillow, including extracting
+the largest ICO image and generating ICNS/ICO/PNG for the selected platform.
+Resources preserve project-relative names and empty directories, follow only
+project-local noncyclic symlinks, and reject missing/special inputs. CLI resources
+add to configured entries. Publishing protects unrelated outputs and replaces an
+existing managed package only after staging/validation succeeds.
+
+macOS copies transitive dylibs/versioned frameworks, rewrites load paths/rpaths,
+and ad-hoc signs/verifies the copies and bundle. GUI mode launches its native
+executable directly; explicit console mode uses a native launcher and a resource
+command file to open Terminal. Windows ZIPs embed icon/version resources, set the
+GUI/console subsystem and recursively inspect normal/delayed PE imports. Linux
+archives use a relocatable launcher, library runpaths and an explicit desktop-entry
+installer. Odin's temporary linked-library export helps locate adjacent runtime
+libraries without exporting any extra persistent project files. Explicit plugins
+are included even when absent from the link graph. OS libraries remain system
+dependencies; unresolved libraries/collisions stop publication.
+
+Add the native thor:app library: resource_path returns an owned absolute string,
+using the original entry directory in development and executable-relative layout
+in published apps. It preserves CWD and ordinary I/O. Runtime flags are scoped to
+projects that import the library; no original project resource root is defined in
+published code. Native library files remain common installation source. TLS hover,
+definition and source-mapped argument errors work without a server/client change.
+The publishing guide, installation/README entries and examples/publish cover the
+new workflow, platform/dependency boundaries and allocator ownership.
+
+Validation: the full discovery run exercised 804 Python cases in 669.896 seconds.
+Its only failures were 13 LLDB cases blocked by sandbox attachment (each also
+failed during teardown), plus the existing demo encountering the already diagnosed
+Odin SIGSEGV while compiling a compile-time helper. All 13 debugger cases pass
+outside the sandbox; the isolated demo retry passes. The later crash record has
+the identical alloc_cstring/type-generation stack and a null string pointer with
+length 30; preserve it in the prepared upstream reporting bundle. No compiler
+installation or default compiler flags were changed to conceal that failure.
+
+The final publishing suite covers 41 cases (40 pass in the sandbox, one conditional
+Finder-launch case passes separately outside it), including real moved apps,
+PNG/ICO conversions, transitive libraries, read-only library inputs, versioned
+frameworks, dynamically loaded plugins, debug allocation tracking, clean rebuilds,
+JSON/source-mapped failures, resource-path ownership and Windows/Linux packaging
+contracts. The new real stdio TLS helper test passes. Together the full run and
+focused/failed-case reruns cover all 811 available Python cases in this workspace.
+Native Windows/Linux execution remains unverified on this macOS host. The normal
+and published demo both run; Launch Services launches a real GUI package with
+argument forwarding and no Terminal wrapper. Existing user playground/basic edits
+are preserved. Logs are under /tmp/thor-publish-*.log.

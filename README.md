@@ -9,6 +9,8 @@ those features usable together.
 
 Requirements: Python 3.10+ and `odin` on `PATH`. The first invocation builds and
 caches the small Odin frontend automatically; no Python packages are required.
+Publishing PNG/ICO application icons additionally uses Pillow; see
+[application publishing](docs/publishing.md).
 
 ```sh
 ./thor run demo
@@ -171,6 +173,14 @@ Odin's other native build modes can be selected with `-build-mode:...`.
 | `build` | Ask Odin to build the requested artifact; an executable by default. |
 | `run` | Build an executable, then run it. |
 | `test` | Build with Odin's `-build-mode:test`, then run the test executable. |
+| `publish` | Build and package a local macOS app, Windows ZIP or Linux archive with resources, icon and native dependencies. |
+
+For distributable applications use `thor publish .`. It includes `assets/`
+automatically, discovers `assets/icon.png` or `assets/icon.ico`, and reads optional
+`[publish]` settings from `thor.toml`. GUI mode is the default: macOS launches the
+executable directly, Windows selects the GUI subsystem, and Linux desktop metadata
+disables the terminal. Use `--app-type console` when a terminal is wanted. See the
+[publishing guide](docs/publishing.md) and [example](examples/publish/README.md).
 
 `run` and `test` remove their executable afterward unless `-keep-executable` is
 passed. Generated sources remain available for inspection. Source-map files are
@@ -182,7 +192,7 @@ Use Odin's usual `-flag:value` spelling, including `-o:speed`, `-debug`,
 `-define:NAME=value`, `-out:path`, and `-target:os_arch`. Values containing spaces
 must remain part of the same quoted argument. Thor does not reproduce Odin's
 complete flag catalog; Odin validates forwarded flags, and compatibility with
-every option is not guaranteed. Thor exposes the five commands above rather
+every option is not guaranteed. Thor exposes the commands above rather
 than forwarding arbitrary Odin subcommands.
 
 A few options receive additional handling:

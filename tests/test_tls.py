@@ -134,6 +134,28 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_app_resource_helper_hover_definition_and_mapped_argument_error(self):
+        text='''package main
+import "thor:app"
+main::proc(){
+    path:=app.resource_path("assets/image.png")
+    defer delete(path)
+}
+'''
+        client,main=self.open(text)
+        hover=self.hover(client,main,text,'resource_path')
+        self.assertIsNotNone(hover)
+        self.assertIn('string',hover['contents']['value'])
+        target=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'resource_path',2)})
+        targets=target if isinstance(target,list) else [target]
+        self.assertTrue(any(t and t['uri'].endswith('/runtime/app/app.odin') for t in targets),target)
+        changed=text.replace('"assets/image.png"','123')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
+            'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        self.assertTrue(any(e['range']['start']['line']==3 for e in errors),errors)
+
     def test_generic_map_optional_lookup_checks_and_unsaved_return_error(self):
         text='''package main
 Box::struct{items:map[int]int}
