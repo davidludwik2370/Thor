@@ -1,0 +1,32 @@
+WARNING: ThreadSanitizer: data race (pid=80985)
+  Read of size 8 at 0x000159f11e98 by thread T4:
+    #0 lb_get_entity_name(lbModule*, Entity*) <null> (odin-tsan-original:arm64+0x100251f48)
+    #1 lb_type_internal(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100259be4)
+    #2 lb_type(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100251298)
+    #3 lb_type_internal(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100258758)
+    #4 lb_type(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100251298)
+    #5 lb_type_internal(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100259ac4)
+    #6 lb_type(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100251298)
+    #7 lb_type_internal(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100259c58)
+    #8 lb_type(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100251298)
+    #9 lb_generate_procedures_and_types_per_module(void*) <null> (odin-tsan-original:arm64+0x100336efc)
+    #10 thread_pool_steal(ThreadPool*) <null> (odin-tsan-original:arm64+0x1001bb1a0)
+    #11 internal_thread_proc(void*) <null> (odin-tsan-original:arm64+0x1001baeb4)
+
+  Previous write of size 8 at 0x000159f11e98 by main thread:
+    #0 lb_get_entity_name(lbModule*, Entity*) <null> (odin-tsan-original:arm64+0x100252168)
+    #1 lb_type_internal(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100259be4)
+    #2 lb_type(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100251298)
+    #3 lb_type_internal_for_procedures_raw(lbModule*, Type*) <null> (odin-tsan-original:arm64+0x100261508)
+    #4 lb_create_procedure(lbModule*, Entity*, bool) <null> (odin-tsan-original:arm64+0x1002a8030)
+    #5 lb_generate_procedures_and_types_per_module(void*) <null> (odin-tsan-original:arm64+0x100336fdc)
+    #6 thread_pool_wait(ThreadPool*) <null> (odin-tsan-original:arm64+0x1001e2f6c)
+    #7 lb_generate_code(lbGenerator*) <null> (odin-tsan-original:arm64+0x10005edf4)
+    #8 main <null> (odin-tsan-original:arm64+0x1000208e0)
+
+  Thread T4 (tid=71879259, running) created by main thread at:
+    #0 pthread_create <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64+0x31d84)
+    #1 init_global_thread_pool() <null> (odin-tsan-original:arm64+0x1000349e4)
+    #2 main <null> (odin-tsan-original:arm64+0x10001fb04)
+
+SUMMARY: ThreadSanitizer: data race (<temporary>/compiler/odin-tsan-original:arm64+0x100251f48) in lb_get_entity_name(lbModule*, Entity*)

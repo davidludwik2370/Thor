@@ -1,0 +1,13 @@
+Where to find more information and get into contact when you encounter a bug:
+
+	Website: https://odin-lang.org
+	GitHub:  https://github.com/odin-lang/Odin/issues
+
+
+Useful information to add to a bug report:
+
+	Odin:    dev-2026-10:8169255b9
+	OS:      macOS Sequoia 15.6.0 (build 24G84, kernel 24.6.0)
+	CPU:     Apple M1 Pro
+	RAM:     32768 MiB
+	Backend: LLVM 22.1.7

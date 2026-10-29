@@ -1,0 +1,34 @@
+# Evidence inventory
+
+- `odin-report.txt`: installed compiler/OS/hardware/LLVM report.
+- `original-crash.txt`: selected crash facts, explicitly a summary rather than a
+  raw crash dump. The exact SIGSEGV did not reproduce in subsequent stress runs.
+- `type-name-race.txt`: selected original TSan access pair with source line
+  numbers; personal temporary paths are replaced with `<temporary>`.
+- `summary.json`: aggregate results from the original investigation, including
+  the larger print fixture, 2,402 stock builds and 200 prototype release builds.
+- `bundle-validation.json`: fresh validation of the standalone hello fixture and
+  runner after consolidation into this folder. Compiler command paths are
+  omitted; statuses, report counts, emitted IR counts and fixture SHA-256 remain.
+- `minimal-fixture-race.txt`: one selected baseline report from that fresh hello
+  validation. Function names are symbolized; this copied compiler binary did not
+  resolve source lines in the fresh run, so the earlier trace supplies those.
+
+The fresh checks use the same pinned original/prototype compilers as the
+investigation, with no TSan suppression option. These are not new tests of current
+upstream master. Historical and fresh warning totals differ because the
+fixtures/invocations/scheduling differ. In particular, a fresh single-thread
+check produced one unrelated parser/global-file-table report despite removing
+the observed name-cache race. The prototype also retains other TSan warnings.
+Those other findings are not validated or fixed by this bundle.
+
+The runner's `name_cache_read_reports` field counts reports whose first-access
+stack starts in `lb_get_entity_name`; it does not indiscriminately count a name
+appearing in a previous-writer stack. It is a focused diagnostic classification,
+not a general compiler correctness test. Negative compiler exit status `-6` in
+these checks is TSan's termination after warnings, not a recurrence of the
+original stock-compiler SIGSEGV. Every fresh check emitted LLVM IR.
+
+Raw stderr, stdout and LLVM IR from the fresh checks were retained locally in
+the temporary validation output directories; this portable bundle includes
+selected traces and structured results rather than unrelated sanitizer output.

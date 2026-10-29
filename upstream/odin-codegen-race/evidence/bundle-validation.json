@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-29",
+  "compiler_commit": "8169255b97b85d6a08691d99764f51fb01f92b5a",
+  "fixture": "main.odin",
+  "fixture_sha256": "370bc63640ff63b38035e6217124fba8829064a6c02ce7eb7d7a55bea014bfbc",
+  "host": "macOS 15.6 arm64",
+  "experiments": {
+    "stock": {
+      "runner_status": 0,
+      "runs": [
+        {
+          "run": 0,
+          "status": 0,
+          "tsan_reports": 0,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        },
+        {
+          "run": 1,
+          "status": 0,
+          "tsan_reports": 0,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        },
+        {
+          "run": 2,
+          "status": 0,
+          "tsan_reports": 0,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        }
+      ]
+    },
+    "baseline-single-thread": {
+      "runner_status": 0,
+      "runs": [
+        {
+          "run": 0,
+          "status": -6,
+          "tsan_reports": 1,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        }
+      ]
+    },
+    "baseline-single-module": {
+      "runner_status": 0,
+      "runs": [
+        {
+          "run": 0,
+          "status": -6,
+          "tsan_reports": 45,
+          "name_cache_read_reports": 0,
+          "ir_files": 1
+        }
+      ]
+    },
+    "baseline-tsan": {
+      "runner_status": 0,
+      "runs": [
+        {
+          "run": 0,
+          "status": -6,
+          "tsan_reports": 58,
+          "name_cache_read_reports": 12,
+          "ir_files": 42
+        },
+        {
+          "run": 1,
+          "status": -6,
+          "tsan_reports": 66,
+          "name_cache_read_reports": 12,
+          "ir_files": 42
+        },
+        {
+          "run": 2,
+          "status": -6,
+          "tsan_reports": 68,
+          "name_cache_read_reports": 10,
+          "ir_files": 42
+        }
+      ]
+    },
+    "prototype-tsan": {
+      "runner_status": 0,
+      "runs": [
+        {
+          "run": 0,
+          "status": -6,
+          "tsan_reports": 58,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        },
+        {
+          "run": 1,
+          "status": -6,
+          "tsan_reports": 37,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        },
+        {
+          "run": 2,
+          "status": -6,
+          "tsan_reports": 73,
+          "name_cache_read_reports": 0,
+          "ir_files": 42
+        }
+      ]
+    }
+  },
+  "note": "Fresh validation after preparing the standalone bundle. Nonzero/negative compiler status can be TSan termination; expected-race runner modes require emitted IR and classify only the observed name-cache first-access stacks. Other TSan findings remain unreviewed."
+}

@@ -1,0 +1,31 @@
+Selected facts extracted from the original macOS crash report and matching
+installed-compiler disassembly. This is a summary, not a complete crash dump.
+Personal filesystem paths are omitted.
+
+Report basename: odin-2026-10-29-031708.ips
+Process: odin (the compiler, not the generated program)
+Compiler: dev-2026-10:8169255b9
+Commit: 8169255b97b85d6a08691d99764f51fb01f92b5a
+Host: macOS 15.6 / arm64
+Signal: SIGSEGV
+Exception: EXC_BAD_ACCESS / KERN_INVALID_ADDRESS at address 0
+Faulting thread: 8
+Compiler threads in report: 11
+
+Faulting stack:
+  alloc_cstring(gbAllocator, String)                 +896
+  lb_type_internal(lbModule*, Type*)                +680
+  lb_type(lbModule*, Type*)                         +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*)
+
+Saved registers, interpreted using the matching function's disassembly:
+  x20 = 0     (source string pointer)
+  x19 = 26    (source string length)
+  x0 != 0    (destination allocation)
+
+The fault is a load through the null source pointer while copying its bytes.
+This is consistent with unsafe cached-name publication, rather than destination
+allocation failure. The exact original SIGSEGV did not recur in 2,402 subsequent
+stock-compiler compilations. The race was reproduced separately with C++ TSan;
+it is a strong explanation for this crash, not proof of an exact crash recurrence.

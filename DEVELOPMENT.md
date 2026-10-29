@@ -1433,4 +1433,4 @@ narrow fix; an analogous variable/link-name race remains in a two-print example.
 The installed compiler, its source checkout and Thor's defaults stay unchanged.
 Document optional single-module/single-thread controls, and preserve the selected
 trace, test fixture, results and three-file patch under
-`tools/repro_odin_codegen`. See [the report](docs/odin-codegen-race.md).
+`upstream/odin-codegen-race`. See [the report](docs/odin-codegen-race.md).
