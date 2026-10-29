@@ -458,6 +458,16 @@ class PublishTests(PublishFixture):
         self.assertEqual([f for f in flags if f.startswith('-extra-linker-flags:')],
                          ['-extra-linker-flags:-dead_strip -Wl,-headerpad_max_install_names'])
 
+    def test_publish_defaults_to_speed_and_preserves_explicit_optimization_on_all_platforms(self):
+        for system in ('darwin', 'windows', 'linux'):
+            for explicit in (None, 'none', 'minimal', 'size', 'speed', 'aggressive'):
+                with self.subTest(system=system, explicit=explicit):
+                    inputs = ['-debug'] if explicit is None else ['-debug', '-o:' + explicit]
+                    original = inputs.copy()
+                    flags = self.plan(system=system).native_flags(inputs, self.directory)
+                    self.assertEqual([f for f in flags if f.startswith('-o:')], ['-o:' + (explicit or 'speed')])
+                    self.assertEqual(inputs, original, 'publish defaults must not mutate flags used by compile-time helpers')
+
     def test_linux_relocates_non_system_dependencies_without_modifying_sources(self):
         source = self.file('app', b'original exe')
         library = self.file('libexample.so.1.2', b'original library')
@@ -510,6 +520,27 @@ class MacPublishTests(PublishFixture):
                                 cwd=cwd or self.output, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
+
+    def test_final_compiler_uses_publish_optimization_defaults_and_leaves_build_alone(self):
+        native_run = subprocess.run
+        for command, explicit, expected in [('publish', [], ['-o:speed']),
+                                             ('publish', ['-o:none'], ['-o:none']),
+                                             ('build', [], [])]:
+            with self.subTest(command=command, explicit=explicit):
+                calls = []
+                def run(arguments, *args, **kwargs):
+                    calls.append(arguments)
+                    return native_run(arguments, *args, **kwargs)
+                output, errors = io.StringIO(), io.StringIO()
+                with contextlib.chdir(self.output), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors), \
+                        patch.object(driver.subprocess, 'run', side_effect=run):
+                    status = driver._main([command, str(self.project), *explicit])
+                self.assertEqual(status, 0, errors.getvalue())
+                suffix = '/compiled/program' if command == 'publish' else str(self.output / 'output')
+                compiler = [args for args in calls if len(args) > 1 and args[1] == 'build' and
+                            any(str(f).startswith('-out:') and str(f).endswith(suffix) for f in args)]
+                self.assertEqual(len(compiler), 1, compiler)
+                self.assertEqual([f for f in compiler[0] if f.startswith('-o:')], expected)
 
     def test_visible_icon_crop_warning_is_structured_and_obeys_warning_flags(self):
         path = self.image()

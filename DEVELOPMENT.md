@@ -1522,3 +1522,19 @@ react_time project, whose 1024x500 palette icon has 500x499 visible artwork,
 publishes successfully with empty stderr using temporary generated/cache/output
 directories. Its artwork fits a 500x500 crop and emits no warning; the source icon
 hash is unchanged. No editor changes or restart are required.
+
+
+## Publish optimization default (0.20.2)
+
+Default the final native `thor publish` build to -o:speed when no explicit -o:
+option is present. Apply it in Publisher.native_flags, leaving the project's
+input flags, compile-time helpers and ordinary build/run/test behavior unchanged.
+Explicit optimization always wins, including -o:none for a debug package.
+Document the default in publish help, README and the publishing guide.
+
+Validation: the publishing suite runs 53 cases in 13.231 seconds, with 52 passing
+and the optional sandbox-restricted Finder-launch case skipped. New coverage
+checks default/explicit optimization on all three platform flag paths and
+captures real final compiler invocations for default publish, explicit -o:none
+publish and ordinary build. Existing packaging, icons, libraries, resource and
+debug tracking tests also pass with the new default.

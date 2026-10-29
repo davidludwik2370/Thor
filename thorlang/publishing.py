@@ -296,6 +296,8 @@ class Publisher:
 
     def native_flags(self, flags, scratch):
         result = [f for f in flags if not f.startswith("-out:")]
+        if not any(f.startswith('-o:') for f in result):
+            result.append('-o:speed')
         exported = next((f.split(':', 1)[1] for f in result if f.startswith('-export-linked-libs-file:')), None)
         self.linked_file = Path(exported).absolute() if exported else scratch / 'linked-libraries.txt'
         if exported is None:

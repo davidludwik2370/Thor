@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.20.1"
+VERSION = "0.20.2"
 
 
 def backend_failure(status):
@@ -346,7 +346,7 @@ def _main(argv=None):
     parser.add_argument('--track-allocations', choices=['auto', 'off', 'basic', 'trace'], default='auto',
                         help='allocation tracker (auto: basic for native macOS debug executables)')
     parser.add_argument('--no-sanitize', action='store_true', help='disable automatic debug AddressSanitizer; explicit Odin sanitizer flags still apply')
-    packaging = parser.add_argument_group('publish options (thor publish only)')
+    packaging = parser.add_argument_group('publish options (thor publish only; defaults to -o:speed)')
     packaging.add_argument('--app-name', help='application/package name (default: executable name)')
     packaging.add_argument('--app-id', help='reverse-domain application identifier')
     packaging.add_argument('--app-version', help='one to three numeric version components (default: 0.1.0)')

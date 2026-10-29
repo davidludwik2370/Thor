@@ -107,9 +107,13 @@ CLI metadata overrides `[publish]`; repeated resource/library options add entrie
 | `--app-library PATH` | Extra native library/plugin; repeatable. |
 | `--publish-dir PATH` | Override final package directory. |
 
-Odin compile flags such as `-o:speed`, `-define:...`, and `-debug` still work.
-Publishing does not implicitly change optimization or enable debug instrumentation.
-`-debug` retains the normal explicit debug behavior. Application packaging flags
+Publishing defaults to `-o:speed` for the final executable. An explicit Odin
+optimization flag such as `-o:none` or `-o:size` overrides that default, including
+when `-debug` is present. For a minimally optimized debug package, use
+`thor publish . -debug -o:none`. The default is applied only to the final publish
+build; ordinary commands and compile-time helpers keep their existing settings.
+Other Odin flags such as `-define:...` and `-debug` still work, and publishing
+does not enable debug instrumentation unless requested. Application packaging flags
 are accepted only by `publish` and never reach Odin or compile-time helpers.
 
 The default executable name is the working directory's name, matching `build`.

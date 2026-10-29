@@ -181,6 +181,8 @@ automatically, discovers `assets/icon.png` or `assets/icon.ico`, and reads optio
 executable directly, Windows selects the GUI subsystem, and Linux desktop metadata
 disables the terminal. Use `--app-type console` when a terminal is wanted. See the
 [publishing guide](docs/publishing.md) and [example](examples/publish/README.md).
+Published executables default to `-o:speed`; an explicit `-o:...` flag overrides
+that setting. Ordinary build/run/test optimization defaults are unchanged.
 
 `run` and `test` remove their executable afterward unless `-keep-executable` is
 passed. Generated sources remain available for inspection. Source-map files are
