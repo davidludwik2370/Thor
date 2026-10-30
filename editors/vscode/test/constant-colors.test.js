@@ -12,11 +12,13 @@ test('preview restores the absence of an override and leaves the theme untouched
 
 test('only the compile-time Thor selector changes; old rules and later edits survive', () => {
     const raw = {enabled: true, rules: {'variable:thor': '#9CDCFE', 'variable.readonly:thor': '#4FC1FF',
+        'label:thor': '#8582DE',
         [RULE]: {foreground: '#112233', bold: true}}};
     const saved = structuredClone(raw), baseline = snapshot(raw), changed = preview(raw, PURPLE);
     assert.deepEqual(raw, saved, 'Preview mutated the original settings object');
     assert.equal(changed.rules['variable:thor'], raw.rules['variable:thor']);
     assert.equal(changed.rules['variable.readonly:thor'], raw.rules['variable.readonly:thor']);
+    assert.equal(changed.rules['label:thor'],raw.rules['label:thor']);
     assert.deepEqual(changed.rules[RULE], {foreground: PURPLE, bold: true});
     changed.rules['function:thor'] = '#ffff00';
     const restored = restore(changed, baseline);

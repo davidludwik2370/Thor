@@ -176,6 +176,59 @@ main::proc(){
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
 
+    def test_labels_have_a_distinct_consistent_category_across_layouts_and_branch_forms(self):
+        text='''package main
+maybe::proc()->(int,bool) #optional_ok{return 1,true}
+main::proc(){
+    row_check:=42
+    row_check:
+    for i in 0..<2 {
+        _=row_check
+        nested: for j in 0..<2 {
+            if j==0 do continue row_check
+            break nested
+        }
+    }
+    block_label: { break block_label }
+    conditional: if true { break conditional }
+    chooser: switch 1 {case: break chooser}
+    choice:any
+    typed: switch v in choice {case int:break typed;case:break typed}
+    optional: for {
+        _=maybe() or_break optional
+        _=maybe() or_continue optional
+        break optional
+    }
+    _="😀"; café: for { break café }
+    // break row_check
+    _="continue row_check"
+}
+'''
+        client,main=self.open(text,compiler=False)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        comptime=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('thorCompileTime')
+        def check(source):
+            spans=self.semantic_spans(client,main,source)
+            self.assert_original_identifier_tokens(main,source,spans)
+            counts={}
+            for _,_,kind,name,mods in spans:
+                if kind!='label':continue
+                self.assertTrue(mods&readonly,name)
+                self.assertFalse(mods&comptime,name)
+                counts[name]=counts.get(name,0)+1
+            self.assertEqual(counts,{'row_check':2,'nested':2,'block_label':2,'conditional':2,
+                                     'chooser':2,'typed':3,'optional':4,'café':2})
+            values=[(kind,mods) for _,_,kind,name,mods in spans if name=='row_check' and kind!='label']
+            self.assertEqual(values,[('variable',0),('variable',0)])
+        check(text)
+        flat=text.replace('row_check:\n    for','row_check: for')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':flat}]})
+        check(flat)
+        renamed=client.request('textDocument/rename',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(flat,'row_check: for'),'newName':'scan_rows'})
+        self.assertEqual(len(renamed['changes'][main.as_uri()]),2)
+        self.assertIn('label',json.dumps(self.hover(client,main,flat,'row_check: for')))
+
     def test_parameters_and_value_loop_bindings_are_readonly_but_reference_bindings_are_not(self):
         text='''package main
 visit::proc(input:[]int, pointer:^int, pointers:[]^int, enabled:=true,

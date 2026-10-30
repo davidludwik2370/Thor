@@ -31,6 +31,7 @@ before(async () => {
             {scope:'constant.numeric',settings:{foreground:'#B5CEA8'}},
             {scope:'keyword.control',settings:{foreground:'#C586C0'}},
             {scope:'entity.name.tag',settings:{foreground:'#569CD6'}},
+            {scope:'entity.name.label.thor',settings:{foreground:'#8582DE'}},
         ]},
         onigLib,
         loadGrammar:async()=>JSON.parse(fs.readFileSync(path.join(__dirname,'../syntaxes/thor.tmLanguage.json'),'utf8')),
@@ -195,6 +196,30 @@ test('raw strings retain syntax-looking text across lines', () => {
     assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
 });
 
+test('label declarations and branch targets share their own purple scope',()=>{
+    for(const source of [
+        'row_check:\nfor &row in board { continue row_check; break row_check }',
+        'row_check: for &row in board { continue row_check; break row_check }',
+        'row_check: // next line\nfor &row in board { continue row_check }',
+        'row_check: if ready { break row_check }',
+        'row_check: switch selector {case: break row_check}',
+        'row_check: { break row_check }',
+        'row_check: for { value:=next() or_break row_check; value=next() or_continue row_check }',
+    ]){
+        const tokens=tokenize(source),colors=themedTokens(source),lines=source.split('\n');
+        for(let line=0;line<lines.length;line++)for(const match of lines[line].matchAll(/row_check/g)){
+            const token=tokens[line].find(t=>t.text==='row_check'&&t.scopes.includes('entity.name.label.thor'));
+            assert.ok(token,source);
+            assert.ok(colors[line].slice(match.index,match.index+match[0].length).every(t=>t.color==='#8582DE'),source);
+        }
+        const colon=lines[0].indexOf(':');
+        assert.equal(colors[0][colon].color,'#D4D4D4','The colon remains punctuation');
+    }
+    for(const source of ['// row_check: for {}','text := "continue row_check"','value: for_values']){
+        assert.ok(!tokenize(source).flat().some(t=>t.scopes.includes('entity.name.label.thor')),source);
+    }
+});
+
 test('escaped quotes stay inside strings', () => {
     const tokens = tokenize('s := "\\\"#if in [1,2]"')[0];
     for (const token of tokens.filter(t => t.text.includes('#if'))) {
@@ -313,7 +338,8 @@ test('declared package names are green, namespace references blue, and set/map s
     const manifest=require('../package.json');
     assert.deepEqual(manifest.contributes.semanticTokenScopes,[{language:'thor',scopes:{
         namespace:['variable.other.namespace.thor'],
-        'parameter.readonly':['variable.other.constant.thor']
+        'parameter.readonly':['variable.other.constant.thor'],
+        label:['entity.name.label.thor']
     }}]);
 });
 

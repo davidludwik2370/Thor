@@ -33,6 +33,7 @@ SemanticTokenTypes :: enum u32 {
 	Property,
 	Method,
 	TypeParameter,
+	Label,
 }
 // Need to be in the same order as SemanticTokenTypes
 semantic_token_type_names: []string = {
@@ -54,6 +55,7 @@ semantic_token_type_names: []string = {
 	"property",
 	"method",
 	"typeParameter",
+	"label",
 }
 
 SemanticTokenModifier :: enum u8 {
@@ -255,6 +257,7 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		if thor_is_import_alias(n) { return } // Synthetic namespaces have no source token.
 		visit_value_decl(n^, builder)
 	case ^ast.Block_Stmt:
+		visit_label(n.label, builder)
 		visit_nodes(n.stmts, builder)
 	case ^ast.Foreign_Block_Decl:
 		visit_nodes(n.attributes[:], builder)
@@ -273,6 +276,7 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		write_semantic_node(builder, n.type, .TypeParameter)
 		visit_node(n.specialization, builder)
 	case ^ast.Range_Stmt:
+		visit_label(n.label, builder)
 		for val in n.vals {
 			visit_range_binding(val, builder)
 		}
@@ -280,6 +284,7 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_node(n.expr, builder)
 		visit_node(n.body, builder)
 	case ^ast.If_Stmt:
+		visit_label(n.label, builder)
 		visit_node(n.init, builder)
 		visit_node(n.cond, builder)
 		visit_node(n.body, builder)
@@ -288,20 +293,24 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 			visit_node(n.else_stmt, builder)
 		}
 	case ^ast.For_Stmt:
+		visit_label(n.label, builder)
 		visit_node(n.init, builder)
 		visit_node(n.cond, builder)
 		visit_node(n.post, builder)
 		visit_node(n.body, builder)
 	case ^ast.Unroll_Range_Stmt:
+		visit_label(n.label, builder)
 		visit_range_binding(n.val0, builder)
 		visit_range_binding(n.val1, builder)
 		visit_node(n.expr, builder)
 		visit_node(n.body, builder)
 	case ^ast.Switch_Stmt:
+		visit_label(n.label, builder)
 		visit_node(n.init, builder)
 		visit_node(n.cond, builder)
 		visit_node(n.body, builder)
 	case ^ast.Type_Switch_Stmt:
+		visit_label(n.label, builder)
 		if n.tag != nil {
 			if tag, ok := n.tag.derived.(^ast.Assign_Stmt); ok {
 				for value in tag.lhs { visit_range_binding(value, builder) }
@@ -405,7 +414,9 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_node(n.y, builder)
 	case ^ast.Or_Branch_Expr:
 		visit_node(n.expr, builder)
-		visit_node(n.label, builder)
+		visit_label(n.label, builder)
+	case ^ast.Branch_Stmt:
+		visit_label(n.label, builder)
 	case ^ast.Ternary_If_Expr:
 		if n.op1.text == "if" {
 			visit_node(n.x, builder)
@@ -470,6 +481,10 @@ visit_value_decl :: proc(value_decl: ast.Value_Decl, builder: ^SemanticTokenBuil
 
 	visit_node(value_decl.type, builder)
 	visit_nodes(value_decl.values, builder)
+}
+
+visit_label :: proc(label: ^ast.Expr, builder: ^SemanticTokenBuilder) {
+	if label != nil { write_semantic_node(builder, label, .Label, {.ReadOnly}) }
 }
 
 visit_range_binding :: proc(value: ^ast.Expr, builder: ^SemanticTokenBuilder) {
@@ -651,6 +666,10 @@ visit_ident :: proc(
 		return
 	}
 	symbol := symbol_and_node.symbol
+	if _, ok := symbol.value.(SymbolLabelValue); ok {
+		write_semantic_node(builder, ident, .Label, {.ReadOnly})
+		return
+	}
 
 	modifiers := modifiers
 

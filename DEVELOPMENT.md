@@ -1891,3 +1891,26 @@ ordinary switches, shadowing, mutable copies, narrowed hovers and alias rename.
 The real VS Code integration also checks declaration/case/assignment token colors
 and readonly versus reference struct-member colors. No language, compiler, theme
 or user project source changes are needed; rebuild/restart TLS to load the fix.
+
+## Independent purple labels (TLS 0.15.0 / VS Code extension 0.14.0)
+
+Append `label` to the semantic legend without changing existing token indices.
+Visit label declarations on loops, conditionals, blocks and switches, ordinary
+break/continue targets, and or_break/or_continue targets. Labels have readonly
+metadata in their own category, separate from variables and compile-time values;
+regular variables sharing a label's name keep their normal classification.
+
+Give the grammar's same-line and separate-line label declarations a consistent
+`entity.name.label.thor` scope, preserving punctuation and requiring a keyword
+boundary so declarations such as `value: for_values` remain type annotations.
+Map semantic labels to the same scope. Apply the requested `#8582DE` purple in the
+local profile using separate semantic and TextMate label preferences, leaving
+constant/variable preferences intact. Document how to change/remove those rules
+independently; constant-color preview/restore also preserves the label preference.
+
+Validation: 1126 native TLS tests, 128 stdio LSP/rename tests, 98 extension tests
+and the real isolated VS Code integration pass. New regressions cover declaration
+layouts, branches and optional branches, nested control flow, Unicode ranges,
+comments/strings, same-named variables, label hover/rename and unsaved layout
+changes. Both grammar fallback color and resolved semantic classification are
+checked. No compiler or user project source changes are required.

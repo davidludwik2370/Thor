@@ -144,6 +144,40 @@ The color follows the binding, not the mutability of pointed-to data. Other
 themes can style the modifier directly;
 the preview is optional and does not replace a theme.
 
+### Label colors
+
+Labels use their own `label` semantic token category and
+`entity.name.label.thor` grammar scope. Declarations on the same line as a loop
+or on the preceding line match their `break`, `continue`, `or_break` and
+`or_continue` references. The colon stays ordinary punctuation. Labeled blocks,
+conditionals and switches follow the same rule.
+
+The local purple preview uses these user settings (merge with existing rules):
+
+```json
+"editor.semanticTokenColorCustomizations": {
+  "rules": {
+    "label:thor": "#8582DE"
+  }
+},
+"editor.tokenColorCustomizations": {
+  "textMateRules": [
+    {
+      "name": "Thor labels (purple preview)",
+      "scope": "entity.name.label.thor",
+      "settings": { "foreground": "#8582DE" }
+    }
+  ]
+}
+```
+
+The semantic rule colors resolved labels; the TextMate rule keeps the syntax
+fallback consistent while TLS starts or is disabled. Change/remove these two
+label-specific rules to adjust/restore labels independently of compile-time
+constants and variables. The constant-color preview commands do not change them.
+
+### Readonly binding colors
+
 If readonly parameters still have the mutable-variable color in your theme,
 you can set their color explicitly in VS Code's user settings. For Dark Modern,
 `#4FC1FF` matches its immutable-variable blue:

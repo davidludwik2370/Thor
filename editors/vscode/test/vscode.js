@@ -35,7 +35,7 @@ async function run() {
         await vscode.window.showTextDocument(document);
         assert.equal(document.languageId, 'thor');
         assert.deepEqual(extension.packageJSON.contributes.semanticTokenScopes,
-            [{language:'thor',scopes:{namespace:['variable.other.namespace.thor'],'parameter.readonly':['variable.other.constant.thor']}}]);
+            [{language:'thor',scopes:{namespace:['variable.other.namespace.thor'],'parameter.readonly':['variable.other.constant.thor'],label:['entity.name.label.thor']}}]);
         const colorConfig=vscode.workspace.getConfiguration('editor');
         const colorBaseline=colorConfig.inspect('semanticTokenColorCustomizations')?.globalValue;
         try {
@@ -196,6 +196,21 @@ async function run() {
             assert.ok(switchFields.has(at),fragment);
             assert.equal(Boolean(switchFields.get(at)&readonly),isReadonly,fragment);
         }
+        const labels='package main\nmain::proc(){row_check:=1;row_check:\nfor i in 0..<2{_=row_check;if i==0 do continue row_check;break row_check}}\n';
+        await replace(labels);
+        const labelTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
+            value=>value?.data?.length>0);
+        let labelLine=0,labelColumn=0;
+        const labelKinds=[];
+        for(let i=0;i<labelTokens.data.length;i+=5){
+            const [delta,char,length,kind,modifiers]=labelTokens.data.slice(i,i+5);
+            labelLine+=delta;labelColumn=delta?char:labelColumn+char;
+            if(testDocument.lineAt(labelLine).text.slice(labelColumn,labelColumn+length)!=='row_check')continue;
+            const type=legend.tokenTypes[kind];labelKinds.push(type);
+            assert.equal(Boolean(modifiers&readonly),type==='label');
+            assert.equal(modifiers&constant,0);
+        }
+        assert.deepEqual(labelKinds,['variable','label','variable','label','label']);
         const immutableRename='package main\nKind::enum{Empty,Wall}\nColor::struct{r:u8}\ncolors:>[Kind]Color{.Empty={0},.Wall={255}}\nmain::proc(){_=colors[.Wall]}\n';
         await replace(immutableRename);
         const immutableRenameEdit=await eventually(()=>vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
@@ -510,6 +525,7 @@ async function run() {
             'readonly parameter and value-loop tokens, mutable reference-loop tokens and immutable theme fallback',
             'readonly value-struct members, mutable pointer members and mutable copies of immutable structs',
             'readonly type-switch aliases and narrowed struct fields, mutable reference aliases and assignment targets',
+            'labels have one semantic category at declarations and branches, distinct from same-named values',
             'global immutable enum-indexed array rename from its declaration',
             'constant string repetition hover and original-source count diagnostics with unsaved recovery',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
