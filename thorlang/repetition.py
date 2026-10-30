@@ -9,6 +9,15 @@ from dataclasses import replace
 LIMIT = 16 * 1024 * 1024  # Match the existing compile-time value budget.
 
 
+def empty_value(source, value):
+    # A constant string slice retains native typed/untyped literal behavior.
+    # Slicing a distinct string drops its named type, so restore that type only
+    # for named strings. Ask Odin about the actual type, including conditional
+    # operands and concatenations whose right operand determines their type.
+    typ = f'type_of({source.prefix}default_value({value}))'
+    return f'(({value})[:0] when {typ} == string else {typ}(""))'
+
+
 def operands(node):
     if not node.source.thor or node.kind != 'Binary' or node.data['op'] != '*':
         return None
@@ -82,7 +91,7 @@ def render(expressions, node):
                 return expressions.error(node, 'String repetition in a generic signature or type expression requires a fixed nonnegative integer count through 128; place a variable-count repetition in the procedure body.')
             source.needs_intrinsics = source.needs_default = True
             value = f'({source.render(text, constant=True)} + "")'
-            empty = f'type_of({source.prefix}default_value({value}))("")'
+            empty = empty_value(source, value)
             def concatenate(n):
                 if n == 0: return empty
                 if n == 1: return value
@@ -120,7 +129,7 @@ def render(expressions, node):
               f'when {allowed} {{']
     known = source.resolver.constant_int(count)
     bits = max(1, known.bit_length()) if known is not None and 0 <= known < 1 << 128 else 128
-    empty = f'type_of({source.prefix}default_value({base}))("")'
+    empty = empty_value(source, base)
     previous_chunk, previous_result = base, empty
     for bit in range(bits):
         chunk, result = f'{name}_chunk_{bit}', f'{name}_result_{bit}'

@@ -133,7 +133,7 @@ async function run() {
         assert.equal(immutableRenameEdit.get(testDocument.uri).length,2);
         assert.ok(await vscode.workspace.applyEdit(immutableRenameEdit));
         assert.equal(testDocument.getText(),immutableRename.replaceAll('colors','palette'));
-        const repetition='package main\nX::"a"*3\nY::4*X+"z"\nmain::proc(){value:=3*"ab";_=value;_=Y}\n';
+        const repetition='package main\nX::"a"*3\nY::4*X+"z"\ntake::proc(value:cstring){}\nmain::proc(){value:=3*"ab";_=value;_=Y;take(X+" title")}\n';
         await replace(repetition);
         const repetitionHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',
             testDocument.uri,testDocument.positionAt(repetition.indexOf('value:=')+2)),

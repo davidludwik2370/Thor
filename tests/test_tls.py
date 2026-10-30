@@ -134,6 +134,22 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_untyped_string_repetition_clears_cstring_argument_error_without_saving(self):
+        text='''package main
+PAD::string(" ")*3
+TITLE::"Title"
+take::proc(value:cstring){}
+main::proc(){_="😀";take(PAD+TITLE+" (animation off)")}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains="to 'cstring'")
+        error=next(e for e in errors if "to 'cstring'" in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'PAD+TITLE',0))
+        fixed=text.replace('string(" ")*3','" "*3')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assert_original_identifier_tokens(main,fixed,self.semantic_spans(client,main,fixed))
+
     def test_string_repetition_hover_branch_selection_and_mapped_diagnostic_recovery(self):
         text='''package main
 X::"a"*3

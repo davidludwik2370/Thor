@@ -1779,3 +1779,25 @@ All 122 stdio TLS/rename cases, 1,126 native TLS cases and 95 Node/editor cases 
 the isolated real VS Code integration passes with its new repetition check. Run
 the new commented examples/string-repetition/main.thor with default/configured
 counts and -debug, without modifying existing user demo/library/playground edits.
+
+
+## Preserve string-repetition literal coercion (0.21.1)
+
+Fix PAD :: " " * 30 losing its untyped constant-string status. The explicitly
+typed empty seed in the repetition chain forced its concatenations to string,
+so PAD + TITLE + " (animation off)" could not be passed to cstring. Use a native
+constant empty slice to preserve literal versus typed string behavior. Restore
+the original type for distinct strings, using a native type comparison rather
+than trusting a partial frontend shape. Apply the same rule to the inline
+generic-signature form, including zero repetitions.
+
+Validation covers the exact 30-space padding argument, direct cstring variables
+and arguments, both operand orders, typed counts, zero/one/empty/nested results,
+and concatenated constants. Explicit string types still require explicit cstring
+conversion. Conditional and concatenated inputs retain their native string or
+distinct-string type even for zero repetitions. All 18 repetition cases pass;
+the related compiler regression run passes and the real VS Code integration
+passes with a concatenated repeated string passed to cstring. A real stdio TLS
+case verifies the old cstring argument error's Unicode-aware source range and
+clearing after an unsaved change to an untyped repetition. No TLS/client code or
+allocation behavior changes, and unrelated user files remain untouched.

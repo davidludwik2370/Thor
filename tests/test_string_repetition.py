@@ -8,6 +8,53 @@ class StringRepetitionTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_untyped_repetition_keeps_cstring_coercion_through_concatenation(self):
+        self.invoke(self.program('''
+take(PAD+TITLE+" (animation off)",EXPECTED+TITLE+" (animation off)")
+take("a"*3,"aaa"); take(3*"b","bbb")
+take("a"*u8(3),"aaa")
+take("x"*0,""); take("x"*1,"x")
+take(""*max(u128),"")
+take(("a"*2)*3,"aaaaaa")
+local::"z"*2
+take(local+"!","zz!")
+a:cstring=PAD
+b:cstring=3*"b"
+assert(string(a)==EXPECTED && string(b)=="bbb")
+''','''
+PAD::" "*30
+EXPECTED::"                              "
+TITLE::"Title"
+take::proc(value:cstring,expected:string){assert(string(value)==expected)}
+'''))
+
+    def test_explicit_string_type_is_preserved_and_requires_explicit_cstring_conversion(self):
+        self.invoke(self.program('_=TEXT; take(TEXT)','''
+TEXT:string:"x"*2
+take::proc(value:cstring){}
+'''),command='check',fail="to 'cstring'")
+        self.invoke(self.program('_=TEXT; take(TEXT)','''
+TYPED::string("x")
+TEXT::TYPED*2
+take::proc(value:cstring){}
+'''),command='check',fail="to 'cstring'")
+
+    def test_zero_repetition_keeps_the_native_type_of_conditional_and_concatenated_inputs(self):
+        self.invoke(self.program('''
+take(("a" when true else string("b"))*0)
+assert(type_of(TYPED_CONCAT)==string && TYPED_CONCAT=="")
+assert(type_of(TYPED_CHOICE)==string && TYPED_CHOICE=="")
+assert(type_of(DISTINCT_CONCAT)==Label && DISTINCT_CONCAT==Label(""))
+assert(type_of(DISTINCT_CHOICE)==Label && DISTINCT_CHOICE==Label(""))
+''','''
+Label::distinct string
+TYPED_CONCAT::("a"+string("b"))*0
+TYPED_CHOICE::("a" when false else string("b"))*0
+DISTINCT_CONCAT::("a"+Label("b"))*0
+DISTINCT_CHOICE::("a" when false else Label("b"))*0
+take::proc(value:cstring){assert(string(value)=="")}
+'''))
+
     def test_literals_precedence_constants_and_both_operand_orders(self):
         self.invoke(self.program('''
 assert(X=="aaa" && Y=="aaab" && Z=="aaaaaaaaaaaaz")

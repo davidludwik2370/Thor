@@ -597,9 +597,13 @@ Like Odin's string `+`, both operands must be compile-time constants; runtime
 immutable bindings (`:>`) are not compile-time constants. Named/imported
 constants, `#config` values, `#run` results and constant parameters inside generic
 procedure bodies work. The result is constant storage: assigning it with `:=`
-does not allocate, and it must not be deleted. Strings repeat their exact bytes,
-including UTF-8, escapes and raw strings. The result is limited to 16 MiB,
-matching the existing compile-time value budget. Thor emits a doubling chain of
+does not allocate, and it must not be deleted. Untyped literal/constant inputs
+retain native coercions such as a `cstring`
+procedure argument, including after concatenation. Explicitly typed string
+inputs retain their type, including for zero repetitions.
+Strings repeat their exact bytes, including UTF-8, escapes and raw strings.
+The result is limited to 16 MiB, matching the existing compile-time value budget.
+Thor emits a doubling chain of
 native constant concatenations, with no repetition execution helper or new cache
 files. See [the runnable example](examples/string-repetition/main.thor).
 In generic signatures and type expressions, a repetition depending on generic
