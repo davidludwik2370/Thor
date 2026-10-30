@@ -722,9 +722,11 @@ get_locals_assign_stmt :: proc(file: ast.File, stmt: ast.Assign_Stmt, ast_contex
 
 	results := make([dynamic]^ast.Expr, context.temp_allocator)
 	calls := make(map[int]struct{}, 0, context.temp_allocator)
+	assignment_flags: GetGenericAssignmentFlags
+	if stmt.op.kind == .In { assignment_flags += {.SameLhsRhsCount} }
 
 	for rhs in stmt.rhs {
-		get_generic_assignment(file, rhs, ast_context, &results, &calls, {}, true)
+		get_generic_assignment(file, rhs, ast_context, &results, &calls, assignment_flags, true)
 	}
 
 	if len(stmt.lhs) != len(results) {
@@ -733,6 +735,8 @@ get_locals_assign_stmt :: proc(file: ast.File, stmt: ast.Assign_Stmt, ast_contex
 
 	for lhs, i in stmt.lhs {
 		if ident, ok := unwrap_ident(lhs); ok {
+			flags: bit_set[LocalFlag] = {.Mutable}
+			if stmt.op.kind == .In { flags = range_binding_flags(lhs) }
 			store_local(
 				ast_context,
 				ident,
@@ -741,7 +745,7 @@ get_locals_assign_stmt :: proc(file: ast.File, stmt: ast.Assign_Stmt, ast_contex
 				ident.name,
 				ast_context.non_mutable_only,
 				false,
-				{.Mutable},
+				flags,
 				"",
 				false,
 			)
@@ -805,8 +809,8 @@ get_locals_unroll_range_stmt :: proc(
 }
 
 range_binding_flags :: proc(value: ^ast.Expr) -> bit_set[LocalFlag] {
-	// A plain loop binding is readonly, including pointer-valued elements.
-	// Only an explicit &binding denotes a mutable reference into the iterable.
+	// Plain loop/type-switch bindings are readonly, including pointer values.
+	// Only an explicit &binding denotes a mutable reference into the source.
 	if unary, ok := value.derived.(^ast.Unary_Expr); ok && unary.op.kind == .And {
 		return {.Mutable}
 	}
@@ -1197,30 +1201,25 @@ get_locals_type_switch_stmt :: proc(
 			}
 			if cause, ok := block_stmt.derived.(^ast.Case_Clause);
 			   ok && cause.pos.offset <= document_position.position && document_position.position <= upper_bound {
-				tag := stmt.tag.derived.(^ast.Assign_Stmt)
-
-				if len(tag.lhs) == 1 && len(cause.list) == 1 {
-					if ident, ok := unwrap_ident(tag.lhs[0]); ok {
-						store_local(
-							ast_context,
-							ident,
-							cause.list[0],
-							ident.pos.offset,
-							ident.name,
-							ast_context.non_mutable_only,
-							false,
-							{.Mutable},
-							"",
-							false,
-						)
-					}
-				}
+				store_type_switch_case_binding(stmt, cause, ast_context)
 
 				for b in cause.body {
 					get_locals_stmt(file, b, ast_context, document_position)
 				}
 			}
 		}
+	}
+}
+
+store_type_switch_case_binding :: proc(stmt: ^ast.Type_Switch_Stmt, clause: ^ast.Case_Clause, ast_context: ^AstContext) {
+	if stmt.tag == nil || len(clause.list) != 1 { return }
+	tag, ok := stmt.tag.derived.(^ast.Assign_Stmt)
+	if !ok || len(tag.lhs) != 1 { return }
+	// A nil case retains the original union/any type, like a default case.
+	if kind, ok := clause.list[0].derived.(^ast.Ident); ok && kind.name == "nil" { return }
+	if ident, ok := unwrap_ident(tag.lhs[0]); ok {
+		store_local(ast_context, ident, clause.list[0], ident.pos.offset, ident.name,
+			ast_context.non_mutable_only, false, range_binding_flags(tag.lhs[0]), "", false)
 	}
 }
 

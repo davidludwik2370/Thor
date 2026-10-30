@@ -585,6 +585,14 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 		resolve_node(n.stmt, data)
 	case ^ast.Case_Clause:
 		local_scope(data, n)
+		if stmt := data.position_context.switch_type_stmt; stmt != nil {
+			if block, ok := stmt.body.derived.(^ast.Block_Stmt); ok {
+				for clause in block.stmts {
+					// A nested ordinary switch must not narrow the outer alias.
+					if clause == node { store_type_switch_case_binding(stmt, n, data.ast_context); break }
+				}
+			}
+		}
 		resolve_nodes(n.list, data)
 		resolve_nodes(n.body, data)
 	case ^ast.Type_Switch_Stmt:
@@ -594,7 +602,12 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 		}
 		data.position_context.switch_type_stmt = n
 		add_label(n.label, data)
-		local_scope(data, n)
+		// Keep the original union/any binding outside case scopes. Looking up
+		// locals at the switch's end would leak its last case's narrowed type.
+		local_scope(data, nil)
+		data.position_context.position = n.end.offset
+		data.position_context.nested_position = n.end.offset
+		get_locals_stmt(data.ast_context.file, n.tag, data.ast_context, data.position_context, true)
 		resolve_node(n.tag, data)
 		resolve_node(n.expr, data)
 		resolve_node(n.body, data)

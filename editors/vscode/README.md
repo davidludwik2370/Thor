@@ -136,6 +136,10 @@ pointer parameters) and plain `for value, index in container` bindings use the
 same readonly blue as immutable variables, on declarations and references.
 `for &value, index in container` keeps `value` light blue and `index` readonly;
 ordinary mutable loop counters and named return variables remain light blue.
+Type-switch bindings follow the same convention: `switch value in union_value`
+uses readonly blue, while `switch &value in union_value` uses mutable blue.
+Each case retains its narrowed type and corresponding struct-member mutability;
+invalid assignments keep the binding's readonly color as well as their diagnostic.
 The color follows the binding, not the mutability of pointed-to data. Other
 themes can style the modifier directly;
 the preview is optional and does not replace a theme.

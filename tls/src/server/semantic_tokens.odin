@@ -302,16 +302,20 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_node(n.cond, builder)
 		visit_node(n.body, builder)
 	case ^ast.Type_Switch_Stmt:
-		visit_node(n.tag, builder)
+		if n.tag != nil {
+			if tag, ok := n.tag.derived.(^ast.Assign_Stmt); ok {
+				for value in tag.lhs { visit_range_binding(value, builder) }
+				visit_nodes(tag.rhs, builder)
+			} else {
+				visit_node(n.tag, builder)
+			}
+		}
 		visit_node(n.expr, builder)
 		visit_node(n.body, builder)
 	case ^ast.Assign_Stmt:
 		for l in n.lhs {
-			if ident, ok := l.derived.(^ast.Ident); ok {
-				write_semantic_node(builder, l, .Variable)
-			} else {
-				visit_node(l, builder)
-			}
+			// Invalid writes still refer to the original readonly binding.
+			visit_node(l, builder)
 		}
 		visit_nodes(n.rhs, builder)
 	case ^ast.Case_Clause:

@@ -1864,3 +1864,30 @@ that navigation ignores the commented bracket and that TLS removes its semantic
 tokens, then uncomments the line and verifies bracket matching returns. This is
 an extension metadata update; load it with Developer: Reload Window rather than
 the TLS restart command.
+
+## Readonly type-switch bindings (TLS 0.14.2)
+
+Type-switch value aliases now carry readonly metadata in their declarations and
+case bodies, matching ordinary value iteration. Explicit `&value` aliases remain
+mutable. Apply the flag both to the initial union/any binding and each narrowed
+case binding, including default/multiple-type/nil cases and indexed switch inputs.
+A single indexed switch source must not expand into an optional index-status pair.
+Assignments now resolve their left-hand identifiers normally, preserving readonly
+colors on invalid writes instead of always emitting a mutable-variable token.
+
+File-wide semantic resolution now starts with the original switch binding and
+adds narrowed types in each case's own scope. This prevents the final case's type
+from leaking into other cases, restores semantic field tokens for struct variants,
+and preserves the existing readonly-value versus mutable-pointee field rules.
+Nested ordinary switches cannot narrow the enclosing type-switch alias. Hover
+and semantic resolution share the narrowed-binding helper; rename remains tied
+to the original alias declaration.
+
+Validation: all 1126 native TLS tests, 127 stdio LSP/rename tests and 97 extension
+tests pass. New cases cover the Sudoku-style indexed union switch, readonly
+invalid writes and precise diagnostic ranges, unsaved value/reference edits and
+recovery, struct/pointer variants, any values, grouped/default/nil cases, nested
+ordinary switches, shadowing, mutable copies, narrowed hovers and alias rename.
+The real VS Code integration also checks declaration/case/assignment token colors
+and readonly versus reference struct-member colors. No language, compiler, theme
+or user project source changes are needed; rebuild/restart TLS to load the fix.

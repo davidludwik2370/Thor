@@ -344,6 +344,108 @@ main::proc(){}
         client.diagnostic(main.as_uri(),empty=True)
         self.assertEqual(field_colors(restored),[('item',True),('value',True),('item',True),('value',True),('item',False),('value',False)])
 
+    def test_type_switch_binding_colors_follow_value_and_reference_cases(self):
+        text='''package main
+Leaf::struct{field:int}
+Choice::union{int,f64,Leaf,^Leaf}
+inspect::proc(input:Choice,any_value:any){
+    source:=input
+    switch value in source {
+    case int:
+        value=2 // An invalid write must keep the original readonly color.
+        _=value
+        copy:=value;copy=3;_=copy
+    case f64: _=value
+    case Leaf: _=value.field
+        switch 1 {case 1: _=value.field}
+    case ^Leaf: _=value.field
+    case nil: _=value
+    case: _=value
+    }
+    switch &reference in source {
+    case int: reference=2;_=reference
+    case Leaf: reference.field=2;_=reference.field
+    case: _=reference
+    }
+    switch many in source {
+    case int,f64: _=many
+    case: _=many
+    }
+    switch checked in any_value {
+    case int: _=checked
+    case: _=checked
+    }
+    switch shadow in source {
+    case int:
+        { shadow:=1;shadow+=1;_=shadow }
+        _=shadow
+    case: _=shadow
+    }
+    _=source
+}
+'''
+        client,main=self.open(text,compiler=False)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        for name,expected in [('value',True),('reference',False),('many',True),('checked',True),('copy',False),('source',False)]:
+            occurrences=[(kind,bool(mods&readonly)) for _,_,kind,word,mods in spans if word==name]
+            self.assertGreaterEqual(len(occurrences),3,name)
+            self.assertTrue(all(kind=='variable' and ro==expected for kind,ro in occurrences),(name,occurrences))
+        self.assertEqual([bool(mods&readonly) for _,_,_,name,mods in spans if name=='shadow'],
+                         [True,False,False,False,True,True])
+        by_start={start:(kind,mods) for start,_,kind,_,mods in spans}
+        for fragment,expected in [('case Leaf: _=value.field',True),('case ^Leaf: _=value.field',False),
+                                  ('case Leaf: reference.field=2',False)]:
+            at=text.index(fragment)+fragment.index('field')
+            kind,mods=by_start[at]
+            self.assertEqual((kind,bool(mods&readonly)),('property',expected),fragment)
+        for fragment,expected in [('_=value\n',r'value: int\b'),('_=value.field\n',r'value: (?:[\w-]+\.)?Leaf\b')]:
+            # For member access, ask on the bound value rather than its field.
+            hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,fragment,3)})
+            self.assertRegex(json.dumps(hover),expected)
+        renamed=client.request('textDocument/rename',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'value in'),'newName':'selected'})
+        edits=renamed['changes'][main.as_uri()]
+        self.assertEqual(len(edits),sum(name=='value' for _,_,_,name,_ in spans))
+
+    def test_type_switch_readonly_diagnostic_and_color_clear_after_unsaved_reference_edit(self):
+        text='''package main
+Possibility_Ary::[9]bool
+Cell::union{int,Possibility_Ary}
+main::proc(){
+    board:[9][9]Cell
+    for y in 0..<9 {
+        switch v in board[y][0] {
+        case int: v=2
+        case Possibility_Ary: _=v[0]
+        case: _=v
+        }
+        switch grouped in board[y][0] {
+        case int,Possibility_Ary: _=grouped
+        case: _=grouped
+        }
+    }
+}
+'''
+        client,main=self.open(text)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        def binding_colors(source):
+            return [(kind,bool(mods&readonly)) for _,_,kind,name,mods in self.semantic_spans(client,main,source) if name=='v']
+        self.assertEqual(binding_colors(text),[('variable',True)]*4)
+        self.assertEqual([bool(mods&readonly) for _,_,_,name,mods in self.semantic_spans(client,main,text) if name=='grouped'],[True]*3)
+        errors=client.diagnostic(main.as_uri(),contains="Cannot assign to 'v'")
+        error=next(e for e in errors if "Cannot assign to 'v'" in e['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'v=2',0))
+        reference=text.replace('switch v in','switch &v in')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':reference}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(binding_colors(reference),[('variable',False)]*4)
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),contains="Cannot assign to 'v'")
+        self.assertEqual(binding_colors(text),[('variable',True)]*4)
+
     def test_binding_readonly_color_follows_shadowing_and_unsaved_loop_edits(self):
         text='''package main
 read::proc(value:int,items:[]int){

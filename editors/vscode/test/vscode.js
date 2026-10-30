@@ -173,6 +173,29 @@ async function run() {
             assert.ok(recordFields.has(at),`Missing property token for ${fragment}`);
             assert.equal(Boolean(recordFields.get(at)&readonly),isReadonly,fragment);
         }
+        const typeSwitches='package main\nRecord::struct{field:int}\nChoice::union{int,Record}\nread::proc(){source:Choice;switch selected in source{case int:_=selected;case Record:_=selected.field;case:_=selected};switch &reference in source{case int:reference=1;case Record:reference.field=2;case:_=reference}}\n';
+        await replace(typeSwitches);
+        const switchTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
+            value=>value?.data?.length>0);
+        let switchLine=0,switchColumn=0;
+        const switchOccurrences=new Map(),switchFields=new Map();
+        for(let i=0;i<switchTokens.data.length;i+=5){
+            const [delta,char,length,kind,modifiers]=switchTokens.data.slice(i,i+5);
+            switchLine+=delta;switchColumn=delta?char:switchColumn+char;
+            const name=testDocument.lineAt(switchLine).text.slice(switchColumn,switchColumn+length);
+            if(name==='selected'||name==='reference'){
+                assert.equal(legend.tokenTypes[kind],'variable',name);
+                assert.equal(Boolean(modifiers&readonly),name==='selected',name);
+                switchOccurrences.set(name,(switchOccurrences.get(name)||0)+1);
+            }
+            if(legend.tokenTypes[kind]==='property')switchFields.set(testDocument.offsetAt(new vscode.Position(switchLine,switchColumn)),modifiers);
+        }
+        for(const name of ['selected','reference'])assert.equal(switchOccurrences.get(name),4,name);
+        for(const [fragment,isReadonly] of [['selected.field',true],['reference.field',false]]){
+            const at=typeSwitches.indexOf(fragment)+fragment.indexOf('.')+1;
+            assert.ok(switchFields.has(at),fragment);
+            assert.equal(Boolean(switchFields.get(at)&readonly),isReadonly,fragment);
+        }
         const immutableRename='package main\nKind::enum{Empty,Wall}\nColor::struct{r:u8}\ncolors:>[Kind]Color{.Empty={0},.Wall={255}}\nmain::proc(){_=colors[.Wall]}\n';
         await replace(immutableRename);
         const immutableRenameEdit=await eventually(()=>vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
@@ -486,6 +509,7 @@ async function run() {
             'reversible compile-time constant color preview and custom color',
             'readonly parameter and value-loop tokens, mutable reference-loop tokens and immutable theme fallback',
             'readonly value-struct members, mutable pointer members and mutable copies of immutable structs',
+            'readonly type-switch aliases and narrowed struct fields, mutable reference aliases and assignment targets',
             'global immutable enum-indexed array rename from its declaration',
             'constant string repetition hover and original-source count diagnostics with unsaved recovery',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
