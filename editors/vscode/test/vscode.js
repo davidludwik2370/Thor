@@ -133,6 +133,20 @@ async function run() {
         assert.equal(immutableRenameEdit.get(testDocument.uri).length,2);
         assert.ok(await vscode.workspace.applyEdit(immutableRenameEdit));
         assert.equal(testDocument.getText(),immutableRename.replaceAll('colors','palette'));
+        const repetition='package main\nX::"a"*3\nY::4*X+"z"\nmain::proc(){value:=3*"ab";_=value;_=Y}\n';
+        await replace(repetition);
+        const repetitionHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',
+            testDocument.uri,testDocument.positionAt(repetition.indexOf('value:=')+2)),
+            values=>hoverText(values||[]).includes('value: string'));
+        assert.ok(repetitionHover.length);
+        const invalidRepetition=repetition.replace('3*"ab"','"ab"*(-1)');
+        await replace(invalidRepetition);
+        const repetitionDiagnostics=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),
+            values=>values.some(value=>value.message.includes('String repetition requires a nonnegative count')));
+        const repetitionError=repetitionDiagnostics.find(value=>value.message.includes('String repetition requires a nonnegative count'));
+        assert.equal(testDocument.getText(repetitionError.range),'"ab"*(-1)');
+        await replace(repetition);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const renameSource = 'package main\nmain::proc(){_="😀";value:=2;message:=f"value {value}";delete(message);_=value}\n';
         await replace(renameSource);
         const renameEdit = await eventually(() => vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
@@ -424,6 +438,7 @@ async function run() {
             'reversible compile-time constant color preview and custom color',
             'readonly parameter and value-loop tokens, mutable reference-loop tokens and immutable theme fallback',
             'global immutable enum-indexed array rename from its declaration',
+            'constant string repetition hover and original-source count diagnostics with unsaved recovery',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',

@@ -134,6 +134,32 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_string_repetition_hover_branch_selection_and_mapped_diagnostic_recovery(self):
+        text='''package main
+X::"a"*3
+Y::4*X+"z"
+#if "a"*3+"b"=="aaab" { SELECTED::"ok" } #else { SELECTED::17 }
+main::proc(){
+    value:=3*"ab"
+    _=value;_=Y;_=SELECTED
+}
+'''
+        client,main=self.open(text)
+        self.assertIn('value: string',json.dumps(self.hover(client,main,text,'value:=')))
+        self.assertIn('X ::',json.dumps(self.hover(client,main,text,'X::')))
+        self.assertIn('Y ::',json.dumps(self.hover(client,main,text,'Y::')))
+        selected=json.dumps(self.hover(client,main,text,'SELECTED\n'))
+        self.assertIn('ok',selected)
+        self.assertNotIn('17',selected)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        broken=text.replace('value:=3*"ab"','_="😀"; value:="ab"*(-1)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='nonnegative count')
+        error=next(e for e in errors if 'nonnegative count' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'"ab"*(-1)',0))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_parameters_and_value_loop_bindings_are_readonly_but_reference_bindings_are_not(self):
         text='''package main
 visit::proc(input:[]int, pointer:^int, pointers:[]^int, enabled:=true,

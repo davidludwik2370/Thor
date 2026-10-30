@@ -11,6 +11,15 @@ from tests.test_tls import Client, ROOT
 
 
 class RenameTests(unittest.TestCase):
+    def test_constants_rename_inside_string_repetition(self):
+        text='package main\nCOUNT::3\nTEXT::"a"*COUNT\nmain::proc(){_=TEXT;_=COUNT*"ab"}\n'
+        files={'main.thor':text}
+        client,root,main=self.project(files)
+        edit=self.rename(client,main,text,'COUNT::','REPETITIONS')
+        expected={'main.thor':text.replace('COUNT','REPETITIONS')}
+        self.assertEqual(self.apply(root,files,edit),expected)
+        self.assert_builds(root,expected)
+
     def test_global_immutable_enum_array_renames_from_declaration_and_references(self):
         text='''package main
 import rl "palette"

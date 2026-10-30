@@ -1734,3 +1734,48 @@ All 1,126 native TLS tests and 92 stdio TLS tests pass. The isolated real VS Cod
 integration test applies a rename to a fresh global immutable enum-array fixture.
 Rebuild the shared TLS binary; the installed client needs only a language-server
 restart. User project files remain unchanged.
+
+
+## Compile-time string repetition (0.21.0, TLS 0.14.0)
+
+Implement string * integer and integer * string with ordinary multiplication
+precedence, retaining string + concatenation. Both operands must be compile-time
+constants, as requested; :> runtime storage and ordinary procedure parameters
+are not constants. Zero yields an empty string, negative and noninteger counts
+are errors, and results use borrowed constant storage without a runtime allocator
+or delete. Keep exact native byte/escape/UTF-8 behavior and distinct string types.
+Support imported/forward constants, native constant arithmetic and #config,
+fn/#run results, constant procedure parameters and selected compile-time branches.
+
+Emit private, source-mapped native constant concatenations in a doubling chain.
+Generated code grows with the count's bit length rather than its magnitude;
+unknown native constant counts use bounded 128-bit templates. Repetition itself
+needs no native execution helper or evaluation cache entry. Apply the existing
+16 MiB compile-time value budget before forming oversized strings. Keep a short
+inline form for fixed counts through 128 in generic signatures/type expressions;
+variable-count generic repetition belongs in the procedure body. Document this
+boundary beside the existing generic-power boundary in the README.
+
+Order nested helper constants before their consumers. Preserve native when and
+compile-switch result-arm selection around hoisted constants, so unused invalid
+repetitions remain unchecked. Recognize runtime operands before lowering them,
+producing one source-level error rather than cascaded helper-name diagnostics.
+Translate generated assertions into direct integer/count/size messages at the
+original operation. Ordinary numeric multiplication and .odin files pass through.
+
+TLS infers either operand order as a string without changing semantic-token
+ranges or constant hover style. Extend partial branch selection for string +
+and bounded repetition. Test unsaved errors and correction, source positions
+after Unicode, original-source rename, and the real VS Code hover/error path.
+No TextMate or extension client change is needed; restart the shared TLS binary.
+
+Validation: 601 existing compiler regression cases pass, along with 15 dedicated
+repetition tests. Coverage includes precedence/chaining, zero/one, empty strings
+with huge counts, Unicode/raw/escaped/invalid-UTF-8 bytes, typed counts and distinct
+strings, record-field constants, imports/shadowing, generic bodies/constraints,
+default values, fn/#run, #if/#switch, arrays, sets, negative indexing, interpolation,
+debug tracking and logarithmic generated size with zero execution-cache writes.
+All 122 stdio TLS/rename cases, 1,126 native TLS cases and 95 Node/editor cases pass;
+the isolated real VS Code integration passes with its new repetition check. Run
+the new commented examples/string-repetition/main.thor with default/configured
+counts and -debug, without modifying existing user demo/library/playground edits.

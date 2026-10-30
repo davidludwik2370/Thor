@@ -480,6 +480,10 @@ class Resolver:
                 left,right=(self.type_of(n.role(side),seen.copy()) for side in ['left','right'])
                 if left.untyped and (not right.untyped or right.name.startswith('f')):return replace(right,witness=n)
                 return replace(left,witness=n,untyped=left.untyped and right.untyped)
+            if n.source.thor and n.data['op']=='*':
+                from .repetition import result_type
+                repeated = result_type(n, seen)
+                if repeated is not None: return repeated
             return self.type_of(n.role("left"), seen)
         if kind == "Unary":
             inner = self.type_of(n.role("expr"), seen)

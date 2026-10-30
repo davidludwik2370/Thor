@@ -41,6 +41,13 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_string_repetition_errors_point_to_original_unicode_operation(self):
+        for expression,message in [('"ab"*(-1)','nonnegative count'),('"ab"*1.5','integer compile-time count'),
+                                   ('"ab"*(1<<30)','16 MiB')]:
+            with self.subTest(expression=expression):
+                errors=self.at('package main\nmain::proc(){/* 😀 */ _='+expression+'}\n',expression,message=message)
+                self.assertEqual(len([e for e in errors if e.get('type')=='error']),1)
+
     def test_odin_compatibility_named_result_error_keeps_original_value(self):
         self.at('package main\nmake_board::proc()->(board:[2]int){i:=-1;/* 😀 */ board[i]="wrong";return}\nmain::proc(){_=make_board()}\n',
                 '"wrong"', message='Cannot')

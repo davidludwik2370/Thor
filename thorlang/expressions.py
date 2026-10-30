@@ -267,6 +267,10 @@ class Expressions:
             return None
         if n.kind=='Binary' and n.data['op']=='**':
             return self.power(n,constant)
+        if n.kind=='Binary' and n.data['op']=='*':
+            from .repetition import render
+            repeated = render(self, n)
+            if repeated is not None: return repeated
         if n.kind == 'Call':
             code = self.extrema.render(n, constant)
             if code is not None: return code

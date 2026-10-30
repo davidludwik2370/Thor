@@ -4409,6 +4409,18 @@ resolve_binary_expression :: proc(ast_context: ^AstContext, binary: ^ast.Binary_
 		return {}, false
 	}
 
+	if binary.op.kind == .Mul && filepath.ext(ast_context.fullpath) == ".thor" {
+		candidates := [2]Symbol{symbol_a, symbol_b}
+		for candidate in candidates {
+			if literal, ok := candidate.value.(SymbolUntypedValue); ok && literal.type == .String {
+				return candidate, true
+			}
+			if basic, ok := candidate.value.(SymbolBasicValue); ok && basic.ident.name == "string" {
+				return candidate, true
+			}
+		}
+	}
+
 
 	matrix_value_a, is_matrix_a := symbol_a.value.(SymbolMatrixValue)
 	matrix_value_b, is_matrix_b := symbol_b.value.(SymbolMatrixValue)

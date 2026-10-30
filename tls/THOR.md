@@ -98,6 +98,11 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   native prefix expansion. Infer numeric results with literal coercion; fold
   representable integer powers for branch selection. Compiler errors retain
   original operation spans, including unsaved mixed-type expressions.
+- Infer either-order string repetition as a string, preserving the original
+  identifiers and constant expressions in hover/navigation. The partial branch
+  evaluator understands string concatenation and bounded repetition; compiler
+  diagnostics enforce constant-only operands, integer/nonnegative counts and
+  the compile-time size budget against original source and unsaved edits.
 - Parse interval membership with half-open/inclusive bounds, parentheses and
   arithmetic bounds, preserving native iteration and container precedence. Infer
   boolean results; fold integer interval conditions (including signed bounds)

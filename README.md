@@ -582,6 +582,30 @@ low..<high` retains iteration. Three-part loop headers accept membership as thei
 condition, including an empty post statement. Intervals here are syntax for
 membership, rather than first-class range values.
 
+String repetition uses `*` with a constant string and a nonnegative integer
+constant, in either order. It has ordinary multiplication precedence:
+
+```odin
+X :: "a" * 3          // "aaa"
+Y :: "a" * 3 + "b"    // "aaab"
+Z :: 4 * X + "z"      // "aaaaaaaaaaaaz"
+PHRASE :: ("a" + "b") * 2 // "abab"
+EMPTY :: "anything" * 0   // ""
+```
+
+Like Odin's string `+`, both operands must be compile-time constants; runtime
+immutable bindings (`:>`) are not compile-time constants. Named/imported
+constants, `#config` values, `#run` results and constant parameters inside generic
+procedure bodies work. The result is constant storage: assigning it with `:=`
+does not allocate, and it must not be deleted. Strings repeat their exact bytes,
+including UTF-8, escapes and raw strings. The result is limited to 16 MiB,
+matching the existing compile-time value budget. Thor emits a doubling chain of
+native constant concatenations, with no repetition execution helper or new cache
+files. See [the runnable example](examples/string-repetition/main.thor).
+In generic signatures and type expressions, a repetition depending on generic
+parameters currently needs a fixed integer count from 0 through 128. A count
+that varies with a generic parameter works inside the procedure body.
+
 Power uses infix `**`; native prefix `**values` expansion remains available.
 It associates to the right and binds above multiplication and unary signs:
 `2 ** 3 ** 2 == 512`, `-2 ** 2 == -4`, and `(-2) ** 2 == 4`.

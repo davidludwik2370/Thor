@@ -4,6 +4,7 @@ package server
 import "core:fmt"
 import "core:odin/ast"
 import "core:strconv"
+import "core:strings"
 
 import "src:common"
 
@@ -251,8 +252,19 @@ resolve_when_expr :: proc(
 			lhs_string, lhs_is_string := lhs.(string)
 			rhs_string, rhs_is_string := rhs.(string)
 
+			if odin_expr.op.kind == .Mul && (lhs_is_string && rhs_is_int || rhs_is_string && lhs_is_int) {
+				text, count := lhs_string, rhs_int
+				if rhs_is_string { text, count = rhs_string, lhs_int }
+				if count < 0 || len(text) != 0 && count > (16*1024*1024)/len(text) { return {}, false }
+				if len(text) == 0 { return "", true }
+				return strings.repeat(text, count, context.temp_allocator), true
+			}
+
 			if lhs_is_string && rhs_is_string {
 				#partial switch odin_expr.op.kind {
+				case .Add:
+					if len(lhs_string) > 16*1024*1024-len(rhs_string) { return {}, false }
+					return strings.concatenate({lhs_string, rhs_string}, context.temp_allocator), true
 				case .Cmp_Eq:
 					return lhs_string == rhs_string, true
 				case .Not_Eq:
