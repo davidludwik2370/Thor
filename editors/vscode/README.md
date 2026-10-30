@@ -153,6 +153,17 @@ Thor projects in the current profile. Named argument labels are separate tokens;
 this setting does not change them. Settings changes apply immediately. Remove
 the selector to return to the theme's fallback, or adjust it when changing themes.
 
+Struct member accesses also carry `property.readonly` when they refer to
+immutable value storage. This includes value parameters, `:>` structs, nested
+structs, fixed-array elements, and value-loop bindings. A pointer field itself
+can be readonly while fields of its pointee remain mutable. Slice/dynamic-array
+elements and reference-loop bindings likewise retain mutable member colors.
+Struct field declarations stay neutral: the same type can have both mutable and
+immutable instances. A mutable copy (`copy := frozen`) and its fields use the
+mutable color even when the original instance is immutable.
+To explicitly match Dark Modern's immutable blue, add
+`"property.readonly:thor": "#4FC1FF"` alongside the parameter rule above.
+
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS
 and the transpiler share the Thor parser, keeping their accepted syntax aligned.
 TLS uses its own partial semantic resolver for interactive features; the Thor

@@ -362,6 +362,11 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 			}
 		} else {
 			if symbol, ok := resolve_type_expression(data.ast_context, &n.node); ok {
+				// Readonly belongs to this access path, not to the field's type.
+				// Keep the resolver's cached type unchanged for hover/references.
+				if symbol.type == .Field && semantic_field_is_readonly(data.ast_context, n) {
+					symbol.flags += {.ReadOnlyBinding}
+				}
 				data.symbols[cast(uintptr)node] = SymbolAndNode {
 					node   = n,
 					symbol = symbol,

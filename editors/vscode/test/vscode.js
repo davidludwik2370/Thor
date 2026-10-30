@@ -126,6 +126,22 @@ async function run() {
             occurrences.set(name,(occurrences.get(name)||0)+1);
         }
         for(const name of ['input','pointer','value','index','cell','offset'])assert.ok(occurrences.get(name)>=2,name);
+        const records='package main\nRecord::struct{field:int}\nread::proc(value:Record,pointer:^Record){frozen:>value;mutable:=frozen;_=value.field;_=pointer.field;_=frozen.field;_=mutable.field}\n';
+        await replace(records);
+        const recordTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
+            value=>value?.data?.length>0);
+        const recordFields=new Map();
+        let recordLine=0,recordColumn=0;
+        for(let i=0;i<recordTokens.data.length;i+=5){
+            const [delta,char,length,kind,modifiers]=recordTokens.data.slice(i,i+5);
+            recordLine+=delta;recordColumn=delta?char:recordColumn+char;
+            if(legend.tokenTypes[kind]==='property')recordFields.set(testDocument.offsetAt(new vscode.Position(recordLine,recordColumn)),modifiers);
+        }
+        for(const [fragment,isReadonly] of [['value.field',true],['pointer.field',false],['frozen.field',true],['mutable.field',false]]){
+            const at=records.indexOf(fragment)+fragment.indexOf('.')+1;
+            assert.ok(recordFields.has(at),`Missing property token for ${fragment}`);
+            assert.equal(Boolean(recordFields.get(at)&readonly),isReadonly,fragment);
+        }
         const immutableRename='package main\nKind::enum{Empty,Wall}\nColor::struct{r:u8}\ncolors:>[Kind]Color{.Empty={0},.Wall={255}}\nmain::proc(){_=colors[.Wall]}\n';
         await replace(immutableRename);
         const immutableRenameEdit=await eventually(()=>vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',
@@ -437,6 +453,7 @@ async function run() {
             'immutable hover and compiler errors', 'runtime collection definition', 'TLS restart',
             'reversible compile-time constant color preview and custom color',
             'readonly parameter and value-loop tokens, mutable reference-loop tokens and immutable theme fallback',
+            'readonly value-struct members, mutable pointer members and mutable copies of immutable structs',
             'global immutable enum-indexed array rename from its declaration',
             'constant string repetition hover and original-source count diagnostics with unsaved recovery',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',

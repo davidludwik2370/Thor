@@ -236,6 +236,114 @@ read_pure::fn(pure_input:int)->int{return pure_input}
             found[name]+=1
         self.assertTrue(all(count>=2 for count in found.values()),found)
 
+    def test_struct_member_colors_follow_value_storage_and_shallow_reference_boundaries(self):
+        text='''package main
+Leaf::struct{value:int}
+Node::struct{nested:Leaf,pointer:^Leaf,fixed:[2]Leaf,view:[]Leaf,table:map[int]Leaf}
+ByValue::struct{using leaf:Leaf}
+ByPointer::struct{using leaf:^Leaf}
+global_frozen:>Leaf{1}
+global_copy:=global_frozen
+inspect::proc(node:Node,pointer:^Node,items:[]Node,fixed:[2]Node,
+              promoted:ByValue,indirect:ByPointer){
+    _=node.nested.value
+    _=(node).nested.value
+    _=node.pointer.value
+    _=node.fixed[0].value
+    _=node.view[0].value
+    _=node.table[0].value
+    _=pointer.nested.value
+    _=pointer^.nested.value
+    _=items[0].nested.value
+    _=fixed[0].nested.value
+    _=promoted.value
+    _=indirect.value
+    frozen:>node
+    _=frozen.nested.value
+    _=frozen.pointer.value
+    _=frozen.fixed[0].value
+    _=frozen.view[0].value
+    _=frozen.table[0].value
+    mutable:=frozen
+    _=mutable.nested.value
+    _=global_frozen.value
+    _=global_copy.value
+    for value_node in items { _=value_node.nested.value }
+    for &reference_node in items { _=reference_node.nested.value }
+    for pointer_node in [pointer] { _=pointer_node.nested.value }
+    { node:=node; _=node.nested.value }
+    _=node.nested.value
+    node.nested.value=1 // Still readonly even in an invalid write.
+}
+'''
+        client,main=self.open(text,compiler=False)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        by_start={start:(kind,mods) for start,_,kind,_,mods in spans}
+        for fragment,expected in [
+            ('_=node.nested.value',[True,True]),
+            ('_=(node).nested.value',[True,True]),
+            ('_=node.pointer.value',[True,False]),
+            ('_=node.fixed[0].value',[True,True]),
+            ('_=node.view[0].value',[True,False]),
+            ('_=node.table[0].value',[True,False]),
+            ('_=pointer.nested.value',[False,False]),
+            ('_=pointer^.nested.value',[False,False]),
+            ('_=items[0].nested.value',[False,False]),
+            ('_=fixed[0].nested.value',[True,True]),
+            ('_=promoted.value',[True]),
+            ('_=indirect.value',[False]),
+            ('_=frozen.nested.value',[True,True]),
+            ('_=frozen.pointer.value',[True,False]),
+            ('_=frozen.fixed[0].value',[True,True]),
+            ('_=frozen.view[0].value',[True,False]),
+            ('_=frozen.table[0].value',[True,True]),
+            ('_=mutable.nested.value',[False,False]),
+            ('_=global_frozen.value',[True]),
+            ('_=global_copy.value',[False]),
+            ('_=value_node.nested.value',[True,True]),
+            ('_=reference_node.nested.value',[False,False]),
+            ('_=pointer_node.nested.value',[False,False]),
+            ('{ node:=node; _=node.nested.value }',[False,False]),
+            ('node.nested.value=1',[True,True]),
+        ]:
+            start=text.index(fragment)
+            fields=[(kind,bool(mods&readonly)) for offset,(kind,mods) in sorted(by_start.items())
+                    if start<=offset<start+len(fragment) and kind=='property']
+            self.assertEqual(fields,[('property',value) for value in expected],fragment)
+
+    def test_readonly_imported_generic_members_update_with_unsaved_pointer_edit_and_diagnostics(self):
+        text='''package main
+import "library"
+read::proc(node:library.Box(library.Leaf)){node.item.value=1}
+main::proc(){}
+'''
+        library='package library\nLeaf::struct{value:int}\nBox::struct($T:typeid){item:T}\n'
+        client,main=self.open(text,files={'library/types.odin':library})
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        def field_colors(source):
+            return [(name,bool(mods&readonly)) for _,_,kind,name,mods in self.semantic_spans(client,main,source)
+                    if kind=='property' and name in {'item','value'}]
+        self.assertEqual(field_colors(text),[('item',True),('value',True)])
+        errors=client.diagnostic(main.as_uri(),contains='procedure parameter')
+        error=next(e for e in errors if 'procedure parameter' in e['message'])
+        self.assertEqual(error['range']['start']['line'],2)
+        write_start=text.splitlines()[2].index('node.item.value')
+        self.assertTrue(write_start<=error['range']['start']['character']<write_start+len('node.item.value'))
+        self.assertIn('value: int',json.dumps(self.hover(client,main,text,'value=1')))
+        definition=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'value=1')})
+        self.assertIn('library/types.odin',json.dumps(definition))
+        pointer=text.replace('node:library','node:^library')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':pointer}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(field_colors(pointer),[('item',False),('value',False)])
+        restored=text.replace('node.item.value=1','_=node.item.value; frozen:>node; _=frozen.item.value; mutable:=frozen; _=mutable.item.value')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':restored}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(field_colors(restored),[('item',True),('value',True),('item',True),('value',True),('item',False),('value',False)])
+
     def test_binding_readonly_color_follows_shadowing_and_unsaved_loop_edits(self):
         text='''package main
 read::proc(value:int,items:[]int){

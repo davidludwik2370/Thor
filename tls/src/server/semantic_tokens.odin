@@ -576,6 +576,65 @@ visit_import_decl :: proc(decl: ^ast.Import_Decl, builder: ^SemanticTokenBuilder
 	}
 }
 
+// Follow value storage until a shallow reference boundary. This only supplies
+// presentation metadata; it must not change type checking or binding lookup.
+semantic_field_is_readonly :: proc(
+	ast_context: ^AstContext,
+	expr: ^ast.Expr,
+	require_immutable := false,
+	depth := 0,
+) -> bool {
+	if expr == nil || depth >= 64 { return false }
+	// Resolving a field's global type can disable local lookup. Each path
+	// component is a new value lookup in the original lexical scope.
+	previous_use_locals := ast_context.use_locals
+	ast_context.use_locals = true
+	defer ast_context.use_locals = previous_use_locals
+	#partial switch n in expr.derived {
+	case ^ast.Paren_Expr:
+		return semantic_field_is_readonly(ast_context, n.expr, require_immutable, depth+1)
+	case ^ast.Ident:
+		symbol: Symbol
+		if !internal_resolve_type_expression(ast_context, expr, &symbol) { return false }
+		if .Immutable in symbol.flags { return true }
+		return !require_immutable && (.ReadOnlyBinding in symbol.flags || .Mutable not_in symbol.flags)
+	case ^ast.Selector_Expr:
+		base: Symbol
+		if !internal_resolve_type_expression(ast_context, n.expr, &base) || base.pointers > 0 { return false }
+		if record, ok := base.value.(SymbolStructValue); ok {
+			for name, i in record.names {
+				if n.field == nil || name != n.field.name { continue }
+				// Promoted fields can cross an implicit `using ^Record` pointer.
+				for index := i; index < len(record.from_usings) && record.from_usings[index] != -1; {
+					index = record.from_usings[index]
+					if index < 0 || index >= len(record.types) { return false }
+					parent: Symbol
+					if !internal_resolve_type_expression(ast_context, record.types[index], &parent) || parent.pointers > 0 { return false }
+				}
+				break
+			}
+		}
+		return semantic_field_is_readonly(ast_context, n.expr, require_immutable, depth+1)
+	case ^ast.Index_Expr:
+		base: Symbol
+		if !internal_resolve_type_expression(ast_context, n.expr, &base) || base.pointers > 0 { return false }
+		#partial switch _ in base.value {
+		case SymbolFixedArrayValue, SymbolMatrixValue:
+			return semantic_field_is_readonly(ast_context, n.expr, require_immutable, depth+1)
+		case SymbolMapValue:
+			// Thor :> protects map entries; an ordinary readonly map header does not.
+			return semantic_field_is_readonly(ast_context, n.expr, true, depth+1)
+		}
+	case ^ast.Matrix_Index_Expr:
+		base: Symbol
+		if !internal_resolve_type_expression(ast_context, n.expr, &base) || base.pointers > 0 { return false }
+		return semantic_field_is_readonly(ast_context, n.expr, require_immutable, depth+1)
+	// Explicit dereferences, slices, dynamic arrays, multipointers and call
+	// results do not inherit readonly storage from a containing binding.
+	}
+	return false
+}
+
 visit_ident :: proc(
 	ident: ^ast.Ident,
 	symbol_ptr: rawptr,

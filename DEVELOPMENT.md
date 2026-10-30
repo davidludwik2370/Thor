@@ -1816,3 +1816,32 @@ Validation: all 95 extension tests and the three targeted stdio TLS tests for
 parameter/value-loop readonly markers, shadowing/unsaved edits, and compile-time
 versus runtime bindings pass. Temporary protocol tracing was removed afterward;
 the parameter color is the only persistent change to the user's settings.
+
+## Readonly struct-member access colors (TLS 0.14.1)
+
+Field uses now carry `property.readonly` when their value storage is readonly:
+ordinary value parameters, `:>` records, nested record fields, fixed-array
+members and plain value-loop bindings. This is access-path metadata added to
+file resolution's symbol copy; field types, declarations, hover, definitions,
+rename and compiler behavior retain their existing rules.
+
+Stop propagation at explicit or implicit pointers, including promoted
+`using ^Record` fields, slice/dynamic-array elements and reference-loop bindings.
+A readonly pointer field stays readonly itself while its pointee's fields remain
+mutable. Explicit `:>` map storage retains Thor's existing entry protection;
+ordinary parameter map headers do not make their contents readonly. Reset local
+lookup for each path component because resolving a global field type can disable
+it in the resolver context.
+
+The audit also found inherited `Immutable` flags on newly declared mutable copies
+of immutable values. Clear initializer binding qualifiers before restoring each
+local/global declaration's own flags. Both the copy and its fields now use mutable
+colors. Preserve the user's other preferences and add the Thor-only
+`property.readonly:thor` override matching the existing readonly parameter blue.
+
+Validation: 1126 native TLS tests, 96 stdio LSP tests, 95 extension tests and the
+real isolated VS Code integration pass. New coverage includes nested and imported
+generic records, pointers/dereferences, promoted fields, fixed arrays, slices,
+maps, value/reference loops, shadowing, local/global copies of immutable structs,
+invalid writes at original source locations, hover/definition and unsaved edits
+that change a value parameter to a pointer and clear its diagnostic.

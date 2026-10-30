@@ -3054,7 +3054,8 @@ resolve_local_identifier :: proc(
 		.Mutable in local.flags,
 	)
 
-	symbol.flags -= {.Parameter, .CompileTime, .ReadOnlyBinding}
+	// Initializers supply a type/value, not the new binding's mutability.
+	symbol.flags -= {.Parameter, .CompileTime, .ReadOnlyBinding, .Immutable}
 	// Value bindings must not inherit their element type's generic-parameter
 	// flag. Actual $T parameters restore it below; type aliases retain it.
 	if .Mutable in local.flags || .Variable in local.flags {
@@ -3110,7 +3111,7 @@ resolve_global_identifier :: proc(
 		.Mutable in global.flags,
 	)
 
-	symbol.flags -= {.CompileTime}
+	symbol.flags -= {.CompileTime, .ReadOnlyBinding, .Immutable}
 	if .Mutable not_in global.flags && .Immutable not_in global.flags { symbol.flags |= {.CompileTime} }
 	if .Mutable in global.flags {
 		symbol.type = .Variable
