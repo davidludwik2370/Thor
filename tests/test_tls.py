@@ -134,6 +134,39 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_automatic_using_feature_hover_rename_and_unsaved_diagnostic_locations(self):
+        text='''// 😀 original header
+package main
+Record::struct{x:int}
+read::proc(using record:Record)->int{return x}
+main::proc(){
+ record:=Record{4}
+ using record
+ value:=read(record)
+ _=value
+}
+'''
+        client,main=self.open(text)
+        self.assertIn('value: int',json.dumps(self.hover(client,main,text,'value:=')))
+        member=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+                              'position':self.position(text,'return x',len('return '))})
+        self.assertIn('x: int',json.dumps(member))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        renamed=client.request('textDocument/rename',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'value:='),'newName':'answer'})
+        self.assertEqual(len(renamed['changes'][main.as_uri()]),2,renamed)
+        broken=text.replace('_=value','_=missing')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Undeclared name: missing')
+        error=next(e for e in errors if 'Undeclared name: missing' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'missing',0))
+        self.assertNotIn('__thor_',error['message'])
+        fixed=broken.replace('missing','value')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_membership_context_hovers_navigation_and_completion(self):
         text='''package main
 Color::enum{Red,Blue}

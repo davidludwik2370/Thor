@@ -1995,3 +1995,40 @@ library/purity/string tests, 19 focused membership tests, 132 stdio LSP/rename
 tests, 1126 native TLS tests, 98 extension tests, and the isolated real VS Code
 integration pass. A temporary copy of the current 15_puzzle.thor passes thor
 check. The local TLS process is restarted with 0.15.2; no window reload is needed.
+
+## Automatic using-stmt opt-in (Thor 0.21.4)
+
+Enable gated using forms in .thor files by emitting a per-file
+`#+feature using-stmt` header. Detect standalone Using AST nodes and Using
+fields in ProcedureType.params, including aliases, callback signatures and
+anonymous procedures. Embedded struct fields and using value declarations are
+ungated Odin syntax and receive no automatic header. Detecting syntax rather
+than searching text avoids comments/string false positives and leaves ordinary
+.odin dependencies under native feature rules.
+
+Export actual header file-tag tokens from the CLI frontend, without inserting
+anything into its parser input. Preserve explicit feature settings, including
+multi-feature tags and `!using-stmt`, rather than adding duplicate/overriding
+tags. Comments that merely mention a feature flag do not configure it. Existing
+compiler syntax/type restrictions, purity checks and immutable-storage rules
+still apply to using; enabling the feature only removes its opt-in requirement.
+
+Insert the generated header as a mapped support fragment at the root's byte
+offset 0 (or after a UTF-8 BOM), retaining CRLF where present. All original
+fragments retain their exact byte mappings. Imported Thor files, checked/pure
+helpers and compile-time evaluation use the same path, with no user-file edits.
+Source-derived flags refresh on cache hits when edits add/remove using syntax.
+
+Tests cover gated/ungated forms, pointer/package/multiple statements, generic
+parameters, nested procedure types, explicit tags/opt-out, comments/strings,
+per-file imports, pure/#run/automatic evaluation, BOM/CRLF exact mappings, and
+runtime/debug compiler-error locations. Stdio LSP checks hovers, semantic ranges,
+rename and unsaved diagnostic recovery. Real CodeLLDB and VS Code tests exercise
+original-line breakpoints, procedure prologues/steps, arguments/locals, and the
+mkthor Cmd+Shift+R task/launch/restart path with the generated header present.
+
+Validation: 380 compiler/cache/purity/import tests, 133 stdio LSP/rename tests,
+1126 native TLS tests, 14 real CodeLLDB tests, 98 extension tests, and both real
+VS Code language/debugger integrations pass. A temporary copy of 15_puzzle.thor
+also passes thor check after removing its manual using-stmt tag. User source
+files remain unchanged, and the local TLS process is refreshed for diagnostics.

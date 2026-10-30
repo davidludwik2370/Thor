@@ -109,6 +109,43 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_automatic_using_header_preserves_breakpoints_steps_and_arguments(self):
+        text='''// 😀 original header
+package main
+Record::struct{x:int}
+read::proc(using record:Record)->int{
+    value:=x+1
+    return value
+}
+main::proc(){
+    record:=Record{4}
+    using record
+    result:=read(record)
+    assert(result==5&&x==4)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[11])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),11),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['name'].split('::')[-1],'read',frame)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        if frame['line']==4: # CodeLLDB can stop on the native procedure prologue.
+            client.request('next',{'threadId':thread})
+            thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],5,frame)
+        argument=client.request('evaluate',{'frameId':frame['id'],'expression':'record.x','context':'watch'})
+        self.assertEqual(argument['result'],'4',argument)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],6,frame)
+        local=client.request('evaluate',{'frameId':frame['id'],'expression':'value','context':'watch'})
+        self.assertEqual(local['result'],'5',local)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_breakpoint_in_shared_basic_uses_its_installed_source_map(self):
         directory,_=self.build('package main\nimport "thor:basic"\nmain::proc(){basic.print("shared breakpoint")}\n')
         basic=ROOT/'runtime/basic/basic.thor'

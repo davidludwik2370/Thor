@@ -36,6 +36,7 @@ Output :: struct {
     immutables: [dynamic][2]int,
     do_tokens: [dynamic]Span,
     selection_tags: [dynamic]Span,
+    file_tags: [dynamic]string,
     features: []parser.Feature,
 }
 Parse_Error :: struct {
@@ -335,6 +336,7 @@ main :: proc() {
     out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public, private_file=tags.private==.File,
                   edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
     for tag in file.tags {
+        append(&out.file_tags, tag.text)
         text := strings.trim_space(tag.text)
         if text == "#+test" || strings.has_prefix(text, "#+build ") {
             append(&out.selection_tags, Span{tag.pos.offset, tag.pos.offset+len(tag.text)})

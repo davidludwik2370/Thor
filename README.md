@@ -686,6 +686,24 @@ Named or passed mutable views and `for &value in values[:]` remain rejected.
 `:>` enforces storage immutability in Thor; Odin's `@(rodata)` is a storage
 placement attribute and does not provide the same compile-time checks.
 
+## Using without a feature header
+
+Thor enables standalone `using value` statements and `using` procedure
+parameters by default. Write them directly in a `.thor` file; the transpiler
+adds `#+feature using-stmt` to that file's generated Odin when needed.
+This includes `using` parameters in procedure types and anonymous procedures.
+
+Embedded fields (`struct { using base: Base }`) and declarations such as
+`using value := Record{}` already work in Odin without the feature, so those
+forms do not cause a tag to be added. Comments and strings are ignored.
+Existing feature tags are preserved without duplicates; an explicit
+`#+feature !using-stmt` retains the restriction for that file. Native `.odin`
+dependencies keep Odin's feature rules.
+
+Original `.thor` files are never edited. Compiler diagnostics, TLS locations,
+breakpoints and stepping use the normal source maps to account for the
+generated header line.
+
 ## Interpolation, switches, Sets and negative indices
 
 ```odin

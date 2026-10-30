@@ -410,6 +410,16 @@ async function run() {
         assert.ok(!powerError.message.includes('Thor expression'));
         await replace(powerSource);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const usingSource='// 😀 original header\npackage main\nRecord::struct{x:int}\nread::proc(using record:Record)->int{return x}\nmain::proc(){record:=Record{4};using record;value:=read(record);_=value}\n';
+        await replace(usingSource);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(usingSource.indexOf('value:=')+2)),values=>hoverText(values||[]).includes('value: int'));
+        await replace(usingSource.replace('_=value','_=missing'));
+        const usingErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('Undeclared name: missing')));
+        assert.equal(testDocument.getText(usingErrors.find(value=>value.message.includes('Undeclared name: missing')).range),'missing');
+        assert.ok(!usingErrors.some(value=>value.message.includes('has been disallowed')));
+        await replace(usingSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const membershipSource='package main\nRecord::struct{value:i8}\nmain::proc(){small:i8=4;found:=small in [4,8];record:=Record{4};if record in [{value=4},{value=8}]{};_=found}\n';
         await replace(membershipSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -549,6 +559,7 @@ async function run() {
             'rune fill syntax and mapped format diagnostics',
             'immediate same-file redeclarations and clearing',
             'contextual membership literals, record-field hovers and mapped unsaved overflow diagnostics',
+            'automatic using feature with original-source hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {

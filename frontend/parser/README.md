@@ -18,6 +18,11 @@ Parser files use the package name `thor_parser` so TLS can link this parser
 alongside the native Odin formatter's parser. Selection metadata retains name
 positions for TLS; the transpiler continues to consume the same AST spans.
 
+The CLI frontend also exports actual header file-tag tokens. The transpiler
+uses them to preserve explicit using-stmt feature settings while enabling
+standalone using statements and procedure parameters in generated Thor output.
+No tag is inserted into parser input, so original AST positions remain intact.
+
 `file_redeclarations` supplies a shared early check of original, unconditional
 top-level value declarations in untagged files. It does not alter the parser's
 syntax-error state or attempt type/branch resolution. The CLI runs it before

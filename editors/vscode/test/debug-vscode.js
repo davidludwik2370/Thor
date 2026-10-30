@@ -24,6 +24,13 @@ async function run() {
         await vscode.window.showTextDocument(document);
         const extension = vscode.extensions.getExtension('thor-local.thor-language');
         await extension.activate();
+        const setup=new vscode.WorkspaceEdit();
+        const original=document.getText();
+        setup.insert(document.uri,document.positionAt(original.indexOf('main :: proc() {')+'main :: proc() {'.length),
+            '\n    state := struct { marker: int }{1}\n    using state\n    assert(marker == 1)\n');
+        assert.ok(await vscode.workspace.applyEdit(setup));
+        await document.save();
+        assert.ok(!document.getText().includes('#+feature using-stmt'));
         assert.equal(extension.packageJSON.contributes.keybindings.find(k=>k.command==='thor.debug').mac,'cmd+shift+r');
         assert.ok(extension.packageJSON.contributes.breakpoints.some(b=>b.language==='thor'));
         const stops = [];
@@ -56,6 +63,7 @@ async function run() {
         }
         let current = await frame();
         assert.equal(current.frame.line,position.line+1);
+        assert.ok(fs.readFileSync(path.join(root,'.vscode/bin/generated/main.odin'),'utf8').startsWith('#+feature using-stmt\n'));
         await session.customRequest('next',{threadId:current.thread});
         current=await frame();
         assert.equal(current.frame.line,document.positionAt(text.indexOf('last :=')).line+1);
@@ -89,7 +97,7 @@ async function run() {
         await session.customRequest('continue',{threadId:current.thread});
         await until(()=>vscode.debug.activeDebugSession,s=>!s);
         result.success=true;
-        result.checks=['mkthor project','shortcut command','pre-launch build task','CodeLLDB launch',
+        result.checks=['mkthor project','shortcut command','pre-launch build task','automatic using header','CodeLLDB launch',
             'Thor breakpoint','Step Over','Step Into fn through fstring','locals/watch','Step Out','restart/rebuild','clean exit'];
     } catch (error) {
         result.error=error.stack || String(error);

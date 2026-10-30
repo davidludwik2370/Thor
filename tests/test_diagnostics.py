@@ -41,6 +41,17 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_automatic_using_header_keeps_runtime_and_parameter_error_locations(self):
+        for flags in [(),('-debug',)]:
+            with self.subTest(flags=flags):
+                self.at('// 😀 source header\npackage main\nR::struct{x:int}\nmain::proc(){r:=R{4};using r;_=missing}\n',
+                        'missing',flags=flags,message='Undeclared')
+                self.at('package main\nR::struct{x:int}\nread::proc(using value:R)->int{return "wrong"}\nmain::proc(){_=read({4})}\n',
+                        '"wrong"',flags=flags,message='Cannot')
+        self.at('package main\nmain::proc(){using missing}\n','missing',message='Undeclared')
+        self.at('package main\nR::struct{x:int}\nread::proc(using value:R)->int{return x}\nmain::proc(){_=read("wrong")}\n',
+                '"wrong"',message='Cannot')
+
     def test_membership_context_errors_point_to_original_inline_elements(self):
         for typ, array, fragment in [('i8','[4,128]','128'),('u8','[-1,4]','-1'),
                                      ('i8','[4,2.5]','2.5'),('i8','[4,i16(8)]','i16(8)')]:

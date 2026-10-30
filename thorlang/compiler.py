@@ -804,6 +804,8 @@ class Source:
             hint, const = overrides.get(child, (None, constant))
             replacements.append((child.start, child.end, self.render(child, hint, const)))
         inserts = []
+        if n is self.root:
+            inserts.extend(self.using_feature_insert())
         if self.defaults and kind == 'Call':
             inserts.extend(self.defaults.arguments(n))
         if self.purity and kind=='Call':
@@ -906,6 +908,30 @@ class Source:
             literal = f"cast({target_type})({literal})"
         return f"({literal})"
 
+    def using_feature_origin(self):
+        """Gate only the AST forms Odin restricts, leaving explicit flags alone."""
+        if not self.thor: return None
+        for tag in self.info.get('file_tags') or []:
+            words = tag.removeprefix('#+').split()
+            if words and words[0] == 'feature' and any(word in {'using-stmt','!using-stmt'} for word in words[1:]):
+                return None
+        for node in self.nodes:
+            if node.kind == 'Using': return node
+            if node.kind == 'Field' and node.data.get('using_field'):
+                fields = node.parent
+                signature = fields.parent if fields else None
+                if signature and signature.kind == 'ProcedureType' and signature.role('params') is fields:
+                    return node
+        return None
+
+    def using_feature_insert(self):
+        origin = self.using_feature_origin()
+        if origin is None: return []
+        newline = '\r\n' if b'\r\n' in self.raw else '\n'
+        offset = 3 if self.raw.startswith(b'\xef\xbb\xbf') else 0
+        return [(offset, self.mapping.wrap('#+feature using-stmt'+newline, self.path,
+                                          origin.start, origin.end, 'support'))]
+
     def transpile(self, *, preserve_native=False):
         if self.excluded:
             code, self.source_map = self.mapping.finish(self.copy(0, len(self.raw)))
@@ -913,7 +939,7 @@ class Source:
         if preserve_native:
             # Installed Odin already has valid native syntax. Only checked
             # variants need lowering; leave the rest of this file verbatim.
-            inserts=[(declaration.end,self.purity.calls.helpers(declaration))
+            inserts=self.using_feature_insert()+[(declaration.end,self.purity.calls.helpers(declaration))
                      for declaration in self.purity.calls.declarations if declaration.source is self]
             code=self.splice(self.root,[],inserts)
         else:
