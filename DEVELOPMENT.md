@@ -1845,3 +1845,22 @@ generic records, pointers/dereferences, promoted fields, fixed arrays, slices,
 maps, value/reference loops, shadowing, local/global copies of immutable structs,
 invalid writes at original source locations, hover/definition and unsaved edits
 that change a value parameter to a pointer and clear its diagnostic.
+
+## Exclude comment brackets from pairing (VS Code extension 0.13.2)
+
+Declare `unbalancedBracketScopes: ["comment"]` for the Thor grammar. Comments
+already had comment scopes and green foregrounds, but inherited the default
+balanced-bracket metadata flag. Explicit exclusion prevents their brackets from
+participating in pairing/colorization, including nested block comments and
+comments inside interpolation, without suppressing actual interpolation brackets.
+The grammar tests now use the manifest's bracket configuration rather than a
+hard-coded wildcard, so they exercise the settings installed into VS Code.
+
+Validation: all 97 extension tests and the real isolated VS Code integration
+pass. Regressions cover the reported commented procedure/array/call pattern,
+nested comments and interpolation metadata. The editor integration invokes the
+actual comment-toggle command after matching an active array bracket, verifies
+that navigation ignores the commented bracket and that TLS removes its semantic
+tokens, then uncomments the line and verifies bracket matching returns. This is
+an extension metadata update; load it with Developer: Reload Window rather than
+the TLS restart command.

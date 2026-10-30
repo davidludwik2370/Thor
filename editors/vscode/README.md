@@ -102,6 +102,12 @@ example, showing a Set as `set[string]` in a hover is a server presentation rule
 Recognizing string text inside nested fstrings also requires correct grammar
 rules. A change may therefore belong in the server, the grammar, or both.
 
+Comments are explicitly excluded from bracket pairing/colorization, including
+nested block comments and comments inside interpolated expressions. Code brackets
+remain active when the surrounding code is uncommented. After an extension
+update, use **Developer: Reload Window** to refresh this grammar metadata;
+restarting TLS alone does not reload it.
+
 ### Reversible constant-color preview
 
 The original theme colors remain the default. To try a different color for Thor

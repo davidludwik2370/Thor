@@ -108,6 +108,37 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const bracketExample='package main\nmain::proc(){\n    values:> [2]int{1,2}\n}\n';
+        await replace(bracketExample);
+        const commentEditor=vscode.window.activeTextEditor;
+        const jumpAt=async position=>{
+            commentEditor.selection=new vscode.Selection(position,position);
+            await vscode.commands.executeCommand('editor.action.jumpToBracket');
+            return commentEditor.selection.active;
+        };
+        const assertArrayPair=async()=>{
+            const text=testDocument.getText();
+            const open=testDocument.positionAt(text.indexOf('['));
+            const close=testDocument.positionAt(text.indexOf(']'));
+            await eventually(()=>jumpAt(open),position=>position.isEqual(close));
+        };
+        await assertArrayPair();
+        commentEditor.selection=new vscode.Selection(2,0,2,testDocument.lineAt(2).text.length);
+        await vscode.commands.executeCommand('editor.action.commentLine');
+        assert.ok(testDocument.lineAt(2).text.trimStart().startsWith('//'));
+        const commentPosition=new vscode.Position(2,testDocument.lineAt(2).text.indexOf('['));
+        const functionClose=testDocument.positionAt(testDocument.getText().lastIndexOf('}'));
+        await eventually(()=>jumpAt(commentPosition),position=>position.isEqual(functionClose));
+        await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),value=>{
+            if(!value?.data?.length)return false;
+            let line=0;
+            for(let i=0;i<value.data.length;i+=5){line+=value.data[i];if(line===2)return false;}
+            return true;
+        });
+        commentEditor.selection=new vscode.Selection(2,0,2,testDocument.lineAt(2).text.length);
+        await vscode.commands.executeCommand('editor.action.commentLine');
+        assert.equal(testDocument.getText(),bracketExample);
+        await assertArrayPair();
         const bindings='package main\nread::proc(input:[]int,pointer:^int){\nfor value,index in input{_=value;_=index}\nfor &cell,offset in input{cell+=1;_=cell;_=offset}\n_=pointer\n}\n';
         await replace(bindings);
         const bindingTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
@@ -439,6 +470,7 @@ async function run() {
         await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, document.positionAt(offset)), values => values?.length > 0);
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
+            'comment toggling removes bracket matches and semantic tokens, uncommenting restores code brackets',
             'Rename Symbol provider applies original-source edits to unsaved Unicode text',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',

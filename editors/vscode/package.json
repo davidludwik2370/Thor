@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -41,7 +41,10 @@
       {
         "language": "thor",
         "scopeName": "source.thor",
-        "path": "./syntaxes/thor.tmLanguage.json"
+        "path": "./syntaxes/thor.tmLanguage.json",
+        "unbalancedBracketScopes": [
+          "comment"
+        ]
       }
     ],
     "snippets": [

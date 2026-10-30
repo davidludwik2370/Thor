@@ -35,7 +35,11 @@ before(async () => {
         onigLib,
         loadGrammar:async()=>JSON.parse(fs.readFileSync(path.join(__dirname,'../syntaxes/thor.tmLanguage.json'),'utf8')),
     });
-    themedGrammar=await themed.loadGrammarWithConfiguration('source.thor',1,{balancedBracketSelectors:['*']});
+    const contribution=require('../package.json').contributes.grammars.find(g=>g.language==='thor');
+    themedGrammar=await themed.loadGrammarWithConfiguration('source.thor',1,{
+        balancedBracketSelectors:contribution.balancedBracketScopes||['*'],
+        unbalancedBracketSelectors:contribution.unbalancedBracketScopes||[],
+    });
     colorMap=themed.getColorMap();
 });
 
@@ -140,6 +144,49 @@ test('comments hide Thor syntax and nested comments close correctly', () => {
     const lines = tokenize('/* outer\n /* #if x in [1,2] */\n still a comment */\n#if true {}');
     for (const token of lines[1]) assert.ok(token.scopes.some(s => s.startsWith('comment.block')));
     assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
+});
+
+test('commented array and procedure brackets have comment colors and no bracket-pair metadata',()=>{
+    const procedure=[
+        'drawPath :: proc(using node: Node, color: rl.Color) {',
+        '    center :> [2]i32{i32(pos.x * GRID_SIZE + GRID_SIZE/2), i32(pos.y)}',
+        '    parentCenter :> [2]i32{i32(parent.pos.x), i32(parent.pos.y)}',
+        '    rl.DrawLine(center.x, center.y, parentCenter.x, parentCenter.y, color)',
+        '    rl.DrawCircle(center.x, center.y, 2, color)',
+        '}',
+    ];
+    for(const commented of [procedure.map(line=>'// '+line).join('\n'),
+        '/* outer [\n'+procedure.join('\n')+'\n/* nested ( ] } */\nend */']){
+        const source=commented+'\n'+procedure.join('\n');
+        const lines=source.split('\n'),tokens=themedTokens(source);
+        const commentLines=commented.split('\n').length;
+        for(let line=0;line<lines.length;line++)for(let at=0;at<lines[line].length;at++){
+            if(!'[](){}'.includes(lines[line][at]))continue;
+            const token=tokens[line][at];
+            if(line<commentLines){
+                assert.equal(token.color,'#6A9955',`${line}:${at} comment color`);
+                assert.equal(token.type,1,`${line}:${at} comment token type`);
+                assert.equal(token.balanced,false,`${line}:${at} comment bracket pairing`);
+            }else{
+                assert.equal(token.type,0,`${line}:${at} live code token type`);
+                assert.equal(token.balanced,true,`${line}:${at} live code bracket pairing`);
+            }
+        }
+    }
+});
+
+test('comments inside interpolation disable only their own bracket pairing',()=>{
+    const source='value := f"{( /* comment [({ */ 2 /* end })] */ )}"';
+    const tokens=themedTokens(source)[0];
+    for(let at=0;at<source.length;at++){
+        if(!'[](){}'.includes(source[at]))continue;
+        // The two block comments are inside an embedded expression. Their
+        // scopes must be excluded without disabling the surrounding code.
+        const inComment=(at>=source.indexOf('/* comment')&&at<source.indexOf('*/')+2)||
+            (at>=source.indexOf('/* end')&&at<source.lastIndexOf('*/')+2);
+        assert.equal(tokens[at].balanced,!inComment,`Bracket ${at}: ${source[at]}`);
+        assert.equal(tokens[at].type,inComment?1:0,`Token type ${at}`);
+    }
 });
 
 test('raw strings retain syntax-looking text across lines', () => {
