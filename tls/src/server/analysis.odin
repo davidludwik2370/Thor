@@ -2151,8 +2151,8 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 				count,valid:=strconv.parse_int(name.name[len("__thor_switch_expression_"):])
 				found:=false
 				if valid{for arg in v.args[:min(count,len(v.args))]{
-					candidate:Symbol
-					if internal_resolve_type_expression(ast_context,arg,&candidate){
+					if thor_context_panic_arm(ast_context,arg){continue}
+					if candidate,resolved:=thor_context_switch_value(ast_context,arg);resolved{
 						literal,untyped:=candidate.value.(SymbolUntypedValue)
 						if !untyped{out^=candidate;return true}
 						if !found||literal.type!=.Integer{out^=candidate;found=true}

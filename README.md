@@ -720,11 +720,19 @@ Expression switches currently require a default arm and exactly one expression
 per arm. They support comma-separated cases and native ranges, check duplicate
 constant cases, evaluate the selector once, and execute only the first matching
 arm. Expected destination/argument/return types supply result context.
+A switch result arm may be a call to the built-in `panic(...)`: it terminates
+instead of supplying a value, so it does not contribute to result-type inference.
+For example, `direction: Coord > switch { case valid: {-1, 0}; case: panic("invalid move") }`
+is valid. Other void calls, including user procedures declared `-> !`, are not
+result arms. A switch with only panic arms needs an expected result type.
 `#switch` has the same selector forms in statement and expression positions;
 it uses native `when` semantics for constant selection, declaration visibility,
 control flow, and unchecked inactive arms. Later conditions, including those in
 a comma-separated case, stay unchecked after a match. Explicit `#run` follows
 selected compile-time branches and known lazy conditions.
+A selected panic arm in a `#switch` expression also needs an expected result
+type; an inactive panic arm is unchecked. `fn` may call `panic`, and a panic
+reached during `#run` or automatic compile-time execution fails the compilation.
 
 Sets use `|`, `&`, `-`, `~`, `==` and `!=`, with `|=`, `&=`, `-=`, `~=`
 for in-place updates; `+=` inserts one element, while `-=` accepts an element

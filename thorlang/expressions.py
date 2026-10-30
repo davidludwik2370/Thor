@@ -828,7 +828,9 @@ class Expressions:
                 result=self.type_code(expected)
             else:
                 s.needs_default=True
-                values=[s.render(a) for a in arms]
+                values=[s.render(a) for a in arms if not s.resolver.is_panic_call(a)]
+                if not values:
+                    return self.error(n,'A switch expression with only panic arms requires an expected result type.')
                 query=values[-1]
                 for value in reversed(values[:-1]): query=f'(false ? ({value}) : ({query}))'
                 result=f'type_of({s.prefix}default_value({query}))'
@@ -836,7 +838,9 @@ class Expressions:
                 code=['switch '+(s.render(selector) if selector else '')+' {']
                 for case in cases:
                     matches=', '.join(s.render(at(v)) for v in case['matches'])
-                    code.append(f'case {matches}: return {s.render(at(case["result"]),hint)}')
+                    arm=at(case['result'])
+                    result=s.render(arm) if s.resolver.is_panic_call(arm) else 'return '+s.render(arm,hint)
+                    code.append(f'case {matches}: {result}')
                 code.append('}')
                 return '\n'.join(code)
             name,args=self.closed(n,body,result=None,flavor='switch')
@@ -845,9 +849,20 @@ class Expressions:
         nondefault=[c for c in cases if c['matches']]
         validation=self.validation(n)
         if expression:
-            result=s.render(at(defaults[0]['result']),expected,True)
+            def value(case):
+                arm=at(case['result'])
+                if not s.resolver.is_panic_call(arm): return s.render(arm,expected,True)
+                if not expected:
+                    # A compile-time switch derives its type only from the
+                    # selected arm. Keep this error lazy, just like its values.
+                    return self.error(arm,'A selected panic arm requires an expected result type.')
+                # Keep constant selection lazy. Only a selected panic calls
+                # this runtime helper; inactive arms remain entirely unchecked.
+                name,args=self.closed(arm,lambda _:s.render(arm),result=None,flavor='switch_panic')
+                return f'{name}({", ".join([*args,self.type_code(expected)])})'
+            result=value(defaults[0])
             for case in reversed(nondefault):
-                result=f'({s.render(at(case["result"]),expected,True)} when {condition(case)} else {result})'
+                result=f'({value(case)} when {condition(case)} else {result})'
             return f'({result} when {validation} else {self.error(n,"Invalid compile-time switch cases.")})'
         code=[]
         for case in [*nondefault,*defaults]:

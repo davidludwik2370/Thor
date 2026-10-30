@@ -42,6 +42,36 @@ thor_context_adapter :: proc(call: ^ast.Call_Expr) -> bool {
     return sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation"
 }
 
+// Only the builtin panic call is a valueless switch result. Other void or
+// diverging procedures still need the compiler's ordinary value diagnostic.
+thor_context_panic_arm :: proc(ctx: ^AstContext, expr: ^ast.Expr) -> bool {
+    if expr == nil { return false }
+    if paren, ok := expr.derived.(^ast.Paren_Expr); ok {
+        return thor_context_panic_arm(ctx, paren.expr)
+    }
+    call, ok := expr.derived.(^ast.Call_Expr)
+    if !ok { return false }
+    callee := call.expr
+    for {
+        paren, wrapped := callee.derived.(^ast.Paren_Expr)
+        if !wrapped { break }
+        callee = paren.expr
+    }
+    ident, named := callee.derived.(^ast.Ident)
+    if !named || ident.name != "panic" { return false }
+    symbol, resolved := thor_context_type(ctx, callee)
+    return resolved && .Builtin in symbol.flags
+}
+
+thor_context_switch_value :: proc(ctx: ^AstContext, expr: ^ast.Expr) -> (Symbol, bool) {
+    old_call := ctx.call
+    defer ctx.call = old_call
+    // Generic result types need the actual arm call's arguments, rather than
+    // the virtual switch call that contains all results and case conditions.
+    if call, ok := get_completed_call(expr); ok { ctx.call = call }
+    return thor_context_value(ctx, expr)
+}
+
 thor_context_dependent_switch :: proc(ctx: ^AstContext, expr: ^ast.Expr, depth := 0) -> bool {
     if expr == nil || depth > 64 { return false }
     if paren, ok := expr.derived.(^ast.Paren_Expr); ok { return thor_context_dependent_switch(ctx, paren.expr, depth+1) }
@@ -61,7 +91,8 @@ thor_context_dependent_switch :: proc(ctx: ^AstContext, expr: ^ast.Expr, depth :
     case: return false
     }
     for arm in arms {
-        candidate, ok := thor_context_value(ctx, arm)
+        if thor_context_panic_arm(ctx, arm) { continue }
+        candidate, ok := thor_context_switch_value(ctx, arm)
         if ok && thor_context_concrete(ctx, candidate) { return false }
     }
     return true
@@ -170,7 +201,8 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
         if count, sw := thor_context_switch_count(node); sw {
             if !thor_context_concrete(ctx, expected) {
                 for arm in node.args[:count] {
-                    candidate, ok := thor_context_value(ctx, arm)
+                    if thor_context_panic_arm(ctx, arm) { continue }
+                    candidate, ok := thor_context_switch_value(ctx, arm)
                     if ok && thor_context_concrete(ctx, candidate) { expected = candidate; break }
                 }
             }

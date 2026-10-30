@@ -134,6 +134,50 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_switch_panic_inference_context_hover_and_unsaved_diagnostic_recovery(self):
+        text='''package main
+Record::struct{value:int}
+Color::enum{Red,Blue}
+identity::proc(value:$T)->T{return value}
+main::proc(){
+ selector:=1
+ value:=switch selector{case 0:panic("first");case:Record{7}}
+ contextual:Record>switch{case selector==1:{7};case:panic("unreachable")}
+ color:Color=switch{case false:panic("enum");case:.Red}
+ generic:=switch{case true:identity(i32(7));case:panic("generic")}
+ _=value.value;_=contextual.value;_=color;_=generic
+}
+'''
+        client,main=self.open(text)
+        for name in ['value:=','contextual:Record']:
+            self.assertIn('Record',json.dumps(self.hover(client,main,text,name)))
+        member=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+                              'position':self.position(text,'value.value',len('value.')+1)})
+        self.assertIn('int',json.dumps(member))
+        self.assertIn('i32',json.dumps(self.hover(client,main,text,'generic:=')))
+        self.assertIn('Color',json.dumps(self.hover(client,main,text,'.Red')))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        broken=text.replace('panic("unreachable")','panic(123)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(error for error in errors if 'Cannot' in error['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'123',0))
+        self.assertNotIn('__thor_',error['message'])
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_switch_user_proc_named_panic_still_supplies_hover_type(self):
+        text='''package main
+panic::proc(message:string)->int{return 7}
+main::proc(){
+ value:=switch{case:panic("ordinary value")}
+ _=value
+}
+'''
+        client,main=self.open(text,compiler=False)
+        hover=self.hover(client,main,text,'value:=')
+        self.assertIn('value: int',json.dumps(hover))
+
     def test_untyped_string_repetition_clears_cstring_argument_error_without_saving(self):
         text='''package main
 PAD::string(" ")*3

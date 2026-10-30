@@ -283,6 +283,19 @@ class DiagnosticTests(unittest.TestCase):
         self.assertIn('main.thor(2:30)',json.dumps(errors))
         self.assertNotIn('__thor_',json.dumps(errors))
 
+    def test_switch_panic_preserves_other_result_and_argument_error_locations(self):
+        for arm, fragment, message in [
+            ('panic(123)', '123', 'Cannot'),
+            ('panic(missing)', 'missing', 'Undeclared'),
+            ('work()', 'work()', 'does not return a value'),
+        ]:
+            with self.subTest(arm=arm):
+                errors=self.at('package main\nwork::proc(){}\nmain::proc(){/* 😀 */ value:int=switch{case true:7;case:'+arm+'};_=value}\n',
+                               fragment, message=message)
+                self.assertNotIn('__thor_',json.dumps(errors))
+        self.at('package main\nmain::proc(){/* 😀 */ value:int=switch{case true:"wrong";case:panic("stop")};_=value}\n',
+                '"wrong"', message='Cannot')
+
     def test_set_literal_contract_and_element_errors(self):
         errors=self.at('package main\nmain::proc(){_=set[[]int]{}}\n','set[[]int]',message='valid Odin map keys')
         self.assertEqual(len(errors),1)

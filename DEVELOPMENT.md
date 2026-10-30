@@ -1914,3 +1914,37 @@ layouts, branches and optional branches, nested control flow, Unicode ranges,
 comments/strings, same-named variables, label hover/rename and unsaved layout
 changes. Both grammar fallback color and resolved semantic classification are
 checked. No compiler or user project source changes are required.
+
+## Built-in panic as a switch result (Thor 0.21.2 / TLS 0.15.1)
+
+Permit an unshadowed built-in panic call, including parenthesized calls, as a
+switch expression arm. Emit the call as a terminating statement rather than
+`return panic(...)`, and omit it from the common-result type query. Retain native
+checking of the call's arguments, every other result and case, and evaluate the
+selector and selected arm exactly once. Ordinary void calls, aliases of panic,
+user declarations named panic and other procedures declared `-> !` receive no
+special treatment. All-panic runtime switches need an expected result type.
+
+Use the same terminating-statement rule in ownership selection so anonymous
+string and Set consumers never assign a panic call into a generated temporary.
+Keep compile-time switches lazy: typed selected panic arms call an expression
+helper, while inactive ones remain unchecked. A selected compile-time switch
+panic has no inferred result type and needs a destination/argument/return type.
+Allow the built-in panic in pure code, like assert; reaching it during automatic
+evaluation or #run produces a compilation failure at the original evaluation
+site. No special case is added for arbitrary non-returning procedures.
+
+TLS ignores builtin panic arms when inferring results and contextual literals.
+Resolve each value-producing arm's value type, including procedure results,
+rather than mistaking a procedure's own symbol for its return type. Preserve
+normal inference for user procedures named panic. Regression tests cover both
+selector forms, panic position and parentheses, contextual records/named arrays/
+enums/generics, execution order, selected failures, pure evaluation, ownership,
+shadowing/imports/aliases, Unicode diagnostic locations, and unsaved TLS edits
+and diagnostic recovery. Check the user's puzzle from a temporary source copy;
+the original project is never changed by this verification.
+
+Validation: 208 compiler/diagnostic/ownership/purity tests, 130 stdio LSP/rename
+tests, 1126 native TLS tests, 98 extension tests, and the isolated real VS Code
+integration pass. A temporary copy of 15_puzzle.thor passes thor check. The local
+TLS process is restarted with the rebuilt binary; no extension reload is needed.

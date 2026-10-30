@@ -49,7 +49,7 @@ class Flow:
 class Purity:
     builtins={'len','cap','size_of','align_of','offset_of','type_of','min','max','abs','clamp',
               'complex','quaternion','real','imag','jmag','kmag','conj','swizzle',
-              'make','copy','delete','assert','assert_contextless'}
+              'make','copy','delete','assert','assert_contextless','panic'}
     type_queries={'type_of','size_of','align_of','offset_of'}
     libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}

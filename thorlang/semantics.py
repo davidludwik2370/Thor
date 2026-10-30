@@ -390,7 +390,9 @@ class Resolver:
             return Type(node=n,witness=n)
         if kind=='SwitchExpr':
             cases=n.data['cases']
-            return self.type_of(n.source.at(cases[0]['result'],n),seen) if cases else Type(node=n)
+            arms=[n.source.at(case['result'],n) for case in cases]
+            value=next((arm for arm in arms if not self.is_panic_call(arm)),None)
+            return self.type_of(value,seen) if value else Type(node=n)
         if kind in {"Paren", "FieldValue"}:
             return self.type_of(n.role("expr") if kind == "Paren" else n.role("value"), seen)
         if kind == "Literal":
@@ -489,6 +491,21 @@ class Resolver:
             inner = self.type_of(n.role("expr"), seen)
             return Type("pointer", node=n, elem=inner) if n.data["op"] == "&" else inner
         return Type(node=n)
+
+    def is_panic_call(self, node):
+        """Only the unshadowed builtin is a bottom-valued switch arm.
+
+        A void procedure (even one declared -> !) is not a result expression.
+        Keep aliases and user declarations named panic under native checking.
+        """
+        while node and node.kind == 'Paren': node = node.role('expr')
+        if node is None or node.kind != 'Call': return False
+        callee = node.role('callee')
+        while callee and callee.kind == 'Paren': callee = callee.role('expr')
+        return bool(callee and callee.kind == 'Ident' and callee.text == 'panic'
+                    and self.symbol(callee) is None
+                    and callee.text not in callee.source.selected
+                    and callee.text not in callee.source.imports)
 
     @staticmethod
     def fields(node):
