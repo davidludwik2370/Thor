@@ -1801,3 +1801,18 @@ passes with a concatenated repeated string passed to cstring. A real stdio TLS
 case verifies the old cstring argument error's Unicode-aware source range and
 clearing after an unsaved change to an untyped repetition. No TLS/client code or
 allocation behavior changes, and unrelated user files remain untouched.
+
+## Readonly parameter color follow-up
+
+Checked the running editor's TLS protocol response for Dijkstra's `calcPath`,
+including pointer and defaulted boolean parameters: declarations and references
+have semantic kind `parameter` and the `readonly` modifier. The issue did not
+require another compiler or server change. Set the current VS Code profile's
+`parameter.readonly:thor` color explicitly to Dark Modern's immutable blue,
+`#4FC1FF`, preserving the compile-time constant preview and other settings.
+Document the optional preference and how to remove it in the editor README.
+
+Validation: all 95 extension tests and the three targeted stdio TLS tests for
+parameter/value-loop readonly markers, shadowing/unsaved edits, and compile-time
+versus runtime bindings pass. Temporary protocol tracing was removed afterward;
+the parameter color is the only persistent change to the user's settings.

@@ -134,6 +134,25 @@ The color follows the binding, not the mutability of pointed-to data. Other
 themes can style the modifier directly;
 the preview is optional and does not replace a theme.
 
+If readonly parameters still have the mutable-variable color in your theme,
+you can set their color explicitly in VS Code's user settings. For Dark Modern,
+`#4FC1FF` matches its immutable-variable blue:
+
+```json
+"editor.semanticTokenColorCustomizations": {
+  "rules": {
+    "parameter.readonly:thor": "#4FC1FF"
+  }
+}
+```
+
+Merge this selector into any existing `rules` object, preserving other rules
+such as the compile-time constant preview. It applies to parameter declarations
+and references, including pointer parameters and defaulted arguments, across
+Thor projects in the current profile. Named argument labels are separate tokens;
+this setting does not change them. Settings changes apply immediately. Remove
+the selector to return to the theme's fallback, or adjust it when changing themes.
+
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS
 and the transpiler share the Thor parser, keeping their accepted syntax aligned.
 TLS uses its own partial semantic resolver for interactive features; the Thor
