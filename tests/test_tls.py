@@ -134,6 +134,40 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_using_promoted_switch_field_context_hover_navigation_and_diagnostics(self):
+        text='''package main
+Kind::enum{A,B}
+Other::enum{A,C}
+Record::struct{kind:Kind}
+write::proc(using record:^Record,selector:bool){
+ kind=switch{
+  case selector:.A
+  case:true?.B:.A
+ }
+}
+main::proc(){record:=Record{};write(&record,true)}
+'''
+        client,main=self.open(text)
+        hover=self.hover(client,main,text,'kind=switch')
+        self.assertIn('Kind',json.dumps(hover))
+        position=self.position(text,'case selector:.A',len('case selector:.'))
+        hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},'position':position})
+        self.assertIn('Kind: .A',json.dumps(hover))
+        definitions=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},'position':position})
+        if isinstance(definitions,dict):definitions=[definitions]
+        self.assertTrue(any(item['range']['start']==self.position(text,'A,B',0) for item in definitions),definitions)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        broken=text.replace('case selector:.A','case selector:"wrong"')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(error for error in errors if 'Cannot' in error['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'"wrong"',0))
+        self.assertIn('Kind',error['message'])
+        self.assertNotIn('__thor_',error['message'])
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_automatic_using_feature_hover_rename_and_unsaved_diagnostic_locations(self):
         text='''// 😀 original header
 package main

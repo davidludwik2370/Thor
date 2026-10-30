@@ -703,6 +703,10 @@ dependencies keep Odin's feature rules.
 Original `.thor` files are never edited. Compiler diagnostics, TLS locations,
 breakpoints and stepping use the normal source maps to account for the
 generated header line.
+Promoted fields keep their own value types when supplying expression context.
+For example, assigning `kind = switch { case condition: .A; case: .B }` through
+`using record: ^Record` uses the type of `record.kind`, including enum and
+generic fields.
 
 ## Interpolation, switches, Sets and negative indices
 

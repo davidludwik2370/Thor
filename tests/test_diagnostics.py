@@ -41,6 +41,12 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_using_promoted_switch_result_errors_have_the_field_type_and_original_range(self):
+        source='package main\nKind::enum{A,B}\nRecord::struct{kind:Kind}\nwrite::proc(using record:^Record){/* 😀 */ kind=switch{case true:"wrong";case:.A}}\nmain::proc(){record:=Record{};write(&record)}\n'
+        errors=self.at(source,'"wrong"',message='Cannot')
+        self.assertIn('Kind',json.dumps(errors))
+        self.assertNotIn("to '^Record'",json.dumps(errors))
+
     def test_automatic_using_header_keeps_runtime_and_parameter_error_locations(self):
         for flags in [(),('-debug',)]:
             with self.subTest(flags=flags):

@@ -2032,3 +2032,28 @@ Validation: 380 compiler/cache/purity/import tests, 133 stdio LSP/rename tests,
 VS Code language/debugger integrations pass. A temporary copy of 15_puzzle.thor
 also passes thor check after removing its manual using-stmt tag. User source
 files remain unchanged, and the local TLS process is refreshed for diagnostics.
+
+## Promoted-field expression context (Thor 0.21.5)
+
+Correct Source.type_hint for using-promoted fields. Resolver projection symbols
+intentionally retain their owner's declaration for storage protection. Looking
+at that declaration's annotation supplied ^Triangle rather than Kind for
+`kind = switch {...}` inside `proc(using tri: ^Triangle)`. Aggregate fields
+already used a value-type witness, but scalar/enum fields fell through to the
+owner annotation. Query the actual promoted expression with type_of before
+that fallback, preserving its lexical scope, nominal identity and private types.
+Do not replace the projection's shared storage declaration or mutability flags.
+
+Regression coverage includes the triangle example's boolean switch and ternary
+enum arms, selector switches, standalone/declaration/parameter using, pointer
+promotion through embedded records, generics, scalar/distinct/string/array/record
+fields, private imported enum types, local shadowing, readonly rejection, and
+pure/#run/#switch paths. Wrong branch values identify Kind and highlight their
+original source spans. TLS checks enum hover/definition and unsaved diagnostics;
+the real VS Code integration exercises the promoted switch destination too.
+
+Validation: 326 compiler/diagnostic/using/switch/compatibility tests, 34 focused
+using/purity tests, 134 stdio LSP/rename tests, 98 extension tests and the real
+VS Code integration pass. A temporary copy of the user's triangle_solver.thor
+runs successfully and classifies the 3-3-3 example as equilateral. The original
+project is unchanged; unused-import vetting also accepts the generated code.

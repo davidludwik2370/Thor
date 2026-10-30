@@ -330,6 +330,11 @@ class Source:
         if expression is None:
             return None
         if self.resolver and expression.kind in {"Ident", "Selector", "Index", "Call", "Deref", "Paren"}:
+            symbol = self.resolver.symbol(expression)
+            if symbol and symbol.projection:
+                # A promoted field shares its owner's declaration for storage
+                # protection, but the owner annotation is not its value type.
+                return Hint(expression.source, expression, f"type_of({expression.source.render(expression)})")
             shape = self.resolver.type_of(expression)
             if shape.kind in {"array", "slice", "dynamic", "struct", "map", "pointer"}:
                 return Hint(expression.source, expression, f"type_of({expression.source.render(expression)})")
