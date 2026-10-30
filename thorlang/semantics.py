@@ -492,6 +492,53 @@ class Resolver:
             return Type("pointer", node=n, elem=inner) if n.data["op"] == "&" else inner
         return Type(node=n)
 
+    def membership_untyped(self, node, seen=None):
+        """Whether a needle lacks a fixed type for inline-list inference.
+
+        Shapes are deliberately approximate; arithmetic must consider both
+        operands here (except shifts), not just the left operand's shape.
+        Odin still checks actual types and representability in the emitted code.
+        """
+        if node is None: return True
+        seen = set() if seen is None else seen
+        if node in seen: return False
+        seen.add(node)
+        if node.kind == 'Paren': return self.membership_untyped(node.role('expr'), seen)
+        if node.kind == 'ImplicitSelector' or node.text == 'nil': return True
+        symbol = self.symbol(node)
+        if symbol is None and self.native and node.source.purity:
+            imported = node.source.purity.imported(node)
+            if imported:
+                # Inspect an opaque SDK constant only when it is actually used
+                # as a needle; do not default an untyped math.PI to f64 first.
+                directory = self.native.load(node.source, imported[0])
+                if directory: symbol = self.package_symbol(directory, imported[1])
+        if symbol and symbol.declaration.kind == 'Declaration':
+            if symbol.annotation or symbol.declaration.data.get('mutable', True): return False
+            return self.membership_untyped(symbol.value, seen)
+        if node.kind == 'Binary' and node.data['op'] in {'==','!=','<','>','<=','>='}:
+            return True # Native comparisons produce an untyped boolean, even at runtime.
+        if node.kind == 'Binary' and node.data['op'] not in {'in','not_in'}:
+            sides = ['left'] if node.data['op'] in {'<<','>>'} else ['left','right']
+            return all(self.membership_untyped(node.role(side), seen.copy()) for side in sides)
+        if node.kind == 'Unary' and node.data['op'] in {'+','-','~','!'}:
+            return self.membership_untyped(node.role('expr'), seen)
+        if node.kind in {'Ternary','WhenExpr'}:
+            return all(self.membership_untyped(node.role(side), seen.copy()) for side in ['x','y'])
+        if node.kind == 'Call' and node.source.purity:
+            builtin = node.source.purity.builtin(node)
+            args = node.group('args')
+            if builtin in {'size_of','align_of','offset_of'}: return True
+            if builtin in {'min','max','abs','clamp','complex','quaternion','real','imag','jmag','kmag','conj'}:
+                return all(self.membership_untyped(arg, seen.copy()) for arg in args)
+            if builtin in {'len','cap'} and args:
+                typ = self.type_of(args[0])
+                if typ.kind == 'array': return True
+                if typ.kind == 'string':
+                    from .repetition import runtime_operand
+                    return not runtime_operand(args[0])
+        return self.type_of(node).untyped
+
     def is_panic_call(self, node):
         """Only the unshadowed builtin is a bottom-valued switch arm.
 

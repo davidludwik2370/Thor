@@ -165,6 +165,43 @@ thor_context_element :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
     return thor_context_type(ctx, type)
 }
 
+thor_context_membership :: proc(ctx: ^AstContext, binary: ^ast.Binary_Expr) -> (container: Symbol, element: Symbol) {
+    if binary.left == nil || binary.right == nil { return }
+    right := binary.right
+    for {
+        paren, wrapped := right.derived.(^ast.Paren_Expr)
+        if !wrapped { break }
+        right = paren.expr
+    }
+    literal, inline_array := right.derived.(^ast.Comp_Lit)
+    inline_array = inline_array && literal.type == nil && thor_is_array_literal(ctx.file, literal)
+    if inline_array {
+        needle, resolved := thor_context_switch_value(ctx, binary.left)
+        _, untyped := needle.value.(SymbolUntypedValue)
+        array: ^ast.Array_Type
+        if resolved && !untyped {
+            query := ast.new(ast.Call_Expr, binary.left.pos, binary.left.end)
+            query.expr = thor_ident("type_of", binary.left.pos)
+            query.args = thor_exprs(binary.left)
+            array = thor_array_type(literal, query)
+        } else { array = thor_array_type(literal) }
+        if array != nil {
+            context.allocator = ctx.allocator
+            container = make_symbol_array_from_ast(ctx, array^, ctx.field_name)
+        }
+    } else { container, _ = thor_context_value(ctx, binary.right) }
+    type: ^ast.Expr
+    #partial switch value in container.value {
+    case SymbolFixedArrayValue: type = value.expr
+    case SymbolSliceValue: type = value.expr
+    case SymbolDynamicArrayValue: type = value.expr
+    case SymbolMapValue: type = value.key
+    case SymbolBitSetValue: type = value.expr
+    }
+    if type != nil { element, _ = thor_context_type(ctx, type) }
+    return
+}
+
 thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
     expr: ^ast.Expr, expected: Symbol, wanted: ^ast.Node, depth := 0) -> (result: Symbol, ok: bool) {
     if expr == nil || depth > 64 || !position_in_node(expr, pc.position) { return {}, false }
@@ -251,6 +288,13 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
             }
         }
     case ^ast.Binary_Expr:
+        if node.op.kind == .In || node.op.kind == .Not_In {
+            container, element := thor_context_membership(ctx, node)
+            if position_in_node(node.right, pc.position) {
+                return thor_context_expression(ctx, pc, node.right, container, wanted, depth+1)
+            }
+            return thor_context_expression(ctx, pc, node.left, element, wanted, depth+1)
+        }
         for branch in ([2]^ast.Expr{node.left, node.right}) {
             if !position_in_node(branch, pc.position) { continue }
             other := node.right if branch == node.left else node.left
@@ -274,6 +318,9 @@ thor_resolve_expected_type :: proc(ctx: ^AstContext, pc: ^DocumentPositionContex
         call := pc.calls[i]
         if thor_context_adapter(call) || !position_in_exprs(call.args, pc.position) { continue }
         if symbol, ok := thor_context_expression(ctx, pc, call, {}, wanted); ok { return symbol, true }
+    }
+    if binary := pc.parent_binary; binary != nil {
+        if symbol, ok := thor_context_expression(ctx, pc, binary, {}, wanted); ok { return symbol, true }
     }
     if literal := pc.parent_comp_lit; literal != nil && literal.type != nil {
         if symbol, ok := thor_context_expression(ctx, pc, literal, {}, wanted); ok { return symbol, true }

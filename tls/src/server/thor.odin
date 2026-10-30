@@ -270,12 +270,13 @@ thor_is_array_literal :: proc(file: ast.File, literal: ^ast.Comp_Lit) -> bool {
     return offset >= 0 && offset < len(file.src) && file.src[offset] == '['
 }
 
-thor_array_type :: proc(literal: ^ast.Comp_Lit) -> ^ast.Array_Type {
-    if len(literal.elems) == 0 { return nil }
+thor_array_type :: proc(literal: ^ast.Comp_Lit, element: ^ast.Expr = nil) -> ^ast.Array_Type {
+    if len(literal.elems) == 0 && element == nil { return nil }
     array := ast.new(ast.Array_Type, literal.pos, literal.end)
     count := ast.new(ast.Basic_Lit, literal.pos, literal.end)
     count.tok = {kind=.Integer, text=fmt.aprintf("%d", len(literal.elems)), pos=literal.pos}
     array.len = count
+    if element != nil { array.elem = element; return array }
     first := literal.elems[0]
     if inner, ok := first.derived.(^ast.Comp_Lit); ok && inner.type == nil {
         array.elem = thor_array_type(inner)

@@ -550,6 +550,16 @@ element with Odin's normal literal defaulting. A type-only helper is used inside
 `type_of` when necessary; it does not evaluate the element an extra time. Every
 literal element executes once. An empty literal needs context, except that an
 empty membership list can obtain its element type from the needle.
+An inline membership list also receives context from an already typed needle:
+`tile: i8 = 4; found := tile in [4, 8]` uses an `[2]i8` list. Untyped constants
+and arithmetic expressions in the list receive the same context. Conversely,
+`4 in existing_i8_array` coerces the untyped `4` to the array's element type.
+Named arrays keep their established types: `values := [4, 8]` remains `[2]int`,
+so an `i8` needle does not implicitly convert to match it. Explicitly typed list
+elements must match too; out-of-range literals are errors rather than narrowing
+casts. `not_in`, compile-time conditions and generic value constraints follow
+the same rules. With untyped operands on both sides, normal first-element
+defaulting remains in effect, so `1.5 in [1, 2]` is an error.
 The inferred element type also supplies context to later nested array/record
 literals. Procedure defaults and assignments through indexing or pointers are
 covered by the tests.

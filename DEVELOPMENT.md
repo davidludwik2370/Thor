@@ -1948,3 +1948,50 @@ Validation: 208 compiler/diagnostic/ownership/purity tests, 130 stdio LSP/rename
 tests, 1126 native TLS tests, 98 extension tests, and the isolated real VS Code
 integration pass. A temporary copy of 15_puzzle.thor passes thor check. The local
 TLS process is restarted with the rebuilt binary; no extension reload is needed.
+
+## Contextual membership literals (Thor 0.21.3 / TLS 0.15.2)
+
+Use a typed needle as the expected element type of a directly written membership
+array, including parenthesized literals: `tile: i8 = 4; tile in [4, 8]` lowers to
+an i8 array rather than eagerly defaulting the first element to int. Render every
+element with that context, including the first elided record/nested array. Keep
+named and explicitly typed containers fixed, and use native assignment checking
+to reject typed element mismatches, fractional integer values and overflow.
+Literal needles still receive the element/key type from an existing container.
+
+Determine whether a needle has a fixed type without materializing its value.
+Follow untyped constants/aliases and arithmetic operands; shifts keep the left
+operand's type. Preserve native untyped boolean comparisons and constant-query
+results such as len(fixed_array), len(constant_string), size_of and abs. Both
+untyped sides retain normal first-element defaulting and homogeneous-array
+validation. The membership AST supplies context even during independent type
+queries/ownership lowering; this does not depend on the order of rendering.
+Type queries never execute operands. Existing eager element evaluation, needle
+before container order, surrounding short circuiting and allocation ownership
+remain in force. Type lists, ranges, native maps/bit sets and Sets retain their
+existing membership semantics.
+
+TLS follows membership context into inline array/record/enum literals, in both
+directions, using original source nodes for definitions, completion and tokens.
+Handle membership directly in if/loop conditions as well as calls, declarations
+and returns. Compiler diagnostics continue to point at the actual rejected
+literal or typed element, including after unsaved Unicode edits and corrections.
+
+Tests cover signed/unsigned widths through 128 bits, distinct types, floats,
+untyped constants and expressions, imported constants, stored containers,
+arrays/slices/dynamic/fixed arrays/maps/bit sets/Sets, enums/runes/strings/nil,
+nested arrays/records, arithmetic/conditional/call/field/index/pointer needles,
+generic type/value constraints, #if/when/#switch, pure/#run/automatic execution,
+inactive branches, empty lists, type lists, ownership and execution order. Add
+real VS Code checks for contextual field hovers and precise unsaved overflow
+diagnostics, with stdio tests for enum completion/navigation in both directions.
+
+Opaque SDK constants such as math.PI retain their untyped status through the
+existing on-demand native-source index. Ordinary variable needles require no
+SDK inspection, and native libraries are never copied merely for this check.
+
+Validation: 300 broad compiler/diagnostic/ownership/range tests, 72 related
+library/purity/string tests, 19 focused membership tests, 132 stdio LSP/rename
+tests, 1126 native TLS tests, 98 extension tests, and the isolated real VS Code
+integration pass. A temporary copy of the current 15_puzzle.thor passes thor
+check. The local TLS process is restarted with 0.15.2; no window reload is needed.

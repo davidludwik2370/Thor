@@ -134,6 +134,68 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_membership_context_hovers_navigation_and_completion(self):
+        text='''package main
+Color::enum{Red,Blue}
+Record::struct{value:i8}
+main::proc(){
+ small:i8=4
+ found:=small in [4,8]
+ color:Color=.Red
+ if color in [.Red,.Blue] {}
+ record:=Record{4}
+ if record in [{value=4},{value=8}] {}
+ values:=[1,2,3]
+ reverse:=6 in values
+ colors:[2]Color={.Red,.Blue}
+ reverse_enum:=.Blue in colors
+ _=found;_=reverse;_=reverse_enum
+}
+'''
+        client,main=self.open(text)
+        for word,expected in [('small:i8','small: i8'),('found:=','found: bool'),
+                              ('values:=','[3]int'),('reverse:=','reverse: bool')]:
+            self.assertIn(expected,json.dumps(self.hover(client,main,text,word)))
+        for fragment,expected in [('[.Red,.Blue]','Color: .Red'),('[{value=4}','value: i8')]:
+            offset=2 if fragment.startswith('[.') else len('[{v')
+            hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+                                  'position':self.position(text,fragment,offset)})
+            self.assertIn(expected,json.dumps(hover))
+        definitions=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
+                                    'position':self.position(text,'[{value=4}',len('[{v'))})
+        if isinstance(definitions,dict):definitions=[definitions]
+        self.assertTrue(any(item['range']['start']==self.position(text,'value:i8',0) for item in definitions),definitions)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        incomplete=text.replace('[.Red,.Blue]','[.R,.Blue]')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':incomplete}]})
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+                                    'position':self.position(incomplete,'[.R,.Blue]',3)})
+        self.assertIn('Red',[item['label'] for item in completion['items']])
+        reverse_hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},
+                                      'position':self.position(incomplete,'reverse_enum:=.Blue',len('reverse_enum:=.')+1)})
+        self.assertIn('Color: .Blue',json.dumps(reverse_hover))
+
+    def test_membership_literal_overflow_unsaved_diagnostics_and_type_mismatch_recovery(self):
+        text='package main\nmain::proc(){/* 😀 */ value:i8=4;found:=value in [4,128];_=found}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='128')
+        error=next(error for error in errors if '128' in error['message'])
+        self.assertEqual(error['range']['start'],self.position(text,'128',0))
+        self.assertNotIn('__thor_',error['message'])
+        fixed=text.replace('[4,128]','[4,8]')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        broken=fixed.replace('[4,8]','[4,i16(8)]')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(error for error in errors if 'Cannot' in error['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'i16(8)',0))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':4},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_switch_panic_inference_context_hover_and_unsaved_diagnostic_recovery(self):
         text='''package main
 Record::struct{value:int}

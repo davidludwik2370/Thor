@@ -410,6 +410,17 @@ async function run() {
         assert.ok(!powerError.message.includes('Thor expression'));
         await replace(powerSource);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const membershipSource='package main\nRecord::struct{value:i8}\nmain::proc(){small:i8=4;found:=small in [4,8];record:=Record{4};if record in [{value=4},{value=8}]{};_=found}\n';
+        await replace(membershipSource);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(membershipSource.indexOf('found:=')+2)),values=>hoverText(values||[]).includes('found: bool'));
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(membershipSource.indexOf('[{value=4')+3)),values=>hoverText(values||[]).includes('value: i8'));
+        await replace(membershipSource.replace('[4,8]','[4,128]'));
+        const membershipErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('128')));
+        assert.equal(testDocument.getText(membershipErrors.find(value=>value.message.includes('128')).range),'128');
+        await replace(membershipSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const intervalSource='package main\nallowed_range::proc($N:int)->int where N in 0..<10{return N}\n#if -2 in -3..=0 {SELECTED::42} #else {SELECTED::false}\nmain::proc(){value:=3;found:=value in 0..<10;result:=allowed_range(9);_=found;_=result;_=SELECTED}\n';
         await replace(intervalSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -537,6 +548,7 @@ async function run() {
             'implicit runtime import names and namespace theme mapping',
             'rune fill syntax and mapped format diagnostics',
             'immediate same-file redeclarations and clearing',
+            'contextual membership literals, record-field hovers and mapped unsaved overflow diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {

@@ -41,6 +41,14 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_membership_context_errors_point_to_original_inline_elements(self):
+        for typ, array, fragment in [('i8','[4,128]','128'),('u8','[-1,4]','-1'),
+                                     ('i8','[4,2.5]','2.5'),('i8','[4,i16(8)]','i16(8)')]:
+            with self.subTest(typ=typ,array=array):
+                errors=self.at('package main\nmain::proc(){/* 😀 */ value:'+typ+'=4;_=value in '+array+'}\n',
+                               fragment)
+                self.assertEqual(len([error for error in errors if error['type']=='error']),1,errors)
+
     def test_string_repetition_errors_point_to_original_unicode_operation(self):
         for expression,message in [('"ab"*(-1)','nonnegative count'),('"ab"*1.5','integer compile-time count'),
                                    ('"ab"*(1<<30)','16 MiB')]:

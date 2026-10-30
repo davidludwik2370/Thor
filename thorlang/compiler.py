@@ -847,7 +847,17 @@ class Source:
     def render_array(self, n, expected=None, needle=None, constant=False):
         return self.mapping.wrap(self._render_array(n, expected, needle, constant), self.path, n.start, n.end, "array")
 
+    @staticmethod
+    def membership_needle(n):
+        container = n
+        while container.parent and container.parent.kind == 'Paren': container = container.parent
+        parent = container.parent
+        if parent and parent.kind == 'Binary' and parent.data['op'] in {'in','not_in'} and parent.role('right') is container:
+            return parent.role('left')
+        return None
+
     def _render_array(self, n, expected=None, needle=None, constant=False):
+        needle = needle or self.membership_needle(n)
         elements = n.group("elems")
         target_type = None
         first_rendered = None
@@ -865,11 +875,12 @@ class Source:
             nested_hint = Hint(node.source, node, element_type)
         elif elements:
             first = elements[0]
-            first_rendered = self.render(first, constant=constant)
-            if needle and (first.kind == "ImplicitSelector" or first.text == "nil"):
+            if needle and (first.kind == "ImplicitSelector" or first.text == "nil"
+                           or not self.resolver.membership_untyped(needle)):
                 self.needs_default = True
                 element_type = f"type_of({self.prefix}default_value({self.render(needle)}))"
             else:
+                first_rendered = self.render(first, constant=constant)
                 self.needs_default = True
                 element_type = f"type_of({self.prefix}default_value({first_rendered}))"
             # Later elements receive the inferred element type as their context,
