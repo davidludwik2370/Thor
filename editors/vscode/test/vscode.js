@@ -422,6 +422,18 @@ async function run() {
         assert.ok(!usingErrors.some(value=>value.message.includes('has been disallowed')));
         await replace(usingSource);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const multiSource='package main\nKind::enum{A,B}\nmain::proc(){number:=0;text:="";number,text=switch{case true:1,"ok";case:2,"other"};kind:Kind;number,kind=switch{case number==1:2,.B;case:break};_=text;_=kind}\n';
+        await replace(multiSource);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(multiSource.indexOf('_=text')+3)),values=>hoverText(values||[]).includes('text: string'));
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(multiSource.indexOf('2,.B')+3)),values=>hoverText(values||[]).includes('Kind: .B'));
+        await replace(multiSource.replace('1,"ok"','1,99'));
+        const multiErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('Cannot')));
+        assert.equal(testDocument.getText(multiErrors.find(value=>value.message.includes('Cannot')).range),'99');
+        assert.ok(multiErrors.every(value=>!value.message.includes('__thor_')));
+        await replace(multiSource);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const membershipSource='package main\nRecord::struct{value:i8}\nmain::proc(){small:i8=4;found:=small in [4,8];record:=Record{4};if record in [{value=4},{value=8}]{};_=found}\n';
         await replace(membershipSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -563,6 +575,7 @@ async function run() {
             'contextual membership literals, record-field hovers and mapped unsaved overflow diagnostics',
             'automatic using feature with original-source hovers and unsaved diagnostics',
             'promoted using fields supply switch result types and contextual enum hovers',
+            'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {

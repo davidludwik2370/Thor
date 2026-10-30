@@ -2147,6 +2147,8 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 				out^=make_symbol_basic_type_from_ast(ast_context,ident)
 				return true
 			}
+			if resolved,handled:=thor_switch_projected_value(ast_context,v,out);handled{return resolved}
+			if name.name=="__thor_switch_results"&&len(v.args)>0{return internal_resolve_type_expression(ast_context,v.args[0],out)}
 			if strings.has_prefix(name.name,"__thor_switch_expression_"){
 				count,valid:=strconv.parse_int(name.name[len("__thor_switch_expression_"):])
 				found:=false

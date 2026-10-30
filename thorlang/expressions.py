@@ -23,6 +23,8 @@ class Expressions:
         self.ownership = Ownership(self)
         from .extrema import Extrema
         self.extrema = Extrema(self)
+        from .switches import Switches
+        self.switches = Switches(self)
 
     def module(self, name, path=None):
         alias = self.source.prefix + name
@@ -89,6 +91,7 @@ class Expressions:
         from .semantics import descendants
         s=self.source
         name=s.prefix+f'{flavor}_{node.start}_{node.end}'
+        if self.switches.global_context: name += '_global'
         scope=self.helper_scope(node)
         key=scope,name
         variables={}
@@ -105,6 +108,10 @@ class Expressions:
         aliases={k:f'({s.prefix}capture_{i}{"^" if refs[i] else ""})' for i,k in enumerate(variables)}
         if result is False:
             result_type=None
+        elif isinstance(result, tuple):
+            for i in range(len(result)):
+                params.append(f'${s.prefix}Result_{i}: typeid')
+            result_type='('+', '.join(s.prefix+f'Result_{i}' for i in range(len(result)))+')'
         elif result is None:
             params.append(f'${s.prefix}Result: typeid')
             result_type=('^' if pointer else '')+s.prefix+'Result'
@@ -119,10 +126,12 @@ class Expressions:
             self.helpers[key]='' # Nested helpers may refer back through type queries.
             self.captures.append(aliases)
             try:
-                body=builder(Hint(s,node,s.prefix+'Result') if result is None else None)
+                hint = (tuple(Hint(s,node,s.prefix+f'Result_{i}') for i in range(len(result)))
+                        if isinstance(result,tuple) else Hint(s,node,s.prefix+'Result') if result is None else None)
+                body=builder(hint)
             finally:
                 self.captures.pop()
-            convention=' "odin"' if self.has_context(node) else ' "contextless"'
+            convention=' "odin"' if self.has_context(node) and not self.switches.global_context else ' "contextless"'
             returns=(' -> (value: '+result_type+', ok: bool) #optional_ok' if optional_ok else ' -> '+result_type) if result_type else ''
             privacy='@(private="file")\n' if scope is s.root else ''
             self.helpers[key]=s.mapping.wrap(f'\n{privacy}{name} :: proc{convention}({", ".join(params)}){returns} {{\n{body}\n}}\n',
@@ -255,6 +264,8 @@ class Expressions:
         return '{\nwhen '+self.set_trait(value)+' {\n'+selected+'\n} else {\n'+loop(value)+'\n}\n}'
 
     def render(self,n,expected,constant):
+        if n in self.switches.replacements:
+            return self.switches.replacements[n]
         s=self.source
         if n.kind=='Ident':
             symbol=self.variable(n)
@@ -300,6 +311,8 @@ class Expressions:
         if n.kind=='Assignment' and n not in self.assigning:
             code=self.assignment(n,constant)
             if code is not None: return code
+        code=self.switches.statement(n,constant)
+        if code is not None: return code
         if n.kind=='Call' and not self.ownership.querying:
             callee=n.role('callee')
             if callee.kind=='Ident' and callee.text=='raw_data' and s.resolver.symbol(callee) is None:
@@ -443,7 +456,7 @@ class Expressions:
             if parent and parent.kind=='Return' and len(parent.group('values'))==1:
                 proc=next((a for a in parent.ancestors() if a.kind=='Procedure'),None)
                 optional=bool(proc and len(s.resolver.fields(proc.role('type').role('results')))>1)
-            if optional:return None
+            if optional and not self.writes(n):return None
         bounds=[n.role('index')] if n.kind=='Index' else [n.role('low'),n.role('high')]
         # Positive constants and narrow unsigned indices stay native. Wide
         # unsigned runtime indices need a check before Odin narrows to int.
@@ -809,6 +822,9 @@ class Expressions:
 
     def switch(self,n,expected,constant):
         s=self.source
+        if self.switches.special(n,expected):
+            return self.switches.render(n,expected,constant)
+        if isinstance(expected,tuple): expected=expected[0] if expected else None
         cases=n.data['cases']
         defaults=[c for c in cases if not c['matches']]
         expression=n.kind!='CompileSwitch'

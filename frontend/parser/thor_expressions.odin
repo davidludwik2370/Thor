@@ -211,14 +211,25 @@ parse_switch_expression :: proc(p: ^Parser) -> ^ast.Expr {
         expect_token(p,.Colon)
         old := p.expr_level
         p.expr_level = 0
-        result := parse_expr(p,false)
+        result: ^ast.Expr
+        if p.curr_tok.kind == .Break {
+            stop := advance_token(p)
+            result = thor_call("__thor_switch_break",stop.pos,end_pos(stop),nil)
+            append(&p.features,Feature{kind="SwitchBreak",start=result.pos.offset,end=result.end.offset})
+        } else {
+            values := parse_rhs_expr_list(p)
+            if len(values) == 1 { result = values[0] } else {
+                result = thor_call("__thor_switch_results",values[0].pos,values[len(values)-1].end,values)
+                append(&p.features,Feature{kind="SwitchResults",start=result.pos.offset,end=result.end.offset})
+            }
+        }
         p.expr_level = old
         expect_semicolon(p,result)
         append(&args,..matches)
         append(&results,result)
         append(&cases,Feature_Case{start=start.pos.offset,end=result.end.offset,matches=thor_spans(matches),result=thor_span(result)})
         if p.curr_tok.kind != .Case && p.curr_tok.kind != .Close_Brace {
-            error(p,p.curr_tok.pos,"A switch expression arm contains exactly one result expression")
+            error(p,p.curr_tok.pos,"A switch expression arm contains only result expressions or break")
             fix_advance_to_next_stmt(p)
             break
         }

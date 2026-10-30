@@ -39,7 +39,7 @@ thor_context_adapter :: proc(call: ^ast.Call_Expr) -> bool {
     ident, ok := call.expr.derived.(^ast.Ident)
     if !ok || ident.pos.offset != ident.end.offset { return false }
     _, sw := thor_context_switch_count(call)
-    return sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation"
+    return sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break"
 }
 
 // Only the builtin panic call is a valueless switch result. Other void or
@@ -108,6 +108,13 @@ thor_context_argument :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
     }
     ctx.call, ctx.resolve_specific_overload = call, true
     ctx.current_package, ctx.use_locals = ctx.document_package, true
+    if len(call.args)==1 && thor_switch_root(call.args[0]) && thor_switch_arity(call.args[0],ctx)>1{
+        symbol:=resolve_type_expression(ctx,call) or_return
+        value:=symbol.value.(SymbolProcedureValue) or_return
+        slot:=thor_switch_result_index(call.args[0],pc.position)
+        field:=get_proc_arg_type_from_index(value,slot) or_return
+        return thor_context_type(ctx,field.type if field.type!=nil else field.default_value)
+    }
     type := get_call_argument_type(ctx, pc, call) or_return
     return thor_context_type(ctx, type)
 }
@@ -235,7 +242,17 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
             return thor_context_expression(ctx, pc, elem, child, wanted, depth+1)
         }
     case ^ast.Call_Expr:
+        if group,ok:=thor_switch_group(node);ok {
+            for arg in group.args {
+                if position_in_node(arg,pc.position){return thor_context_expression(ctx,pc,arg,expected,wanted,depth+1)}
+            }
+            return {},false
+        }
         if count, sw := thor_context_switch_count(node); sw {
+            if thor_switch_arity(node,ctx)>1 && !thor_context_concrete(ctx,expected){
+                slot:=thor_switch_result_index(node,pc.position)
+                expected,_=thor_context_switch_value(ctx,thor_switch_projection(node,slot))
+            }
             if !thor_context_concrete(ctx, expected) {
                 for arm in node.args[:count] {
                     if thor_context_panic_arm(ctx, arm) { continue }
@@ -325,6 +342,13 @@ thor_resolve_expected_type :: proc(ctx: ^AstContext, pc: ^DocumentPositionContex
     if literal := pc.parent_comp_lit; literal != nil && literal.type != nil {
         if symbol, ok := thor_context_expression(ctx, pc, literal, {}, wanted); ok { return symbol, true }
     }
+    if assignment := pc.assign; assignment != nil && len(assignment.rhs)==1 && len(assignment.lhs)>1 && thor_switch_root(assignment.rhs[0]) {
+        slot:=thor_switch_result_index(assignment.rhs[0],pc.position)
+        if slot<len(assignment.lhs){
+            expected:=thor_context_type(ctx,assignment.lhs[slot]) or_return
+            return thor_context_expression(ctx,pc,assignment.rhs[0],expected,wanted)
+        }
+    }
     if assignment := pc.assign; assignment != nil && len(assignment.lhs) == len(assignment.rhs) {
         for rhs, i in assignment.rhs {
             if !position_in_node(rhs, pc.position) { continue }
@@ -333,6 +357,17 @@ thor_resolve_expected_type :: proc(ctx: ^AstContext, pc: ^DocumentPositionContex
         }
     }
     if returns := pc.returns; returns != nil && pc.function != nil && pc.function.type != nil && pc.function.type.results != nil {
+        if len(returns.results)==1 && thor_switch_root(returns.results[0]) && thor_switch_arity(returns.results[0],ctx)>1{
+            slot:=thor_switch_result_index(returns.results[0],pc.position)
+            current:=0
+            for field in pc.function.type.results.list{for _ in 0..<max(1,len(field.names)){
+                if current==slot{
+                    expected:=thor_context_type(ctx,field.type) or_return
+                    return thor_context_expression(ctx,pc,returns.results[0],expected,wanted)
+                }
+                current+=1
+            }}
+        }
         index := 0
         for field in pc.function.type.results.list {
             for _ in 0..<max(1, len(field.names)) {

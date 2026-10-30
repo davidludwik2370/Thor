@@ -186,7 +186,7 @@ Statement syntax:
   calls after a match, including when conditions share a comma-separated case.
 - Statement form lowers to a when chain and may omit a default, selecting no
   statements when no case matches.
-- Expression form follows section 7's single-expression-arm and exhaustiveness
+- Expression form follows section 7's result-arm and exhaustiveness
   rules. Lower to compile-time conditional expressions or equivalent declarations.
 - Only the selected expression arm is evaluated. Its result must meet the
   surrounding constant-expression/type requirements.
@@ -346,8 +346,23 @@ Syntax:
   The selectorless form behaves as switch true: cases are boolean conditions,
   checked in source order, and the first true condition selects the result.
   Type switches are not a new expression feature in v1.
-- Each arm contains exactly one result expression. No switch-targeting break or
-  fallthrough is allowed in expression form.
+- Each value arm contains one expression or a comma-separated result list;
+  every selected value arm must supply the required number of results. A direct
+  multi-result procedure call can supply the results. Each position receives
+  its own destination/return/argument type context. Results remain ordinary
+  multiple values, not a first-class tuple or an allocated object.
+- When the whole RHS of an ordinary = assignment is a switch (parentheses are
+  allowed), an arm may contain break instead of results. This skips every
+  store in that assignment, not an outer loop. Destination locations/indices
+  are evaluated once before selection, following native assignment order.
+  break is forbidden in declarations, returns, arguments, compound assignments
+  and nested value contexts. fallthrough remains forbidden. A default remains
+  required even when the destinations already hold values.
+- These rules apply to runtime switch and expression #switch alike. Native
+  when selection preserves compile-time constants and unchecked inactive arms.
+- Only the unshadowed built-in panic call may replace a value arm with a
+  nonreturning call. It supplies no result types. Other void/nonreturning calls
+  remain ordinary type errors. All-panic switches require expected types.
 - Require a default unless finite exhaustiveness is actually established. The
   first implementation may require a default for every expression switch.
 - Never manufacture a zero-valued fallback for a missing arm.

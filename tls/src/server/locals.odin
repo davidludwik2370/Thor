@@ -1,6 +1,7 @@
 package server
 
 import "core:log"
+import "core:strings"
 import "core:odin/ast"
 
 import "src:spall"
@@ -182,6 +183,10 @@ get_generic_assignment :: proc(
 	is_mutable: bool,
 ) {
 	reset_ast_context(ast_context)
+	if strings.has_suffix(file.fullpath,".thor") && thor_switch_root(value) && thor_switch_arity(value,ast_context)>1 {
+		for index in 0..<thor_switch_arity(value,ast_context){append(results,thor_switch_projection(value,index))}
+		return
+	}
 
 	#partial switch v in value.derived {
 	case ^ast.Or_Return_Expr:

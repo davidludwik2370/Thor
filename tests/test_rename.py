@@ -11,6 +11,23 @@ from tests.test_tls import Client, ROOT
 
 
 class RenameTests(unittest.TestCase):
+    def test_multi_result_switch_names_and_references_rename(self):
+        text='''package main
+main::proc(){
+ first,second:=switch{case true:1,2;case:3,4}
+ first,second=switch{case true:second,first;case:break}
+ assert(first==2&&second==1)
+}
+'''
+        for name in ['first','second']:
+            with self.subTest(name=name):
+                files={'main.thor':text}
+                client,root,main=self.project(files)
+                edit=self.rename(client,main,text,name,'renamed')
+                expected={'main.thor':text.replace(name,'renamed')}
+                self.assertEqual(self.apply(root,files,edit),expected)
+                self.assert_builds(root,expected)
+
     def test_constants_rename_inside_string_repetition(self):
         text='package main\nCOUNT::3\nTEXT::"a"*COUNT\nmain::proc(){_=TEXT;_=COUNT*"ab"}\n'
         files={'main.thor':text}

@@ -351,6 +351,8 @@ class Evaluator:
             if not self.known(n.role('cond'),seen.copy()):return False
             selected=self.boolean(n.role('cond'))
             return self.known(n.role('x' if selected else 'y'),seen)
+        if n.kind == 'SwitchResults':
+            return all(self.known(value, seen.copy()) for value in n.group('args'))
         if n.kind in {'SwitchExpr','CompileSwitchExpr'}:
             selector=n.role('selector')
             if selector and not self.known(selector,seen.copy()):return False

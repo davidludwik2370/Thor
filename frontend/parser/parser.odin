@@ -3912,6 +3912,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 	immutable := false
 
 	values: []^ast.Expr
+	thor_multi := false
 	type: ^ast.Expr
 	if !(p.thor && p.curr_tok.kind == .Gt) { type = parse_type_or_ident(p) }
 
@@ -3926,9 +3927,18 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 		is_mutable = sep.kind != .Colon
 
 		values = parse_rhs_expr_list(p)
+		if p.thor && len(values) == 1 {
+			value := values[0]
+			for { if paren,ok:=value.derived.(^ast.Paren_Expr);ok {value=paren.expr} else {break} }
+			if call,ok:=value.derived.(^ast.Call_Expr);ok {
+				if ident,named:=call.expr.derived.(^ast.Ident);named {
+					thor_multi = ident.name == "__thor_switch_expression" && ident.pos.offset == ident.end.offset
+				}
+			}
+		}
 		if len(values) > len(names) {
 			error(p, p.curr_tok.pos, "too many values on the right-hand side of the declaration")
-		} else if len(values) < len(names) && !is_mutable {
+		} else if len(values) < len(names) && !is_mutable && !thor_multi {
 			error(p, p.curr_tok.pos, "all constant declarations must be defined")
 		} else if len(values) == 0 {
 			error(p, p.curr_tok.pos, "expected an expression for this declaration")
@@ -3965,7 +3975,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 	}
 
 	if p.curr_proc == nil {
-		if len(values) > 0 && len(names) != len(values) {
+		if len(values) > 0 && len(names) != len(values) && !thor_multi {
 			error(p, values[0].pos, "expected %d expressions on the right-hand side, got %d", len(names), len(values))
 		}
 	}

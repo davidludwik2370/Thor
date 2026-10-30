@@ -638,6 +638,10 @@ class Source:
             hint = Hint(self, annotation) if annotation else None
             for value in n.group("values"):
                 overrides[value] = (hint, not n.data["mutable"])
+            if len(n.group('values')) == 1 and len(n.group('names')) > 1:
+                from .switches import unwrap
+                if unwrap(n.group('values')[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
+                    overrides[n.group('values')[0]] = (self.expressions.switches.hints(n), not n.data['mutable'])
         elif kind == "Assignment":
             for lhs, rhs in zip(n.group("lhs"), n.group("rhs")):
                 if lhs.kind == "Ident" and lhs.text == "_":
@@ -647,6 +651,10 @@ class Source:
                 # dereferences, and procedure results. type_of never evaluates it.
                 hint = self.type_hint(lhs) or Hint(self, lhs, f"type_of({self.render(lhs)})")
                 overrides[rhs] = (hint, constant)
+            if len(n.group('rhs')) == 1 and len(n.group('lhs')) > 1:
+                from .switches import unwrap
+                if unwrap(n.group('rhs')[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
+                    overrides[n.group('rhs')[0]] = (self.expressions.switches.hints(n), constant)
         elif kind == "Field" and n.role("type") and n.role("default"):
             overrides[n.role("default")] = (Hint(self, n.role("type")), constant)
         elif kind == "Procedure":
@@ -676,6 +684,10 @@ class Source:
             fields = self.fields(procedure.role("type").role("results")) if procedure else []
             for value, (_, annotation) in zip(n.group("values"), fields):
                 overrides[value] = (self.type_hint(annotation) or Hint(self, annotation), constant)
+            if len(n.group('values')) == 1 and len(fields) > 1:
+                from .switches import unwrap
+                if unwrap(n.group('values')[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
+                    overrides[n.group('values')[0]] = (self.expressions.switches.hints(n), constant)
         elif kind == "Call":
             signature = self.signature(n)
             params = self.fields(signature.role("params")) if signature else []
@@ -706,6 +718,16 @@ class Source:
                 overrides[arg] = (hint, constant or n.role("callee").text in {"#assert", "#config"})
             callee = n.role("callee")
             args = n.group("args")
+            if len(args) == 1 and len(params) > 1:
+                from .switches import unwrap
+                switch = unwrap(args[0])
+                if switch.kind in {'SwitchExpr','CompileSwitchExpr'} and self.expressions.switches.special(switch):
+                    if not generic and not method:
+                        self.needs_intrinsics = True
+                        callee_text = self.render(callee)
+                        count = self.expressions.switches.count(switch)
+                        overrides[args[0]] = (tuple(Hint(self,args[0],f'#type {self.prefix}meta.type_proc_parameter_type(type_of({callee_text}), {i})')
+                                                   if i < len(params) else None for i in range(count)),constant)
             if callee and callee.text in {"#load", "#load_hash", "#load_directory", "#exists"} and args and args[0].kind == "Literal":
                 path = unquote(args[0].text)
                 resource = None

@@ -286,6 +286,10 @@ class Purity:
             return result
         if n.kind in {'Ternary','WhenExpr','OrElse'}:
             result=Flow();result.merge(self.flow(n.role('x'),env));result.merge(self.flow(n.role('y'),env));return result
+        if n.kind == 'SwitchResults':
+            result=Flow()
+            for value in n.group('args'):result.merge(self.flow(value,env))
+            return result
         if n.kind in {'SwitchExpr','CompileSwitchExpr'}:
             result=Flow()
             for case in n.data['cases']:result.merge(self.flow(n.source.at(case['result'],n),env))
@@ -406,9 +410,13 @@ class Purity:
                 if n.kind=='Declaration':names,values=n.group('names'),n.group('values')
                 elif n.kind=='Assignment' and n.data['op']=='=':names,values=n.group('lhs'),n.group('rhs')
                 else:names,values=[],[]
-                for lhs,rhs in zip(names,values):
+                pairs=list(zip(names,values))
+                from .switches import unwrap
+                if len(values)==1 and unwrap(values[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
+                    pairs=[(lhs,values[0]) for lhs in names]
+                for index,(lhs,rhs) in enumerate(pairs):
                     if lhs.text=='_':continue
-                    value=self.copied(self.flow(rhs,env),rhs)
+                    value=self.copied(self.result_flow(rhs,index,env) if len(values)==1 else self.flow(rhs,env),rhs)
                     if n.kind=='Declaration':
                         key=n,lhs.data.get('name') or lhs.text
                         if key not in env:env[key]=value;changed=True
@@ -535,6 +543,17 @@ class Purity:
                 pieces.append('('+' || '.join(f'{meta}.type_is_{kind}({t})' for kind in ['slice','string','dynamic_array','map','pointer','multi_pointer'])+')')
         return ' || '.join(pieces) or 'false'
 
+    def result_flow(self,n,index,env):
+        if n.kind=='Paren':return self.result_flow(n.role('expr'),index,env)
+        if n.kind=='SwitchResults':
+            args=n.group('args')
+            return self.flow(args[index],env) if index<len(args) else Flow()
+        if n.kind in {'SwitchExpr','CompileSwitchExpr'}:
+            result=Flow()
+            for case in n.data['cases']:result.merge(self.result_flow(n.source.at(case['result'],n),index,env))
+            return result
+        return self.flow(n,env) if index==0 else Flow()
+
     def render(self,n,expected,constant):
         proc=n if n.kind=='Procedure' else self.owner(n)
         if n.kind=='Run':
@@ -585,6 +604,8 @@ class Purity:
                 return name+'('+', '.join(args)+')'
             finally:self.rendering.remove(n)
         if n.kind=='Return' and proc in self.inner_bodies:
+            selected=n.source.expressions.switches.statement(n,constant)
+            if selected is not None:return selected
             s=n.source;results=self.r.fields(proc.role('type').role('results'))
             if n.parent and n.parent.kind == 'Block' and s.raw[n.parent.start:n.parent.start+1] != b'{':
                 # Promotion expands a single return into a block. Odin's `do`
@@ -593,8 +614,12 @@ class Purity:
                 s.expressions.convert_do(n.parent)
             named=self.result_names(proc)
             values_=n.group('values')
-            rhs=','.join(s.render(value,expected=s.type_hint(typ) or Hint(s,typ))
-                         for value,(_,typ) in zip(values_,results)) if values_ else ','.join(named)
+            from .switches import unwrap
+            if len(values_)==1 and unwrap(values_[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
+                rhs=s.render(values_[0],expected=tuple(s.type_hint(t) or Hint(s,t) for _,t in results))
+            else:
+                rhs=','.join(s.render(value,expected=s.type_hint(typ) or Hint(s,typ))
+                             for value,(_,typ) in zip(values_,results)) if values_ else ','.join(named)
             # Preserve native arity errors, including a single multi-result call.
             if len(values_)>len(results):rhs+=','+','.join(s.render(v) for v in values_[len(results):])
             assignment=','.join(named)+'='+rhs+';' if values_ else ''

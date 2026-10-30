@@ -748,10 +748,38 @@ released after use, including mixed branches such as
 Named field values keep their existing ownership. A procedure that returns
 allocated storage still needs an explicit lifetime chosen by the caller.
 
-Expression switches currently require a default arm and exactly one expression
-per arm. They support comma-separated cases and native ranges, check duplicate
+Expression switches require a default arm. Arms may supply one result or a
+comma-separated list of results. They support comma-separated cases and native ranges, check duplicate
 constant cases, evaluate the selector once, and execute only the first matching
 arm. Expected destination/argument/return types supply result context.
+Each result receives its own destination type, including distinct types, enum
+members and inferred record/array literals. Multiple results use ordinary Odin
+multiple-value rules; swaps evaluate every selected RHS before storing results.
+An arm can also call a procedure returning the required number of values.
+
+```odin
+a, angle, b = switch {
+    case rotate: b, other_angle, a
+    case:        break
+}
+
+NUMBER, TEXT :: #switch {
+    case DEBUG: 1, "debug"
+    case:       2, "release"
+}
+```
+
+`break` skips the entire assignment and leaves all destinations unchanged. It is
+allowed only when the switch is the entire RHS of an ordinary `=` assignment
+(parentheses are fine), in any arm. It does not break an enclosing loop. It is
+rejected in declarations, returns, arguments, nested arithmetic and compound
+assignments. Destination locations/indices are evaluated once before switch
+selection, as in native assignment; skipping performs no stores. A default is
+still required. `#switch` supports the same result lists and assignment-only
+skip; compile-time constants and unchecked inactive arms retain native `when`
+behavior. Anonymous Thor allocations discarded into `_` are cleaned up; named
+values remain borrowed. Run the [commented examples](examples/switch-results/demo.thor)
+with `thor run examples/switch-results`.
 A switch result arm may be a call to the built-in `panic(...)`: it terminates
 instead of supplying a value, so it does not contribute to result-type inference.
 For example, `direction: Coord > switch { case valid: {-1, 0}; case: panic("invalid move") }`

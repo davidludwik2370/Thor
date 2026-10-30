@@ -134,6 +134,54 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_multiple_switch_result_hovers_and_original_tokens(self):
+        text='''package main
+Kind::enum{A,B}
+A,B::#switch{case true:1,"global";case:undefined,undefined}
+GLOBAL_N,GLOBAL_TEXT:=switch{case true:3,"runtime";case:4,"other"}
+pair::proc()->(int,string){return 7,"pair"}
+generic_pair::proc(x:$T)->(T,string){return x,"generic"}
+main::proc(){
+ a,b,k:=switch{case true:2,"ok",Kind.B;case:3,"no",Kind.A}
+ c,d:=(switch{case true:pair();case:8,"other"})
+ x,y:=#switch{case true:4,"local";case:undefined,undefined}
+ p,q:=switch{case true:generic_pair(f32(7));case:generic_pair(f32(8))}
+ _=a;_=b;_=k;_=c;_=d;_=x;_=y;_=A;_=B;_=GLOBAL_N;_=GLOBAL_TEXT;_=p;_=q
+}
+'''
+        client,main=self.open(text)
+        for word,typ in [('a','int'),('b','string'),('k','Kind'),('c','int'),('d','string'),('x','int'),('y','string'),('A',':: 1'),('B',':: "global"'),('GLOBAL_N','int'),('GLOBAL_TEXT','string'),('p','f32'),('q','string')]:
+            with self.subTest(word=word):
+                hover=client.request('textDocument/hover',{'textDocument':{'uri':main.as_uri()},'position':self.position(text,'_='+word,2)})
+                self.assertIsNotNone(hover)
+                self.assertIn(typ,hover['contents']['value'])
+                self.assertNotIn('__thor_',hover['contents']['value'])
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+
+    def test_multiple_switch_context_uses_corresponding_enum_result(self):
+        header='package main\nColor::enum{Red,Blue}\nOther::enum{Red,Green}\n'
+        for body in [
+            'main::proc(){a:int;b:Color;a,b=switch{case true:1,.R{*}ed;case:2,.Blue};_=a;_=b}',
+            'f::proc()->(int,Color){return switch{case true:1,.R{*}ed;case:2,.Blue}}\nmain::proc(){}',
+            'main::proc(){a,b:=switch{case true:1,.R{*}ed;case:2,Color.Blue};_=a;_=b}',
+            'main::proc(){a:int;b:Color;a,b=switch{case true:1,.R{*}ed;case:break};_=a;_=b}',
+            'take::proc(a:int,b:Color){}\nmain::proc(){take(switch{case true:1,.R{*}ed;case:2,.Blue})}',
+        ]:
+            with self.subTest(body=body):self.assert_contextual_enum(header+body+'\n')
+
+    def test_multiple_switch_second_result_diagnostics_and_recovery(self):
+        text='package main\nmain::proc(){a:int;b:string;a,b=switch{case true:1,"ok";case:2,"other"};_=a;_=b}\n'
+        client,main=self.open(text)
+        broken=text.replace('1,"ok"','1,99')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(e for e in errors if 'Cannot' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'99',0))
+        self.assertNotIn('__thor_',error['message'])
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_using_promoted_switch_field_context_hover_navigation_and_diagnostics(self):
         text='''package main
 Kind::enum{A,B}

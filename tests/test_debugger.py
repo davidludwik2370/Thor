@@ -109,6 +109,30 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_multi_switch_arm_and_skip_preserve_source_breakpoints(self):
+        text='''package main
+main::proc(){
+    a,b:=1,2
+    a,b=switch a {
+        case 1: b,a
+        case: break
+    }
+    assert(a==2&&b==1)
+    a,b=switch {case false:9,8;case:break}
+    assert(a==2&&b==1)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,8,10])
+        for line in [5,8,10]:
+            thread,frame=self.frame(client)
+            self.assertEqual((frame['source']['path'],frame['line']),(str(source),line),frame)
+            if line>=8:
+                value=client.request('evaluate',{'frameId':frame['id'],'expression':'a','context':'watch'})
+                self.assertEqual(value['result'],'2',value)
+            client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_automatic_using_header_preserves_breakpoints_steps_and_arguments(self):
         text='''// 😀 original header
 package main

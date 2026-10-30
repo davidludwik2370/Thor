@@ -495,6 +495,12 @@ collect_value_decl :: proc(
 	for name, i in value_decl.names {
 		global_expr.name = get_ast_node_string(name, file.src)
 		global_expr.name_expr = name
+		if len(value_decl.values)==1 && len(value_decl.names)>1 && thor_switch_root(value_decl.values[0]) && value_decl.type==nil {
+			global_expr.expr=thor_switch_projection(value_decl.values[0],i)
+			global_expr.value_expr=global_expr.expr
+			append(exprs,global_expr)
+			continue
+		}
 
 		if len(value_decl.values) > i {
 			global_expr.value_expr = value_decl.values[i]

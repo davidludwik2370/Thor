@@ -373,6 +373,22 @@ class Resolver:
                 return Type("struct", node=record, substitutions=mapping)
         return Type(node=n)
 
+    def result_type(self, n, index, seen=None):
+        if n.kind == 'Paren': return self.result_type(n.role('expr'), index, seen)
+        if n.kind == 'SwitchResults':
+            args = n.group('args')
+            return self.type_of(args[index], seen) if index < len(args) else Type(node=n)
+        if n.kind == 'SwitchExpr':
+            arms = [n.source.at(c['result'], n) for c in n.data['cases']]
+            value = next((a for a in arms if a.kind != 'SwitchBreak' and not self.is_panic_call(a)), None)
+            return self.result_type(value, index, seen) if value else Type(node=n)
+        if n.kind == 'CompileSwitchExpr': return Type(node=n)
+        if n.kind == 'Call':
+            plan = self.resolve_call(n)
+            results = self.fields(plan.signature.role('results')) if plan else []
+            if index < len(results): return self.type_node(results[index][1], plan.substitutions)
+        return self.type_of(n, seen) if index == 0 else Type(node=n)
+
     def type_of(self, n, seen=None):
         if n is None:
             return Type()
@@ -389,10 +405,7 @@ class Resolver:
             # select it rather than borrowing an inactive arm's shape.
             return Type(node=n,witness=n)
         if kind=='SwitchExpr':
-            cases=n.data['cases']
-            arms=[n.source.at(case['result'],n) for case in cases]
-            value=next((arm for arm in arms if not self.is_panic_call(arm)),None)
-            return self.type_of(value,seen) if value else Type(node=n)
+            return self.result_type(n, 0, seen)
         if kind in {"Paren", "FieldValue"}:
             return self.type_of(n.role("expr") if kind == "Paren" else n.role("value"), seen)
         if kind == "Literal":
@@ -411,6 +424,10 @@ class Resolver:
             if symbol.annotation:
                 return replace(self.type_node(symbol.annotation), witness=n)
             if symbol.value:
+                from .switches import unwrap
+                if unwrap(symbol.value).kind in {'SwitchExpr','CompileSwitchExpr'}:
+                    index = symbol.index if len(symbol.declaration.group('values')) == 1 else 0
+                    return replace(self.result_type(symbol.value,index,seen),witness=n)
                 if symbol.value.kind == "Procedure":
                     return self.type_node(symbol.value.role("type"))
                 if symbol.value.kind == "Call":

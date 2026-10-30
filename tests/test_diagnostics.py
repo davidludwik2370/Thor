@@ -41,6 +41,24 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_multi_switch_wrong_result_has_original_position_and_destination_type(self):
+        for switch in ['switch',' #switch']:
+            source='package main\nKind::enum{A,B}\nmain::proc(){/* 😀 */ a:int;b:Kind;a,b='+switch+'{case true:1,"wrong";case:2,.B};_=a;_=b}\n'
+            errors=self.at(source,'"wrong"',message='Cannot')
+            self.assertIn('Kind',json.dumps(errors))
+
+    def test_multi_switch_arity_diagnostic_identifies_the_wrong_arm(self):
+        source='package main\nmain::proc(){a,b:=switch{case true:1,2;case:3,4,5};_=a;_=b}\n'
+        self.at(source,'3,4,5',message='Every switch value arm')
+
+    def test_switch_skip_bad_value_still_has_original_location(self):
+        source='package main\nmain::proc(){a:int;b:string;a,b=switch{case true:1,99;case:break};_=a;_=b}\n'
+        self.at(source,'99',message='Cannot')
+
+    def test_inferred_multi_switch_incompatible_result_identifies_that_position(self):
+        source='package main\nmain::proc(){a,b:=switch{case true:1,99;case:2,"other"};_=a;_=b}\n'
+        self.at(source,'99',message='Cannot convert')
+
     def test_using_promoted_switch_result_errors_have_the_field_type_and_original_range(self):
         source='package main\nKind::enum{A,B}\nRecord::struct{kind:Kind}\nwrite::proc(using record:^Record){/* 😀 */ kind=switch{case true:"wrong";case:.A}}\nmain::proc(){record:=Record{};write(&record)}\n'
         errors=self.at(source,'"wrong"',message='Cannot')

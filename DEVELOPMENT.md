@@ -2057,3 +2057,61 @@ using/purity tests, 134 stdio LSP/rename tests, 98 extension tests and the real
 VS Code integration pass. A temporary copy of the user's triangle_solver.thor
 runs successfully and classifies the 3-3-3 example as equilateral. The original
 project is unchanged; unused-import vetting also accepts the generated code.
+
+## Multiple switch results and assignment skipping (Thor 0.22.0 / TLS 0.16.0)
+
+The parser represents a result list as a virtual SwitchResults call, retaining
+every original result expression and span. A standalone break arm has its own
+virtual SwitchBreak node. Native single-result switches retain their existing
+lowering. Multiple results use generic Odin procedures with one result type
+parameter per position; declaration, assignment, return and expanded argument
+contexts supply independent type witnesses. Direct multi-result calls and
+nested switches use the same native multiple-value contract.
+
+An assignment whose complete RHS is a switch may use break in any arm. Capture
+destination addresses/indices in source order before selecting the switch,
+then perform a native multiple assignment only for a value arm. Map elements
+need their header's address and a typed key, rather than an element address.
+Generic sequence/map dispatch uses separate helper names for each branch;
+sharing those names could instantiate a sequence address operation for a map.
+Post-statement assignments retain Odin's required assignment syntax. Default
+arms are still mandatory; break is rejected in other value contexts.
+
+Whole-statement #switch selection uses native when blocks, preserving constant
+declarations, visibility and unchecked inactive arms. Header contexts use a
+lazy generic helper instead. Arity errors remain semantic and branch-local,
+including native syntax's stricter constant-declaration expression counts.
+Native Odin disallows global multiple-value initializers; runtime Thor globals
+stage results once in a private value record and initialize the real names
+from its fields. This adds no heap allocation and preserves global dependency
+order. Global helpers use a contextless convention, following Odin's normal
+global initializer restriction.
+
+Purity tracks borrowed origins separately for each result. Anonymous Thor
+allocations discarded into blanks are released after all RHS work; named
+values remain borrowed. Explicit result values and arity/type witnesses keep
+their original mappings, so errors identify the appropriate arm/result.
+
+TLS queries each result through a projected expression without rewriting the
+document AST. This retains original semantic tokens and rename/reference
+spans, while giving each local/global binding its own type and each contextual
+enum/record value its corresponding destination, return or argument type.
+Both selector forms, runtime/compile-time switches, generics, private/promoted
+fields, aliasing, map/sequence destinations, readonly rejection, skipped
+assignments, ownership, diagnostics and unsaved recovery have regression tests.
+The separate commented walkthrough is examples/switch-results/demo.thor.
+
+Validation: the 832-test compiler/integration sweep (one platform skip) found a
+nested-#run context regression while adding native global initializers. Narrow
+contextless helper generation to the new global-switch path, rather than
+changing the evaluation helpers' conventions. The exact failing test and 172
+affected allocation/cache/purity/default/native-call/repetition/switch tests
+pass after that correction; 128 focused switch/diagnostic/using/compatibility
+checks pass too. Also pass: 138 stdio LSP/rename tests, 1126 native TLS tests,
+15 real CodeLLDB tests, 98 extension tests, and the isolated real VS Code
+integration including multiple-result hovers and mapped unsaved errors.
+The main demo and new walkthrough run successfully (the walkthrough also in
+debug with clean allocation tracking). An unchanged temporary copy of the
+triangle solver runs; five further temporary input variants exercise its
+multiple-result branches. External project source and unrelated user edits
+are preserved, and the rebuilt local TLS is refreshed.

@@ -132,7 +132,7 @@ assert(a[1]==.Blue&&s.x==1)
         for expr,message in [('switch 1 {case 1:2}','requires a default'),
                              ('switch 1 {case 1:2;case 1:3;case:4}','Duplicate'),
                              ('switch 1 {case 1:2;case:3;case:4}','one default'),
-                             ('switch 1 {case 1: x:=3;case:4}','one result expression')]:
+                             ('switch 1 {case 1: x:=3;case:4}','only result expressions or break')]:
             with self.subTest(expr=expr): self.invoke(self.program('_='+expr),command='check',fail=message)
 
     def test_compile_switch_selector_and_boolean_expressions_are_constants(self):
