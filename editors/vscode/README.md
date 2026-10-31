@@ -249,6 +249,8 @@ some selected names are unused, those names fade individually while the used
 names stay bright. A qualified call such as `fmt.print()` uses the namespace,
 so it does not keep an unused selected `print` bright. Multiline selections and
 Unicode names use the original source ranges, including at newline/EOF.
+Hover over a selected name in the import list to see the same signature, type
+and documentation as a reference in code, even when that import is unused.
 
 Syntax errors and some obvious redeclarations can be reported immediately. For
 deeper checks, TLS invokes `thor check -json-errors` using snapshots of the open

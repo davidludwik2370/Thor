@@ -2222,3 +2222,28 @@ hints, full-declaration hint coverage and unsaved use/clearing. A read-only
 check of the user's sandbox.thor confirms the print token and complete unused
 range. No compiler, scaffold, theme or production extension changes are needed;
 restart TLS once to load the rebuilt server.
+
+## Hover on selected imports (TLS 0.16.2)
+
+Treat a selected identifier in an import list as a normal imported-symbol
+reference during position lookup. The synthetic alias's attributes and fake
+namespace previously intercepted hover and produced no tooltip. The normal
+hover renderer now supplies the same signature/type and documentation as code
+references, including for unused imports, multiline lists, namespace-free
+imports, Unicode identifiers, generics and overload groups. Navigation from
+the list also follows the original declaration.
+
+Keep imported symbols' original initializer/type and mutability when resolving
+the adapter. Previously a selected constant could display the internal
+__thor_import_N.NAME expression, and a mutable imported variable could inherit
+the adapter's constant flags. The adapter is presentation/scoping metadata,
+not another user-visible constant declaration.
+
+Regression tests compare import-list hovers directly with function-value and
+call hovers, check every character in print and its exact original range, and
+remove uses through unsaved edits. Mixed lists cover record types, constants,
+mutable variables, generic procedures, overload groups and Unicode names.
+Actual VS Code integration checks signature/docs equality and tooltip ranges
+before and after use/removal. All 143 stdio LSP/rename tests and all 1126 native
+TLS tests pass, with memory tracking enabled for the native suite. The local
+TLS binary is rebuilt; restart the language server once to load the change.

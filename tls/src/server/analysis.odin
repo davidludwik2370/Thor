@@ -3112,6 +3112,9 @@ resolve_global_identifier :: proc(
 		global.attributes,
 		.Mutable in global.flags,
 	)
+	// A selected import names the original declaration. Keep its initializer,
+	// type and mutability instead of displaying the synthetic alias expression.
+	if thor_is_import_alias_attributes(global.attributes) { return symbol, ok }
 
 	symbol.flags -= {.CompileTime, .ReadOnlyBinding, .Immutable}
 	if .Mutable not_in global.flags && .Immutable not_in global.flags { symbol.flags |= {.CompileTime} }

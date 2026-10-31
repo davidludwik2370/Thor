@@ -123,6 +123,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   Explicit collection configuration takes precedence.
 - Resolve selected import aliases with file privacy and local shadowing. Hover
   retains the imported declaration's signature; definitions follow the origin.
+  Selected names in import lists use the same hover path as code references,
+  including documentation, overloads and generics, even when unused. Imported
+  constants and variables retain their original initializer/type and mutability;
+  synthetic alias expressions never appear in the tooltip.
 - Report unused source imports as `Hint` diagnostics tagged `Unnecessary`, so
   VS Code dims them. The client enables reporting on open/change/save, including
   unsaved edits. Usage follows the actual namespace or selected name, distinguishing

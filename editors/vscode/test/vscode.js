@@ -270,12 +270,25 @@ async function run() {
             return JSON.stringify(found)===JSON.stringify([['print','function'],['println','function']]);
         };
         await eventually(selectedColors,Boolean);
+        const selectedPrintPosition=testDocument.positionAt(selectedImportSource.indexOf('/ print')+3);
+        const importedPrintHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',
+            testDocument.uri,selectedPrintPosition),values=>hoverText(values||[]).includes('fmt.print :: proc('));
+        assert.ok(hoverText(importedPrintHover).includes('Formats'));
+        assert.equal(testDocument.getText(importedPrintHover[0].range),'print');
         await replace(selectedImportSource.replace('println("hello")','print("used");println("hello")'));
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const calledPrintHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',
+            testDocument.uri,testDocument.positionAt(testDocument.getText().indexOf('print("used")')+1)),
+            values=>hoverText(values||[]).includes('fmt.print :: proc('));
+        assert.equal(hoverText(importedPrintHover),hoverText(calledPrintHover));
         const allSelectedUnused='package main\nimport "core:fmt" / print\nmain::proc(){}\n';
         await replace(allSelectedUnused);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>
             value.code==='Unused'&&testDocument.getText(value.range)==='import "core:fmt" / print'));
+        const unusedPrintHover=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',
+            testDocument.uri,testDocument.positionAt(allSelectedUnused.indexOf('/ print')+3)),
+            values=>hoverText(values||[]).includes('fmt.print :: proc('));
+        assert.equal(hoverText(unusedPrintHover),hoverText(importedPrintHover));
         const genericLoop = 'package main\nasc::proc(first:$T,rest:..T)->bool{previous:=first;for v in rest{if previous>v do return false;previous=v};return true}\ndesc::proc(first:$T,rest:..T)->bool{previous:=first;for v in rest{if previous<v do return false;previous=v};return true}\nmain::proc(){assert(asc(1,2,3));assert(desc(3,2,1))}\n';
         await replace(genericLoop);
         await eventually(() => vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri), value => {
@@ -573,6 +586,7 @@ async function run() {
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',
             'selected import names keep function colors, fade individually, and update without saving',
+            'selected import hovers show the same function signature and docs as calls, including unused imports',
             'activation and restart with no active editor', 'package declaration hover',
             'generic loop variables remain values in semantic tokens and hover',
             'generic inline defaults compile and body errors highlight original source', 'hidden Set imports do not hover on comments',

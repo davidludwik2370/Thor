@@ -2031,6 +2031,85 @@ main::proc(){_=GLOBAL;_=SELECTED}
             definitions = [definitions]
         self.assertTrue(any(item['uri'].endswith('/library/main.thor') for item in definitions), definitions)
 
+    def test_selected_import_declaration_hover_matches_function_value_and_call(self):
+        text = '''package main
+import "core:fmt" / print
+main::proc(){callback:=print;callback("hello");print("hello")}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        reference = self.hover(client, main, text, 'print;')
+        call = self.hover(client, main, text, 'print("hello")')
+        self.assertIsNotNone(reference)
+        self.assertIn('fmt.print :: proc(', reference['contents']['value'])
+        self.assertIn('Formats', reference['contents']['value'])
+        definitions = [client.request('textDocument/definition', {
+            'textDocument':{'uri':main.as_uri()},'position':self.position(text,word)})
+            for word in ['print\n','print;']]
+        self.assertTrue(definitions[0])
+        self.assertEqual(definitions[0],definitions[1])
+        for offset in range(len('print')):
+            with self.subTest(offset=offset):
+                selected = client.request('textDocument/hover', {
+                    'textDocument':{'uri':main.as_uri()},'position':self.position(text,'print\n',offset)})
+                self.assertIsNotNone(selected)
+                self.assertEqual(selected['contents'], reference['contents'])
+                self.assertEqual(selected['contents'], call['contents'])
+                self.assertEqual(selected['range'], {
+                    'start':self.position(text,'print\n',0), 'end':self.position(text,'print\n',len('print'))})
+        unused = text.replace('callback:=print;callback("hello");print("hello")', '')
+        client.send('textDocument/didChange', {'textDocument':{'uri':main.as_uri(),'version':2},
+                    'contentChanges':[{'text':unused}]})
+        self.assertEqual(len(self.unused_imports(client, main)), 1)
+        self.assertEqual(self.hover(client,main,unused,'print\n')['contents'],reference['contents'])
+
+    def test_multiline_selected_import_hovers_resolve_original_docs_and_types(self):
+        library = '''package library
+// A documented record.
+Record::struct{value:int}
+// A documented constant.
+LIMIT::7
+counter:int
+// A documented generic.
+identity::proc(value:$T)->T{return value}
+as_int::proc(value:int){}
+as_string::proc(value:string){}
+// A documented overload group.
+overloaded::proc{as_int,as_string}
+// A documented Unicode procedure.
+écho::proc(value:int)->int{return value}
+'''
+        text = '''package main
+/* 😀 */ import _ "library" / Record,
+    LIMIT, counter, identity, overloaded,
+    écho
+main::proc(){_=Record{};_=LIMIT;_=counter;_=identity;_=overloaded;_=écho}
+'''
+        client, main = self.open(text, {'library/main.thor':library}, compiler=False)
+        for name, docs in [('Record','A documented record.'), ('LIMIT','A documented constant.'),
+                           ('counter',None),
+                           ('identity','A documented generic.'), ('overloaded','A documented overload group.'),
+                           ('écho','A documented Unicode procedure.')]:
+            with self.subTest(name=name):
+                selected = self.hover(client,main,text,name)
+                reference = client.request('textDocument/hover', {'textDocument':{'uri':main.as_uri()},
+                    'position':self.position(text,'_='+name,3)})
+                self.assertIsNotNone(selected)
+                self.assertEqual(selected['contents'],reference['contents'])
+                if docs is not None:
+                    self.assertIn(docs,selected['contents']['value'])
+                if name == 'counter':
+                    self.assertIn('counter: int',selected['contents']['value'])
+                self.assertNotIn('__thor_',selected['contents']['value'])
+                self.assertEqual(selected['range'], {
+                    'start':self.position(text,name,0), 'end':self.position(text,name,len(name))})
+        modifiers = client.capabilities['semanticTokensProvider']['legend']['tokenModifiers']
+        readonly = 1 << modifiers.index('readonly')
+        comptime = 1 << modifiers.index('thorCompileTime')
+        for _,_,kind,name,flags in self.semantic_spans(client,main,text):
+            if name == 'counter':
+                self.assertEqual(kind,'variable')
+                self.assertEqual(flags & (readonly | comptime),0)
+
     def test_selected_completion_and_namespace(self):
         text = 'package main\nimport "library" / selected\nmain :: proc() { sel }\n'
         client, main = self.open(text, {'library/main.thor': 'package library\nselected :: proc() {}\n'})

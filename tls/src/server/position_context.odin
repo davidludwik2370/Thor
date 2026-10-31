@@ -88,6 +88,16 @@ get_stmt_attrs :: proc(decl: ^ast.Stmt) -> []^ast.Attribute {
 get_document_position_decls :: proc(decls: []^ast.Stmt, position_context: ^DocumentPositionContext) -> bool {
 	exists_in_decl := false
 	for decl in decls {
+		if value, ok := decl.derived.(^ast.Value_Decl); ok && thor_is_import_alias(value) {
+			// Only the selected identifier exists in source. Treat it like a
+			// normal reference to its imported symbol; synthetic attributes and
+			// the overlapping namespace must not intercept hover/navigation.
+			if position_in_node(decl, position_context.position) {
+				get_document_position(value.names, position_context)
+				return true
+			}
+			continue
+		}
 		for attr in get_stmt_attrs(decl) {
 			// Thor adds zero-width metadata for :> storage and import aliases.
 			// It has no source token and must not intercept the declaration's
