@@ -92,6 +92,21 @@ Breakpoints, stepping and stack locations map back to the original Thor source.
 This uses DAP separately from TLS's LSP connection. See the
 [debugger guide](DEBUGGING.md) for setup, architecture and supported behavior.
 
+User keyboard bindings take precedence over extension defaults. If another
+extension such as Code Runner already owns Cmd+R in your user keybindings,
+append this Thor-only override to **Preferences: Open Keyboard Shortcuts (JSON)**:
+
+```json
+{
+    "key": "cmd+r",
+    "command": "thor.run",
+    "when": "editorLangId == thor && !inDebugMode"
+}
+```
+
+Other languages keep their existing run shortcut. Reload VS Code after installing
+an extension update; restarting TLS does not reload client commands.
+
 ## Highlighting and compiler diagnostics
 
 There are two highlighting layers:

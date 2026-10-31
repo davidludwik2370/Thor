@@ -2168,3 +2168,8 @@ The tested VSIX is installed locally at extension version 0.15.0; its run-comman
 source matches the checkout. Reload VS Code once to activate the new client
 command in an already-open window. User source, Desktop template and unrelated
 working-tree changes are preserved.
+
+The user's global Cmd+R binding to code-runner.run would override the extension
+default. Append a Thor-only thor.run binding in the user's keybindings.json,
+preserving the Code Runner rule for other languages. Document the same scoped
+override in the extension guide for installations with existing run shortcuts.
