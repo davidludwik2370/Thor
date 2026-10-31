@@ -9,3 +9,5 @@ tls/bin/
 .DS_Store
 .vscode/bin/
 *.dSYM/
+/odin-playground/odin-playground
+/thor-playground/thor-playground

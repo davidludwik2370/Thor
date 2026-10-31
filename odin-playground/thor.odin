@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:slice"
 
 
 // V0 - brainstorming
@@ -1110,11 +1111,30 @@ access preserves shallow writes; concrete/shape-constrained records resolve the
 promotion. Keep this limitation visible until the resolver handles it directly.
 */
 
-main :: proc() {
+HELLO :: "hello"
 
+
+
+tst :: proc()
+
+main :: proc() {
     
-    fmt.println("Hello, World!")
+    x := 10
+    x += 1
     
-    x := 1
+    a := []int{1, 2, 3}
     
+    sorted(a, less)
+    
+    // a := [?]int{1, 2, 3}
+    
+    // maximum := max(**a)
+    
+    
+    
+    
+    
+    // minimum := min(a[0], ..a[1:])
+    
+    fmt.println(a[0:0])
 }

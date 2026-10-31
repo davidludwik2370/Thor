@@ -48,6 +48,12 @@ make_pair :: proc() -> [2]f64 {
     return [3, 4]
 }
 
+allowed_size_range :: proc($N: int) -> int where N in 0..<10 {
+    return N
+}
+
+
+
 last_color :: proc(values: [2]$T, hint: T) -> T { return values[1] }
 callback_last :: proc "c"(values: []int, index: int) -> int { return values[index] }
 
@@ -156,7 +162,7 @@ main :: proc() {
                     : true ? 2
                            : 3
     color: Color = false ? .Red
-                        : .Blue
+                         : .Blue
     assert(answer == 27 && nested == 2 && color == .Blue)
 
     println("T04: #if / #else if / #else, nesting, defines, and native when")
@@ -253,6 +259,7 @@ main :: proc() {
 
     println("T08: Set support library, independent results, and alias-safe operations")
     names: sets.Set(string)
+    other_set: set[string]
     sets.insert(&names,"apple"); sets.insert(&names,"apple"); sets.insert(&names,"pear")
     assert(sets.count(names)==2 && "pear" in sets.entries(names))
     other_names := sets.clone(names)

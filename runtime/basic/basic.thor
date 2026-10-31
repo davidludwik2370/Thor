@@ -16,7 +16,7 @@ import "thor:sets"
 
 // Allocating, shallow collection conversions. Free each returned container;
 // to_slice returns keys in unspecified order. Both accept allocator=.
-to_set :: sets.to_set
+to_set   :: sets.to_set
 to_slice :: sets.to_slice
 
 // Print each argument with sep between values, followed by end.
@@ -52,6 +52,10 @@ desc :: proc(first: $T, rest: ..T) -> bool {
 ordered :: proc(vals: ..$T) -> bool {
     if len(vals) < 2 do return true
     return asc(vals[0], ..vals[1:]) || desc(vals[0], ..vals[1:])
+}
+
+swap :: proc(a, b: ^$T) {
+	a^, b^ = b^, a^
 }
 
 // Return a sorted copy without changing data. Delete the result with allocator.
