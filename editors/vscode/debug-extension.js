@@ -34,7 +34,7 @@ function activateDebugging(context) {
         const configurations = vscode.workspace.getConfiguration('launch',folder.uri).get('configurations',[]);
         const config = configurations.find(config => config.type === 'thor-lldb');
         if (!config) {
-            void vscode.window.showErrorMessage('This folder has no Thor debug configuration. Create a project with mkthor, or add a thor-lldb launch configuration.');
+            void vscode.window.showErrorMessage('This folder has no Thor debug configuration. Create a project with thor new, or add a thor-lldb launch configuration.');
             return;
         }
         return vscode.debug.startDebugging(folder,config.name);

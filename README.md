@@ -304,19 +304,28 @@ for the pinned upstream revision, semantic-resolution limits, and configuration.
 For the startup sequence, local installation model, LSP communication and the two
 highlighting layers, see [how the VS Code extension works](editors/vscode/README.md#how-vs-code-launches-tls).
 
-## Create a project and debug Thor
+## Create, run and debug a project
 
 With this checkout on PATH and the local Thor Language extension installed:
 
 ```sh
-mkthor my_project
+thor new my_project          # Create ./my_project
+thor new my_project --open   # Also open VS Code
+mkthor my_project            # Create ~/Code/Thor/my_project and open VS Code
 ```
 
-This creates `~/Code/Odin/my_project`, writes a starter `.thor` file and `.vscode`
-build/launch/settings files, then opens the folder in VS Code. Set a breakpoint
-and press **Cmd+Shift+R** on macOS (**Ctrl+Shift+R** elsewhere), or **F5**.
-The Thor extension supplies the shortcut for Thor documents. The existing Odin
-project setup and shortcuts continue to work with their own configurations.
+Creation writes just `my_project.thor`, `.vscode/tasks.json`, and
+`.vscode/launch.json`. No package manifest, README, local library copy or TLS
+settings file is needed. The default source comes from the editable shared
+[templates/main.thor](templates/main.thor), initially copied from your Desktop
+`new.thor`. Project creation does not invoke Odin or build caches.
+
+**Cmd+R** runs the project in VS Code's integrated terminal; **Cmd+Shift+R**
+builds with debugging and starts CodeLLDB. Use **Ctrl+R / Ctrl+Shift+R** elsewhere.
+Both commands save edits first. **F5** also starts debugging. The shortcuts apply
+to Thor editors and leave existing Odin shortcuts alone. Normal runs use the
+whole package (`thor run .`), including sibling files. A saved standalone Thor
+file outside an open workspace can also be run with Cmd+R.
 
 Install **CodeLLDB** (`vadimcn.vscode-lldb`) as well as the locally built Thor
 extension. Rebuild/install the VSIX and reload VS Code after updating from an
@@ -324,6 +333,9 @@ older extension. `mkthor` itself is an executable beside `thor`, so the same PAT
 entry makes both commands available. Other creation options include:
 
 ```sh
+thor new my_project --parent /path/to/projects
+thor new my_project --template /path/to/starter.thor
+thor new my_project --gitignore # Optional fourth file for build output/caches
 mkthor my_project --parent /path/to/projects
 mkthor my_project --no-open
 mkthor my_project --odin /path/to/odin
@@ -331,9 +343,12 @@ mkthor my_project --odin /path/to/odin
 
 The generated task runs `thor build . -debug -o:none`, keeps the executable in
 `.vscode/bin/debug`, and writes the matching generated sources/maps beneath
-`.vscode/bin/generated/`. It records local compiler/TLS/Odin paths, so VS Code
-does not depend on picking up your interactive shell's PATH. Existing project
-folders are never overwritten.
+`.vscode/bin/generated/`. Tasks record the Thor installation's launcher path;
+TLS discovers the shared installation. The optional `--odin` selects an Odin
+executable for the run/debug tasks. Existing folders and symlinks are never
+overwritten. Platform/test filename suffixes retain Odin's native filtering;
+the creator warns about names such as `example_linux` instead of silently
+changing the requested filename. Use a neutral name for a portable starter.
 
 On native macOS, debug executable builds also enable allocation tracking and
 AddressSanitizer, with runtime reports mapped to the original Thor source even

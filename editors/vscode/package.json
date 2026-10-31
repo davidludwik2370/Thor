@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -57,6 +57,10 @@
       {
         "command": "tls.restart",
         "title": "Thor: Restart Language Server"
+      },
+      {
+        "command": "thor.run",
+        "title": "Thor: Run Project"
       },
       {
         "command": "thor.debug",
@@ -132,6 +136,12 @@
       }
     ],
     "keybindings": [
+      {
+        "command": "thor.run",
+        "key": "ctrl+r",
+        "mac": "cmd+r",
+        "when": "editorLangId == thor && !inDebugMode"
+      },
       {
         "command": "thor.debug",
         "key": "ctrl+shift+r",

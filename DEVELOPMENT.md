@@ -2115,3 +2115,56 @@ debug with clean allocation tracking). An unchanged temporary copy of the
 triangle solver runs; five further temporary input variants exercise its
 multiple-result branches. External project source and unrelated user edits
 are preserved, and the rebuilt local TLS is refreshed.
+
+## Minimal project creation and run shortcut (Thor 0.23.0 / extension 0.15.0)
+
+`thor new NAME` dispatches to project_template before compiler/bootstrap work.
+It creates NAME/NAME.thor and only .vscode/tasks.json and launch.json. The
+editable shared starter lives at templates/main.thor, copied from the user's
+Desktop/new.thor. `--template` reads another UTF-8 source verbatim, retaining
+bytes/newlines; `--gitignore` adds optional build/cache ignores. Validate names,
+template reads and existing/dangling-symlink destinations before writing.
+Creation works without Odin. No caches, native binaries or library copies are
+created until a build/run. Project-named files retain native filename filtering;
+warn for platform/architecture/test suffixes rather than overriding that rule.
+
+The mkthor launcher delegates to the same `thor new` dispatch with
+~/Code/Thor as its default parent and --open enabled. --parent, --no-open,
+--template and --odin remain available. Opening uses the VS Code CLI when
+present, otherwise the existing macOS open behavior. An editor launch failure
+does not undo the successfully created project. No shell profile change is
+needed because both launchers already live on PATH.
+
+The extension contributes thor.run (Cmd+R / Ctrl+R) alongside the existing
+thor.debug (Cmd+Shift+R / Ctrl+Shift+R). Both shortcuts remain scoped to Thor
+editors. Run saves changes and prefers the current workspace's run-thor task;
+existing projects without one get a process task. The whole package runs, so
+sibling source files work. Tasks use process arguments, an interactive terminal,
+and one concurrent instance. No debugger or debug flags are added by normal run.
+Debug retains its original pre-launch build, source maps, breakpoints and steps.
+TLS still discovers the shared installation without a per-project settings file.
+
+VS Code silently declines process tasks in windows without any workspace
+folder. For a saved standalone file, launch the command in an integrated terminal
+with explicit POSIX-sh or PowerShell quoting, source-directory cwd and persistent
+visible output. Each run gets its own terminal so a new command cannot become
+stdin for an already running program. Untrusted workspaces and failed saves do
+not start execution.
+
+Tests cover the exact three-file layout, default/custom template bytes, missing
+and invalid templates, no-Odin creation, optional flags, spaced paths, name and
+symlink rejection, editor opening, wrapper delegation, and build/debug identity.
+Extension tests cover configured tasks, process/standalone fallbacks, shell
+quoting, trust/save failures and shortcut registration. The real VS Code debugger
+fixture now lives separately under tests/support/project_debug.thor, keeping
+the actual user starter small. Integration tests run an unsaved project with a
+sibling source, verify the configured and fallback tasks, then check breakpoints,
+step in/over/out, watches and restart. A separate empty-window integration runs
+a spaced standalone filename. The standard language integration also passes.
+
+Validation: 45 Python creation/build/installation tests, the rejection-fixture
+check, 106 Node extension tests, and all three real VS Code integrations pass.
+The tested VSIX is installed locally at extension version 0.15.0; its run-command
+source matches the checkout. Reload VS Code once to activate the new client
+command in an already-open window. User source, Desktop template and unrelated
+working-tree changes are preserved.

@@ -9,7 +9,7 @@ checkout; there is one physical copy.
 ## Installation and projects
 
 The installation owns `thor`, `mkthor`, `thorlang/`, `frontend/`, `tls/`, library
-sources under `runtime/`, and common library output under `lib/`. The frontend
+sources under `runtime/`, the editable starter under `templates/`, and common library output under `lib/`. The frontend
 binary and the toolchain's own parsing data live in its `.thor-cache/`.
 
 Each project owns its `.thor-cache/` (parser packets, compile-time results and
@@ -21,7 +21,7 @@ parser cache.
 The shell PATH includes `~/Thor`. New project setup is:
 
 ```sh
-mkthor example --parent ~/Code/Thor --no-open
+thor new example --parent ~/Code/Thor
 cd ~/Code/Thor/example
 thor build .
 ./example
@@ -85,7 +85,12 @@ result is checked before writing its temporary project.
 
 VS Code discovers TLS from `THOR_ROOT`, a toolchain workspace, or `~/Thor`.
 Explicit `tls.server.path` and `tls.compiler.path` settings remain supported.
-`mkthor` writes build, launch and TLS settings pointing at the current physical
-installation. Cmd+Shift+R starts CodeLLDB through the Thor debug adapter.
+`thor new name` creates `./name/name.thor` and only `.vscode/tasks.json` and
+`.vscode/launch.json`. `mkthor name` delegates to `thor new` with parent
+`~/Code/Thor` and `--open`; `--no-open` disables opening. The shared editable
+starter is `templates/main.thor`; `--template` overrides it and `--gitignore`
+adds optional build/cache ignore rules. Per-project TLS settings are unnecessary.
+Cmd+R runs the package in the integrated terminal. Cmd+Shift+R starts CodeLLDB
+through the Thor debug adapter. Both save edits before compiling.
 After an extension update, run **Developer: Reload Window**. Reopen the relocated
 checkout at its canonical path when working on the toolchain itself.

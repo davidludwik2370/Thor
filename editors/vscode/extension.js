@@ -94,6 +94,7 @@ async function start(context) {
 
 function activate(context) {
     require('./constant-colors').registerConstantColors(context, vscode);
+    require('./run-extension').activateRunning(context, vscode);
     require('./debug-extension').activateDebugging(context);
     output = vscode.window.createOutputChannel('Thor Language Server');
     context.subscriptions.push(output);

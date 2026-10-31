@@ -6,24 +6,21 @@ the `thor` language, independently of TLS's editing features.
 
 ## Start a project
 
-Run `mkthor my_project` from a terminal with the Thor checkout on PATH. It creates
-`~/Code/Odin/my_project`, including:
+Run `thor new my_project` to create `./my_project`, or `mkthor my_project` to
+create `~/Code/Thor/my_project` and open VS Code. Only three files are created:
 
-- `main.thor`: an executable starter with a pure function, a negative index
-  and interpolation, with explicit cleanup of its allocated string.
-- `.vscode/tasks.json`: a process task invoking this checkout's Thor launcher
-  with `-debug -o:none` and the discovered Odin executable.
+- `my_project.thor`: copied from the installation's editable `templates/main.thor`.
+- `.vscode/tasks.json`: normal run and `-debug -o:none` build process tasks.
 - `.vscode/launch.json`: the `thor-lldb` executable and matching manifest paths.
-- `.vscode/settings.json`: absolute compiler, TLS and Odin paths for this machine.
-- `.vscode/extensions.json`: a CodeLLDB recommendation.
-- `.gitignore`: generated sources, symbols, caches and executables are excluded.
 
-The creator opens VS Code, matching the local `mkodin` workflow. `--no-open`
-suppresses opening; `--parent path` changes the parent directory. Existing folders
-and symlinks are rejected. Projects point at this checkout; update their paths
-if you move it or use another computer.
-The starter uses `main.thor` so a project name ending in an Odin platform suffix,
-such as `_linux`, does not accidentally exclude its only source file.
+`thor new --open` opens VS Code; `mkthor --no-open` suppresses opening.
+`--parent path` changes the parent directory, `--template path.thor` chooses
+another starter, and `--gitignore` adds optional build/cache ignore rules.
+Existing folders and symlinks are rejected. TLS discovers the shared installation
+without a local settings file. Tasks record this installation's Thor path;
+update that path if you relocate it or use another computer. Names ending in
+platform, architecture or test suffixes retain Odin's filename selection rules;
+the creator warns about these names and preserves the requested source filename.
 
 Install the local Thor VSIX and CodeLLDB, open the generated Thor file, set a
 breakpoint and press **Cmd+Shift+R**, or **F5**. The Thor extension's
@@ -31,6 +28,15 @@ breakpoint and press **Cmd+Shift+R**, or **F5**. The Thor extension's
 the folder's first `thor-lldb` launch configuration. The shortcut applies to Thor
 editors while a debug session is not already active. Standard debug toolbar
 buttons and existing VS Code stepping shortcuts continue to work.
+
+**Cmd+R** runs **Thor: Run Project** without the debugger. It saves edits and
+executes the folder's `run-thor` task in the integrated terminal. The task uses
+`thor run .`, so sibling source files participate and stdin works normally.
+Existing projects without a run task get a process task using the discovered
+or configured compiler. A saved standalone `.thor` file without a workspace
+folder runs in file mode. Non-macOS shortcuts are Ctrl+R and Ctrl+Shift+R.
+Keyboard shortcuts are contributed by the extension, not a workspace
+`keybindings.json` file.
 
 ## Existing projects
 

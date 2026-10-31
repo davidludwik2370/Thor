@@ -22,7 +22,12 @@ def main():
     if not backend:parser.error('CodeLLDB is required; pass --codelldb or install its VS Code extension')
     with tempfile.TemporaryDirectory(prefix='thor-vscode-debug-') as temporary:
         temporary=Path(temporary)
-        subprocess.run([str(ROOT/'mkthor'),'debug_project','--parent',str(temporary),'--no-open'],check=True)
+        subprocess.run([str(ROOT/'mkthor'),'debug_project','--parent',str(temporary),'--no-open',
+                        '--template',str(ROOT/'tests/support/project_debug.thor')],check=True)
+        (temporary/'debug_project/helper.thor').write_text('''package main
+import "core:os"
+confirm_run::proc(){when !ODIN_DEBUG {assert(os.write_entire_file("normal-run.txt", []u8{'o','k'}) == nil)}}
+''')
         extensions=temporary/'extensions'
         extensions.mkdir()
         (extensions/backend.name).symlink_to(backend,target_is_directory=True)

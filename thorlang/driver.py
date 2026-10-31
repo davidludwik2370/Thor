@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.22.0"
+VERSION = "0.23.0"
 
 
 def backend_failure(status):
@@ -325,13 +325,17 @@ class Project:
 
 def _main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == 'new':
+        from .project_template import main as new_project
+        return new_project(argv[1:])
     runtime_args = []
     if "--" in argv:
         boundary = argv.index("--")
         runtime_args, argv = argv[boundary + 1:], argv[:boundary]
-    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T23: compile additive Odin syntax to Odin.")
+    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T23: compile additive Odin syntax to Odin.",
+                                     epilog="Create a project with thor new NAME; see thor new --help for creation options.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
-    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test", "publish"])
+    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test", "publish", "new"])
     parser.add_argument("source", help="a .thor/.odin file or package directory")
     parser.add_argument("--output-dir", type=Path, help="directory for generated Odin (default: .thor-build/<source>)")
     parser.add_argument("--odin", default=os.environ.get("THOR_ODIN", "odin"), help="Odin compiler executable")

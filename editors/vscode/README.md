@@ -78,11 +78,16 @@ behavior. The server communicates through local process streams, with no network
 port or remote service required. If TLS cannot start, check the **Thor Language
 Server** channel in VS Code's Output panel.
 
-## Debugging
+## Running and debugging
 
-The extension also provides **Thor: Debug Project**, bound to **Cmd+Shift+R** in
+The extension provides **Thor: Run Project** on **Cmd+R**, saving edits and
+running the workspace package in the integrated terminal. Existing projects
+without a `run-thor` task and saved standalone Thor files are supported too.
+It also provides **Thor: Debug Project**, bound to **Cmd+Shift+R** in
 Thor editors on macOS, and a `thor-lldb` debug adapter using ordinary CodeLLDB.
-Run `mkthor my_project` to create a project with matching build and launch files.
+Run `thor new my_project` to create a local folder containing `my_project.thor`
+and only VS Code task/launch files. `mkthor my_project` creates the same layout
+in `~/Code/Thor` and opens VS Code. TLS needs no generated project settings.
 Breakpoints, stepping and stack locations map back to the original Thor source.
 This uses DAP separately from TLS's LSP connection. See the
 [debugger guide](DEBUGGING.md) for setup, architecture and supported behavior.
