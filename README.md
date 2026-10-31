@@ -7,6 +7,11 @@ milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
+Arbitrary-precision `Integer`/`Rational` support is being added in stages. The
+[stage-one runtime](runtime/big/README.md) is available through `thor:big`;
+[the design and roadmap](docs/arbitrary-precision.md) distinguish it from the
+planned language-level literals, operators, copying, and compile-time support.
+
 Odin compatibility is checked against real projects as well as focused tests.
 The [October compatibility audit](docs/compatibility-audit-2026-10-29/README.md)
 records the original failures and their regression cases; the compiler preserves

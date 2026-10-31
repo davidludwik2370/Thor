@@ -1,5 +1,9 @@
 # Thor language specification
 
+The accepted Integer/Rational extension and its staged implementation are
+specified separately in [Arbitrary precision](arbitrary-precision.md). Its
+runtime foundation is implemented; language syntax and ownership are pending.
+
 This is the canonical plain-text reference for the original T01–T23 tasks,
 moved out of the former root `thor.odin` so playground edits cannot remove the
 reference. The source block was preserved from the user's relocated specification;

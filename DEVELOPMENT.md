@@ -2276,3 +2276,65 @@ All 108 extension tests and the real isolated VS Code integration suite pass.
 The packaged VSIX includes the PNG emblem and both glyph-only SVGs, and the
 local extension is installed. No compiler/TLS rebuild or user theme changes
 are needed.
+
+## Arbitrary precision: stage 1 runtime foundation
+
+Checkpoint `238dd59` preserves the pre-feature library/playground edits and table
+tests. The accepted Integer/Rational syntax, direct numeric ownership compromise,
+aggregate/native boundaries, constants, and five implementation stages are in
+`docs/arbitrary-precision.md`. Keep its distinction between implemented runtime
+APIs and pending compiler features explicit.
+
+`runtime/big` contains native Integer/Rational storage and constructors, strict
+integer/finite/repeating-decimal parsing, canonical fractions, independent
+cloning/getters, atomic replacement, error handling, and decimal text output.
+Empty values represent zero without allocating; an empty rational's logical
+denominator is one. Nonzero rationals are reduced with positive denominators.
+Text conversion uses integer arithmetic throughout, without a float intermediate.
+
+Stage 1 uses ordinary native ownership. Language-level predefined types, long
+unquoted literals, automatic direct copies/replacement, dot properties, operators,
+fn/#run support, and their TLS adaptation remain future work. No new parser,
+semantic-token, extension, or debugger protocol is introduced in this batch.
+The driver excludes the new package's native test files during dependency
+discovery, just as for the other runtime support packages. Shared-runtime
+publication already discovers native packages automatically.
+
+Backing-library workarounds are local to Thor. Validate complete numeric text;
+the backend accepts empty/partially terminated inputs. Normalize denominator
+signs before arithmetic; the installed rational setter loses a negative
+denominator's sign. Destroy stored digit arrays through their saved allocators
+and reset the real caller value; backend destruction uses the current allocator
+and does not reset that value. Format magnitudes and remove conservative padding
+before adding signs; some large negative backend outputs otherwise gain a zero.
+Use a limb-based output bound instead of backend radix_size: its integer-log
+path calls a power helper with a scratch leak on allocation failure. Do not
+modify the installed Odin checkout for these workarounds.
+
+Runtime Error distinguishes Invalid_Text from Invalid_Allocator. The backend's
+Invalid_Argument also covers allocator errors and cannot safely stand for both:
+only a genuine text syntax error may yield ok=false. Other errors panic through
+location-aware wrappers or return from try_ APIs. Failed constructors return
+empty values, partial allocations are freed, and failed replacement preserves
+the original target. Exponent magnitude overflow is checked before constructing
+powers; available memory still limits huge valid values.
+
+Validation: the selected Python compiler/library suite passed 130 tests; the
+additional constructor-rejection regression and the final seven-test big runtime
+integration suite pass. The 12 native big-number tests pass with allocation
+tracking and in a debug AddressSanitizer build. They sweep successive allocation
+failures across 11 operation paths, including resizing a 3,600-digit number,
+normalization, output, cloning, and replacement. Independent Python int/Fraction
+oracles cover 106 integer cases (through 6,000 digits) and 155 rational cases
+(including positive/negative decimal exponents of 4,096). Existing sets, format,
+pure, and eval native suites pass all 17 tests with allocation tracking.
+Fresh-project imports, wildcard/selected imports, malformed input, incompatible
+constructor types, and isolated allocation/zero-denominator panics are covered.
+Both the main demo and commented walkthrough pass in the compiler regression
+suite. The new commented example runs with allocation tracking:
+
+```sh
+./thor run examples/big_runtime --track-allocations=basic
+python3 -m unittest tests.test_big -v
+odin test runtime/big -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+```

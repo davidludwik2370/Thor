@@ -5,6 +5,15 @@ The driver supplies `thor:` automatically unless explicitly overridden with
 Odin by supplying `-collection:thor=/path/to/thor/runtime`. The `basic` package is
 written in Thor and uses its inline generic default callbacks.
 
+## Arbitrary-precision foundation
+
+`import "thor:big"` provides the stage-one Integer/Rational runtime: exact
+construction/parsing, normalization, cloning, destruction, component getters,
+and allocator/error handling. See [the runtime API](big/README.md) and
+[accepted design and remaining stages](../docs/arbitrary-precision.md).
+Predefined types, unquoted big-number literals, operators and automatic numeric
+copying are later stages; the current package uses ordinary native ownership.
+
 ## Basic helpers
 
 `import "thor:basic"` provides `basic.print`, `basic.sorted`, order checks, parsing,
