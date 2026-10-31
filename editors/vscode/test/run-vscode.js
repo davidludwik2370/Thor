@@ -25,7 +25,7 @@ async function run(){
         result.checks=['standalone .thor file with spaces and no workspace folder','unsaved edits saved','integrated process execution without debugging'];
     }catch(error){result.error=error.stack||String(error);throw error;}
     finally{
-        for(const terminal of vscode.window.terminals)if(terminal.name.startsWith('Thor: '))terminal.dispose();
+        for(const terminal of vscode.window.terminals)if(terminal.name==='Thor')terminal.dispose();
         fs.writeFileSync(process.env.THOR_VSCODE_TEST_RESULT,JSON.stringify(result,null,2));
     }
 }

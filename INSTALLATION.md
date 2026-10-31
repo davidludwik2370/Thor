@@ -90,7 +90,8 @@ Explicit `tls.server.path` and `tls.compiler.path` settings remain supported.
 `~/Code/Thor` and `--open`; `--no-open` disables opening. The shared editable
 starter is `templates/main.thor`; `--template` overrides it and `--gitignore`
 adds optional build/cache ignore rules. Per-project TLS settings are unnecessary.
-Cmd+R runs the package in the integrated terminal. Cmd+Shift+R starts CodeLLDB
+Cmd+R sends `thor run .` to the active integrated terminal, using its current
+directory and shell environment, without a VS Code task. Cmd+Shift+R starts CodeLLDB
 through the Thor debug adapter. Both save edits before compiling.
 After an extension update, run **Developer: Reload Window**. Reopen the relocated
 checkout at its canonical path when working on the toolchain itself.

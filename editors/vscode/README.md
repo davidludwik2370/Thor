@@ -80,9 +80,11 @@ Server** channel in VS Code's Output panel.
 
 ## Running and debugging
 
-The extension provides **Thor: Run Project** on **Cmd+R**, saving edits and
-running the workspace package in the integrated terminal. Existing projects
-without a `run-thor` task and saved standalone Thor files are supported too.
+The extension provides **Thor: Run Project** on **Cmd+R**. It saves edits, shows
+the active integrated terminal, and sends `thor run .` followed by Enter. It
+uses that terminal's current directory and shell environment, without scanning
+or launching tasks. If no live terminal exists, it creates a regular terminal
+in the project folder or the saved file's directory. Repeated runs reuse it.
 It also provides **Thor: Debug Project**, bound to **Cmd+Shift+R** in
 Thor editors on macOS, and a `thor-lldb` debug adapter using ordinary CodeLLDB.
 Run `thor new my_project` to create a local folder containing `my_project.thor`

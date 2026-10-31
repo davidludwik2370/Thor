@@ -2173,3 +2173,26 @@ The user's global Cmd+R binding to code-runner.run would override the extension
 default. Append a Thor-only thor.run binding in the user's keybindings.json,
 preserving the Code Runner rule for other languages. Document the same scoped
 override in the extension guide for installations with existing run shortcuts.
+
+## Direct terminal run command (extension 0.15.1)
+
+Replace Cmd+R's task enumeration/execution with the literal `thor run .` sent
+to the active integrated terminal after saving edits. Preserve that terminal's
+cwd and shell environment. If no live terminal exists, create a regular terminal
+using the user's default profile in the workspace or saved file's directory.
+Reuse it on repeated runs. No task providers, compiler/TLS path lookup, explicit
+shell, path quoting or standalone-file special command is needed. Normal run
+now follows exactly the terminal command's package and environment semantics.
+New projects emit only the debug build task; existing run tasks are left alone
+and no longer consulted by the shortcut. --odin on thor new affects debugging;
+normal execution uses the terminal's PATH/THOR_ODIN. Debug launch stays unchanged.
+
+Verification: 106 Node tests and 11 project-creation tests pass. Tests reject
+any task enumeration/execution or toolchain lookup in the run handler, check
+terminal reuse and exited-terminal replacement, and preserve save/trust checks.
+Real VS Code checks repeat the command in one terminal, execute sibling sources,
+assert that no run task starts, and retain source breakpoints, stepping, watches
+and restart. Dispatch measured 32 ms initially and 1 ms on reuse in that test;
+these timings exclude compiler/program execution. The empty-window terminal
+test passes as well. The local VSIX is updated; reload the editor to load the
+new client code. No compiler changes or cache invalidation are required.

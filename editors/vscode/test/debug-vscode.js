@@ -29,33 +29,28 @@ async function run() {
         setup.insert(document.uri,document.positionAt(original.indexOf('main :: proc() {')+'main :: proc() {'.length),
             '\n    confirm_run()\n    state := struct { marker: int }{1}\n    using state\n    assert(marker == 1)\n');
         assert.ok(await vscode.workspace.applyEdit(setup));
-        const runs=[],runSources=[];
-        subscriptions.push(vscode.tasks.onDidEndTaskProcess(event=>{
-            if(event.execution.task.name==='run-thor'){runs.push(event.exitCode);runSources.push(event.execution.task.source);}
-        }));
+        const startedTasks=[];
+        subscriptions.push(vscode.tasks.onDidStartTask(event=>startedTasks.push(event.execution.task.name)));
         assert.ok(document.isDirty);
         assert.equal(extension.packageJSON.contributes.keybindings.find(k=>k.command==='thor.run').mac,'cmd+r');
+        const start=Date.now();
         await vscode.commands.executeCommand('thor.run');
-        await until(()=>runs,values=>values.length===1);
-        assert.equal(runs[0],0);
-        assert.notEqual(runSources[0],'Thor','A new project must use its configured task');
+        result.runDispatchMs=Date.now()-start;
+        const terminal=await until(()=>vscode.window.activeTerminal,Boolean);
+        await until(()=>fs.existsSync(path.join(root,'normal-run.txt')),Boolean);
         assert.equal(document.isDirty,false,'Run must save the edited source');
         assert.equal(fs.readFileSync(path.join(root,'normal-run.txt'),'utf8'),'ok','Run must build the whole package without -debug');
         assert.equal(vscode.debug.activeDebugSession,undefined);
         assert.equal(fs.existsSync(path.join(root,'.vscode/bin/debug')),false);
-        const taskPath=path.join(root,'.vscode/tasks.json');
-        const originalTasks=fs.readFileSync(taskPath,'utf8');
-        const taskConfig=JSON.parse(originalTasks);
-        taskConfig.tasks=taskConfig.tasks.filter(task=>task.label!=='run-thor');
-        fs.writeFileSync(taskPath,JSON.stringify(taskConfig));
-        await until(()=>vscode.tasks.fetchTasks(),tasks=>!tasks.some(task=>task.name==='run-thor'));
+        await new Promise(resolve=>setTimeout(resolve,100)); // Let the first program return to the shell prompt.
         fs.unlinkSync(path.join(root,'normal-run.txt'));
+        const warmStart=Date.now();
         await vscode.commands.executeCommand('thor.run');
-        await until(()=>runs,values=>values.length===2);
-        assert.equal(runs[1],0,'Existing projects without a run task must use the process fallback');
-        assert.equal(runSources[1],'Thor');
+        result.warmRunDispatchMs=Date.now()-warmStart;
+        assert.equal(vscode.window.activeTerminal,terminal,'Repeated runs must reuse the active shell');
+        await until(()=>fs.existsSync(path.join(root,'normal-run.txt')),Boolean);
+        assert.deepEqual(startedTasks,[],'Cmd+R must not start a VS Code task');
         assert.equal(fs.readFileSync(path.join(root,'normal-run.txt'),'utf8'),'ok');
-        fs.writeFileSync(taskPath,originalTasks);
         assert.ok(!document.getText().includes('#+feature using-stmt'));
         assert.equal(extension.packageJSON.contributes.keybindings.find(k=>k.command==='thor.debug').mac,'cmd+shift+r');
         assert.ok(extension.packageJSON.contributes.breakpoints.some(b=>b.language==='thor'));
@@ -123,8 +118,8 @@ async function run() {
         await session.customRequest('continue',{threadId:current.thread});
         await until(()=>vscode.debug.activeDebugSession,s=>!s);
         result.success=true;
-        result.checks=['minimal mkthor project with project-named source','Cmd+R run command saves edits and runs sibling files without debugging',
-            'existing project without a run task',
+        result.checks=['minimal mkthor project with project-named source','Cmd+R sends thor run . to a normal terminal and saves edits',
+            'repeated runs reuse the active terminal without starting VS Code tasks',
             'Cmd+Shift+R debug command','pre-launch build task','automatic using header','CodeLLDB launch',
             'Thor breakpoint','Step Over','Step Into fn through fstring','locals/watch','Step Out','restart/rebuild','clean exit'];
     } catch (error) {

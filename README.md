@@ -323,9 +323,12 @@ settings file is needed. The default source comes from the editable shared
 **Cmd+R** runs the project in VS Code's integrated terminal; **Cmd+Shift+R**
 builds with debugging and starts CodeLLDB. Use **Ctrl+R / Ctrl+Shift+R** elsewhere.
 Both commands save edits first. **F5** also starts debugging. The shortcuts apply
-to Thor editors and leave existing Odin shortcuts alone. Normal runs use the
-whole package (`thor run .`), including sibling files. A saved standalone Thor
-file outside an open workspace can also be run with Cmd+R.
+to Thor editors and leave existing Odin shortcuts alone. Cmd+R sends the literal
+`thor run .` command to the active integrated terminal, using its current
+directory and shell environment. It reuses that terminal without looking up or
+launching VS Code tasks. If no live terminal exists, it opens one in the project
+folder (or the saved file's directory outside a workspace). Normal runs include
+sibling source files, just like typing `thor run .` yourself.
 
 Install **CodeLLDB** (`vadimcn.vscode-lldb`) as well as the locally built Thor
 extension. Rebuild/install the VSIX and reload VS Code after updating from an
@@ -345,7 +348,8 @@ The generated task runs `thor build . -debug -o:none`, keeps the executable in
 `.vscode/bin/debug`, and writes the matching generated sources/maps beneath
 `.vscode/bin/generated/`. Tasks record the Thor installation's launcher path;
 TLS discovers the shared installation. The optional `--odin` selects an Odin
-executable for the run/debug tasks. Existing folders and symlinks are never
+executable for the debug build task; normal runs use the terminal's environment.
+Existing folders and symlinks are never
 overwritten. Platform/test filename suffixes retain Odin's native filtering;
 the creator warns about names such as `example_linux` instead of silently
 changing the requested filename. Use a neutral name for a portable starter.

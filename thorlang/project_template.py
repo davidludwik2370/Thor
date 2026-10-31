@@ -20,11 +20,6 @@ def project_files(name, starter, odin=None, *, gitignore=False):
     files = {
         name + '.thor': starter,
         '.vscode/tasks.json': {'version': '2.0.0', 'tasks': [
-            {'label': 'run-thor', 'type': 'process', 'command': command,
-             'args': ['run', '.', *native], 'options': {'cwd': '${workspaceFolder}'},
-             'problemMatcher': [], 'runOptions': {'instanceLimit': 1},
-             'presentation': {'reveal': 'always', 'panel': 'shared', 'clear': True, 'focus': True,
-                              'showReuseMessage': False}},
             {'label': 'build-thor-debug', 'type': 'process', 'command': command,
              'args': ['build', '.', '-debug', '-o:none', '--output-dir', generated,
                       '-out:${workspaceFolder}/.vscode/bin/' + binary, *native],
@@ -68,7 +63,7 @@ def main(argv=None):
     opening.add_argument('--no-open', action='store_true', help='create without opening VS Code (the default)')
     parser.add_argument('--template', type=Path, default=DEFAULT_TEMPLATE, help='starter source (default: templates/main.thor in the Thor installation)')
     parser.add_argument('--gitignore', action='store_true', help='also create a .gitignore for build output and caches')
-    parser.add_argument('--odin', help='optional Odin executable for the run/build tasks')
+    parser.add_argument('--odin', help='optional Odin executable for the debug build task')
     options = parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_-]*', options.name):
         parser.error('project name must contain only letters, digits, underscores or hyphens')

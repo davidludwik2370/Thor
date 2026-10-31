@@ -10,7 +10,7 @@ Run `thor new my_project` to create `./my_project`, or `mkthor my_project` to
 create `~/Code/Thor/my_project` and open VS Code. Only three files are created:
 
 - `my_project.thor`: copied from the installation's editable `templates/main.thor`.
-- `.vscode/tasks.json`: normal run and `-debug -o:none` build process tasks.
+- `.vscode/tasks.json`: the `-debug -o:none` build process task.
 - `.vscode/launch.json`: the `thor-lldb` executable and matching manifest paths.
 
 `thor new --open` opens VS Code; `mkthor --no-open` suppresses opening.
@@ -30,11 +30,13 @@ editors while a debug session is not already active. Standard debug toolbar
 buttons and existing VS Code stepping shortcuts continue to work.
 
 **Cmd+R** runs **Thor: Run Project** without the debugger. It saves edits and
-executes the folder's `run-thor` task in the integrated terminal. The task uses
-`thor run .`, so sibling source files participate and stdin works normally.
-Existing projects without a run task get a process task using the discovered
-or configured compiler. A saved standalone `.thor` file without a workspace
-folder runs in file mode. Non-macOS shortcuts are Ctrl+R and Ctrl+Shift+R.
+sends the literal `thor run .` command to the active integrated terminal. Its
+current directory, PATH, aliases and shell environment apply, just as for a
+manually typed command. It does not enumerate or execute VS Code tasks or read
+the TLS compiler setting. An existing terminal is reused; if there is no live
+terminal, one is opened in the project folder or the saved file's directory.
+Non-macOS shortcuts are Ctrl+R and Ctrl+Shift+R. The debug shortcut still uses
+its original pre-launch build task and mapped CodeLLDB adapter.
 Keyboard shortcuts are contributed by the extension, not a workspace
 `keybindings.json` file.
 
