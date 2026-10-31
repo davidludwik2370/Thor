@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="824" viewBox="0 0 1120 824"><rect width="1120" height="824" fill="#202226" /><text x="40" y="42" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="600" fill="#f3f2ee">THOR  /  T + H LETTERING STUDIES</text><text x="40" y="70" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="400" fill="#b7b9bd">Same palette, spacing, O and R in every option.</text><svg width="500" height="260" viewBox="0 0 500 260" x="40" y="104">
+<defs><linearGradient id="yellow" gradientUnits="userSpaceOnUse" x1="70" y1="0" x2="340" y2="250">
+<stop offset="0" stop-color="#fed818" /><stop offset="0.42" stop-color="#dab810" />
+<stop offset="0.86" stop-color="#937a00" /><stop offset="1" stop-color="#937a00" />
+</linearGradient>
+<linearGradient id="paper" x2="0" y2="1"><stop stop-color="#f9f9f9" /><stop offset="0.8" stop-color="#f5f5f5" /><stop offset="1" stop-color="#e9e9e9" /></linearGradient>
+<linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7d7d7" /><stop offset="0.3" stop-color="#eeeeee" /><stop offset="1" stop-color="#ffffff" /></linearGradient>
+<mask id="split-t" maskUnits="userSpaceOnUse" x="0" y="0" width="500" height="260"><rect width="500" height="260" fill="white" /><path d="M60 139L80 104V114L60 149Z" fill="black" /></mask></defs><rect width="500" height="260" rx="26" fill="url(#yellow)" />
+<g fill="white">
+<path d="M34 68H104V78H74V181H90V191H48V181H64V78H34Z" mask="url(#split-t)" />
+<path d="M120 68H130V125H200V68H210V191H200V135H130V191H120Z" />
+<g transform="translate(226 68) scale(0.14341209227663465 0.1434127223483758) translate(-244.092793407298 -807.838807881139)"><path d="m 430.516,1595.76 c -16.576,-11.38 -29.677,-22.4 -29.677,-22.4 L 827.125,835.012 c 0,0 17.547,6.508 32.041,13.457 18.27,8.757 33.403,17.294 33.403,17.294 206.631,119.3 277.541,383.917 158.241,590.547 -119.303,206.64 -383.92,277.54 -590.554,158.24 0,0 -14.473,-8.32 -29.74,-18.79 z M 856.543,928.162 496.282,1552.15 c 172.195,99.42 392.709,40.33 492.126,-131.86 99.412,-172.2 40.332,-392.71 -131.865,-492.128 z M 321.659,1487.36 c -14.487,-20.98 -19.644,-31.04 -19.644,-31.04 -74.475,-129.36 -79.937,-293.86 0.003,-432.32 79.94,-138.46 225.128,-215.977 374.397,-216.161 0,0 20.153,-0.052 36.933,1.555 25.28,2.422 42.087,5.684 42.087,5.684 L 347.771,1521.17 c 0,0 -9.671,-10.01 -26.112,-33.81 z M 633.291,882.532 c -108.638,13.203 -209.994,75.512 -268.874,177.498 -58.88,101.98 -62.162,220.91 -19.278,321.6 z" /></g>
+</g>
+<g fill="none" stroke="white" stroke-width="10" stroke-linejoin="miter" stroke-linecap="butt">
+<path d="M371 110V73H412C438 73 461 90 461 111C461 129 450 142 435 149Z" />
+<path d="M371 132V191M371 132L461 187" />
+</g></svg><text x="40" y="394" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="600" fill="#f4d64d">A  /  SPLIT T</text><text x="40" y="419" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="400" fill="#c6c7cb">A diagonal gap echoes the O.</text><svg width="500" height="260" viewBox="0 0 500 260" x="580" y="104">
+<defs><linearGradient id="yellow" gradientUnits="userSpaceOnUse" x1="70" y1="0" x2="340" y2="250">
+<stop offset="0" stop-color="#fed818" /><stop offset="0.42" stop-color="#dab810" />
+<stop offset="0.86" stop-color="#937a00" /><stop offset="1" stop-color="#937a00" />
+</linearGradient>
+<linearGradient id="paper" x2="0" y2="1"><stop stop-color="#f9f9f9" /><stop offset="0.8" stop-color="#f5f5f5" /><stop offset="1" stop-color="#e9e9e9" /></linearGradient>
+<linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7d7d7" /><stop offset="0.3" stop-color="#eeeeee" /><stop offset="1" stop-color="#ffffff" /></linearGradient>
+</defs><rect width="500" height="260" rx="26" fill="url(#yellow)" />
+<g fill="white">
+<path d="M34 68H104V78H74V181H90V191H48V181H64V78H34Z" />
+<path d="M120 68H130V191H120ZM200 68H210V191H200Z" />
+<g transform="translate(226 68) scale(0.14341209227663465 0.1434127223483758) translate(-244.092793407298 -807.838807881139)"><path d="m 430.516,1595.76 c -16.576,-11.38 -29.677,-22.4 -29.677,-22.4 L 827.125,835.012 c 0,0 17.547,6.508 32.041,13.457 18.27,8.757 33.403,17.294 33.403,17.294 206.631,119.3 277.541,383.917 158.241,590.547 -119.303,206.64 -383.92,277.54 -590.554,158.24 0,0 -14.473,-8.32 -29.74,-18.79 z M 856.543,928.162 496.282,1552.15 c 172.195,99.42 392.709,40.33 492.126,-131.86 99.412,-172.2 40.332,-392.71 -131.865,-492.128 z M 321.659,1487.36 c -14.487,-20.98 -19.644,-31.04 -19.644,-31.04 -74.475,-129.36 -79.937,-293.86 0.003,-432.32 79.94,-138.46 225.128,-215.977 374.397,-216.161 0,0 20.153,-0.052 36.933,1.555 25.28,2.422 42.087,5.684 42.087,5.684 L 347.771,1521.17 c 0,0 -9.671,-10.01 -26.112,-33.81 z M 633.291,882.532 c -108.638,13.203 -209.994,75.512 -268.874,177.498 -58.88,101.98 -62.162,220.91 -19.278,321.6 z" /></g>
+<path d="M126 141L204 112M126 157L204 128" fill="none" stroke="white" stroke-width="8" stroke-linecap="butt" /></g>
+<g fill="none" stroke="white" stroke-width="10" stroke-linejoin="miter" stroke-linecap="butt">
+<path d="M371 110V73H412C438 73 461 90 461 111C461 129 450 142 435 149Z" />
+<path d="M371 132V191M371 132L461 187" />
+</g></svg><text x="580" y="394" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="600" fill="#f4d64d">B  /  DOUBLE H</text><text x="580" y="419" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="400" fill="#c6c7cb">Parallel diagonals echo the R.</text><svg width="500" height="260" viewBox="0 0 500 260" x="40" y="452">
+<defs><linearGradient id="yellow" gradientUnits="userSpaceOnUse" x1="70" y1="0" x2="340" y2="250">
+<stop offset="0" stop-color="#fed818" /><stop offset="0.42" stop-color="#dab810" />
+<stop offset="0.86" stop-color="#937a00" /><stop offset="1" stop-color="#937a00" />
+</linearGradient>
+<linearGradient id="paper" x2="0" y2="1"><stop stop-color="#f9f9f9" /><stop offset="0.8" stop-color="#f5f5f5" /><stop offset="1" stop-color="#e9e9e9" /></linearGradient>
+<linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7d7d7" /><stop offset="0.3" stop-color="#eeeeee" /><stop offset="1" stop-color="#ffffff" /></linearGradient>
+</defs><rect width="500" height="260" rx="26" fill="url(#yellow)" />
+<g fill="white">
+<path d="M34 68H104V78H74V110H85L66 151H74V181H90V191H48V181H64V151H54L74 110H64V78H34Z" />
+<path d="M120 68H130V125H200V68H210V191H200V135H130V191H120Z" />
+<g transform="translate(226 68) scale(0.14341209227663465 0.1434127223483758) translate(-244.092793407298 -807.838807881139)"><path d="m 430.516,1595.76 c -16.576,-11.38 -29.677,-22.4 -29.677,-22.4 L 827.125,835.012 c 0,0 17.547,6.508 32.041,13.457 18.27,8.757 33.403,17.294 33.403,17.294 206.631,119.3 277.541,383.917 158.241,590.547 -119.303,206.64 -383.92,277.54 -590.554,158.24 0,0 -14.473,-8.32 -29.74,-18.79 z M 856.543,928.162 496.282,1552.15 c 172.195,99.42 392.709,40.33 492.126,-131.86 99.412,-172.2 40.332,-392.71 -131.865,-492.128 z M 321.659,1487.36 c -14.487,-20.98 -19.644,-31.04 -19.644,-31.04 -74.475,-129.36 -79.937,-293.86 0.003,-432.32 79.94,-138.46 225.128,-215.977 374.397,-216.161 0,0 20.153,-0.052 36.933,1.555 25.28,2.422 42.087,5.684 42.087,5.684 L 347.771,1521.17 c 0,0 -9.671,-10.01 -26.112,-33.81 z M 633.291,882.532 c -108.638,13.203 -209.994,75.512 -268.874,177.498 -58.88,101.98 -62.162,220.91 -19.278,321.6 z" /></g>
+</g>
+<g fill="none" stroke="white" stroke-width="10" stroke-linejoin="miter" stroke-linecap="butt">
+<path d="M371 110V73H412C438 73 461 90 461 111C461 129 450 142 435 149Z" />
+<path d="M371 132V191M371 132L461 187" />
+</g></svg><text x="40" y="742" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="600" fill="#f4d64d">C  /  LIGHTNING T</text><text x="40" y="767" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="400" fill="#c6c7cb">A subtle bolt runs through the stem.</text><svg width="500" height="260" viewBox="0 0 500 260" x="580" y="452">
+<defs><linearGradient id="yellow" gradientUnits="userSpaceOnUse" x1="70" y1="0" x2="340" y2="250">
+<stop offset="0" stop-color="#fed818" /><stop offset="0.42" stop-color="#dab810" />
+<stop offset="0.86" stop-color="#937a00" /><stop offset="1" stop-color="#937a00" />
+</linearGradient>
+<linearGradient id="paper" x2="0" y2="1"><stop stop-color="#f9f9f9" /><stop offset="0.8" stop-color="#f5f5f5" /><stop offset="1" stop-color="#e9e9e9" /></linearGradient>
+<linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7d7d7" /><stop offset="0.3" stop-color="#eeeeee" /><stop offset="1" stop-color="#ffffff" /></linearGradient>
+</defs><rect width="500" height="260" rx="26" fill="url(#yellow)" />
+<g fill="white">
+<path d="M34 68H210V78H74V181H90V191H48V181H64V78H34Z" />
+<path d="M120 68H130V125H200V68H210V191H200V135H130V191H120Z" />
+<g transform="translate(226 68) scale(0.14341209227663465 0.1434127223483758) translate(-244.092793407298 -807.838807881139)"><path d="m 430.516,1595.76 c -16.576,-11.38 -29.677,-22.4 -29.677,-22.4 L 827.125,835.012 c 0,0 17.547,6.508 32.041,13.457 18.27,8.757 33.403,17.294 33.403,17.294 206.631,119.3 277.541,383.917 158.241,590.547 -119.303,206.64 -383.92,277.54 -590.554,158.24 0,0 -14.473,-8.32 -29.74,-18.79 z M 856.543,928.162 496.282,1552.15 c 172.195,99.42 392.709,40.33 492.126,-131.86 99.412,-172.2 40.332,-392.71 -131.865,-492.128 z M 321.659,1487.36 c -14.487,-20.98 -19.644,-31.04 -19.644,-31.04 -74.475,-129.36 -79.937,-293.86 0.003,-432.32 79.94,-138.46 225.128,-215.977 374.397,-216.161 0,0 20.153,-0.052 36.933,1.555 25.28,2.422 42.087,5.684 42.087,5.684 L 347.771,1521.17 c 0,0 -9.671,-10.01 -26.112,-33.81 z M 633.291,882.532 c -108.638,13.203 -209.994,75.512 -268.874,177.498 -58.88,101.98 -62.162,220.91 -19.278,321.6 z" /></g>
+</g>
+<g fill="none" stroke="white" stroke-width="10" stroke-linejoin="miter" stroke-linecap="butt">
+<path d="M371 110V73H412C438 73 461 90 461 111C461 129 450 142 435 149Z" />
+<path d="M371 132V191M371 132L461 187" />
+</g></svg><text x="580" y="742" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="600" fill="#f4d64d">D  /  LINKED TH</text><text x="580" y="767" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="400" fill="#c6c7cb">A shared cap connects the two letters.</text></svg>

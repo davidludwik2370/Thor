@@ -3,7 +3,8 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.15.1",
+  "version": "0.15.2",
+  "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -34,6 +35,10 @@
         "extensions": [
           ".thor"
         ],
+        "icon": {
+          "light": "./fileicons/thor-file-light.svg",
+          "dark": "./fileicons/thor-file.svg"
+        },
         "configuration": "./language-configuration.json"
       }
     ],

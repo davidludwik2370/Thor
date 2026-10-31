@@ -1,5 +1,7 @@
 # Thor
 
+![Thor](assets/branding/logo-slim.png)
+
 Thor is an experimental Odin superset that transpiles to ordinary Odin. This
 milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make

@@ -2247,3 +2247,32 @@ Actual VS Code integration checks signature/docs equality and tooltip ranges
 before and after use/removal. All 143 stdio LSP/rename tests and all 1126 native
 TLS tests pass, with memory tracking enabled for the native suite. The local
 TLS binary is rebuilt; restart the language server once to load the change.
+
+## Final Thor brand and transparent file icons (extension 0.15.2)
+
+Finalize the straight T with its wider cap and small foot, the selected double
+diagonal H, the original outlined O, and the R's sharp joined leg. The three
+brand exports are assets/branding/logo-slim.png, emblem.ico and sourcefile.ico;
+editable SVG masters live alongside them. The source-file glyph is yellow on
+transparency, with no document sheet or colored tile. The app emblem retains
+white on the rounded gold gradient. ICO exports include 16 through 256 pixels.
+
+Register the transparent T with contributes.languages[].icon, using the same
+mechanism as OLS's Odin file icon. The dark-theme glyph uses the palette's
+bright yellow, with darker gold on light themes. This works with the current
+language-icon-aware theme without changing user settings or Odin associations.
+The extension listing now has the app emblem. Loading these new manifest
+contributions requires Developer: Reload Window after installing the update.
+
+tools/build_branding.py reproduces the PNG/ICO exports from SVG with isolated
+Chrome renderers and ImageMagick. It closes its renderers once the PNG is
+complete, including macOS Chrome versions which otherwise remain running.
+These authoring tools do not run during compilation, TLS startup or extension
+activation. Extension tests check the icon paths, glyph-only transparent SVGs,
+light/dark palette and supported PNG listing image. Export verification checks
+the source icon's transparent margins and opaque yellow pixels in all 7 sizes.
+
+All 108 extension tests and the real isolated VS Code integration suite pass.
+The packaged VSIX includes the PNG emblem and both glyph-only SVGs, and the
+local extension is installed. No compiler/TLS rebuild or user theme changes
+are needed.

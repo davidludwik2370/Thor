@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 150 150" role="img">
+  <title>Thor emblem</title>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#fed818" />
+      <stop offset="0.42" stop-color="#dab810" />
+      <stop offset="0.86" stop-color="#937a00" />
+      <stop offset="1" stop-color="#937a00" />
+    </linearGradient>
+  </defs>
+  <rect width="150" height="150" rx="8.4" fill="url(#gold)" />
+  <path d="M26 68H112V78H74V181H80V191H58V181H64V78H26Z" fill="#ffffff" transform="translate(75 75) scale(0.959349593495935) translate(-69 -129.5)" />
+</svg>

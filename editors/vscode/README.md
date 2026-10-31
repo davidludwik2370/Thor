@@ -4,6 +4,18 @@ Local Thor T01-T23 syntax highlighting and a client for the TLS fork in this
 repository. `.thor` files have their own language identity; existing Odin support
 continues to own `.odin` files.
 
+Thor supplies a yellow T file icon with a transparent background through the
+same language-icon contribution Odin uses. Explorer rows and editor tabs keep
+the editor's background visible around the glyph. Dark themes use bright yellow;
+light themes use a darker gold from the same palette. No icon-theme switch is
+required. Themes with their own explicit Thor mapping can override the language
+icon. The extension listing uses the white T on gold app emblem.
+
+The final brand exports and editable SVG masters live in
+[`assets/branding`](../../assets/branding/README.md). Reload the VS Code window
+after installing an extension update to refresh icons; restarting TLS does not
+reload extension contributions.
+
 ## Local installation and updates
 
 The setup in this repository uses a locally built VSIX and a local TLS executable.
