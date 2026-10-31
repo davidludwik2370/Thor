@@ -153,6 +153,8 @@ class Specializations:
                 bindings[symbol.declaration,name]=Binding(symbol,actual,condition=condition)
             else:
                 typ=r.type_node(symbol.annotation,plan.substitutions) if symbol.annotation else Type('scalar','int')
+                if typ.kind in {'big_integer','big_rational'}:
+                    e.fail(arg or call,'Integer/Rational values cannot be native generic constant parameters; pass a borrowed numeric value to fn/#run instead.')
                 if arg is None and isinstance(actual,int):data={'kind':'integer','value':str(actual)}
                 elif arg is None:return
                 elif not e.known(arg):return

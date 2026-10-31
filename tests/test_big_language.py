@@ -201,7 +201,6 @@ delete(b);delete(c)
                ('a:Integer=1.25','whole number'),
                ('a:=Integer(f64(1))','exact integer inputs'),
                ('a:=max(u128)*2','Error:'),
-               ('VALUE::Integer(123)','Compile-time Integer/Rational'),
                ('a:=Integer(1);_=a._value','backing storage is private'),
                ('r:=Rational(1,2);_=r._numerator','backing storage is private'),
                ('a:=Integer(1);p:=&a;_=p._value','backing storage is private')]

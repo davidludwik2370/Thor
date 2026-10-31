@@ -22,6 +22,10 @@ write_hover_content :: proc(
     }
 	if .Immutable in symbol.flags { cat = append_first_line_comment(cat, "immutable storage", allocator) }
 	doc := construct_symbol_docs(symbol, allocator)
+	if thor_type_display_enabled(ast_context) && .Variable in symbol.flags && thor_big_kind(symbol)!="" &&
+	   strings.contains(doc,"These fields are compiler/runtime implementation details") {
+		doc="Arbitrary-precision numeric value. Direct Thor copies own independent storage; delete a named runtime owner when finished. Compile-time constants borrow read-only numeric data."
+	}
     if value,ok:=symbol.value.(SymbolProcedureValue);ok&&value.thor_pure {
         doc=fmt.aprintf("%s\n\nKnown-argument calls are evaluated at compile time; runtime inputs remain ordinary calls. String/slice results in runtime code own independent storage. Use `pure.destroy` for recursive cleanup of nested results. Constant strings and fixed aggregates use borrowed Odin storage.",doc,allocator=allocator)
     }

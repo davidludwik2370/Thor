@@ -23,6 +23,7 @@ Parser :: struct {
 	selections: [dynamic]Selection,
 	immutables: [dynamic][2]int,
 	features: [dynamic]Feature,
+	declaration_separators: [dynamic][3]int,
 	file: ^ast.File,
 	tok: tokenizer.Tokenizer,
 
@@ -3919,6 +3920,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 	#partial switch p.curr_tok.kind {
 	case .Eq, .Colon, .Gt:
 		sep := advance_token(p)
+		if p.thor { append(&p.declaration_separators,[3]int{names[0].pos.offset,sep.pos.offset,sep.pos.offset+len(sep.text)}) }
 		if sep.kind == .Gt {
 			if !p.thor { error(p, sep.pos, "immutable storage syntax requires Thor source (.thor); rename this .odin file to .thor") }
 			immutable = true

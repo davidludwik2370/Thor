@@ -176,7 +176,7 @@ class EvaluationCache:
             packet = json.loads(path.read_bytes());value = packet['value']
             if packet['schema'] != SCHEMA or packet['key'] != key: raise ValueError('cache schema/key')
             if packet['checksum'] != hashlib.sha256(canonical(value)).hexdigest(): raise ValueError('cache checksum')
-            values.expression(value, 'T', 'meta')
+            values.validate(value)
         except FileNotFoundError:
             self.stats['misses'] += 1;return None
         except (OSError, ValueError, TypeError, KeyError, RecursionError):
@@ -188,7 +188,7 @@ class EvaluationCache:
         if key is None: return
         temporary = None
         try:
-            values.expression(value, 'T', 'meta');contents = canonical(value)
+            values.validate(value);contents = canonical(value)
             if len(contents) > MAX_PACKET: return
             packet = canonical(dict(schema=SCHEMA, key=key, value=value, checksum=hashlib.sha256(contents).hexdigest()))
             self.directory.mkdir(parents=True, exist_ok=True)

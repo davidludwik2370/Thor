@@ -119,10 +119,13 @@ class Source:
                     node.data.setdefault("roles", {})["selector"] = feature["selector"]
         self.excluded = self.info.get("excluded", False)
         self.diagnostics = self.info.get("diagnostics") or []
+        declaration_separators = {span[0]:span[1:] for span in self.info.get("declaration_separators") or []}
         immutable_starts = {span[0] for span in self.info.get("immutables") or []}
         for n in self.nodes:
             if n.kind == "Declaration":
                 n.data["immutable"] = n.start in immutable_starts
+                first_name=(n.data.get('lists',{}).get('names') or [[n.start]])[0][0]
+                if first_name in declaration_separators:n.data['roles']['separator']=declaration_separators[first_name]
         if not self.nodes:
             self.nodes = [Node(self, 0, {"kind": "File", "start": 0, "end": len(self.raw), "parent": -1})]
         self.by_span: dict[tuple[int, int], list[Node]] = {}

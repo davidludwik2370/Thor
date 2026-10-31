@@ -809,6 +809,8 @@ class Resolver:
         return result
 
     def template(self, n):
+        if n.kind=='Ident' and n.source.thor and n.text in {'Integer','Rational'} and self.symbol(n) is None:
+            return n.source.big.module()+'.'+n.text
         if n.kind == "PolyType":
             specialization = n.role("specialization")
             return self.template(specialization) if specialization else n.data["name"]

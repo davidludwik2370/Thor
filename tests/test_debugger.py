@@ -109,6 +109,30 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_big_compile_time_results_keep_original_breakpoints(self):
+        text='''package main
+VALUE::Integer(123456789012345678901234567890)
+calculate::fn(n:int)->Integer{return Integer(n)**20}
+main::proc(){
+    value:=#run calculate(22)
+    copied:=VALUE
+    copied+=value
+    delete(value);delete(copied)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_multi_switch_arm_and_skip_preserve_source_breakpoints(self):
         text='''package main
 main::proc(){

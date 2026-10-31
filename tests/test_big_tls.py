@@ -12,6 +12,30 @@ class BigTLSTests(unittest.TestCase):
     semantic_spans=tls.TLSTests.semantic_spans
     assert_original_identifier_tokens=tls.TLSTests.assert_original_identifier_tokens
 
+    def test_compile_time_big_values_hover_rename_and_readonly_diagnostics(self):
+        text='''package main
+VALUE::Integer(123456789012345678901234567890)
+NEXT::VALUE+1
+make_value::fn()->Rational{return Rational(22,13)}
+RATIO::#run make_value()
+main::proc(){copy:=NEXT;delete(copy);r:=RATIO;delete(r)}
+'''
+        client,main=self.open(text)
+        for name,expected in [('VALUE::','Integer'),('NEXT::','Integer'),('RATIO::','Rational')]:
+            hover=json.dumps(self.hover(client,main,text,name))
+            self.assertIn(expected,hover)
+            self.assertNotIn('._value',hover)
+        spans=self.semantic_spans(client,main,text)
+        self.assert_original_identifier_tokens(main,text,spans)
+        rename=client.request('textDocument/rename',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'VALUE::'),'newName':'NUMBER'})
+        self.assertEqual(len(rename['changes'][main.as_uri()]),2)
+        broken=text.replace('copy:=NEXT','VALUE+=1;copy:=NEXT')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='read-only')
+        error=next(e for e in errors if 'read-only' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'VALUE+=',0))
+
     def test_logical_hovers_properties_and_optional_constructors(self):
         text='''package main
 identity::proc(value:Integer)->Integer{return value}

@@ -3,6 +3,7 @@ package thor_pure
 
 import "base:intrinsics"
 import "base:runtime"
+import big "thor:big"
 
 // Compiler scratch must not import core:mem/core:reflect: checked SDK bodies
 // can belong to those packages or their dependencies. Keep tracking local to
@@ -59,7 +60,9 @@ scratch_destroy :: proc(s:^Scratch) {
 
 validate :: proc "contextless"($T:typeid,$Result:bool,$Depth:int) {
     when Depth>24 {#panic("Pure functions do not support recursive reference-containing types")}
-    else when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {}
+    else when T==big.Integer || T==big.Rational {
+        when Result {#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc")}
+    } else when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {}
     else when intrinsics.type_is_string(T) {
         when Result {#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc")}
     } else when intrinsics.type_is_slice(T) {
@@ -97,7 +100,8 @@ validate_format :: proc "contextless"($T:typeid) {
 // storage, including input views and repeated aliases. Padding is copied only
 // within this process; no address is serialized by the compile-time protocol.
 clone :: proc(value:$T,allocator:=context.allocator)->T {
-    when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {
+    when T==big.Integer || T==big.Rational {return big.clone(value,allocator)}
+    else when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {
         return value
     } else {
         result:=value
@@ -130,6 +134,8 @@ offset :: proc "contextless"(pointer:rawptr,amount:int)->rawptr {return rawptr(u
 
 clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocator,depth:int) {
     if depth>24 {panic("Pure result nesting limit exceeded")}
+    if info.id==typeid_of(big.Integer){(cast(^big.Integer)dst)^=big.clone((cast(^big.Integer)src)^,allocator);return}
+    if info.id==typeid_of(big.Rational){(cast(^big.Rational)dst)^=big.clone((cast(^big.Rational)src)^,allocator);return}
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
     case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,
@@ -179,6 +185,8 @@ destroy :: proc(value:$T,allocator:=context.allocator) {destroy_at(any(value).da
 
 destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocator,depth:int) {
     if depth>24 {panic("Pure result nesting limit exceeded")}
+    if info.id==typeid_of(big.Integer){value:=(cast(^big.Integer)src)^;big.destroy(&value);return}
+    if info.id==typeid_of(big.Rational){value:=(cast(^big.Rational)src)^;big.destroy(&value);return}
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
     case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,

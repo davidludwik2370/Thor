@@ -46,7 +46,11 @@ class BigOperators:
 
     def render(self,node,hint,constant):
         if not self.handles(node,hint):return None
-        if constant:return self.big.error(node,'Compile-time Integer/Rational operators are not enabled yet.')
+        if constant:
+            concrete=any(self.big.shape(v).kind in self.kinds for v in self.operands(node))
+            requested=self.big.expected(hint)
+            if not concrete and not(requested and requested.kind in self.kinds):return None
+            return self.big.error(node,'Compile-time Integer/Rational operators require matching, compile-time-known numeric operands; use fn/#run for computation through procedures.')
         op=node.data['op']
         concrete=[self.big.shape(v).kind for v in self.operands(node)]
         if 'big_rational' in concrete and op in {'&','|','~','&~','<<','>>'}:

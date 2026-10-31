@@ -3130,6 +3130,10 @@ resolve_global_identifier :: proc(
 	if .Variable in global.flags {
 		symbol.flags |= {.Variable}
 	}
+	if thor_type_display_enabled(ast_context) && .Variable in symbol.flags && thor_big_kind(symbol)!="" {
+		symbol.pkg=get_package_from_node(global.name_expr^)
+		symbol.doc=""
+	}
 	if .Immutable in global.flags { symbol.flags |= {.Immutable} }
 
 	// Keep value aliases and procedure/#run results variable-colored, even

@@ -38,6 +38,7 @@ Output :: struct {
     selection_tags: [dynamic]Span,
     file_tags: [dynamic]string,
     features: []parser.Feature,
+    declaration_separators: [dynamic][3]int,
 }
 Parse_Error :: struct {
     pos: tokenizer.Pos,
@@ -334,7 +335,7 @@ main :: proc() {
     }
     file.end.offset = len(data)
     out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public, private_file=tags.private==.File,
-                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:]}
+                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:],declaration_separators=p.declaration_separators}
     for tag in file.tags {
         append(&out.file_tags, tag.text)
         text := strings.trim_space(tag.text)

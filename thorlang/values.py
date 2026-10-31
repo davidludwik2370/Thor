@@ -7,6 +7,11 @@ import sys
 class ValueErrorProtocol(ValueError):pass
 
 
+def validate(value):
+    """Validate portable contents without emitting executable reconstruction."""
+    expression(value,'T','meta',big=lambda *_:'0')
+
+
 def decode(data):
     if len(data)>16*1024*1024:raise ValueErrorProtocol('Compile-time result exceeds 16 MiB.')
     try:packet=json.loads(data)
@@ -16,15 +21,21 @@ def decode(data):
     return packet['value']
 
 
-def expression(value,typ,meta,depth=0):
+def expression(value,typ,meta,depth=0,big=None):
     if depth>32 or not isinstance(value,dict):raise ValueErrorProtocol('Invalid nested compile-time value.')
     kind=value.get('kind')
-    def child(v,t):return expression(v,t,meta,depth+1)
+    def child(v,t):return expression(v,t,meta,depth+1,big)
     if kind=='specialized':
         names=value.get('types')
         if not isinstance(names,list) or not all(isinstance(v,dict) and v.get('kind')=='string' for v in names):raise ValueErrorProtocol('Invalid specialization metadata.')
         for name in names:child(name,'string')
         return child(value.get('value'),typ)
+    if kind in {'big_integer','big_rational'}:
+        from .bigvalues import number
+        try:number(value)
+        except (ValueError,KeyError,TypeError) as exc:raise ValueErrorProtocol(str(exc)) from exc
+        if big is None:raise ValueErrorProtocol('Big-number reconstruction requires static numeric backing.')
+        return big(value,typ)
     if kind=='bool':
         if type(value.get('value')) is not bool:raise ValueErrorProtocol('Invalid boolean result.')
         return f'{typ}({str(value["value"]).lower()})'
@@ -92,7 +103,7 @@ def expression(value,typ,meta,depth=0):
 
 def has_owned(value, *, slices_only=False):
     kind=value['kind']
-    if kind=='string':return not slices_only
+    if kind in {'string','big_integer','big_rational'}:return not slices_only
     if kind=='sequence':
         if value.get('storage')=='slice' or value.get('nil'):return True
         return any(has_owned(v,slices_only=slices_only) for v in value['values'])
@@ -101,15 +112,16 @@ def has_owned(value, *, slices_only=False):
     return False
 
 
-def materialize(value,typ,meta,module,prefix):
+def materialize(value,typ,meta,module,prefix,big=None):
     """Construct independent storage directly, without allocating templates."""
     statements=[]
     serial=0
     def build(v,t):
         nonlocal serial
-        if not has_owned(v):return expression(v,t,meta)
+        if not has_owned(v):return expression(v,t,meta,big=big)
         kind=v['kind']
-        if kind=='string':return f'{module}.clone({expression(v,t,meta)})'
+        if kind in {'big_integer','big_rational'}:return f'{module}.clone({expression(v,t,meta,big=big)})'
+        if kind=='string':return f'{module}.clone({expression(v,t,meta,big=big)})'
         if kind=='sequence':
             elem=f'{meta}.type_elem_type({t})'
             if v.get('storage')=='slice' or v['nil']:
@@ -127,6 +139,6 @@ def materialize(value,typ,meta,module,prefix):
         if kind=='union':
             variant=f'{meta}.type_variant_type_of({t},{v["variant"]})'
             return f'{t}({build(v["value"],variant)})'
-        return expression(v,t,meta)
+        return expression(v,t,meta,big=big)
     result=build(value,typ)
     return '\n'.join([*statements,'return '+result])

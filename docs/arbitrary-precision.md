@@ -1,7 +1,6 @@
 # Integer and Rational: design and implementation stages
 
-This records the accepted design. Stages 1–3 are implemented. Compile-time support and broad formatting integration
-follow in stages 4–5.
+This records the accepted design. Stages 1–4 are implemented. Broad formatting and library integration follow in stage 5.
 See the [commented language demo](../examples/big_numbers/demo.thor) and
 [explicit runtime API](../runtime/big/README.md).
 
@@ -129,7 +128,7 @@ hashing/equality is added.
 3. **Runtime operators (implemented):** arithmetic/comparisons, coercion, compound
    updates, powers/bitwise operations, temporary cleanup and expression/generic
    interactions, including `a,b=b,a+1`.
-4. **Compile-time support (pending):** exact constants, read-only data, fn/#run,
+4. **Compile-time support (implemented):** exact constants, read-only data, fn/#run,
    arbitrary-size value protocol, independent reconstruction and caching.
 5. **Integration/hardening (pending):** formatting, aggregate/native boundaries,
    memory/debugging, complete TLS behavior, commented demo and full suites.
@@ -173,10 +172,10 @@ package API, now with direct Thor numeric-copy ownership enabled.
   member dispatch for these computed properties is deferred to integration work.
 - Use `big.to_string` for display for now; it returns an allocated string that
   the caller frees. General `fmt`/f-string formatting integration comes in stage 5.
-- Big `::` constants and big `fn`/`#run` results are not enabled yet.
-  `VALUE :: Integer(...)` receives a clear diagnostic instead of allocating a
-  runtime value disguised as a constant. Distinct big types and big map keys/set
-  elements are explicitly rejected for now; ordinary type aliases are supported.
+- Big `::` constants, exact constant operators and big `fn`/`#run` results are
+  implemented. Constants borrow read-only limbs; runtime copies own allocations.
+  Distinct big types and big map keys/set elements remain explicitly rejected;
+  ordinary type aliases are supported.
 
 TLS resolves the predefined names without an import, retains user shadowing and
 native `.odin` type spelling, offers logical constructor signatures and read-only
@@ -221,3 +220,41 @@ allocation-failure sweeps passed 13. Original-source arithmetic stepping was
 also checked through CodeLLDB. Integration of numeric library
 builtins, membership, shared `basic` generics, and unconstrained computed
 properties belongs to stage five; compile-time constants/evaluation are next.
+
+## Compile-time numbers (stage four)
+
+See [the compile-time walkthrough](../examples/big_comptime/demo.thor).
+Constant construction and arithmetic preserve exact source digits and fractions,
+including negative division/remainder, shifts, bitwise operations, and powers.
+Constants can feed compile-time conditions and switches, other constants, and
+`fn`/`#run` calls. Literal native operands still require the same contextual
+coercion as runtime expressions; typed native values require explicit conversion.
+
+Runtime access uses small allocation-free native headers over `@(rodata)` limb
+arrays. This is a bridge to Odin, which does not support arbitrary-precision
+struct constants: numeric *contents* are compiled into read-only data rather than
+parsed/allocated at startup. Thor retains the original constant identity and
+rejects writes, deletion, and taking its address. A direct runtime copy clones
+its contents; runtime arithmetic never modifies the backing data.
+
+`fn` return promotion recognizes numbers as logical numeric values, including
+inside records, arrays, slices and unions. It never serializes private backend
+fields, pointers or allocator identities. Each returned occurrence owns fresh
+storage. Named direct numeric returns are preserved before deferred deletion;
+existing returned slice views still observe user defers before promotion.
+`pure.destroy` recursively releases an owned returned tree.
+
+The value protocol stores canonical decimal Integer contents or a reduced
+Rational numerator and positive denominator. It accepts numbers beyond Python's
+native decimal-string conversion limit. Cache reads validate this canonical
+schema, and reconstruction creates independent runtime owners every time.
+Warm scalar/big-result dependency records survive unrelated runtime edits; pure
+callee/argument/source changes invalidate them normally.
+
+Aggregate `#run` results containing numbers require `:=`, preserving the explicit
+shallow-aggregate ownership boundary. Individual numeric constants support `::`.
+
+These values cannot be native Odin generic *constant parameters* (`$N: Integer`):
+pass a borrowed numeric parameter to `fn`/`#run` instead. Generic type parameters
+instantiated with Integer/Rational remain supported. Cross-target `#run` retains
+the existing host-execution restriction; ordinary rodata constants are portable.

@@ -166,6 +166,11 @@ class Expressions:
         duplicate aliases, conversions, strings, ranges and #config values.
         """
         s=self.source
+        selector=node.role('selector')
+        if selector and self.shape(selector).kind in {'big_integer','big_rational'}:
+            # These constants have Thor-evaluated contents and rodata views;
+            # they cannot be native Odin generic constant arguments.
+            return 'true'
         def constant(n,seen=None):
             seen=set() if seen is None else seen
             if n in seen: return False
@@ -691,6 +696,8 @@ class Expressions:
 
     def switch_condition(self,n,case):
         s=self.source
+        numeric=s.big.constants.case(n,case)
+        if numeric is not None:return str(numeric).lower()
         selector=n.role('selector')
         if not case['matches']: return 'true'
         values=[]
@@ -892,6 +899,8 @@ class Expressions:
 
     def validate_compile_cases(self,n,selector):
         s=self.source
+        numeric=s.big.constants.validate_cases(n)
+        if numeric:return numeric
         keys=set()
         intervals=[]
         def key(node,seen=None):

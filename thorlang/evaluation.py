@@ -182,7 +182,7 @@ class Evaluator:
         # Like native arithmetic, expressions made entirely from untyped
         # constants retain literal coercion at their eventual use site.
         untyped=self.power(n) and self.r.type_of(n).untyped
-        try:code=values.expression(data,'' if untyped else typ,s.prefix+'meta')
+        try:code=values.expression(data,'' if untyped else typ,s.prefix+'meta',big=lambda value,_:s.big.constants.view(value,n))
         except (ValueError,TypeError,KeyError) as exc:self.fail(n,f'Invalid compile-time result: {exc}')
         if untyped:
             if data['kind']=='integer':
@@ -192,15 +192,19 @@ class Evaluator:
             else:check=f'{typ} == {typ}'
             code=f'({code} when ({check}) else {code})'
         literal=s.mapping.wrap(code,s.path,n.start,n.end,'compile-time-result')
+        s.big.constants.remember(n,data)
         if values.has_owned(data):
             module=self.p.purity.module(s)
-            def body(_):return values.materialize(data,s.prefix+'Result',s.prefix+'meta',module,s.prefix+'materialized_'+str(n.start)+'_')
+            def body(_):return values.materialize(data,s.prefix+'Result',s.prefix+'meta',module,s.prefix+'materialized_'+str(n.start)+'_',big=lambda value,_:s.big.constants.view(value,n))
             name,args=s.expressions.closed(n,body,result=None,flavor='run_value_'+self.specializations.fingerprint(bindings))
             args.append(typ)
             runtime=f'{name}({", ".join(args)})'
             label='#run' if n.kind=='Run' else 'fn'
             constant=(s.expressions.error(n,f'A slice-containing {label} result needs a runtime binding (:=); use a pure consumer to compute a scalar constant.')
                       if values.has_owned(data,slices_only=True) else literal)
+            from .bigvalues import contains
+            if contains(data) and data['kind'] not in {'big_integer','big_rational'}:
+                constant=s.expressions.error(n,'An aggregate containing Integer/Rational results needs a runtime binding (:=); use :: for individual numeric constants.')
             value={'runtime':runtime,'constant':constant}
         else:value={'runtime':literal,'constant':literal}
         self.register(n,value,bindings)
@@ -234,6 +238,8 @@ class Evaluator:
             return f'{meta}.type_proc_return_type(type_of({meta}.procedure_of({code})),0)'
         if self.power(call):return call.source.expressions.power_type(call)
         if call.source.expressions.extrema.plan(call):return call.source.expressions.extrema.result_type(call)
+        constructor=call.source.big.constructor(call)
+        if constructor:return call.source.big.type_hint(constructor.kind).expression
         plan=call.source.resolver.resolve_call(call)
         if not plan and not(self.purity.approved(call) or self.purity.builtin(call)):
             self.fail(call,'Compile-time result type requires an unambiguous resolved procedure target.')
@@ -381,6 +387,11 @@ class Evaluator:
 
     def boolean(self,n):
         if n.text in {'true','false'}:return n.text=='true'
+        from .bigconstants import NotConstant
+        try:
+            value=n.source.big.constants.evaluate(n)
+            if value['kind']=='bool':return value['value']
+        except (NotConstant,ValueError,ZeroDivisionError,OverflowError):pass
         key=self.key(n)
         if key in self.guard_busy:self.fail(n,'Cyclic compile-time selection dependency.')
         self.guard_busy.add(key)
@@ -491,7 +502,7 @@ class Evaluator:
                 self.results[key]=data;self.result_bindings[key]=self.specializations.relevant(n).copy();self.install(n,data)
                 return data
             if call.kind!='Call':self.fail(n,'#run requires a direct eligible procedure call.')
-            if not(self.purity.targets(call) or self.purity.approved(call) or self.purity.builtin(call)):
+            if not(self.purity.targets(call) or self.purity.approved(call) or self.purity.builtin(call) or call.source.big.constructor(call)):
                 library=self.purity.library(call)
                 if library and library[0]=='base:intrinsics':
                     self.fail(n,f"#run cannot evaluate compiler intrinsic '{call.role('callee').text}': it is not an eligible pure operation.")
@@ -721,7 +732,7 @@ class Evaluator:
         """
         if not self.cache or not self.cache.enabled:return None
         typ=self.r.type_of(n)
-        if typ.kind!='scalar' or typ.name in {'any','typeid','rawptr','cstring'}:return None
+        if typ.kind not in {'scalar','big_integer','big_rational'} or typ.name in {'any','typeid','rawptr','cstring'}:return None
         if any(self.r.generic_parameters(proc.role('type')) for proc in procedures):return None
         if any(node.kind=='Directive' and node.data['name']=='procedure' for item in (*roots,*keep) for node in descendants(item)):return None
         from .cache import canonical
@@ -870,7 +881,7 @@ class Evaluator:
             finally:source.evaluation_keep=old
         else:
             old=source.evaluation_keep;source.evaluation_keep=None
-            try:expr=source.render(site)
+            try:expr=source.render(site,constant=condition)
             finally:source.evaluation_keep=old
         alias=source.prefix+'evaluation'
         emitted='true when ('+expr+') else false' if condition or condition_case is not None else expr
@@ -923,7 +934,7 @@ class Evaluator:
                     arguments.append(type_code(b.typ,entry_source,self.r))
                 else:
                     parameters.append('$'+b.symbol.name+':'+(self.r.template(b.symbol.annotation) if b.symbol.annotation else type_code(b.typ,source,self.r)))
-                    arguments.append(values.expression(b.value,type_code(b.typ,entry_source,self.r),entry_source.prefix+'meta'))
+                    arguments.append(values.expression(b.value,type_code(b.typ,entry_source,self.r),entry_source.prefix+'meta',big=lambda value,_:entry_source.big.constants.view(value,n)))
             names=source.prefix+'binding_names'
             source.needs_intrinsics=True
             metadata=f'{names}:=[{len(type_bindings)}]string{{'+','.join(source.prefix+'meta.type_canonical_name('+b.symbol.name+')' for b in type_bindings)+'}\n'
@@ -1011,7 +1022,7 @@ class Evaluator:
                 self.fail(error_site,f'{label} execution failed (exit {result.returncode}).'+(' '+detail[:300] if detail else ''))
             try:
                 value=values.decode(result.stdout)
-                values.expression(value,'T','meta')
+                values.validate(value)
             except values.ValueErrorProtocol as exc:self.fail(error_site,str(exc))
             if self.cache:
                 if key and self.cache.key(self.p,helper,target,self.odin,self.root)!=key:

@@ -6,6 +6,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:reflect"
 import "core:strings"
+import big "thor:big"
 
 hex :: proc(builder:^strings.Builder,bytes:[]u8) {
     digits:="0123456789abcdef"
@@ -33,7 +34,9 @@ emit_specialized :: proc(value:$T,names:[]string) {
 
 write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
     when Depth>32 {panic("Compile-time value nesting limit exceeded")}
-    else when intrinsics.type_is_boolean(T) {
+    else when T==big.Integer || T==big.Rational {
+        write_big(builder,value)
+    } else when intrinsics.type_is_boolean(T) {
         strings.write_string(builder,`{"kind":"bool","value":`)
         fmt.sbprintf(builder,"%t",bool(value));strings.write_byte(builder,'}')
     } else when intrinsics.type_is_integer(T) {
@@ -90,6 +93,8 @@ write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
 // encoded individually; padding and process addresses never enter the packet.
 write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
     assert(depth<=32,"Compile-time value nesting limit exceeded")
+    if value.id==typeid_of(big.Integer){write_big(builder,(cast(^big.Integer)value.data)^);return}
+    if value.id==typeid_of(big.Rational){write_big(builder,(cast(^big.Rational)value.data)^);return}
     info:=runtime.type_info_base(type_info_of(value.id))
     bytes:=(cast([^]u8)value.data)[:info.size]
     #partial switch variant in info.variant {
@@ -225,4 +230,21 @@ emit :: proc(value:$T) {
     strings.write_byte(&builder,'}')
     assert(len(strings.to_string(builder))<=16*1024*1024,"Compile-time result is too large")
     fmt.println(strings.to_string(builder))
+}
+
+// Canonical decimal contents, independent of backend limb width and allocators.
+write_big :: proc(builder:^strings.Builder,value:$T) where T==big.Integer || T==big.Rational {
+    when T==big.Integer {
+        text:=big.to_string(value);defer delete(text)
+        strings.write_string(builder,`{"kind":"big_integer","value":"`)
+        strings.write_string(builder,text);strings.write_string(builder,`"}`)
+    } else {
+        n:=big.numerator(value);d:=big.denominator(value)
+        defer big.destroy(&n);defer big.destroy(&d)
+        numer:=big.to_string(n);denom:=big.to_string(d)
+        defer delete(numer);defer delete(denom)
+        strings.write_string(builder,`{"kind":"big_rational","numerator":"`)
+        strings.write_string(builder,numer);strings.write_string(builder,`","denominator":"`)
+        strings.write_string(builder,denom);strings.write_string(builder,`"}`)
+    }
 }

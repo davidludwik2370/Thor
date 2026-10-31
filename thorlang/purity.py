@@ -217,8 +217,10 @@ class Purity:
         names=sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
                       for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
-        parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types")}}',
-               f'else when {meta}.type_is_struct(T) {{']
+        parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types")}}']
+        if s.big.enabled:
+            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{{native}.validate(T,Result && !Allow_Owned,Depth)}}')
+        parts.append(f'else when {meta}.type_is_struct(T) {{')
         count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
         parts.append(f'#assert({meta}.type_struct_field_count(T)==({count}),"Pure record fields could not be fully resolved")')
         raw_shapes={tuple(n.text for f in record.role('fields').children if f.kind=='Field' for n in f.group('names'))
@@ -618,7 +620,7 @@ class Purity:
             if len(values_)==1 and unwrap(values_[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
                 rhs=s.render(values_[0],expected=tuple(s.type_hint(t) or Hint(s,t) for _,t in results))
             else:
-                rhs=','.join(s.render(value,expected=s.type_hint(typ) or Hint(s,typ))
+                rhs=','.join(s.big.owned(value,hint=s.type_hint(typ) or Hint(s,typ))
                              for value,(_,typ) in zip(values_,results)) if values_ else ','.join(named)
             # Preserve native arity errors, including a single multi-result call.
             if len(values_)>len(results):rhs+=','+','.join(s.render(v) for v in values_[len(results):])
@@ -669,7 +671,7 @@ class Purity:
         key=typ.kind,typ.node
         if key in seen:return True
         seen.add(key)
-        if typ.kind in {'string','slice','generic','unknown'}:return True
+        if typ.kind in {'string','slice','generic','unknown','big_integer','big_rational'}:return True
         if typ.elem:return self.owned_type(typ.elem,seen)
         if typ.kind=='struct' and typ.node:
             return any(self.owned_type(self.r.type_node(f.role('type'),typ.substitutions),seen.copy())
@@ -723,17 +725,16 @@ class Purity:
         code+='return '+','.join(names)+'\n'
         return '{'+code+'}'
 
+    def promote_results(self,proc):
+        s=proc.source;prefix=s.prefix+'scratch_'+str(proc.start)
+        return ';'.join(s.prefix+'output_'+str(proc.start)+'_'+str(i)+'^='+self.module(s)+'.clone('+name+','+prefix+'_caller)'
+                        for i,name in enumerate(self.result_names(proc)))+';'
+
     def prologue(self,block):
         proc=block.parent
         if not(proc and proc.kind=='Procedure' and proc.role('body') is block and self.checked(proc)):return ''
         if proc in self.inner_bodies:
-            s=block.source;prefix=s.prefix+'scratch_'+str(proc.start)
-            outputs=[]
-            for i,name in enumerate(self.result_names(proc)):
-                slot=s.prefix+'output_'+str(proc.start)+'_'+str(i)+'^'
-                outputs.append(slot+'='+self.module(s)+'.clone('+name+','+prefix+'_caller)')
-            # First installed defer runs last, while local arrays still live.
-            return '\ndefer {'+';'.join(outputs)+'}\n'
+            return 'defer {'+self.promote_results(proc)+'}\n'
         self.analyze(proc)
         s=block.source;module=self.module(s);prefix=s.prefix+'scratch_'+str(proc.start)
         code=[]

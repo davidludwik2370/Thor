@@ -859,6 +859,15 @@ construct_symbol_information :: proc(ast_context: ^AstContext, symbol: Symbol) -
 	sb := strings.builder_make(ast_context.allocator)
 	write_symbol_attributes(&sb, symbol)
 	write_symbol_name(&sb, symbol)
+	if thor_type_display_enabled(ast_context) && .CompileTime in symbol.flags && .Variable in symbol.flags && thor_big_kind(symbol)!="" {
+		strings.write_string(&sb, " :: ")
+		thor_write_big_type(&sb, ast_context, symbol)
+		if symbol.value_expr!=nil {
+			strings.write_string(&sb," = ")
+			write_node(&sb,ast_context,symbol.value_expr,"",1,false)
+		}
+		return strings.to_string(sb)
+	}
 
 	if symbol.type == .Package {
 		return strings.to_string(sb)

@@ -27,13 +27,17 @@ class BigNumbers:
         self.type_hints = {}
         from .bigoperators import BigOperators
         self.ops = BigOperators(self)
+        from .bigconstants import BigConstants
+        self.constants = BigConstants(self)
 
     @property
     def enabled(self):
         if not self.s.thor or self.s.resolver is None:return False
         sources=self.s.resolver.sources
         if self.activation[0]!=len(sources):
-            self.activation=(len(sources),any('thor:big' in source.imports.values() for source in sources))
+            from .semantics import BIG_TYPES_SOURCE
+            internal={BIG_TYPES_SOURCE.parent.parent/'pure',BIG_TYPES_SOURCE.parent.parent/'eval'}
+            self.activation=(len(sources),any('thor:big' in source.imports.values() and source.path.parent not in internal for source in sources))
         return self.activation[1]
 
     def mapped(self,node,code,kind='big-number'):
@@ -96,7 +100,7 @@ class BigNumbers:
         if node.kind in {'Binary','Unary'} and self.ops.handles(node):return node.data['op'] not in self.ops.comparisons
         if node.kind == 'Selector': return self.property(node) is not None
         if node.kind == 'Compound': return typ.kind in KINDS
-        if node.kind in {'OrElse','OrReturn','OrBranch'}:return typ.kind in {*KINDS,'generic'}
+        if node.kind in {'OrElse','OrReturn','OrBranch','Run'}:return typ.kind in {*KINDS,'generic'}
         if node.kind == 'Call' and not self.s.denotes_type(node):
             signature=self.s.signature(node)
             if signature and not self.s.fields(signature.role('results')): return False
@@ -169,7 +173,7 @@ class BigNumbers:
     def render_literal(self, node, kind, constant):
         text=self.literal(node)
         if text is None: return None
-        if constant: return self.error(node,'Compile-time Integer/Rational values are not enabled yet; use a runtime declaration.')
+        if constant: return self.error(node,'This Integer/Rational literal is not a valid exact compile-time number.')
         if kind=='big_integer' and ('.' in text or 'e' in text.lower() and not re.match(r'[+-]?0[xz]',text,re.I)):
             from decimal import Decimal, InvalidOperation
             try:
@@ -183,7 +187,7 @@ class BigNumbers:
         return f'{self.module()}.{method}({json.dumps(text)})'
 
     def render_constructor(self, node, typ, constant):
-        if constant: return self.error(node,'Compile-time Integer/Rational values are not enabled yet; use a runtime declaration.')
+        if constant: return self.error(node,'A compile-time Integer/Rational constructor requires exact known numeric inputs; use #run for text parsing or procedure calls.')
         args=node.group('args')
         values=[a.role('value') if a.kind=='FieldValue' else a for a in args
                 if a.kind!='FieldValue' or a.role('field').text not in {'allocator','loc'}]
@@ -540,6 +544,11 @@ class BigNumbers:
     def render(self,node,hint,constant):
         if node in self.replacements: return self.replacements[node]
         if not self.enabled or node in self.busy: return None
+        if constant:
+            folded=self.constants.render(node,hint)
+            if folded is not None:return folded
+        declaration=self.constants.declaration(node)
+        if declaration is not None:return declaration
         if node.kind in {'OrReturn','OrBranch'}:
             optional=self.optional(node)
             if optional is not None:return optional
@@ -604,6 +613,8 @@ class BigNumbers:
             targets=node.group('lhs') if node.kind=='Assignment' else [node.role('expr')] if node.kind in {'Unary','IncDec'} else []
             for value in targets:
                 if value is None: continue
+                if (node.kind!='Unary' or node.data['op']=='&') and self.constants.readonly(value):
+                    return self.error(value,'A compile-time Integer/Rational constant is read-only; copy it into a runtime binding before changing it or taking its address.')
                 from .semantics import descendants
                 for child in descendants(value):
                     if self.property(child) and (node.kind!='Unary' or node.data['op']=='&'):
@@ -616,6 +627,7 @@ class BigNumbers:
                 if appended is not None:return appended
             if callee.kind=='Ident' and callee.text=='delete' and self.s.resolver.symbol(callee) is None and len(args)==1 and self.shape(args[0]).kind in {*KINDS,'generic','unknown'}:
                 arg=args[0]
+                if self.constants.readonly(arg):return self.error(arg,'A compile-time Integer/Rational constant is read-only and cannot be deleted; delete an independent runtime copy instead.')
                 root=unwrap(arg)
                 while root.kind in {'Selector','Index','Paren'}:root=root.role('expr')
                 symbol=self.s.resolver.symbol(root)
