@@ -133,6 +133,29 @@ main::proc(){
             client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_big_number_literal_copy_and_property_keep_original_breakpoints(self):
+        text='''package main
+main::proc(){
+    value:Integer=123456789012345678901234567890
+    copy:=value
+    rational:=Rational(22,13)
+    component:=rational.numerator
+    delete(value);delete(copy);delete(rational);delete(component)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[4,6])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),4),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_automatic_using_header_preserves_breakpoints_steps_and_arguments(self):
         text='''// 😀 original header
 package main

@@ -36,9 +36,24 @@ thor_display_node :: proc(ast_context:^AstContext,node:^ast.Node) -> ^ast.Node {
     state:=State{ast_context}
     visit::proc(v:^ast.Visitor,node:^ast.Node)->^ast.Visitor {
         if node==nil {return v}
+        state:=cast(^State)v.data
+        if selector, ok := node.derived.(^ast.Selector_Expr); ok &&
+           (selector.field.name=="Integer" || selector.field.name=="Rational") {
+            ctx:=state.ctx^
+            ctx.call=nil
+            source_pkg:=get_package_from_node(node^)
+            if source_pkg!="" && source_pkg!=ctx.document_package {
+                ctx.current_package,ctx.use_locals=source_pkg,false
+            }
+            if symbol, found := resolve_type_expression(&ctx,cast(^ast.Expr)node); found && thor_big_kind(symbol)!="" && .Variable not_in symbol.flags {
+                ident:=new_type(ast.Ident,node.pos,node.end,ctx.allocator)
+                ident.name=thor_big_kind(symbol)
+                node.derived=ident
+                return v
+            }
+        }
         call,ok:=node.derived.(^ast.Call_Expr)
         if !ok || len(call.args)!=1 {return v}
-        state:=cast(^State)v.data
         candidate:=false
         #partial switch callee in call.expr.derived {
         case ^ast.Ident: candidate=callee.name=="Set"

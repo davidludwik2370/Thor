@@ -41,6 +41,7 @@ class Ownership:
     def may_own(self, n):
         if n is None: return False
         if n.kind == 'Paren': return self.may_own(n.role('expr'))
+        if self.s.big.enabled and self.s.big.fresh(n): return True
         if n.kind == 'Interpolation': return True
         if n.kind == 'Compound' and n.role('type'):
             return self.s.resolver.type_node(n.role('type')).kind == 'set'
@@ -53,6 +54,7 @@ class Ownership:
 
     def borrows_temporary(self, n):
         if n.kind == 'Paren': return self.borrows_temporary(n.role('expr'))
+        if self.s.big.enabled and self.s.big.property(n): return False
         return n.kind in {'Slice', 'Selector'} and (self.may_own(n.role('expr')) or self.borrows_temporary(n.role('expr')))
 
     def native_type(self, n):
@@ -77,7 +79,10 @@ class Ownership:
         code.append(f'{value}: {annotation} = {self.s.render(n, hint)}' if annotation else f'{value} := {self.s.render(n)}')
         owned = 'false'
         if self.may_own(n):
-            if n.kind == 'Binary' and self.e.shape(n).kind != 'set':
+            if self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'generic','unknown'}:
+                typ=self.native_type(n)
+                owned=f'({typ}=={self.s.big.module()}.Integer || {typ}=={self.s.big.module()}.Rational)'
+            elif n.kind == 'Binary' and self.e.shape(n).kind != 'set':
                 # The native type is authoritative for unconstrained generics.
                 owned = f'(true when {self.e.set_trait("("+self.native_type(n)+"){ }")} else false)'
             else: owned = 'true'
@@ -91,11 +96,14 @@ class Ownership:
             destroy = None
             if kind == 'string': destroy = f'delete({value.value})'
             elif kind == 'set': destroy = f'{self.e.module("sets")}.destroy({value.value})'
+            elif kind in {'big_integer','big_rational'}: destroy=f'{self.s.big.module()}.compiler_destroy_value({value.value})'
             if destroy is None:
                 self.s.needs_intrinsics = True
                 typ = self.native_type(origin)
                 destroy = (f'when {self.s.prefix}meta.type_is_string({typ}) {{delete({value.value})}} '
                            f'else when {self.e.set_trait("("+typ+"){ }")} {{{self.e.module("sets")}.destroy({value.value})}}')
+                if self.s.big.enabled:
+                    destroy+=f' else {{{self.s.big.module()}.compiler_destroy_value({value.value})}}'
             cleanup.append(destroy if value.owned == 'true' else f'if {value.owned} {{{destroy}}}')
         for dependency in reversed(value.dependencies): self.release(dependency, cleanup)
         if cleanup:

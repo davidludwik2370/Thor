@@ -2,7 +2,8 @@
 
 The accepted Integer/Rational extension and its staged implementation are
 specified separately in [Arbitrary precision](arbitrary-precision.md). Its
-runtime foundation is implemented; language syntax and ownership are pending.
+runtime, predefined types, exact literals, and direct-copy ownership are implemented
+(stages 1–2); operators, compile-time big values, and formatting follow in stages 3–5.
 
 This is the canonical plain-text reference for the original T01–T23 tasks,
 moved out of the former root `thor.odin` so playground edits cannot remove the

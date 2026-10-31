@@ -137,14 +137,29 @@ class Switches:
             # name even in inactive when blocks. Keep the error semantic/lazy.
             return self.s.mapping.wrap(', '.join([error]*len(hints)),self.s.path,arm.start,arm.end,'switch-arity')
         if arm.kind == 'SwitchResults':
-            return ', '.join(self.s.render(v, hint, constant) for v, hint in zip(arm.group('args'), hints))
-        return self.s.render(arm, hints[0] if len(hints) == 1 else hints, constant)
+            return ', '.join(self.s.big.owned(v, hint, constant) for v, hint in zip(arm.group('args'), hints))
+        return self.s.big.owned(arm, hints[0], constant) if len(hints)==1 else self.s.render(arm,hints,constant)
 
     def consume(self, arm, hints, targets=None, discarded=()):
         """Release anonymous Thor values sent to blanks, after all RHS work."""
         e = self.e
         values = self.values(arm)
         blanks = discarded if targets is None else tuple(v == '_' for v in targets)
+        big=self.s.big
+        if big.enabled and (big.numeric_results(arm,len(hints)) or
+                            any(big.expected(h) and big.expected(h).kind in {'big_integer','big_rational','generic'} for h in hints)):
+            code=[]
+            names=[e.ownership.fresh('big_switch') for _ in hints]
+            if len(values)==len(hints):
+                for name,value,hint in zip(names,values,hints):
+                    code.append(f'{name}: {e.type_code(hint)} = {big.owned(value,hint)}')
+            else: code.append(', '.join(names)+' := '+self.s.render(arm,hints))
+            if targets is not None: big.commit(targets,names,code)
+            else:
+                for blank,name in zip(blanks,names):
+                    if blank:code.append(f'{big.module()}.compiler_destroy(&{name})')
+                code.append('return '+', '.join(names))
+            return '\n'.join(code)
         if len(values) != len(hints) or not any(blank and (e.ownership.may_own(value) or e.ownership.borrows_temporary(value))
                                                 for blank, value in zip(blanks, values)):
             return ('return ' if targets is None else ', '.join(targets)+' = ')+self.arm_code(arm, hints)

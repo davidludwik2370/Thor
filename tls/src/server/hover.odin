@@ -26,7 +26,7 @@ write_hover_content :: proc(
         doc=fmt.aprintf("%s\n\nKnown-argument calls are evaluated at compile time; runtime inputs remain ordinary calls. String/slice results in runtime code own independent storage. Use `pure.destroy` for recursive cleanup of nested results. Constant strings and fixed aggregates use borrowed Odin storage.",doc,allocator=allocator)
     }
 
-	if ast_context.show_layout {
+	if ast_context.show_layout && !(thor_type_display_enabled(ast_context) && thor_big_kind(symbol) != "") {
 		layout := layout
 		if layout == "" {
 			layout = construct_symbol_layout(ast_context, symbol, allocator)
@@ -373,6 +373,11 @@ get_hover_information :: proc(
 			}
 		}
 
+		if symbol, found := thor_big_property(&ast_context, selector, field); found {
+			hover.contents = write_hover_content(&ast_context, symbol)
+			hover.range = common.get_token_range(position_context.field, document.ast.src)
+			return hover, true, true
+		}
 		ast_context.current_package = selector.pkg
 
 		// TODO: Use resolve_selector_expression for this?

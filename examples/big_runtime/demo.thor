@@ -1,8 +1,8 @@
 // Run: ./thor run examples/big_runtime --track-allocations=basic
 //
 // Stage 1 is the mathematical runtime foundation. These are ordinary package
-// calls. Built-in type names, unquoted big literals, operators, dot properties,
-// automatic copying, and #run integration arrive in the following stages.
+// calls. See examples/big_numbers for the stage-two built-in types, unquoted
+// literals, computed properties and ownership. Operators and #run follow later.
 package main
 
 import "core:fmt"

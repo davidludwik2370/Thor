@@ -1242,6 +1242,14 @@ get_selector_completion :: proc(
 
 	case SymbolStructValue:
 		is_incomplete = false
+		if thor_type_display_enabled(ast_context) && thor_big_kind(selector) != "" {
+			for name in ([]string{"numerator", "denominator"}) {
+				if symbol, ok := thor_big_property(ast_context, selector, name); ok {
+					append(results, CompletionResult{symbol = symbol})
+				}
+			}
+			return false
+		}
 		is_objc_value := .ObjC in selector.flags || len(v.objc_ivars) > 0
 
 		// The same Objective-C type can be reached through several using paths.
@@ -2051,6 +2059,17 @@ get_identifier_completion :: proc(
 	}
 
 	matcher := common.make_fuzzy_matcher(lookup_name)
+	if thor_type_display_enabled(ast_context) {
+		for name in ([]string{"Integer", "Rational"}) {
+			if score, ok := common.fuzzy_match(matcher, name); ok == 1 {
+				ident := new_type(ast.Ident, {}, {}, ast_context.allocator)
+				ident.name = name
+				if symbol, found := resolve_type_expression(ast_context, ident); found {
+					append(results, CompletionResult{score = score, symbol = symbol})
+				}
+			}
+		}
+	}
 
 
 	if position_context.call != nil {

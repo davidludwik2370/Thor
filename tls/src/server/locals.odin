@@ -257,6 +257,10 @@ get_generic_assignment :: proc(
 				append(results, value)
 
 			case SymbolStructValue:
+				if returns := thor_big_returns(ast_context, symbol, v); len(returns) > 0 {
+					for ret in returns { calls[len(results)] = {}; append(results, ret) }
+					return
+				}
 				// Parametrized struct or type cast like My_Struct(123)
 				if symbol.type != .Function && symbol.type != .Type_Function && symbol.type != .Package {
 					append(results, value)

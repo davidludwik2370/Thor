@@ -201,6 +201,27 @@ add_proc_signature :: proc(
 	if !ok {
 		return active_parameter
 	}
+	if thor_type_display_enabled(ast_context) {
+		kind := thor_big_kind(call)
+		if kind != "" {
+			forms := []string{"value: native integer, Integer, or exact literal", "text: string"}
+			if kind == "Rational" {
+				forms = []string{"value: native integer, Integer, Rational, or exact literal", "text: string", "numerator, denominator: native integers or Integer", "numerator, denominator: string"}
+			}
+			for form, i in forms {
+				parameters := make([dynamic]ParameterInformation, allocator)
+				if kind == "Rational" && i >= 2 {
+					append(&parameters, ParameterInformation{label="numerator"}, ParameterInformation{label="denominator"})
+				} else {
+					append(&parameters, ParameterInformation{label="text" if i == 1 else "value"})
+				}
+				optional := i == 1 || kind == "Rational" && i == 3
+				result := fmt.tprintf("(%s, bool)",kind) if optional else kind
+				append(signature_information, SignatureInformation{label=fmt.tprintf("%s(%s) -> %s",kind,form,result), parameters=parameters[:], documentation={kind="markdown",value="Returns independent owned storage. Text parsing returns false for malformed input. Zero denominators panic. Optional named allocator defaults to context.allocator."}})
+			}
+			return active_parameter
+		}
+	}
 
 	split_all_field_arguments(&call, allocator)
 	call = thor_display_symbol(ast_context, call)

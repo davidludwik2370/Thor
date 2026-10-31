@@ -294,6 +294,8 @@ class Resolver:
         if kind=='Call' and n.role('callee').text=='type_of' and self.symbol(n.role('callee')) is None and len(n.group('args'))==1:
             return self.type_of(n.group('args')[0],seen)
         symbol=self.symbol(n) if kind=='Ident' else None
+        if kind=='Ident' and n.source.thor and n.text in {'Integer','Rational'} and symbol is None:
+            return Type('big_integer' if n.text=='Integer' else 'big_rational',n.text,n)
         bound=self.bound_types.get((n,n.data.get('name'))) if kind=='PolyType' else self.bound_types.get((symbol.declaration,symbol.name)) if symbol else None
         if bound is not None:return bound
         if kind=='Run':return self.type_of(n.role('expr'),seen)
@@ -352,6 +354,9 @@ class Resolver:
                 return Type("scalar", n.text, n)
         symbol = self.symbol(n)
         if symbol:
+            if (symbol.declaration.source.path == Path(__file__).resolve().parents[1]/'runtime/big/big.odin'
+                    and symbol.name in {'Integer','Rational'}):
+                return Type('big_integer' if symbol.name=='Integer' else 'big_rational',symbol.name,n)
             if symbol.declaration.kind == "PolyType":
                 return Type("generic", symbol.name, n)
             if symbol.annotation and (symbol.annotation.kind == "TypeidType" or symbol.annotation.text == "typeid"):
@@ -384,6 +389,9 @@ class Resolver:
             return self.result_type(value, index, seen) if value else Type(node=n)
         if n.kind == 'CompileSwitchExpr': return Type(node=n)
         if n.kind == 'Call':
+            target=self.type_node(n.role('callee'))
+            if target.kind in {'big_integer','big_rational'}:
+                return Type('scalar','bool',n) if index else target
             plan = self.resolve_call(n)
             results = self.fields(plan.signature.role('results')) if plan else []
             if index < len(results): return self.type_node(results[index][1], plan.substitutions)
@@ -431,6 +439,9 @@ class Resolver:
                 if symbol.value.kind == "Procedure":
                     return self.type_node(symbol.value.role("type"))
                 if symbol.value.kind == "Call":
+                    target=self.type_node(symbol.value.role('callee'))
+                    if target.kind in {'big_integer','big_rational'}:
+                        return Type('scalar','bool',n) if symbol.index and len(symbol.declaration.group('values'))==1 else replace(target,witness=n)
                     extrema = symbol.value.source.expressions.extrema.plan(symbol.value)
                     if extrema and extrema[2] and symbol.index == 1 and len(symbol.declaration.group('values')) == 1:
                         return Type('scalar', 'bool', n)
@@ -483,7 +494,11 @@ class Resolver:
             base_type = self.type_node(n.role("expr"))
             if base_type.kind == "enum":
                 return replace(base_type, witness=n)
-            result = self.field(self.type_of(n.role("expr"), seen), n.role("field").text)
+            owner_type=self.type_of(n.role('expr'),seen)
+            while owner_type.kind=='pointer': owner_type=owner_type.elem or Type()
+            if owner_type.kind=='big_rational' and n.role('field').text in {'numerator','denominator'}:
+                return Type('big_integer','Integer',n,witness=n)
+            result = self.field(owner_type, n.role("field").text)
             return replace(result[0], witness=n) if result else Type(node=n)
         if kind == "Index":
             return self.type_of(n.role("expr"), seen).elem or Type(node=n)

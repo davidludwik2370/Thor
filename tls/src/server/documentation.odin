@@ -69,7 +69,7 @@ get_signature :: proc(ast_context: ^AstContext, symbol: Symbol, depth := 0) -> s
 }
 
 write_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, symbol: Symbol, depth := 0) {
-	if thor_write_set_type(sb, ast_context, symbol) { return }
+	if thor_write_big_type(sb, ast_context, symbol) || thor_write_set_type(sb, ast_context, symbol) { return }
 	pointer_prefix := repeat("^", symbol.pointers, ast_context.allocator)
 
 	spall.trace(#procedure, symbol.name)
@@ -223,7 +223,7 @@ get_short_signature :: proc(ast_context: ^AstContext, symbol: Symbol) -> string 
 }
 
 write_short_signature :: proc(sb: ^strings.Builder, ast_context: ^AstContext, symbol: Symbol) {
-	if thor_write_set_type(sb, ast_context, symbol) { return }
+	if thor_write_big_type(sb, ast_context, symbol) || thor_write_set_type(sb, ast_context, symbol) { return }
 	spall.trace(#procedure, ast_context.fullpath)
 
 	pointer_prefix := repeat("^", symbol.pointers, ast_context.allocator)
@@ -989,7 +989,7 @@ write_symbol_type_information :: proc(sb: ^strings.Builder, ast_context: ^AstCon
 
 	append_type_pkg := false
 	pkg_name := get_pkg_name(ast_context, symbol.type_pkg)
-	if thor_write_set_type(sb, ast_context, symbol) { return true }
+	if thor_write_big_type(sb, ast_context, symbol) || thor_write_set_type(sb, ast_context, symbol) { return true }
 	if pkg_name != "" && pkg_name != "$builtin" {
 		if _, ok := keywords_docs[symbol.type_name]; !ok {
 			append_type_pkg = true

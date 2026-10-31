@@ -178,6 +178,8 @@ class Source:
         self.evaluation_query_checks = {}
         from .expressions import Expressions
         self.expressions = Expressions(self)
+        from .bignumbers import BigNumbers
+        self.big = BigNumbers(self)
         self.selected = {}
         self.selected_origins = {}
         self.wildcards = []
@@ -218,7 +220,8 @@ class Source:
                               ('pure',spreading or any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call','Range'} for n in self.nodes)),
                               ('sequence',spreading or self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes)),
-                              ('numeric',self.thor and any(n.kind=='Binary' and n.data['op']=='**' for n in self.nodes))]:
+                              ('numeric',self.thor and any(n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
+                              ('big',self.thor and any(n.kind=='Ident' and n.text in {'Integer','Rational'} for n in self.nodes))]:
             if needed:
                 self.imports[self.prefix+module]='thor:'+module
 
@@ -345,7 +348,7 @@ class Source:
         s = expression.source
         if expression.kind == "Paren":
             return self.type_hint(expression.role("expr"), seen)
-        if expression.kind in {"ArrayType", "StructType", "DynamicArrayType"}:
+        if expression.kind in {"ArrayType", "StructType", "DynamicArrayType", "MapType"}:
             return Hint(s, expression)
         if expression.kind == "Compound" and expression.role("type"):
             return self.type_hint(expression.role("type"), seen)
@@ -393,6 +396,8 @@ class Source:
         builtins.update({'complex32','complex64','complex128','quaternion64','quaternion128','quaternion256'})
         declaration = self.declaration_for(expression)
         if declaration is None:
+            if expression.source.thor and expression.kind=='Ident' and expression.text in {'Integer','Rational'}:
+                return True
             return expression.kind == "Ident" and expression.text in builtins
         if declaration.kind == "PolyType":
             return True
@@ -587,6 +592,7 @@ class Source:
 
     def _render(self, n, expected=None, constant=False):
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
+        owning = set()
         kind = n.kind
         if kind == 'Import':
             namespace = self.import_names[n]
@@ -618,6 +624,8 @@ class Source:
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code
+        big_code = self.big.render(n, expected, constant)
+        if big_code is not None: return big_code
         if kind=='Ternary' and constant:
             return '('+self.render(n.role('x'),expected,True)+' when ('+self.render(n.role('cond'),constant=True)+') else '+self.render(n.role('y'),expected,True)+')'
         extra = self.expressions.render(n, expected, constant)
@@ -638,6 +646,7 @@ class Source:
             hint = Hint(self, annotation) if annotation else None
             for value in n.group("values"):
                 overrides[value] = (hint, not n.data["mutable"])
+                if n.data['mutable'] and (len(n.group('values'))==len(n.group('names'))): owning.add(value)
             if len(n.group('values')) == 1 and len(n.group('names')) > 1:
                 from .switches import unwrap
                 if unwrap(n.group('values')[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
@@ -683,7 +692,9 @@ class Source:
             procedure = next((a for a in n.ancestors() if a.kind == "Procedure"), None)
             fields = self.fields(procedure.role("type").role("results")) if procedure else []
             for value, (_, annotation) in zip(n.group("values"), fields):
-                overrides[value] = (self.type_hint(annotation) or Hint(self, annotation), constant)
+                numeric = self.big.enabled and self.resolver.type_node(annotation).kind in {'big_integer','big_rational','generic'}
+                overrides[value] = (Hint(annotation.source,annotation) if numeric else self.type_hint(annotation) or Hint(self, annotation), constant)
+                if len(n.group('values'))==len(fields): owning.add(value)
             if len(n.group('values')) == 1 and len(fields) > 1:
                 from .switches import unwrap
                 if unwrap(n.group('values')[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
@@ -778,7 +789,12 @@ class Source:
                     field_hint = Hint(field_hint.source, field_hint.node, query) if field_hint else Hint(self, n, query)
                 if isinstance(elem, Node):
                     field_hint = Hint(elem.source, elem)
+                shape = self.big.expected(hint) if self.big.enabled else None
+                if shape and shape.kind == 'map' and shape.node:
+                    annotation = shape.node.role('value')
+                    field_hint = Hint(annotation.source, annotation)
                 overrides[value] = (field_hint, constant)
+                owning.add(value)
         if self.thor and kind == "Ternary" and n.data["op"] == "?":
             cond, x, y = [n.role(k) for k in ("cond", "x", "y")]
             if "\n" in self.text(cond.end, y.start):
@@ -829,7 +845,8 @@ class Source:
         replacements = []
         for child in n.children:
             hint, const = overrides.get(child, (None, constant))
-            replacements.append((child.start, child.end, self.render(child, hint, const)))
+            code = self.big.owned(child, hint, const) if child in owning else self.render(child, hint, const)
+            replacements.append((child.start, child.end, code))
         inserts = []
         if n is self.root:
             inserts.extend(self.using_feature_insert())
@@ -921,7 +938,8 @@ class Source:
         else:
             # Let Odin reject this only if the containing branch is active.
             element_type, nested_hint = self.prefix + "array_literal_needs_element_type", None
-        values = ", ".join(first_rendered if i == 0 and first_rendered is not None else self.render(e, nested_hint, constant)
+        values = ", ".join(self.big.owned(e, nested_hint, constant) if self.big.enabled else
+                           first_rendered if i == 0 and first_rendered is not None else self.render(e, nested_hint, constant)
                            for i, e in enumerate(elements))
         comments = self.comments(n.start, n.end, [(e.start, e.end) for e in elements])
         literal = self.mapping.wrap(f"[{len(elements)}]{element_type}{{{comments}{values}}}",

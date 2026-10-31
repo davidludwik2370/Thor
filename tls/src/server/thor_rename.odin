@@ -196,6 +196,17 @@ thor_rename_target :: proc(document: ^Document, position: common.Position) -> (T
 		}
 		if !resolved {target.symbol, target.flag, resolved = prepare_references(document, &ctx, &pos)}
 		if !resolved {return {}, "Cannot resolve this identifier to a declaration."}
+		if pos.selector != nil && (token.name == "numerator" || token.name == "denominator") {
+			if base, ok := resolve_type_expression(&ctx, pos.selector); ok && thor_big_kind(base) == "Rational" {
+				return {}, "Built-in Rational properties cannot be renamed."
+			}
+		}
+		if token.name == "Integer" || token.name == "Rational" {
+			if canonical, ok := thor_lookup_big_type(&ctx, token.name); ok &&
+			   target.symbol.uri == canonical.uri && target.symbol.range == canonical.range {
+				return {}, "Built-in numeric types cannot be renamed."
+			}
+		}
 		if target.symbol.type == .Package {
 			for imp in document.imports {
 				if imp.base == token.name && imp.range == target.symbol.range && imp.name == target.symbol.pkg {

@@ -72,6 +72,15 @@ function themedTokens(source) {
     });
 }
 
+test('arbitrary-precision contexts retain complete numeric and ordinary identifier tokens',()=>{
+    const digits='1234567890'.repeat(600);
+    check(`value: Integer = ${digits}`,digits,'constant.numeric');
+    check('ratio: Rational = 0.10000000000000000000000000000000000001',
+        '0.10000000000000000000000000000000000001','constant.numeric');
+    check('Integer := 3','Integer','variable'); // Predefined type names remain shadowable.
+    check('n := ratio.numerator','numerator','variable');
+});
+
 for (const [name, source, word, scope, line] of [
     ['package', 'package main', 'main', 'entity.name.namespace'],
     ['selective import', 'import "core:math" / sin, cos', 'import', 'keyword.control.import'],

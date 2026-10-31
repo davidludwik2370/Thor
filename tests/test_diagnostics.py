@@ -41,6 +41,21 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_big_literals_properties_and_copy_errors_keep_original_unicode_positions(self):
+        for body,needle,message in [
+            ('r:=Rational(1,2);r.numerator=1','r.numerator','read-only'),
+            ('value:Integer=1.25','1.25','whole number'),
+            ('value:=Integer(f64(1))','f64(1)','exact integer inputs'),
+            ('value:=Rational(1,0)','0','denominator must not be zero'),
+            ('value:=Integer(123);value="wrong"','"wrong"','Cannot'),
+            ('VALUE::Integer(123)','Integer(123)','Compile-time Integer/Rational'),
+        ]:
+            source='// original header\npackage main\nmain::proc(){/* 😀 */ '+body+'}\n'
+            with self.subTest(body=body):
+                errors=self.at(source,needle,message=message)
+                self.assertNotIn('big.Integer',json.dumps(errors))
+                self.assertNotIn('Thor expression.Integer',json.dumps(errors))
+
     def test_multi_switch_wrong_result_has_original_position_and_destination_type(self):
         for switch in ['switch',' #switch']:
             source='package main\nKind::enum{A,B}\nmain::proc(){/* 😀 */ a:int;b:Kind;a,b='+switch+'{case true:1,"wrong";case:2,.B};_=a;_=b}\n'

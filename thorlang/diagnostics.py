@@ -206,6 +206,9 @@ class Diagnostics:
                 for name in self.hidden_parameters:
                     msgs=[re.sub(r'(?:,\s*)?'+re.escape(name)+r'\s*=\s*true\b','',m) for m in msgs]
                 for alias, name in self.namespace_aliases.items():
+                    if name == 'big':
+                        for logical in ('Integer','Rational'):
+                            msgs = [m.replace(alias+'.'+logical, logical) for m in msgs]
                     msgs = [m.replace(alias, name) for m in msgs]
                 for prefix in self.prefixes:
                     msgs = [re.sub(re.escape(prefix) + r"[A-Za-z0-9_]+", "Thor expression", m) for m in msgs]

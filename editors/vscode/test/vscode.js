@@ -108,6 +108,16 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const bigExample='package main\nmain::proc(){\n huge:Integer=12345678901234567890123456789012345678901234567890\n ratio:=Rational(22,13)\n component:=ratio.numerator\n delete(huge);delete(ratio);delete(component)\n}\n';
+        await replace(bigExample);
+        for(const [fragment,expected] of [['huge:','huge: Integer'],['ratio:=','ratio: Rational'],['component:=','component: Integer'],['numerator','numerator: Integer']]){
+            const values=await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+                testDocument.positionAt(bigExample.indexOf(fragment)+1)),values=>hoverText(values||[]).includes(expected));
+            assert.ok(!hoverText(values).includes('_value'));
+        }
+        const bigCompletion=await eventually(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',testDocument.uri,
+            testDocument.positionAt(bigExample.indexOf('ratio.numerator')+'ratio.'.length)),result=>result?.items.some(item=>(typeof item.label==='string'?item.label:item.label.label)==='denominator'));
+        assert.ok(!bigCompletion.items.some(item=>(typeof item.label==='string'?item.label:item.label.label).startsWith('_')));
         const bracketExample='package main\nmain::proc(){\n    values:> [2]int{1,2}\n}\n';
         await replace(bracketExample);
         const commentEditor=vscode.window.activeTextEditor;
@@ -616,7 +626,7 @@ async function run() {
             'automatic using feature with original-source hovers and unsaved diagnostics',
             'promoted using fields supply switch result types and contextual enum hovers',
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
-            'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers'];
+            'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

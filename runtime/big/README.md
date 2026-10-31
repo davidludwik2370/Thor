@@ -1,9 +1,11 @@
 # Arbitrary-precision runtime foundation
 
-Stage 1 provides the native `thor:big` package. Predefined `Integer`/`Rational`,
-unquoted big-number literals, operators, read-only dot properties, automatic
-numeric copying, and compile-time evaluation are **not implemented yet**. See
-[the accepted design and remaining stages](../../docs/arbitrary-precision.md).
+This is the explicit native API underlying Thor's built-in `Integer`/`Rational`
+types. Thor stage 2 adds exact unquoted literals, read-only dot properties, and
+automatic direct numeric copying/replacement. See the
+[language walkthrough](../../examples/big_numbers/demo.thor) and
+[remaining stages](../../docs/arbitrary-precision.md). Operators and compile-time
+big values are still pending.
 
 Use `import "thor:big"` from any Thor project. Native Odin users can supply
 `-collection:thor=/path/to/Thor/runtime`.
@@ -64,8 +66,9 @@ Panic wrappers accept caller locations for later source-map integration.
 
 ## Ownership
 
-**Assignments at this stage are ordinary native Odin shallow copies.** They do
-not activate the future Thor numeric ownership rules. Use `clone` for another
+**Native Odin assignments are shallow copies.** Thor direct numeric assignments
+clone and replacements free old storage; whole aggregates remain shallow in both
+languages. Use `clone` for another
 owner and do not destroy aliases twice. Underscore-prefixed fields are runtime
 internals; manipulating them bypasses normalization and ownership rules.
 

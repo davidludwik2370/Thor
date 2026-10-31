@@ -1,4 +1,4 @@
-// Runtime foundation for Thor's planned Integer and Rational language types.
+// Runtime foundation for Thor's Integer and Rational language types.
 // Native Odin assignments are shallow: clone explicitly and destroy each owner.
 package thor_big
 
@@ -209,8 +209,8 @@ rational_from_integer :: proc(value: $T, allocator := context.allocator, loc := 
     return result
 }
 
-// Getters return independent owners. The future .numerator/.denominator syntax
-// will call these; a zero denominator sentinel is never visible to the caller.
+// Getters return independent owners, including through Thor's computed
+// properties. A zero denominator sentinel is never visible to the caller.
 numerator :: proc(value: Rational, allocator := context.allocator, loc := #caller_location) -> Integer {
     return clone_integer(value._numerator, allocator, loc)
 }

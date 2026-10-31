@@ -2502,6 +2502,9 @@ resolve_selector_expression :: proc(ast_context: ^AstContext, node: ^ast.Selecto
 
 	selector := Symbol{}
 	if ok := internal_resolve_type_expression(ast_context, node.expr, &selector); ok {
+		if thor_type_display_enabled(ast_context) && thor_big_kind(selector) != "" {
+			return thor_big_property(ast_context, selector, node.field.name)
+		}
 		set_ast_package_from_symbol_scoped(ast_context, selector)
 
 		symbol := Symbol{}
@@ -2892,6 +2895,7 @@ internal_resolve_type_identifier :: proc(ast_context: ^AstContext, node: ast.Ide
 	if symbol, ok := lookup(node.name, ast_context.current_package, node.pos.file); ok {
 		return resolve_symbol_return(ast_context, symbol)
 	}
+	if symbol, ok := thor_lookup_big_type(ast_context, node.name); ok { return symbol, true }
 
 	if !is_runtime {
 		if symbol, ok := lookup(node.name, "$builtin", node.pos.file); ok {
@@ -4228,6 +4232,9 @@ resolve_location_selector :: proc(ast_context: ^AstContext, selector_expr: ^ast.
 		defer ast_context.use_usings = true
 
 		symbol = resolve_type_expression(ast_context, selector.expr) or_return
+		if thor_type_display_enabled(ast_context) && thor_big_kind(symbol) != "" {
+			return thor_big_property(ast_context, symbol, selector.field.name)
+		}
 		return resolve_symbol_selector(ast_context, selector, symbol)
 	}
 

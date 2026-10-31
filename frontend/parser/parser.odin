@@ -3931,8 +3931,11 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 			value := values[0]
 			for { if paren,ok:=value.derived.(^ast.Paren_Expr);ok {value=paren.expr} else {break} }
 			if call,ok:=value.derived.(^ast.Call_Expr);ok {
+				// Thor materializes big-number parse results through a private
+				// global record. Native Odin retains its expression-count rule.
+				if is_mutable { thor_multi = true }
 				if ident,named:=call.expr.derived.(^ast.Ident);named {
-					thor_multi = ident.name == "__thor_switch_expression" && ident.pos.offset == ident.end.offset
+					thor_multi = thor_multi || ident.name == "__thor_switch_expression" && ident.pos.offset == ident.end.offset
 				}
 			}
 		}

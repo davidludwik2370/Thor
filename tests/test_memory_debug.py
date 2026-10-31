@@ -337,6 +337,22 @@ main :: proc() {
         result = self.run_program('global')
         self.assertIn("defined in '"+str(self.source)+":4'", result.stderr)
 
+    def test_big_number_copy_leak_trace_identifies_original_thor_owner(self):
+        self.build('''package main
+main::proc(){
+    value:=Integer(123456789012345678901234567890)
+    copy:=value
+    delete(value)
+    _=copy // Intentionally leak the independent copy to test its report.
+}
+''', ['-debug','--track-allocations=trace','--no-sanitize'])
+        result=self.run_program()
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('with call stacks',result.stderr)
+        self.assertIn(str(self.source)+':4:',result.stderr)
+        self.assertNotIn('/generated/',result.stderr)
+        self.assertNotIn('__thor_',result.stderr)
+
     def test_trace_and_imported_thor_allocation_locations(self):
         self.build('''package main
 import "helper"
