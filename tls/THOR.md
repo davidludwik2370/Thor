@@ -129,6 +129,11 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   aliases of the same package and local shadowing. Synthetic selected aliases and
   implicit `set[T]` imports do not count as explicit source uses. Blank imports are
   intentional; syntax-incomplete buffers and closed documents clear stale hints.
+  Selected import names receive their resolved semantic token kinds (functions,
+  types, constants, variables) even when unused. Within an otherwise used import,
+  unused selected names receive individual hints; qualified member references
+  do not count as uses of a selected alias. Full-declaration hint ranges include
+  the last name at a newline or EOF and preserve Unicode/UTF-16 positions.
 - Infer common bracket-array types (including nested arrays), indexed element
   types, and membership's boolean type. Explicit declaration types continue to
   supply contextual information through OLS.

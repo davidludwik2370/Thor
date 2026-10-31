@@ -524,11 +524,10 @@ parse_imports :: proc(document: ^Document, config: ^common.Config, selections: [
 			if selection.package_name == "_" {
 				selection_namespaces[import_decl.pos.offset] = thor_selection_namespace(selection, document.ast)
 			}
-			last := len(selection.names)-1
-			end := selection.positions[last]
-			end.offset += len(selection.names[last])
-			end.column += len(selection.names[last])
-			selection_ends[import_decl.pos.offset] = common.token_pos_to_position(end, document.ast.src)
+			// The exclusive end can be a newline (or EOF). Token-position
+			// conversion would then read columns from the following line.
+			selection_ends[import_decl.pos.offset] = common.get_relative_token_position(
+				selection.end, transmute([]u8)document.ast.src, 0)
 		}
 	}
 

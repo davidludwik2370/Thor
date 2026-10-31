@@ -1246,6 +1246,81 @@ main::proc(){println("hello");sqrt::proc(){};sqrt()}
                     'contentChanges': [{'text': used}]})
         self.assertEqual(self.unused_imports(client, main), [])
 
+    def test_selected_import_names_keep_their_symbol_colors_when_unused(self):
+        library = '''package library
+Record::struct{value:int}
+Kind::enum{A,B}
+LIMIT::3
+counter:int
+single::proc(){}
+one::proc(value:int){}
+two::proc(value:string){}
+overloaded::proc{one,two}
+'''
+        text = '''package main
+import "library" / Record, Kind, LIMIT, counter, single, overloaded
+import "core:fmt" / print
+main::proc(){}
+'''
+        client, main = self.open(text, {'library/main.thor': library}, compiler=False, unused_imports=True)
+        spans = self.semantic_spans(client, main, text)
+        kinds = {name: kind for _, _, kind, name, _ in spans}
+        for name, kind in [('Record','struct'), ('Kind','enum'), ('LIMIT','variable'),
+                           ('counter','variable'), ('single','function'), ('overloaded','function'),
+                           ('print','function')]:
+            self.assertEqual(kinds.get(name), kind, name)
+        modifiers = client.capabilities['semanticTokensProvider']['legend']['tokenModifiers']
+        readonly = 1 << modifiers.index('readonly')
+        comptime = 1 << modifiers.index('thorCompileTime')
+        by_name = {name: mods for _, _, _, name, mods in spans}
+        self.assertFalse(by_name['counter'] & readonly)
+        self.assertTrue(by_name['LIMIT'] & comptime)
+        self.assertTrue(by_name['single'] & readonly)
+        errors = self.unused_imports(client, main)
+        self.assertEqual([d['range']['start']['line'] for d in errors], [1, 2])
+        for diagnostic, line in zip(errors, [1, 2]):
+            self.assertEqual(diagnostic['range']['end'], {'line':line,'character':len(text.splitlines()[line])})
+            self.assertEqual(diagnostic['tags'], [1])
+
+    def test_unused_selected_names_follow_live_usage_and_qualified_shadowed_names(self):
+        text = '''package main
+import "core:fmt" / print,
+    println,
+    printf
+main::proc(){println("hello");fmt.print("qualified");printf:=1;_=printf}
+'''
+        client, main = self.open(text, compiler=False, unused_imports=True)
+        errors = self.unused_imports(client, main)
+        for diagnostic, name in zip(errors, ['print,', 'printf\n']):
+            self.assertEqual(diagnostic['range']['start'], self.position(text, name, 0))
+            self.assertEqual(diagnostic['range']['end'], self.position(text, name, len(name.rstrip(',\n'))))
+            self.assertEqual(diagnostic['tags'], [1])
+        self.assertEqual(len(errors), 2)
+        used = text.replace('printf:=1;_=printf', 'printf("%d",1);print("direct")')
+        unused = text.replace('println("hello");fmt.print("qualified");printf:=1;_=printf', '')
+        for version, source, expected in [(2,used,0), (3,unused,1), (4,text,2)]:
+            client.notifications.clear()
+            client.send('textDocument/didChange', {'textDocument':{'uri':main.as_uri(),'version':version},
+                        'contentChanges':[{'text':source}]})
+            diagnostics = self.unused_imports(client, main)
+            self.assertEqual(len(diagnostics), expected)
+            if source == unused:
+                self.assertEqual(diagnostics[0]['range']['end'], self.position(source, 'printf\n', len('printf')))
+            spans = self.semantic_spans(client, main, source)
+            imported = [(kind,name) for start, _, kind, name, _ in spans if start < source.index('main::')]
+            self.assertEqual(imported, [('function','print'),('function','println'),('function','printf')])
+
+    def test_selected_import_ranges_handle_unicode_crlf_and_eof(self):
+        for ending in ['\n','\r\n','']:
+            with self.subTest(ending=repr(ending)):
+                text = 'package main\n/* 😀 */ import _ "core:fmt" / print' + ending
+                client, main = self.open(text, compiler=False, unused_imports=True)
+                errors = self.unused_imports(client, main)
+                self.assertEqual(len(errors), 1)
+                self.assertEqual(errors[0]['range']['start'], self.position(text, 'import _', 0))
+                self.assertEqual(errors[0]['range']['end'], self.position(text, '/ print', len('/ print')))
+                self.assertIn(('function','print'), [(kind,name) for _,_,kind,name,_ in self.semantic_spans(client,main,text)])
+
     def test_imports_in_thor_expressions_and_explicit_blank_imports_are_used(self):
         text = '''package main
 import "core:fmt"
@@ -1372,6 +1447,10 @@ main::proc(){value:=VALUE;{value:=3;_=value};_=value;selected()}
         for n in source.nodes:
             if n.kind=='Import' and n.data.get('name'):
                 name=n.data['name'];start=n.start+len(n.text[:n.text.index(name)].encode())
+                allowed.add((start,start+len(name.encode())))
+        for selection in source.info.get('selections') or []:
+            for name, position in zip(selection.get('names') or [], selection.get('positions') or []):
+                start=position['offset']
                 allowed.add((start,start+len(name.encode())))
         for start,end,kind,token,_ in spans:
             self.assertIn((start,end),allowed,f'{kind} token overrides non-identifier source {token!r} at byte {start}')

@@ -95,11 +95,22 @@ find_used_not_imported :: proc(
 	return missing[:]
 }
 
+ImportUsage :: struct {
+	unused_packages: []Package,
+	unused_selections: []^ast.Ident,
+}
+
 find_unused_imports :: proc(document: ^Document, allocator := context.temp_allocator) -> []Package {
+	usage := find_import_usage(document, allocator)
+	delete(usage.unused_selections, allocator)
+	return usage.unused_packages
+}
+
+find_import_usage :: proc(document: ^Document, allocator := context.temp_allocator) -> ImportUsage {
 	spall.trace(#procedure, document.fullpath)
 
 	if document.ast.syntax_error_count > 0 {
-		return nil
+		return {}
 	}
 
 	symbols := resolve_entire_file(document)
@@ -108,17 +119,28 @@ find_unused_imports :: proc(document: ^Document, allocator := context.temp_alloc
 	// Resolving those declarations alone does not mean the source uses them.
 	synthetic_positions := make(map[int]bool, context.temp_allocator)
 	selections := make(map[string]string, context.temp_allocator)
+	selected_names := make([dynamic]^ast.Ident, context.temp_allocator)
 	for decl in document.ast.decls {
 		if value, ok := decl.derived.(^ast.Value_Decl); ok && thor_is_import_alias(value) {
 			synthetic_positions[decl.pos.offset] = true
 			selector := value.values[0].derived.(^ast.Selector_Expr)
 			namespace := selector.expr.derived.(^ast.Ident)
 			selections[selector.field.name] = namespace.name
+			append(&selected_names, selector.field)
+		}
+	}
+	// A qualified access uses the namespace, not a same-named selection.
+	selector_fields := make(map[uintptr]bool, context.temp_allocator)
+	for _, v in symbols {
+		if v.node == nil { continue }
+		if selector, ok := v.node.derived.(^ast.Selector_Expr); ok && selector.field != nil {
+			selector_fields[cast(uintptr)selector.field] = true
 		}
 	}
 
 	pkgs := make(map[string]struct{}, context.temp_allocator)
 	used_names := make(map[string]bool, context.temp_allocator)
+	used_selections := make(map[string]bool, context.temp_allocator)
 	for _, v in symbols {
 		if v.node == nil || synthetic_positions[v.node.pos.offset] { continue }
 		pkgs[v.symbol.pkg] = {}
@@ -129,11 +151,12 @@ find_unused_imports :: proc(document: ^Document, allocator := context.temp_alloc
 			if v.symbol.type == .Package && ident.end.offset > ident.pos.offset {
 				used_names[ident.name] = true
 			}
-			if namespace, selected := selections[ident.name]; selected {
+			if namespace, selected := selections[ident.name]; selected && !selector_fields[cast(uintptr)ident] {
 				for imp in document.imports {
 					// A local that shadows a selected name is not an import use.
 					if imp.base == namespace && imp.name == v.symbol.pkg {
 						used_names[namespace] = true
+						used_selections[ident.name] = true
 					}
 				}
 			}
@@ -141,6 +164,7 @@ find_unused_imports :: proc(document: ^Document, allocator := context.temp_alloc
 	}
 
 	unused := make([dynamic]Package, allocator)
+	unused_selections := make([dynamic]^ast.Ident, allocator)
 	for imp in document.imports {
 		// Zero-length imports are internal adapters (e.g. for set[T]), with no
 		// source declaration to dim or remove. Blank imports are intentional.
@@ -148,8 +172,14 @@ find_unused_imports :: proc(document: ^Document, allocator := context.temp_alloc
 		if imp.import_decl.is_using { used = imp.name in pkgs }
 		if imp.base != "_" && imp.import_decl.pos.offset < imp.import_decl.end.offset && !used {
 			append(&unused, imp)
+			continue // The whole declaration already includes its selected names.
+		}
+		for name in selected_names {
+			if selections[name.name] == imp.base && !used_selections[name.name] {
+				append(&unused_selections, name)
+			}
 		}
 	}
 
-	return unused[:]
+	return {unused_packages=unused[:], unused_selections=unused_selections[:]}
 }

@@ -254,7 +254,13 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 	case ^ast.Pointer_Type:
 		visit_node(n.elem, builder)
 	case ^ast.Value_Decl:
-		if thor_is_import_alias(n) { return } // Synthetic namespaces have no source token.
+		if thor_is_import_alias(n) {
+			// Only the selected name is source text. The adapted namespace and
+			// alias declaration overlap it and must never emit competing tokens.
+			selector := n.values[0].derived.(^ast.Selector_Expr)
+			visit_ident(selector.field, selector, {}, builder)
+			return
+		}
 		visit_value_decl(n^, builder)
 	case ^ast.Block_Stmt:
 		visit_label(n.label, builder)

@@ -2196,3 +2196,29 @@ and restart. Dispatch measured 32 ms initially and 1 ms on reuse in that test;
 these timings exclude compiler/program execution. The empty-window terminal
 test passes as well. The local VSIX is updated; reload the editor to load the
 new client code. No compiler changes or cache invalidation are required.
+
+## Selected import coloring and unused ranges (TLS 0.16.1)
+
+Selected-import aliases were omitted from semantic tokens entirely, leaving
+names such as print with the grammar's generic variable color. Emit only the
+real selected identifier using its resolved symbol kind, preserving function,
+overload-group, type, constant and mutable-variable colors. Keep the overlapping
+synthetic namespace and declaration out of the token stream.
+
+An exclusive selected-list end at a newline was also converted using columns
+from the following line, clipping the unused hint. Convert its original byte
+offset directly to an LSP position, including Unicode, CRLF and EOF. Within a
+used import, fade unused selected names individually. Namespace-qualified calls
+use the namespace, while local shadowing and qualified field identifiers do
+not count as selected-name uses. Wholly unused imports retain one full-range
+hint; the import organizer continues to consider only wholly unused packages.
+
+Verification: 141 stdio LSP/rename tests, all 1126 native TLS tests with memory
+tracking, and 106 extension tests pass. New regressions cover unused procedures
+and overloads, types/constants/variables, multiline selections, qualified and
+shadowed names, live edits, namespace-free imports, Unicode, CRLF and EOF.
+Real VS Code integration verifies selected function tokens, individual unused
+hints, full-declaration hint coverage and unsaved use/clearing. A read-only
+check of the user's sandbox.thor confirms the print token and complete unused
+range. No compiler, scaffold, theme or production extension changes are needed;
+restart TLS once to load the rebuilt server.

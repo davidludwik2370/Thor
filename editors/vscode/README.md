@@ -243,6 +243,13 @@ local shadowing and imports used inside interpolation are recognized. Intentiona
 blank imports (`import _ "..."`) are kept. Internal imports added for `set[T]`
 never appear as unused source declarations.
 
+Selected names retain their resolved symbol colors, including when unused:
+`print` in `import "core:fmt" / print` is function-colored and faded. If only
+some selected names are unused, those names fade individually while the used
+names stay bright. A qualified call such as `fmt.print()` uses the namespace,
+so it does not keep an unused selected `print` bright. Multiline selections and
+Unicode names use the original source ranges, including at newline/EOF.
+
 Syntax errors and some obvious redeclarations can be reported immediately. For
 deeper checks, TLS invokes `thor check -json-errors` using snapshots of the open
 buffers. Thor performs compile-time evaluation, lowers the source, checks it with

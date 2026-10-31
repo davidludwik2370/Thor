@@ -233,9 +233,9 @@ check_unused_imports :: proc(document: ^Document, config: ^common.Config) {
 		return
 	}
 
-	unused_imports := find_unused_imports(document, context.temp_allocator)
+	usage := find_import_usage(document, context.temp_allocator)
 
-	for imp in unused_imports {
+	for imp in usage.unused_packages {
 		add_diagnostics(
 			.Unused,
 			uri.uri,
@@ -247,6 +247,15 @@ check_unused_imports :: proc(document: ^Document, config: ^common.Config) {
 				tags = {.Unnecessary},
 			},
 		)
+	}
+	for name in usage.unused_selections {
+		add_diagnostics(.Unused, uri.uri, Diagnostic {
+			range = common.get_token_range(name, document.ast.src),
+			severity = DiagnosticSeverity.Hint,
+			code = "Unused",
+			message = "unused selected import",
+			tags = {.Unnecessary},
+		})
 	}
 }
 
