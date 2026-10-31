@@ -1,7 +1,7 @@
 # Integer and Rational: design and implementation stages
 
-This records the accepted design. Stages 1 and 2 are implemented. Operators,
-compile-time support, and broad formatting integration follow in stages 3–5.
+This records the accepted design. Stages 1–3 are implemented. Compile-time support and broad formatting integration
+follow in stages 4–5.
 See the [commented language demo](../examples/big_numbers/demo.thor) and
 [explicit runtime API](../runtime/big/README.md).
 
@@ -126,7 +126,7 @@ hashing/equality is added.
 2. **Types and ownership (implemented):** predefined types, constructors, unquoted
    contextual literals, properties, direct copy/replacement rules, simultaneous
    assignment, parameter/result boundaries, TLS support.
-3. **Runtime operators (pending):** arithmetic/comparisons, coercion, compound
+3. **Runtime operators (implemented):** arithmetic/comparisons, coercion, compound
    updates, powers/bitwise operations, temporary cleanup and expression/generic
    interactions, including `a,b=b,a+1`.
 4. **Compile-time support (pending):** exact constants, read-only data, fn/#run,
@@ -173,7 +173,7 @@ package API, now with direct Thor numeric-copy ownership enabled.
   member dispatch for these computed properties is deferred to integration work.
 - Use `big.to_string` for display for now; it returns an allocated string that
   the caller frees. General `fmt`/f-string formatting integration comes in stage 5.
-- Operators, big `::` constants, and big `fn`/`#run` results are not enabled yet.
+- Big `::` constants and big `fn`/`#run` results are not enabled yet.
   `VALUE :: Integer(...)` receives a clear diagnostic instead of allocating a
   runtime value disguised as a constant. Distinct big types and big map keys/set
   elements are explicitly rejected for now; ordinary type aliases are supported.
@@ -183,3 +183,41 @@ native `.odin` type spelling, offers logical constructor signatures and read-onl
 properties, hides internal limb fields, and keeps rename/semantic/diagnostic
 positions in the original Thor file. Numeric text can contain thousands of digits;
 there is no lexer reservation of these type names.
+
+## Runtime operator details (stage three)
+
+[The operator walkthrough](../examples/big_operators/demo.thor) exercises the
+implemented arithmetic, exact comparisons, unary signs, Integer complement,
+bitwise operations (`&`, `|`, `~`, `&~`), shifts, powers and ordinary compound
+assignments. Odin's unsupported `++`/`--` syntax remains unsupported.
+
+Untyped literal expressions adopt a requested big-number context before native
+inference can overflow or round: `r: Rational = 1/3 + 0.25` is exactly `7/12`.
+The same applies in constructors and with untyped scalar constants. Typed native
+values still require explicit conversion. Operands are preserved before RHS
+side effects, and every anonymous numeric operand/result is released after its
+last known use. Generics retain native operations for native instantiations.
+
+Integer `/` truncates toward zero; `%` follows the dividend's sign. `%%` matches
+Odin's `((a % b) + b) % b`, so nonzero results follow the divisor's sign. Rational
+remainders use those same quotient/sign rules with exact fractions. Right shift
+extends the sign. Shift operands follow the matching-type rule (or an untyped
+count); negative counts are rejected. Integer exponents are nonnegative, Rational
+exponents must be whole, and zero to a negative power panics. `0 ** 0` is one.
+
+The native bigint APIs initialize empty input headers and contain an incorrect
+signed-shift final subtraction and a misplaced quotient clamp. The Thor bridge
+owns/frees input-initialization scratch, computes signed shifts through magnitude
+quotient/remainder, and canonicalizes results. Allocation-failure sweeps cover
+arithmetic, fractions, powers, shifts, complement and comparisons. No Odin SDK
+source is patched.
+
+Validation for this batch includes independent Python int/Fraction oracles,
+4,096-bit operands, debug/tracking examples, native ASan and failure injection,
+source diagnostics and TLS hover/edit recovery. The focused language/runtime
+regression run passed 42 tests; the broader numeric/power/diagnostic run passed
+142, TLS/rename passed 149, native TLS passed 1,126, and native bigint ASan plus
+allocation-failure sweeps passed 13. Original-source arithmetic stepping was
+also checked through CodeLLDB. Integration of numeric library
+builtins, membership, shared `basic` generics, and unconstrained computed
+properties belongs to stage five; compile-time constants/evaluation are next.

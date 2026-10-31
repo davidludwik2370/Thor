@@ -101,6 +101,30 @@ main::proc(){
         hover=client.request('textDocument/hover',{'textDocument':{'uri':native.as_uri()},'position':self.position(library,'create::')})
         self.assertIn('big.Integer',json.dumps(hover))
 
+    def test_runtime_operator_hovers_and_mapped_type_diagnostics(self):
+        text='''package main
+main::proc(){
+ a:=Integer(2)
+ b:=3+a*4
+ c:=-b
+ d:=a**5
+ r:=Rational(1,3)+0.25
+ less:=a<b
+ delete(a);delete(b);delete(c);delete(d);delete(r);_=less
+}
+'''
+        client,main=self.open(text)
+        for name,expected in [('b:=','b: Integer'),('c:=','c: Integer'),('d:=','d: Integer'),('r:=','r: Rational'),('less:=','less: bool')]:
+            self.assertIn(expected,json.dumps(self.hover(client,main,text,name)))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        broken=text.replace('a*4','a*f64(4)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(e for e in errors if 'Cannot' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'f64(4)',0))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_user_names_shadow_predefined_types(self):
         text='package main\nInteger::struct{value:int}\nmain::proc(){number:=Integer{3};_=number.value}\n'
         client,main=self.open(text,compiler=False)

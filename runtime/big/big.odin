@@ -16,6 +16,8 @@ Error :: enum u8 {
     Invalid_Allocator,
     Integer_Overflow,
     Backend_Failure,
+    Invalid_Exponent,
+    Invalid_Shift,
 }
 
 @(private="package")
@@ -67,7 +69,9 @@ release_raw :: proc(value: ^backend.Int) {
 check :: proc(err: Error, loc: runtime.Source_Code_Location) {
     #partial switch err {
     case .None:
-    case .Division_by_Zero: panic("Thor Rational denominator must not be zero", loc)
+    case .Division_by_Zero: panic("Thor big-number divisor or Rational denominator must not be zero", loc)
+    case .Invalid_Exponent: panic("Integer powers need nonnegative whole exponents; Rational powers need whole exponents", loc)
+    case .Invalid_Shift: panic("Integer shift counts must be nonnegative", loc)
     case .Out_Of_Memory: panic("Thor big-number allocation failed", loc)
     case .Invalid_Allocator: panic("Thor big-number allocator failed", loc)
     case .Integer_Overflow: panic("Thor big-number size is too large", loc)

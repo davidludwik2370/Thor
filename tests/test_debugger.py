@@ -133,6 +133,25 @@ main::proc(){
             client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_big_number_operators_and_updates_keep_original_step_lines(self):
+        text='''package main
+main::proc(){
+    a:=Integer(2)
+    a+=3
+    b:=a*2
+    delete(a);delete(b)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[4])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),4),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_big_number_literal_copy_and_property_keep_original_breakpoints(self):
         text='''package main
 main::proc(){

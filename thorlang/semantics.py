@@ -10,6 +10,8 @@ from dataclasses import dataclass, field, replace
 import hashlib
 from pathlib import Path
 
+BIG_TYPES_SOURCE = Path(__file__).resolve().parents[1]/'runtime/big/big.odin'
+
 
 @dataclass(eq=False)
 class Type:
@@ -354,7 +356,7 @@ class Resolver:
                 return Type("scalar", n.text, n)
         symbol = self.symbol(n)
         if symbol:
-            if (symbol.declaration.source.path == Path(__file__).resolve().parents[1]/'runtime/big/big.odin'
+            if (symbol.declaration.source.path == BIG_TYPES_SOURCE
                     and symbol.name in {'Integer','Rational'}):
                 return Type('big_integer' if symbol.name=='Integer' else 'big_rational',symbol.name,n)
             if symbol.declaration.kind == "PolyType":
@@ -510,8 +512,11 @@ class Resolver:
         if kind == "Binary":
             if n.data["op"] in {"in", "not_in", "==", "!=", "<", ">", "<=", ">=", "&&", "||"}:
                 return Type("scalar", "bool", n)
+            operands=[self.type_of(n.role(side),seen.copy()) for side in ['left','right']]
+            for operand in operands:
+                if operand.kind in {'big_integer','big_rational'}:return replace(operand,witness=n)
             if n.data['op']=='**':
-                left,right=(self.type_of(n.role(side),seen.copy()) for side in ['left','right'])
+                left,right=operands
                 if left.untyped and (not right.untyped or right.name.startswith('f')):return replace(right,witness=n)
                 return replace(left,witness=n,untyped=left.untyped and right.untyped)
             if n.source.thor and n.data['op']=='*':

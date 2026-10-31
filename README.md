@@ -7,9 +7,9 @@ milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
-Arbitrary-precision stages 1–2 add predefined `Integer`/`Rational` types, exact
-unquoted literals, constructors, read-only components, and direct-copy ownership.
-Operators and compile-time constants follow in later stages. See
+Arbitrary-precision stages 1–3 add predefined `Integer`/`Rational` types, exact
+unquoted literals, constructors, read-only components, direct-copy ownership, and
+exact runtime operators. Compile-time constants and formatting follow next. See
 [the commented demo](examples/big_numbers/demo.thor),
 [the runtime API](runtime/big/README.md), and
 [the design and roadmap](docs/arbitrary-precision.md).

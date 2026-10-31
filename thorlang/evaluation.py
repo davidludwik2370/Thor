@@ -87,7 +87,17 @@ class Evaluator:
     def call(n):return n.role('expr') if n.kind=='Run' else n
 
     @staticmethod
-    def power(n):return n.source.thor and n.kind=='Binary' and n.data['op']=='**'
+    def power(n):
+        if not (n.source.thor and n.kind=='Binary' and n.data['op']=='**'):return False
+        big=n.source.big
+        if big.enabled:
+            if big.ops.handles(n):return False
+            for ancestor in n.ancestors():
+                if ancestor.kind=='Call' and big.constructor(ancestor):return False
+                annotation=ancestor.role('type') if ancestor.kind=='Declaration' else None
+                if annotation and n.source.resolver.type_node(annotation).kind in {'big_integer','big_rational'}:return False
+                if ancestor.kind=='Binary' and big.ops.handles(ancestor):return False
+        return True
 
     def automatic(self,n):
         if self.power(n):

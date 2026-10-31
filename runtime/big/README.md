@@ -123,3 +123,19 @@ widths, clone/getter independence, replacement aliasing, allocator changes, and
 failures at successive allocation points. Python integers/Fraction provide
 independent reference values, including 6,000-digit inputs. External-project
 imports and isolated panic processes verify packaging and error distinctions.
+
+## Runtime operators (stage 3)
+
+Thor supports `+ - * / % %% **`, exact comparisons, unary signs, Integer `~`
+complement, `& | ~ &~`, shifts and native compound assignments. Typed operands
+must match; untyped literal expressions adopt the big context. Integer division
+truncates toward zero, `%` follows the dividend and `%%` follows the divisor.
+Right shift extends the sign. Rational powers require whole exponents and may
+be negative; Integer powers require nonnegative exponents.
+
+Native callers can use `binary(a,b,"+")`, `unary(value,"-")`, and
+`compare(a,b,"<")` with optional `allocator=`/`loc=`. `try_binary`, `try_unary`,
+and `try_compare` return result/error; partial values and scratch are released on
+failure. Results are independent owners. `Invalid_Exponent` and `Invalid_Shift`
+distinguish domain errors from allocation failure. See
+[the operator demo](../../examples/big_operators/demo.thor).

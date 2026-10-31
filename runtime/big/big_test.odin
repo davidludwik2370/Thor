@@ -378,3 +378,52 @@ allocation_failure_sweep_cleans_partial_values_and_scratch :: proc(t: ^testing.T
         testing.expect(t, completed, "Failure sweep did not reach a successful operation")
     }
 }
+
+@(test)
+operator_failure_sweeps_release_results_and_scratch :: proc(t:^testing.T) {
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,context.allocator,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracker)
+    a,_:=parse_integer("-123456789012345678901234567890123456789012345678901234567890")
+    b:=from_integer(123456789)
+    exponent:=from_integer(8)
+    r:=fraction(-12345,67)
+    s:=fraction(76543,89)
+    defer destroy(&a);defer destroy(&b);defer destroy(&exponent);defer destroy(&r);defer destroy(&s)
+    negative_exponent:=fraction(-3,1)
+    defer destroy(&negative_exponent)
+    for operation in 0..<16 {
+        completed:=false
+        for limit in 0..<512 {
+            state:=Failing{backing=mem.tracking_allocator(&tracker),fail_after=limit}
+            allocator:=runtime.Allocator{fail_allocate,&state}
+            i:Integer;q:Rational;err:Error
+            switch operation {
+            case 0:i,err=try_binary(a,b,"+",allocator)
+            case 1:i,err=try_binary(a,b,"-",allocator)
+            case 2:i,err=try_binary(a,b,"*",allocator)
+            case 3:i,err=try_binary(a,b,"/",allocator)
+            case 4:i,err=try_binary(a,b,"%%",allocator)
+            case 5:i,err=try_binary(a,b,"&~",allocator)
+            case 6:i,err=try_binary(a,exponent,">>",allocator)
+            case 7:i,err=try_binary(b,exponent,"**",allocator)
+            case 8:q,err=try_binary(r,s,"+",allocator)
+            case 9:q,err=try_binary(r,s,"-",allocator)
+            case 10:q,err=try_binary(r,s,"*",allocator)
+            case 11:q,err=try_binary(r,s,"/",allocator)
+            case 12:q,err=try_binary(r,s,"%%",allocator)
+            case 13:_,err=try_compare(r,s,allocator)
+            case 14:q,err=try_binary(r,negative_exponent,"**",allocator)
+            case 15:i,err=try_unary(Integer{},"~",allocator)
+            }
+            if err!=.None{testing.expect(t,is_zero(i)&&is_zero(q))}
+            destroy(&i);destroy(&q)
+            if len(tracker.allocation_map)!=0 || len(tracker.bad_free_array)!=0 {
+                testing.fail_now(t,fmt.tprintf("Operator leak/bad free: operation=%d, allocation failure=%d",operation,limit))
+            }
+            if !state.failed {testing.expect(t,err==.None);completed=true;break}
+            testing.expect(t,err==.Out_Of_Memory)
+        }
+        testing.expect(t,completed)
+    }
+}

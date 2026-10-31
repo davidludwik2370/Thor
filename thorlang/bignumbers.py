@@ -24,6 +24,9 @@ class BigNumbers:
         self.querying = 0
         self.globalizing = 0
         self.activation = (-1, False)
+        self.type_hints = {}
+        from .bigoperators import BigOperators
+        self.ops = BigOperators(self)
 
     @property
     def enabled(self):
@@ -53,13 +56,33 @@ class BigNumbers:
                       or p.kind in {'Selector','FieldValue'} and node is p.role('field')
                       or p.kind in {'PolyType','ImplicitSelector','EnumType'})
 
-    def literal(self, node):
+    def literal(self, node, seen=None):
         node = unwrap(node)
+        seen=set() if seen is None else seen
+        if node in seen:return None
+        seen.add(node)
         if node.kind == 'Literal' and node.data['op'] in {'integer','float'}: return node.text
         if node.kind == 'Unary' and node.data['op'] in {'+','-'}:
-            inner = self.literal(node.role('expr'))
+            inner = self.literal(node.role('expr'),seen)
             if inner is not None: return node.data['op'] + inner
+        if node.kind=='Ident':
+            symbol=self.s.resolver.symbol(node)
+            if symbol and symbol.value and symbol.declaration.kind=='Declaration' and not symbol.declaration.data.get('mutable',True) and not symbol.annotation:
+                return self.literal(symbol.value,seen)
         return None
+
+    def type_hint(self,kind):
+        from .compiler import Hint
+        from .semantics import BIG_TYPES_SOURCE
+        if kind in self.type_hints:return self.type_hints[kind]
+        path=BIG_TYPES_SOURCE
+        for source in self.s.resolver.sources:
+            if source.path==path:
+                declaration=source.lookup(KINDS[kind],source.root)
+                hint=Hint(source,declaration.group('names')[0],self.module()+'.'+KINDS[kind])
+                self.type_hints[kind]=hint
+                return hint
+        raise RuntimeError('Big-number runtime was not discovered')
 
     def constructor(self, node):
         if node.kind != 'Call': return None
@@ -69,7 +92,8 @@ class BigNumbers:
     def fresh(self, node):
         node = unwrap(node)
         typ = self.shape(node)
-        if node.kind in {'Literal','Unary'}: return False
+        if node.kind=='Literal' or self.literal(node) is not None:return False
+        if node.kind in {'Binary','Unary'} and self.ops.handles(node):return node.data['op'] not in self.ops.comparisons
         if node.kind == 'Selector': return self.property(node) is not None
         if node.kind == 'Compound': return typ.kind in KINDS
         if node.kind in {'OrElse','OrReturn','OrBranch'}:return typ.kind in {*KINDS,'generic'}
@@ -126,7 +150,7 @@ class BigNumbers:
             target=self.e.type_code(hint) if hint else self.e.ownership.native_type(node)
             return name+'('+', '.join([*args,target])+')'
         code=self.s.render(node,hint,constant)
-        if self.fresh(node) or self.literal(node) is not None and expected and expected.kind in KINDS:
+        if self.fresh(node) or self.literal(node) is not None and expected and expected.kind in KINDS or self.ops.handles(node,hint):
             return code
         return self.mapped(node,f'{self.module()}.compiler_clone({code})','big-owned')
 
@@ -182,21 +206,28 @@ class BigNumbers:
             extras=[self.s.render(a) for a in args if a.kind=='FieldValue' and a.role('field').text in {'allocator','loc'}]
             if extras and code.endswith(')'): code=code[:-1]+', '+', '.join(extras)+')'
             return code
+        if len(values)==1 and self.s.resolver.membership_untyped(values[0]):
+            contextual=self.type_hint(typ.kind)
+            if self.ops.handles(values[0],contextual):return self.s.render(values[0],contextual)
         if typ.kind=='big_rational' and len(values)==2:
             denominator=next((a.role('value') for a in args if a.kind=='FieldValue' and a.role('field').text=='denominator'),values[1])
             if self.statically_zero(denominator):
                 return self.error(denominator,'A Rational denominator must not be zero.')
         method='integer' if typ.kind=='big_integer' else 'rational'
         rendered=[]
+        converted=set()
         for arg in args:
             value=arg.role('value') if arg.kind=='FieldValue' else arg
             literal=self.literal(value)
             # Two-part constructors preserve arbitrary-size numerators and
             # denominators before native default-integer inference can occur.
-            code=self.render_literal(value,'big_integer',False) if literal is not None else self.s.render(value)
+            contextual=self.type_hint('big_integer') if len(values)==2 else None
+            if contextual and self.s.resolver.membership_untyped(value) and self.ops.handles(value,contextual):converted.add(value)
+            code=(self.render_literal(value,'big_integer',False) if literal is not None else
+                  self.s.render(value,contextual) if contextual and self.s.resolver.membership_untyped(value) and self.ops.handles(value,contextual) else self.s.render(value))
             if arg.kind=='FieldValue': code=arg.role('field').text+'='+code
             rendered.append(code)
-        return self.consume_call(node,f'{self.module()}.{method}',args,rendered)
+        return self.consume_call(node,f'{self.module()}.{method}',args,rendered,converted)
 
     def statically_zero(self,node):
         if self.s.resolver.constant_int(node)==0:return True
@@ -214,11 +245,11 @@ class BigNumbers:
             return self.statically_zero(node.group('args')[0])
         return False
 
-    def consume_call(self,node,callee,args,rendered):
+    def consume_call(self,node,callee,args,rendered,converted=()):
         """Known constructors borrow their inputs and own all their results."""
         # Literal converted arguments are anonymous owners too. Ordinary
         # generic/native constructor inputs remain borrowed for the call.
-        owned=[self.literal(a.role('value') if a.kind=='FieldValue' else a) is not None or
+        owned=[(a.role('value') if a.kind=='FieldValue' else a) in converted or self.literal(a.role('value') if a.kind=='FieldValue' else a) is not None or
                self.e.ownership.may_own(a.role('value') if a.kind=='FieldValue' else a) for a in args]
         if not any(owned): return callee+'('+', '.join(rendered)+')'
         types=[self.shape(a.role('value') if a.kind=='FieldValue' else a) for a in args]
@@ -239,7 +270,7 @@ class BigNumbers:
         name,inputs=self.e.closed(node,body,result='('+result+', bool)' if count==2 else result,flavor='big_constructor')
         return name+'('+', '.join(inputs)+')'
 
-    def argument_hints(self,node):
+    def argument_hints(self,node,native=True):
         from .compiler import Hint
         signature=self.s.signature(node)
         params=self.s.fields(signature.role('params')) if signature else []
@@ -249,6 +280,7 @@ class BigNumbers:
             if arg.kind=='FieldValue': index=next((j for j,(name,_) in enumerate(params) if name==arg.role('field').text),i)
             annotation=params[index][1] if index<len(params) else None
             hint=self.s.resolver.call_hint(node,arg,i)
+            if annotation and not hint and not native:hint=Hint(annotation.source,annotation)
             if annotation and not hint:
                 self.s.needs_intrinsics=True
                 self.busy.add(node)
@@ -294,20 +326,21 @@ class BigNumbers:
         signature=self.s.signature(node)
         if signature is None: return None
         args=node.group('args')
-        hints=self.argument_hints(node)
+        hints=self.argument_hints(node,native=False)
         owns=[]
         for arg,hint in zip(args,hints):
             value=arg.role('value') if arg.kind=='FieldValue' else arg
             expected=self.expected(hint)
             owns.append(self.e.ownership.may_own(value) and self.shape(value).kind in {*KINDS,'generic','unknown'}
-                        or self.literal(value) is not None and expected and expected.kind in KINDS)
+                        or self.literal(value) is not None and expected and expected.kind in KINDS or self.ops.handles(value,hint))
         if not any(owns): return None
         count=len(self.s.fields(signature.role('results')))
         def body(_):
             lines=[]
             replacements={}
             params=self.s.fields(signature.role('params'))
-            for i,(arg,hint,own) in enumerate(zip(args,hints,owns)):
+            contextual=self.argument_hints(node)
+            for i,(arg,hint,own) in enumerate(zip(args,contextual,owns)):
                 value=arg.role('value') if arg.kind=='FieldValue' else arg
                 if self.s.denotes_type(value) or i<len(params) and params[i][0].startswith('$'): continue
                 name=self.s.prefix+f'big_input_{node.start}_{i}'
@@ -393,12 +426,12 @@ class BigNumbers:
             n=unwrap(target)
             if n.kind=='Index' and self.shape(n.role('expr')).kind=='map':
                 base,key=n.role('expr'),n.role('index')
-                lines.append(f'{name} := &({self.e.address(base)})')
+                lines.append(self.mapped(node,f'{name} := &({self.e.address(base)})','Assignment' if i==0 else 'debug-capture'))
                 keyname=name+'_key'
-                lines.append(f'{keyname}: type_of({self.e.module("sets")}.key_witness({name}^)) = {self.s.render(key)}')
+                lines.append(self.mapped(key,f'{keyname}: type_of({self.e.module("sets")}.key_witness({name}^)) = {self.s.render(key)}','debug-capture'))
                 targets.append(f'{name}^[{keyname}]')
             else:
-                lines.append(f'{name} := &({self.e.address(target)})')
+                lines.append(self.mapped(node,f'{name} := &({self.e.address(target)})','Assignment' if i==0 else 'debug-capture'))
                 targets.append(name+'^')
         return targets
 
@@ -413,7 +446,7 @@ class BigNumbers:
 
     def assignment(self,node):
         from .compiler import Hint
-        if node.data['op']!='=': return None
+        if node.data['op']!='=': return self.ops.assignment(node)
         lhs,rhs=node.group('lhs'),node.group('rhs')
         if len(rhs)==1 and unwrap(rhs[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
             lowered=self.e.switches.statement(node,False)
@@ -433,7 +466,7 @@ class BigNumbers:
                 name=self.s.prefix+f'big_rhs_{node.start}_{i}'
                 hint=Hint(self.s,lhs[i],f'type_of({target})') if target!='_' else None
                 code=self.owned(value,hint)
-                lines.append(self.mapped(value,f'{name}: type_of({target}) = {code}' if target!='_' else f'{name} := {code}'))
+                lines.append(self.mapped(value,f'{name}: type_of({target}) = {code}' if target!='_' else f'{name} := {code}','debug-capture'))
                 values.append(name)
             self.commit(targets,values,lines)
             return '\n'.join(lines)
@@ -502,7 +535,7 @@ class BigNumbers:
             post=node.parent.role('post') is node
             name,args=self.e.closed(node,lambda _:builder(None)+('\nreturn true' if post else ''),result='bool' if post else False,flavor='big_assign')
             return ('_ = ' if post else '')+name+'('+', '.join(args)+')'
-        return '{\n'+builder(None)+'\n}'
+        return self.mapped(node,'{\n'+builder(None)+'\n}','support')
 
     def render(self,node,hint,constant):
         if node in self.replacements: return self.replacements[node]
@@ -524,6 +557,8 @@ class BigNumbers:
                 return name+'('+', '.join(args)+')'
         discard=self.e.ownership.discard(node)
         if discard is not None:return discard
+        operation=self.ops.render(node,hint,constant)
+        if operation is not None:return operation
         if node.kind=='OrElse':
             optional=self.optional(node)
             if optional is not None:return optional

@@ -82,6 +82,7 @@ class Ownership:
             if self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'generic','unknown'}:
                 typ=self.native_type(n)
                 owned=f'({typ}=={self.s.big.module()}.Integer || {typ}=={self.s.big.module()}.Rational)'
+                if self.generic_math(n):owned=f'({owned} || {self.e.set_trait("("+typ+"){ }")})'
             elif n.kind == 'Binary' and self.e.shape(n).kind != 'set':
                 # The native type is authoritative for unconstrained generics.
                 owned = f'(true when {self.e.set_trait("("+self.native_type(n)+"){ }")} else false)'
