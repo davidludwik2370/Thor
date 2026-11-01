@@ -54,6 +54,69 @@ class DiagnosticHardeningTests(unittest.TestCase):
         errors=self.at(source,'record.missing',message='has no field')
         self.assertEqual(len(errors),1,errors)
 
+    def test_missing_interpolation_operands_do_not_report_generated_type_cascades(self):
+        for imports in ['', 'import * "thor:basic"\n']:
+            for expression in ['(1-p_loss) * 100','(1-p_loss) * (100)',
+                               '(1-p_loss) * -100','(1-p_loss) * (50+50)',
+                               '100 * (1-p_loss)','(1-p_loss) ** 2','number_value(100)+p_loss','p_loss+number_value(100)']:
+                with self.subTest(imports=imports,expression=expression):
+                    source='package main\n'+imports+'number_value::proc(value:int)->int{return value}\nmain::proc(){/* 😀 */ p_win_pad:>len(f"{'+expression+':.2f}");_=p_win_pad}\n'
+                    errors=self.at(source,'p_loss',message='Undeclared name: p_loss')
+                    self.assertEqual(len(errors),1,errors)
+                    self.assertEqual(errors[0]['msgs'],['Undeclared name: p_loss'])
+                    self.assertEqual(errors[0]['pos']['end_offset']-errors[0]['pos']['offset'],len('p_loss'))
+
+    def test_missing_members_and_multiple_root_errors_keep_precise_ranges(self):
+        prefix='package main\nimport * "thor:basic"\nRecord::struct{x:f64}\n'
+        source=prefix+'main::proc(){record:=Record{1};_=f"{(1-record.absent)*100:.2f}"}\n'
+        errors=self.at(source,'record.absent',message='has no field')
+        self.assertEqual(len(errors),1,errors)
+        source=prefix+'main::proc(){_=f"{missing}|{other}"}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertEqual({e['msgs'][0] for e in errors},{'Undeclared name: missing','Undeclared name: other'})
+
+    def test_inference_cleanup_preserves_independent_errors_and_field_boundaries(self):
+        prefix='package main\nimport * "thor:basic"\nbool_number::proc(value:bool)->int{return 1}\nneed_type::proc($T:typeid)->int{return 0}\n'
+        for body,expected in [
+            ('_=f"{(1-missing)*100:.2f}";bad:bool=100;_=bad','Cannot convert'),
+            ('_=f"{(1-missing)*100:.2f}|{bool_number(100)}"','Cannot convert'),
+            ('_=f"{(1-missing)*100:.2f}|{need_type(100)}"','Expected a type'),
+            ('_=f"{(1-missing)*100:.2f}|{Rational(1,3):g}"','requires explicit precision'),
+        ]:
+            with self.subTest(body=body):
+                _,_,errors,_=self.invoke(prefix+'main::proc(){'+body+'}\n')
+                self.assertEqual(len(errors),2,errors)
+                self.assertTrue(any(e['msgs']==['Undeclared name: missing'] for e in errors),errors)
+                self.assertTrue(any(expected in '\n'.join(e['msgs']) for e in errors),errors)
+                self.assertNotIn('Thor expression',json.dumps(errors))
+
+    def test_independent_argument_error_in_same_arithmetic_expression_survives(self):
+        prefix='package main\nbool_number::proc(value:bool)->int{return 1}\nneed_type::proc($T:typeid)->int{return 0}\n'
+        for expression,message in [('bool_number(100)+missing',"to 'bool'"),
+                                   ('need_type(100)+missing','Expected a type')]:
+            with self.subTest(expression=expression):
+                _,_,errors,_=self.invoke(prefix+'main::proc(){_=f"{'+expression+'}"}\n')
+                self.assertEqual(len(errors),2,errors)
+                self.assertTrue(any(e['msgs']==['Undeclared name: missing'] for e in errors),errors)
+                self.assertTrue(any(message in e['msgs'][0] for e in errors),errors)
+                self.assertNotIn('Thor expression',json.dumps(errors))
+
+    def test_inference_errors_without_a_primary_cause_are_retained(self):
+        source='package main\nneed_type::proc($T:typeid)->int{return 0}\nmain::proc(){_=f"{need_type(100)}"}\n'
+        errors=self.at(source,'100',message='Expected a type')
+        self.assertTrue(errors)
+        source='package main\nunused::proc($T:typeid){_=f"{(1-missing)*100:.2f}"}\nmain::proc(){when false{_=f"{(1-missing)*100:.2f}"}}\n'
+        self.invoke(source,success=True)
+
+    def test_imported_generic_interpolation_reports_its_root_at_the_definition(self):
+        source='package main\nimport "library"\nmain::proc(){_=library.render(1.0)}\n'
+        library='// 😀 library\npackage library\nimport * "thor:basic"\nrender::proc(value:$T)->string{return f"{(value-missing)*100:.2f}"}\n'
+        entry,_,errors,_=self.invoke(source,files={'library/render.thor':library})
+        self.assertEqual(len(errors),1,errors)
+        self.assertEqual(errors[0]['msgs'][0],'Undeclared name: missing')
+        self.assertEqual(errors[0]['pos']['file'],str(entry.parent/'library/render.thor'))
+        self.assertEqual(errors[0]['pos']['offset'],library.encode().index(b'missing'))
+
     def test_invalid_sequence_bounds_have_their_original_ranges_and_types(self):
         for body,needle,expected in [
             ('values:=[1,2];index:f64=1;_=values[index]','index]','Sequence indices must have an integer type'),

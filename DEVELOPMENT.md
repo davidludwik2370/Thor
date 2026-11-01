@@ -2609,3 +2609,44 @@ fresh passing reruns, is recorded in
 One intermittent stock Odin SIGSEGV repeated the earlier code-generation stack
 signature; its anonymized observation is retained in the upstream report bundle.
 No automatic build retry, sanitizer bypass, or upstream compiler patch was added.
+
+
+## Root errors ahead of generated inference cascades: 0.30.1
+
+An unknown name in `(1-p_loss)*100` inside a formatted interpolation could
+produce five diagnostics: the undeclared name, invalid generic/type queries,
+and a conversion of `100` to an unresolved compiler result type. Their ranges
+overlapped, so VS Code could show the generated conversions without showing the
+actual cause, depending on the hovered character.
+
+The shared diagnostic mapper now recognizes failed generated type queries,
+result-placeholder conversions (including ones mapped to copied source), and
+invalid generated operator dispatch. It follows value inference through the
+source AST's arithmetic, parentheses, unary operations, and other value nodes.
+Known cascade messages are suppressed only when an independent concrete error
+exists in an expression they depend on. Call arguments, separate interpolation
+fields and statements bound the search. Original user generic/type arguments,
+independent argument/type errors, and useful instantiation notes are retained.
+If no primary error was reported, the inference diagnostic remains visible.
+
+The original example now has one diagnostic, `Undeclared name: p_loss`, on the
+identifier alone. `100` no longer has a false error underline. This changes
+presentation only: Odin still checks the same program and unsuccessful checks
+still fail. Source generation and debugger mappings are unchanged. TLS 0.23.1
+uses the same compiler output for unsaved buffers; no extension reinstall is
+needed. Restart TLS or edit/save the document to refresh existing diagnostics.
+
+Tests cover literal and parenthesized operands, unary/arithmetic chains, power,
+selected imports, absent members, multiple root errors, imported generics,
+inactive/uninstantiated code, and independent native type arguments and
+conversion errors. A live TLS regression checks the exact UTF-16 identifier
+range, the absence of an error at `100`, and repeated unsaved typo/fix cycles.
+
+Validation: all 154 diagnostics/hygiene/formatting/typed-loop compiler tests,
+all nine live diagnostic/typed-loop/f-string TLS tests, and the complete isolated
+VS Code integration suite pass. The editor regression verifies one error exactly
+on `p_loss`, no error range at `100`, and clearing after changing the reference to
+`prob_loss`. Its existing undo/redo test now explicitly focuses the text editor
+before issuing focus-routed history commands; no extension runtime change was
+needed. A read-only copy of the reported double_bet source reproduces the same
+single primary error. The original project files were not modified.

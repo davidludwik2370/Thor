@@ -10,6 +10,36 @@ class DiagnosticHardeningTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_interpolation_root_error_is_precise_and_unsaved_fix_clears_all_cascades(self):
+        text='''// 😀 header
+package main
+import * "thor:basic"
+main::proc(){
+ prob_loss:f64
+ p_win_pad:>len(f"{(1-p_loss) * 100:.2f}")
+ _=p_win_pad
+}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='Undeclared name: p_loss')
+        self.assertEqual(len(errors),1,errors)
+        start=self.position(text,'p_loss',0)
+        self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+len('p_loss')}})
+        self.assertNotIn('polymorphic',errors[0]['message']);self.assertNotIn('Thor expression',errors[0]['message'])
+        literal=self.position(text,'100',0)
+        self.assertFalse(any(e['range']['start']['line']==literal['line'] and e['range']['start']['character']<=literal['character']<e['range']['end']['character'] for e in errors))
+        for version in range(2,6):
+            changed=text.replace('1-p_loss','1-prob_loss') if version%2==0 else text
+            client.notifications.clear()
+            client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':version},'contentChanges':[{'text':changed}]})
+            if version%2==0:
+                client.diagnostic(main.as_uri(),empty=True)
+                self.assertIn('p_win_pad: int',json.dumps(self.hover(client,main,changed,'p_win_pad:>')))
+            else:
+                errors=client.diagnostic(main.as_uri(),contains='Undeclared name: p_loss')
+                self.assertEqual(len(errors),1,errors)
+        self.assertEqual(main.read_text(),text)
+
     def test_unsaved_index_root_type_and_result_errors_recover(self):
         text='// 😀 header\npackage main\nmain::proc(){/* 😀 */ values:=[1,2];i:=1;value:=values[i];_=value}\n'
         client,main=self.open(text)

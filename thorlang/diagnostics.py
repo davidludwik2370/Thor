@@ -71,6 +71,7 @@ class Diagnostics:
         for error in errors:
             msgs = list(error.get("msgs") or [])
             generated_result_failure = False
+            generated_type_failure = False
             type_operand = None
             index_dependencies = []
             related = []
@@ -291,6 +292,20 @@ class Diagnostics:
                     and re.search(r"of type '\$"+re.escape(prefix)+r"Result(?:_\d+)?'",message)
                     for message in msgs for prefix in self.prefixes
                 )
+                # A copied literal can be rejected against an unresolved compiler
+                # result type inferred from another operand. Its exact source map
+                # does not make that generated type conversion a primary error.
+                generated_type_failure = any(
+                    re.search(r"(?:to|of type) '\$"+re.escape(prefix)+r"[A-Za-z0-9_]+'", message)
+                    for message in msgs for prefix in self.prefixes
+                )
+                generated_type_failure |= bool(not origin.exact and (
+                    msgs and msgs[0].startswith('Invalid operands for ') and any('invalid type' in message for message in msgs)
+                    or origin.kind in {'expression-helper','interpolation-field','debug-capture'}
+                    and any(prefix in message and ('is not an expression but a type' in message
+                                or message.startswith("'type_of(") and message.endswith("' is not a type"))
+                            for message in msgs for prefix in self.prefixes)
+                ))
                 # Generated implementation names never belong in user diagnostics.
                 for name in self.hidden_parameters:
                     msgs=[re.sub(r'(?:,\s*)?'+re.escape(name)+r'\s*=\s*true\b','',m) for m in msgs]
@@ -311,12 +326,9 @@ class Diagnostics:
             if related: diagnostic['related'] = related
             diagnostic['_type_operand'] = type_operand
             diagnostic['_index_dependencies'] = index_dependencies
-            diagnostic['_type_query_cascade'] = bool(origin and not origin.exact and any(
-                message == 'Expected a type to assign to the type parameter'
-                or "'type_of' of polymorphic type cannot be determined" in message
-                or "Cannot determine polymorphic type from parameter: 'invalid type'" in message
-                for message in msgs
-            ))
+            diagnostic['_type_query_cascade'] = bool(origin and not origin.exact and self.inference_query_failure(msgs))
+            diagnostic['_inference_failure'] = generated_type_failure or diagnostic['_type_query_cascade']
+            diagnostic['_inference_contexts'] = self.inference_contexts(origin) if diagnostic['_inference_failure'] else ()
             diagnostic["_cascade"] = bool(origin and not origin.exact and (
                 generated_result_failure or origin.kind in {'range-type','power-type'}
                 or origin.kind=='typed-loop-check' and msgs and msgs[0].startswith('A typed numeric range requires ')
@@ -334,6 +346,14 @@ class Diagnostics:
         filtered = []
         for diagnostic in result:
             pos = diagnostic["pos"]
+            contexts=diagnostic['_inference_contexts']
+            if contexts and any(
+                other is not diagnostic and other['type']=='error' and other['pos']
+                and not other['_inference_failure'] and not other['_cascade']
+                and other['pos']['file']==str(context.source.path)
+                and context.start <= other['pos']['offset'] < other['pos']['end_offset'] <= context.end
+                for context in contexts for other in result
+            ): continue
             if diagnostic['_index_dependencies'] and any(
                 other['type']=='error' and other['pos'] and other['msgs']
                 and (other['msgs'][0].startswith('Undeclared name:')
@@ -355,6 +375,46 @@ class Diagnostics:
                 continue
             filtered.append({k: v for k, v in diagnostic.items() if not k.startswith('_')})
         return filtered
+
+    @staticmethod
+    def inference_query_failure(messages):
+        return any(
+            message == 'Expected a type to assign to the type parameter'
+            or "'type_of' of polymorphic type cannot be determined" in message
+            or "Cannot determine polymorphic type from parameter: 'invalid type'" in message
+            for message in messages
+        )
+
+    def inference_contexts(self, origin):
+        """Value operations on which a generated type query/conversion depends.
+
+        Both sides of arithmetic and the arms of a ternary share inference;
+        parentheses/unary operations propagate it. Call arguments, separate
+        interpolation fields and statements are boundaries, not dependencies
+        merely because they share a line or an enclosing string.
+        """
+        source=self.sources.get(origin.file) if origin else None
+        if source is None:return ()
+        propagate={'Binary','Unary','Paren','Ternary','Index','Slice','Selector',
+                   'Deref','Compound','SwitchExpr','CompileSwitchExpr'}
+        operations=propagate|{'Call','Interpolation','Run'}
+        atoms={'Ident','Literal','ImplicitSelector'}
+        candidates=[node for node in source.nodes if node.kind in operations|atoms
+                    and node.start <= origin.start and origin.end <= node.end]
+        if not candidates:return ()
+        original=min(candidates,key=lambda n:n.end-n.start)
+        node=original.parent if original.kind in atoms else original
+        if node and node.kind=='Call' and original.kind in atoms:return (node,)
+        contexts=[]
+        while node and node.kind in operations:
+            contexts.append(node)
+            parent=node.parent
+            if parent and parent.kind=='Call':
+                contexts.append(parent)
+                break
+            if not parent or parent.kind not in propagate:break
+            node=parent
+        return contexts
 
     def restore_expressions(self, messages):
         if self.expression_patterns is None:

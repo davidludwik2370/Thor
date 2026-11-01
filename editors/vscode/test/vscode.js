@@ -121,6 +121,16 @@ async function run() {
         assert.ok(!rationalError.message.includes('runtime/'));
         await replace(precisionExample);
         await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.length===0);
+        const rootExample='// 😀\npackage main\nimport * "thor:basic"\nmain::proc(){prob_loss:f64;p_win_pad:>len(f"{(1-p_loss) * 100:.2f}");_=p_win_pad}\n';
+        await replace(rootExample);
+        const rootDiagnostics=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri).filter(d=>d.severity===vscode.DiagnosticSeverity.Error)),
+            values=>values.length===1 && values[0].message.includes('Undeclared name: p_loss'));
+        const rootStart=rootExample.indexOf('p_loss');
+        assert.ok(rootDiagnostics[0].range.isEqual(new vscode.Range(testDocument.positionAt(rootStart),testDocument.positionAt(rootStart+'p_loss'.length))));
+        assert.ok(!rootDiagnostics[0].range.contains(testDocument.positionAt(rootExample.indexOf('100'))));
+        assert.ok(!rootDiagnostics[0].message.includes('polymorphic'));
+        await replace(rootExample.replace('1-p_loss','1-prob_loss'));
+        await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri).filter(d=>d.severity===vscode.DiagnosticSeverity.Error)),values=>values.length===0);
         const bigExample='package main\nmain::proc(){\n huge:Integer=12345678901234567890123456789012345678901234567890\n ratio:=Rational(22,13)\n component:=ratio.numerator\n delete(huge);delete(ratio);delete(component)\n}\n';
         await replace(bigExample);
         for(const [fragment,expected] of [['huge:','huge: Integer'],['ratio:=','ratio: Rational'],['component:=','component: Integer'],['numerator','numerator: Integer']]){
@@ -167,6 +177,12 @@ async function run() {
         const loopExample='package main\nmain::proc(){\n    a:=0\n    for _ in 0..<20 {\n        _ = [2]int{a,(a+1)}\n    }\n    _=a\n}\n';
         await replace(loopExample);
         const loopSource=testDocument.getText();
+        const editHistory=async command=>{
+            // Undo/redo route to the focused control, unlike provider commands.
+            // Bracket jumps and provider waits need not leave editor focus there.
+            await vscode.window.showTextDocument(testDocument,{preserveFocus:false});
+            await vscode.commands.executeCommand(command);
+        };
         for(let cycle=0;cycle<3;cycle++){
             commentEditor.selection=new vscode.Selection(3,0,5,testDocument.lineAt(5).text.length);
             await vscode.commands.executeCommand('editor.action.commentLine');
@@ -177,13 +193,13 @@ async function run() {
             const open=testDocument.positionAt(commentedSource.indexOf('[2]'));
             const close=testDocument.positionAt(commentedSource.lastIndexOf('}'));
             await eventually(()=>jumpAt(open),position=>position.isEqual(close));
-            await vscode.commands.executeCommand('undo');
+            await editHistory('undo');
             await eventually(()=>testDocument.getText(),text=>text===loopSource);
             await assertArrayPair();
-            await vscode.commands.executeCommand('redo');
+            await editHistory('redo');
             await eventually(()=>testDocument.getText(),text=>text===commentedSource);
             await eventually(()=>jumpAt(testDocument.positionAt(commentedSource.indexOf('[2]'))),position=>position.isEqual(close));
-            await vscode.commands.executeCommand('undo');
+            await editHistory('undo');
             await eventually(()=>testDocument.getText(),text=>text===loopSource);
         }
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -753,6 +769,7 @@ async function run() {
             'promoted using fields supply switch result types and contextual enum hovers',
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
+        result.checks.push('undeclared interpolation names keep one precise root diagnostic and no false literal underline');
         result.checks.push('Odin-style precision formats, Rational g/G contract and mapped unsaved recovery');
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');
         result.checks.push('type-as-array errors have original use ranges, clickable declaration notes and unsaved recovery');
