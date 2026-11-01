@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
@@ -48,7 +48,13 @@
         "scopeName": "source.thor",
         "path": "./syntaxes/thor.tmLanguage.json",
         "unbalancedBracketScopes": [
-          "comment"
+          "comment",
+          "string.quoted.double.thor",
+          "string.quoted.single.thor",
+          "string.quoted.raw.thor",
+          "meta.interpolation.literal.thor",
+          "constant.character.escape",
+          "invalid.illegal.unknown-escape.thor"
         ]
       }
     ],

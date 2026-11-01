@@ -175,6 +175,24 @@ async function run() {
         }
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
             testDocument.positionAt(loopSource.indexOf('a:=')+1)),values=>hoverText(values||[]).includes('a: int'));
+        for(const literal of [
+            'f"fib ({i}): {a:,}"', 'f!"fib ({i}): {a:,}"',
+            'f`fib ({i}): {a:,}`', 'f!`fib ({i}): {a:,}`',
+            'f"outer ({f"inner ({i})"}) {a:,}"',
+            '"fib (text) [text] {text}"', '`fib (text) [text] {text}`',
+        ]){
+            const example='package main\nimport "core:fmt"\nmain::proc(){\n    i:=1; a:=2; _=i; _=a\n    fmt.println('+literal+')\n}\n';
+            await replace(example);
+            const call=example.indexOf('println(')+'println'.length;
+            const callEnd=example.lastIndexOf(')');
+            await eventually(()=>jumpAt(testDocument.positionAt(call)),position=>position.isEqual(testDocument.positionAt(callEnd)));
+            const literalOpen=example.indexOf('(',call+1),literalClose=example.indexOf(')',literalOpen);
+            await eventually(()=>jumpAt(testDocument.positionAt(literalOpen)),position=>!position.isEqual(testDocument.positionAt(literalClose)));
+            if(literal.includes('{i}')){
+                const field=example.indexOf('{i}');
+                await eventually(()=>jumpAt(testDocument.positionAt(field)),position=>position.isEqual(testDocument.positionAt(field+2)));
+            }
+        }
         const bindings='package main\nread::proc(input:[]int,pointer:^int){\nfor value,index in input{_=value;_=index}\nfor &cell,offset in input{cell+=1;_=cell;_=offset}\n_=pointer\n}\n';
         await replace(bindings);
         const bindingTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
@@ -629,6 +647,7 @@ async function run() {
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
             'comment toggling removes bracket matches and semantic tokens, uncommenting restores code brackets',
             'batched comment toggles, undo/redo and bracket refresh preserve source, live brackets and TLS',
+            'literal parentheses are excluded from matching in ordinary, raw, f/f! and nested strings; interpolation brackets stay active',
             'Rename Symbol provider applies original-source edits to unsaved Unicode text',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',

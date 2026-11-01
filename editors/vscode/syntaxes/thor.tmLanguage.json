@@ -1347,6 +1347,10 @@
                   "include": "#expressions"
                 }
               ]
+            },
+            {
+              "name": "meta.interpolation.literal.thor",
+              "match": "[^\"\\\\{}]+|\\}"
             }
           ],
           "contentName": "string.quoted.double.interpolated.thor",
@@ -1416,6 +1420,10 @@
                   "include": "#expressions"
                 }
               ]
+            },
+            {
+              "name": "meta.interpolation.literal.thor",
+              "match": "[^`{}]+|\\}"
             }
           ],
           "contentName": "string.quoted.raw.interpolated.thor",

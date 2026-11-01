@@ -309,6 +309,37 @@ test('nested interpolations retain string colors and ordinary expression colors'
     }
 });
 
+test('literal brackets never participate in pairing, including text around nested interpolation fields',()=>{
+    for(const source of [
+        'print(f"fib ({i}): {a:,}", end="\\n\\n")',
+        'print(f!"fib [{i}]: ({a:,})")',
+        'print(f`fib ({i}): [{a:,}]`)',
+        'print(f!`fib ({i}): [{a:,}]`)',
+        'print(f"outer ({f"inner [{mark(7)}]"})")',
+        'print(f"{(allocated ? f"nested ({7})" : "borrowed [text]")}")',
+        'print(f"{{literal}} ({identity("text (inside) [braces]")})")',
+        'print("ordinary (text) [braces] {braces}")',
+        'print(`raw (text) [braces] {braces}`)',
+        'print(\'(\', \')\', \'[\', \']\', \'{\', \'}\')',
+        'print(f"{7:\'(\'>5}")',
+    ]){
+        const tokens=themedTokens(source)[0];
+        let literalBrackets=0,codeBrackets=0;
+        for(let at=0;at<source.length;at++){
+            if(!'()[]{}'.includes(source[at]))continue;
+            const token=tokens[at];
+            assert.equal(token.balanced,token.type===0,`${source}: bracket ${at} (${source[at]})`);
+            if(token.type===2)literalBrackets++;else codeBrackets++;
+        }
+        assert.ok(literalBrackets>0,source);
+        assert.ok(codeBrackets>0,source);
+    }
+    const source='print(f"fib ({i}): {a:,}", end="\\n\\n")',tokens=themedTokens(source)[0];
+    for(const at of [source.indexOf('(' ,source.indexOf('fib')),source.indexOf('):')]){
+        assert.deepEqual(tokens[at],{color:'#CE9178',type:2,balanced:false});
+    }
+});
+
 test('reported ternary interpolation has ordinary expressions and nested string text',()=>{
     const source='outer := f"{(allocated ? f"nested {7}" : borrowed)}"';
     const tokens=themedTokens(source)[0];

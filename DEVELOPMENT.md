@@ -2370,3 +2370,23 @@ coverage exercises multi-line Cmd+/, undo/redo and manual refresh while checking
 bracket navigation, unchanged buffers, and continued TLS hover. This is a
 workaround with a tested mechanism, not a claim that the intermittent trigger
 has been isolated.
+
+## Exclude literal string brackets (VS Code extension 0.16.2)
+
+The reported `print(f"fib ({i}): {a:,}", end="\n\n")` had orange
+string tokens, but its literal parentheses still inherited the balanced-bracket
+metadata flag. Add explicit bracket exclusions for ordinary string/rune scopes,
+escapes, and interpolated literal text. Interpolation needs a leaf-only
+`meta.interpolation.literal.thor` scope: excluding the entire outer string scope
+would also disable genuine brackets inside `{...}`, including nested calls and
+nested fstrings. Quoted/raw and f/f! forms share the correction; escaped `{{` and
+`}}` remain literal, and literal brackets never affect code nesting.
+
+The new grammar regression fails on the original manifest at the exact opening
+parenthesis in the reported example. It checks color, token type, and bracket
+metadata across eleven cases: quoted/raw/manual/nested interpolation, conditional
+fields, strings inside fields, ordinary strings, runes, escaped braces and rune
+format fills. Real VS Code tests verify that call/field bracket matching remains
+active and literal parentheses do not match, across seven ordinary/interpolated
+forms and unsaved replacements. All 118 extension tests and the full isolated
+VS Code integration suite pass.

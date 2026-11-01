@@ -150,6 +150,11 @@ comment-delimiter edits settle. Ordinary typing does not request a refresh.
 This is a defensive workaround for intermittent stale editor state; the exact
 trigger has not yet been reproduced in a clean editor profile.
 
+Literal string/rune brackets are also explicitly excluded. In
+`print(f"fib ({i}): {a:,}")`, the parentheses around `{i}` are orange string text;
+the interpolation braces and the actual procedure-call parentheses remain code
+brackets. This applies to quoted/raw strings, nested interpolation, and `f!`.
+
 ### Reversible constant-color preview
 
 The original theme colors remain the default. To try a different color for Thor
