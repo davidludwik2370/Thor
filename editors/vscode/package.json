@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
@@ -62,6 +62,10 @@
       {
         "command": "tls.restart",
         "title": "Thor: Restart Language Server"
+      },
+      {
+        "command": "thor.refreshBracketHighlighting",
+        "title": "Thor: Refresh Bracket Highlighting"
       },
       {
         "command": "thor.run",

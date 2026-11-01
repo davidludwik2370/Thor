@@ -93,6 +93,7 @@ async function start(context) {
 }
 
 function activate(context) {
+    require('./bracket-refresh').registerBracketRefresh(context, vscode);
     require('./constant-colors').registerConstantColors(context, vscode);
     require('./run-extension').activateRunning(context, vscode);
     require('./debug-extension').activateDebugging(context);

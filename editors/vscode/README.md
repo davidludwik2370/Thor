@@ -142,6 +142,14 @@ remain active when the surrounding code is uncommented. After an extension
 update, use **Developer: Reload Window** to refresh this grammar metadata;
 restarting TLS alone does not reload it.
 
+If brackets occasionally retain their code colors after Cmd+/ comments a block,
+use **Thor: Refresh Bracket Highlighting**. This rebuilds VS Code's bracket cache
+without reloading the window, restarting TLS, editing the buffer, or changing
+your settings. The extension also requests this refresh automatically after
+comment-delimiter edits settle. Ordinary typing does not request a refresh.
+This is a defensive workaround for intermittent stale editor state; the exact
+trigger has not yet been reproduced in a clean editor profile.
+
 ### Reversible constant-color preview
 
 The original theme colors remain the default. To try a different color for Thor

@@ -2344,3 +2344,29 @@ suite. The new commented example runs with allocation tracking:
 python3 -m unittest tests.test_big -v
 odin test runtime/big -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
 ```
+## Intermittent comment bracket colors (VS Code extension 0.16.1)
+
+The user reported brackets retaining rainbow colors inside line-commented code
+after Cmd+/, cleared by reloading the window. The existing grammar excludes
+comment scopes from bracket pairing. Both static TextMate metadata and a clean
+VS Code renderer correctly excluded the reported loop/call brackets through
+comment toggles, undo/redo and semantic-token updates. The persistent bad state
+itself has not been reproduced, so a specific upstream defect is not established.
+
+Add a bounded defensive recovery in `editors/vscode/bracket-refresh.js`: after
+comment-delimiter edits settle for 100 ms, register an empty Thor language
+configuration overlay. VS Code's language-configuration notification rebuilds
+its separate bracket tree from current tokens. The empty overlay preserves all
+installed language rules; previous overlays are disposed. Ordinary code/text
+edits do not request this refresh. Source snapshots are editor-local and released
+on document close. This does not affect compilation, diagnostics or source maps.
+The command `Thor: Refresh Bracket Highlighting` requests the same recovery
+immediately, including for an already affected document. No user settings change,
+source edit, language-ID switch or TLS restart is involved.
+
+Unit coverage checks delimiter insertion/removal (including single slash/star
+edits), batching, ordinary typing, document lifecycle and disposal. Real editor
+coverage exercises multi-line Cmd+/, undo/redo and manual refresh while checking
+bracket navigation, unchanged buffers, and continued TLS hover. This is a
+workaround with a tested mechanism, not a claim that the intermittent trigger
+has been isolated.

@@ -149,6 +149,32 @@ async function run() {
         await vscode.commands.executeCommand('editor.action.commentLine');
         assert.equal(testDocument.getText(),bracketExample);
         await assertArrayPair();
+        // Exercise batched Cmd+/ edits, undo/redo, and explicit recovery. The
+        // refresh must preserve the source buffer, TLS and language rules.
+        const loopExample='package main\nmain::proc(){\n    a:=0\n    for _ in 0..<20 {\n        _ = [2]int{a,(a+1)}\n    }\n    _=a\n}\n';
+        await replace(loopExample);
+        const loopSource=testDocument.getText();
+        for(let cycle=0;cycle<3;cycle++){
+            commentEditor.selection=new vscode.Selection(3,0,5,testDocument.lineAt(5).text.length);
+            await vscode.commands.executeCommand('editor.action.commentLine');
+            const commentedSource=testDocument.getText();
+            assert.ok(testDocument.lineAt(3).text.trimStart().startsWith('//'));
+            await vscode.commands.executeCommand('thor.refreshBracketHighlighting');
+            assert.equal(testDocument.getText(),commentedSource);
+            const open=testDocument.positionAt(commentedSource.indexOf('[2]'));
+            const close=testDocument.positionAt(commentedSource.lastIndexOf('}'));
+            await eventually(()=>jumpAt(open),position=>position.isEqual(close));
+            await vscode.commands.executeCommand('undo');
+            assert.equal(testDocument.getText(),loopSource);
+            await assertArrayPair();
+            await vscode.commands.executeCommand('redo');
+            assert.equal(testDocument.getText(),commentedSource);
+            await eventually(()=>jumpAt(testDocument.positionAt(commentedSource.indexOf('[2]'))),position=>position.isEqual(close));
+            await vscode.commands.executeCommand('undo');
+            assert.equal(testDocument.getText(),loopSource);
+        }
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(loopSource.indexOf('a:=')+1)),values=>hoverText(values||[]).includes('a: int'));
         const bindings='package main\nread::proc(input:[]int,pointer:^int){\nfor value,index in input{_=value;_=index}\nfor &cell,offset in input{cell+=1;_=cell;_=offset}\n_=pointer\n}\n';
         await replace(bindings);
         const bindingTokens=await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),
@@ -602,6 +628,7 @@ async function run() {
         result.success = true;
         result.checks = ['Thor language registration', 'TLS hover', 'selected-import definition', 'Odin association preserved',
             'comment toggling removes bracket matches and semantic tokens, uncommenting restores code brackets',
+            'batched comment toggles, undo/redo and bracket refresh preserve source, live brackets and TLS',
             'Rename Symbol provider applies original-source edits to unsaved Unicode text',
             'live compiler diagnostics on unsaved text', 'Unicode source ranges', 'diagnostics clear after fix',
             'unused imports carry VS Code dimming tags and update without saving',
