@@ -155,6 +155,22 @@ a:=LOCAL;expect(a,"124");delete(a)
         self.run_big('assert(SELECTED==2)','VALUE::Integer(3)\nSELECTED::#switch VALUE {case 0..<3:1;case 3..<5:2;case:0}\n')
         self.invoke(self.program('_=SELECTED','VALUE::Integer(3)\nSELECTED::#switch VALUE {case 0..<4:1;case 3..<5:2;case:0}\n'),command='check',fail='overlapping')
 
+    def test_local_numeric_constants_remain_usable_inside_expression_helpers(self):
+        self.run_big('''
+LOCAL::Integer(123)
+CHOICE::#switch LOCAL {case 0..<100:Integer(0);case:LOCAL+1}
+RATIO::#switch {case LOCAL>100:Rational(1,3);case:Rational(0)}
+LOCAL_RUN::#run Integer(5)
+assert(LOCAL==123 && CHOICE==124 && RATIO==Rational(1,3))
+assert(LOCAL_RUN==5)
+copy:=CHOICE
+copy+=1
+assert(CHOICE==124 && copy==125)
+text:=f"local {LOCAL} {RATIO}"
+assert(text=="local 123 1/3")
+delete(copy);delete(text)
+''')
+
 
 class BigValueProtocolTests(base.unittest.TestCase):
     def test_arbitrarily_long_digits_and_canonical_protocol(self):

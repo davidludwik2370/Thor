@@ -16,6 +16,19 @@ compiler_equal :: proc "contextless"(a,b:$T)->bool {
     else {return a==b}
 }
 
+// The compiler clones case operands before passing them here. Consume those
+// owners after comparison; the switch selector is a borrowed stable snapshot.
+compiler_switch_case :: proc(value,match:$T)->bool where T==Integer || T==Rational {
+    defer compiler_destroy_value(match)
+    return compare(value,match,"==")
+}
+compiler_switch_range :: proc(value,low,high:$T,$inclusive:bool)->bool where T==Integer || T==Rational {
+    defer compiler_destroy_value(low)
+    defer compiler_destroy_value(high)
+    when inclusive {return compare(value,low,">=") && compare(value,high,"<=")}
+    else {return compare(value,low,">=") && compare(value,high,"<")}
+}
+
 // Inputs are borrowed. Each returned number is an independent owner.
 compiler_abs :: proc(value:$T)->T where T==Integer || T==Rational {
     when T==Integer {return unary(value,"-") if value._value.sign==.Negative else clone(value)}

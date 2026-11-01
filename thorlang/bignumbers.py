@@ -593,6 +593,12 @@ class BigNumbers:
         if constant:
             folded=self.constants.render(node,hint)
             if folded is not None:return folded
+        # Local numeric constants lower to read-only header views, not native
+        # Odin constants. Recreate the view at each read so expression helpers
+        # never depend on an uncaptured runtime local header.
+        if node.kind=='Ident' and not self.binding(node) and self.constants.readonly(node):
+            folded=self.constants.render(node,None)
+            if folded is not None:return folded
         declaration=self.constants.declaration(node)
         if declaration is not None:return declaration
         integrated=self.integration.render(node,hint,constant)

@@ -88,6 +88,41 @@ for &value in values {delete(value)}
 delete(a)
 ''')
 
+    def test_runtime_numeric_switch_selectors_ranges_and_anonymous_results(self):
+        self.run_big('''
+a:=Integer(10)
+selected:=switch next(){case 0..<5:Integer(0);case 10,11:a+2;case:panic("unreachable")}
+assert(calls==1 && selected==12)
+r:=Rational(1,3)
+kind:=switch r {case 0..<0.25:1;case 0.25..=0.5:2;case:3}
+assert(kind==2)
+text:=f"picked {switch Integer(3) {case 3:Integer(7);case:Integer(9)}}"
+assert(text=="picked 7");delete(text)
+x,y:=switch a {case 10:Integer(1),Integer(2);case:Integer(3),Integer(4)}
+x,y=switch Integer(99){case 10:Integer(7),Integer(8);case:break}
+assert(x==1 && y==2)
+x=switch Integer(99){case 99:x+1;case:break}
+assert(x==2)
+delete(a);delete(selected);delete(r);delete(x);delete(y)
+''','calls:int\nnext::proc()->Integer{calls+=1;return Integer(10)}\n')
+
+    def test_numeric_switch_snapshots_selector_before_case_effects(self):
+        self.run_big('''
+a:=Integer(7)
+selected:=switch a {case replace(&a):1;case:2}
+assert(a==99 && selected==1)
+delete(a)
+''','replace::proc(value:^Integer)->Integer{value^=Integer(99);return Integer(7)}\n')
+
+    def test_numeric_switch_rejections_use_original_case_locations(self):
+        for selector,cases,message in [
+            ('Integer(3)','case 0..<4:1;case 3..<5:2;case:0','overlapping'),
+            ('Rational(1,3)','case 1..<0:1;case:0','empty or reversed'),
+            ('Integer(3)','case i64(3):1;case:0','Cannot'),
+            ('Integer(3)','case Rational(3):1;case:0','Cannot')]:
+            with self.subTest(cases=cases):
+                self.invoke(self.program('result:=switch '+selector+' {'+cases+'};_=result'),command='check',fail=message)
+
     def test_numeric_builtins_preserve_ownership_and_context(self):
         self.run_big('''
 a:=Integer(-8);b:=Integer(3)

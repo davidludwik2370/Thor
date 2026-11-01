@@ -1826,6 +1826,10 @@ main::proc(){
         hover=self.hover(client,main,text,'staff: set[string]')
         self.assertIn('staff: set[string]',hover['contents']['value'])
         self.assertIn('```thor',hover['contents']['value'])
+        for snippet,spelling in [('enormous: Integer', 'enormous: Integer'),
+                                 ('decimal: Rational', 'decimal: Rational'),
+                                 ('TOUR_BIG_BASE ::', 'Integer')]:
+            self.assertIn(spelling,self.hover(client,main,text,snippet)['contents']['value'])
         for value in client.notifications:
             if value.get('method')=='textDocument/publishDiagnostics':
                 self.assertFalse(any(e.get('code') in {'Syntax','Declaration'} for e in value['params']['diagnostics']),value)

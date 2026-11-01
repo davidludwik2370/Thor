@@ -12,6 +12,28 @@ class BigTLSTests(unittest.TestCase):
     semantic_spans=tls.TLSTests.semantic_spans
     assert_original_identifier_tokens=tls.TLSTests.assert_original_identifier_tokens
 
+    def test_local_switch_constants_and_runtime_cases_keep_logical_types_and_diagnostics(self):
+        text='''package main
+main::proc(){
+ LOCAL::Integer(123)
+ CHOICE::#switch LOCAL{case 0..<100:Integer(0);case:LOCAL+1}
+ ratio:=Rational(1,3)
+ result:=switch ratio {case 0..<0.5:Integer(7);case:Integer(9)}
+ assert(CHOICE==124 && result==7)
+ delete(ratio);delete(result)
+}
+'''
+        client,main=self.open(text)
+        for name,expected in [('LOCAL::','Integer'),('CHOICE::','Integer'),('result:=','result: Integer')]:
+            self.assertIn(expected,json.dumps(self.hover(client,main,text,name)))
+        broken=text.replace('0..<0.5','0..<f64(0.5)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='Cannot')
+        error=next(e for e in errors if 'Cannot' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'f64(0.5)',0))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_builtins_shared_library_and_generic_components_keep_logical_hovers(self):
         text='''package main
 import "thor:basic"

@@ -1,7 +1,8 @@
 // Run: thor run examples/big_numbers --track-allocations=basic
 //
 // Stage 2: language types, exact construction, and direct value ownership.
-// Arithmetic/operators and compile-time big constants follow in stages 3 and 4.
+// See big_operators/big_comptime for operators/constants, or examples/demo for
+// the full commented tour including library and ownership interactions.
 package main
 
 import "core:fmt"

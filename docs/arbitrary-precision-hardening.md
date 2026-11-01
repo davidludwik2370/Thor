@@ -2,7 +2,7 @@
 
 The accepted behavior is in [the language reference](arbitrary-precision.md).
 Stages 1–4 have individual commits; stage 5 completes library/editor integration
-and hardens the combined implementation. Compiler version 0.27.0, TLS
+and hardens the combined implementation. Compiler version 0.27.1, TLS
 `thor-0.20.0+ols-0c9438f`.
 
 ## Changes and interactions covered
@@ -97,3 +97,33 @@ reconstruction. The earlier intermittent native compiler crash is recorded above
 it did not recur in the clean full-suite run. Runnable examples are in
 `examples/big_runtime`, `big_numbers`, `big_operators`, `big_comptime`, and
 `big_integration`.
+
+## Main walkthrough follow-up (0.27.1)
+
+The main [commented tour](../examples/demo/demo.thor) now includes five numeric
+topics alongside the rest of the language. Its [coverage index](../examples/demo/README.md)
+lists construction, ownership, operators/control flow, constants/evaluation, and
+formatting/library examples. The mixed helper package includes an ordinary Odin
+procedure that explicitly clones its numeric return.
+
+Expanding that tour exposed two gaps. Runtime value switches now compare exact
+Integer/Rational selectors and contextual case operands, including ranges. The
+selector is evaluated and snapshotted once before case effects, and anonymous
+case operands are consumed after comparison. Scalar, multiple-result, skipped
+assignment and interpolation paths share this lowering. Duplicate/reversed
+constant cases and typed operand mismatches retain source diagnostics.
+
+Local numeric constants lower to read-only header views. Generated expression
+helpers now reconstruct those views directly rather than referring to an
+uncaptured local header. Tests cover direct constants, both compile-time switch
+forms, local #run, runtime copies, comparisons and interpolation. TLS checks
+logical hovers, original case-error locations and recovery after edits.
+
+The focused language/ownership suite passed 95 tests, the native switch/diagnostic
+subset passed 163, and the editor suite passed 10. The tour also passed its Odin
+allocation-checking test wrapper and ran with Thor debug tracking/ASan. Real
+CodeLLDB's full 19-test suite passed, covering breakpoints on numeric switch arms
+and statements after them alongside the existing stepping cases. Generated
+comparisons/operand snapshots retain diagnostic spans while being hidden from
+breakpoint selection, avoiding duplicate stops on one arm line. Both alternate
+tour modes (`TOUR_MODE=1` and `3`) passed as well.

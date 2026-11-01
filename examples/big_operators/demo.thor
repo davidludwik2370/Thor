@@ -66,7 +66,7 @@ main::proc(){
     // _=Integer(2)+native    // Compile error: matching operand types required.
     // _=Integer(2)**-3      // Use Rational for negative exponents.
     // _=Rational(1,2)&1     // Rational has no bitwise operations.
-    // VALUE::Integer(1)+2   // Compile-time big values arrive in the next stage.
+    // Exact :: constants are demonstrated in examples/big_comptime.
 
     fmt.println("All big-number runtime operator examples passed.")
 }

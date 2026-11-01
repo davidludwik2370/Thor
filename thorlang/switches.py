@@ -24,6 +24,35 @@ class Switches:
     def arms(self, node):
         return [self.s.at(case['result'], node) for case in node.data['cases']]
 
+    def runtime_selector(self,node,code):
+        selector=node.role('selector')
+        kind=self.e.shape(selector).kind if selector else None
+        if self.s.big.enabled and kind in {'big_integer','big_rational'}:
+            problem=self.s.big.constants.validate_cases(node)
+            if problem:code.append(self.e.error(node,problem))
+            name=self.e.ownership.fresh('switch_selector')
+            code.append(f'{name} := {self.s.big.owned(selector)}')
+            code.append(f'defer {self.s.big.module()}.compiler_destroy(&{name})')
+            return name,kind
+        return (self.s.render(selector) if selector else ''),None
+
+    def runtime_matches(self,node,case,selector,kind):
+        if kind is None:return ', '.join(self.s.render(self.s.at(v,node)) for v in case['matches'])
+        big=self.s.big
+        hint=big.type_hint(kind)
+        matches=[]
+        for span in case['matches']:
+            match=self.s.at(span,node)
+            if match.kind=='Binary' and match.data['op'] in {'..','..<','..='}:
+                low,high=(big.owned(match.role(side),hint) for side in ['left','right'])
+                value=f'{big.module()}.compiler_switch_range({selector},{low},{high},{str(match.data["op"]=="..=").lower()})'
+            else:value=f'{big.module()}.compiler_switch_case({selector},{big.owned(match,hint)})'
+            # Diagnostics retain the case operand's span. Debug stepping skips
+            # the synthetic comparison so a case-line breakpoint stops on its
+            # actual result rather than twice on comparison and result.
+            matches.append(big.mapped(match,value,'debug-capture'))
+        return ', '.join(matches)
+
     def values(self, arm):
         return arm.group('args') if arm.kind == 'SwitchResults' else [arm]
 
@@ -192,8 +221,8 @@ class Switches:
             lines = []
             cases = node.data['cases']
             if node.kind == 'SwitchExpr':
-                selector = s.render(node.role('selector')) if node.role('selector') else ''
-                lines.append('switch '+selector+' {')
+                selector,kind=self.runtime_selector(node,lines)
+                lines.append('switch '+('' if kind else selector)+' {')
             else:
                 cases = [c for c in cases if c['matches']] + [c for c in cases if not c['matches']]
                 lines.append('when '+e.validation(node)+' {')
@@ -201,7 +230,7 @@ class Switches:
                 arm = s.at(case['result'], node)
                 value = s.render(arm) if s.resolver.is_panic_call(arm) else self.consume(arm, generic, discarded=discarded)
                 if node.kind == 'SwitchExpr':
-                    matches = ', '.join(s.render(s.at(v, node)) for v in case['matches'])
+                    matches = self.runtime_matches(node,case,selector,kind)
                     lines.append(f'case {matches}: {value}')
                 else:
                     lines.append(('when ' if i == 0 else 'else when ')+e.switch_condition(node, case)+' { '+value+' }')
@@ -294,8 +323,8 @@ class Switches:
                                     for lhs, original in zip(lhs_codes, owner.group('lhs')))
             cases = node.data['cases']
             if node.kind == 'SwitchExpr':
-                selector = s.render(node.role('selector')) if node.role('selector') else ''
-                code.append('switch '+selector+' {')
+                selector,kind=self.runtime_selector(node,code)
+                code.append('switch '+('' if kind else selector)+' {')
             else:
                 cases = [c for c in cases if c['matches']] + [c for c in cases if not c['matches']]
                 code.append('when '+e.validation(node)+' {')
@@ -309,7 +338,7 @@ class Switches:
                     content = self.consume(arm, typed, lhs_codes)
                 else: content = selected(arm)
                 if node.kind == 'SwitchExpr':
-                    matches = ', '.join(s.render(s.at(v, node)) for v in case['matches'])
+                    matches = self.runtime_matches(node,case,selector,kind)
                     code.append(f'case {matches}: {content}')
                 else:
                     code.append(('when ' if i == 0 else 'else when ')+e.switch_condition(node, case)+' { '+content+' }')

@@ -858,9 +858,11 @@ class Expressions:
                 for value in reversed(values[:-1]): query=f'(false ? ({value}) : ({query}))'
                 result=f'type_of({s.prefix}default_value({query}))'
             def body(hint):
-                code=['switch '+(s.render(selector) if selector else '')+' {']
+                code=[]
+                selected,kind=self.switches.runtime_selector(n,code)
+                code.append('switch '+('' if kind else selected)+' {')
                 for case in cases:
-                    matches=', '.join(s.render(at(v)) for v in case['matches'])
+                    matches=self.switches.runtime_matches(n,case,selected,kind)
                     arm=at(case['result'])
                     result=s.render(arm) if s.resolver.is_panic_call(arm) else 'return '+s.render(arm,hint)
                     code.append(f'case {matches}: {result}')

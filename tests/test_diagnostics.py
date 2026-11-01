@@ -41,6 +41,12 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_big_switch_case_type_errors_keep_original_positions(self):
+        for selector,case in [('Integer(3)','i64(3)'),('Integer(3)','Rational(3)'),
+                              ('Rational(1,3)','f64(0.5)')]:
+            source='// original 😀 header\npackage main\nmain::proc(){value:=switch '+selector+' {case '+case+':1;case:0};_=value}\n'
+            self.at(source,case,message='Cannot')
+
     def test_big_literals_properties_and_copy_errors_keep_original_unicode_positions(self):
         for body,needle,message in [
             ('r:=Rational(1,2);r.numerator=1','r.numerator','read-only'),

@@ -1,7 +1,8 @@
 # Integer and Rational: design and implementation stages
 
 This records the accepted design. Stages 1–5 are implemented. This document records behavior and intentional boundaries.
-See the [commented language demo](../examples/big_numbers/demo.thor) and
+See the [complete commented tour](../examples/demo/demo.thor),
+[focused numeric demo](../examples/big_numbers/demo.thor), and
 [explicit runtime API](../runtime/big/README.md).
 
 ## Types, construction, and literals
@@ -285,6 +286,12 @@ As with other array lists, every element is evaluated before testing membership.
 Generic `r.numerator`/`r.denominator` reads dispatch by actual type, preserving
 ordinary fields with the same names. Generic writes/address-taking reject actual
 Rational properties while ordinary mutable record fields remain usable.
+
+Runtime value switches also accept Integer/Rational selectors, including ranges,
+multiple results, and skipped assignments. The selector is snapshotted once before
+case evaluation, and temporary numeric case values are released after comparison.
+Compile-time switches and locally declared numeric constants retain their exact
+contents when used by generated expression helpers.
 
 F-strings render canonical decimal integers and reduced fractions, clean up
 anonymous arithmetic/components, and support deterministic pure formatting.

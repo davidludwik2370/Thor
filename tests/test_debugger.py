@@ -109,6 +109,27 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_big_runtime_switch_and_local_constant_keep_original_breakpoints(self):
+        text='''package main
+main::proc(){
+    LOCAL::#switch{case true:Integer(3);case:Integer(0)}
+    selector:=LOCAL
+    chosen:=switch selector {
+        case 3: selector+4
+        case: Integer(9)
+    }
+    assert(chosen==7)
+    delete(selector);delete(chosen)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6,9])
+        for line in [6,9]:
+            thread,frame=self.frame(client)
+            self.assertEqual((frame['source']['path'],frame['line']),(str(source),line),frame)
+            client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_big_compile_time_results_keep_original_breakpoints(self):
         text='''package main
 VALUE::Integer(123456789012345678901234567890)

@@ -53,7 +53,9 @@ read [examples/demo/demo.thor](examples/demo/demo.thor) and run:
 ```
 
 It uses fresh examples, with a procedure per topic, ownership explanations,
-commented invalid cases, and a mixed Odin/Thor helper package. Its compile-time
+commented invalid cases, a mixed Odin/Thor helper package, and five sections on
+Integer/Rational construction, ownership, operators, compile-time results and
+library/formatting interactions. Its compile-time
 branch selector is `-define:TOUR_MODE=1`, `2` (default), or `3`.
 
 ## Commands

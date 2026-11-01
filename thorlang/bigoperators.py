@@ -78,7 +78,9 @@ class BigOperators:
                 from .semantics import Type
                 expected=Hint(origin.source,origin,typ,Type('generic'))
                 code=self.big.owned(value,expected)
-                lines.append(self.big.mapped(value,f'{name}: {typ} = {code}'))
+                # Operand snapshots are lowering work. Keep diagnostics on the
+                # operand, but stop only at the source operation's call site.
+                lines.append(self.big.mapped(value,f'{name}: {typ} = {code}','debug-capture'))
                 lines.append(f'defer {self.big.module()}.compiler_destroy(&{name})')
                 names.append(name)
             method='compare' if comparison else 'binary' if node.kind=='Binary' else 'unary'
@@ -86,7 +88,7 @@ class BigOperators:
             self.big.busy.add(node)
             try:native=self.s.render(node,hint,constant)
             finally:self.big.busy.remove(node)
-            lines.append('} else { return '+native+' }')
+            lines.append(self.big.mapped(node,'} else { return '+native+' }','debug-capture'))
             return '\n'.join(lines)
         name,args=self.e.closed(node,body,result='bool' if comparison else None,flavor='big_operator')
         if not comparison:args=[*args,self.chosen(node,hint)]

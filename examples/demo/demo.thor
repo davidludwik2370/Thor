@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt" / println
+import "core:mem"
 import math "core:math" /
     sqrt,
     PI
@@ -12,6 +13,8 @@ import "guide" / Parcel, identity, label
 import "thor:format"
 import "thor:sets"
 import "thor:pure"
+import "thor:big"
+import "thor:basic"
 
 
 /*
@@ -56,8 +59,10 @@ import "thor:pure"
     assets/ is deliberately read relative to this original source directory.
 
     Coverage includes the T01-T23 language additions and their hardening, plus
-    interval membership and numeric power. Compiler-internal tasks such as source
-    maps and serialization are illustrated through their observable behavior.
+    interval membership, numeric power, and Integer/Rational construction,
+    ownership, operators, compile-time evaluation, and library interactions.
+    Compiler-internal tasks such as source maps and serialization are illustrated
+    through their observable behavior.
 */
 
 
@@ -1185,6 +1190,505 @@ generic_evaluation :: proc() {
 }
 
 
+// These are genuine constants: their exact contents live in read-only data.
+// Reading them needs no allocation; copying one into a runtime owner does.
+TOUR_BIG_BASE :: Integer(1234567890123456789012345678901234567890)
+TOUR_BIG_NEXT :: TOUR_BIG_BASE * 2 + 1
+TOUR_BIG_FRACTION :: Rational(0.1) + 0.2
+
+
+big_numbers_and_construction :: proc() {
+    println("\n# Integer/Rational construction and exact source digits")
+
+    {
+        // No import is needed for the two type names or their constructors.
+        // A requested big-number type preserves every source digit. Native
+        // inference stays native: an overflowing int/u128 never promotes itself.
+        enormous: Integer = 123456789012345678901234567890123456789012345678901234567890
+        decimal: Rational = 0.1000000000000000000000000000000000000001
+        defer delete(enormous)
+        defer delete(decimal)
+
+        assert(enormous == Integer(123456789012345678901234567890123456789012345678901234567890))
+        assert(decimal == Rational(1000000000000000000000000000000000000001, 10000000000000000000000000000000000000000))
+        basic.print("  Unquoted Integer:", enormous)
+        basic.print("  Exact decimal:", decimal)
+
+        native := 12
+        assert(type_of(native) == int)
+        // Not valid: overflow := max(u128) * 2
+        // Not valid: rounded := Integer(f64(1.5))
+    }
+
+    {
+        // Uninitialized numbers represent zero without allocating storage.
+        // Read-only constants can also be borrowed with an allocator that
+        // forbids allocation. Creating a nonzero runtime copy would allocate.
+        previous := context.allocator
+        context.allocator = mem.nil_allocator()
+        defer context.allocator = previous
+
+        zero_integer: Integer
+        zero_fraction: Rational
+        assert(big.is_zero(zero_integer) && big.is_zero(zero_fraction))
+        assert(big.equal(TOUR_BIG_BASE, TOUR_BIG_BASE))
+        delete(zero_integer)
+        delete(zero_fraction)
+    }
+
+    {
+        // Native integers convert explicitly and aliases denote the same type.
+        // Fractions normalize their signs and reduce by the common divisor.
+        Count :: Integer
+        source: i64 = -42
+        count := Count(source)
+        fraction := Rational(numerator=6, denominator=-8)
+        whole := Rational(5)
+        zero: Rational
+        defer delete(count)
+        defer delete(fraction)
+        defer delete(whole)
+        defer delete(zero)
+
+        assert(count == -42 && fraction == Rational(-3, 4))
+        assert(whole == Rational(5, 1))
+        assert(zero.numerator == 0 && zero.denominator == 1)
+
+        // Text construction returns value/status. Repeating decimals use
+        // parentheses IN STRINGS; no new numeric suffix is involved.
+        parsed, parsed_ok := Integer("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+        repeating, repeating_ok := Rational("0.1(6)")
+        from_parts, parts_ok := Rational("-22", "-13")
+        bad, bad_ok := Integer("not a number")
+        defer delete(parsed)
+        defer delete(repeating)
+        defer delete(from_parts)
+        defer delete(bad)
+
+        assert(parsed_ok && parsed == Integer(max(u128)))
+        assert(repeating_ok && repeating == Rational(1, 6))
+        assert(parts_ok && from_parts == Rational(22, 13))
+        assert(!bad_ok && bad == 0)
+        // Allocation failure is an error, not malformed text/ok=false.
+        // A zero denominator panics (or is rejected when statically known).
+        // Not valid: impossible := Rational(1, 0)
+    }
+
+    {
+        // Properties need no helper import and return independent owners.
+        // Changing the original fraction cannot change saved components.
+        fraction := Rational(22, 13)
+        pointer := &fraction
+        numerator := fraction.numerator
+        denominator := pointer.denominator
+        defer delete(fraction)
+        defer delete(numerator)
+        defer delete(denominator)
+
+        big.set_fraction(&fraction, numerator=2, denominator=4)
+        assert(numerator == 22 && denominator == 13)
+        assert(fraction == Rational(1, 2))
+        // Not valid: fraction.numerator = 9
+        // Not valid: address := &fraction.denominator
+    }
+}
+
+
+tour_big_local :: proc(value: Integer) -> Integer {
+    // Parameters borrow immutable values. Our local is an independent owner.
+    // A direct numeric return is preserved before this defer deletes the local.
+    local := value
+    defer delete(local)
+    local += 1
+    return local
+}
+
+tour_big_total :: proc(first: Integer, rest: ..Integer) -> Integer {
+    total := first
+    defer delete(total)
+    for value in rest { total += value }
+    return total
+}
+
+Tour_Big_Callback :: struct {
+    apply: proc(self: ^Tour_Big_Callback, value: Integer) -> Integer,
+}
+
+tour_big_increment :: proc(self: ^Tour_Big_Callback, value: Integer) -> Integer {
+    return value + 1
+}
+
+
+big_ownership_and_aggregates :: proc() {
+    println("\n# big-number owners, simultaneous assignment, and shallow aggregates")
+
+    {
+        a := Integer(10)
+        b := a // Direct numeric assignment clones, including immutable bindings.
+        saved :> b
+        defer delete(a)
+        defer delete(b)
+        defer delete(saved)
+
+        a = Integer(20) // Replacing an owner frees its old storage.
+        assert(b == 10 && saved == 10)
+        a, b = b, a + 1 // Preserve both old RHS values before replacing either.
+        assert(a == 10 && b == 21 && saved == 10)
+        a = a
+        assert(a == 10)
+
+        returned := tour_big_local(a)
+        generic := guide.identity(a)
+        native := guide.clone_big(a)
+        explicit := big.clone(a)
+        defer delete(returned)
+        defer delete(generic)
+        defer delete(native)
+        defer delete(explicit)
+
+        a += 2
+        assert(returned == 11 && generic == 10 && native == 10 && explicit == 10)
+        // guide/clone_big.odin is native Odin: its return explicitly clones.
+        // Native Odin header assignments themselves remain shallow.
+    }
+
+    {
+        Holder :: struct { value: Integer }
+        source := Integer(42)
+        record := Holder{value=source} // Individual numeric fields clone.
+        member := record.value // Reading a numeric member also clones.
+        alias := record // A WHOLE record copy remains shallow.
+        independent := pure.clone(record) // Explicit independent deep tree.
+        defer delete(source)
+        defer delete(record.value)
+        defer delete(member)
+        defer pure.destroy(independent)
+
+        assert(alias.value == 42)
+        independent.value += 1
+        record.value = Integer(9)
+        assert(source == 42 && member == 42 && independent.value == 43)
+
+        // Replacing record.value invalidated alias.value. Do not read/delete
+        // alias again. A shallow aggregate copy is not another numeric owner.
+        _ = alias
+        // Arrays, slices and native copy/append(..slice) have the same boundary.
+    }
+
+    {
+        values := [Integer(1), Integer(2)]
+        defer for &value in values { delete(value) }
+        last := values[-1] // Negative-index reads still make independent owners.
+        defer delete(last)
+        values[-1] = values[0]
+        assert(last == 2 && values[-1] == 1)
+
+        growing: [dynamic]Integer
+        defer delete(growing) // Only the outer container, after its elements.
+        defer for &value in growing { delete(value) }
+        append(&growing, values[0], Integer(8))
+        growing[0] += 3
+        assert(values[0] == 1 && growing[0] == 4)
+        // By-value iteration borrows: do not delete(value) in `for value in ...`.
+
+        entries: map[string]Integer
+        defer delete(entries)
+        entries["answer"] = Integer(7)
+        entries["answer"] = entries["answer"] + 1
+        copied := entries["answer"]
+        defer delete(copied)
+        delete(entries["answer"])
+        assert(copied == 8)
+        // Containers do not recursively destroy their numeric elements.
+        // Big-number map keys / set[Integer] are currently unsupported.
+    }
+}
+
+
+big_arithmetic_and_control_flow :: proc() {
+    println("\n# exact operators, literal coercion, and lazy big-number results")
+
+    {
+        a: Integer = 1
+        defer delete(a)
+        a += 2 // Untyped integer literals adopt the big operand's type.
+        a *= 4
+        a -= 1
+        a /= 11
+        assert(a == 1)
+
+        native: i64 = 2
+        a += Integer(native)
+        assert(a == 3)
+        // Not valid: a += native // Typed native operands require conversion.
+        // Not valid: a + Rational(1) // The two big types also remain distinct.
+
+        // Typed variadic and method parameters supply the same literal context.
+        // Anonymous argument owners are released after the call returns.
+        total := tour_big_total(Integer(1), 2, 3)
+        callback := Tour_Big_Callback{tour_big_increment}
+        incremented := callback->apply(2)
+        defer delete(total)
+        defer delete(incremented)
+        assert(total == 6 && incremented == 3)
+
+        product: Integer = 123456789012345678901234567890 * 123456789012345678901234567890
+        defer delete(product)
+        assert(product > TOUR_BIG_BASE)
+        assert(Integer(-7) / 3 == -2)
+        assert(Integer(-7) % 3 == -1) // Remainder has the dividend's sign.
+        assert(Integer(-7) %% 3 == 2) // Odin modulo has the divisor's sign.
+        assert(Integer(7) %% -3 == -2)
+
+        // Infinite two's-complement bitwise operations; >> extends the sign.
+        assert((Integer(5) & 3) == 1 && (Integer(5) | 3) == 7)
+        assert((Integer(5) ~ 3) == 6 && (Integer(5) &~ 3) == 4)
+        assert(~Integer(5) == -6 && (Integer(-7) >> 1) == -4)
+        assert((Integer(1) << 100) == Integer(2) ** 100)
+
+        fraction: Rational = 1/3 + 0.25 // Exact 7/12, including the division.
+        defer delete(fraction)
+        assert(fraction == Rational(7, 12))
+        assert(Rational(2, 3) ** -3 == Rational(27, 8))
+        assert(Rational(7, 3) % Rational(1, 2) == Rational(1, 3))
+        // Not valid: Integer(2) ** -3 // Use Rational for reciprocals.
+        // Not valid: Rational(2) ** 0.5 // Exponents must be whole.
+        // Not valid: Rational(1, 2) & 1 // Bitwise operators need Integer.
+    }
+
+    {
+        // Only the selected path executes. Anonymous arithmetic/constructors
+        // and unselected branches do not leak hidden number allocations.
+        a := Integer(10)
+        b := Integer(20)
+        choice := true ? a + 1 : Integer(must_not_run())
+        defer delete(a)
+        defer delete(b)
+        defer delete(choice)
+        assert(choice == 11)
+
+        selected := switch a {
+            case 0..<5: Integer(0)
+            case 10: a + b
+            case: panic("unreachable")
+        }
+        defer delete(selected)
+        assert(selected == 30)
+
+        a, b = switch {
+            case a < b: b, a + 1
+            case: a, b
+        }
+        assert(a == 20 && b == 11)
+        a = switch { case false: Integer(99); case: break }
+        assert(a == 20) // A skipped assignment preserves the existing owner.
+
+        parsed := Integer("bad") or_else Integer(7)
+        defer delete(parsed)
+        assert(parsed == 7)
+
+        values := [a, b]
+        defer for &value in values { delete(value) }
+        assert(a in [1, 20, 100] && Integer(11) in values)
+        assert(7 not_in values[:] && 21 in [a + 1, b + 1])
+    }
+}
+
+
+tour_big_power :: fn(base: Integer, count: int) -> Integer {
+    result := Integer(1)
+    defer delete(result)
+    for _ in 0..<count { result *= base }
+    return result
+}
+
+Tour_Big_Report :: struct {
+    value: Integer,
+    ratio: Rational,
+    rows: []Integer,
+}
+
+tour_big_report :: fn() -> Tour_Big_Report {
+    rows := make([]Integer, 2)
+    rows[0] = Integer(7)
+    rows[1] = Integer(8)
+    return {Integer(123456789012345678901234567890), Rational(1, 3), rows}
+}
+
+TOUR_BIG_POWER :: #run tour_big_power(Integer(22), 20)
+
+
+big_constants_and_evaluation :: proc() {
+    println("\n# exact constants, fn/#run, and independent returned trees")
+
+    {
+        assert(TOUR_BIG_NEXT == TOUR_BIG_BASE * 2 + 1)
+        assert(TOUR_BIG_FRACTION == Rational(3, 10))
+        assert(TOUR_BIG_POWER == Integer(705429498686404044207947776))
+
+        // Both #switch forms and #if can consume exact big-number constants.
+        CHOICE :: #switch TOUR_BIG_BASE {
+            case 0..<100: Integer(0)
+            case: TOUR_BIG_NEXT
+        }
+        BOOLEAN_CHOICE :: #switch {
+            case TOUR_BIG_BASE > 100: Rational(1, 3)
+            case: Rational(0)
+        }
+        #if TOUR_BIG_NEXT > TOUR_BIG_BASE {
+            assert(CHOICE == TOUR_BIG_NEXT)
+        } #else {
+            missing_name_is_in_an_inactive_branch()
+        }
+        assert(BOOLEAN_CHOICE == Rational(1, 3))
+
+        LOCAL_POWER :: #run tour_big_power(Integer(3), 4)
+        assert(LOCAL_POWER == 81)
+
+        copied := TOUR_BIG_BASE
+        defer delete(copied)
+        copied += 1
+        assert(copied != TOUR_BIG_BASE)
+        // Not valid: TOUR_BIG_BASE += 1
+        // Not valid: delete(TOUR_BIG_BASE)
+        // Not valid: address := &TOUR_BIG_BASE
+    }
+
+    {
+        // Known fn calls fold automatically. Explicit #run forces eligible
+        // calls; both reconstruct an independent runtime owner at each use.
+        automatic := tour_big_power(Integer(22), 20)
+        forced := #run tour_big_power(Integer(22), 20)
+        defer delete(automatic)
+        defer delete(forced)
+        automatic += 1
+        assert(forced == TOUR_BIG_POWER && automatic != forced)
+
+        runtime_count := 3
+        runtime := tour_big_power(forced, runtime_count)
+        defer delete(runtime)
+        assert(runtime == forced ** 3)
+        // Cached contents never share live number storage between owners.
+        // Native generic VALUE parameters ($N: Integer) are unsupported;
+        // use a normal numeric fn parameter as above. Type generics work.
+    }
+
+    {
+        // Numbers nested in returned records/slices survive scratch cleanup.
+        // Aggregate #run results need :=; pure.destroy releases the whole tree.
+        first := #run tour_big_report()
+        second := #run tour_big_report()
+        defer pure.destroy(first)
+        defer pure.destroy(second)
+        first.value += 1
+        first.rows[0] += 10
+        assert(first.value != second.value)
+        assert(second.rows[0] == 7 && second.rows[1] == 8)
+        assert(second.ratio == Rational(1, 3))
+        // Not valid: REPORT :: #run tour_big_report()
+        // A whole runtime assignment `alias := second` would still be shallow.
+    }
+}
+
+
+tour_big_component :: proc(value: $T) -> Integer {
+    // Rational and ^Rational dispatch to the computed read-only property.
+    // An ordinary record with a real numerator field keeps that field instead.
+    return value.numerator
+}
+
+tour_big_description :: fn(value: int) -> string {
+    return f"exact {Rational(value, 13)}"
+}
+
+
+big_formatting_and_libraries :: proc() {
+    println("\n# numerical builtins, shared basic, formatting, and generic properties")
+
+    {
+        values := [Integer(8), Integer(-2), Integer(3)]
+        defer for &value in values { delete(value) }
+        low := min(**values) // Fixed-array expansion always has a value.
+        high, found := max(..values[:]) // Slice reduction can be empty.
+        magnitude := abs(values[1])
+        limited := clamp(values[0], -2, 2)
+        defer delete(low)
+        defer delete(high)
+        defer delete(magnitude)
+        defer delete(limited)
+        assert(found && low == -2 && high == 8 && magnitude == 2 && limited == 2)
+
+        empty: []Integer
+        missing, present := min(..empty)
+        defer delete(missing)
+        assert(!present && missing == 0)
+        // Not valid: min(Integer) // There is no finite type minimum.
+
+        total := basic.sum(values[:])
+        sorted := basic.sorted(values[:])
+        defer delete(total)
+        defer delete(sorted)
+        assert(total == 9 && basic.ordered(..sorted))
+        assert(sorted[0] == -2 && sorted[-1] == 8)
+        // sorted owns its outer slice, but its numeric elements are shallow
+        // aliases of values. Delete the elements through values exactly once.
+        native := [1, 2, 3]
+        assert(basic.sum(native[:]) == 6 && basic.asc(1, 2, 3))
+    }
+
+    {
+        fraction := Rational(22, 13)
+        component := tour_big_component(&fraction)
+        Record :: struct { numerator: Integer }
+        record := Record{Integer(7)}
+        ordinary := tour_big_component(record)
+        defer delete(fraction)
+        defer delete(component)
+        defer delete(record.numerator)
+        defer delete(ordinary)
+        assert(component == 22 && ordinary == 7)
+
+        text := f"{Integer(12345678901234567890):,} {fraction:>8} {Integer(2) + 3}"
+        nested := f"outer {f"inner {Integer(2) ** 10}"}"
+        compiled := #run tour_big_description(22)
+        defer delete(text)
+        defer delete(nested)
+        defer delete(compiled)
+        assert(text == "12,345,678,901,234,567,890    22/13 5")
+        assert(nested == "outer inner 1024" && compiled == "exact 22/13")
+        basic.print("  Formatted:", text)
+        // Not valid: f"{fraction:,}" // Grouping needs Integer, not Rational.
+
+        Row :: struct { name: string, amount: Integer, ratio: Rational }
+        rows := [Row{"sample", Integer(3), fraction}]
+        defer delete(rows[0].amount)
+        defer delete(rows[0].ratio)
+        table := basic.table(rows[:])
+        defer delete(table)
+        basic.print(table, end="") // Numeric columns are right aligned.
+
+        explicit := big.to_string(fraction)
+        defer delete(explicit)
+        assert(explicit == "22/13")
+    }
+
+    {
+        // Native fmt uses an explicit shared registry. Basic/fstrings above
+        // require no registration. Detach before releasing the caller's map.
+        registry := new(map[typeid]fmt.User_Formatter)
+        defer free(registry)
+        format.add_big_formatters(registry)
+        fmt.set_user_formatters(registry)
+        defer format.destroy_formatter_registry(registry)
+
+        text := fmt.aprintf("%d %v", Integer(12345678901234567890), Rational(22, 13))
+        defer delete(text)
+        assert(text == "12345678901234567890 22/13")
+        println("  Native fmt:", text)
+    }
+}
+
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
@@ -1202,6 +1706,11 @@ main :: proc() {
     pure_functions_and_constants()
     owned_pure_results()
     generic_evaluation()
+    big_numbers_and_construction()
+    big_ownership_and_aggregates()
+    big_arithmetic_and_control_flow()
+    big_constants_and_evaluation()
+    big_formatting_and_libraries()
 
     println("\nAll Thor walkthrough examples passed.")
 }
