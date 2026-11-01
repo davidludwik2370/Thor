@@ -449,7 +449,12 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 		local_scope(data, n)
 		add_label(n.label, data)
 		resolve_node(n.init, data)
-		resolve_nodes(n.vals, data)
+		for binding in n.vals {
+			if typed,ok:=binding.derived.(^ast.Field_Value);ok {
+				resolve_node(typed.field,data)
+				resolve_node(typed.value,data)
+			}else{resolve_node(binding,data)}
+		}
 		resolve_node(n.expr, data)
 		resolve_node(n.body, data)
 	case ^ast.Switch_Stmt:

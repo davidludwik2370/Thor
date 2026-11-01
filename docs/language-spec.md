@@ -273,6 +273,35 @@ Range membership (runtime and compile time):
   A condition-only for needs parentheses to distinguish membership from iteration.
 - This adds interval membership syntax, not a first-class range value/type.
 
+Typed loop bindings:
+    for i: f64 in 1..=ROUNDS { ... }
+    for value, (index: i8) in values { ... }
+    for &value, (index: u8) in values { ... }
+
+- A value annotation is supported only on numeric interval loops. It selects
+  the integer/floating-point iteration type and provides context to untyped
+  endpoints. Already-typed endpoints must match, as in ordinary assignment;
+  explicit conversion remains necessary otherwise. Aliases, distinct numeric
+  types, generic types, and both inclusive and half-open ranges are supported.
+- A parenthesized index annotation is supported only for arrays, slices,
+  dynamic arrays, fixed-capacity dynamic arrays, and native iterable pointers
+  to them. Require a native integer type; leave the element type inferred.
+  Reject the ambiguous `for value, index: T` spelling. Enumerated array indices,
+  string/map/set iteration, and iterator procedures retain their native forms.
+- Fixed arrays reject an annotation if any possible index cannot fit, including
+  through generic specialization. Empty arrays always fit a valid integer type.
+  Dynamic-length inputs check each visited index and panic before narrowing if
+  it does not fit. Checks remain active with -disable-assert and -no-bounds-check.
+  Early exit does not require unvisited dynamic-length indices to fit.
+- Keep a native int counter internally for typed array/slice indices; never
+  narrow the counter itself. Typed bindings remain readonly/non-addressable
+  under Thor's storage rules, and reference element bindings remain mutable.
+  Preserve body shadowing, labels, break/continue/return, defer, do bodies,
+  native for initializers, and input/bound evaluation order and frequency.
+- Add no allocation or implicit collection/element conversion. Preserve normal
+  fn/#run behavior, original diagnostic spans, TLS hover/rename/tokens, and
+  debugger breakpoints/stepping/visible user variable names and types.
+
 Numeric power (post-v1 extension):
     2 ** 3 ** 2 == 512
     -2 ** 2 == -4

@@ -226,6 +226,15 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["body"] = span(n.body); info.roles["post"] = span(n.post)
     case ^ast.Range_Stmt:
         info.kind = "Range"; info.lists["names"] = spans(n.vals)
+        info.lists["bindings"] = spans(n.vals)
+        for binding,i in n.vals {
+            if typed,ok:=binding.derived.(^ast.Field_Value);ok {
+                info.lists["names"][i]=span(typed.field)
+                if i==0 {info.roles["value_type"]=span(typed.value)}
+                if i==1 {info.roles["index_type"]=span(typed.value)}
+            }
+        }
+        info.roles["init"] = span(n.init)
         if n.label!=nil{info.start=n.label.pos.offset}
         info.roles["expr"] = span(n.expr); info.roles["body"] = span(n.body)
     case ^ast.Switch_Stmt: info.kind = "Switch"

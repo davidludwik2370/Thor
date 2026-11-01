@@ -41,6 +41,33 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_typed_loop_contracts_and_bound_errors_point_to_original_annotations(self):
+        for body,needle,message in [
+            ('values:[129]int;for _,(index:i8) in values{_=index}','i8','indices do not fit'),
+            ('values:=[1,2];for _,(index:f64) in values{_=index}','f64','indices require an integer type'),
+            ('for value,(index:i8) in "text"{_=value;_=index}','i8','only for arrays and slices'),
+            ('limit:int=3;for i:f64 in 1..=limit{_=i}','limit{','Cannot assign'),
+            ('for i:string in 1..=3{_=i}','string','integer or floating-point'),
+            ('for i:Missing in 1..=3{_=i}','Missing','Undeclared'),
+            ('values:=[1,2];for _,(index:Missing) in values{_=index}','Missing','Undeclared'),
+        ]:
+            with self.subTest(body=body):
+                source='package main\nmain::proc(){/* 😀 */ '+body+'}\n'
+                if needle=='limit{':
+                    # The final reference, not the declaration of limit.
+                    entry,_,errors,_=self.invoke(source)
+                    error=next(e for e in errors if message in e['msgs'][0])
+                    self.assertEqual(error['pos']['offset'],source.encode().index(b'limit{'))
+                else:errors=self.at(source,needle,message=message)
+                self.assertEqual(len(errors),1,errors)
+                self.assertNotIn('Thor expression',json.dumps(errors))
+                self.assertNotIn('runtime/sequence',json.dumps(errors))
+
+    def test_typed_loop_following_errors_and_readonly_index_keep_unicode_ranges(self):
+        source='package main\nmain::proc(){/* 😀 */ values:=[1,2];for value,(index:i8) in values{_=value;index+=1};_=missing}\n'
+        errors=self.at(source,'index+=',message='immutable storage')
+        self.assertTrue(any(e['pos']['offset']==source.encode().index(b'missing') for e in errors))
+
     def test_big_switch_case_type_errors_keep_original_positions(self):
         for selector,case in [('Integer(3)','i64(3)'),('Integer(3)','Rational(3)'),
                               ('Rational(1,3)','f64(0.5)')]:

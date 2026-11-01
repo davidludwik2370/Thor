@@ -1,6 +1,30 @@
 package thor_sequence
 
 import "base:intrinsics"
+import "base:runtime"
+
+validate_loop_index :: proc "contextless"($A:typeid,$I:typeid) {
+    #assert(intrinsics.type_is_integer(I), "Typed loop indices require an integer type.")
+    when intrinsics.type_is_pointer(A) {validate_loop_index(intrinsics.type_elem_type(A),I)}
+    else {
+        #assert((intrinsics.type_is_array(A) && !intrinsics.type_is_enumerated_array(A)) || intrinsics.type_is_slice(A) ||
+            intrinsics.type_is_dynamic_array(A) || intrinsics.type_is_fixed_capacity_dynamic_array(A),
+            "Typed index bindings are supported only for arrays and slices.")
+        when intrinsics.type_is_integer(I) && intrinsics.type_is_array(A) && !intrinsics.type_is_enumerated_array(A) {
+            when len(A)>0 {
+                #assert(u128(len(A)-1)<=u128(max(I)), "The array's indices do not fit in the declared loop index type.")
+            }
+        }
+    }
+}
+checked_loop_index :: proc "contextless"(index:int,$I:typeid,location:=#caller_location)->I {
+    when intrinsics.type_is_integer(I) {
+        if index<0 || u128(index)>u128(max(I)) {
+            runtime.panic_contextless("Typed loop index is out of range for its declared type.",location)
+        }
+        return I(index)
+    }else{return {}}
+}
 
 // Widen signed arithmetic before adding the length. Unsigned values retain
 // their original type and never take a negative path or undergo narrowing.

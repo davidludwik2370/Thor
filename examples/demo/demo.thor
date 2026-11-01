@@ -904,6 +904,62 @@ power_and_native_expansion :: proc() {
 }
 
 
+typed_loops :: proc() {
+    println("\n# typed numeric ranges and checked array/slice indices")
+
+    {
+        // The annotation gives untyped bounds an f64 context. The loop value
+        // remains immutable, and the range advances by one in that type.
+        // This also supplies the matching exponent type required by power.
+        ROUNDS :: 3
+        HOUSE_ODDS :: f64(0.5)
+        last := 0.0
+        for round: f64 in 1..=ROUNDS {
+            last = HOUSE_ODDS ** round
+        }
+        assert(last == 0.125)
+
+        // An already typed bound still needs an explicit conversion.
+        count: int = 3
+        for round: f64 in 1..<f64(count) {
+            assert(round >= 1 && round < 3)
+        }
+        // Not valid: for round: f64 in 1..=count {}
+    }
+
+    {
+        values := [10, 20, 30]
+        total := 0
+
+        // Parentheses make the annotation belong only to index. The element
+        // type remains int; both value bindings are immutable in the body.
+        for value, (index: i8) in values {
+            total += value + int(index)
+        }
+        assert(total == 63)
+
+        // A reference element stays mutable; its separate index is readonly.
+        for &value, (index: u8) in values {
+            value += int(index)
+        }
+        assert(values == [10, 21, 32])
+
+        // Dynamic-length views receive the same checked conversion. Nothing
+        // allocates merely to change the index type, and the input is evaluated
+        // according to ordinary Odin iteration semantics.
+        view := values[:]
+        for value, (index: u16) in view do assert(value == values[index])
+
+        // A fixed array whose last index exceeds max(i8) fails at compile time.
+        // A slice/dynamic array panics if iteration reaches such an index,
+        // including when ordinary assertions have been disabled.
+        // Not valid: too_many: [129]int; for _, (index: i8) in too_many {}
+        // Not valid: for value, index: i8 in values {} // group is ambiguous
+        // Not valid: for value: f64 in values {}      // no element conversion
+    }
+}
+
+
 expression_interactions :: proc() {
     println("\n# lazy expressions, loops, and callbacks")
 
@@ -1744,6 +1800,7 @@ main :: proc() {
     sets_and_ownership()
     negative_indices()
     power_and_native_expansion()
+    typed_loops()
     expression_interactions()
     pure_functions_and_constants()
     owned_pure_results()

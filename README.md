@@ -666,6 +666,29 @@ Both operands must have the same integer or floating-point type. Untyped numeric
 constants follow native coercions, so `2.0 ** -3 == 0.125` and `f32_value ** 3`
 work; typed `int_value ** f64_value` requires an explicit conversion.
 
+Numeric loops can specify their value type, and array/slice loops can specify
+only the index type using a parenthesized binding:
+
+```odin
+ROUNDS :: 10
+for i: f64 in 1..=ROUNDS { probability := 0.5 ** i; _ = probability }
+for value, (i: i8) in values { _ = value; _ = i }
+for &value, (i: u8) in values { value += int(i) }
+```
+
+Range annotations supply context for untyped bounds; already-typed bounds must
+match or be explicitly converted. Range values and indices remain immutable;
+`&value` keeps its existing reference behavior. Element types are inferred, and
+the ambiguous `for value, i: i8 in values` spelling is rejected. Index types must
+be integers. Fixed arrays must fit their complete index range at compile time;
+slices and dynamic arrays panic if a visited index cannot be represented, even
+with `-disable-assert`. The internal counter retains Odin's normal type, so a
+narrow index cannot wrap. Annotations allocate no memory and preserve native
+range-bound evaluation, labels, and loop control flow. See the
+[commented examples](examples/demo/demo.thor).
+Floating-point ranges keep Odin's unit stepping and precision limits, including
+the inability to advance by one at sufficiently large magnitudes.
+
 Floating-point powers use `core:math.pow`, including fractional exponents.
 Integer powers require a nonnegative exponent (a compile error when known, a
 panic otherwise). `0 ** 0` is `1`; runtime integer overflow follows ordinary

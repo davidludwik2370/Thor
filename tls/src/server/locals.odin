@@ -828,12 +828,37 @@ range_binding_flags :: proc(value: ^ast.Expr) -> bit_set[LocalFlag] {
 
 get_locals_range_vals :: proc(
 	file: ast.File,
-	vals: []^ast.Expr,
+	bindings: []^ast.Expr,
 	expr: ^ast.Expr,
 	body: ^ast.Stmt,
 	ast_context: ^AstContext,
 	document_position: ^DocumentPositionContext,
 ) {
+	// Typed bindings retain their annotation in a Field_Value AST node. Reuse
+	// native element/reference inference, then override only annotated bindings.
+	vals:=bindings
+	original_vals:=bindings
+	typed:=false
+	for val in vals {if _,ok:=val.derived.(^ast.Field_Value);ok{typed=true}}
+	if typed {
+		vals=make([]^ast.Expr,len(original_vals),context.temp_allocator)
+		for val,i in original_vals {
+			if binding,ok:=val.derived.(^ast.Field_Value);ok{vals[i]=binding.field}else{vals[i]=val}
+		}
+	}
+	defer {
+		if typed {
+			for val in original_vals {
+				if binding,ok:=val.derived.(^ast.Field_Value);ok {
+					if ident,ok:=unwrap_ident(binding.field);ok {
+						store_local(ast_context,ident,binding.value,ident.pos.offset,ident.name,
+							ast_context.non_mutable_only,false,range_binding_flags(binding.field),
+							get_package_from_node(binding.value^),false,type_expr=binding.value)
+					}
+				}
+			}
+		}
+	}
 	results := make([dynamic]^ast.Expr, context.temp_allocator)
 
 	if expr == nil {
@@ -841,7 +866,7 @@ get_locals_range_vals :: proc(
 	}
 
 	if binary, ok := expr.derived.(^ast.Binary_Expr); ok {
-		if binary.op.kind == .Range_Half || binary.op.kind == .Range_Full {
+        if binary.op.kind == .Range_Half || binary.op.kind == .Range_Full || binary.op.kind == .Ellipsis {
 			if len(vals) >= 1 {
 				if ident, ok := unwrap_ident(vals[0]); ok {
 					type_expr: ^ast.Expr = make_int_ast(ast_context, ident.pos, ident.end)
@@ -864,6 +889,12 @@ get_locals_range_vals :: proc(
 					)
 				}
 			}
+            if len(vals)>=2 {
+                if ident,ok:=unwrap_ident(vals[1]);ok {
+                    store_local(ast_context,ident,make_int_ast(ast_context,ident.pos,ident.end),ident.pos.offset,
+                        ident.name,ast_context.non_mutable_only,false,range_binding_flags(vals[1]),"",false)
+                }
+            }
 		}
 	}
 

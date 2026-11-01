@@ -495,6 +495,11 @@ visit_label :: proc(label: ^ast.Expr, builder: ^SemanticTokenBuilder) {
 
 visit_range_binding :: proc(value: ^ast.Expr, builder: ^SemanticTokenBuilder) {
 	if value == nil { return }
+    if typed,ok:=value.derived.(^ast.Field_Value);ok {
+        visit_node(typed.value,builder)
+        visit_range_binding(typed.field,builder)
+        return
+    }
 	if ident, ok := unwrap_ident(value); ok {
 		modifiers: SemanticTokenModifiers
 		if .ReadOnlyBinding in range_binding_flags(value) { modifiers += {.ReadOnly} }

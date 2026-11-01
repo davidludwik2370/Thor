@@ -2414,3 +2414,60 @@ unrelated undeclared name, and a genuine return-type error. Both affected TLS
 tests pass, including the original operation range and unsaved `f64(i)` recovery.
 A copied version of the user's full file now emits one readable power error;
 adding the explicit cast checks successfully. The original file was untouched.
+
+## Typed loop bindings (Thor 0.29.0, TLS 0.22.0, extension 0.17.0)
+
+Add `for number: f64 in low..=high` and
+`for value, (index: i8) in values`, including reference elements. Value
+annotations are restricted to native numeric intervals; grouped index annotations
+are restricted to arrays/slices and their native dynamic/pointer forms. Existing
+Odin loop spellings and inference retain their behavior. A range annotation gives
+untyped bounds context without silently converting already-typed values.
+
+The shared parser stores an annotated binding as a Field_Value containing the
+original name/type nodes. Frontend output exports normalized binding names,
+annotation roles, original binding spans, and native initializer roles. TLS
+retains those ASTs for type hovers, alias definitions and readonly semantic
+tokens. Position/reference traversal treats them as declarations, avoiding the
+named-argument interpretation that initially prevented rename at a header.
+
+`thorlang/typedloops.py` lowers annotations while retaining the native loop.
+Range-bound helpers take an explicit type parameter before their typed argument,
+so Odin supplies ordinary literal coercions and rejects typed mismatches. Helper
+arguments stay at the original endpoints: this intentionally preserves native
+evaluation order/frequency (an upper bound may be evaluated on each iteration).
+Floating-point iteration retains native unit stepping and precision limits.
+
+Typed array/slice indices use a hidden native counter and a checked conversion
+at each visited iteration. Runtime support is in the existing sequence package;
+no new SDK copies, output artifacts, allocator use, or reserved terms are added.
+Fixed arrays validate their complete index range at compile time. Dynamic-length
+inputs panic before an unrepresentable visited index, including optimized builds
+with assertions and bounds checks disabled. Early exit need not visit every
+possible dynamic index. Native enum indices and iterator procedures keep their
+unannotated forms. Contract diagnostics point at the original annotation.
+
+The readonly exposed index lives outside the original body block, preserving
+legal body shadowing. Thor's storage checks reject writes and mutable addresses.
+Native break/continue/return/labels and defer semantics remain in place. `do`
+bodies and deferred loops are supported. A lifted loop initializer occupies a
+parent synthetic block: Odin collects a when condition before variables in its
+own block, so this extra scope is necessary for annotations such as
+`type_of(prototype)` that refer to initializer bindings.
+
+Source mappings cover checks, bound helpers and exposed bindings. The debug
+adapter skips generated checks/helpers and hides the internal counter. Real
+CodeLLDB tests verify header step-in, body breakpoints, user binding types/values,
+and hidden-temporary filtering for both annotation forms. Main and commented
+tour demos include examples and invalid-case explanations. The spec, README and
+editor README record the semantics; `fort`/`forindex` snippets insert the syntax.
+
+Validation: 162 compiler regressions passed, followed by a focused run of all
+19 typed-loop tests and targeted final boundary/diagnostic checks. Another 89
+ordinary-language compatibility/TLS tests passed. All 1,126 native TLS tests,
+119 extension/grammar tests, the full isolated VS Code integration, and 23 real
+debugger tests passed (22 in the full run plus the additional index step-in
+regression). Both demos run with -debug, and the commented tour passes its
+allocation-checked test wrapper. Coverage includes aliases/generic types,
+fn/#run/cache invalidation, empty/max-size arrays, dynamic overflow, references,
+shadowing, control flow, initializers, C callbacks, and unsaved editor recovery.

@@ -41,6 +41,8 @@ class Symbol:
 
     @property
     def immutable(self):
+        if self.declaration.kind=='Range' and self.index==1 and self.declaration.role('index_type'):
+            return True
         return self.declaration.data.get("immutable", False)
 
 
@@ -119,7 +121,8 @@ class Resolver:
                         scope = prototype.parent if prototype.parent and prototype.parent.kind == "Procedure" else prototype
                 if scope:
                     for i, name in enumerate(names):
-                        symbol = Symbol(binding_name(name), name, n, scope, annotation,
+                        binding_annotation=n.role('value_type' if i==0 else 'index_type') if n.kind=='Range' else annotation
+                        symbol = Symbol(binding_name(name), name, n, scope, binding_annotation,
                                         values[i] if i < len(values) else values[0] if len(values) == 1 else None, i)
                         if symbol.name == "_":
                             continue

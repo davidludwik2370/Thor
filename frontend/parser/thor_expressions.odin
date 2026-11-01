@@ -3,6 +3,72 @@ package thor_parser
 import "core:odin/ast"
 import tokenizer "../tokenizer"
 
+// A typed range header is separate from a three-clause for initializer.
+// Keep annotations as Field_Value nodes so the type retains its original AST
+// and source positions without extending Odin's shared AST definitions.
+thor_typed_for_follows :: proc(p:^Parser)->bool {
+    lexer:=p.tok
+    lexer.err=nil
+    token:=p.curr_tok
+    depth:=0
+    annotated:=false
+    for {
+        if token.kind==.EOF{return false}
+        if depth==0 {
+            if token.kind==.In{return annotated}
+            if token.kind==.Eq || token.kind==.Semicolon || token.kind==.Open_Brace || token.kind==.Do{return false}
+        }
+        if token.kind==.Colon{annotated=true}
+        #partial switch token.kind {
+        case .Open_Paren,.Open_Bracket:depth+=1
+        case .Close_Paren,.Close_Bracket:depth-=1
+        }
+        token=tokenizer.scan(&lexer)
+    }
+}
+
+thor_parse_typed_for_header :: proc(p:^Parser)->^ast.Stmt {
+    start:=p.curr_tok.pos
+    names:=make([dynamic]^ast.Expr)
+    for {
+        binding_start:=p.curr_tok.pos
+        grouped:=allow_token(p,.Open_Paren)
+        reference:=p.curr_tok
+        by_reference:=allow_token(p,.And)
+        name:^ast.Expr=parse_ident(p)
+        if by_reference {
+            unary:=ast.new(ast.Unary_Expr,reference.pos,name.end)
+            unary.op,unary.expr=reference,name
+            name=unary
+        }
+        if allow_token(p,.Colon) {
+            if len(names)>0 && !grouped {
+                error(p,name.pos,"An index type annotation must be parenthesized: for value, (index: T) in collection")
+            }
+            annotation:=parse_type(p)
+            binding:=ast.new(ast.Field_Value,binding_start,annotation.end)
+            binding.field,binding.value=name,annotation
+            name=binding
+        }else if grouped{
+            error(p,name.pos,"A parenthesized loop binding requires a type: (index: T)")
+        }
+        if grouped {
+            close:=expect_token(p,.Close_Paren)
+            name.end=end_pos(close)
+        }
+        append(&names,name)
+        if !allow_token(p,.Comma){break}
+    }
+    in_token:=expect_token(p,.In)
+    previous:=p.allow_range
+    p.allow_range=true
+    expr:=parse_expr(p,false)
+    p.allow_range=previous
+    assignment:=ast.new(ast.Assign_Stmt,start,expr.end)
+    assignment.op,assignment.lhs,assignment.rhs=in_token,names[:],thor_exprs_run(expr)
+    return assignment
+}
+
 thor_for_condition_has_separator :: proc(p:^Parser)->bool {
     lexer:=p.tok
     lexer.err=nil

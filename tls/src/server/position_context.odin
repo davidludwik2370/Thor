@@ -821,7 +821,12 @@ get_document_position_node :: proc(node: ^ast.Node, position_context: ^DocumentP
 	case ^ast.Range_Stmt:
 		get_document_position_label(n.label, position_context)
 		get_document_position(n.init, position_context)
-		get_document_position(n.vals, position_context)
+		for binding in n.vals {
+			if typed,ok:=binding.derived.(^ast.Field_Value);ok {
+				get_document_position(typed.field,position_context)
+				get_document_position(typed.value,position_context)
+			}else{get_document_position(binding,position_context)}
+		}
 		get_document_position(n.expr, position_context)
 		get_document_position(n.body, position_context)
 	case ^ast.Case_Clause:

@@ -158,6 +158,23 @@ test('comments hide Thor syntax and nested comments close correctly', () => {
     assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
 });
 
+test('typed range and grouped index annotations keep binding/type/keyword scopes distinct',()=>{
+    for(const [source,name,type] of [
+        ['for number: f64 in 1..=ROUNDS { print(number) }','number','f64'],
+        ['for value, (index: i8) in values { print(value, index) }','index','i8'],
+        ['for &value, (index: u8) in values do value+=int(index)','index','u8'],
+    ]){
+        check(source,name,'variable.other.readonly');
+        check(source,type,'support.type.primitive');
+        check(source,'in','keyword.control');
+        const tokens=themedTokens(source)[0];
+        for(let at=0;at<source.length;at++)if('(){}'.includes(source[at]))assert.ok(tokens[at].balanced);
+    }
+    check('for i:int=0; i<3; i+=1 { print(i) }','print','entity.name.function');
+    check('for number:f64,ordinal in 1..=3 {}','ordinal','variable');
+    assert.ok(tokenize('// for i:f64 in 1..=3 {}')[0].every(t=>t.scopes.some(s=>s.startsWith('comment'))));
+});
+
 test('commented array and procedure brackets have comment colors and no bracket-pair metadata',()=>{
     const procedure=[
         'drawPath :: proc(using node: Node, color: rl.Color) {',

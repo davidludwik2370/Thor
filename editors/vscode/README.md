@@ -155,6 +155,13 @@ Literal string/rune brackets are also explicitly excluded. In
 the interpolation braces and the actual procedure-call parentheses remain code
 brackets. This applies to quoted/raw strings, nested interpolation, and `f!`.
 
+Typed numeric ranges (`for number: f64 in 1..=COUNT`) and grouped array/slice
+indices (`for value, (index: i8) in values`) have original-source hover,
+definition, rename, readonly semantic tokens, and compiler diagnostics. The
+element's inferred type and explicit `&value` mutability are preserved.
+The `fort` and `forindex` snippets insert these forms. Debugging retains the
+visible binding names/types and hides the internal native index counter.
+
 ### Reversible constant-color preview
 
 The original theme colors remain the default. To try a different color for Thor

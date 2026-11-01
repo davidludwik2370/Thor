@@ -502,6 +502,22 @@ async function run() {
         assert.ok(!powerError.message.includes('Thor expression'));
         await replace(powerSource);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const typedLoops='package main\nmain::proc(){\n values:=[10,20]\n for value,(index:i8) in values{_=value;_=index}\n for number:f64 in 1..=3{_=number}\n}\n';
+        await replace(typedLoops);
+        for(const [fragment,expected] of [['index:','index: i8'],['number:','number: f64'],['value,','value: int']]){
+            await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+                testDocument.positionAt(typedLoops.indexOf(fragment)+1)),values=>hoverText(values||[]).includes(expected));
+        }
+        const typedRename=await vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',testDocument.uri,
+            testDocument.positionAt(typedLoops.indexOf('index:')+1),'ordinal');
+        assert.equal(typedRename.get(testDocument.uri).length,2);
+        await replace(typedLoops.replace('index:i8','index:f64'));
+        const typedErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('indices require an integer type')));
+        const typedError=typedErrors.find(value=>value.message.includes('indices require an integer type'));
+        assert.equal(testDocument.getText(typedError.range),'f64');
+        assert.ok(!typedError.message.includes('Thor expression'));
+        await replace(typedLoops);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const usingSource='// 😀 original header\npackage main\nKind::enum{A,B}\nRecord::struct{x:int,kind:Kind}\nread::proc(using record:Record)->int{return x}\nwrite::proc(using record:^Record){kind=switch{case x==4:.A;case:true?.B:.A}}\nmain::proc(){record:=Record{x=4};write(&record);using record;value:=read(record);_=value}\n';
         await replace(usingSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -684,6 +700,7 @@ async function run() {
             'promoted using fields supply switch result types and contextual enum hovers',
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
+        result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

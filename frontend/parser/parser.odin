@@ -956,7 +956,9 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		}
 
 		if p.curr_tok.kind != .Semicolon {
-			cond = parse_simple_stmt(p, {Stmt_Allow_Flag.In})
+			if p.thor && thor_typed_for_follows(p) {
+				cond=thor_parse_typed_for_header(p)
+			}else{cond = parse_simple_stmt(p, {Stmt_Allow_Flag.In})}
 			if as, ok := cond.derived.(^ast.Assign_Stmt); ok && as.op.kind == .In {
 				is_range = true
 			}
@@ -975,6 +977,11 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				error(p, p.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", tokenizer.tokens[p.curr_tok.kind])
 			} else {
 				if p.curr_tok.kind != .Semicolon {
+					if p.thor && thor_typed_for_follows(p) {
+						cond=thor_parse_typed_for_header(p)
+						is_range=true
+						break general_conds
+					}
 					if p.curr_tok.kind == .Ident && !membership_condition {
 						next_token := peek_token(p)
 						if next_token.kind == .In || next_token.kind == .Comma {

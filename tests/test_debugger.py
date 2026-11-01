@@ -1,4 +1,5 @@
 """Real CodeLLDB/DAP checks against executables built with ordinary Odin."""
+import ast
 import json
 import os
 from pathlib import Path
@@ -109,6 +110,98 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_typed_loop_bindings_break_step_and_show_original_variable_types(self):
+        text='''package main
+main::proc(){
+    values:=[10,20]
+    sum:=0
+    for value,(index:i8) in values {
+        sum+=value+int(index)
+    }
+    assert(sum==31)
+    for number:f64 in 1..=2 {
+        sum+=int(number)
+    }
+    assert(sum==34)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6,10,12])
+        for expected_line,name,expected_value in [(6,'index','0'),(6,'index','1'),(10,'number','1'),(10,'number','2')]:
+            thread,frame=self.frame(client)
+            self.assertEqual((frame['source']['path'],frame['line']),(str(source),expected_line),frame)
+            scopes=client.request('scopes',{'frameId':frame['id']})['scopes']
+            variables=[v for scope in scopes if not scope['expensive'] for v in client.request('variables',{'variablesReference':scope['variablesReference']})['variables']]
+            self.assertTrue(any(v['name']==name for v in variables),variables)
+            self.assertFalse(any(v['name'].startswith('__thor_') for v in variables),variables)
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':name,'context':'watch'})
+            self.assertIn('i8' if name=='index' else 'f64',value['type'])
+            rendered=value['result']
+            if name=='index':
+                # LLDB's native i8 formatter displays character escapes.
+                if rendered.startswith("'"):rendered=str(ord(ast.literal_eval(rendered)))
+            self.assertEqual(rendered,expected_value,value)
+            client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],12,frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
+    def test_typed_range_step_into_skips_bound_helpers(self):
+        text='''package main
+main::proc(){
+    sum:=0.0
+    for number:f64 in 1..=2 {
+        sum+=number
+    }
+    assert(sum==3)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[4,7])
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],4,frame)
+        for _ in range(12):
+            client.request('stepIn',{'threadId':thread})
+            thread,frame=self.frame(client)
+            self.assertEqual(frame['source']['path'],str(source),frame)
+            if frame['line']==5:break
+        self.assertEqual(frame['line'],5,frame)
+        client.request('setBreakpoints',{'source':{'path':str(source)},'breakpoints':[{'line':7}]})
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],7,frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
+    def test_typed_index_step_into_skips_checked_conversion(self):
+        text='''package main
+main::proc(){
+    values:=[10,20]
+    sum:=0
+    for value,(index:i8) in values {
+        sum+=value+int(index)
+    }
+    assert(sum==31)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,8])
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],5,frame)
+        for _ in range(12):
+            client.request('stepIn',{'threadId':thread})
+            thread,frame=self.frame(client)
+            self.assertEqual(frame['source']['path'],str(source),frame)
+            if frame['line']==6:break
+        self.assertEqual(frame['line'],6,frame)
+        client.request('setBreakpoints',{'source':{'path':str(source)},'breakpoints':[{'line':8}]})
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],8,frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_fstring_argument_cleanup_keeps_original_breakpoints_and_user_step_into(self):
         text='''package main
 read::proc(text:string)->int{

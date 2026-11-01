@@ -37,7 +37,7 @@ function byteOffset(unit, line, column = 1, native = false) {
     return start + Buffer.byteLength(prefix);
 }
 const generatedKinds = new Set(['expression-helper', 'support', 'import', 'pure-contract',
-    'pure-type-validator', 'pure-procedure', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture', 'memory-debug']);
+    'pure-type-validator', 'pure-procedure', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture', 'memory-debug', 'typed-loop-check']);
 
 function typeQueryRanges(bytes) {
     // Generated type witnesses repeat source expressions without executing

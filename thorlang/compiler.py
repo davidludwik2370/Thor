@@ -182,6 +182,8 @@ class Source:
         self.evaluation_query_checks = {}
         from .expressions import Expressions
         self.expressions = Expressions(self)
+        from .typedloops import TypedLoops
+        self.typed_loops = TypedLoops(self)
         from .bignumbers import BigNumbers
         self.big = BigNumbers(self)
         self.selected = {}
@@ -224,7 +226,7 @@ class Source:
                               ('temporaries',self.thor and any(n.kind=='Interpolation' for n in self.nodes)),
                               ('pure',spreading or any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call','Range'} for n in self.nodes)),
-                              ('sequence',spreading or self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes)),
+                              ('sequence',spreading or self.thor and any(n.kind in {'Index','Slice'} or n.kind=='Range' and n.role('index_type') for n in self.nodes)),
                               ('numeric',self.thor and any(n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('big',self.thor and any(n.kind=='Ident' and n.text in {'Integer','Rational'} for n in self.nodes))]:
             if needed:
@@ -639,6 +641,9 @@ class Source:
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code
+        if kind=='Range':
+            typed_loop=self.typed_loops.render(n)
+            if typed_loop is not None:return typed_loop
         big_code = self.big.render(n, expected, constant)
         if big_code is not None: return big_code
         if kind=='Ternary' and constant:
@@ -905,6 +910,12 @@ class Source:
                 else:
                     result = "{" + declarations + result + "}"
                     self.expressions.convert_do(n)
+            prologue=self.typed_loops.prologue(n)
+            if prologue:
+                if not real_block:
+                    self.expressions.convert_do(n)
+                    result='{'+result+'}'
+                result='{'+prologue+result+'}'
         return result
 
     def render_array(self, n, expected=None, needle=None, constant=False):

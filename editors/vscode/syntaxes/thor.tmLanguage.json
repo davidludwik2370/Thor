@@ -66,6 +66,9 @@
     "statements": {
       "patterns": [
         {
+          "include": "#typed-loop-binding"
+        },
+        {
           "include": "#attribute"
         },
         {
@@ -396,7 +399,7 @@
           "name": "keyword.operator.type.annotation.thor"
         }
       },
-      "end": "(?=^|,|;|\\)|=|:|for|switch|if|{)",
+      "end": "(?=^|,|;|\\)|=|:|for|switch|if|\\bin\\b|{)",
       "patterns": [
         {
           "include": "#set-type"
@@ -423,6 +426,33 @@
       "patterns": [
         {
           "include": "#statements"
+        }
+      ]
+    },
+    "typed-loop-binding": {
+      "patterns": [
+        {
+          "name": "meta.loop.typed.thor",
+          "begin": "\\b(for)\\s+([A-Za-z_]\\w*)\\s*(:)(?![=>])(?=[^\\n;{}]*\\bin\\b)",
+          "beginCaptures": {
+            "1": {"name": "keyword.control.thor"},
+            "2": {"name": "variable.other.readonly.thor"},
+            "3": {"name": "keyword.operator.type.annotation.thor"}
+          },
+          "end": "(?=\\bin\\b|,)",
+          "patterns": [{"include": "#type-declaration"}]
+        },
+        {
+          "name": "meta.loop.index.thor",
+          "begin": "(\\()\\s*([A-Za-z_]\\w*)\\s*(:)(?=[^\\n;{}]*\\)\\s*in\\b)",
+          "beginCaptures": {
+            "1": {"name": "punctuation.thor"},
+            "2": {"name": "variable.other.readonly.thor"},
+            "3": {"name": "keyword.operator.type.annotation.thor"}
+          },
+          "end": "\\)",
+          "endCaptures": {"0": {"name": "punctuation.thor"}},
+          "patterns": [{"include": "#type-declaration"}]
         }
       ]
     },

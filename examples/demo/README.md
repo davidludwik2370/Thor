@@ -34,6 +34,7 @@ The walkthrough covers:
 | `sets_and_ownership` | Type/library spellings, lazy allocation, all operators, independent results, anonymous cleanup, shallow keys and aliases |
 | `negative_indices` | Reads/writes/addresses, slices, dynamic arrays, UTF-8 bytes, ordinary negative map keys, once-only evaluation |
 | `power_and_native_expansion` | Precedence, associativity, float coercion, strict operand types, fixed-width integers, prefix `**` expansion |
+| `typed_loops` | Numeric range context, typed-bound conversions, grouped array/slice index annotations, reference elements and checked overflow |
 | `expression_interactions` | Lazy paths, loop conditions/posts, switch inside fstring, set iteration cleanup, C callbacks |
 | `pure_functions_and_constants` | Recursive/generic/imported `fn`, explicit eligible `proc`, forward constants, scratch mutation, exact types and float bits |
 | `owned_pure_results` | Recursive ownership, repeated aliases, cloning, runtime/folded materialization, defers, zero-sized slice elements |

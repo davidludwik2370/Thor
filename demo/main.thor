@@ -249,6 +249,18 @@ main :: proc() {
     #assert(2 ** 3 == 8)
     // Typed mismatches require a cast: int_value ** float_value is an error.
 
+    println("Typed loops: numeric range context and checked array/slice indices")
+    for exponent: f64 in 1..=3 {
+        assert(type_of(exponent) == f64 && 0.5 ** exponent > 0)
+    }
+    indexed := [10, 20, 30]
+    for value, (index: i8) in indexed {
+        assert(type_of(value) == int && type_of(index) == i8)
+        assert(value == (int(index)+1)*10)
+    }
+    for &value, (index: u8) in indexed do value += int(index)
+    assert(indexed == [10, 21, 32])
+
     println("T07: owned integer grouping, padding, and Unicode fill")
     grouped := format.group_integer(i64(-9223372036854775808))
     padded := format.format(1234567, grouping=true, width=14, align=.Center, fill='界')

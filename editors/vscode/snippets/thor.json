@@ -79,6 +79,16 @@
     ],
     "description": "Evaluate a direct eligible call at compile time"
   },
+  "Typed numeric range": {
+    "prefix": "fort",
+    "body": ["for ${1:i}: ${2:int} in ${3:0}..<${4:count} {", "\t$0", "}"],
+    "description": "Numeric range with an explicit iteration type"
+  },
+  "Typed array or slice index": {
+    "prefix": "forindex",
+    "body": ["for ${1:value}, (${2:index}: ${3:u8}) in ${4:values} {", "\t$0", "}"],
+    "description": "Infer the element type and use a checked integer index type"
+  },
   "Manual-lifetime interpolated string": {
     "prefix": "fkeep",
     "body": [

@@ -122,6 +122,12 @@ class Diagnostics:
                 'type_is_ordered(T)' in m for m in msgs
             ):
                 contract = 'Spread min/max requires ordered numeric, enum, or string elements.'
+            elif origin and Path(origin.file) == runtime / 'sequence' / 'sequence.odin':
+                contract=next((text for text in [
+                    'Typed loop indices require an integer type.',
+                    'Typed index bindings are supported only for arrays and slices.',
+                    "The array's indices do not fit in the declared loop index type.",
+                ] if any(text in message for message in msgs)),None)
             if contract:
                 caller = None
                 for message in msgs:
@@ -234,6 +240,7 @@ class Diagnostics:
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             diagnostic["_cascade"] = bool(origin and not origin.exact and (
                 generated_result_failure or origin.kind in {'range-type','power-type'}
+                or origin.kind=='typed-loop-check' and msgs and msgs[0].startswith('A typed numeric range requires ')
                 or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
             if msgs and msgs[0].startswith("Power ('**') requires"):
                 diagnostic['_cascade']=False
