@@ -819,6 +819,7 @@ switches and interpolations. Parenthesize a ternary before a format separator.
 The [format grammar](docs/interpolation-formatting.md) is
 `[quoted-fill][flags][width][,][.precision][verb]`, following Odin's `fmt` verbs.
 For example, `.2f`, `12.2f`, `-12.2f`, `#08x`, `012,.2f`, and `.2%`.
+Use nested braces for a runtime width: `f"{value:{width}.2f}"`.
 Alignment defaults to right for every type; `-` means left and `^` means center.
 `<` and `>` are removed. Unicode fills use quoted runes (`'界'^12s`);
 width counts runes. `f/F` defaults to three decimal places, `e/E` to six,

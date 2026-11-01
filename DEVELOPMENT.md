@@ -2650,3 +2650,40 @@ on `p_loss`, no error range at `100`, and clearing after changing the reference 
 before issuing focus-routed history commands; no extension runtime change was
 needed. A read-only copy of the reported double_bet source reproduces the same
 single primary error. The original project files were not modified.
+
+
+## Dynamic interpolation widths: 0.31.0
+
+Use `f"{value:{width}}"`, with existing literal flags before the nested expression
+and grouping/precision/verb after it. Bare identifiers are diagnosed with the
+nested-brace syntax. The shared lexer balances the width expression using normal
+Thor tokens, including nested literals and interpolation; the parser appends its
+AST after the field value. Source byte positions remain unchanged. The suffix
+parser substitutes parsed spans rather than re-parsing arbitrary expressions in
+Python. Runtime `normalize_width` checks native integer types, nonnegative values,
+and overflow before conversion to int. Dynamic precision remains unsupported.
+
+Lowering evaluates the field value and width once, in that order. One discovered
+ownership interaction required preserving borrowed Integer/Rational values:
+a width function could otherwise replace the original owner and automatically
+release the digits held by the staged field header. ASan reproduced that use
+after free. Compiler capture/release helpers now snapshot borrowed big scalars
+only; owned field results and ordinary native values avoid the extra copy.
+Tests include both Integer and Rational replacement through pointer parameters,
+with tracking and ASan, plus nested temporary allocations used to compute widths.
+
+Width expressions are ordinary AST children for purity, fn/#run dependencies,
+semantic tokens, hover, references, and rename. The source-map tag
+`interpolation-width` attaches type errors to the width rather than expanding
+them to the enclosing len/call. Native lexer/TLS tests, live TLS tests, grammar
+metadata tests, and a CodeLLDB step-in test cover the new syntax. TLS is 0.24.0;
+extension 0.19.0 adds embedded-code/bracket scopes for nested format widths.
+See [the format reference](docs/interpolation-formatting.md#variable-minimum-widths).
+
+Validation: 209 compiler/formatting/diagnostic tests, 1,128 native TLS tests,
+121 Node extension tests, four native tokenizer tests, eight live TLS tests,
+26 debugger tests, and the isolated VS Code integration suite pass. Both the
+T01–T23 evaluation demo and the commented walkthrough run successfully with
+their new variable-width examples. Distinct integer widths are also covered.
+The installed local extension is 0.19.0; reload the VS Code window to refresh
+its TextMate grammar along with TLS.

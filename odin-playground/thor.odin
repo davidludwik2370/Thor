@@ -721,6 +721,10 @@ Syntax:
 - Group only decimal integer portions, never fractional digits or exponents.
   Precision applies before string quoting and padding; strings count runes.
   Runtime, fn and #run use the same implementation and sized precision storage.
+- Width may be a runtime expression in nested braces: f"{value:{width}}",
+  f"{value:-{width}}", f"{value:'_'^{width+2}.2f}". Evaluate each value then
+  its width once. Require a nonnegative native integer fitting int; check
+  overflow before conversion. Precision remains a literal.
 - Complete verb/type rules and limitations: docs/interpolation-formatting.md.
 - Ordinary proc use allocates the final string with context.allocator; the caller
   owns it under normal Odin cleanup rules. No implicit temp-allocator lifetime.

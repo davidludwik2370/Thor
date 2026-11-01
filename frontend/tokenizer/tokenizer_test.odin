@@ -3,6 +3,7 @@ package thor_tokenizer
 
 import native "core:odin/tokenizer"
 import "core:testing"
+import "core:fmt"
 
 @(test)
 native_token_and_position_compatibility :: proc(t: ^testing.T) {
@@ -75,4 +76,22 @@ thor_manual_interpolation_and_boolean_not_remain_distinct :: proc(t:^testing.T){
     lexer.thor=true
     testing.expect_value(t,scan(&lexer).kind,.Ident)
     testing.expect_value(t,scan(&lexer).text,"!=")
+}
+
+@(test)
+thor_dynamic_width_preserves_nested_strings_and_following_tokens :: proc(t:^testing.T) {
+    context.allocator=context.temp_allocator
+    sources:=[?]string{
+        `f"{value:{width}}"`,
+        `f"{value:'}'^{len("{}")+1}.2f}"`,
+        `f!"{value:{len(f"{index}")}}"`,
+    }
+    for source in sources {
+        lexer:Tokenizer;init(&lexer,fmt.aprintf("%s\nnext",source),"width.thor");lexer.thor=true
+        token:=scan(&lexer)
+        testing.expect_value(t,token.kind,.String)
+        testing.expect_value(t,token.text,source)
+        testing.expect_value(t,scan(&lexer).text,"next")
+        testing.expect_value(t,lexer.error_count,0)
+    }
 }

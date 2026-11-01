@@ -533,3 +533,24 @@ test('Odin-style format verbs flags and precision stay outside string/bracket sc
         }
     }
 });
+
+
+test('dynamic format widths contain ordinary code and keep following format and string scopes',()=>{
+    for(const source of [
+        's := f"value {12:{width}.2f} after"',
+        's := f`value {12:\'界\'^{width+2},d} after`',
+        's := f"{12:{len(\"{}\")}} after"',
+        's := f"{12:{len(f\"{value}\")}} after"',
+        's := f"{12:{len([2]int{1,2})}} after"',
+    ]){
+        const tokens=themedTokens(source)[0];
+        if(source.includes('width')){
+            const at=source.indexOf('width');
+            assert.equal(tokens[at].color,'#9CDCFE');assert.equal(tokens[at].type,0);
+            const open=source.lastIndexOf('{',at),close=source.indexOf('}',at);
+            assert.ok(tokens[open].balanced && tokens[close].balanced);
+        }
+        const after=source.indexOf(' after');
+        assert.equal(tokens[after+1].color,'#CE9178');assert.equal(tokens[after+1].type,2);
+    }
+});

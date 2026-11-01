@@ -121,6 +121,18 @@ async function run() {
         assert.ok(!rationalError.message.includes('runtime/'));
         await replace(precisionExample);
         await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.length===0);
+        const widthExample='package main\nmain::proc(){width:>6;text:=f"{12:{width}}";delete(text)}\n';
+        await replace(widthExample);
+        const widthPosition=testDocument.positionAt(widthExample.indexOf('width}}')+1);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,widthPosition),values=>hoverText(values||[]).includes('width: int'));
+        const widthRename=await vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',testDocument.uri,widthPosition,'padding');
+        assert.equal(widthRename.get(testDocument.uri).length,2);
+        const badWidth=widthExample.replace('width:>6','width:>"bad"');
+        await replace(badWidth);
+        const widthError=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.some(v=>v.message.includes('width must have an integer type')));
+        assert.ok(widthError.find(v=>v.message.includes('width must have an integer type')).range.start.isEqual(testDocument.positionAt(badWidth.indexOf('width}}'))));
+        await replace(widthExample);
+        await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.length===0);
         const rootExample='// 😀\npackage main\nimport * "thor:basic"\nmain::proc(){prob_loss:f64;p_win_pad:>len(f"{(1-p_loss) * 100:.2f}");_=p_win_pad}\n';
         await replace(rootExample);
         const rootDiagnostics=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri).filter(d=>d.severity===vscode.DiagnosticSeverity.Error)),
@@ -769,6 +781,7 @@ async function run() {
             'promoted using fields supply switch result types and contextual enum hovers',
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
+        result.checks.push('dynamic width hover, rename and precise unsaved type diagnostics');
         result.checks.push('undeclared interpolation names keep one precise root diagnostic and no false literal underline');
         result.checks.push('Odin-style precision formats, Rational g/G contract and mapped unsaved recovery');
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');

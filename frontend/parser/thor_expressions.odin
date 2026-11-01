@@ -200,27 +200,32 @@ parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
     args := make([dynamic]^ast.Expr)
     for part in parts {
         if part.literal { continue }
-        nested := default_parser()
-        nested.thor = true
-        nested.file = p.file
-        nested.err, nested.warn = p.err,p.warn
-        nested.allow_in_expr = true
-        tokenizer.init(&nested.tok,p.file.src,p.file.fullpath,p.err)
-        nested.tok.thor = true
-        tokenizer.seek(&nested.tok,part.start)
-        advance_token(&nested)
-        if nested.curr_tok.pos.offset >= part.end {
-            error(p,nested.curr_tok.pos,"Interpolation field requires an expression")
-            continue
+        spans:=make([dynamic][2]int)
+        append(&spans,[2]int{part.start,part.end})
+        append(&spans,..part.format_exprs)
+        for span,span_index in spans {
+            nested := default_parser()
+            nested.thor = true
+            nested.file = p.file
+            nested.err, nested.warn = p.err,p.warn
+            nested.allow_in_expr = true
+            tokenizer.init(&nested.tok,p.file.src,p.file.fullpath,p.err)
+            nested.tok.thor = true
+            tokenizer.seek(&nested.tok,span[0])
+            advance_token(&nested)
+            if nested.curr_tok.pos.offset >= span[1] {
+                error(p,nested.curr_tok.pos,"Interpolation width requires an expression" if span_index>0 else "Interpolation field requires an expression")
+                continue
+            }
+            expr := parse_expr(&nested,false)
+            if nested.curr_tok.pos.offset != span[1] {
+                error(p,nested.curr_tok.pos,"Unexpected token in interpolation width expression" if span_index>0 else "Unexpected token in interpolation field; parenthesize a ternary before a format separator")
+            }
+            p.error_count += nested.error_count
+            append(&p.edits,..nested.edits[:])
+            append(&p.features,..nested.features[:])
+            append(&args,expr)
         }
-        expr := parse_expr(&nested,false)
-        if nested.curr_tok.pos.offset != part.end {
-            error(p,nested.curr_tok.pos,"Unexpected token in interpolation field; parenthesize a ternary before a format separator")
-        }
-        p.error_count += nested.error_count
-        append(&p.edits,..nested.edits[:])
-        append(&p.features,..nested.features[:])
-        append(&args,expr)
     }
     call := thor_call("__thor_interpolation",token.pos,end_pos(token),args[:])
     append(&p.features,Feature{kind="Interpolation",start=call.pos.offset,end=call.end.offset,parts=parts,

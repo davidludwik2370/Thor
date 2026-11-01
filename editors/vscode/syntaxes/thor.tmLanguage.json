@@ -1501,6 +1501,11 @@
         }
       ]
     },
+    "width-code-braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [{"include": "#width-code-braces"}, {"include": "#expressions"}]
+    },
     "interpolation-format": {
       "name": "meta.interpolation.format.thor",
       "begin": ":",
@@ -1511,6 +1516,14 @@
       },
       "end": "(?=\\})",
       "patterns": [
+        {
+          "name": "meta.embedded.line.thor meta.interpolation.width.thor",
+          "begin": "\\{",
+          "beginCaptures": {"0": {"name": "punctuation.section.interpolation.begin.thor"}},
+          "end": "\\}",
+          "endCaptures": {"0": {"name": "punctuation.section.interpolation.end.thor"}},
+          "patterns": [{"include": "#width-code-braces"}, {"include": "#expressions"}]
+        },
         {
           "name": "string.quoted.single.thor",
           "begin": "'",

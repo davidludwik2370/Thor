@@ -4,6 +4,7 @@ Interpolation_Part :: struct {
     literal: bool,
     start, end: int,
     format_start, format_end: int,
+    format_exprs: [][2]int,
 }
 
 // Resume scanning an original source buffer without changing byte positions.
@@ -65,7 +66,28 @@ scan_interpolated :: proc(t: ^Tokenizer) -> (string, []Interpolation_Part) {
                     advance_rune(t)
                     _ = scan_rune(t)
                 }
-                for t.ch >= 0 && t.ch != '}' && t.ch != quote { advance_rune(t) }
+                expressions:=make([dynamic][2]int)
+                for t.ch >= 0 && t.ch != '}' && t.ch != quote {
+                    if t.ch!='{' {advance_rune(t);continue}
+                    advance_rune(t)
+                    expression_start:=t.offset
+                    nesting:=0
+                    for {
+                        item:=scan(t)
+                        if item.kind==.EOF {error(t,expression_start,"Unterminated interpolation width expression");break}
+                        if nesting==0 && item.kind==.Close_Brace {
+                            append(&expressions,[2]int{expression_start,item.pos.offset})
+                            break
+                        }
+                        #partial switch item.kind {
+                        case .Open_Brace,.Open_Paren,.Open_Bracket:nesting+=1
+                        case .Close_Brace,.Close_Paren,.Close_Bracket:nesting-=1
+                        }
+                        if nesting<0 {error(t,item.pos.offset,"Unbalanced interpolation width expression");break}
+                    }
+                }
+                field.format_exprs=expressions[:]
+
                 field.format_end = t.offset
                 if t.ch != '}' { error(t, field.start, "Unterminated interpolation format"); break }
                 advance_rune(t)

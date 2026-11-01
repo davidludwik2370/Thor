@@ -6,8 +6,9 @@ Thor's suffix follows Odin `fmt` conventions, without a leading `%`:
 text := f"{value:[quoted-fill][flags][width][,][.precision][verb]}"
 ```
 
-Everything after `:` is literal syntax. Width/precision are nonnegative decimal
-integers. A bare dot means precision zero (`:.f`). Precision requires a verb.
+Flags, fill, precision and the verb are literal syntax. Width is either a
+nonnegative decimal integer or a nested `{expression}`. Precision stays literal.
+A bare dot means precision zero (`:.f`). Precision requires a verb.
 Fields still evaluate once, left to right; formatting never changes the value.
 Parenthesize ternaries before `:`. Nested interpolation, raw literals, and
 `{{`/`}}` retain their existing behavior.
@@ -42,6 +43,37 @@ of nondecimal bases, text, booleans, or the default Rational fraction is rejecte
 Width is applied after conversion, rounding, and grouping. Numeric zero padding
 is applied last and does not introduce more grouping separators.
 
+## Variable minimum widths
+
+```odin
+round_pad :> len(f"{ROUNDS}")
+print(f"Round {i+1:{round_pad}}")       // Right aligned.
+print(f"Round {i+1:-{round_pad}}")      // Left aligned.
+print(f"{value:'_'^{round_pad+2}}")     // Centered with a computed width.
+print(f"{probability:{round_pad}.2%}")  // Width plus literal precision.
+print(f"{number:0{round_pad},d}")       // Zero padding and grouping.
+```
+
+Use nested braces around a variable or expression; `:round_pad` is not a width.
+The expression uses ordinary Thor syntax, including calls, indexing, ternaries,
+selected switch expressions, and nested strings. Widths accept native integer
+types, including unsigned and distinct integers, and are checked before converting
+to `int`. Negative values and values exceeding native `int` fail with a width
+error; zero is valid. Width never truncates a longer value.
+
+Each field's value evaluates first, then its width, exactly once each. The next
+field starts after the previous one is formatted. Skipped branches do no work.
+Borrowed Integer/Rational fields get a temporary snapshot before width evaluation,
+so a width function can overwrite the original owner safely; that snapshot is
+released after formatting. Existing aggregate/reference-copy rules stay shallow.
+Fresh owned numeric results need no extra copy. Temporaries used to compute the
+width are released normally. The same behavior works in runtime code, `fn`,
+`#run`, and generic functions.
+
+TLS treats width expressions as code: hover, definition, references, and rename
+work inside their braces. Wrong types and undeclared names point to the original
+width expression. Width calls remain executable original-source debugger targets.
+
 ## Odin verbs
 
 | Values | Supported verbs |
@@ -70,8 +102,9 @@ spelling is preserved (`q` may encode an emoji as `\U0001f600`). Native custom
 formatters remain registered and owned by the application; interpolation does
 not replace their registry. Scalar sign/width handling is outside callbacks.
 
-Dynamic `*` width/precision, argument indices, Python `!r`/`!s`, and locale `n` are
-not supported. Precision on aggregate values is rejected: recursively forwarding
+Dynamic precision, printf-style `*` widths, argument indices, Python `!r`/`!s`,
+and locale `n` are not supported. Use `{expression}` for variable widths.
+Precision on aggregate values is rejected: recursively forwarding
 large precision into Odin's aggregate formatter would hit its fixed float buffer.
 Format the individual numeric fields instead. Custom aggregate formatting without
 precision continues to use Odin's formatter.
@@ -125,5 +158,6 @@ TLS uses the same compiler checks for malformed formats, invalid type/verb pairs
 and missing Rational precision, including unsaved buffers. Field diagnostics map
 to the original Thor expression. VS Code colors quoted fills as runes, digits as
 numbers, verbs as type-format keywords, and punctuation/flags as ordinary
-operators. Formats do not create expression tokens or executable debugger stops.
-Stepping still follows the original field expressions and surrounding Thor code.
+operators. Literal format syntax creates no executable debugger stops. Nested
+width expressions are ordinary code; stepping follows those expressions, the
+original field values, and surrounding Thor code.

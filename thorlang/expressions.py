@@ -699,30 +699,48 @@ class Expressions:
         fields=iter(n.group('args'))
         parts=[]
         quote=chr(s.raw[n.start+(2 if n.data.get('manual_lifetime') else 1)])
-        for part in n.data['parts']:
+        prefix=s.prefix+f'format_{n.start}_'
+        for part_index,part in enumerate(n.data['parts']):
             if part['literal']:
                 text=s.text(part['start'],part['end']).replace('{{','{').replace('}}','}')
-                parts.append((None,quote+text+quote,None))
+                parts.append((None,quote+text+quote,None,[],None))
                 continue
             field=next(fields)
             spec=s.text(part['format_start'],part['format_end']) if part['format_start']>=0 else ''
-            options=self.format_spec(spec,part['format_start'],part['format_end'])
-            parts.append((field,None,options))
+            from .formatting import WIDTH_MARKER
+            widths=[next(fields) for _ in (part.get('format_exprs') or [])]
+            raw=spec.encode('utf-8')
+            for start,end in reversed(part.get('format_exprs') or []):
+                raw=raw[:start-1-part['format_start']]+WIDTH_MARKER.encode()+raw[end+1-part['format_start']:]
+            width_name=prefix+f'width_{part_index}' if widths else None
+            options=self.format_spec(raw.decode('utf-8'),part['format_start'],part['format_end'],width_name)
+            parts.append((field,None,options,widths,width_name))
         def body(_):
-            prefix=s.prefix+f'format_{n.start}_'
             builder=prefix+'builder'
             code=[f'{builder}: {strings}.Builder',f'{strings}.builder_init(&{builder})',f'defer {strings}.builder_destroy(&{builder})']
-            for i,(field,literal,options) in enumerate(parts):
+            for i,(field,literal,options,widths,width_name) in enumerate(parts):
                 if field is None:
                     code.append(f'{strings}.write_string(&{builder}, {literal})')
                 else:
                     value=self.ownership.evaluate(field,code)
                     expression=value.value
+                    if widths:
+                        snapshot=prefix+f'snapshot_{i}'
+                        code.append(s.mapping.wrap(f'{snapshot} := {formatting}.compiler_capture_width_value({expression}, {value.owned})',
+                                                   s.path,field.start,field.end,'interpolation-field'))
+                        expression=snapshot
+                    for width in widths:
+                        evaluated_width=self.ownership.evaluate(width,code)
+                        code.append(s.mapping.wrap(f'{width_name} := {formatting}.normalize_width({evaluated_width.value})',
+                                                   s.path,width.start,width.end,'interpolation-width'))
+                        self.ownership.release(evaluated_width,code)
                     if s.purity and (s.purity.eval_mode or s.purity.checked(s.purity.owner(n))):
                         code.append(f'{formatting}.validate_pure_value(type_of({expression}))')
                     field_code='\n'.join([f'{prefix}field_{i} := {formatting}.format_spec({expression}, {options})',
                                          f'{strings}.write_string(&{builder}, {prefix}field_{i})',f'delete({prefix}field_{i})'])
                     code.append(s.mapping.wrap(field_code,s.path,field.start,field.end,'interpolation-field'))
+                    if widths:
+                        code.append(f'{formatting}.compiler_release_width_value({expression}, {value.owned})')
                     self.ownership.release(value,code)
             code.append(f'return {strings}.clone({strings}.to_string({builder}))')
             return '\n'.join(code)
@@ -840,9 +858,9 @@ class Expressions:
         name,args=self.closed(node,body,result='bool',flavor='range_contains')
         return name+'('+', '.join(args)+')'
 
-    def format_spec(self,text,start,end):
+    def format_spec(self,text,start,end,dynamic_width=None):
         from .formatting import parse_format
-        return parse_format(text,lambda message:self.source.error(message,start,end))
+        return parse_format(text,lambda message:self.source.error(message,start,end),dynamic_width)
 
     def switch(self,n,expected,constant):
         s=self.source

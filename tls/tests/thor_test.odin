@@ -569,3 +569,11 @@ insert::proc(set:^Set($T),value:T){}
 `}}
     test.expect_hover_contains(t,&source,"set: ^set[$T]")
 }
+
+@(test)
+thor_hover_in_runtime_interpolation_width :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+main::proc(){width:=8;text:=f"{1:{wid{*}th}.2f}";_=text}
+`)
+    test.expect_hover_contains(t,&source,"width: int")
+}

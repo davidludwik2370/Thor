@@ -176,6 +176,7 @@ class Diagnostics:
             elif origin and Path(origin.file).parent == runtime / 'format':
                 contract=next((text for text in [
                     'Grouping requires a decimal numeric format.',
+                    'Interpolation width must have an integer type.',
                     'Rational g/G formatting requires explicit precision, e.g. :.6g; omit the verb for an exact fraction.',
                     'Rational formatting does not support this verb.',
                     'Integer formatting does not support this verb.',
@@ -220,7 +221,7 @@ class Diagnostics:
                 if caller:
                     source = self.sources.get(caller.file)
                     calls = [n for n in source.nodes if (n.kind == "Call" or n.kind=='Binary' and n.data['op']=='**') and n.start <= caller.start < n.end] if source else []
-                    if calls:
+                    if calls and caller.kind!='interpolation-width':
                         call = min(calls, key=lambda n: n.end - n.start)
                         caller = Origin(caller.file, call.start, call.end)
                     origin, msgs = caller, [contract]

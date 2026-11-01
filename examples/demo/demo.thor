@@ -599,6 +599,16 @@ formatting_and_strings :: proc() {
         defer delete(numbers)
         assert(numbers == "-0000042|00000-42|0x00002a|1,234,567.12")
 
+        // A nested pair of braces supplies a runtime minimum width. It can
+        // contain a variable, function call, or any integer-valued expression.
+        // The value is evaluated first, then its width, once each.
+        column_width := len(numbers)/4 + 2
+        padded_columns := f"{12:{column_width}}|{12:-{column_width}}|{12:'_'^{column_width}}"
+        defer delete(padded_columns)
+        assert(len(padded_columns) == 3*column_width + 2)
+        // Other flags and literal precision still follow their normal order:
+        // f"{probability:{column_width}.2%}"
+
         // Exact arithmetic is not converted through f64 for decimal formatting.
         // This example intentionally exceeds native integer precision.
         enormous := Integer(123456789012345678901234567890)

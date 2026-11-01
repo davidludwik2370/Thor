@@ -333,6 +333,10 @@ main :: proc() {
     exact_demo := f"{Rational(1,3):.20f}|{Integer(123456789012345678901234567890):.4e}"
     assert(exact_demo == "0.33333333333333333333|1.2346e+29")
     delete(exact_demo)
+    min_width:=12
+    dynamic_padding:=f"{1234:{min_width},d}|{0.125:-{min_width}.2%}"
+    assert(dynamic_padding=="       1,234|12.50%      ")
+    delete(dynamic_padding)
     // Rational bare g/G is rejected: a repeating decimal has no finite shortest
     // representation. Pick precision (.6g), or omit the format for an exact fraction.
 
