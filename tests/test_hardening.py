@@ -173,7 +173,7 @@ text:=f"{f"abc {7}"[1:]}";testing.expect(t,text=="bc 7");delete(text)
         self.memory('''
 a:=set[int]{1};b:=set[int]{2};result:=identity(a|b)
 testing.expect(t,len(result)==2);delete(result);delete(a);delete(b)
-consume(f"hello {7}")
+consume(f!"hello {7}")
 ''','identity::proc(value:set[int])->set[int]{return value}\nconsume::proc(value:string){delete(value)}\n')
 
     def test_mixed_blank_destinations_release_only_discarded_values(self):

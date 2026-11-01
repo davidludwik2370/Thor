@@ -105,6 +105,8 @@ for (const [name, source, word, scope, line] of [
     ['automatic constant call', 'SIZE :: square(8)', 'square', 'entity.name.function'],
     ['generic dependent run', 'work :: proc($N:int){SIZE::#run square(N)}', '#run', 'entity.name.tag'],
     ['interpolation prefix', 's := f"hello {value}"', 'f', 'storage.modifier.interpolation'],
+    ['manual interpolation prefix', 's := f!"hello {value}"', 'f!', 'storage.modifier.interpolation'],
+    ['manual raw interpolation field', 's := f!`hello {value}`', 'value', 'variable'],
     ['interpolation field', 's := f"hello {value}"', 'value', 'variable'],
     ['nested interpolation string', 's := f"{echo("inner")}"', 'inner', 'string.quoted.double'],
     ['raw interpolation field', 's := f`hello {value}`', 'value', 'variable'],
@@ -320,6 +322,19 @@ test('reported ternary interpolation has ordinary expressions and nested string 
             assert.ok(tokens[at].balanced);
         }
         if(source[at]==='f')assert.equal(tokens[at].type,0,'Interpolation prefix is syntax');
+    }
+});
+
+test('manual interpolation nests with automatic interpolation without leaking string scopes',()=>{
+    const source='show(f!"outer {f"inner {7}"} {value}"); next := 3';
+    const tokens=themedTokens(source)[0];
+    for(const word of ['outer ','inner ']){
+        const start=source.indexOf(word);
+        assert.ok(tokens.slice(start,start+word.length).every(t=>t.color==='#CE9178'));
+    }
+    for(const word of ['f!','value','next']){
+        const start=source.indexOf(word);
+        assert.ok(tokens.slice(start,start+word.length).every(t=>t.type===0),word);
     }
 });
 

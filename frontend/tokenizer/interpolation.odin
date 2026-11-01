@@ -23,6 +23,7 @@ seek :: proc(t: ^Tokenizer, offset: int) {
 scan_interpolated :: proc(t: ^Tokenizer) -> (string, []Interpolation_Part) {
     start := t.offset
     advance_rune(t) // f
+    if t.ch == '!' { advance_rune(t) } // Explicit manual lifetime.
     quote := t.ch
     advance_rune(t)
     parts := make([dynamic]Interpolation_Part)

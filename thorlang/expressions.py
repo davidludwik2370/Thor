@@ -25,6 +25,8 @@ class Expressions:
         self.extrema = Extrema(self)
         from .switches import Switches
         self.switches = Switches(self)
+        from .fstrings import FStringLifetimes
+        self.fstrings = FStringLifetimes(self)
 
     def module(self, name, path=None):
         alias = self.source.prefix + name
@@ -86,11 +88,13 @@ class Expressions:
             return None
         return symbol
 
-    def closed(self,node,builder,result='string',pointer=False,flavor='value',optional_ok=False):
+    def closed(self,node,builder,result='string',pointer=False,flavor='value',optional_ok=False,optional_tag=None):
         from .compiler import Hint
         from .semantics import descendants
         s=self.source
         name=s.prefix+f'{flavor}_{node.start}_{node.end}'
+        lifetime=self.fstrings.current
+        if lifetime:name+='_fstrings'
         if self.switches.global_context: name += '_global'
         scope=self.helper_scope(node)
         key=scope,name
@@ -105,13 +109,16 @@ class Expressions:
         params=[f'{s.prefix}capture_{i}: {"^" if refs[i] else ""}${s.prefix}Capture_{i}' for i in range(len(variables))]
         args=[f'&({s.render(child)})' if refs[i] else s.render(child) for i,(_,child) in enumerate(variables.values())]
         args=[s.mapping.wrap(arg,s.path,node.start,node.end,'debug-capture') for arg in args]
+        if lifetime:
+            params.append(self.fstrings.parameter())
+            args.append(lifetime.pointer)
         aliases={k:f'({s.prefix}capture_{i}{"^" if refs[i] else ""})' for i,k in enumerate(variables)}
         if result is False:
             result_type=None
         elif isinstance(result, tuple):
             for i in range(len(result)):
-                params.append(f'${s.prefix}Result_{i}: typeid')
-            result_type='('+', '.join(s.prefix+f'Result_{i}' for i in range(len(result)))+')'
+                if result[i] is None:params.append(f'${s.prefix}Result_{i}: typeid')
+            result_type='('+', '.join(typ or s.prefix+f'Result_{i}' for i,typ in enumerate(result))+')'
         elif result is None:
             params.append(f'${s.prefix}Result: typeid')
             result_type=('^' if pointer else '')+s.prefix+'Result'
@@ -126,13 +133,14 @@ class Expressions:
             self.helpers[key]='' # Nested helpers may refer back through type queries.
             self.captures.append(aliases)
             try:
-                hint = (tuple(Hint(s,node,s.prefix+f'Result_{i}') for i in range(len(result)))
+                hint = (tuple(Hint(s,node,typ or s.prefix+f'Result_{i}') for i,typ in enumerate(result))
                         if isinstance(result,tuple) else Hint(s,node,s.prefix+'Result') if result is None else None)
                 body=builder(hint)
             finally:
                 self.captures.pop()
             convention=' "odin"' if self.has_context(node) and not self.switches.global_context else ' "contextless"'
             returns=(' -> (value: '+result_type+', ok: bool) #optional_ok' if optional_ok else ' -> '+result_type) if result_type else ''
+            if returns and optional_tag:returns+=' #'+optional_tag
             privacy='@(private="file")\n' if scope is s.root else ''
             self.helpers[key]=s.mapping.wrap(f'\n{privacy}{name} :: proc{convention}({", ".join(params)}){returns} {{\n{body}\n}}\n',
                                              s.path,node.start,node.end,'expression-helper')
@@ -663,7 +671,7 @@ class Expressions:
         strings=self.module('strings','core:strings')
         fields=iter(n.group('args'))
         parts=[]
-        quote=chr(s.raw[n.start+1])
+        quote=chr(s.raw[n.start+(2 if n.data.get('manual_lifetime') else 1)])
         for part in n.data['parts']:
             if part['literal']:
                 text=s.text(part['start'],part['end']).replace('{{','{').replace('}}','}')

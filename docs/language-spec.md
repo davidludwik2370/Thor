@@ -507,6 +507,8 @@ The general formula uses addition, not n - i.
 Syntax:
     f"value: {expression}"
     f`raw text: {expression}`
+    f!"manual lifetime: {expression}"
+    f!`raw manual lifetime: {expression}`
     f"count: {number:,}"
     f"count: {number:>12,}"
 
@@ -532,8 +534,19 @@ Syntax:
 - Examples include >12, <12, ^12, '0'>8, and >12,. This is a documented subset of
   Python-style formatting; other Python specifiers are not implicitly supported.
   A comma requests integer grouping and is rejected for unsupported value types.
-- Ordinary proc use allocates the final string with context.allocator; the caller
-  owns it under normal Odin cleanup rules. No implicit temp-allocator lifetime.
+- Allocate the final string with context.allocator; no implicit temp allocator.
+  Named bindings and returned values retain explicit ownership. f! is legal in
+  a named binding and has the same cleanup requirements there as f.
+- An anonymous f-string used as a function argument is automatically deleted
+  after the enclosing expression finishes. Preserve it through all nested calls,
+  lazy operators, interpolation fields and selected branch evaluation. Apply
+  this rule by expression identity, not by the receiving procedure's name.
+- f! opts out of automatic temporary cleanup, including existing formatting/query
+  consumers. Use it for an API that retains or frees its input; that API then
+  defines ownership. This does not add a statically checked borrowing contract.
+  Literals/named strings and arbitrary string-returning procedure results are
+  not inferred to be disposable. Returned references to default argument
+  temporaries cannot outlive the expression; use f! or a surviving named owner.
 - Release owned intermediate formatting buffers, or write directly into the final
   builder. Never delete borrowed field values merely because they were formatted.
 - Track ownership of nested interpolation through runtime/compile-time branches.
@@ -549,8 +562,9 @@ Anonymous expression lifetimes (also applies to Set expressions):
   assignments). A loop's owned range survives until loop exit, including break,
   continue and return paths.
 - Assignment to a name and return expose ownership to the caller. Ordinary proc
-  arguments/results retain Odin's explicit ownership conventions: arbitrary procs
-  may retain, consume or return their arguments, so do not infer their lifetimes.
+  results, Set arguments and f! arguments retain explicit ownership conventions.
+  Default anonymous f-string arguments use the expression lifetime above;
+  temporary allocation headers use stack storage, without another heap allocation.
 - Keep an anonymous owner alive through a scoped read of its borrowed view, then
   release it. Reject escaping slices, field views, addresses and raw_data pointers
   that need a surviving owner; request a named owner in the diagnostic. Conservative

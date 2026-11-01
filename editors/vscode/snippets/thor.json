@@ -44,7 +44,7 @@
     "body": [
       "f\"${1:text} {${2:value}}\""
     ],
-    "description": "Caller-owned interpolated string"
+    "description": "Interpolated string; anonymous call arguments are freed after the expression"
   },
   "Switch expression": {
     "prefix": "switchexpr",
@@ -78,5 +78,12 @@
       "#run ${1:function}(${2:arguments})"
     ],
     "description": "Evaluate a direct eligible call at compile time"
+  },
+  "Manual-lifetime interpolated string": {
+    "prefix": "fkeep",
+    "body": [
+      "f!\"${1:text} {${2:value}}\""
+    ],
+    "description": "Interpolated string with explicit manual temporary ownership"
   }
 }

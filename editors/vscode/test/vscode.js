@@ -513,6 +513,16 @@ async function run() {
         const hardened = 'package main\nlast::proc "c"(a:[]int,i:int)->int{return a[i]}\nmain::proc(){value:=1;p:=&value;p^=2;a:=set[int]{1};b:=set[int]{2};a~=b;_=len(a~b);_=f"{(true ? f"nested {7}" : "borrowed")}";for item in set[int]{1,2}{_=item};delete(a);delete(b)}\n';
         await replace(hardened);
         await eventually(() => vscode.languages.getDiagnostics(testDocument.uri), values => values.length === 0);
+        const manualFstring='package main\ncheck::proc(text:string){}\nmain::proc(){message:=f!"manual {7}";check(f"automatic {message}");delete(message)}\n';
+        await replace(manualFstring);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(manualFstring.indexOf('message:=')+2)),values=>hoverText(values||[]).includes('message: string'));
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        await replace(manualFstring.replace('manual {7}','manual {missing}'));
+        const manualFstringErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('Undeclared')));
+        assert.equal(testDocument.getText(manualFstringErrors.find(value=>value.message.includes('missing')).range),'missing');
+        await replace(manualFstring);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const pure = 'package main\nsquare::fn(value:int)->int{return value*value}\nSIZE::#run square(3)\nmain::proc(){result:=#run square(4);_=result;data:[SIZE]int;_=data}\n';
         await replace(pure);
         await eventually(() => vscode.commands.executeCommand('vscode.executeHoverProvider', testDocument.uri,
@@ -615,6 +625,7 @@ async function run() {
             'constant string repetition hover and original-source count diagnostics with unsaved recovery',
             'interpolation/switch/Set inference', 'definition inside interpolation', 'mapped interpolation diagnostics',
             'native pointer assignment and Set xor', 'mixed nested interpolation', 'mapped temporary-view diagnostics',
+            'f! string hovers, anonymous f arguments, original field diagnostics and unsaved recovery',
             'pure function hover', '#run result inference', 'mapped unsaved purity diagnostics',
             'allocated #run result inference', 'mapped slice-constant diagnostic',
             'automatic constants', 'generic-dependent evaluation', 'mapped unsaved generic diagnostic',

@@ -106,6 +106,7 @@ Feature :: struct {
     selector: [2]int,
     cases: []Feature_Case,
     parts: []tokenizer.Interpolation_Part,
+    manual_lifetime: bool,
 }
 thor_span :: proc(node: ^ast.Node) -> [2]int {
     return [2]int{-1,-1} if node == nil else [2]int{node.pos.offset,node.end.offset}
@@ -156,7 +157,8 @@ parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
         append(&args,expr)
     }
     call := thor_call("__thor_interpolation",token.pos,end_pos(token),args[:])
-    append(&p.features,Feature{kind="Interpolation",start=call.pos.offset,end=call.end.offset,parts=parts})
+    append(&p.features,Feature{kind="Interpolation",start=call.pos.offset,end=call.end.offset,parts=parts,
+        manual_lifetime=len(token.text)>1 && token.text[1]=='!'})
     return call
 }
 

@@ -269,6 +269,8 @@ class BigNumbers:
         # generic/native constructor inputs remain borrowed for the call.
         owned=[(a.role('value') if a.kind=='FieldValue' else a) in converted or self.literal(a.role('value') if a.kind=='FieldValue' else a) is not None or
                self.e.ownership.may_own(a.role('value') if a.kind=='FieldValue' else a) for a in args]
+        owned=[own and not (self.shape(a.role('value') if a.kind=='FieldValue' else a).kind=='string' and
+                           self.e.fstrings.manages(a.role('value') if a.kind=='FieldValue' else a)) for a,own in zip(args,owned)]
         if not any(owned): return callee+'('+', '.join(rendered)+')'
         types=[self.shape(a.role('value') if a.kind=='FieldValue' else a) for a in args]
         count=2 if any(t.kind=='string' for t in types) else 1

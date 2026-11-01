@@ -614,9 +614,51 @@ formatting_and_strings :: proc() {
 
         // Not valid: dangling := f"trail {7}"[1:]
 
-        // Ordinary procedure calls are not a general ownership system. Bind an
-        // allocated argument before handing it to an arbitrary procedure, so
-        // that you still have an owner to free afterward.
+        // Named strings and ordinary factory returns still need an owner.
+        // The next block demonstrates automatic call-argument temporaries.
+    }
+
+    {
+        // Every procedure gets the same rule: an anonymous f-string argument
+        // lives until the whole expression finishes, then Thor deletes it.
+        // There is no special case for print or the standard fmt procedures.
+        borrowed_identity :: proc(text: string) -> string { return text }
+        println(f"  Automatically released: {1234567:,}")
+        assert(borrowed_identity(f"nested call {7}") == "nested call 7")
+
+        named := f"a named owner {8}"
+        manual_named := f!"also a named owner {9}"
+        defer delete(named)
+        defer delete(manual_named)
+        println(named, manual_named) // Neither named owner is deleted here.
+
+        for allocate in [false, true] {
+            // Only the selected anonymous allocation is released. The other
+            // branch borrows named, which is still valid after the call.
+            println(allocate ? f"temporary branch {10}" : named)
+        }
+        assert(named == "a named owner 8")
+
+        // f! explicitly leaves lifetime management to the receiving API.
+        // A retaining or consuming function needs this spelling, or a named
+        // owner whose lifetime the program manages explicitly.
+        retain :: proc(target: ^string, text: string) { target^ = text }
+        consume :: proc(text: string) { delete(text) }
+        retained: string
+        retain(&retained, f!"retained {11}")
+        defer delete(retained)
+        consume(f!`consumed raw {12}`)
+        assert(retained == "retained 11")
+
+        messages: [dynamic]string
+        append(&messages, f!"stored by append {13}")
+        assert(messages[0] == "stored by append 13")
+        delete(messages[0]) // Free element bytes before deleting the container.
+        delete(messages)
+
+        // f! does not verify that an API really takes ownership. Likewise,
+        // retaining a default f argument would outlive its temporary storage.
+        // Ordinary string factory calls keep their usual manual contracts.
     }
 }
 

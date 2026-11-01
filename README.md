@@ -777,8 +777,33 @@ Bare fills such as `界^5` and `0>12` are rejected. Omit the fill to use a space
 the caller. Internal formatting buffers and owned nested interpolations are
 released after use, including mixed branches such as
 `f"{(flag ? f"value {n}" : borrowed)}"`: only the selected owned string is freed.
-Named field values keep their existing ownership. A procedure that returns
-allocated storage still needs an explicit lifetime chosen by the caller.
+Named field values keep their existing ownership.
+
+Anonymous f-string arguments are temporary by default. Thor releases them when
+the whole enclosing expression finishes, including nested calls and selected
+conditional/switch branches. This applies to every function, including native
+Odin functions; printing has no special compiler rule.
+
+```odin
+print(f"value {n}")                  // Automatically freed after printing.
+print(identity(f"value {n}"))        // Lives through both calls.
+save_for_later(f!"value {n}")        // Opt out: the receiving API owns cleanup.
+append(&messages, f!"value {n}")     // Containers retain string headers too.
+
+text := f"value {n}"                 // Named owners still require deletion.
+defer delete(text)
+other := f!"value {n}"               // Legal; same ownership as a named f string.
+defer delete(other)
+```
+
+The `f!` spelling also supports raw backticks. It disables automatic temporary
+cleanup; use it when the receiving API retains or deletes the argument. This is
+a caller-controlled lifetime rule, not a checked borrowing contract. Returning
+or storing a reference to a default anonymous argument beyond its expression
+would leave a dangling reference. Named strings, literals and arbitrary
+string-returning procedures are not automatically deleted at call sites.
+Ordinary factory results still need the lifetime specified by their API.
+See [the lifetime implementation and validation notes](docs/fstring-lifetimes.md).
 
 Expression switches require a default arm. Arms may supply one result or a
 comma-separated list of results. They support comma-separated cases and native ranges, check duplicate
@@ -1032,7 +1057,8 @@ formatters. Other direct calls require inspectable, transitively eligible bodies
 allocator overrides and custom record formatters are rejected. Each checked
 function uses private tracking scratch storage, including for interpolation;
 all outstanding internal allocations are released on every return. Ordinary
-`proc` allocation and f-string ownership retain their existing manual rules.
+`proc` results and named f-string owners retain explicit cleanup. Anonymous
+f-string arguments follow the expression lifetime rule described above.
 
 String/slice results own independent backing storage, including input views and
 repeated aliases inside arrays, records and tagged unions. Promotion uses the

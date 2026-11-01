@@ -109,6 +109,36 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_fstring_argument_cleanup_keeps_original_breakpoints_and_user_step_into(self):
+        text='''package main
+read::proc(text:string)->int{
+    count:=len(text)
+    return count
+}
+main::proc(){
+    named:=f!"named {8}"
+    count:=read(f"temporary {7}")
+    assert(count==11 && named=="named 8")
+    delete(named)
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[8,9])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        observed=[]
+        for _ in range(12):
+            client.request('stepIn',{'threadId':thread})
+            thread,frame=self.frame(client)
+            observed.append((frame['source']['path'],frame['line']))
+            if frame['source']['path']==str(source) and frame['line']==3:break
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),3),observed)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),9),frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_big_runtime_switch_and_local_constant_keep_original_breakpoints(self):
         text='''package main
 main::proc(){

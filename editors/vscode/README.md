@@ -285,6 +285,10 @@ TLS analyzes original source positions and supports the Thor parser extensions,
 file-local selected import aliases, inferred-array types, and sequence membership.
 It also parses quoted/raw interpolation, runtime/compile-time switches and Set
 types/literals; fields and arms retain completion/hover/definition positions.
+`f!"..."` and raw `f!` backtick literals use the same string/embedded-expression
+scopes as ordinary f-strings. Their `!` is part of the lifetime prefix. Default
+anonymous f-string arguments are freed after the enclosing expression; f! opts
+out, while named bindings retain explicit cleanup.
 The grammar highlights embedded expressions independently from string text,
 including nested quotes and braces. Negative indices use native expression scopes.
 Explicit interpolation fills use Odin rune literals, e.g. `{"é😀":'界'^5}` or

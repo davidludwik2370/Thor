@@ -669,7 +669,8 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	pos := offset_to_pos(t, offset)
 
 	switch ch := t.ch; true {
-	case t.thor && ch == 'f' && (peek_rune(t, 0) == '"' || peek_rune(t, 0) == '`'):
+	case t.thor && ch == 'f' && (peek_rune(t, 0) == '"' || peek_rune(t, 0) == '`' ||
+		peek_rune(t, 0) == '!' && (peek_rune(t, 1) == '"' || peek_rune(t, 1) == '`')):
 		kind = .String
 		lit, _ = scan_interpolated(t)
 	case is_letter(ch):

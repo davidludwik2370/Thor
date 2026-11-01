@@ -13,7 +13,7 @@ class NativeSources:
     @staticmethod
     def support(source):
         runtime=Path(__file__).resolve().parents[1] / 'runtime'
-        return source.path.parent.parent==runtime and source.path.parent.name in {'eval','pure','format','numeric','sequence','sets','big'}
+        return source.path.parent.parent==runtime and source.path.parent.name in {'eval','pure','format','numeric','sequence','sets','big','temporaries'}
 
     def __init__(self, project, root=None):
         self.project = project

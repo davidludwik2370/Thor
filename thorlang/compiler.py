@@ -221,6 +221,7 @@ class Source:
         spreading = self.thor and any(n.kind=='Call' and (n.data.get('roles',{}).get('ellipsis') or
             any(a.kind=='Unary' and a.data['op']=='**' for a in n.group('args'))) for n in self.nodes)
         for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
+                              ('temporaries',self.thor and any(n.kind=='Interpolation' for n in self.nodes)),
                               ('pure',spreading or any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call','Range'} for n in self.nodes)),
                               ('sequence',spreading or self.thor and any(n.kind in {'Index','Slice'} for n in self.nodes)),
@@ -560,7 +561,13 @@ class Source:
             self.error_messages[token] = message
             code = token
         else:
-            code = self._render(n, expected, constant)
+            # User procedure literals establish their own invocation lifetime;
+            # they must never capture a surrounding call's temporary scope.
+            lifetimes=self.expressions.fstrings
+            saved=lifetimes.frames
+            if n.kind=='Procedure':lifetimes.frames=[]
+            try:code = self._render(n, expected, constant)
+            finally:lifetimes.frames=saved
         if n in self.guards:
             code = self.guard_code(self.guards[n]) + code
         if n in self.evaluation_query_checks:
@@ -614,6 +621,8 @@ class Source:
             value=self.run_values[n]
             if callable(value):return value(expected,constant)
             return value['constant' if constant else 'runtime'] if isinstance(value,dict) else value
+        lifetime_code=self.expressions.fstrings.render(n,expected,constant)
+        if lifetime_code is not None:return lifetime_code
         if kind == 'Procedure' and self.resolver:
             invalid_default = (self.defaults.errors.get(n) if self.defaults else None)
             if not invalid_default and not (self.defaults and n in self.defaults.plans):

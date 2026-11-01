@@ -66,7 +66,13 @@ feature metadata and adapts only its editor AST, keeping original source spans.
 producers. Consumers release them after use; branch results carry an ownership
 flag, union chains reuse fresh left tables, and loop cleanup covers every exit.
 Unused expressions and blank destinations also release their owned results.
-Named results and arbitrary user procedure contracts remain manual. Set elements
+Named results and arbitrary user procedure contracts remain manual. Anonymous
+f-string call arguments additionally live through the entire enclosing expression;
+`f!` opts out. `thorlang/fstrings.py` records their headers/allocators in a stack
+scope and threads that scope through generated helpers without hoisting argument
+evaluation or adding heap allocations. User procedure literals establish separate
+invocation scopes. Named f/f! bindings and ordinary factory results remain manual.
+Set elements
 retain shallow ownership. Escaping temporary views require a named owner; safe
 immediate reads carry the owner until the read finishes. Test new consumers with
 Odin's tracking allocator, including mixed branches and early exits. Broad TLS

@@ -20,6 +20,7 @@ Info :: struct {
     using_field: bool,
     variadic: bool,
     optional_ok: bool,
+    optional_allocator_error: bool,
     roles: map[string]Span,
     lists: map[string][]Span,
 }
@@ -169,6 +170,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Proc_Type:
         info.kind = "ProcedureType"; info.roles["params"] = span(n.params); info.roles["results"] = span(n.results)
         info.optional_ok = .Optional_Ok in n.tags || .Optional_Allocator_Error in n.tags
+        info.optional_allocator_error = .Optional_Allocator_Error in n.tags
         if cc,ok:=n.calling_convention.(string);ok {info.calling_convention=strings.trim(cc,"\"`")}
         else if n.calling_convention!=nil {info.calling_convention="foreign"}
     case ^ast.Foreign_Block_Decl:

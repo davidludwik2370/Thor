@@ -42,7 +42,7 @@ class Ownership:
         if n is None: return False
         if n.kind == 'Paren': return self.may_own(n.role('expr'))
         if self.s.big.enabled and self.s.big.fresh(n): return True
-        if n.kind == 'Interpolation': return True
+        if n.kind == 'Interpolation': return not n.data.get('manual_lifetime',False)
         if n.kind == 'Compound' and n.role('type'):
             return self.s.resolver.type_node(n.role('type')).kind == 'set'
         if self.generic_math(n): return True
@@ -78,7 +78,7 @@ class Ownership:
         annotation = self.e.type_code(hint) if hint else None
         code.append(f'{value}: {annotation} = {self.s.render(n, hint)}' if annotation else f'{value} := {self.s.render(n)}')
         owned = 'false'
-        if self.may_own(n):
+        if self.may_own(n) and not self.e.fstrings.captured(n):
             if self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'big_integer','big_rational'}:
                 owned='true'
             elif self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'generic','unknown'}:

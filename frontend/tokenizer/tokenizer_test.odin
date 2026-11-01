@@ -56,3 +56,23 @@ thor_interpolation_nested_quotes_and_original_positions :: proc(t:^testing.T){
     testing.expect_value(t,scan(&lexer).text,"~=")
     testing.expect_value(t,lexer.error_count,0)
 }
+
+@(test)
+thor_manual_interpolation_and_boolean_not_remain_distinct :: proc(t:^testing.T){
+    context.allocator=context.temp_allocator
+    sources := [?]string{`f!"owned {f"nested {7}"}"`,"f!`raw {7}`"}
+    for source in sources {
+        lexer:Tokenizer
+        init(&lexer,source,"source.thor")
+        lexer.thor=true
+        token:=scan(&lexer)
+        testing.expect_value(t,token.kind,.String)
+        testing.expect_value(t,token.text,source)
+        testing.expect_value(t,lexer.error_count,0)
+    }
+    lexer:Tokenizer
+    init(&lexer,"f != other","source.thor")
+    lexer.thor=true
+    testing.expect_value(t,scan(&lexer).kind,.Ident)
+    testing.expect_value(t,scan(&lexer).text,"!=")
+}

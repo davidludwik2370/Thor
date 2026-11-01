@@ -30,7 +30,7 @@ The walkthrough covers:
 | `conditional_expressions` | Multiline/lazy ternaries, selector and boolean switches, contextual results, default/enum coverage rules |
 | `compile_time_selection` | Both `#switch` forms, declaration selection, `#if`/`#else if`, inactive names and native `when` |
 | `immutable_storage` | Runtime initialization, protected subobjects, mutable copies, shallow slice/pointer immutability |
-| `formatting_and_strings` | Quoted/raw/nested fstrings, literal braces, quoted Unicode fills, grouping, order, owned strings and borrowed views |
+| `formatting_and_strings` | Quoted/raw/nested fstrings, literal braces, quoted Unicode fills, grouping, order, named owners, borrowed views, anonymous argument cleanup, mixed branches and f! ownership transfer |
 | `sets_and_ownership` | Type/library spellings, lazy allocation, all operators, independent results, anonymous cleanup, shallow keys and aliases |
 | `negative_indices` | Reads/writes/addresses, slices, dynamic arrays, UTF-8 bytes, ordinary negative map keys, once-only evaluation |
 | `power_and_native_expansion` | Precedence, associativity, float coercion, strict operand types, fixed-width integers, prefix `**` expansion |
