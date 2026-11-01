@@ -53,6 +53,7 @@ class Purity:
     type_queries={'type_of','size_of','align_of','offset_of'}
     libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}
+    libraries |= {('thor:big',name) for name in ['from_integer','rational_from_integer','fraction','parse_integer','parse_rational','parse_fraction','clone','numerator','denominator','to_string','equal','is_zero','sum','ascending','descending']}
     native_constants={('core:math',name) for name in ['PI','TAU','E','SQRT_TWO','SQRT_THREE','SQRT_FIVE']}
     scalar_intrinsics = {'sqrt', 'fused_mul_add', 'count_ones', 'count_zeros',
         'count_leading_zeros', 'count_trailing_zeros', 'count_leading_ones',
@@ -134,8 +135,8 @@ class Purity:
         library=self.library(call)
         if library not in self.libraries:return False
         package=call.source.import_dir(library[0])
-        if library[0]=='thor:format':
-            return package==Path(__file__).resolve().parents[1]/'runtime'/'format'
+        if library[0] in {'thor:format','thor:big'}:
+            return package==Path(__file__).resolve().parents[1]/'runtime'/library[0].split(':')[1]
         return package is None # installed native package, not a user override
 
     def primitive(self,callee,seen=None):
@@ -218,8 +219,8 @@ class Purity:
                       for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
         parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types")}}']
-        if s.big.enabled:
-            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{{native}.validate(T,Result && !Allow_Owned,Depth)}}')
+        if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
+            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc")}}}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
         count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
         parts.append(f'#assert({meta}.type_struct_field_count(T)==({count}),"Pure record fields could not be fully resolved")')
@@ -640,7 +641,7 @@ class Purity:
                 value=next((a.role('value') for a in args if a.kind=='FieldValue' and a.role('field').text=='value'),args[0] if args else None)
                 if value:
                     def body(_):
-                        return f'{self.module(source)}.validate_format(type_of({source.render(value)}))\nreturn '+source._render(n,expected,constant)
+                        return f'{source.expressions.module("format")}.validate_pure_value(type_of({source.render(value)}))\nreturn '+source._render(n,expected,constant)
                     name,args=source.expressions.closed(n,body,result='string',flavor='pure_format')
                     return f'{name}({", ".join(args)})'
             finally:self.rendering.remove(n)

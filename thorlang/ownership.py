@@ -79,7 +79,9 @@ class Ownership:
         code.append(f'{value}: {annotation} = {self.s.render(n, hint)}' if annotation else f'{value} := {self.s.render(n)}')
         owned = 'false'
         if self.may_own(n):
-            if self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'generic','unknown'}:
+            if self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'big_integer','big_rational'}:
+                owned='true'
+            elif self.s.big.enabled and self.s.big.fresh(n) and self.e.shape(n).kind in {'generic','unknown'}:
                 typ=self.native_type(n)
                 owned=f'({typ}=={self.s.big.module()}.Integer || {typ}=={self.s.big.module()}.Rational)'
                 if self.generic_math(n):owned=f'({owned} || {self.e.set_trait("("+typ+"){ }")})'
@@ -152,6 +154,7 @@ class Ownership:
         """Consume Set operands, or owned strings used in comparisons."""
         op = n.data['op']
         left, right = n.role('left'), n.role('right')
+        if self.s.denotes_type(left) or self.s.denotes_type(right):return None
         sets = self.generic_math(n)
         if constant or not (sets or op in self.comparisons and (self.may_own(left) or self.may_own(right))): return None
         # Comparisons of ordinary borrowed Sets use the existing direct path.

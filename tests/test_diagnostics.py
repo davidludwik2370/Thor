@@ -48,7 +48,7 @@ class DiagnosticTests(unittest.TestCase):
             ('value:=Integer(f64(1))','f64(1)','exact integer inputs'),
             ('value:=Rational(1,0)','0','denominator must not be zero'),
             ('value:=Integer(123);value="wrong"','"wrong"','Cannot'),
-            ('VALUE::Integer(123)','Integer(123)','Compile-time Integer/Rational'),
+            ('VALUE::Integer(123);VALUE+=1','VALUE+=1','read-only'),
         ]:
             source='// original header\npackage main\nmain::proc(){/* 😀 */ '+body+'}\n'
             with self.subTest(body=body):

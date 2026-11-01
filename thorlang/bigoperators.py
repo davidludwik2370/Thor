@@ -23,14 +23,15 @@ class BigOperators:
         values=self.operands(node)
         if any(self.s.denotes_type(v) for v in values):return False
         types=[self.big.shape(v) for v in values]
+        if any(t.kind=='scalar' and t.name=='typeid' for t in types):return False
         if any(t.kind in self.kinds for t in types):return True
         if any(t.kind=='generic' or t.kind=='unknown' and v.kind!='ImplicitSelector' and v.text not in {'nil','---'} for v,t in zip(values,types)):return True
         expected=self.big.expected(hint)
-        return bool(expected and expected.kind in self.kinds and all(self.s.resolver.membership_untyped(v) for v in values))
+        return bool(expected and expected.kind in self.kinds|{'generic'} and all(self.s.resolver.membership_untyped(v) for v in values))
 
     def chosen(self,node,hint):
         expected=self.big.expected(hint)
-        if expected and expected.kind in self.kinds:return self.e.type_code(hint)
+        if expected and expected.kind in self.kinds|{'generic'}:return self.e.type_code(hint)
         operands=self.operands(node)
         for kind in [self.kinds,{'generic','unknown'}]:
             for operand in operands:
@@ -39,13 +40,15 @@ class BigOperators:
 
     def context_node(self,node,hint):
         expected=self.big.expected(hint)
-        if expected and expected.kind in self.kinds:return hint.node
+        if expected and expected.kind in self.kinds|{'generic'}:return hint.node
         values=self.operands(node)
         return next((v for v in values if self.big.shape(v).kind in self.kinds),
                     next((v for v in values if self.big.shape(v).kind in {'generic','unknown'}),values[0]))
 
     def render(self,node,hint,constant):
         if not self.handles(node,hint):return None
+        if self.big.default_value(node):
+            if not any(self.big.shape(value).kind in self.kinds for value in self.operands(node)):return None
         if constant:
             concrete=any(self.big.shape(v).kind in self.kinds for v in self.operands(node))
             requested=self.big.expected(hint)
@@ -72,7 +75,8 @@ class BigOperators:
             for i,value in enumerate(self.operands(node)):
                 name=self.s.prefix+f'big_operand_{node.start}_{i}'
                 origin=self.context_node(node,hint)
-                expected=Hint(origin.source,origin,typ)
+                from .semantics import Type
+                expected=Hint(origin.source,origin,typ,Type('generic'))
                 code=self.big.owned(value,expected)
                 lines.append(self.big.mapped(value,f'{name}: {typ} = {code}'))
                 lines.append(f'defer {self.big.module()}.compiler_destroy(&{name})')

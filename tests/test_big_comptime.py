@@ -36,6 +36,10 @@ assert(big.equal(RATIO,RATIO))
 VALUE::Integer(123456789012345678901234567890)
 RATIO::Rational(22,13)
 ''',flags=())
+        self.invoke(self.program('context.allocator=mem.nil_allocator();copy:=CHOICE;_=copy',
+            'import "core:mem"\nCHOICE::#switch {case true:Integer(123);case:Integer(0)}\n'),fail='allocation failed')
+        self.invoke(self.program('CHOICE+=1',
+            'CHOICE::#switch {case true:Integer(123);case:Integer(0)}\n'),command='check',fail='read-only')
 
     def test_constants_are_readonly_and_domain_errors_map_to_source(self):
         for body in ['VALUE=Integer(2)','VALUE+=1','_=&VALUE','delete(VALUE)']:
@@ -45,6 +49,8 @@ RATIO::Rational(22,13)
                                ('VALUE::Rational(1,0)','denominator'),('VALUE::Rational(2)**0.5','whole exponents'),
                                ('VALUE::Integer(1)+Rational(2)','matching types'),('VALUE::Integer(1)<<-1','nonnegative')]:
             with self.subTest(prefix=prefix):self.invoke(self.program('_=VALUE',prefix+'\n'),command='check',fail=message)
+        for expression in ['Integer(Rational(2))','Rational(Rational(2),3)']:
+            self.invoke(self.program('_=VALUE','VALUE::'+expression+'\n'),command='check',fail='integer inputs')
 
     def test_fn_and_run_results_preserve_values_before_deferred_deletion(self):
         self.run_big('''
@@ -116,6 +122,38 @@ identity::fn(value:Integer)->Integer{return value}
 LOCAL::library.VALUE+1
 a:=LOCAL;expect(a,"124");delete(a)
 ''','import "library"\n',files={'library/main.thor':'package library\nVALUE::Integer(123)\n'})
+
+    def test_constant_operators_match_independent_native_runtime_operations(self):
+        import random
+        rng=random.Random(90331)
+        declarations=[];checks=[]
+        for index in range(8):
+            a=rng.randrange(-2**220,2**220);b=rng.randrange(1,2**160)*rng.choice([-1,1])
+            prefix=f'I{index}_'
+            declarations.extend([f'{prefix}A::Integer({a})',f'{prefix}B::Integer({b})'])
+            checks.append('{a:=Integer('+str(a)+');b:=Integer('+str(b)+')')
+            for step,op in enumerate(['+','-','*','/','%','%%','&','|','~','&~']):
+                name=prefix+'RESULT_'+str(step)
+                declarations.append(f'{name}::{prefix}A {op} {prefix}B')
+                checks.append(f'assert({name}==a {op} b)')
+            for step,expression in enumerate(['a<<4','a>>4','a**3','~a','-a']):
+                name=prefix+'UNARY_'+str(step)
+                declarations.append(name+'::'+expression.replace('a',prefix+'A'))
+                checks.append(f'assert({name}==({expression}))')
+            checks.append('delete(a);delete(b)}')
+            prefix=f'R{index}_'
+            declarations.extend([f'{prefix}A::Rational({a},13)',f'{prefix}B::Rational({b},17)'])
+            checks.append('{a:=Rational('+str(a)+',13);b:=Rational('+str(b)+',17)')
+            for step,op in enumerate(['+','-','*','/','%','%%']):
+                name=prefix+'RESULT_'+str(step)
+                declarations.append(f'{name}::{prefix}A {op} {prefix}B')
+                checks.append(f'assert({name}==a {op} b)')
+            checks.append('delete(a);delete(b)}')
+        self.run_big('\n'.join(checks),'\n'.join(declarations)+'\n')
+
+    def test_big_switch_ranges_reject_overlaps_and_preserve_open_boundaries(self):
+        self.run_big('assert(SELECTED==2)','VALUE::Integer(3)\nSELECTED::#switch VALUE {case 0..<3:1;case 3..<5:2;case:0}\n')
+        self.invoke(self.program('_=SELECTED','VALUE::Integer(3)\nSELECTED::#switch VALUE {case 0..<4:1;case 3..<5:2;case:0}\n'),command='check',fail='overlapping')
 
 
 class BigValueProtocolTests(base.unittest.TestCase):

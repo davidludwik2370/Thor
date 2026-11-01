@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.26.0"
+VERSION = "0.27.0"
 
 
 def backend_failure(status):
@@ -177,6 +177,16 @@ class Project:
                                   if name not in self.default_collections}
         self._old_manifest=old_manifest
         self._planned=generated
+        # Settle logical numeric constant types before any value-copy lowering,
+        # including forward declarations and selected compile-time switch arms.
+        for source in self.sources.values():
+            if source.big.enabled:
+                for declaration in source.nodes:
+                    if declaration.kind=='Declaration' and not declaration.data.get('mutable',True):
+                        annotation=declaration.role('type')
+                        kind=source.resolver.type_node(annotation).kind if annotation else None
+                        hint=source.big.type_hint(kind) if kind in {'big_integer','big_rational'} else None
+                        for value in declaration.group('values'):source.big.constants.render(value,hint)
         from .shared import Runtime
         runtime=Runtime(self,ROOT) if self.use_shared and not self.purity.eval_mode else None
         runtime_base=ROOT/'runtime'

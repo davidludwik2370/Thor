@@ -4,8 +4,8 @@ This is the explicit native API underlying Thor's built-in `Integer`/`Rational`
 types. Thor stage 2 adds exact unquoted literals, read-only dot properties, and
 automatic direct numeric copying/replacement. See the
 [language walkthrough](../../examples/big_numbers/demo.thor) and
-[remaining stages](../../docs/arbitrary-precision.md). Operators and compile-time
-big values are still pending.
+[language reference](../../docs/arbitrary-precision.md). Exact operators, read-only constants, fn/#run, formatting and library integration
+are implemented. See the integration walkthrough linked from that reference.
 
 Use `import "thor:big"` from any Thor project. Native Odin users can supply
 `-collection:thor=/path/to/Thor/runtime`.
@@ -139,3 +139,13 @@ and `try_compare` return result/error; partial values and scratch are released o
 failure. Results are independent owners. `Invalid_Exponent` and `Invalid_Shift`
 distinguish domain errors from allocation failure. See
 [the operator demo](../../examples/big_operators/demo.thor).
+
+## Language integration helpers
+
+`sum`, `ascending` and `descending` borrow numeric inputs; `sum` returns an owned
+number. They back the shared basic library's generic functions. Native `fmt`
+registration lives in `thor:format` as `add_big_formatters(&registry)` and is
+explicit, so existing applications retain control of their formatter registry.
+Compiler-prefixed procedures are trusted lowering support, not additional
+language syntax. The native API keeps shallow header assignments; use clone for
+independent owners.

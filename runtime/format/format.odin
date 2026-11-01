@@ -4,6 +4,8 @@ package thor_format
 import "base:intrinsics"
 import "core:fmt"
 import "core:unicode/utf8"
+import "core:io"
+import "thor:big"
 
 Alignment :: enum { Default, Left, Right, Center }
 
@@ -17,11 +19,12 @@ format_options :: proc(
     align: Alignment = .Default,
     fill: rune = ' ',
     allocator := context.allocator,
-) -> string where !grouping || intrinsics.type_is_integer(T) {
+) -> string where !grouping || intrinsics.type_is_integer(T) || T==big.Integer {
     assert(width >= 0, "format width must be nonnegative")
     assert(fill >= 0 && fill <= 0x10ffff && !(0xd800 <= fill && fill <= 0xdfff), "format fill must be a Unicode scalar")
     text: string
-    when grouping { text = fmt.aprintf("%d", value, allocator=allocator) }
+    when T==big.Integer || T==big.Rational {text=big.to_string(value,allocator)}
+    else when grouping { text = fmt.aprintf("%d", value, allocator=allocator) }
     else { text = fmt.aprint(value, allocator=allocator) }
     defer delete(text, allocator)
 
@@ -35,7 +38,7 @@ format_options :: proc(
     padding := max(0, width-text_width)
     alignment := align
     if alignment == .Default {
-        when intrinsics.type_is_numeric(T) { alignment = .Right }
+        when intrinsics.type_is_numeric(T) || T==big.Integer || T==big.Rational { alignment = .Right }
         else { alignment = .Left }
     }
     left, right := 0, 0
@@ -68,6 +71,25 @@ format_plain :: proc(value: $T, width: int = 0, align: Alignment = .Default, fil
 
 format :: proc{format_plain, format_options}
 
-group_integer :: proc(value: $T, allocator := context.allocator) -> string where intrinsics.type_is_integer(T) {
+group_integer :: proc(value: $T, allocator := context.allocator) -> string where intrinsics.type_is_integer(T) || T==big.Integer {
     return format(value, grouping=true, allocator=allocator)
+}
+
+// Dynamic values used by basic.print/table. No global fmt registry is changed.
+value_string :: proc(value:any,allocator:=context.allocator)->string {
+    if value.id==typeid_of(big.Integer){return big.to_string((cast(^big.Integer)value.data)^,allocator)}
+    if value.id==typeid_of(big.Rational){return big.to_string((cast(^big.Rational)value.data)^,allocator)}
+    return fmt.aprint(value,allocator=allocator)
+}
+write_value :: proc(writer:io.Writer,value:any) {
+    if value.id==typeid_of(big.Integer) || value.id==typeid_of(big.Rational) {
+        text:=value_string(value);defer delete(text)
+        fmt.wprint(writer,text,flush=false)
+    } else {fmt.wprint(writer,value,flush=false)}
+}
+
+validate_pure_value :: proc "contextless"($T:typeid) {
+    when !(T==big.Integer || T==big.Rational || intrinsics.type_is_boolean(T) || intrinsics.type_is_numeric(T) || intrinsics.type_is_enum(T) || intrinsics.type_is_string(T)) {
+        #panic("Pure formatting supports deterministic scalar/string values only; custom record formatters are not eligible")
+    }
 }

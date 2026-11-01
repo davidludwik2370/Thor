@@ -12,6 +12,28 @@ class BigTLSTests(unittest.TestCase):
     semantic_spans=tls.TLSTests.semantic_spans
     assert_original_identifier_tokens=tls.TLSTests.assert_original_identifier_tokens
 
+    def test_builtins_shared_library_and_generic_components_keep_logical_hovers(self):
+        text='''package main
+import "thor:basic"
+component::proc(value:$T)->Integer{return value.numerator}
+main::proc(){
+ a:=Integer(-2)
+ magnitude:=abs(a)
+ smallest:=min(9,a)
+ bounded:=clamp(a,-1,1)
+ values:=[Integer(1),Integer(2)]
+ total:=basic.sum(values[:])
+ maximum,ok:=max(..values[:])
+ part:=component(Rational(22,13))
+ _=magnitude;_=smallest;_=bounded;_=total;_=maximum;_=ok;_=part
+}
+'''
+        client,main=self.open(text,compiler=False)
+        for name in ['magnitude:=','smallest:=','bounded:=','total:=','maximum,','part:=']:
+            with self.subTest(name=name):self.assertIn('Integer',json.dumps(self.hover(client,main,text,name)))
+        self.assertIn('bool',json.dumps(self.hover(client,main,text,'ok:=')))
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+
     def test_compile_time_big_values_hover_rename_and_readonly_diagnostics(self):
         text='''package main
 VALUE::Integer(123456789012345678901234567890)

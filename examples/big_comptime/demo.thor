@@ -4,7 +4,6 @@ package main
 
 import "core:fmt"
 import "thor:big"
-import "thor:pure"
 
 // These numbers never pass through a native machine integer or floating point.
 LARGE :: Integer(1234567890123456789012345678901234567890)
@@ -43,8 +42,8 @@ main :: proc() {
     defer delete(runtime)
     assert(runtime == value ** 3)
 
-    // General formatting integration follows in stage five. Explicit conversion
-    // already produces a normal caller-owned string.
+    // Explicit conversion produces a normal caller-owned string. F-strings and
+    // basic.print can also format these numbers directly; see big_integration.
     text := big.to_string(computed)
     defer delete(text)
     fmt.println("22 to the twentieth power:", text)

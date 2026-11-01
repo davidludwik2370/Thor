@@ -13,6 +13,8 @@ import "base:runtime"
 import "core:slice"
 import "core:math/rand"
 import "thor:sets"
+import "thor:big"
+import "thor:format"
 
 // Allocating, shallow collection conversions. Free each returned container;
 // to_slice returns keys in unspecified order. Both accept allocator=.
@@ -23,7 +25,10 @@ to_slice :: sets.to_slice
 print :: proc(args:..any, sep:=" ", flush:=true, end:="\n"){
     // Write directly: fmt.print's temporary buffer cannot survive flush=false.
     writer := os.to_stream(os.stdout)
-    fmt.wprint(writer, ..args, sep=sep, flush=false)
+    for arg,i in args {
+        if i>0 do fmt.wprint(writer,sep,flush=false)
+        format.write_value(writer,arg)
+    }
     fmt.wprint(writer, end, flush=flush)
 }
 
@@ -31,22 +36,28 @@ type :: proc(_: $T) -> typeid { return typeid_of(T) }
 size :: proc(_: $T) -> int    { return size_of  (T) }
 
 asc :: proc(first: $T, rest: ..T) -> bool {
+    when T==Integer || T==Rational {return big.ascending(first,..rest)}
+    else {
     previous := first
     for v in rest {
         if previous > v do return false
         previous = v
     }
     return true
+    }
 }
 
 // Equal adjacent values are allowed by both asc and desc.
 desc :: proc(first: $T, rest: ..T) -> bool {
+    when T==Integer || T==Rational {return big.descending(first,..rest)}
+    else {
     previous := first
     for v in rest {
         if previous < v do return false
         previous = v
     }
     return true
+    }
 }
 
 ordered :: proc(vals: ..$T) -> bool {
@@ -214,12 +225,15 @@ filter :: proc(vals: []$T, f: proc(x: T)->bool, allocator:=context.allocator) ->
 
 // Empty inputs yield T's zero value. Arithmetic keeps Odin's overflow rules.
 sum :: proc(vals: []$T) -> T
-where intrinsics.type_is_numeric(T) {
+where intrinsics.type_is_numeric(T) || T==Integer || T==Rational {
+    when T==Integer || T==Rational {return big.sum(vals)}
+    else {
     total: T
     for val in vals {
         total += val
     }
     return total
+    }
 }
 
 // Half-open integer ranges. Wrong direction, equal bounds, or a zero step
@@ -451,6 +465,7 @@ where intrinsics.type_is_struct(T) {
         cells[col] = normalize(name)
 
         floating := false
+        if info.types[col].id==typeid_of(Integer) || info.types[col].id==typeid_of(Rational) {numeric[col]=true}
         #partial switch _ in runtime.type_info_base(info.types[col]).variant {
         case runtime.Type_Info_Integer, runtime.Type_Info_Complex, runtime.Type_Info_Quaternion:
             numeric[col] = true
@@ -460,7 +475,7 @@ where intrinsics.type_is_struct(T) {
 
         for row in 0..<len(data) {
             value := any{rawptr(uintptr(&data[row]) + info.offsets[col]), info.types[col].id}
-            text := floating ? fmt.aprintf(float_format, value) : fmt.aprint(value)
+            text := floating ? fmt.aprintf(float_format, value) : format.value_string(value)
             cells[(row+1)*columns+col] = normalize(text)
             delete(text)
         }

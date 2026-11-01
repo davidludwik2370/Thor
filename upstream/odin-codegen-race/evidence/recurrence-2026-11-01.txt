@@ -1,0 +1,18 @@
+Odin backend recurrence during Thor arbitrary-precision integration tests
+
+macOS report: odin-2026-11-01-004257.ips
+Exception: EXC_BAD_ACCESS / SIGSEGV / KERN_INVALID_ADDRESS at 0x0
+Test: native generic constant defaults in a project with Integer/Rational support
+
+Leading faulting frames:
+  alloc_cstring(gbAllocator, String) +896
+  lb_type_internal(lbModule*, Type*) +680
+  lb_type(lbModule*, Type*) +568
+  lb_type_internal(lbModule*, Type*) +4704
+  lb_type(lbModule*, Type*) +568
+
+The first three symbol/offset pairs match the existing captured code-generation
+race. Thor reported a backend SIGSEGV, rather than attaching a false source error.
+Eight isolated repeated builds of the numeric/default-parameter fixture passed.
+The same default-parameter regression test also passed on its isolated retry.
+The installed Odin compiler has not been changed, and no upstream report was sent.

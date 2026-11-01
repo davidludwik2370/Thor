@@ -1,6 +1,9 @@
 // Trusted compiler bridge. Native Odin callers still use explicit clone/destroy.
 package thor_big
 
+import "base:runtime"
+import "thor:sets"
+
 integer :: proc{from_integer, parse_integer}
 rational :: proc{rational_from_integer, clone_rational, parse_rational, fraction, parse_fraction}
 
@@ -41,9 +44,9 @@ compiler_destroy_value :: proc(value: $T) {
     }
 }
 // Preserve native delete behavior for other generic specializations.
-compiler_delete :: proc(target: ^$T) {
-    when T == Integer || T == Rational { destroy(target) }
-    else { delete(target^) }
+compiler_delete :: proc(target: ^$T)->runtime.Allocator_Error {
+    when T == Integer || T == Rational { destroy(target);return .None }
+    else { return sets.compiler_delete(target^) }
 }
 compiler_optional_ok :: proc "contextless"(value: $T) -> bool {
     when T == bool { return value }

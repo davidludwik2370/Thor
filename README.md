@@ -7,12 +7,14 @@ milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
-Arbitrary-precision stages 1–3 add predefined `Integer`/`Rational` types, exact
-unquoted literals, constructors, read-only components, direct-copy ownership, and
-exact runtime operators. Compile-time constants and formatting follow next. See
-[the commented demo](examples/big_numbers/demo.thor),
+Arbitrary-precision stages 1–5 implement predefined `Integer`/`Rational` types,
+exact unquoted literals, constructors, read-only components, direct-copy ownership,
+runtime operators, read-only constants, fn/#run, formatting and shared-library
+integration. See [the introductory demo](examples/big_numbers/demo.thor),
+[the compile-time demo](examples/big_comptime/demo.thor),
+[the integration demo](examples/big_integration/demo.thor),
 [the runtime API](runtime/big/README.md), and
-[the design and roadmap](docs/arbitrary-precision.md).
+[the language reference](docs/arbitrary-precision.md).
 
 Odin compatibility is checked against real projects as well as focused tests.
 The [October compatibility audit](docs/compatibility-audit-2026-10-29/README.md)

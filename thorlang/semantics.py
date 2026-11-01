@@ -389,7 +389,10 @@ class Resolver:
             arms = [n.source.at(c['result'], n) for c in n.data['cases']]
             value = next((a for a in arms if a.kind != 'SwitchBreak' and not self.is_panic_call(a)), None)
             return self.result_type(value, index, seen) if value else Type(node=n)
-        if n.kind == 'CompileSwitchExpr': return Type(node=n)
+        if n.kind == 'CompileSwitchExpr':
+            data=n.source.big.constants.payloads.get(n,{})
+            if data.get('kind') in {'big_integer','big_rational'}:return Type(data['kind'],'Integer' if data['kind']=='big_integer' else 'Rational',n,witness=n)
+            return Type(node=n)
         if n.kind == 'Call':
             target=self.type_node(n.role('callee'))
             if target.kind in {'big_integer','big_rational'}:
@@ -407,6 +410,8 @@ class Resolver:
             return Type(node=n)
         seen.add(n)
         kind = n.kind
+        data=n.source.big.constants.payloads.get(n,{})
+        if data.get('kind') in {'big_integer','big_rational'}:return Type(data['kind'],'Integer' if data['kind']=='big_integer' else 'Rational',n,witness=n)
         if kind=='Run':return self.type_of(n.role('expr'),seen)
         if kind == 'Interpolation':
             return Type('string','string',n,witness=n)
@@ -467,6 +472,9 @@ class Resolver:
                 return Type("array", node=n, elem=self.type_of(elements[0], seen) if elements else Type(), length=len(elements), witness=n)
         if kind == "Call":
             callee = n.role("callee")
+            if n.source.big.enabled:
+                numeric=n.source.big.integration.result(n)
+                if numeric is not None:return replace(numeric,witness=n)
             operand = n.source.expressions.extrema.element(n)
             if operand is not None:
                 return self.type_of(operand, seen).elem or Type(node=n)

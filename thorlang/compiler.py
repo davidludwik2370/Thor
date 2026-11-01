@@ -73,6 +73,7 @@ class Hint:
     source: Source
     node: Node
     expression: str | None = None
+    semantic: object = None
 
 
 class Source:
@@ -499,6 +500,8 @@ class Source:
             plan = self.resolver.call_plans.get(call) or self.resolver.resolve_call(call)
             if plan:
                 return plan.signature
+            target=self.resolver.type_of(call.role('callee'))
+            if target.kind=='procedure' and target.node:return target.node
         callee = call.role("callee")
         declaration = self.declaration_for(callee)
         if declaration:
@@ -729,6 +732,8 @@ class Source:
                     hint = Hint(param.source, param, query)
                 if self.resolver:
                     hint = self.resolver.call_hint(n, arg, index) or hint
+                if self.big.enabled:
+                    hint=self.big.call_hint(n,arg,index) or hint
                 overrides[arg] = (hint, constant or n.role("callee").text in {"#assert", "#config"})
             callee = n.role("callee")
             args = n.group("args")
@@ -1009,7 +1014,7 @@ class Source:
             code += self.mapping.wrap(f'\n@(private="file")\n{self.prefix}default_value :: proc "contextless" (value: $T) -> T {{ return value }}\n', self.path, *array_span, "support")
         if self.needs_membership:
             operation = next(n for n in self.nodes if n.kind == "Binary" and n.data["op"] in {"in", "not_in"})
-            code += self.mapping.wrap("\n" + membership_helpers(self.prefix,self.expressions.module('sets')), self.path, operation.start, operation.end, "membership-helper")
+            code += self.mapping.wrap("\n" + membership_helpers(self.prefix,self.expressions.module('sets'),self.big.module() if self.big.enabled else None), self.path, operation.start, operation.end, "membership-helper")
         for namespace, alias in self.hidden_namespaces.items():
             code += self.mapping.wrap(f'\nimport {alias} {json.dumps(self.import_code(namespace))}\n',
                                       self.path, 0, 0, "support")
@@ -1020,7 +1025,7 @@ class Source:
         return code
 
 
-def membership_helpers(prefix,sets):
+def membership_helpers(prefix,sets,big=None):
     signatures = {
         "array": "$C/[$N]$E",
         "slice": "$C/[]$E",
@@ -1031,7 +1036,7 @@ def membership_helpers(prefix,sets):
     for name, signature in signatures.items():
         parts.append(f'''@(private="file")
 {prefix}{name} :: proc "contextless" (values: {signature}, value: E) -> bool {{
-    for element in values {{ if element == value {{ return true }} }}
+    for element in values {{ if {big+'.compiler_equal(element,value)' if big else 'element == value'} {{ return true }} }}
     return false
 }}
 ''')

@@ -25,6 +25,7 @@ class BigRuntimeTests(unittest.TestCase):
             self.skipTest('Odin is required')
         with tempfile.TemporaryDirectory(prefix='thor-big-native-') as temporary:
             result = subprocess.run([odin, 'test', str(ROOT / 'runtime' / 'big'),
+                '-collection:thor='+str(ROOT/'runtime'),
                 '-out:' + str(Path(temporary) / 'big-tests'),
                 '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'],
                 text=True, capture_output=True, timeout=120)

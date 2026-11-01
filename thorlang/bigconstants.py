@@ -57,7 +57,23 @@ class BigConstants:
             return self.evaluate(symbol.value,annotation or kind)
         if node.kind=='Call':
             target=source.big.constructor(node)
-            if not target:raise NotConstant()
+            if not target:
+                name=source.big.integration.builtin(node)
+                typ=source.big.integration.result(node) if name else None
+                chosen=kind or (typ.kind if typ and typ.kind in {'big_integer','big_rational'} else None)
+                if not name or not chosen:raise NotConstant()
+                args=node.group('args')
+                numbers=[]
+                for arg in args:
+                    shape=resolver.type_of(arg)
+                    if shape.kind in {'big_integer','big_rational'} and shape.kind!=chosen:raise ValueError('Integer/Rational operands must have matching types.')
+                    if shape.kind not in {'big_integer','big_rational'} and not resolver.membership_untyped(arg):raise NotConstant()
+                    numbers.append(bigvalues.number(self.evaluate(arg,chosen)))
+                if name=='abs' and len(numbers)==1:result=abs(numbers[0])
+                elif name in {'min','max'} and numbers:result=(min if name=='min' else max)(numbers)
+                elif name=='clamp' and len(numbers)==3:result=min(max(numbers[0],numbers[1]),numbers[2])
+                else:raise NotConstant()
+                return bigvalues.packet(chosen,result)
             args=node.group('args');named={};positional=[]
             for arg in args:
                 if arg.kind=='FieldValue':
@@ -70,6 +86,7 @@ class BigConstants:
                 values=positional+[v for k,v in named.items() if k=='value']
                 if len(values)!=1:raise ValueError('A numeric constructor requires one value or a numerator/denominator pair.')
                 value=self.evaluate(values[0],target.kind)
+                if target.kind=='big_integer' and value['kind']=='big_rational':raise ValueError('Integer/Rational constructors require exact integer inputs or text; convert Rational values explicitly first.')
                 # Constructing Rational from Integer is explicit and exact.
                 return bigvalues.packet(target.kind,bigvalues.number(value))
             values=[]
@@ -78,7 +95,9 @@ class BigConstants:
                 elif index<len(positional):values.append(positional[index])
                 else:raise ValueError('Rational requires a numerator and denominator.')
             if len(args)!=2:raise ValueError('Rational requires a numerator and denominator.')
-            n,d=[bigvalues.number(self.evaluate(v,'big_integer')) for v in values]
+            contents=[self.evaluate(v,'big_integer') for v in values]
+            if any(v['kind']!='big_integer' for v in contents):raise ValueError('Rational numerator and denominator require Integer or native integer inputs.')
+            n,d=[bigvalues.number(v) for v in contents]
             if not d:raise ValueError('A Rational denominator must not be zero.')
             return bigvalues.packet('big_rational',Fraction(n,d))
         if node.kind in {'Unary','Binary'}:

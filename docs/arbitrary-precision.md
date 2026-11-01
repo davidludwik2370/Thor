@@ -1,6 +1,6 @@
 # Integer and Rational: design and implementation stages
 
-This records the accepted design. Stages 1–4 are implemented. Broad formatting and library integration follow in stage 5.
+This records the accepted design. Stages 1–5 are implemented. This document records behavior and intentional boundaries.
 See the [commented language demo](../examples/big_numbers/demo.thor) and
 [explicit runtime API](../runtime/big/README.md).
 
@@ -130,14 +130,14 @@ hashing/equality is added.
    interactions, including `a,b=b,a+1`.
 4. **Compile-time support (implemented):** exact constants, read-only data, fn/#run,
    arbitrary-size value protocol, independent reconstruction and caching.
-5. **Integration/hardening (pending):** formatting, aggregate/native boundaries,
+5. **Integration/hardening (implemented):** formatting, aggregate/native boundaries,
    memory/debugging, complete TLS behavior, commented demo and full suites.
 
 Every user-facing batch includes source-map diagnostics, relevant TLS work,
 regression/interaction tests, and documentation. See the
 [stage-two implementation and validation record](arbitrary-precision-stage2.md).
 
-## Current stage-two boundaries and examples
+## Ownership boundaries and examples
 
 Run `thor run examples/big_numbers --track-allocations=basic` for the language
 walkthrough. The stage-one `examples/big_runtime` demo still exercises the native
@@ -167,11 +167,11 @@ package API, now with direct Thor numeric-copy ownership enabled.
   Implicit direct copies use the current allocator. Global initialization uses
   Odin's default context before `main`, so main-scoped tracking does not see those
   allocations; this follows existing global-initializer behavior.
-- Read-only properties resolve on concrete Rational values/pointers. A helper
-  accepting `Rational` works generically at its call sites; unconstrained generic
-  member dispatch for these computed properties is deferred to integration work.
-- Use `big.to_string` for display for now; it returns an allocated string that
-  the caller frees. General `fmt`/f-string formatting integration comes in stage 5.
+- Read-only properties resolve on concrete and generic Rational receivers,
+  including pointers. Ordinary records retain fields with the same names.
+- F-strings and `basic.print`/`basic.table` display logical numbers. Use
+  `big.to_string` for an owned explicit conversion. Native `fmt` integration uses
+  an explicit registry, described below.
 - Big `::` constants, exact constant operators and big `fn`/`#run` results are
   implemented. Constants borrow read-only limbs; runtime copies own allocations.
   Distinct big types and big map keys/set elements remain explicitly rejected;
@@ -217,9 +217,9 @@ source diagnostics and TLS hover/edit recovery. The focused language/runtime
 regression run passed 42 tests; the broader numeric/power/diagnostic run passed
 142, TLS/rename passed 149, native TLS passed 1,126, and native bigint ASan plus
 allocation-failure sweeps passed 13. Original-source arithmetic stepping was
-also checked through CodeLLDB. Integration of numeric library
-builtins, membership, shared `basic` generics, and unconstrained computed
-properties belongs to stage five; compile-time constants/evaluation are next.
+also checked through CodeLLDB. Compile-time support and library integration are
+described below; the final combined verification is recorded in
+[the hardening report](arbitrary-precision-hardening.md).
 
 ## Compile-time numbers (stage four)
 
@@ -227,7 +227,9 @@ See [the compile-time walkthrough](../examples/big_comptime/demo.thor).
 Constant construction and arithmetic preserve exact source digits and fractions,
 including negative division/remainder, shifts, bitwise operations, and powers.
 Constants can feed compile-time conditions and switches, other constants, and
-`fn`/`#run` calls. Literal native operands still require the same contextual
+`fn`/`#run` calls. The lightweight constant folder handles numeric literals and
+expressions; use `:: #run Integer(...)` (or a known-argument fn call) when inputs
+require native typed conversions, intrinsics, or procedure evaluation. Literal native operands still require the same contextual
 coercion as runtime expressions; typed native values require explicit conversion.
 
 Runtime access uses small allocation-free native headers over `@(rodata)` limb
@@ -258,3 +260,70 @@ These values cannot be native Odin generic *constant parameters* (`$N: Integer`)
 pass a borrowed numeric parameter to `fn`/`#run` instead. Generic type parameters
 instantiated with Integer/Rational remain supported. Cross-target `#run` retains
 the existing host-execution restriction; ordinary rodata constants are portable.
+
+## Integration and hardening (stage five)
+
+[The integration demo](../examples/big_integration/demo.thor) runs with `-debug`.
+Untyped numeric literals adopt the big operand/context, including compound updates:
+
+```odin
+a: Integer = 1
+a += 2                 // 3; no explicit Integer(2) required.
+n := 2
+a += Integer(n)         // A typed native variable needs explicit conversion.
+```
+
+`abs`, `min`, `max` and `clamp` return independent owned numeric results.
+Fixed-array expansion and optional slice reductions work with `min`/`max`; an
+empty slice returns zero and `ok=false`. All candidates are evaluated in source
+order, and literal candidates are contextual. Native/generic instantiations keep
+native behavior. `min(Integer)` has no finite bound and remains invalid.
+
+Sequence membership compares numeric contents. Named containers are borrowed;
+anonymous Thor array-list elements and needles are released after the comparison.
+As with other array lists, every element is evaluated before testing membership.
+Generic `r.numerator`/`r.denominator` reads dispatch by actual type, preserving
+ordinary fields with the same names. Generic writes/address-taking reject actual
+Rational properties while ordinary mutable record fields remain usable.
+
+F-strings render canonical decimal integers and reduced fractions, clean up
+anonymous arithmetic/components, and support deterministic pure formatting.
+Integer grouping and numeric alignment work normally; Rational grouping is
+rejected. `basic.print` and `basic.table` format numeric values automatically;
+table numeric columns align right. Shared `basic.sum`, `asc`, `desc`, `ordered`
+and the default `sorted` comparator support these logical types. Sorting/filtering
+and whole aggregate copies retain their documented shallow element ownership.
+
+Odin `fmt` owns a global custom-formatter registry. Thor does **not** install or
+replace that global registry implicitly. To format numbers with native `fmt`,
+including numbers nested inside records/containers, use its normal setup:
+
+```odin
+import "core:fmt"
+import "thor:format"
+
+registry: map[typeid]fmt.User_Formatter
+format.add_big_formatters(&registry)
+// Add your own formatters to the same map before installing it.
+fmt.set_user_formatters(&registry)
+defer format.destroy_formatter_registry(&registry) // After the final fmt call.
+```
+
+The cleanup helper detaches the registry before freeing it, so subsequent
+formatting (including finalizers) cannot read a freed map. Keep a registry alive
+longer if finalizers also need its custom formatters.
+
+The numeric formatters support `%v`/`%s`, plus Integer `%d`, using exact decimal
+contents and ordinary string padding. Use f-string numeric options for grouping.
+The registry is an explicit runtime capability; custom formatter callbacks remain
+ineligible for pure computation. Native .odin code retains explicit ownership.
+
+Pure promotion uses allocation-free, init-registered logical clone/destroy hooks.
+The base pure runtime has no dependency on the bigint backend, avoiding cycles
+when checked math, time or OS functions themselves need pure validation. Numeric
+payloads never expose the backend's allocator or limb implementation to CTFE.
+
+The runtime/ownership, exact Fraction/Python arithmetic oracles, allocation-failure
+sweeps, cache invalidation, native-library compatibility, TLS stdio/editor tests,
+and real CodeLLDB stepping checks form the regression coverage. The complete
+validation record is in [the hardening report](arbitrary-precision-hardening.md).

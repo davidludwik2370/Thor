@@ -894,7 +894,7 @@ class Evaluator:
                 parameter=f'{source.prefix}meta.type_proc_parameter_type(type_of({source.prefix}meta.procedure_of({expr})),0)'
                 guards.append(f'{helper.purity.validator(source)}({parameter},false,true,0)')
                 if library[0]=='thor:format':
-                    guards.append(f'{helper.purity.module(source)}.validate_format({parameter})')
+                    guards.append(f'{source.expressions.module("format")}.validate_pure_value({parameter})')
         output='\n'.join([*guards,f'{result_name}:={emitted}\n{alias}.emit({result_name})'])
         inner=output
         for scope in n.ancestors():
