@@ -2390,3 +2390,27 @@ format fills. Real VS Code tests verify that call/field bracket matching remains
 active and literal parentheses do not match, across seven ordinary/interpolated
 forms and unsaved replacements. All 118 extension tests and the full isolated
 VS Code integration suite pass.
+
+## Power diagnostic cascades through numeric dispatch
+
+Reproduced the user's `double_bet` case using a copy of its source. An immutable
+loop binding initialized by `HOUSE_ODDS ** i`, with `thor:basic` imported, emitted
+a generated numeric-dispatch return failure before the actual `f64`/`int` power
+mismatch. The existing filter handled `power-type` query failures, but this
+additional failure mapped to the outer Binary operation instead.
+
+Recognize failed returns of unresolved compiler-generated `$...Result` type
+parameters before sanitizing generated names. Mark those failures as cascades;
+the existing range-aware filter drops one only when a primary error belongs to
+the same source expression. Actual typed returns and user generic parameters
+retain their errors, and an isolated failure is never silently discarded.
+Power mismatch messages also request an explicit conversion and explain that
+only untyped numeric constants are coerced. The fix applies to both CLI output
+and TLS compiler diagnostics; it requires no TLS or extension rebuild.
+
+Validation: 103 diagnostic/source-map and power tests pass. Regressions cover
+the original enum-table/constant/immutable-loop interaction, a simultaneous
+unrelated undeclared name, and a genuine return-type error. Both affected TLS
+tests pass, including the original operation range and unsaved `f64(i)` recovery.
+A copied version of the user's full file now emits one readable power error;
+adding the explicit cast checks successfully. The original file was untouched.

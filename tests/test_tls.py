@@ -1928,6 +1928,35 @@ main::proc(){result:=square(SIZE);data:[SIZE]int;assert(work(3)==9);_=result;_=d
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
 
+    def test_power_mismatch_in_immutable_loop_value_reports_only_original_operation_and_clears(self):
+        text='''// original 😀 header
+package main
+import * "thor:basic"
+Games::enum{roulette}
+HOUSE_ODDS_TABLE::[Games]f64{.roulette=.5263157894736842}
+main::proc(){
+    GAME::Games.roulette
+    HOUSE_ODDS::HOUSE_ODDS_TABLE[GAME]
+    for i in 1..=10 {
+        loss:>HOUSE_ODDS ** i
+        _=loss
+    }
+}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='matching operand types')
+        self.assertEqual(len(errors),1,errors)
+        error=errors[0]
+        self.assertEqual(error['range'],{'start':{'line':9,'character':14},'end':{'line':9,'character':29}})
+        self.assertIn('f64 vs int',error['message'])
+        self.assertIn('Convert an operand explicitly',error['message'])
+        self.assertNotIn('Thor expression',error['message'])
+        self.assertNotIn('return statement',error['message'])
+        client.notifications.clear()
+        changed=text.replace('HOUSE_ODDS ** i','HOUSE_ODDS ** f64(i)')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_range_membership_constraints_hover_tokens_and_unsaved_errors(self):
         text='''package main
 allowed::proc($N:int)->int where N in 0..<10{return N}

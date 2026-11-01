@@ -67,6 +67,7 @@ class Diagnostics:
         result, seen = [], set()
         for error in errors:
             msgs = list(error.get("msgs") or [])
+            generated_result_failure = False
             for name in self.hidden_parameters:
                 msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false))?', '',m) for m in msgs]
             for token, message in self.error_messages.items():
@@ -98,7 +99,8 @@ class Diagnostics:
             if origin and origin.kind=='power-type':
                 mismatch=next((re.search(r"Mismatched types in (?:binary expression .* : |ternary if expression, )(.+)",m) for m in msgs if 'Mismatched types in ' in m),None)
                 if mismatch:
-                    msgs=["Power ('**') requires matching operand types: "+mismatch[1]+'. Untyped numeric constants may be coerced.']
+                    msgs=["Power ('**') requires matching operand types: "+mismatch[1]+'.',
+                          'Convert an operand explicitly; only untyped numeric constants are coerced.']
                 elif any('String concatenation' in m or 'not defined' in m or 'not supported' in m for m in msgs):
                     msgs=["Power ('**') requires integer or floating-point operands."]
             # These are public Thor support contracts, rather than an error in
@@ -202,6 +204,17 @@ class Diagnostics:
                         original_text = self.read(source_file)[start:end].decode("utf-8")
                         if generated_text and generated_text != original_text:
                             msgs = [m.replace(generated_text, original_text) for m in msgs]
+                # An unresolved generated result parameter is not a real return
+                # type. For example, a power mismatch can leave the enclosing
+                # numeric-dispatch helper returning '$__thor_..._Result'. Keep
+                # that failure only if no underlying error covers its source
+                # expression. Actual typed returns (and user generic parameters)
+                # must retain their ordinary diagnostics.
+                generated_result_failure = not origin.exact and any(
+                    message.startswith('Cannot assign value ') and 'in return statement' in message
+                    and re.search(r"of type '\$"+re.escape(prefix)+r"Result(?:_\d+)?'",message)
+                    for message in msgs for prefix in self.prefixes
+                )
                 # Generated implementation names never belong in user diagnostics.
                 for name in self.hidden_parameters:
                     msgs=[re.sub(r'(?:,\s*)?'+re.escape(name)+r'\s*=\s*true\b','',m) for m in msgs]
@@ -220,7 +233,8 @@ class Diagnostics:
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             diagnostic["_cascade"] = bool(origin and not origin.exact and (
-                origin.kind in {'range-type','power-type'} or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
+                generated_result_failure or origin.kind in {'range-type','power-type'}
+                or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
             if msgs and msgs[0].startswith("Power ('**') requires"):
                 diagnostic['_cascade']=False
             if origin and origin.kind=='power-type' and msgs and (msgs[0].startswith('Cannot convert numeric value') or 'truncated to' in msgs[0]):

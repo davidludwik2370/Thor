@@ -419,6 +419,38 @@ class DiagnosticTests(unittest.TestCase):
         self.assertNotIn('type_of',json.dumps(errors))
         self.assertNotIn('runtime/',json.dumps(errors))
 
+    def test_power_mismatch_in_immutable_loop_binding_has_no_generated_return_cascade(self):
+        source='''// original 😀 header
+package main
+import * "thor:basic"
+Games::enum{roulette}
+HOUSE_ODDS_TABLE::[Games]f64{.roulette=.5263157894736842}
+main::proc(){
+    GAME::Games.roulette
+    HOUSE_ODDS::HOUSE_ODDS_TABLE[GAME]
+    for i in 1..=10 {
+        prob_loss:>HOUSE_ODDS ** i
+        _=prob_loss
+    }
+}
+'''
+        errors=self.at(source,'HOUSE_ODDS ** i',message='matching operand types')
+        self.assertEqual(len(errors),1,errors)
+        self.assertEqual(errors[0]['pos']['end_offset']-errors[0]['pos']['offset'],len('HOUSE_ODDS ** i'))
+        self.assertIn('f64 vs int',errors[0]['msgs'][0])
+        self.assertNotIn('Thor expression',json.dumps(errors))
+        self.assertNotIn('return statement',json.dumps(errors))
+
+    def test_generated_power_cascade_filter_preserves_independent_and_real_return_errors(self):
+        source='package main\nimport * "thor:basic"\nmain::proc(){HOUSE_ODDS::f64(.52);for i in 1..=10{loss:>HOUSE_ODDS ** i;_=loss};_=missing}\n'
+        errors=self.at(source,'HOUSE_ODDS ** i',message='matching operand types')
+        self.assertEqual(len(errors),2,errors)
+        self.assertTrue(any(e['pos']['offset']==source.index('missing') and 'Undeclared' in e['msgs'][0] for e in errors))
+        self.assertNotIn('Thor expression',json.dumps(errors))
+        errors=self.at('package main\nbad::proc(value:int)->bool{return value**2}\nmain::proc(){_=bad(2)}\n',
+                       'value**2',message='return statement')
+        self.assertTrue(any("to 'bool'" in e['msgs'][0] for e in errors),errors)
+
     def test_power_undefined_operand_and_unsupported_type(self):
         errors=self.at('package main\nmain::proc(){_=2**missing}\n','missing',message='Undeclared')
         self.assertEqual(len(errors),1,errors)

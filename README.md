@@ -451,6 +451,13 @@ back to the operation that instantiated them. Empty-array and membership failure
 have Thor-specific explanations; redundant inference errors are suppressed when
 the underlying expression already has a diagnostic.
 
+Power operand mismatches underline the original `**` expression and name both
+types. For example, `HOUSE_ODDS ** i` with `f64` and `int` operands reports the
+type mismatch and asks for an explicit conversion. A failed generated result
+type can also cause a secondary return error; that error is suppressed when
+the original expression already has an error. Genuine user return-type errors
+remain visible.
+
 Thor supports inline generic callback defaults in named procedures:
 
 ```odin
