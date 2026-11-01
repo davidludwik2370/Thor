@@ -554,7 +554,7 @@ formatting_and_strings :: proc() {
         place := "cedar gate"
         walkers := 12_345
 
-        message := f"Meet at {place}; permits {walkers:'0'>9,}"
+        message := f"Meet at {place}; permits {walkers:'0'9,}"
         defer delete(message)
 
         assert(message == "Meet at cedar gate; permits 00012,345")
@@ -574,7 +574,47 @@ formatting_and_strings :: proc() {
         defer delete(unicode)
 
         assert(unicode == "界界é😀界界")
-        // Not valid: f"{walkers:0>9,}" // bare fills are not accepted
+        // Not valid: f"{walkers:>9,}" // use 9, for right alignment
+    }
+
+    {
+        // Use Odin's format verbs without the leading %. f/F defaults to three
+        // decimal places; e/E defaults to six; .N requests explicit precision.
+        // A percentage multiplies by 100 and includes the % in the width.
+        probability := 0.123456
+        percentage := f"{probability:10.2%}"
+        defer delete(percentage)
+        assert(percentage == "    12.35%")
+
+        // Width is a minimum. Right alignment is the default for strings too;
+        // - selects left alignment, ^ centers. < and > are no longer accepted.
+        // Precision on a string truncates before quoting or width is applied.
+        label := f"{"é😀tail":'_'8.2s}|{"left":-6s}"
+        defer delete(label)
+        assert(label == "______é😀|left  ")
+
+        // Numeric 0 padding goes after the sign. A quoted '0' is literal fill,
+        // so it pads outside the complete text. # requests the native prefix.
+        numbers := f"{-42:08d}|{-42:'0'8d}|{42:#08x}|{1234567.125:,.2f}"
+        defer delete(numbers)
+        assert(numbers == "-0000042|00000-42|0x00002a|1,234,567.12")
+
+        // Exact arithmetic is not converted through f64 for decimal formatting.
+        // This example intentionally exceeds native integer precision.
+        enormous := Integer(123456789012345678901234567890)
+        third := Rational(1, 3)
+        defer delete(enormous)
+        defer delete(third)
+        exact := f"{enormous:.2f}|{third:.20f}|{third:.6g}"
+        defer delete(exact)
+        assert(exact == "123456789012345678901234567890.00|0.33333333333333333333|0.333333")
+        println(" ", percentage, " ", numbers)
+
+        // Not valid: f"{third:g}". A repeating Rational has no finite shortest
+        // decimal; g/G requires significant-digit precision. The default remains
+        // the exact reduced fraction, 1/3. This rule also covers terminating values.
+        // The same formats work in fn constants and #run, with sized storage for
+        // high precision. See docs/interpolation-formatting.md for the full table.
     }
 
     {
@@ -1746,7 +1786,7 @@ big_formatting_and_libraries :: proc() {
         defer delete(ordinary)
         assert(component == 22 && ordinary == 7)
 
-        text := f"{Integer(12345678901234567890):,} {fraction:>8} {Integer(2) + 3}"
+        text := f"{Integer(12345678901234567890):,} {fraction:8} {Integer(2) + 3}"
         nested := f"outer {f"inner {Integer(2) ** 10}"}"
         compiled := #run tour_big_description(22)
         defer delete(text)

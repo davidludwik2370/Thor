@@ -1527,7 +1527,11 @@
         },
         {
           "name": "keyword.operator.interpolation.format.thor",
-          "match": "[<>^,]"
+          "match": "[+ #^,.\\-]"
+        },
+        {
+          "name": "storage.type.format.thor",
+          "match": "[vwTtdibozxXcrUqfFeEgGhHspmM%]"
         }
       ]
     }

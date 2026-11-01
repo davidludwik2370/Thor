@@ -110,7 +110,7 @@ for (const [name, source, word, scope, line] of [
     ['interpolation field', 's := f"hello {value}"', 'value', 'variable'],
     ['nested interpolation string', 's := f"{echo("inner")}"', 'inner', 'string.quoted.double'],
     ['raw interpolation field', 's := f`hello {value}`', 'value', 'variable'],
-    ['brace fill stays in format', 's := f"{1:\'}\'>3} after"', ' after', 'string.quoted.double'],
+    ['brace fill stays in format', 's := f"{1:\'}\'3} after"', ' after', 'string.quoted.double'],
     ['nested switch field', 's := f"{switch x{case 1:value;case:0}}"', 'value', 'variable'],
     ['nested Set literal field', 's := f"{len(set[int]{1,2})}"', 'set', 'storage.type.set'],
     ['set literal type', 's := set[int]{1,2}', 'set', 'storage.type.set'],
@@ -338,7 +338,7 @@ test('literal brackets never participate in pairing, including text around neste
         'print("ordinary (text) [braces] {braces}")',
         'print(`raw (text) [braces] {braces}`)',
         'print(\'(\', \')\', \'[\', \']\', \'{\', \'}\')',
-        'print(f"{7:\'(\'>5}")',
+        'print(f"{7:\'(\'5}")',
     ]){
         const tokens=themedTokens(source)[0];
         let literalBrackets=0,codeBrackets=0;
@@ -430,9 +430,9 @@ test('inline comparator procedure keywords are dark blue in a multiline generic 
 test('format fills are rune literals, widths are numbers, format punctuation stays neutral',()=>{
     for(const source of [
         'text := f`raw \\n {"é😀":\'界\'^5}`',
-        'text := f"{1234567:\'0\'>12,}"',
-        'text := f"{1:\'}\'>3} after"',
-        'text := f`{1:\'`\'<3}`',
+        'text := f"{1234567:\'0\'12,}"',
+        'text := f"{1:\'}\'3} after"',
+        'text := f`{1:\'`\'-3}`',
         String.raw`text := f"{1:'\u754c'^5}"`,
     ]){
         const tokens=themedTokens(source)[0],format=source.indexOf(':',source.indexOf('{'));
@@ -441,7 +441,7 @@ test('format fills are rune literals, widths are numbers, format punctuation sta
         assert.equal(tokens[open].color,'#CE9178');
         for(let at=close+1;at<source.indexOf('}',close+1);at++){
             if(/\d/.test(source[at]))assert.deepEqual({color:tokens[at].color,type:tokens[at].type},{color:'#B5CEA8',type:0});
-            if(/[<>^,]/.test(source[at])){
+            if(/[+ #^,.\-]/.test(source[at])){
                 assert.equal(tokens[at].type,0);
                 assert.equal(tokens[at].color,'#D4D4D4');
             }
@@ -505,4 +505,31 @@ test('manifest owns Thor without replacing Odin', () => {
     assert.deepEqual(manifest.contributes.languages[0].extensions, ['.thor']);
     assert.equal(manifest.contributes.languages[0].id, 'thor');
     assert.equal(manifest.contributes.grammars[0].scopeName, 'source.thor');
+});
+
+
+test('Odin-style format verbs flags and precision stay outside string/bracket scopes',()=>{
+    for(const source of [
+        's := f"{value:+012,.2f}"',
+        's := f`{ratio:.6g} {text:\'界\'^12.3s}`',
+        's := f"{odds:10.2%}"',
+        's := f"{text:q} {integer:#08x}"',
+    ]){
+        const tokens=themedTokens(source)[0];
+        let offset=0;
+        for(const token of tokenize(source)[0]){
+            const end=offset+token.text.length;
+            if(token.scopes.includes('meta.interpolation.format.thor')){
+                for(let i=offset;i<end;i++){
+                    if(token.scopes.includes('constant.numeric.thor')) assert.equal(tokens[i].color,'#B5CEA8');
+                    if(token.scopes.includes('keyword.operator.interpolation.format.thor')) assert.equal(tokens[i].color,'#D4D4D4');
+                    if(token.scopes.includes('storage.type.format.thor')){
+                        assert.equal(tokens[i].color,'#569CD6');
+                        assert.equal(tokens[i].type,0,'Verbs belong to embedded code');
+                    }
+                }
+            }
+            offset=end;
+        }
+    }
 });

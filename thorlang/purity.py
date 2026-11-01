@@ -51,7 +51,7 @@ class Purity:
               'complex','quaternion','real','imag','jmag','kmag','conj','swizzle',
               'make','copy','delete','assert','assert_contextless','panic'}
     type_queries={'type_of','size_of','align_of','offset_of'}
-    libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),
+    libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),('thor:format','format_spec'),
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}
     libraries |= {('thor:big',name) for name in ['from_integer','rational_from_integer','fraction','parse_integer','parse_rational','parse_fraction','clone','numerator','denominator','to_string','equal','is_zero','sum','ascending','descending']}
     native_constants={('core:math',name) for name in ['PI','TAU','E','SQRT_TWO','SQRT_THREE','SQRT_FIVE']}
@@ -333,7 +333,7 @@ class Purity:
         if library in {('core:strings','clone'),('core:slice','clone'),('thor:format','group_integer')}:
             return len(positional)>1
         if library and library[0]=='thor:format':
-            limit=5 if library[1]=='format_options' else 4
+            limit=5 if library[1] in {'format_options','format_spec'} else 4
             return len(positional)>limit
         return False
 

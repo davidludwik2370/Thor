@@ -806,7 +806,7 @@ main :: proc() {
         case: "other"
     }
     value := switch { case len(tail) == 2: 1234567; case: 0 }
-    text := f"{{label}} {label}: {value:'0'>12,}"
+    text := f"{{label}} {label}: {value:'0'12,}"
     assert(text == "{label} after: 0001,234,567")
     delete(text)
     delete(names)
@@ -816,12 +816,15 @@ main :: proc() {
 Interpolation accepts quoted or raw backtick literals. `{{` and `}}` escape
 literal braces. Fields contain real Thor expressions, including nested literals,
 switches and interpolations. Parenthesize a ternary before a format separator.
-The format grammar is `[[rune-literal]align][width][,]`: align with `<`, `>` or `^`,
-use a literal decimal width, and add `,` for integer grouping. Width counts
-Unicode runes. An explicit fill is a single-quoted Odin rune followed by an
-alignment: `'界'^5` or `'0'>12,`. Rune escapes work too, such as `'\u754c'^5`.
-Bare fills such as `界^5` and `0>12` are rejected. Omit the fill to use a space:
-`^5`, `>12` or `12`. Fields execute once, left to right. The final string is owned by
+The [format grammar](docs/interpolation-formatting.md) is
+`[quoted-fill][flags][width][,][.precision][verb]`, following Odin's `fmt` verbs.
+For example, `.2f`, `12.2f`, `-12.2f`, `#08x`, `012,.2f`, and `.2%`.
+Alignment defaults to right for every type; `-` means left and `^` means center.
+`<` and `>` are removed. Unicode fills use quoted runes (`'界'^12s`);
+width counts runes. `f/F` defaults to three decimal places, `e/E` to six,
+and native `g/G` to shortest round-trip text. Big-number decimals are exact;
+Rational `g/G` requires explicit precision (`.6g`). String `.10s` truncates at
+rune boundaries. Large precisions use sized storage. Fields execute once, left to right. The final string is owned by
 the caller. Internal formatting buffers and owned nested interpolations are
 released after use, including mixed branches such as
 `f"{(flag ? f"value {n}" : borrowed)}"`: only the selected owned string is freed.

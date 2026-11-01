@@ -2061,6 +2061,40 @@ main::proc(){_=GLOBAL;_=SELECTED}
             self.assertIsNotNone(result)
             self.assertIn(':: 7',result['contents']['value'])
 
+    def test_precision_formats_hover_original_tokens_and_unsaved_diagnostic_recovery(self):
+        text='''package main
+render::fn(value:Rational)->string{return f"{value:.6g}"}
+main::proc(){
+ ratio:=Rational(1,3)
+ message:=f"😀 {ratio:.6g} {1.25:012,.2f} {\"é😀\":'界'^8.2s}"
+ delete(message);delete(ratio)
+}
+'''
+        client,main=self.open(text)
+        self.assertIn('Rational',self.hover(client,main,text,'ratio:.6g')['contents']['value'])
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        broken=text.replace('ratio:.6g','ratio:g')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='requires explicit precision')
+        error=next(e for e in errors if 'requires explicit precision' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'ratio:g',0))
+        self.assertEqual(error['range']['end'],self.position(broken,'ratio:g',5))
+        self.assertNotIn('runtime/',error['message']);self.assertNotIn('__thor_',error['message'])
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_removed_alignment_format_reports_suffix_after_unsaved_edit(self):
+        text='package main\nmain::proc(){s:=f"{1:8d}";delete(s)}\n'
+        client,main=self.open(text)
+        self.assertIn('string',self.hover(client,main,text,'s:=')['contents']['value'])
+        changed=text.replace('1:8d','1:>8d')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        error=next(e for e in client.diagnostic(main.as_uri(),contains='no longer uses') if 'no longer uses' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'>8d',0))
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_quoted_format_fill_unsaved_validation_and_token_ranges(self):
         text='package main\nmain::proc(){text:=f`raw \\n {"é😀":\'界\'^5}`;delete(text)}\n'
         client,main=self.open(text)

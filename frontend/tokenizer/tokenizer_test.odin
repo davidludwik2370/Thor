@@ -40,7 +40,7 @@ native_token_and_position_compatibility :: proc(t: ^testing.T) {
 @(test)
 thor_interpolation_nested_quotes_and_original_positions :: proc(t:^testing.T){
     context.allocator=context.temp_allocator
-    source:="f\"😀 {echo(\"nested\")} {1:'}'>3}\"\nnext ~= other"
+    source:="f\"😀 {echo(\"nested\")} {1:'}'3}\"\nnext ~= other"
     lexer:Tokenizer
     init(&lexer,source,"source.thor")
     lexer.thor=true

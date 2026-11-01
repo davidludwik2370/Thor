@@ -38,7 +38,7 @@ b := f.format(1234567, grouping=true, width=14, align=.Center, fill='界')
 c := f.format("é😀", width=5)
 assert(a == "-9,223,372,036,854,775,808")
 assert(b == "界界1,234,567界界界")
-assert(c == "é😀   ")
+assert(c == "   é😀")
 delete(a); delete(b); delete(c)
 ''', 'import f "thor:format"\n'))
 

@@ -108,6 +108,19 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const precisionExample='package main\nmain::proc(){ratio:=Rational(1,3);text:=f"😀 {ratio:.6g}";delete(text);delete(ratio)}\n';
+        await replace(precisionExample);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(precisionExample.indexOf('ratio:.6g')+1)),values=>hoverText(values||[]).includes('Rational'));
+        const invalidPrecision=precisionExample.replace('ratio:.6g','ratio:g');
+        await replace(invalidPrecision);
+        const precisionDiagnostic=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),
+            values=>values.some(v=>v.message.includes('requires explicit precision')));
+        const rationalError=precisionDiagnostic.find(v=>v.message.includes('requires explicit precision'));
+        assert.ok(rationalError.range.start.isEqual(testDocument.positionAt(invalidPrecision.indexOf('ratio:g'))));
+        assert.ok(!rationalError.message.includes('runtime/'));
+        await replace(precisionExample);
+        await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.length===0);
         const bigExample='package main\nmain::proc(){\n huge:Integer=12345678901234567890123456789012345678901234567890\n ratio:=Rational(22,13)\n component:=ratio.numerator\n delete(huge);delete(ratio);delete(component)\n}\n';
         await replace(bigExample);
         for(const [fragment,expected] of [['huge:','huge: Integer'],['ratio:=','ratio: Rational'],['component:=','component: Integer'],['numerator','numerator: Integer']]){
@@ -740,6 +753,7 @@ async function run() {
             'promoted using fields supply switch result types and contextual enum hovers',
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
+        result.checks.push('Odin-style precision formats, Rational g/G contract and mapped unsaved recovery');
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');
         result.checks.push('type-as-array errors have original use ranges, clickable declaration notes and unsaved recovery');
         result.checks.push('index root/type/result diagnostics, membership context notes and user builtin-spelling hovers recover without saving');

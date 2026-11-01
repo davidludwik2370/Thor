@@ -693,7 +693,7 @@ Syntax:
     f"value: {expression}"
     f`raw text: {expression}`
     f"count: {number:,}"
-    f"count: {number:>12,}"
+    f"count: {number:12,}"
 
 - f prefixes an ordinary quoted string or Odin raw backtick string. No new r
   prefix. Multiline interpolated-string delimiters are not required in v1.
@@ -706,17 +706,22 @@ Syntax:
 - Evaluate each field once, left to right.
 - Default formatting uses Odin-style value formatting. Add integer decimal
   thousands grouping with a comma, including zero and negative signed values.
-- Minimum padding syntax is [[rune-literal]align][width][,], with align <, >, or ^,
-  optional single-quoted fill rune, nonnegative literal width, and default space fill.
-  Use ordinary Odin rune escapes; bare fills are rejected. For example, '界'^5
-  centers with 界 padding, and '0'>12, groups digits then pads with zeros.
-  Width alone right-aligns numeric values and left-aligns strings. For centering,
-  put the extra padding rune on the right when the padding count is odd.
-- Group digits first, then pad the formatted text, counting signs/separators in
-  its width. Match Odin's rune-based width convention, not terminal display cells.
-- Examples include >12, <12, ^12, '0'>8, and >12,. This is a documented subset of
-  Python-style formatting; other Python specifiers are not implicitly supported.
-  A comma requests integer grouping and is rejected for unsupported value types.
+- Format grammar: [quoted-fill][flags][width][,][.precision][verb]. Use Odin
+  fmt verbs/flags (+, space, -, 0, #), with Thor extensions ^ (center), comma
+  grouping, rune fill, rune-aware string truncation, and % percentage output.
+- Right alignment is the default for all types; - selects left alignment.
+  < and > are removed. Quoted fill is independent of alignment: '界'12s,
+  '界'-12s, '界'^12s. Odd center padding puts the extra rune on the right.
+- Width is a minimum rune count after conversion, rounding, and grouping.
+  Numeric 0 padding comes after a sign/base prefix; quoted '0' is literal fill.
+- Precision uses .N (or . for zero) and requires a verb. f/F defaults to three
+  decimal places, e/E to six; native g/G is shortest round-trip formatting.
+  Integer/Rational decimals are exact, with ties-to-even rounding. Rational
+  g/G requires explicit precision; no format produces the exact reduced fraction.
+- Group only decimal integer portions, never fractional digits or exponents.
+  Precision applies before string quoting and padding; strings count runes.
+  Runtime, fn and #run use the same implementation and sized precision storage.
+- Complete verb/type rules and limitations: docs/interpolation-formatting.md.
 - Ordinary proc use allocates the final string with context.allocator; the caller
   owns it under normal Odin cleanup rules. No implicit temp-allocator lifetime.
 - Release owned intermediate formatting buffers, or write directly into the final

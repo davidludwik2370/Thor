@@ -1,0 +1,30 @@
+Observation: 2026-11-01, during Thor's expanded-formatting regression run.
+Stock compiler: odin version dev-2026-10:8169255b9.
+No experimental Odin patch has been installed.
+
+The integer-only test NativeSDKTests.test_conditional_constants_keep_their_configured_dependencies
+failed while compiling a #run helper (exit -11), with EXTRA left undefined.
+The fixture computes a constant selected by #config and adds 3; it contains no
+interpolation or Integer/Rational formatting.
+
+macOS report timestamp: 2026-11-01 13:00:12 -0500 (18:00:12 UTC).
+Faulting worker: 10.
+EXC_BAD_ACCESS / SIGSEGV / KERN_INVALID_ADDRESS at 0x0.
+Top frames, in order:
+  alloc_cstring(gbAllocator, String)
+  lb_type_internal(lbModule*, Type*)
+  lb_type(lbModule*, Type*)
+  lb_generate_procedures_and_types_per_module(void*)
+  internal_thread_proc(void*)
+  _pthread_start
+  thread_start
+
+This matches the prior symbol signature; no TSan run was made for this event,
+so the identical underlying race is not independently proven here. The fresh
+50-test compilation/SDK/edited-build run passed, including the failing fixture.
+The original temporary helper tree was cleaned up by unittest; the full macOS
+report and personal machine paths are intentionally not included in this bundle.
+
+Ten additional fresh runs of the conditional-constant SDK test passed (both
+EXTRA configurations per test, 20 helper compilations total). These are explicit
+regression experiments; production Thor does not automatically retry crashes.

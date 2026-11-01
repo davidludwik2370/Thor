@@ -26,7 +26,7 @@ delete(a);delete(b)
 
     def test_fstrings_exact_numbers_grouping_nested_temporaries_and_pure_calls(self):
         self.run_big('''
-text:=f"{Integer(12345678901234567890):,} {Rational(22,13):>8} {Integer(2)+3}"
+text:=f"{Integer(12345678901234567890):,} {Rational(22,13):8} {Integer(2)+3}"
 assert(text=="12,345,678,901,234,567,890    22/13 5");delete(text)
 nested:=f"outer {f\"inner {Integer(2)**10}\"}"
 assert(nested=="outer inner 1024");delete(nested)
@@ -193,6 +193,6 @@ LIMIT::clamp(max(VALUE,3),0,9)
 MAGNITUDE::abs(VALUE)
 INCLUDED::Integer(4) in [2,4,8]
 ''')
-        for body,message in [('text:=f"{Rational(1,3):,}"','grouping requires an integer'),('a:=min(Integer(1),i64(2))','Cannot'),
+        for body,message in [('text:=f"{Rational(1,3):,}"','Grouping requires a decimal'),('a:=min(Integer(1),i64(2))','Cannot'),
                              ('a:=max(Rational(1),Integer(2))','Cannot')]:
             with self.subTest(body=body):self.invoke(self.program(body),command='check',fail=message)

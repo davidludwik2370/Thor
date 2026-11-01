@@ -32,7 +32,7 @@ alignment_and_runes :: proc(t: ^testing.T) {
     e := format("already wider", width=2)
     f := format("", width=3, align=.Right, fill='😀')
     testing.expect_value(t, a, "    -1,234")
-    testing.expect_value(t, b, "é😀   ")
+    testing.expect_value(t, b, "   é😀")
     testing.expect_value(t, c, "界界x界界界")
     testing.expect_value(t, d, "00012")
     testing.expect_value(t, e, "already wider")

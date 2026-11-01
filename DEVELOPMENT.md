@@ -204,7 +204,7 @@ pass. The 0.7.2 VSIX is installed locally; its grammar/theme contributions requi
 
 ## Quoted interpolation fills: 0.7.3
 
-Explicit format fills now use ordinary Odin rune literals: `'界'^5`, `'0'>12,`
+Explicit format fills now use ordinary Odin rune literals: `'界'^5`, `'0'12,`
 and `'\u754c'^5`. The shared lexer validates a single Unicode scalar and native
 escapes; lowering preserves that literal in the formatter call. Bare fills are
 rejected with a diagnostic against the format span. Alignment-only and width-only
@@ -2562,3 +2562,50 @@ The same example passed direct and regression reruns, and the final clean suite
 passed without a backend crash. This remains an observed intermittent backend
 issue, not a retry or suppression policy added to Thor. The earlier context-value
 qualification regression was fixed and its original regression test passes.
+
+
+## Odin-style interpolation formatting: 0.30.0
+
+The current format contract is [docs/interpolation-formatting.md](docs/interpolation-formatting.md),
+which supersedes the original T07/T13 padding-only grammar above. `<` and `>`
+are removed; default alignment is right for every type, with `-` for left and
+Thor `^` for center. Quoted fill remains independent of alignment. Odin verbs,
+flags, width/precision, grouping of decimal integer portions, and Thor `%`
+percentage output are supported. Rational g/G requires explicit precision.
+
+`thorlang/formatting.py` validates literal suffixes and emits static options for
+`thor:format.format_spec`. Existing format/format_options/format_plain APIs keep
+their signatures. `runtime/format/render.odin` performs conversion, using Odin's
+formatter for native/custom values and sized strconv float buffers. Integer
+precision avoids the native integer formatter's fixed buffer too. Aggregate
+precision is rejected rather than forwarding unsafe sizes recursively into fmt;
+format individual fields. `runtime/big/formatting.odin` implements exact decimal
+scaling, ties-even division, significant digits, exponent carries, and radix
+conversion. Both formatter layers release scratch and return one owned result.
+The f/f! lifetime policy and pure-function capability checks are unchanged.
+
+The source map still wraps each expression field, while format punctuation is
+nonexecutable metadata. Shared compiler diagnostics remap type/verb contracts to
+the original field, including unsaved TLS documents. TLS 0.23.0 and extension
+0.18.0 carry the updated grammar: rune fills, numeric widths/precisions, neutral
+flags/operators, and blue verbs. No debug adapter translation change is needed.
+
+Regression coverage includes a Decimal-based rounding oracle, native scalar and
+aggregate/custom formats, bigint bases, Rational ties/carries/negative zero,
+1,000-place runtime/fn/#run output, grouping/prefix padding, Unicode/byte
+truncation, nesting, ownership tracking, inactive branches, mapped diagnostics,
+unsaved TLS recovery, TextMate bracket/color metadata, actual VS Code providers,
+and original-source CodeLLDB breakpoints/step-in. Both evaluation demos include
+new formats; the spaced walkthrough explains ownership and exact-number choices.
+
+The broad regression pass also found and fixed an older SDK-overlay diagnostic
+initialization gap: native overlay source snapshots now carry the empty
+`type_operand_errors` and `sequence_bounds` maps expected by the mapper. The
+existing unsaved-native-file/resource regression reproduces and verifies it.
+
+Final verification, including the broad compiler run's investigated failures and
+fresh passing reruns, is recorded in
+[docs/interpolation-formatting-verification.md](docs/interpolation-formatting-verification.md).
+One intermittent stock Odin SIGSEGV repeated the earlier code-generation stack
+signature; its anonymized observation is retained in the upstream report bundle.
+No automatic build retry, sanitizer bypass, or upstream compiler patch was added.

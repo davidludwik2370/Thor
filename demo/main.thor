@@ -266,7 +266,7 @@ main :: proc() {
     padded := format.format(1234567, grouping=true, width=14, align=.Center, fill='界')
     text := format.format("é😀", width=5)
     assert(grouped == "-9,223,372,036,854,775,808")
-    assert(padded == "界界1,234,567界界界" && text == "é😀   ")
+    assert(padded == "界界1,234,567界界界" && text == "   é😀")
     delete(grouped); delete(padded); delete(text)
 
     println("T08: Set support library, independent results, and alias-safe operations")
@@ -316,7 +316,7 @@ main :: proc() {
 
     println("T13: quoted/raw interpolation, braces, nested expressions, and formatting")
     calls, order = 0, 0
-    interpolated := f"{{fields}} {mark(1)} {mark(2)} {1234567:'0'>12,}"
+    interpolated := f"{{fields}} {mark(1)} {mark(2)} {1234567:'0'12,}"
     assert(interpolated == "{fields} 1 2 0001,234,567" && order == 12)
     raw_interpolated := f`raw \n {"é😀":'界'^5}`
     assert(raw_interpolated == `raw \n 界é😀界界`)
@@ -325,6 +325,16 @@ main :: proc() {
     // Interpolation owns its result and formatting intermediates. A field's
     // borrowed value remains yours. Delete each final allocated result once.
     delete(interpolated); delete(raw_interpolated); delete(nested_interpolated)
+
+    // Odin-style formatting; width includes signs, separators, quotes, and %.
+    precision_demo := f"{0.123456:.2%}|{1234567.125:,.2f}|{-42:08d}|{"é😀tail":.2s}"
+    assert(precision_demo == "12.35%|1,234,567.12|-0000042|é😀")
+    delete(precision_demo)
+    exact_demo := f"{Rational(1,3):.20f}|{Integer(123456789012345678901234567890):.4e}"
+    assert(exact_demo == "0.33333333333333333333|1.2346e+29")
+    delete(exact_demo)
+    // Rational bare g/G is rejected: a repeating decimal has no finite shortest
+    // representation. Pick precision (.6g), or omit the format for an exact fraction.
 
     println("T14: runtime and compile-time switches, with and without selectors")
     calls, order = 0, 0

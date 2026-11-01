@@ -450,7 +450,7 @@ main::proc(){
 
     def test_interpolation_field_errors_keep_unicode_source_ranges(self):
         self.at('package main\nmain::proc(){_=f"😀 {missing_value}"}\n','missing_value')
-        errors=self.at('package main\nmain::proc(){_=f"😀 {1.25:,}"}\n','1.25',message='Integer grouping')
+        errors=self.at('package main\nmain::proc(){_=f"😀 {true:,}"}\n','true',message='Grouping requires')
         self.assertEqual(len(errors),1)
         self.assertNotIn('runtime/',json.dumps(errors))
 

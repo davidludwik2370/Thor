@@ -312,7 +312,7 @@ out, while named bindings retain explicit cleanup.
 The grammar highlights embedded expressions independently from string text,
 including nested quotes and braces. Negative indices use native expression scopes.
 Explicit interpolation fills use Odin rune literals, e.g. `{"é😀":'界'^5}` or
-`{1234567:'0'>12,}`. Rune fills and numeric widths keep their ordinary literal
+`{1234567:'0'12,}`. Rune fills and numeric widths keep their ordinary literal
 colors; alignment and grouping punctuation stay neutral. Bare fills are rejected.
 Compile-time `#if`, `#else`, `#switch` and `#run` use directive scopes, matching
 `#assert` and `#partial`. The entire `#else if` branch introducer has that styling,
@@ -381,3 +381,12 @@ advertised capabilities; an extension reinstall is unnecessary for this change.
 Formatting and automatic import edits remain disabled until their edits can
 preserve Thor syntax. See [the TLS implementation notes](../../tls/THOR.md#rename-symbol)
 for details and current resolver limitations.
+
+
+Interpolation formatting follows Odin verbs and flags, with precision, percentage,
+center alignment, grouping, and quoted fill. `<`/`>` alignment is removed.
+See [the compiler reference](../../docs/interpolation-formatting.md). Rune fills
+stay orange, width/precision digits use numeric colors, verbs use keyword blue,
+and flags/punctuation stay neutral. TLS checks the same format contracts as the
+compiler, including explicit precision for Rational g/G, using unsaved source
+locations. Reload the window after installing an updated grammar.

@@ -27,7 +27,7 @@ def extend(project,destination,generated):
         generated[output.relative_to(destination).as_posix()]=raw
         if path.suffix!='.odin':continue
         source=SimpleNamespace(raw=raw,prefix='__thor_sdk_'+hashlib.sha256(str(path).encode()).hexdigest()[:12]+'_',
-            error_messages={},hidden_namespaces={},guard_messages={},nodes=[],asset_collections={})
+            error_messages={},hidden_namespaces={},guard_messages={},type_operand_errors={},sequence_bounds={},nodes=[],asset_collections={})
         mapping=SourceMap([[0,len(raw),str(path),0,len(raw),'source',True]])
         project.sdk_sources[path]=source
         project.maps[str(output)]=mapping

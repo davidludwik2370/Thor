@@ -295,8 +295,10 @@ contents when used by generated expression helpers.
 
 F-strings render canonical decimal integers and reduced fractions, clean up
 anonymous arithmetic/components, and support deterministic pure formatting.
-Integer grouping and numeric alignment work normally; Rational grouping is
-rejected. `basic.print` and `basic.table` format numeric values automatically;
+Integer grouping and numeric alignment work normally. Decimal and percentage
+formats use exact rational rounding; grouping is allowed for Rational decimal
+output, while grouping its default fraction is rejected. Rational g/G requires
+explicit significant-digit precision. See [interpolation formatting](interpolation-formatting.md). `basic.print` and `basic.table` format numeric values automatically;
 table numeric columns align right. Shared `basic.sum`, `asc`, `desc`, `ordered`
 and the default `sorted` comparator support these logical types. Sorting/filtering
 and whole aggregate copies retain their documented shallow element ownership.

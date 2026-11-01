@@ -169,9 +169,24 @@ class Diagnostics:
             runtime = Path(__file__).resolve().parent.parent / "runtime"
             contract = None
             if origin and Path(origin.file) == runtime / "format" / "format.odin" and any(
-                "type_is_integer(T)" in m for m in msgs
+                "type_is_integer(T)" in m and "Grouping requires" not in m for m in msgs
             ):
                 contract = "Integer grouping requires an integer value."
+            elif origin and Path(origin.file).parent == runtime / 'format':
+                contract=next((text for text in [
+                    'Grouping requires a decimal numeric format.',
+                    'Rational g/G formatting requires explicit precision, e.g. :.6g; omit the verb for an exact fraction.',
+                    'Rational formatting does not support this verb.',
+                    'Integer formatting does not support this verb.',
+                    'Boolean formatting requires v, w, T, or t.',
+                    'Precision is not supported for boolean values.',
+                    'String formatting requires v, w, T, s, q, x, or X.',
+                    'Float formatting requires v, w, T, f/F, e/E, g/G, h/H, or %.',
+                    'Complex/quaternion formatting requires v, w, T, f/F, e/E, g/G, or h/H.',
+                    'Precision is supported for scalar numbers and strings, not aggregate values.',
+                    'Decimal formatting requires a numeric value.',
+                    'Byte precision requires s, q, w, x, or X.',
+                ] if any(text in m for m in msgs)),None)
             elif origin and Path(origin.file) == runtime / "sets" / "sets.odin" and any(
                 "type_is_valid_map_key(T)" in m or "Invalid type of a key for a map" in m for m in msgs
             ):
