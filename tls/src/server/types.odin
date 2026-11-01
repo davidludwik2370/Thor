@@ -294,6 +294,12 @@ Diagnostic :: struct {
 	code:     string,
 	message:  string,
 	tags:     []DiagnosticTag,
+	relatedInformation: []Diagnostic_Related_Information,
+}
+
+Diagnostic_Related_Information :: struct {
+	location: common.Location,
+	message: string,
 }
 
 DidOpenTextDocumentParams :: struct {

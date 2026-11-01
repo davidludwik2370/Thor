@@ -41,6 +41,94 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_type_used_as_array_has_one_error_and_declaration_note(self):
+        for operation in ['_=Rows[0]', 'i:=1;_=Rows[i]', 'i:=1;Rows[i]={1}',
+                          'i:=1;Rows[i]+={1}', 'i:=-1;_=Rows[i:]', '_=Rows[:]']:
+            with self.subTest(operation=operation):
+                source='// 😀 original header\npackage main\nRows :: [3]struct{x:int}\nmain::proc(){'+operation+'}\n'
+                entry,output,errors,result=self.invoke(source)
+                self.assertEqual(len(errors),1,errors)
+                error=errors[0]
+                self.assertIn('it names a type, not an array value',error['msgs'][0])
+                self.assertIn('Rows: [3]struct{x:int}',error['msgs'][1])
+                self.assertEqual(error['pos']['offset'],source.encode().rindex(b'Rows'))
+                self.assertEqual(error['pos']['end_offset']-error['pos']['offset'],4)
+                note=error['related'][0]
+                self.assertEqual(note['pos']['file'],str(entry))
+                self.assertEqual(note['pos']['offset'],source.encode().index(b'Rows'))
+                self.assertNotIn('Thor expression',json.dumps(errors))
+                self.assertNotIn(str(output),json.dumps(errors))
+
+    def test_type_operand_notes_follow_imported_unsaved_aliases(self):
+        source='package main\nimport "records"\nmain::proc(){i:=1;_=records.Rows[i]}\n'
+        files={'records/records.thor':'package records\nRows::[2]int\n'}
+        changed='// 😀 unsaved header\npackage records\nRows::[4]int\n'
+        entry,_,errors,_=self.invoke(source,files=files,overlays={'records/records.thor':changed})
+        self.assertEqual(len(errors),1,errors)
+        error=errors[0]
+        self.assertEqual(error['pos']['offset'],source.encode().index(b'records.Rows'))
+        self.assertIn('Rows: [4]int',error['msgs'][1])
+        note=error['related'][0]['pos']
+        self.assertEqual(note['file'],str(entry.parent/'records/records.thor'))
+        self.assertEqual((note['line'],note['column']),(3,1))
+        self.assertEqual(note['offset'],changed.encode().index(b'Rows'))
+
+    def test_type_operand_error_inside_lowered_expressions_keeps_one_primary(self):
+        for body in [
+            'Rows::[3]Integer;i:=1;Rows[i]=2',
+            'Rows::[3]int;i:=1;text:=f"{Rows[i]}";_=text',
+            'Rows::[3]int;i:=1;_=switch{case true:Rows[i];case:1}',
+            'Rows::[3]int;i:=1;_=read(Rows[i])',
+        ]:
+            with self.subTest(body=body):
+                source='package main\nread::proc(x:int)->int{return x}\nmain::proc(){'+body+'}\n'
+                _,_,errors,_=self.invoke(source)
+                self.assertEqual(len(errors),1,errors)
+                self.assertIn('it names a type',errors[0]['msgs'][0])
+
+    def test_type_operand_errors_preserve_independent_errors(self):
+        source='package main\nRows::[3]struct{x:int}\nmain::proc(){i:=1;Rows[i]={1};_=missing;_=Rows[i];other:int="bad";_=other}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertEqual(len(errors),4,errors)
+        self.assertEqual(sum('it names a type' in e['msgs'][0] for e in errors),2)
+        self.assertTrue(any('Undeclared name: missing' in e['msgs'][0] for e in errors))
+        self.assertTrue(any('bad' in '\n'.join(e['msgs']) for e in errors))
+        # A fully typed RHS has its own independently invalid field value.
+        source='package main\nRows::[3]struct{x:int}\nmain::proc(){i:=1;Rows[i]=struct{x:int}{"wrong"}}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertTrue(any('it names a type' in e['msgs'][0] for e in errors))
+        self.assertTrue(any('wrong' in '\n'.join(e['msgs']) for e in errors))
+        source='package main\nRows::[3]struct{x:int}\nmain::proc(){i:=1;Rows[i]={struct{x:int}{"wrong"}}}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertTrue(any('it names a type' in e['msgs'][0] for e in errors))
+        self.assertTrue(any('wrong' in '\n'.join(e['msgs']) for e in errors))
+
+    def test_type_operand_diagnostics_preserve_native_laziness_and_valid_values(self):
+        source='''package main
+Rows::[3]int
+read::proc(values:$T,index:int)->int{return values[index]}
+unused::proc($T:typeid){i:=1;_=Rows[i]}
+main::proc(){
+    when false {i:=1;Rows[i]={1};_=Rows[i:]}
+    values:=Rows{1,2,3};i:=1;_=values[i];_=read(values,i)
+    when true {Choice::Rows;_=Choice{1,2,3}} else {Choice::3;_=Choice}
+}
+'''
+        self.invoke(source,success=True)
+        self.invoke('package main\ntype_of::proc()->[2]int{return {1,2}}\nmain::proc(){_=type_of()[0]}\n',success=True)
+
+    def test_type_operand_terminal_note_and_native_raw_escape_hatch(self):
+        source='package main\nRows::[2]int\nmain::proc(){i:=1;_=Rows[i]}\n'
+        entry,output,errors,_=self.invoke(source)
+        result=subprocess.run([str(ROOT/'thor'),'check',str(entry),'--output-dir',str(output)],capture_output=True,text=True,timeout=40)
+        self.assertEqual(result.returncode,1)
+        self.assertIn('Cannot index',result.stderr)
+        self.assertIn('(2:1): Note:',result.stderr)
+        self.assertIn('Rows::[2]int',result.stderr)
+        raw=subprocess.run([str(ROOT/'thor'),'check',str(entry),'--output-dir',str(output),'--raw-diagnostics'],capture_output=True,text=True,timeout=40)
+        self.assertIn('is not an expression but a type',raw.stderr)
+        self.assertNotIn('it names a type',raw.stderr)
+
     def test_typed_loop_contracts_and_bound_errors_point_to_original_annotations(self):
         for body,needle,message in [
             ('values:[129]int;for _,(index:i8) in values{_=index}','i8','indices do not fit'),

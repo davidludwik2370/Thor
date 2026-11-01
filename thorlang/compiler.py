@@ -166,6 +166,7 @@ class Source:
         self.needs_default = False
         self.needs_intrinsics = False
         self.error_messages = {}
+        self.type_operand_errors = {}
         self.hidden_namespaces = {}
         self.asset_collections = {}
         self.blocked = {}
@@ -674,6 +675,14 @@ class Source:
         elif kind == "Assignment":
             for lhs, rhs in zip(n.group("lhs"), n.group("rhs")):
                 if lhs.kind == "Ident" and lhs.text == "_":
+                    overrides[rhs] = (None, constant)
+                    continue
+                from .semantics import descendants
+                if self.thor and any(child.kind in {'Index','Slice'} and self.expressions.type_operand(child)
+                                     for child in descendants(lhs)):
+                    # An invalid destination cannot supply contextual types for
+                    # aggregate literals; those would create unrelated-looking
+                    # element/arity errors before Odin rejects the destination.
                     overrides[rhs] = (None, constant)
                     continue
                 # The checker knows the exact type even for indexed fields,

@@ -193,3 +193,30 @@ main :: proc() {
 		testing.expectf(t, false, "expected rejected didChange to publish nothing, got %d bytes", got)
 	}
 }
+
+@(test)
+compiler_related_declarations_are_owned_until_diagnostics_are_removed :: proc(t: ^testing.T) {
+	previous := common.config.enable_diagnostics
+	common.config.enable_diagnostics = true
+	defer common.config.enable_diagnostics = previous
+	setup_diagnostics()
+	defer teardown_diagnostics()
+	uri := "file:///example/main.thor"
+	notes := []server.Diagnostic_Related_Information{{
+		location = {uri = "file:///example/types.thor", range = {start = {line=2, character=3}, end = {line=2, character=7}}},
+		message = "Rows is declared as a type here.",
+	}}
+	for pass in 0..<2 {
+		server.add_diagnostics(.Check, uri, {message="Cannot index a type", relatedInformation=notes})
+		merged := server.get_merged_diagnostics()
+		got := merged[uri][0].relatedInformation[0]
+		testing.expect_value(t, got.message, notes[0].message)
+		testing.expect_value(t, got.location.uri, notes[0].location.uri)
+		testing.expect_value(t, got.location.range.start.line, 2)
+		testing.expect(t, raw_data(got.message) != raw_data(notes[0].message))
+		testing.expect(t, raw_data(got.location.uri) != raw_data(notes[0].location.uri))
+		if pass == 0 { server.remove_diagnostics(.Check, uri) }
+		else { server.clear_diagnostics(.Check) }
+		testing.expect_value(t, len(server.get_merged_diagnostics()[uri]), 0)
+	}
+}

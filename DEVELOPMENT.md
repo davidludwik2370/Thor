@@ -2471,3 +2471,34 @@ regression). Both demos run with -debug, and the commented tour passes its
 allocation-checked test wrapper. Coverage includes aliases/generic types,
 fn/#run/cache invalidation, empty/max-size arrays, dynamic overflow, references,
 shadowing, control flow, initializers, C callbacks, and unsaved editor recovery.
+
+## Type operands in value indexing: 0.29.1
+
+Known type operands now bypass generated value-index/assignment helpers before
+native checking. `Resolver.known_type_operand` deliberately excludes ambiguous
+conditional declarations, runtime typeid variables and polymorphic formals.
+Native checking still decides whether the use is active; no eager Thor rejection
+breaks inactive when branches or uninstantiated generic bodies. Valid array type
+aliases, conversions and value expressions retain their existing behavior.
+
+Diagnostics translate the native type-as-value rejection at the original operand
+and add an original-declaration note. Only contextual implicit-compound failures
+from that same invalid assignment are filtered; explicitly typed nested values
+and independent errors remain. Terminal rendering and JSON `related` notes share
+positions. TLS 0.22.1 carries the notes through LSP `relatedInformation`, preserves
+editor path spelling, and owns/releases the copied URI/message storage.
+
+The focused review and five further proposals are recorded in
+[the diagnostic review](docs/diagnostic-review-2026-11-01.md). Those additional
+message/compatibility changes await user approval and are not part of this patch.
+
+Validation: all 181 compiler diagnostic/ordinary-language regressions passed,
+as did 113 diagnostic/typed-loop regressions and the additional nested-expression
+and independent-error tests. The final complete diagnostic suite passed all 95
+tests after those refinements. All 1,127 native TLS tests passed with memory
+tracking, including note storage ownership and both removal paths. Two real TLS
+transport tests cover Unicode use/declaration ranges, imported unsaved notes and
+repeated error recovery. The full isolated VS Code integration confirms the
+related note reaches the editor; two CodeLLDB smoke tests preserve breakpoints,
+source stepping and helper-local inspection. The live TLS binary is rebuilt;
+no grammar or extension runtime update is needed.

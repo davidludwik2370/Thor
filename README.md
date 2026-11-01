@@ -434,6 +434,14 @@ Thor validation, and Odin type-checking errors use the same display. For example
 `values := [1, "wrong"]` underlines `"wrong"` in your Thor source, even though
 the generated array declaration is much longer.
 
+If an array type is accidentally used as an array value (for example,
+`Rows :: [3]int; Rows[i] = 1`), Thor explains the distinction and suggests a
+variable declaration such as `Rows: [3]int`. A related note points to the type's
+declaration. Notes appear with source excerpts in the terminal and as clickable
+related locations in VS Code, including original imported/unsaved source. JSON
+diagnostics expose these as optional `related` entries containing `pos` and
+`message`; notes do not increase the error count.
+
 Unconditional top-level redeclarations in the same untagged file are checked by
 the shared frontend before compile-time evaluation. TLS reports these immediately
 while editing, even without compiler checking, with the duplicate name underlined

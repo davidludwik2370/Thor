@@ -230,6 +230,31 @@ class Resolver:
         symbol = self.symbol(n)
         return symbol.declaration if symbol else None
 
+    def known_type_operand(self, node, seen=None):
+        """Conclusive type expressions only, for value-use diagnostics.
+
+        Approximate value shapes, runtime typeid variables, polymorphic formals
+        and competing conditional declarations are left to Odin. In particular,
+        a user procedure named type_of must not be mistaken for the builtin.
+        """
+        seen = set() if seen is None else seen
+        if node is None or node in seen: return False
+        seen.add(node)
+        if node.kind == 'Paren': return self.known_type_operand(node.role('expr'), seen)
+        if node.kind.endswith('Type'): return node.kind != 'PolyType'
+        symbol = self.symbol(node)
+        if symbol:
+            if len(symbol.candidates) > 1: return False
+            declaration = symbol.declaration
+            return (declaration.kind == 'Declaration' and not declaration.data.get('mutable', True)
+                    and symbol.value is not None and self.known_type_operand(symbol.value, seen))
+        if node.kind == 'Call':
+            callee = node.role('callee')
+            return (callee.kind == 'Ident' and callee.text == 'type_of' and self.symbol(callee) is None
+                    and callee.text not in callee.source.imports and callee.text not in callee.source.selected)
+        return (node.kind == 'Ident' and node.text not in node.source.imports
+                and node.text not in node.source.selected and node.source.denotes_type(node))
+
     def generic_default_error(self, procedure):
         """Recognize anonymous default signatures Odin cannot specialize.
 

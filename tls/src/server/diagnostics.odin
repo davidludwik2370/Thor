@@ -37,6 +37,7 @@ remove_diagnostics_locked :: proc(type: DiagnosticType, uri: string) {
 	for diagnostic in diagnostic_array {
 		delete(diagnostic.message)
 		delete(diagnostic.code)
+		delete_related_diagnostics(diagnostic.relatedInformation)
 		if diagnostic.tags != nil {
 			delete(diagnostic.tags)
 		}
@@ -76,6 +77,13 @@ add_diagnostics :: proc(type: DiagnosticType, uri: string, diagnostic: Diagnosti
 	if diagnostic.tags != nil {
 		diagnostic.tags = slice.clone(diagnostic.tags)
 	}
+	if diagnostic.relatedInformation != nil {
+		diagnostic.relatedInformation = slice.clone(diagnostic.relatedInformation)
+		for &related in diagnostic.relatedInformation {
+			related.location.uri = strings.clone(related.location.uri)
+			related.message = strings.clone(related.message)
+		}
+	}
 
 	append(diagnostic_array, diagnostic)
 }
@@ -103,9 +111,19 @@ clear_diagnostics :: proc(type: DiagnosticType) {
 			delete(diagnostic.message)
 			delete(diagnostic.code)
 			delete(diagnostic.tags)
+			delete_related_diagnostics(diagnostic.relatedInformation)
 		}
 		clear(&diagnostic_array)
 	}
+}
+
+@(private = "file")
+delete_related_diagnostics :: proc(related: []Diagnostic_Related_Information) {
+	for note in related {
+		delete(note.location.uri)
+		delete(note.message)
+	}
+	delete(related)
 }
 
 get_merged_diagnostics :: proc() -> map[string][dynamic]Diagnostic {

@@ -518,6 +518,18 @@ async function run() {
         assert.ok(!typedError.message.includes('Thor expression'));
         await replace(typedLoops);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const arrayTypeMisuse='// 😀 original header\npackage main\nmain::proc(){\n Rows::[3]struct{x:int}\n i:=1\n Rows[i]={1}\n}\n';
+        await replace(arrayTypeMisuse);
+        const arrayErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('it names a type')));
+        assert.equal(arrayErrors.length,1);
+        assert.equal(testDocument.getText(arrayErrors[0].range),'Rows');
+        const declarationNote=arrayErrors[0].relatedInformation[0];
+        assert.equal(declarationNote.location.uri.toString(),testDocument.uri.toString());
+        assert.equal(declarationNote.location.range.start.line,3);
+        assert.equal(testDocument.getText(declarationNote.location.range),'Rows');
+        assert.ok(declarationNote.message.includes('declared as a type'));
+        await replace(arrayTypeMisuse.replace('Rows::','Rows:'));
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const usingSource='// 😀 original header\npackage main\nKind::enum{A,B}\nRecord::struct{x:int,kind:Kind}\nread::proc(using record:Record)->int{return x}\nwrite::proc(using record:^Record){kind=switch{case x==4:.A;case:true?.B:.A}}\nmain::proc(){record:=Record{x=4};write(&record);using record;value:=read(record);_=value}\n';
         await replace(usingSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -701,6 +713,7 @@ async function run() {
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');
+        result.checks.push('type-as-array errors have original use ranges, clickable declaration notes and unsaved recovery');
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

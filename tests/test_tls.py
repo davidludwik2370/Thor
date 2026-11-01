@@ -134,6 +134,50 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_type_operand_error_related_declaration_and_unsaved_recovery(self):
+        text='''// 😀 header
+package main
+main::proc(){
+    /* 😀 */ Rows::[3]struct{x:int}
+    i:=1
+    /* 😀 */ Rows[i]={1}
+}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='it names a type')
+        self.assertEqual(len(errors),1,errors)
+        error=errors[0]
+        start=self.position(text,'Rows[i]',0)
+        self.assertEqual(error['range'],{'start':start,'end':{**start,'character':start['character']+4}})
+        note=error['relatedInformation'][0]
+        self.assertEqual(note['location']['uri'],main.as_uri())
+        self.assertEqual(note['location']['range']['start'],self.position(text,'Rows::',0))
+        self.assertIn('declared as a type',note['message'])
+        self.assertNotIn('Thor expression',json.dumps(errors))
+        for version in range(2,6):
+            changed=text.replace('Rows::','Rows:') if version%2==0 else text
+            client.notifications.clear()
+            client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':version},'contentChanges':[{'text':changed}]})
+            client.diagnostic(main.as_uri(),empty=True) if version%2==0 else client.diagnostic(main.as_uri(),contains='it names a type')
+
+    def test_type_operand_imported_unsaved_related_location(self):
+        text='package main\nimport "records"\nmain::proc(){i:=1;_=records.Rows[i]}\n'
+        records='package records\nRows::[3]int\n'
+        client,main=self.open(text,files={'records/records.thor':records})
+        uri=(main.parent/'records/records.thor').as_uri()
+        note=client.diagnostic(main.as_uri(),contains='it names a type')[0]['relatedInformation'][0]
+        self.assertEqual(note['location']['uri'],uri)
+        self.assertEqual(note['location']['range']['start'],{'line':1,'character':0})
+        changed='// 😀 unsaved\n'+records.replace('[3]int','[4]int')
+        client.notifications.clear()
+        client.send('textDocument/didOpen',{'textDocument':{'uri':uri,'languageId':'thor','version':1,'text':changed}})
+        # This client deliberately disables workspace checking; request another
+        # dependent-package check while the imported buffer remains unsaved.
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':text}]})
+        note=client.diagnostic(main.as_uri(),contains='Rows: [4]int')[0]['relatedInformation'][0]
+        self.assertEqual(note['location']['uri'],uri)
+        self.assertEqual(note['location']['range']['start'],{'line':2,'character':0})
+
     def test_multiple_switch_result_hovers_and_original_tokens(self):
         text='''package main
 Kind::enum{A,B}

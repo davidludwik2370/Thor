@@ -24,6 +24,12 @@ Json_Error :: struct {
 	stage: string,
 	pos:  Json_Type_Error,
 	msgs: []string,
+	related: []Json_Related_Error,
+}
+
+Json_Related_Error :: struct {
+	pos: Json_Type_Error,
+	message: string,
 }
 
 Json_Type_Error :: struct {
@@ -621,6 +627,21 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			if strings.equal_fold(error.type, "warning") {
 				diagnostic_severity = .Warning
 			}
+			related := make([dynamic]Diagnostic_Related_Information, context.temp_allocator)
+			for note in error.related {
+				note_path := note.pos.file
+				if note_path == "" { continue }
+				for b in buffers { if b.canonical == note_path { note_path = b.path; break } }
+				when ODIN_OS == .Windows {
+					note_path = common.get_case_sensitive_path(note_path, context.temp_allocator)
+					note_path, _ = filepath.replace_separators(note_path, '/', context.temp_allocator)
+				}
+				note_uri := common.create_uri(note_path, context.temp_allocator)
+				append(&related, Diagnostic_Related_Information{
+					location = {uri = note_uri.uri, range = compiler_error_range(note.pos)},
+					message = note.message,
+				})
+			}
 
 			add_diagnostics(
 				.Check,
@@ -628,18 +649,24 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 				Diagnostic {
 					code = "thor",
 					severity = diagnostic_severity,
-					range = {
-						// odin will sometimes report errors on column 0, so we ensure we don't provide a negative column/line to the client
-						start = {character = max(error.pos.column - 1, 0), line = max(error.pos.line - 1, 0)},
-						end = {character = max(error.pos.end_column - 1, 0), line = max((error.pos.end_line > 0 ? error.pos.end_line : error.pos.line) - 1, 0)},
-					},
+					range = compiler_error_range(error.pos),
 					message = message,
+					relatedInformation = related[:],
 				},
 			)
 		}
 
 	}
 
+}
+
+@(private = "file")
+compiler_error_range :: proc(pos: Json_Type_Error) -> common.Range {
+	// Native Odin can report column zero; Thor positions are already UTF-16.
+	return {
+		start = {character = max(pos.column-1, 0), line = max(pos.line-1, 0)},
+		end = {character = max(pos.end_column-1, 0), line = max((pos.end_line > 0 ? pos.end_line : pos.line)-1, 0)},
+	}
 }
 @(private = "file")
 start_check_process :: proc(

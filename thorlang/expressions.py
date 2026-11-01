@@ -289,6 +289,11 @@ class Expressions:
                         return aliases[key]
         if not s.thor:
             return None
+        if n.kind == 'Assignment':
+            from .semantics import descendants
+            if any(child.kind in {'Index','Slice'} and self.type_operand(child)
+                   for lhs in n.group('lhs') for child in descendants(lhs)):
+                return None
         if n.kind=='Binary' and n.data['op']=='**':
             return self.power(n,constant)
         if n.kind=='Binary' and n.data['op']=='*':
@@ -312,6 +317,7 @@ class Expressions:
         if n.kind=='SetType':
             return self.module('sets')+'.Set('+s.render(n.group('args')[0],constant=True)+')'
         if n.kind in {'Index','Slice'}:
+            if self.type_operand(n): return None
             if n in self.native_access: return None
             if n.kind=='Index':
                 code=self.ownership.index(n)
@@ -353,7 +359,8 @@ class Expressions:
         from .semantics import descendants
         s=self.source
         indices=[child for lhs in n.group('lhs') for child in descendants(lhs)
-                 if child.kind=='Index' and self.shape(child.role('expr')).kind in {'generic','unknown'}]
+                 if child.kind=='Index' and not self.type_operand(child)
+                 and self.shape(child.role('expr')).kind in {'generic','unknown'}]
         if not indices or any(child in s.blocked for lhs in n.group('lhs') for child in descendants(lhs)):
             return None
         post=n.parent and n.parent.kind=='For' and n.parent.role('post') is n
@@ -432,6 +439,18 @@ class Expressions:
             if parent.kind=='Slice': return True
             if parent.kind not in {'Paren','Selector','Index','Deref'}: return False
         return False
+
+    def type_operand(self, node):
+        """Leave invalid type operands native, before introducing value helpers.
+
+        Native checking decides whether this occurrence is active. Record its
+        original identity for diagnostics, without guessing unknown generic or
+        imported values from their approximate shapes.
+        """
+        base = node.role('expr')
+        if not self.source.resolver.known_type_operand(base): return False
+        self.source.type_operand_errors[node] = base
+        return True
 
     def sequence_type(self,node):
         typ=self.shape(node)
