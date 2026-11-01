@@ -353,6 +353,19 @@ the live compiler evaluates explicit and known-argument calls, including generic
 Live compiler diagnostics use source maps to report errors against original Thor
 files, including unsaved edits and imported buffers. Errors clear after a fix;
 generated helper names are replaced with messages about the Thor operation.
+Invalid sequence indices and lower/upper slice bounds identify their original
+expressions and concrete types. Unresolved index operands keep their primary
+name/field error without generated inference cascades. Result mismatches quote
+original expressions such as `values[i]`. Type-as-array errors link to the type
+declaration; inline membership errors link to the needle and explain why its
+type constrains list elements. These notes are clickable related locations in
+the Problems panel and diagnostic popup, including imported/unsaved files.
+User procedures named `type_of`, `len`, and other native names retain hover and
+rename support; generated builtin queries use an isolated native namespace when
+needed. Extension 0.17.1 also keeps user `type_of` calls' runtime argument
+breakpoints distinct from unevaluated native type queries. Reload VS Code after
+installing that adapter update; subsequent compiler/TLS updates need only
+**Thor: Restart Language Server**.
 Use **Rename Symbol** in the context menu or **F2** on an identifier. TLS supports
 local/global declarations, generic and procedure parameters, resolvable members,
 selective imports, and file-local import aliases. It returns edits to original

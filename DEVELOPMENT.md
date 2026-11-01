@@ -2489,8 +2489,8 @@ positions. TLS 0.22.1 carries the notes through LSP `relatedInformation`, preser
 editor path spelling, and owns/releases the copied URI/message storage.
 
 The focused review and five further proposals are recorded in
-[the diagnostic review](docs/diagnostic-review-2026-11-01.md). Those additional
-message/compatibility changes await user approval and are not part of this patch.
+[the diagnostic review](docs/diagnostic-review-2026-11-01.md). Their implementation
+is described in the 0.29.2 section below.
 
 Validation: all 181 compiler diagnostic/ordinary-language regressions passed,
 as did 113 diagnostic/typed-loop regressions and the additional nested-expression
@@ -2502,3 +2502,63 @@ repeated error recovery. The full isolated VS Code integration confirms the
 related note reaches the editor; two CodeLLDB smoke tests preserve breakpoints,
 source stepping and helper-local inspection. The live TLS binary is rebuilt;
 no grammar or extension runtime update is needed.
+
+## Contextual diagnostics and generated builtin names: 0.29.2
+
+The five follow-ups in the diagnostic review are implemented. Sequence dispatch,
+element type queries and normalized bounds have distinct emission origins.
+Diagnostics use these origins and the original Index/Slice nodes to suppress
+inference/normalization cascades only when a real unresolved-name/field diagnostic
+exists in the same operation. Noninteger bounds use Odin's concrete argument
+types, including generic instantiations, and point to the original index or
+lower/upper bound. Native map/enum rules and integer representation remain intact.
+
+Expression expansion records now include lowered calls, indices, slices,
+interpolation and switches. Diagnostics restore original expressions from those
+records even when Odin pretty-prints whitespace differently. Literal contents
+and identifier boundaries are retained. Contextual switch-arm errors remain
+specific to the actual wrong arm. Membership conversion diagnostics add context
+and a related needle location, without relabeling nested explicit value errors.
+
+`thorlang/hygiene.py` protects generated references through `base:builtin` when
+the source's package or lexical bindings can shadow a native callable operation.
+Only synthetic native tokens are qualified; exact source, literals/comments,
+selectors and explicitly marked renamed user call targets retain their meaning.
+Files without relevant shadowing skip the lexical pass/import. Qualifier
+insertions shift all generated map coordinates, expression expansions and debug
+regions; original UTF-8 offsets are unchanged. This adds no frontend invocation,
+subprocess, new output artifact or reserved word.
+
+Native query detection respects actual binding identity, including aliases and
+selected imports. The debug adapter recognizes source call-target regions, so
+user `type_of` procedures keep evaluated arguments and real breakpoint locations.
+Sequence-only generated fragments remain hidden during stepping. Extension
+0.17.1 includes that adapter update; TLS 0.22.2 uses the shared compiler messages
+and existing related-location transport. New live TLS tests cover all five
+changes, generic imported errors, original UTF-16 ranges, hover/rename and unsaved
+recovery. Runtime tests cover maps, enum arrays, wide/distinct integer indices,
+scope/import shadows, allocation cleanup and cold/cached pure `#run`.
+
+The qualification pass only targets native callable references. Generated
+parameter/value references and compile-time context bindings such as a user's
+`ODIN_TEST` remain untouched. Expression restoration similarly excludes ordinary
+folded literals and real type names; a regression ensures emitted `8` cannot
+rewrite a native diagnostic's `i8` type name.
+
+Validation: the final clean run passed all 466 compiler regressions across
+diagnostics, ordinary compatibility, typed loops, power/range/membership/extrema,
+interpolation ownership, defaults, pure/native compile-time calls and big-number
+integration. The final four live TLS tests and all 24 CodeLLDB tests passed,
+including user-call argument breakpoints after qualifier insertion. All 1,127
+native TLS tests and 119 Node extension tests passed. The full isolated VS Code
+suite confirms all five changes through unsaved diagnostics, hover/rename and
+related locations. Its comment undo/redo assertions now wait for the actual
+asynchronous document update instead of assuming command completion immediately
+updates the extension host's document snapshot. The local extension is packaged
+and installed; reload VS Code once for the adapter update.
+
+An earlier broad run hit one Odin backend SIGSEGV compiling the extrema demo.
+The same example passed direct and regression reruns, and the final clean suite
+passed without a backend crash. This remains an observed intermittent backend
+issue, not a retry or suppression policy added to Thor. The earlier context-value
+qualification regression was fixed and its original regression test passes.

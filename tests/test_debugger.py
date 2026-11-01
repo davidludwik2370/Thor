@@ -110,6 +110,45 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_builtin_shadows_keep_shifted_maps_and_user_argument_breakpoints(self):
+        text='''package main
+import native "base:builtin"
+identity::proc(value:int)->int {
+    return value
+}
+type_of::proc(value:int)->int {
+    return value+1
+}
+main::proc(){
+    values:=[4,5,6]
+    i:=-1
+    result:=type_of(identity(values[i]))
+    native.assert(result==7)
+}
+'''
+        directory,source=self.build(text)
+        line=text.splitlines()[11]
+        column=line.index('identity')+1
+        client=self.launch(directory,source,[{'line':12,'column':column},13])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),12),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[3,4],frame)
+        self.assertIn('identity',frame['name'])
+        if frame['line']==3:
+            client.request('next',{'threadId':thread})
+            thread,frame=self.frame(client)
+            self.assertEqual(frame['line'],4,frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],13,frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'result','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_typed_loop_bindings_break_step_and_show_original_variable_types(self):
         text='''package main
 main::proc(){

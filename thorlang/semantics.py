@@ -230,6 +230,12 @@ class Resolver:
         symbol = self.symbol(n)
         return symbol.declaration if symbol else None
 
+    def native_builtin(self, callee, name):
+        if callee.source.purity:
+            return callee.source.purity.builtin_name(callee) == name
+        return (callee.kind=='Ident' and callee.text==name and self.symbol(callee) is None
+                and callee.text not in callee.source.imports and callee.text not in callee.source.selected)
+
     def known_type_operand(self, node, seen=None):
         """Conclusive type expressions only, for value-use diagnostics.
 
@@ -250,8 +256,7 @@ class Resolver:
                     and symbol.value is not None and self.known_type_operand(symbol.value, seen))
         if node.kind == 'Call':
             callee = node.role('callee')
-            return (callee.kind == 'Ident' and callee.text == 'type_of' and self.symbol(callee) is None
-                    and callee.text not in callee.source.imports and callee.text not in callee.source.selected)
+            return self.native_builtin(callee, 'type_of')
         return (node.kind == 'Ident' and node.text not in node.source.imports
                 and node.text not in node.source.selected and node.source.denotes_type(node))
 
@@ -321,7 +326,7 @@ class Resolver:
             return Type(node=n)
         seen.add(key)
         kind = n.kind
-        if kind=='Call' and n.role('callee').text=='type_of' and self.symbol(n.role('callee')) is None and len(n.group('args'))==1:
+        if kind=='Call' and self.native_builtin(n.role('callee'),'type_of') and len(n.group('args'))==1:
             return self.type_of(n.group('args')[0],seen)
         symbol=self.symbol(n) if kind=='Ident' else None
         if kind=='Ident' and n.source.thor and n.text in {'Integer','Rational'} and symbol is None:

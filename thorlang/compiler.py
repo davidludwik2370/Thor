@@ -167,6 +167,7 @@ class Source:
         self.needs_intrinsics = False
         self.error_messages = {}
         self.type_operand_errors = {}
+        self.sequence_bounds = {}
         self.hidden_namespaces = {}
         self.asset_collections = {}
         self.blocked = {}
@@ -393,7 +394,7 @@ class Source:
             return self.denotes_type(expression.role('expr'), seen)
         if expression.kind.endswith("Type"):
             return True
-        if expression.kind == "Call" and expression.role("callee").text == "type_of":
+        if expression.kind == "Call" and self.resolver and self.resolver.native_builtin(expression.role('callee'),'type_of'):
             return True
         builtins = {"bool", "b8", "b16", "b32", "b64", "int", "uint", "uintptr", "rune",
                     "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128",
@@ -575,6 +576,10 @@ class Source:
             code = self.guard_code(self.guards[n]) + code
         if n in self.evaluation_query_checks:
             code=''.join('_ = '+self.render(query)+'\n' for query in self.evaluation_query_checks[n])+code
+        if n.parent and n.parent.kind=='Call' and n.parent.role('callee') is n and self.resolver:
+            name=n.role('field').text if n.kind=='Selector' else n.text
+            if name in {'type_of','typeid_of','type_info_of','size_of','align_of','offset_of'} and not self.resolver.native_builtin(n,name):
+                code=self.mapping.wrap(code,self.path,n.start,n.end,'source-call-target')
         return self.mapping.wrap(code, self.path, n.start, n.end, n.kind)
 
     def guard_code(self, guards):
@@ -622,8 +627,12 @@ class Source:
                 return code
         if n in self.run_values:
             value=self.run_values[n]
-            if callable(value):return value(expected,constant)
-            return value['constant' if constant else 'runtime'] if isinstance(value,dict) else value
+            code=value(expected,constant) if callable(value) else value['constant' if constant else 'runtime'] if isinstance(value,dict) else value
+            if n.parent and n.parent.kind=='Call' and n.parent.role('callee') is n:
+                # A renamed/specialized user call still names that procedure;
+                # synthetic spelling does not make it a native builtin query.
+                return self.mapping.wrap(code,self.path,n.start,n.end,'source-call-target')
+            return code
         lifetime_code=self.expressions.fstrings.render(n,expected,constant)
         if lifetime_code is not None:return lifetime_code
         if kind == 'Procedure' and self.resolver:
@@ -1051,6 +1060,8 @@ class Source:
         if getattr(self, 'memory_import', None):
             code += self.mapping.wrap(self.memory_import, self.path, 0, 0, 'memory-debug')
         code, self.source_map = self.mapping.finish(code)
+        from .hygiene import qualify
+        code, self.source_map = qualify(self, code, self.source_map)
         return code
 
 

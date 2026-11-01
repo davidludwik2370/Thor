@@ -18,12 +18,14 @@ class Diagnostics:
         self.guard_messages = {(str(path), start, end): message for path, s in (sources or {}).items()
                                for (start, end), message in s.guard_messages.items()}
         self.type_operand_errors = {str(path): s.type_operand_errors for path, s in (sources or {}).items()}
+        self.sequence_bounds = {str(path): s.sequence_bounds for path, s in (sources or {}).items()}
         self.hidden_parameters={calls.marker for s in (sources or {}).values()
             if (calls:=getattr(getattr(s,'purity',None),'calls',None)) and calls.names}
         self.raw.update({str(p): b for p, b in (overlays or {}).items()})
         self.maps = maps or {}
         self.generated = generated or {}
         self.path_aliases=path_aliases or {}
+        self.expression_patterns = None
         self.reference_patterns = [(file, re.compile(re.escape(file) + r"(?:\((\d+):(\d+)\)|:(\d+):(\d+):)"))
                                    for file in self.maps]
 
@@ -70,6 +72,7 @@ class Diagnostics:
             msgs = list(error.get("msgs") or [])
             generated_result_failure = False
             type_operand = None
+            index_dependencies = []
             related = []
             for name in self.hidden_parameters:
                 msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false))?', '',m) for m in msgs]
@@ -99,6 +102,43 @@ class Diagnostics:
                     msgs = [message, *[m for m in msgs if "instantiated as" in m or "Called within" in m]]
             if origin and origin.kind=='range-type':
                 msgs=[m.replace('ternary expression','range membership') for m in msgs]
+            if origin:
+                bound_info=self.sequence_bounds.get(origin.file,{}).get((origin.start,origin.end))
+                normalization=msgs and any(f"procedure group '{prefix}sequence.normalize'" in msgs[0] for prefix in self.prefixes)
+                query_failure=any(
+                    message.startswith("Expected a type for 'type_is_")
+                    or "'type_of' of polymorphic type cannot be determined" in message
+                    or message == 'Expected a type to assign to the type parameter'
+                    or "Cannot determine polymorphic type from parameter: 'invalid type'" in message
+                    or any(f"procedure group '{prefix}sequence.element'" in message for prefix in self.prefixes)
+                    for message in msgs
+                )
+                implicit_bound_cast=(bound_info and bound_info[1].kind in {'Literal','Ident','Unary','Paren'}
+                                     and msgs and msgs[0].startswith('Cannot cast '))
+                if bound_info and (origin.kind in {'sequence-index','sequence-lower','sequence-upper'} or implicit_bound_cast):
+                    operation,bound,role=bound_info
+                    types=[message.strip().removeprefix('• ').strip() for message in msgs if message.strip().startswith('• ')]
+                    actual=types[-1] if normalization and types else None
+                    if not actual and not normalization and any('Cannot convert' in message or 'Cannot cast' in message or 'truncated to' in message for message in msgs):
+                        shape=bound.source.resolver.type_of(bound)
+                        if shape.name and (shape.kind=='string' or shape.kind=='scalar' and shape.name.startswith(('f','complex','quaternion','b'))):
+                            actual=('untyped string' if shape.kind=='string' else 'untyped float' if shape.name.startswith('f') else 'untyped boolean') if shape.untyped else shape.name
+                    if actual and actual != 'invalid type':
+                        subject='Sequence indices' if role=='index' else f'The {role} slice bound'
+                        notes=[message for message in msgs if 'instantiated as' in message]
+                        msgs=[f"{subject} must have an integer type; '{bound.text}' has type '{actual}'.",*notes]
+                    elif normalization or query_failure:
+                        index_dependencies=[operation]
+                if not origin.exact and query_failure and not index_dependencies:
+                    source=self.sources.get(origin.file)
+                    if source:
+                        index_dependencies=[node for node in source.nodes if node.kind in {'Index','Slice'}
+                            and origin.start <= node.start and node.end <= origin.end]
+                context=self.membership_context(origin,msgs)
+                if context:
+                    explanation,note=context
+                    msgs=[*msgs,explanation]
+                    related.append(note)
             if origin and any('is not an expression but a type' in message for message in msgs):
                 for operation, base in self.type_operand_errors.get(origin.file, {}).items():
                     if base.start <= origin.start < base.end:
@@ -224,12 +264,7 @@ class Diagnostics:
                             msgs = [m.replace(expanded, original) for m in msgs]
                 # Native messages also quote whole lowered expressions. Replace
                 # those using recorded emission boundaries, never source guesses.
-                for generated_file, mapping in self.maps.items():
-                    for a, b, source_file, start, end in sorted(mapping.expansions, key=lambda s: s[1] - s[0], reverse=True):
-                        generated_text = self.generated[generated_file][a:b].decode("utf-8")
-                        original_text = self.read(source_file)[start:end].decode("utf-8")
-                        if generated_text and generated_text != original_text:
-                            msgs = [m.replace(generated_text, original_text) for m in msgs]
+                msgs = self.restore_expressions(msgs)
                 # An unresolved generated result parameter is not a real return
                 # type. For example, a power mismatch can leave the enclosing
                 # numeric-dispatch helper returning '$__thor_..._Result'. Keep
@@ -260,6 +295,7 @@ class Diagnostics:
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             if related: diagnostic['related'] = related
             diagnostic['_type_operand'] = type_operand
+            diagnostic['_index_dependencies'] = index_dependencies
             diagnostic['_type_query_cascade'] = bool(origin and not origin.exact and any(
                 message == 'Expected a type to assign to the type parameter'
                 or "'type_of' of polymorphic type cannot be determined" in message
@@ -283,6 +319,15 @@ class Diagnostics:
         filtered = []
         for diagnostic in result:
             pos = diagnostic["pos"]
+            if diagnostic['_index_dependencies'] and any(
+                other['type']=='error' and other['pos'] and other['msgs']
+                and (other['msgs'][0].startswith('Undeclared name:')
+                     or re.search(r"of type '.+' has no field '",other['msgs'][0]))
+                and any(other['pos']['file']==str(operation.source.path)
+                        and operation.start <= other['pos']['offset'] < operation.end
+                        for operation in diagnostic['_index_dependencies'])
+                for other in result
+            ): continue
             if pos and any(self.type_operand_cascade(diagnostic, other['_type_operand'])
                            for other in result if other['_type_operand'] is not None):
                 continue
@@ -295,6 +340,50 @@ class Diagnostics:
                 continue
             filtered.append({k: v for k, v in diagnostic.items() if not k.startswith('_')})
         return filtered
+
+    def restore_expressions(self, messages):
+        if self.expression_patterns is None:
+            from .hygiene import tokens
+            self.expression_patterns=[]
+            for generated_file,mapping in self.maps.items():
+                for a,b,source_file,start,end in sorted(mapping.expansions,key=lambda span:span[1]-span[0],reverse=True):
+                    emitted=self.generated[generated_file][a:b]
+                    original=self.read(source_file)[start:end].decode('utf-8')
+                    text=emitted.decode('utf-8')
+                    # Ordinary folded literals/type names need no cleanup.
+                    # Replacing e.g. emitted '8' globally would corrupt 'i8'.
+                    if not text or text==original or not any(prefix in text for prefix in self.prefixes):continue
+                    # Odin pretty-prints expressions with its own whitespace.
+                    # Match complete recorded token sequences, keeping literal
+                    # contents and identifier boundaries intact.
+                    pattern=None
+                    if any(prefix in text for prefix in self.prefixes):
+                        parts=[re.escape(token.decode('utf-8')) for _,_,token in tokens(emitted)]
+                        if parts:pattern=re.compile(r'(?<!\w)'+r'\s*'.join(parts)+r'(?!\w)')
+                    self.expression_patterns.append((text,pattern,original))
+        for text,pattern,original in self.expression_patterns:
+            messages=[message.replace(text,original) if text in message else
+                      pattern.sub(lambda _:original,message) if pattern else message for message in messages]
+        return messages
+
+    def membership_context(self, origin, messages):
+        if not messages or not messages[0].startswith(('Cannot convert ', 'Cannot assign ')): return None
+        source=self.sources.get(origin.file)
+        if source is None:return None
+        for node in source.nodes:
+            if node.kind!='Compound' or not source.is_array(node):continue
+            needle=source.membership_needle(node)
+            if needle is None:continue
+            # Only conversions of list elements themselves use membership's
+            # context. Errors inside calls/explicit typed values have their own.
+            if not any(element.start==origin.start for element in node.group('elems')):continue
+            target=re.search(r" to '(.+?)' from ",messages[0])
+            typed=f" (type '{target[1]}')" if target and not source.resolver.membership_untyped(needle) else ''
+            message=f"In this membership test, each list element must be comparable with '{needle.text}'{typed}."
+            note={'pos':self.locate(Origin(str(source.path),needle.start,needle.end)),
+                  'message':'The value being tested for membership is here.'}
+            return message,note
+        return None
 
     @staticmethod
     def type_operand_cascade(diagnostic, operation):

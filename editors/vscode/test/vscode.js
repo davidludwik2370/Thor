@@ -165,13 +165,13 @@ async function run() {
             const close=testDocument.positionAt(commentedSource.lastIndexOf('}'));
             await eventually(()=>jumpAt(open),position=>position.isEqual(close));
             await vscode.commands.executeCommand('undo');
-            assert.equal(testDocument.getText(),loopSource);
+            await eventually(()=>testDocument.getText(),text=>text===loopSource);
             await assertArrayPair();
             await vscode.commands.executeCommand('redo');
-            assert.equal(testDocument.getText(),commentedSource);
+            await eventually(()=>testDocument.getText(),text=>text===commentedSource);
             await eventually(()=>jumpAt(testDocument.positionAt(commentedSource.indexOf('[2]'))),position=>position.isEqual(close));
             await vscode.commands.executeCommand('undo');
-            assert.equal(testDocument.getText(),loopSource);
+            await eventually(()=>testDocument.getText(),text=>text===loopSource);
         }
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
             testDocument.positionAt(loopSource.indexOf('a:=')+1)),values=>hoverText(values||[]).includes('a: int'));
@@ -530,6 +530,34 @@ async function run() {
         assert.ok(declarationNote.message.includes('declared as a type'));
         await replace(arrayTypeMisuse.replace('Rows::','Rows:'));
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        const shadowQueries='// 😀 header\npackage main\nimport native "base:builtin"\ntype_of::proc()->[2]int{return {1,2}}\nmain::proc(){values:=[1,2];i:=-1;result:=type_of()[i];native.assert(result==2)}\n';
+        await replace(shadowQueries);
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(shadowQueries.indexOf('result:=')+1)),values=>hoverText(values||[]).includes('result: int'));
+        await replace(shadowQueries.replace('type_of()[i]','type_of()[missing]'));
+        const missingIndexErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('Undeclared name: missing')));
+        assert.equal(missingIndexErrors.length,1);
+        assert.equal(testDocument.getText(missingIndexErrors[0].range),'missing');
+        await replace(shadowQueries.replace('i:=-1','i:f64=1'));
+        const indexTypeErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes('Sequence indices must have an integer type')));
+        assert.equal(indexTypeErrors.length,1);
+        assert.equal(testDocument.getText(indexTypeErrors[0].range),'i');
+        await replace(shadowQueries.replace('result:=','result:string=').replace('native.assert(result==2)','native.assert(true)'));
+        const indexResultErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.some(value=>value.message.includes("value 'type_of()[i]'")));
+        assert.equal(indexResultErrors.length,1);
+        assert.ok(!indexResultErrors[0].message.includes('Thor expression'));
+        const memberContext='package main\nRecord::struct{x:int}\nmain::proc(){/* 😀 */ record:=Record{1};_=record in [1,2]}\n';
+        await replace(memberContext);
+        const memberErrors=await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.filter(value=>value.message.includes('In this membership test')).length===2);
+        for(const error of memberErrors){
+            assert.ok(error.message.includes("comparable with 'record'"));
+            const note=error.relatedInformation[0];
+            assert.equal(note.location.uri.toString(),testDocument.uri.toString());
+            assert.equal(testDocument.getText(note.location.range),'record');
+        }
+        await replace(memberContext.replace('[1,2]','[Record{1},Record{2}]'));
+        await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
         const usingSource='// 😀 original header\npackage main\nKind::enum{A,B}\nRecord::struct{x:int,kind:Kind}\nread::proc(using record:Record)->int{return x}\nwrite::proc(using record:^Record){kind=switch{case x==4:.A;case:true?.B:.A}}\nmain::proc(){record:=Record{x=4};write(&record);using record;value:=read(record);_=value}\n';
         await replace(usingSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -714,6 +742,7 @@ async function run() {
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');
         result.checks.push('type-as-array errors have original use ranges, clickable declaration notes and unsaved recovery');
+        result.checks.push('index root/type/result diagnostics, membership context notes and user builtin-spelling hovers recover without saving');
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

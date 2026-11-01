@@ -2,8 +2,8 @@
 
 This is a focused review of indexing, contextual literals and adjacent lowered
 expressions. Thirteen small programs were checked against the real compiler.
-The additional proposals below are **not implemented**; they are recorded for
-review before a further diagnostic change.
+All five follow-up improvements below are implemented in **Thor 0.29.2** and
+covered by real compiler and TLS transport tests.
 
 ## Implemented: indexing a type instead of an array variable
 
@@ -45,7 +45,7 @@ same proven error in an f-string or switch expression are also filtered.
 Independent diagnostics, other statements, and failures inside explicitly typed
 nested compounds remain visible.
 
-## Proposals awaiting approval
+## Follow-up improvements implemented in 0.29.2
 
 ### 1. Suppress proven indexing cascades after an undeclared name
 
@@ -54,17 +54,18 @@ i := 1
 missing[i] = 2
 ```
 
-Currently: eight errors, starting with generated `type_is_array` / `type_of`
+Before 0.29.2: eight errors, starting with generated `type_is_array` / `type_of`
 failures; the useful `Undeclared name: missing` is buried among them. An undeclared
 index in `values[missing]` similarly produces the name error and an additional
 `normalize` overload error.
 
-Proposed: retain the original undeclared-name error and suppress only generated
+Implemented: retain the original undeclared-name error and suppress only generated
 inference/normalization failures tied to that same unresolved operand. Do not
 suppress unrelated errors merely because they share a line or statement.
 
-Priority: high. This is diagnostic handling, with regression coverage needed for
-generic instantiation and multiple independent missing names.
+The same handling covers a missing record field used as an index. Tests preserve
+multiple independent errors on the same line and in separate slice bounds, and
+cover indexing inside switches and f-strings.
 
 ### 2. Explain invalid index and slice-bound types as language operations
 
@@ -74,22 +75,23 @@ i: f64 = 1
 _ = values[i]
 ```
 
-Currently: `No procedures or ambiguous call for procedure group 'Thor
+Before 0.29.2: `No procedures or ambiguous call for procedure group 'Thor
 expression.normalize' that match with the given arguments`, followed by overload
 details. String-valued slice bounds have the same problem.
 
-Proposed:
+Now:
 
 ```text
 Error: Sequence indices must have an integer type; 'i' has type 'f64'.
 ```
 
-For slicing, identify the lower or upper bound. Preserve native enum-array and
-map-key rules; a noninteger map key can be completely valid. Cover wide unsigned
-indices, distinct integer types, imported types and generic parameters.
+For slicing, the message identifies the lower or upper bound. Native enum-array and
+map-key rules are preserved; a noninteger map key can be completely valid. Tests
+cover wide unsigned indices, distinct types, original library locations, generic
+parameters and constant fractional bounds.
 
-Priority: high. This should explain the existing contract, not change accepted
-index types or add implicit conversions.
+The message explains the existing contract without changing accepted index types
+or adding implicit conversions.
 
 ### 3. Show original expressions in result-type mismatch messages
 
@@ -99,22 +101,23 @@ i := 1
 result: string = values[i]
 ```
 
-Currently: the message correctly reports `int` versus `string`, but quotes a long
+Before 0.29.2: the message correctly reported `int` versus `string`, but quoted a long
 generated expression containing captures and `sequence.element` type witnesses.
 
-Proposed:
+Now the native diagnostic quotes the original expression:
 
 ```text
-Error: Cannot assign 'values[i]' of type 'int' to 'result' of type 'string'.
+Error: Cannot assign value 'values[i]' of type 'int' to 'string' in a variable declaration
 ```
 
-Use recorded emission boundaries and original AST spans to reconstruct the
-quoted expression. Do not perform global text substitutions that could replace
-user identifiers or alter real type names. Apply the same presentation rule to
-similar lowered switch, interpolation and numeric expressions where possible.
+Recorded emission boundaries and original AST spans reconstruct the quoted
+expression. Token-boundary matching also handles Odin's pretty-printed
+whitespace while preserving string/rune contents and identifier boundaries.
+The same presentation rule covers lowered calls, slices, switches, interpolation
+and numeric expressions. Specific errors in individual switch arms keep their
+more precise arm expressions and ranges.
 
-Priority: high. The current type information and source range are useful; the
-quoted generated implementation is the confusing part.
+Actual result/destination types and original source ranges remain available.
 
 ### 4. Avoid generated builtin queries being captured by user declarations
 
@@ -126,19 +129,25 @@ main :: proc() {
 }
 ```
 
-Currently: generated calls to `type_of(value)` resolve to the user's zero-argument
+Before 0.29.2: generated calls to `type_of(value)` resolved to the user's zero-argument
 procedure, producing `Too many arguments for 'type_of', expected 0 arguments, got
 1`. The source call has no arguments. The constant-index form does not need the
 helper and works.
 
-Proposed: investigate a reliable, scope-independent way for generated code to
-refer to native builtins, and apply it consistently. Merely rewriting the error
-would conceal a code-generation compatibility problem. If native Odin provides
-no such mechanism for a particular builtin, discuss the limitation explicitly
-before introducing any new reserved names.
+Implemented: when a user binding can shadow a generated native name, Thor imports
+Odin's `base:builtin` namespace under a private generated alias and qualifies
+only the affected generated native calls. User-written references, literals,
+comments, selectors and renamed/specialized user call targets retain their
+bindings. The resolver also distinguishes user `type_of` procedures from the
+native query, including selected imports.
 
-Priority: medium. This is a correctness investigation as well as a clarity issue;
-it needs broader compatibility tests before deployment.
+Tests cover local, parameter, same-package and imported shadows, user type names,
+f-string allocation/cleanup, declared pure functions and cold/cached `#run`.
+Source-map segments, expression boundaries and debugger regions shift with the
+inserted qualifiers. User procedures named `type_of` keep runtime argument
+breakpoints and stepping; they are not mistaken for unevaluated type queries.
+No new reserved names, frontend passes or compiler subprocesses are introduced.
+Files without relevant shadowing need no additional builtin import.
 
 ### 5. Add operation context to inline membership conversion failures
 
@@ -147,17 +156,23 @@ record := struct {x: int} {1}
 _ = record in [1, 2]
 ```
 
-Currently: two separate native messages about converting `1` and `2` to the
+Before 0.29.2: two separate native messages about converting `1` and `2` to the
 record's struct type. This follows Thor's contextual membership-list typing, but
 does not explain why the literals were being converted to a struct.
 
-Proposed: add a short explanation identifying membership and the needle's type,
-while keeping the actual offending element ranges and native conversion details.
-For example, explain that the membership list's elements must be comparable with
-the struct-valued needle. Grouping repeated failures could be considered later;
-the first change should preserve useful per-element information.
+Now each native conversion diagnostic keeps its element range and conversion
+details and adds:
 
-Priority: lower. The present errors are accurate, but lack the operation's context.
+```text
+In this membership test, each list element must be comparable with 'record' (type 'struct {x: int}').
+```
+
+A related source location identifies the needle. Native errors inside an
+explicitly typed list value or nested call retain their own context. `in` and
+`not_in` use the same behavior; useful per-element information is preserved.
+
+TLS carries the explanation and clickable needle note through unsaved changes
+and clears the diagnostics after a fix.
 
 ## Cases that already read clearly
 
@@ -166,4 +181,4 @@ types, empty array literals without context, invalid Set key types, unordered
 spread `min` elements and mismatched power operand types. These already produced
 focused, useful messages in the tested examples; no changes were made to them.
 
-The five proposals above do not include any new syntax or implicit coercion.
+These changes introduce no new syntax or implicit coercion.

@@ -442,6 +442,16 @@ related locations in VS Code, including original imported/unsaved source. JSON
 diagnostics expose these as optional `related` entries containing `pos` and
 `message`; notes do not increase the error count.
 
+Indexing errors identify invalid index/lower-bound/upper-bound types at the
+original bound, and proven generated cascades are removed when the real error is
+an undeclared name or missing record field. Result-type errors quote the original
+lowered expression (such as `values[i]`) while preserving its actual type.
+Inline membership-list conversion errors explain the comparison context and link
+to the value being tested. User bindings named `type_of`, `len` or other native
+builtins keep their normal meaning; generated operations use Odin's qualified
+builtin namespace when needed. See the [diagnostic review](docs/diagnostic-review-2026-11-01.md)
+for examples and implementation boundaries.
+
 Unconditional top-level redeclarations in the same untagged file are checked by
 the shared frontend before compile-time evaluation. TLS reports these immediately
 while editing, even without compiler checking, with the duplicate name underlined

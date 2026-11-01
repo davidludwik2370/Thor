@@ -374,7 +374,8 @@ class Expressions:
                 self.native_access.add(index)
                 try: native=branch(i+1)
                 finally: self.native_access.remove(index)
-                return f'when {self.sequence_trait(original)} {{\n{sequence}\n}} else {{\n{native}\n}}'
+                trait=s.mapping.wrap(self.sequence_trait(original),s.path,index.start,index.end,'sequence-dispatch')
+                return f'when {trait} {{\n{sequence}\n}} else {{\n{native}\n}}'
             try: return branch(0)+('\nreturn true' if post else '')
             finally: self.assigning.remove(n)
         name,args=self.closed(n,body,result='bool' if post else False,flavor='assignment')
@@ -511,13 +512,17 @@ class Expressions:
                 return s.mapping.wrap(self.error(bounds[0],f'Negative sequence index {original} is out of bounds for length {typ.length}.'),s.path,bounds[0].start,bounds[0].end,'negative-index')
             return f'({s.render(base)})[{index}]'
         sequence=self.module('sequence')
+        def mapped_bound(bound, code):
+            role = 'index' if n.kind == 'Index' else 'lower' if bound is bounds[0] else 'upper'
+            s.sequence_bounds[bound.start,bound.end] = (n, bound, role)
+            return s.mapping.wrap(code,s.path,bound.start,bound.end,'sequence-'+role)
         if constant:
             b=s.render(base,constant=True)
             def normalized(bound):
                 if bound is None: return ''
                 i=s.render(bound,constant=True)
                 if not needs(bound) or self.shape(bound).name.startswith('u'): return i
-                return f'(i128(len({b}))+i128({i}) when i128({i}) < 0 else i128({i}))'
+                return mapped_bound(bound,f'(i128(len({b}))+i128({i}) when i128({i}) < 0 else i128({i}))')
             # Every operand is required to be constant by the surrounding Odin
             # context; there are no duplicated runtime evaluations here.
             if n.kind=='Index': return f'({b})[{normalized(bounds[0])}]'
@@ -525,10 +530,10 @@ class Expressions:
         pointer=n.kind=='Index' and self.writes(n)
         b=s.render(base)
         if n.kind=='Index':
-            result=f'type_of({sequence}.element({b}))'
+            result=s.mapping.wrap(f'type_of({sequence}.element({b}))',s.path,n.start,n.end,'sequence-type')
         else:
             s.needs_default=True
-            result=f'type_of({s.prefix}default_value(({b})[:]))'
+            result=s.mapping.wrap(f'type_of({s.prefix}default_value(({b})[:]))',s.path,n.start,n.end,'sequence-type')
         local=s.prefix+'access_'
         value,index,low,high=[local+x for x in ['base','index','low','high']]
         def body(_):
@@ -540,25 +545,28 @@ class Expressions:
             meta=s.prefix+'meta'
             s.needs_default=True
             source_type=f'type_of({s.prefix}default_value({original}))'
-            array=f'{meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}) || {meta}.type_is_fixed_capacity_dynamic_array({source_type})'
+            array=s.mapping.wrap(f'{meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}) || {meta}.type_is_fixed_capacity_dynamic_array({source_type})',s.path,n.start,n.end,'sequence-dispatch')
             def branch(byref):
                 original=self.address(base) if byref else s.render(base)
                 code=[f'{value} := '+('&('+original+')' if byref else original)]
                 v=value+'^' if byref else value
                 if n.kind=='Index':
                     code.append(f'{index} := {s.render(bounds[0])}')
-                    access=f'({v})[{sequence}.normalize(len({v}),{index})]'
+                    normalized=mapped_bound(bounds[0],f'{sequence}.normalize(len({v}),{index})')
+                    access=f'({v})[{normalized}]'
                     native=f'({v})[{index}]'
                     op='&' if pointer else ''
                     if pointer and not addr and byref:
                         return self.error(n,'Cannot take a mutable address of an element in a temporary array.')
-                    code.append(f'when {self.sequence_trait(original)} {{ return {op}{access} }} else {{ return {op}{native} }}')
+                    trait=s.mapping.wrap(self.sequence_trait(original),s.path,n.start,n.end,'sequence-dispatch')
+                    code.append(f'when {trait} {{ return {op}{access} }} else {{ return {op}{native} }}')
                 else:
                     for bound,name in zip(bounds,[low,high]):
                         if bound: code.append(f'{name} := {s.render(bound)}')
-                    l=f'{sequence}.normalize(len({v}),{low})' if bounds[0] else ''
-                    h=f'{sequence}.normalize(len({v}),{high})' if bounds[1] else ''
-                    code.append(f'when {self.sequence_trait(original)} {{ return ({v})[{l}:{h}] }} else {{ return ({v})[{low if bounds[0] else ""}:{high if bounds[1] else ""}] }}')
+                    l=mapped_bound(bounds[0],f'{sequence}.normalize(len({v}),{low})') if bounds[0] else ''
+                    h=mapped_bound(bounds[1],f'{sequence}.normalize(len({v}),{high})') if bounds[1] else ''
+                    trait=s.mapping.wrap(self.sequence_trait(original),s.path,n.start,n.end,'sequence-dispatch')
+                    code.append(f'when {trait} {{ return ({v})[{l}:{h}] }} else {{ return ({v})[{low if bounds[0] else ""}:{high if bounds[1] else ""}] }}')
                 return '\n'.join(code)
             if addr:
                 referenced=branch(True)

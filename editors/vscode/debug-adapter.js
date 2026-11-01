@@ -37,14 +37,16 @@ function byteOffset(unit, line, column = 1, native = false) {
     return start + Buffer.byteLength(prefix);
 }
 const generatedKinds = new Set(['expression-helper', 'support', 'import', 'pure-contract',
-    'pure-type-validator', 'pure-procedure', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture', 'memory-debug', 'typed-loop-check']);
+    'pure-type-validator', 'pure-procedure', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture', 'memory-debug', 'typed-loop-check',
+    'sequence-dispatch','sequence-type','sequence-index','sequence-lower','sequence-upper']);
 
-function typeQueryRanges(bytes) {
+function typeQueryRanges(bytes, regions = []) {
     // Generated type witnesses repeat source expressions without executing
     // them. Their byte ranges must never win over an arm's real runtime code.
     const code = bytes.toString('latin1'); // byte-preserving offsets
     const ranges = [], stack = [];
     let previous = '';
+    let previousStart = 0;
     for (let i = 0; i < code.length;) {
         if (code.startsWith('//', i)) { i = code.indexOf('\n', i); if (i < 0) break; continue; }
         if (code.startsWith('/*', i)) {
@@ -64,8 +66,9 @@ function typeQueryRanges(bytes) {
             previous = 'literal'; continue;
         }
         const word = /^[A-Za-z_][A-Za-z_0-9]*/.exec(code.slice(i));
-        if (word) { previous = word[0]; i += word[0].length; continue; }
-        if (code[i] === '(') stack.push({start: i, query: ['type_of','size_of','align_of','offset_of'].includes(previous)});
+        if (word) { previous = word[0]; previousStart = i; i += word[0].length; continue; }
+        if (code[i] === '(') stack.push({start: i, query: ['type_of','typeid_of','type_info_of','size_of','align_of','offset_of'].includes(previous)
+            && !regions.some(([a,b,kind])=>kind==='source-call-target' && a<=previousStart && previousStart<b)});
         if (code[i] === ')' && stack.length) {
             const opened = stack.pop();
             if (opened.query) ranges.push([opened.start, i + 1]);
@@ -96,7 +99,7 @@ class DebugMaps {
             if (map.generated_sha256!==crypto.createHash('sha256').update(bytes).digest('hex')) {
                 throw new Error(`Generated source changed or maps are outdated: ${file}. Rebuild before debugging.`);
             }
-            const unit = {file, bytes, lines: lineStarts(bytes), map, starts: map.segments.map(s => s[0]), queries: typeQueryRanges(bytes)};
+            const unit = {file, bytes, lines: lineStarts(bytes), map, starts: map.segments.map(s => s[0]), queries: typeQueryRanges(bytes,map.regions)};
             this.files.set(file, unit);
             for (const [original, text] of Object.entries(map.sources)) {
                 const key = canonical(original), previous = this.originals.get(key);

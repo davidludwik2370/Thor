@@ -64,9 +64,12 @@ class MappingBuilder:
                 last=segments[-1] if segments else None
                 identity=bool(last and last[6] and last[2]==origin.file and last[0]<=opened and last[1]>=offset
                               and last[3]+opened-last[0]==origin.start and origin.end-origin.start==offset-opened)
-                if not origin.exact and not identity and origin.kind in {"array", "Binary", "Ternary", "Ident", "pure-call-target"}:
+                if not origin.exact and not identity and origin.kind in {
+                    'array','Binary','Ternary','Ident','pure-call-target','Index','Slice',
+                    'SwitchExpr','CompileSwitchExpr','Interpolation','Call','Deref','Unary',
+                }:
                     expansions.append([opened, offset, origin.file, origin.start, origin.end])
-                if self.debug and origin.kind in {"expression-helper", "debug-capture"}:
+                if self.debug and origin.kind in {"expression-helper", "debug-capture", "source-call-target"}:
                     regions.append([opened, offset, origin.kind, origin.file, origin.start, origin.end])
                 if self.debug and origin.kind.startswith('pure-procedure|'):
                     _,name,variant=origin.kind.split('|')
