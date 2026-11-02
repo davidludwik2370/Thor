@@ -34,6 +34,35 @@ class FormattingBufferTests(unittest.TestCase):
     invoke=base.ThorTests.invoke
     program=base.ThorTests.program
 
+    def test_formatting_with_assertions_disabled_and_unchecked_release_flags(self):
+        source=self.program('''
+backing:=context.allocator
+tracker:mem.Tracking_Allocator;mem.tracking_allocator_init(&tracker,backing)
+context.allocator=mem.tracking_allocator(&tracker)
+width:=8;number:=42
+text:=f"value {number:0{width}d}|{1.25:+.2f}|{0.125:.2%}|{Choice.A:.4d}|{42:.8d}"
+fmt.println(text);delete(text)
+text=f"outer {f"inner {number}"} end"
+fmt.println(text);delete(text)
+text=f"{Integer(12345678901234567890):,}|{Rational(1,3):.2f}"
+fmt.println(text);delete(text)
+input:=strings.repeat("x",4096)
+text=f"prefix {input} suffix"
+if len(text)!=4110 || text[:7]!="prefix " || text[-7:]!=" suffix" {panic("large output differs")}
+delete(text);delete(input)
+if tracker.total_allocation_count==0 || tracker.current_memory_allocated!=0 {panic("allocation accounting differs")}
+context.allocator=backing
+mem.tracking_allocator_destroy(&tracker)
+fmt.println("release formatting passed")
+''','import "core:fmt"\nimport "core:mem"\nimport "core:strings"\nChoice::enum{A=7}\n')
+        expected="value 00000042|+1.25|12.50%|0007|00000042\nouter inner 42 end\n12,345,678,901,234,567,890|0.33\nrelease formatting passed"
+        for flags in [
+            ['-disable-assert'],
+            ['-o:speed','-disable-assert'],
+            ['-o:speed','-microarch:native','-no-bounds-check','-no-type-assert','-disable-assert'],
+        ]:
+            with self.subTest(flags=flags):self.invoke(source,flags=flags,expected=expected)
+
     def test_common_native_fields_allocate_only_the_owned_result(self):
         self.invoke(self.program('''
 backing:=context.allocator
@@ -139,13 +168,15 @@ assert(tracker.current_memory_allocated==0)
 ''','import "core:mem"\nimport "thor:format"\n'))
 
     def test_final_result_allocation_failure_is_reported(self):
-        self.invoke(self.program('context.allocator=mem.Allocator{procedure=deny};_=f"short {7}"','''import "core:mem"
+        source=self.program('context.allocator=mem.Allocator{procedure=deny};_=f"short {7}"','''import "core:mem"
 deny::proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,old_memory:rawptr,old_size:int,
            loc:=#caller_location)->([]byte,mem.Allocator_Error){return nil,.Out_Of_Memory}
-'''),fail='format allocation failed')
+''')
+        for flags in [[],['-o:speed','-disable-assert']]:
+            with self.subTest(flags=flags):self.invoke(source,flags=flags,fail='format allocation failed')
 
     def test_failed_scratch_growth_does_not_silently_truncate_custom_output(self):
-        self.invoke(self.program('''
+        source=self.program('''
 registry:map[typeid]fmt.User_Formatter
 registry[typeid_of(Item)]=custom;fmt.set_user_formatters(&registry)
 context.allocator=mem.Allocator{procedure=deny}
@@ -159,7 +190,9 @@ custom::proc(fi:^fmt.Info,arg:any,verb:rune)->bool{
 }
 deny::proc(data:rawptr,mode:mem.Allocator_Mode,size,alignment:int,old_memory:rawptr,old_size:int,
            loc:=#caller_location)->([]byte,mem.Allocator_Error){return nil,.Out_Of_Memory}
-'''),fail='format allocation failed')
+''')
+        for flags in [[],['-o:speed','-disable-assert']]:
+            with self.subTest(flags=flags):self.invoke(source,flags=flags,fail='format allocation failed')
 
 
 if __name__=='__main__':unittest.main()

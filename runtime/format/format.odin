@@ -66,7 +66,7 @@ write_spec :: proc(
     buffer_init(&rendered,allocator)
     defer buffer_destroy(&rendered)
     text:=render_view(&rendered.builder,value,verb,precision,plus,space,alternate)
-    assert(!rendered.scratch.failed,"format allocation failed")
+    if rendered.scratch.failed {panic("format allocation failed")}
     numeric_verb::verb=='d'||verb=='i'||verb=='b'||verb=='o'||verb=='z'||verb=='x'||verb=='X'||verb=='f'||verb=='F'||verb=='e'||verb=='E'||verb=='g'||verb=='G'||verb=='%'||verb=='m'||verb=='M'||verb=='h'||verb=='H'||verb=='p'||verb=='v'&&T!=rune&&!intrinsics.type_is_enum(T)
     numeric::numeric_verb && (intrinsics.type_is_integer(T)||intrinsics.type_is_float(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_pointer(T)||intrinsics.type_is_multi_pointer(T)||T==big.Integer||T==big.Rational)
     signed:=text
@@ -74,7 +74,7 @@ write_spec :: proc(
         if len(text)>0 && text[0]!='-' && text[0]!='+' && text!="NaN" {
             // Native floats/big numbers can need a sign added after rendering.
             // Insert in the caller-owned scratch instead of allocating a string.
-            assert(resize(&rendered.builder.buf,len(text)+1)==nil,"format allocation failed")
+            if resize(&rendered.builder.buf,len(text)+1)!=nil {panic("format allocation failed")}
             for i:=len(text);i>0;i-=1 {rendered.builder.buf[i]=rendered.builder.buf[i-1]}
             rendered.builder.buf[0]='+' when plus else ' '
             signed=strings.to_string(rendered.builder)
@@ -113,7 +113,7 @@ write_spec :: proc(
     when intrinsics.type_is_string(T) || (intrinsics.type_is_array(T)||intrinsics.type_is_slice(T)||intrinsics.type_is_dynamic_array(T)) {
         if is_builder_view(builder,signed) {
             alias_copy=strings.clone(signed,allocator)
-            assert(len(alias_copy)==len(signed),"format allocation failed")
+            if len(alias_copy)!=len(signed) {panic("format allocation failed")}
             signed=alias_copy
         }
     }
@@ -127,9 +127,9 @@ write_spec :: proc(
             storage:=len((cast(^Scratch_Allocator)builder.buf.allocator.data).storage)
             if wanted<=storage {slack=min(slack,storage-wanted)}
         }
-        assert(reserve(&builder.buf,wanted+slack)==nil,"format allocation failed")
+        if reserve(&builder.buf,wanted+slack)!=nil {panic("format allocation failed")}
     }
-    assert(resize(&builder.buf,used+total)==nil,"format allocation failed")
+    if resize(&builder.buf,used+total)!=nil {panic("format allocation failed")}
     data:=builder.buf[used:]
     cursor:=0
     if numeric_zero {copy(data,signed[:prefix]);cursor+=prefix}
@@ -160,10 +160,10 @@ append_borrowed :: proc(builder:^strings.Builder,text:string,allocator:runtime.A
     defer delete(owned,allocator=allocator)
     if is_builder_view(builder,text) {
         owned=strings.clone(text,allocator)
-        assert(len(owned)==len(text),"format allocation failed")
+        if len(owned)!=len(text) {panic("format allocation failed")}
         text=owned
     }
-    assert(strings.write_string(builder,text)==len(text),"format allocation failed")
+    if strings.write_string(builder,text)!=len(text) {panic("format allocation failed")}
 }
 
 format_options :: proc(value:$T,$grouping:bool,width:int=0,align:Alignment=.Default,fill:rune=' ',allocator:=context.allocator)->string {

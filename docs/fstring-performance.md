@@ -27,6 +27,14 @@ These can allocate more than once. The optimization does not change numeric
 rounding, formatting syntax, allocator selection, or ownership: `f`, `f!`, named
 results, and anonymous temporary cleanup keep their existing behavior.
 
+Thor 0.32.1 corrects a release-build regression in 0.32.0: buffer writes and
+growth were incorrectly placed inside assertions, so `-disable-assert` could
+remove required work and cause malformed output or a crash. These operations
+now execute independently of assertions. Allocation failures also retain
+explicit checks with assertions disabled. Regression coverage includes
+`-disable-assert` alone, optimized builds, and the full unchecked `tbss` flag
+combination; output comparisons and allocation checks do not depend on assertions.
+
 ## Measurements
 
 The following local macOS arm64 measurements compare Thor 0.31.0 with 0.32.0.

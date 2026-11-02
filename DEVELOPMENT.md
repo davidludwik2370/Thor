@@ -2788,3 +2788,38 @@ failure diagnostic, although its log contained the completed assertions. A
 subsequent normal invocation passed; a rebuild into isolated output then passed
 ten consecutive debug/ASan runs with status 0 and no memory reports. No
 reproducible formatter failure was found.
+
+## Assertion-disabled formatting: Thor 0.32.1
+
+The `double_bet` executable built with `tbss` crashed because that alias includes
+`-disable-assert`. The 0.32.0 formatter had placed some required buffer writes,
+reserves and resizes inside `assert(...)`; Odin removes the expressions entirely
+under that flag. This was a Thor regression, reproducible with the unchanged
+user source, rather than an optimizer or Odin compiler failure.
+
+Buffer operations now use ordinary conditionals with explicit failure panics.
+Allocation-result and formatter-writer failure checks remain active even with
+assertions disabled. The remaining runtime assertions have no required side
+effects; the rest of the Thor runtime and generated-code templates were also
+reviewed for this pattern.
+
+A behavioral regression first failed under three flag configurations and now
+checks actual output under `-disable-assert`, `-o:speed -disable-assert`, and the
+full `tbss` flags (`-o:speed -microarch:native -no-bounds-check -no-type-assert
+-disable-assert`). It covers literal writes, native numbers, percent/signs,
+enum precision, dynamic widths, nested f-strings, big-number conversion, heap
+growth and balanced allocation counts. Its checks use ordinary conditionals
+and Python output comparisons so disabling assertions cannot disable the test.
+Both final-result and custom-formatter allocation-failure tests also run with
+assertions disabled. Future runtime optimizations must keep required operations
+outside assertions and include the assertion-disabled release configuration.
+
+An unchanged temporary copy of the reported `double_bet` source reproduces the
+crash before the fix and passes five consecutive runs after rebuilding with the
+exact alias flags. Both evaluation demos also pass under those flags. Native
+formatter tests pass with ASan and memory tracking both with and without
+assertions; all 45 debugger/memory-policy tests and eight live TLS tests pass.
+The benchmark retains one tracked allocation for each common short case and
+two for the large-string case, with matching frees and zero live allocations.
+The full affected compiler regression run passes all 362 tests, including the
+ten buffer tests and the new assertion-disabled output/allocation-failure cases.

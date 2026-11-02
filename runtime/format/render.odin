@@ -31,13 +31,15 @@ float_into :: proc(builder:^strings.Builder,value:f64,bits:int,verb:rune,precisi
     data:=local[:]
     if size>len(local) {
         heap=make([]u8,size)
-        assert(len(heap)==size,"format allocation failed")
+        if len(heap)!=size {panic("format allocation failed")}
         data=heap
     }
     text:=strconv.write_float(data,value*100 if verb=='%' else value,u8(v),p,bits)
     if len(text)>1 && text[0]=='+' && text[1]!='I' {text=text[1:]}
-    assert(strings.write_string(builder,text)==len(text),"format allocation failed")
-    if verb=='%' {assert(strings.write_byte(builder,'%')==1,"format allocation failed")}
+    if strings.write_string(builder,text)!=len(text) {panic("format allocation failed")}
+    if verb=='%' {
+        if strings.write_byte(builder,'%')!=1 {panic("format allocation failed")}
+    }
 }
 
 @(private="package")
@@ -93,7 +95,7 @@ render_view :: proc(builder:^strings.Builder,value:$T,$verb:rune,$precision:int,
                 (intrinsics.type_is_complex(T)||intrinsics.type_is_quaternion(T)) && (decimal || verb=='v'||verb=='w') {
         text:=render(value,verb,precision,plus,space,alternate)
         defer delete(text)
-        assert(strings.write_string(builder,text)==len(text),"format allocation failed")
+        if strings.write_string(builder,text)!=len(text) {panic("format allocation failed")}
     } else when intrinsics.type_is_float(T) && (decimal || verb=='v'||verb=='w') {
         float_into(builder,f64(value),size_of(T)*8,verb,precision)
     } else {native_into(builder,value,verb,precision,plus,space,alternate)}
@@ -225,7 +227,7 @@ native_into :: proc(builder:^strings.Builder,value:$T,$verb:rune,$precision:int,
         padding:=max(0,precision-(len(text)-prefix))
         assert(padding<max(int)-len(text),"format precision overflow")
         length:=len(text)
-        assert(resize(&builder.buf,length+padding)==nil,"format allocation failed")
+        if resize(&builder.buf,length+padding)!=nil {panic("format allocation failed")}
         for i:=length-1;i>=prefix;i-=1 {builder.buf[i+padding]=builder.buf[i]}
         for i in prefix..<prefix+padding {builder.buf[i]='0'}
     }

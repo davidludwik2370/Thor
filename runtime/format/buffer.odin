@@ -78,14 +78,15 @@ buffer_destroy :: proc(buffer:^Buffer) {
 }
 
 buffer_write_string :: proc(buffer:^Buffer,text:string) {
-    assert(strings.write_string(&buffer.builder,text)==len(text),"format allocation failed")
+    // Writes must execute even when the application uses -disable-assert.
+    if strings.write_string(&buffer.builder,text)!=len(text) {panic("format allocation failed")}
 }
 
 // A string carries no capacity or allocator. Keep this final exact-sized copy
 // even on the heap fallback, so ordinary delete(string) works with sized frees.
 buffer_owned_text :: proc(buffer:^Buffer,allocator:=context.allocator,loc:=#caller_location)->string {
-    assert(!buffer.scratch.failed,"format allocation failed")
+    if buffer.scratch.failed {panic("format allocation failed")}
     text:=strings.clone(strings.to_string(buffer.builder),allocator,loc)
-    assert(len(text)==len(buffer.builder.buf),"format allocation failed")
+    if len(text)!=len(buffer.builder.buf) {panic("format allocation failed")}
     return text
 }
