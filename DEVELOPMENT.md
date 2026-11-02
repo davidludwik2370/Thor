@@ -2722,3 +2722,31 @@ also cover the constant modifier used by the purple theme preference.
 Validation: all 1,129 native TLS tests, eight targeted live TLS tests, 122 Node
 extension tests, and the isolated VS Code integration suite pass. The local
 TLS binary is rebuilt; restart the language server to refresh open editors.
+
+## Selective-import member completion: TLS 0.25.0
+
+`import "core:fmt" / ` and `import "core:fmt" / print, ` now offer public package
+members with the same fuzzy lookup, visibility and documentation as `fmt.`.
+The server recognizes a selected-name context directly from the original token
+stream, so an empty selection, a trailing comma, and multiline/commented lists
+work before the source parses cleanly. Relative imports, collection imports,
+explicit aliases and namespace-free selections use the resolved source package.
+Already-selected names on either side of the cursor are omitted. Edits retain
+original UTF-16 ranges and insert names alone, without call snippets or imports.
+
+The package-member query is shared with ordinary selector completion. Comma
+and space are additional LSP triggers; both return empty results outside the
+selected-import context. Space is necessary because VS Code otherwise closes
+the slash/comma popup when the usual following space is typed. No client or
+grammar update is needed: restarting TLS advertises the new triggers.
+
+Tests cover native and real stdio requests, public/private members, overloaded
+groups, documentation, prefix matching, Unicode edit ranges, incomplete lists,
+comments, multiline continuation, existing selections, import-path edits,
+core/Thor libraries and unrelated code. The VS Code integration test types the
+separators and spaces, accepts suggestions from the actual automatic popup,
+and filters to a procedure name while checking that no call syntax is inserted.
+Validation: all 1,133 native TLS tests, ten live import/regression tests, 122
+Node extension tests and the isolated VS Code integration suite pass. The local
+TLS 0.25.0 executable is rebuilt; use **Thor: Restart Language Server** to load
+the new completion triggers.

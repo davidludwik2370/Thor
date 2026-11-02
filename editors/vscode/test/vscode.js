@@ -108,6 +108,33 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        fs.mkdirSync(path.join(temporary,'completion_library'));
+        fs.writeFileSync(path.join(temporary,'completion_library/main.thor'),'package completion_library\n// Alpha accepts a number.\nalpha::proc(value:int)->int{return value}\nalpine::proc(){}\n@(private) hidden::proc(){}\n');
+        const importExample='package main\nimport "completion_library" / \nmain::proc(){}\n';
+        await replace(importExample);
+        const importPosition=testDocument.positionAt(importExample.indexOf(' / ')+3);
+        const importLabel=item=>typeof item.label==='string'?item.label:item.label.label;
+        const importItems=await eventually(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',testDocument.uri,importPosition,'/'),
+            value=>value?.items.some(item=>importLabel(item)==='alpha'));
+        const importedAlpha=importItems.items.find(item=>importLabel(item)==='alpha');
+        assert.equal(importedAlpha.insertText,'alpha');
+        assert.ok(!importItems.items.some(item=>importLabel(item)==='hidden'));
+        assert.ok((importedAlpha.documentation?.value||importedAlpha.documentation||'').includes('Alpha accepts a number'));
+        const acceptImportSuggestion=async(initial,characters,expected)=>{
+            await vscode.commands.executeCommand('hideSuggestWidget');
+            await replace(initial);
+            const editor=await vscode.window.showTextDocument(testDocument,{preserveFocus:false});
+            const at=testDocument.positionAt(initial.indexOf('\nmain::'));
+            editor.selection=new vscode.Selection(at,at);
+            for(const text of characters)await vscode.commands.executeCommand('default:type',{text});
+            await eventually(async()=>{
+                await vscode.commands.executeCommand('acceptSelectedSuggestion');
+                return testDocument.getText();
+            },text=>text.includes(expected));
+        };
+        await acceptImportSuggestion(importExample.replace(' / ',' '),['/',' '],' / alpha\n');
+        await acceptImportSuggestion(importExample.replace(' / ',' / alpha'),[',',' '],' / alpha, alpine\n');
+        await acceptImportSuggestion(importExample.replace(' / ',' '),['/',' ','a','l','p','i'],' / alpine\n');
         const precisionExample='package main\nmain::proc(){ratio:=Rational(1,3);text:=f"😀 {ratio:.6g}";delete(text);delete(ratio)}\n';
         await replace(precisionExample);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
@@ -818,6 +845,7 @@ async function run() {
         result.checks.push('dynamic width hover, rename and precise unsaved type diagnostics');
         result.checks.push('invalid bare format names retain diagnostics and surrounding semantic highlighting');
         result.checks.push('indexed compile-time values use constant tokens while actual type aliases stay types');
+        result.checks.push('selective-import member completion, docs and automatic slash/comma suggestions with spaces');
         result.checks.push('undeclared interpolation names keep one precise root diagnostic and no false literal underline');
         result.checks.push('Odin-style precision formats, Rational g/G contract and mapped unsaved recovery');
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');

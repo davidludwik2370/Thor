@@ -284,6 +284,16 @@ Unicode names use the original source ranges, including at newline/EOF.
 Hover over a selected name in the import list to see the same signature, type
 and documentation as a reference in code, even when that import is unused.
 
+Typing `/` after an import path or `,` between selected names opens package
+member suggestions, using the same public-member index and fuzzy filtering as
+`fmt.`. For example, `import "core:fmt" / pr` suggests matching fmt members.
+The usual space after `/` or `,` also opens the list in that import context.
+Relative packages, `core:`/`thor:` collections, explicit aliases, and namespace-free
+`import _` selections all work, including multiline lists and incomplete edits.
+Members already selected elsewhere in the list are omitted. Accepting a procedure
+inserts its name alone; it does not add a namespace prefix or call parentheses.
+Comments and commas in ordinary code do not trigger selective-import suggestions.
+
 Syntax errors and some obvious redeclarations can be reported immediately. For
 deeper checks, TLS invokes `thor check -json-errors` using snapshots of the open
 buffers. Thor performs compile-time evaluation, lowers the source, checks it with

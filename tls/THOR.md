@@ -36,6 +36,16 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 
 ## Current support
 
+- Complete public package members after `/` or `,` in selective imports, including
+  partial names, multiline/commented lists, relative and collection imports,
+  explicit aliases and `import _`. Suggestions reuse namespace-member fuzzy
+  lookup and documentation, omit already selected names, and insert plain names
+  with original UTF-16 edit ranges. Completion remains available while an empty
+  selection or trailing comma is a syntax error. Other code retains its normal
+  completion/signature behavior. TLS 0.25.0 adds comma/space completion triggers;
+  a space after a separator opens the list without suggesting globals on spaces
+  and commas elsewhere in the program.
+
 - Infer min/max element results through fixed-array expansion and slice spreads,
   including immutable builtin aliases and qualified core:math calls. Slice spread
   status bindings infer bool, and single-result uses retain their element type.

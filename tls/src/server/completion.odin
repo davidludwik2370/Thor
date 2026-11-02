@@ -35,6 +35,7 @@ Completion_Type :: enum {
 	Directive,
 	Package,
 	Attribute,
+	Import_Selection,
 }
 
 get_completion_list :: proc(
@@ -49,6 +50,10 @@ get_completion_list :: proc(
 	spall.trace(#procedure, document.fullpath)
 
 	list: CompletionList
+	if selected,ok:=get_thor_import_completion(document,position,config);ok {return selected,true}
+	// Keep the usual space after a separator useful without suggesting globals
+	// on ordinary spaces/commas elsewhere in a program.
+	if completion_context.triggerCharacter=="," || completion_context.triggerCharacter==" " {return list,true}
 
 	position_context, ok := get_document_position_context(document, position, .Completion)
 
@@ -179,6 +184,7 @@ get_completion_list :: proc(
 		is_incomplete = get_attribute_completion(&ast_context, &position_context, &results)
 	case .Package:
 		is_incomplete = get_package_completion(&ast_context, &position_context, &results, config)
+	case .Import_Selection: // Handled before AST-position recovery above.
 	}
 
 	items := convert_completion_results(
@@ -482,7 +488,7 @@ convert_completion_results :: proc(
 }
 
 
-@(private = "file")
+@(private)
 add_completion_text_edits :: proc(
 	items: []CompletionItem,
 	position_context: ^DocumentPositionContext,
@@ -490,7 +496,7 @@ add_completion_text_edits :: proc(
 	position: common.Position,
 	config: ^common.Config,
 ) {
-	if completion_type != .Identifier && completion_type != .Selector do return
+	if completion_type != .Identifier && completion_type != .Selector && completion_type != .Import_Selection do return
 	insert_range, replace_range := get_completion_edit_ranges(position_context, position)
 	for &item in items {
 		// Preserve supplied primary edits
@@ -548,6 +554,7 @@ get_completion_edit_ranges :: proc(
 }
 
 should_add_parens_snippet :: proc(position_context: ^DocumentPositionContext, config: ^common.Config, result_type: SymbolType) -> bool{
+	if position_context.import_stmt != nil {return false}
 	if result_type != .Function {
 		return false
 	}
@@ -1401,33 +1408,7 @@ get_selector_completion :: proc(
 		}
 
 	case SymbolPackageValue:
-		is_incomplete = true
-
-		packages := make([dynamic]string, context.temp_allocator)
-		if is_builtin_pkg(selector.pkg) {
-			append(&packages, "$builtin")
-			for built in indexer.builtin_packages {
-				append(&packages, built)
-			}
-		} else {
-			append(&packages, selector.pkg)
-		}
-
-		if searched, ok := fuzzy_search(field, packages[:], ast_context.fullpath); ok {
-			for search in searched {
-				symbol := search.symbol
-
-				if .PrivatePackage in symbol.flags {
-					continue
-				}
-
-				resolve_unresolved_symbol(ast_context, &symbol)
-				append(results, CompletionResult{symbol = symbol})
-			}
-		} else {
-			log.errorf("Failed to fuzzy search, field: %v, package: %v", field, selector.pkg)
-			return is_incomplete
-		}
+		is_incomplete = get_package_member_completion(ast_context,selector.pkg,field,results)
 	case SymbolDynamicArrayValue:
 		is_incomplete = false
 		append_magic_array_like_completion(position_context, selector, results)
@@ -2207,6 +2188,25 @@ get_identifier_completion :: proc(
 	}
 
 	return is_incomplete
+}
+
+// Both ordinary namespace selectors and selective imports use the same index,
+// visibility rules and fuzzy matching. The caller determines insertion syntax.
+get_package_member_completion :: proc(ast_context:^AstContext,pkg,field:string,results:^[dynamic]CompletionResult)->bool {
+	packages:=make([dynamic]string,context.temp_allocator)
+	if is_builtin_pkg(pkg) {
+		append(&packages,"$builtin")
+		for built in indexer.builtin_packages {append(&packages,built)}
+	} else {append(&packages,pkg)}
+	if searched,ok:=fuzzy_search(field,packages[:],ast_context.fullpath);ok {
+		for search in searched {
+			symbol:=search.symbol
+			if .PrivatePackage in symbol.flags {continue}
+			resolve_unresolved_symbol(ast_context,&symbol)
+			append(results,CompletionResult{symbol=symbol})
+		}
+	} else {log.errorf("Failed to fuzzy search, field: %v, package: %v",field,pkg)}
+	return true
 }
 
 get_package_completion :: proc(
