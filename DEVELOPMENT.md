@@ -2750,3 +2750,41 @@ Validation: all 1,133 native TLS tests, ten live import/regression tests, 122
 Node extension tests and the isolated VS Code integration suite pass. The local
 TLS 0.25.0 executable is rebuilt; use **Thor: Restart Language Server** to load
 the new completion triggers.
+
+## Streaming interpolation storage: Thor 0.32.0
+
+Interpolation now writes fields directly into a stack-backed output buffer,
+with checked heap growth for larger output. Native strings can be borrowed
+during formatting; native scalar formatting, grouping and padding avoid owned
+intermediate field strings. Complex and big-number conversion fallbacks retain
+their existing algorithms. No syntax or ownership change is involved.
+
+`runtime/format/buffer.odin` supplies 512 bytes of scratch and a private allocator
+that grows without replaying a custom formatter. A live buffer has pointers to
+its own storage, so initialize it in place and never copy it. The result remains
+an exact-sized clone: strings do not carry builder capacity, and sized custom
+allocators need correct sizes on deletion. Real allocation failures are checked
+even when Odin's formatter ignores writer errors; unsupported resize modes still
+allow Odin's allocator fallback. Borrowed views that alias a destination are
+protected before growing it. The final clone forwards the Thor caller location
+so leak reports continue to identify the original interpolation.
+
+The lowering keeps the same field source-map wrappers and evaluation/cleanup
+order, replacing per-field `format_spec` results with `write_spec` calls.
+The public owned `format_spec` API is unchanged. TLS and the editor extension
+require no protocol or grammar changes.
+
+Validation: 359 broader compiler/formatting/lifetime/pure/big-number/diagnostic
+tests pass, as do the dedicated nine buffer regression tests, five native runtime
+tests with ASan and memory tracking, 45 debugger/memory-policy tests, eight live
+TLS tests, 122 Node extension tests, and the isolated VS Code integration suite.
+Both evaluation demos run in optimized and debug modes. The benchmark tool
+compares identical owned results against Odin `aprintf`, outside terminal I/O,
+and measures allocations separately. See
+[performance details and measured results](docs/fstring-performance.md).
+
+One overlapping walkthrough invocation returned status 1 without a retained
+failure diagnostic, although its log contained the completed assertions. A
+subsequent normal invocation passed; a rebuild into isolated output then passed
+ten consecutive debug/ASan runs with status 0 and no memory reports. No
+reproducible formatter failure was found.

@@ -149,10 +149,11 @@ in `fn` constant calls, and in `#run`.
 
 ## Ownership and tooling
 
-The current allocator supplies all storage. Intermediates are released; a named
-result remains yours to `delete`. Anonymous `f` arguments are freed after their
-enclosing expression; `f!` retains its explicit ownership-transfer behavior.
-No formatting-specific exception is added to printing.
+The current allocator supplies the owned result and any heap scratch. Bounded
+stack scratch handles common short fields and strings. Intermediates are
+released; a named result remains yours to `delete`. Anonymous `f` arguments are
+freed after their enclosing expression; `f!` retains its explicit
+ownership-transfer behavior. No formatting-specific exception is added to printing.
 
 TLS uses the same compiler checks for malformed formats, invalid type/verb pairs,
 and missing Rational precision, including unsaved buffers. Field diagnostics map
@@ -161,3 +162,11 @@ numbers, verbs as type-format keywords, and punctuation/flags as ordinary
 operators. Literal format syntax creates no executable debugger stops. Nested
 width expressions are ordinary code; stepping follows those expressions, the
 original field values, and surrounding Thor code.
+
+Thor 0.32 streams formatted fields directly into the output buffer rather than
+allocating a separate padded string for each field. Common short native formats
+need only the final owned result allocation. Large output/precision grows to
+heap storage; exact big-number conversion can still allocate its own scratch.
+Finalization retains an exact-sized copy for ordinary `delete(string)`, including
+custom allocators that require accurate allocation sizes. See
+[implementation, benchmarks and validation](fstring-performance.md).

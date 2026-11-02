@@ -2,6 +2,8 @@
 package thor_format
 
 import "core:testing"
+import "core:mem"
+import "core:strings"
 
 @(test)
 decimal_grouping :: proc(t: ^testing.T) {
@@ -50,4 +52,40 @@ independent_results_and_borrowed_input :: proc(t: ^testing.T) {
     delete(a)
     testing.expect_value(t, b, "borrowed")
     delete(b)
+}
+
+@(test)
+buffer_boundaries_and_owned_results :: proc(t:^testing.T) {
+    backing:=context.allocator
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,backing)
+    defer mem.tracking_allocator_destroy(&tracker)
+    allocator:=mem.tracking_allocator(&tracker)
+    for length in ([?]int{0,1,511,512,513,4096}) {
+        input:=make([]u8,length,backing)
+        for &byte in input {byte='x'}
+        buffer:Buffer=---
+        buffer_init(&buffer,allocator)
+        buffer_write_string(&buffer,string(input))
+        owned:=buffer_owned_text(&buffer,allocator)
+        buffer_destroy(&buffer)
+        for &byte in buffer.storage {byte='?'}
+        testing.expect_value(t,owned,string(input))
+        testing.expect_value(t,tracker.current_memory_allocated,i64(length))
+        delete(owned,allocator=allocator)
+        delete(input,allocator=backing)
+        testing.expect_value(t,tracker.current_memory_allocated,i64(0))
+    }
+}
+
+@(test)
+streaming_appends_after_existing_output :: proc(t:^testing.T) {
+    buffer:Buffer
+    buffer_init(&buffer)
+    defer buffer_destroy(&buffer)
+    buffer_write_string(&buffer,"prefix:")
+    write_spec(&buffer.builder,1234,grouping=true,width=8,verb='d',precision=-1,
+               plus=false,space=false,zero=false,alternate=false)
+    buffer_write_string(&buffer,"!")
+    testing.expect_value(t,strings.to_string(buffer.builder),"prefix:   1,234!")
 }

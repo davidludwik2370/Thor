@@ -695,7 +695,6 @@ class Expressions:
     def interpolation(self,n):
         s=self.source
         formatting=self.module('format')
-        strings=self.module('strings','core:strings')
         fields=iter(n.group('args'))
         parts=[]
         quote=chr(s.raw[n.start+(2 if n.data.get('manual_lifetime') else 1)])
@@ -717,10 +716,10 @@ class Expressions:
             parts.append((field,None,options,widths,width_name))
         def body(_):
             builder=prefix+'builder'
-            code=[f'{builder}: {strings}.Builder',f'{strings}.builder_init(&{builder})',f'defer {strings}.builder_destroy(&{builder})']
+            code=[f'{builder}: {formatting}.Buffer = ---',f'{formatting}.buffer_init(&{builder})',f'defer {formatting}.buffer_destroy(&{builder})']
             for i,(field,literal,options,widths,width_name) in enumerate(parts):
                 if field is None:
-                    code.append(f'{strings}.write_string(&{builder}, {literal})')
+                    code.append(f'{formatting}.buffer_write_string(&{builder}, {literal})')
                 else:
                     value=self.ownership.evaluate(field,code)
                     expression=value.value
@@ -736,13 +735,12 @@ class Expressions:
                         self.ownership.release(evaluated_width,code)
                     if s.purity and (s.purity.eval_mode or s.purity.checked(s.purity.owner(n))):
                         code.append(f'{formatting}.validate_pure_value(type_of({expression}))')
-                    field_code='\n'.join([f'{prefix}field_{i} := {formatting}.format_spec({expression}, {options})',
-                                         f'{strings}.write_string(&{builder}, {prefix}field_{i})',f'delete({prefix}field_{i})'])
+                    field_code=f'{formatting}.write_spec(&{builder}.builder, {expression}, {options})'
                     code.append(s.mapping.wrap(field_code,s.path,field.start,field.end,'interpolation-field'))
                     if widths:
                         code.append(f'{formatting}.compiler_release_width_value({expression}, {value.owned})')
                     self.ownership.release(value,code)
-            code.append(f'return {strings}.clone({strings}.to_string({builder}))')
+            code.append(f'return {formatting}.buffer_owned_text(&{builder})')
             return '\n'.join(code)
         name,args=self.closed(n,body)
         return f'{name}({", ".join(args)})'

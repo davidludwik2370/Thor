@@ -831,6 +831,10 @@ released after use, including mixed branches such as
 `f"{(flag ? f"value {n}" : borrowed)}"`: only the selected owned string is freed.
 Named field values keep their existing ownership.
 
+Formatting streams into bounded stack scratch, with a heap fallback for large
+output. Common short native f-strings allocate only the final owned string.
+See [formatting performance and benchmarks](docs/fstring-performance.md).
+
 Anonymous f-string arguments are temporary by default. Thor releases them when
 the whole enclosing expression finishes, including nested calls and selected
 conditional/switch branches. This applies to every function, including native

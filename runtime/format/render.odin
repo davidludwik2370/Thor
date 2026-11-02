@@ -9,22 +9,35 @@ import "thor:big"
 
 @(private="package")
 float_text :: proc(value:f64,bits:int,verb:rune,precision:int)->string {
+    buffer:Buffer;buffer_init(&buffer);defer buffer_destroy(&buffer)
+    float_into(&buffer.builder,value,bits,verb,precision)
+    return buffer_owned_text(&buffer)
+}
+
+@(private="package")
+float_into :: proc(builder:^strings.Builder,value:f64,bits:int,verb:rune,precision:int) {
     p:=precision
     v:=verb
     if v=='v'||v=='w'||v=='G' {v='g'}
     if v=='F'||v=='%' {v='f'}
     if p<0 {p=3 if v=='f' else 6 if v=='e'||v=='E' else -1}
     assert(p<max(int)-400,"format precision overflow")
-    // f64 can need 309 integer digits. The additional space covers sign,
-    // decimal point, exponent, special values, and shortest representations.
+    // f64 needs at most 309 integer digits. Common precisions fit on stack;
+    // larger precisions retain the original checked, appropriately sized path.
     size:=max(400,p+400)
-    buffer:=make([]u8,size);defer delete(buffer)
-    assert(len(buffer)==size,"format allocation failed")
-    str:=strconv.write_float(buffer,value*100 if verb=='%' else value,u8(v),p,bits)
-    if len(str)>1 && str[0]=='+' && str[1]!='I' {str=str[1:]}
-    // Odin spells g/G identically; Thor preserves that convention.
-    if verb=='%' {return fmt.aprintf("%s%%",str)}
-    return strings.clone(str)
+    local:[512]u8
+    heap:[]u8
+    defer delete(heap)
+    data:=local[:]
+    if size>len(local) {
+        heap=make([]u8,size)
+        assert(len(heap)==size,"format allocation failed")
+        data=heap
+    }
+    text:=strconv.write_float(data,value*100 if verb=='%' else value,u8(v),p,bits)
+    if len(text)>1 && text[0]=='+' && text[1]!='I' {text=text[1:]}
+    assert(strings.write_string(builder,text)==len(text),"format allocation failed")
+    if verb=='%' {assert(strings.write_byte(builder,'%')==1,"format allocation failed")}
 }
 
 @(private="package")
@@ -36,7 +49,7 @@ truncate_runes :: proc "contextless"(text:string,count:int)->string {
 }
 
 @(private="package")
-render :: proc(value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$alternate:bool)->string {
+validate_render :: proc($T:typeid,$verb:rune,$precision:int) {
     bytes::intrinsics.type_elem_type(T)==u8 when (intrinsics.type_is_array(T)||intrinsics.type_is_slice(T)||intrinsics.type_is_dynamic_array(T)) else false
     // Public type contracts are mapped back to the interpolation field by Thor.
     when T==big.Rational {
@@ -60,6 +73,35 @@ render :: proc(value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$altern
     } else {
         #assert(precision<0,"Precision is supported for scalar numbers and strings, not aggregate values.")
     }
+}
+
+// Returned text borrows either the input or the caller's scratch builder.
+// Custom formatters execute once, including when their writer grows to heap.
+@(private="package")
+render_view :: proc(builder:^strings.Builder,value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$alternate:bool)->string {
+    validate_render(T,verb,precision)
+    bytes::intrinsics.type_elem_type(T)==u8 when (intrinsics.type_is_array(T)||intrinsics.type_is_slice(T)||intrinsics.type_is_dynamic_array(T)) else false
+    decimal::verb=='f'||verb=='F'||verb=='e'||verb=='E'||verb=='g'||verb=='G'||verb=='%'
+    integer_precision::precision>=0 && (verb=='b'||verb=='o'||verb=='z'||verb=='x'||verb=='X'||verb=='d'||verb=='i'||verb=='v'&&T!=rune)
+    when intrinsics.type_is_string(T) && (verb=='v'||verb=='s') {
+        return truncate_runes(string(value),precision)
+    } else when bytes && verb=='s' {
+        data:=value[:]
+        return string(data[:min(len(data),precision)]) when precision>=0 else string(data)
+    } else when T==big.Integer || T==big.Rational ||
+                intrinsics.type_is_integer(T) && (decimal || integer_precision || verb=='m'||verb=='M') ||
+                (intrinsics.type_is_complex(T)||intrinsics.type_is_quaternion(T)) && (decimal || verb=='v'||verb=='w') {
+        text:=render(value,verb,precision,plus,space,alternate)
+        defer delete(text)
+        assert(strings.write_string(builder,text)==len(text),"format allocation failed")
+    } else when intrinsics.type_is_float(T) && (decimal || verb=='v'||verb=='w') {
+        float_into(builder,f64(value),size_of(T)*8,verb,precision)
+    } else {native_into(builder,value,verb,precision,plus,space,alternate)}
+    return strings.to_string(builder^)
+}
+
+@(private="package")
+render :: proc(value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$alternate:bool)->string {
     when verb=='T' && (T==big.Integer || T==big.Rational) {
         return strings.clone("Integer" when T==big.Integer else "Rational")
     } else when (T==big.Integer || T==big.Rational) && verb=='w' {
@@ -152,39 +194,39 @@ integer_text :: proc(value:big.Integer,verb:rune,precision:int,alternate:bool)->
 }
 
 @(private="package")
-minimum_digits :: proc(text:string,precision:int)->string {
-    prefix:=0
-    if len(text)>0 && (text[0]=='-'||text[0]=='+'||text[0]==' '){prefix=1}
-    if len(text)>=prefix+2 && (text[prefix]=='0'&&(text[prefix+1]=='b'||text[prefix+1]=='o'||text[prefix+1]=='x'||text[prefix+1]=='X'||text[prefix+1]=='z') || text[:2]=="U+"){prefix+=2}
-    padding:=max(0,precision-(len(text)-prefix))
-    assert(padding<max(int)-len(text),"format precision overflow")
-    result:=make([]u8,len(text)+padding)
-    copy(result,text[:prefix])
-    for i in prefix..<prefix+padding {result[i]='0'}
-    copy(result[prefix+padding:],text[prefix:])
-    return string(result)
+native_text :: proc(value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$alternate:bool)->string {
+    buffer:Buffer;buffer_init(&buffer);defer buffer_destroy(&buffer)
+    native_into(&buffer.builder,value,verb,precision,plus,space,alternate)
+    return buffer_owned_text(&buffer)
 }
 
 @(private="package")
-native_text :: proc(value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$alternate:bool)->string {
+native_into :: proc(builder:^strings.Builder,value:$T,$verb:rune,$precision:int,$plus:bool,$space:bool,$alternate:bool) {
     bytes::intrinsics.type_elem_type(T)==u8 when (intrinsics.type_is_array(T)||intrinsics.type_is_slice(T)||intrinsics.type_is_dynamic_array(T)) else false
-        b:strings.Builder;strings.builder_init(&b);defer strings.builder_destroy(&b)
-        fi:=fmt.Info{writer=strings.to_writer(&b)}
-        fi.plus=plus;fi.space=space;fi.hash=alternate;fi.prec_set=precision>=0;fi.prec=max(0,precision)
-        when intrinsics.type_is_string(T) && verb!='T' {
-            // Truncate before escaping; never split an encoded Unicode scalar.
-            fi.prec_set=false
-            fmt.fmt_string(&fi,truncate_runes(string(value),precision),verb)
-        } else when bytes && (verb=='s'||verb=='q'||verb=='w'||verb=='x'||verb=='X') {
-            data:=value[:]
-            if precision>=0 {data=data[:min(len(data),precision)]}
-            fi.prec_set=false
-            fmt.fmt_string(&fi,string(data),verb)
-        } else {
-            fi.prec_set=false
-            fmt.fmt_arg(&fi,value,verb)
-        }
-        when precision>=0 && (intrinsics.type_is_enum(T) || intrinsics.type_is_pointer(T) || intrinsics.type_is_multi_pointer(T) || intrinsics.type_is_integer(T)) && (verb=='d'||verb=='i'||verb=='b'||verb=='o'||verb=='z'||verb=='x'||verb=='X'||verb=='U'||verb=='p') {
-            return minimum_digits(strings.to_string(b),precision)
-        } else {return strings.clone(strings.to_string(b))}
+    fi:=fmt.Info{writer=strings.to_writer(builder)}
+    fi.plus=plus;fi.space=space;fi.hash=alternate;fi.prec_set=precision>=0;fi.prec=max(0,precision)
+    when intrinsics.type_is_string(T) && verb!='T' {
+        fi.prec_set=false
+        fmt.fmt_string(&fi,truncate_runes(string(value),precision),verb)
+    } else when bytes && (verb=='s'||verb=='q'||verb=='w'||verb=='x'||verb=='X') {
+        data:=value[:]
+        if precision>=0 {data=data[:min(len(data),precision)]}
+        fi.prec_set=false
+        fmt.fmt_string(&fi,string(data),verb)
+    } else {
+        fi.prec_set=false
+        fmt.fmt_arg(&fi,value,verb)
+    }
+    when precision>=0 && (intrinsics.type_is_enum(T) || intrinsics.type_is_pointer(T) || intrinsics.type_is_multi_pointer(T) || intrinsics.type_is_integer(T)) && (verb=='d'||verb=='i'||verb=='b'||verb=='o'||verb=='z'||verb=='x'||verb=='X'||verb=='U'||verb=='p') {
+        text:=strings.to_string(builder^)
+        prefix:=0
+        if len(text)>0 && (text[0]=='-'||text[0]=='+'||text[0]==' '){prefix=1}
+        if len(text)>=prefix+2 && (text[prefix]=='0'&&(text[prefix+1]=='b'||text[prefix+1]=='o'||text[prefix+1]=='x'||text[prefix+1]=='X'||text[prefix+1]=='z') || text[:2]=="U+"){prefix+=2}
+        padding:=max(0,precision-(len(text)-prefix))
+        assert(padding<max(int)-len(text),"format precision overflow")
+        length:=len(text)
+        assert(resize(&builder.buf,length+padding)==nil,"format allocation failed")
+        for i:=length-1;i>=prefix;i-=1 {builder.buf[i+padding]=builder.buf[i]}
+        for i in prefix..<prefix+padding {builder.buf[i]='0'}
+    }
 }
