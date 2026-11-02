@@ -420,13 +420,16 @@ merge_attributes :: proc(attrs: []^ast.Attribute, foreign_attrs: []^ast.Attribut
 	return new_attrs[:]
 }
 
-// TODO: it seems the global symbols don't distinguish between a type decl and
-// a const variable declaration, so we do a quick check here to distinguish the cases.
-// Note this will be incorrect for type aliases from poly types, eg `Foo :: Bar(int)`
+// These expressions produce values even when resolving their shape returns an
+// element's type symbol. Actual type-producing calls are refined during
+// identifier resolution (e.g. type_of and polymorphic record instantiation).
 is_variable_declaration :: proc(expr: ^ast.Expr) -> bool {
 	#partial switch v in expr.derived {
-	case ^ast.Comp_Lit, ^ast.Basic_Lit, ^ast.Type_Cast, ^ast.Call_Expr, ^ast.Binary_Expr, ^ast.Unary_Expr:
+	case ^ast.Comp_Lit, ^ast.Basic_Lit, ^ast.Type_Cast, ^ast.Call_Expr, ^ast.Binary_Expr, ^ast.Unary_Expr,
+         ^ast.Index_Expr, ^ast.Matrix_Index_Expr, ^ast.Slice_Expr:
 		return true
+	case ^ast.Paren_Expr:
+		return is_variable_declaration(v.expr)
 	case:
 		return false
 	}

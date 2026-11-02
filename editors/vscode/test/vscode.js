@@ -150,6 +150,23 @@ async function run() {
         assert.ok(widthError.find(v=>v.message.includes('width must have an integer type')).range.start.isEqual(testDocument.positionAt(badWidth.indexOf('width}}'))));
         await replace(widthExample);
         await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.length===0);
+        const lookupExample='package main\nGames::enum{roulette,blackjack}\nTABLE::[Games]f64{.roulette=0.526,.blackjack=0.503}\nGLOBAL::TABLE[.roulette]\nmain::proc(){GAME::Games.roulette;HOUSE_ODDS::TABLE[GAME];ALIAS::(TABLE[GAME]);Actual_Type::type_of(TABLE[GAME]);value:Actual_Type=HOUSE_ODDS;_=GLOBAL+ALIAS+value}\n';
+        await replace(lookupExample);
+        const lookupLegend=await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend',testDocument.uri);
+        const constantFlag=1<<lookupLegend.tokenModifiers.indexOf('thorCompileTime');
+        await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),value=>{
+            if(!value?.data?.length)return false;
+            let line=0,column=0;
+            const constants=[],types=[];
+            for(let i=0;i<value.data.length;i+=5){
+                const [delta,char,length,kind,flags]=value.data.slice(i,i+5);
+                line+=delta;column=delta?char:column+char;
+                const at=testDocument.offsetAt(new vscode.Position(line,column)),name=lookupExample.slice(at,at+length);
+                if(['HOUSE_ODDS','GLOBAL','ALIAS'].includes(name))constants.push(lookupLegend.tokenTypes[kind]==='variable' && !!(flags&constantFlag));
+                if(name==='Actual_Type')types.push(lookupLegend.tokenTypes[kind]==='type');
+            }
+            return constants.length===6 && constants.every(Boolean) && types.length===2 && types.every(Boolean);
+        });
         const rootExample='// 😀\npackage main\nimport * "thor:basic"\nmain::proc(){prob_loss:f64;p_win_pad:>len(f"{(1-p_loss) * 100:.2f}");_=p_win_pad}\n';
         await replace(rootExample);
         const rootDiagnostics=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri).filter(d=>d.severity===vscode.DiagnosticSeverity.Error)),
@@ -800,6 +817,7 @@ async function run() {
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
         result.checks.push('dynamic width hover, rename and precise unsaved type diagnostics');
         result.checks.push('invalid bare format names retain diagnostics and surrounding semantic highlighting');
+        result.checks.push('indexed compile-time values use constant tokens while actual type aliases stay types');
         result.checks.push('undeclared interpolation names keep one precise root diagnostic and no false literal underline');
         result.checks.push('Odin-style precision formats, Rational g/G contract and mapped unsaved recovery');
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');

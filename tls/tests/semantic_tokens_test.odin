@@ -87,6 +87,33 @@ semantic_tokens_literals_with_explicit_types :: proc(t: ^testing.T) {
 }
 
 @(test)
+semantic_tokens_indexed_constants_and_parentheses :: proc(t:^testing.T) {
+    src:=test.Source{main=`package test
+TABLE :: [2]f64{0.5, 0.6}
+GLOBAL :: TABLE[0]
+main :: proc() {
+    LOCAL :: TABLE[1]
+    COPY :: (TABLE[0])
+    _ = GLOBAL + LOCAL + COPY
+}
+`}
+    test.expect_semantic_tokens(t,&src,{
+        {1, 0, 5, .Variable, {.ReadOnly, .CompileTime}}, // TABLE
+        {0, 12, 3, .Type, {.ReadOnly}}, // f64
+        {1, 0, 6, .Variable, {.ReadOnly, .CompileTime}}, // GLOBAL
+        {0, 10, 5, .Variable, {.ReadOnly, .CompileTime}}, // TABLE
+        {1, 0, 4, .Function, {.ReadOnly}}, // main
+        {1, 4, 5, .Variable, {.ReadOnly, .CompileTime}}, // LOCAL
+        {0, 9, 5, .Variable, {.ReadOnly, .CompileTime}}, // TABLE
+        {1, 4, 4, .Variable, {.ReadOnly, .CompileTime}}, // COPY
+        {0, 9, 5, .Variable, {.ReadOnly, .CompileTime}}, // TABLE
+        {1, 8, 6, .Variable, {.ReadOnly, .CompileTime}}, // GLOBAL
+        {0, 9, 5, .Variable, {.ReadOnly, .CompileTime}}, // LOCAL
+        {0, 8, 4, .Variable, {.ReadOnly, .CompileTime}}, // COPY
+    })
+}
+
+@(test)
 semantic_tokens_struct_fields :: proc(t: ^testing.T) {
 	src := test.Source {
 		main = `package test

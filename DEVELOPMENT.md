@@ -2702,3 +2702,23 @@ and Unicode, literal brackets after the field, and the following code line.
 The VS Code integration regression keeps the nested-braces diagnostic and
 surrounding hover/semantic tokens through an unsaved invalid-to-valid edit.
 All 122 Node extension tests and the isolated VS Code integration suite pass.
+
+## Indexed constants retain value colors: TLS 0.24.1
+
+`HOUSE_ODDS :: HOUSE_ODDS_TABLE[GAME]` could inherit the indexed element's type
+classification, causing the constant to appear green. TLS's declaration
+classifier now recognizes indexed, matrix-indexed and sliced values, including
+expressions wrapped in parentheses. Their declaration and reference tokens
+retain the new binding's compile-time or runtime value modifiers. Actual type
+aliases, including `type_of(...)` and generic record instantiations, retain
+their type classification.
+
+Regression coverage checks plain/enum-indexed arrays, nested arrays, strings,
+slices, matrix elements/columns, value aliases, mutable and immutable bindings,
+actual type aliases, hover, rename, and unsaved value-to-type edits. A read-only
+copy of the reported double_bet source confirms both HOUSE_ODDS occurrences use
+the compile-time variable token. The native TLS suite and editor integration
+also cover the constant modifier used by the purple theme preference.
+Validation: all 1,129 native TLS tests, eight targeted live TLS tests, 122 Node
+extension tests, and the isolated VS Code integration suite pass. The local
+TLS binary is rebuilt; restart the language server to refresh open editors.
