@@ -119,7 +119,8 @@ main :: proc() {
 
     // Random bounds are inclusive; explicit zero is a real bound. Supplying a
     // generator lets callers control reproducibility; omission uses context.
-    assert(basic.random(int, 0, 0) == 0)
+    zero_sample := basic.random(int, 0, 0)
+    assert(zero_sample == 0)
     sample := basic.random(f64, 0, 1)
     assert(sample >= 0 && sample <= 1)
 

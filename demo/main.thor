@@ -212,12 +212,15 @@ main :: proc() {
 
     // An early match does not skip construction of the remaining elements.
     calls, order = 0, 0
-    assert(mark(1) in [mark(1), mark(2), mark(3)])
+    marked_member := mark(1) in [mark(1), mark(2), mark(3)]
+    assert(marked_member)
     assert(calls == 4 && order == 1123)
     calls, order = 0, 0
-    assert(true || (mark(1) in [mark(2)]))
+    skipped_member := true || (mark(1) in [mark(2)])
+    assert(skipped_member)
     assert(calls == 0 && order == 0)
-    assert(mark(1) not_in [])
+    empty_member := mark(1) not_in []
+    assert(empty_member)
     assert(calls == 1)
 
     // These constraints lower to constant comparisons, with no runtime helpers.
@@ -229,7 +232,8 @@ main :: proc() {
     assert(9 in 0..<10 && 10 not_in 0..<10 && 10 in 0..=10)
     #assert(3 in (0..<10))
     calls, order = 0, 0
-    assert(mark(3) in mark(0)..<mark(9))
+    marked_range := mark(3) in mark(0)..<mark(9)
+    assert(marked_range)
     assert(calls == 3 && order == 309)
     #assert(int in [int, f64])
     #assert(bool not_in [int, f64])
@@ -245,7 +249,8 @@ main :: proc() {
     power_values: [POWER_SIZE]int
     assert(len(power_values) == 8 && 8 in 0..=2 ** 3)
     calls, order = 0, 0
-    assert(mark(2) ** mark(3) == 8 && calls == 2 && order == 23)
+    marked_power := mark(2) ** mark(3)
+    assert(marked_power == 8 && calls == 2 && order == 23)
     #assert(2 ** 3 == 8)
     // Typed mismatches require a cast: int_value ** float_value is an error.
 

@@ -23,7 +23,7 @@ def main():
         suite='vscode.js'
         if options.standalone_run:
             target=temporary/'standalone file.thor'
-            target.write_text('package main\nimport "core:os"\nmain::proc(){assert(os.write_entire_file("standalone-run.txt", []u8{\'o\',\'k\'}) == nil)}\n')
+            target.write_text('package main\nimport "core:os"\nmain::proc(){err:=os.write_entire_file("standalone-run.txt", []u8{\'o\',\'k\'});assert(err == nil)}\n')
             suite='run-vscode.js'
         args = [options.code, '--wait', '--new-window', '--user-data-dir', str(temporary / 'profile'), '--extensions-dir', str(temporary / 'extensions'),
                 '--disable-extensions', '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust',

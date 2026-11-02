@@ -269,7 +269,8 @@ membership_and_constraints :: proc() {
         // All three operands run once, in value / low / high order, even when
         // the value is already outside the interval after the first comparison.
         order := 0
-        assert(step(&order, 1) not_in step(&order, 3)..<step(&order, 8))
+        outside := step(&order, 1) not_in step(&order, 3)..<step(&order, 8)
+        assert(outside)
         assert(order == 138)
     }
 

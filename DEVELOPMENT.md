@@ -2823,3 +2823,22 @@ The benchmark retains one tracked allocation for each common short case and
 two for the large-string case, with matching frees and zero live allocations.
 The full affected compiler regression run passes all 362 tests, including the
 ten buffer tests and the new assertion-disabled output/allocation-failure cases.
+
+## Assertion side-effect audit and maintenance rule
+
+Audit all implementation assertions across the Python compiler, native frontend,
+runtime/basic, TLS and editor tooling after the 0.32.1 formatter fix. No further
+required side effects were found in implementation assertion predicates or
+messages. Two editor test helpers had confirmation-file writes inside assertions;
+these now execute first and only assert on the error result. Hoist counter-updating
+demo expressions and random sampling before their result checks as well.
+
+`AGENTS.md` records the repository rule. Six new assertion-hygiene tests inspect
+native ASTs and Python assertions, require review of native predicate callees,
+cover multiline/nested/message operations and contextless assertions, execute
+the editor fixtures with assertions disabled, compare regular/unchecked frontend
+ASTs and errors, and exercise the compiler itself under Python `-O`.
+
+All 1,133 native TLS tests pass with assertions/bounds/type checks disabled, as do
+the four native tokenizer tests and both actual VS Code run/debug integration
+suites. See [the audit scope, findings and guard limitations](docs/assertion-audit.md).

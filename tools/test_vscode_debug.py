@@ -26,7 +26,7 @@ def main():
                         '--template',str(ROOT/'tests/support/project_debug.thor')],check=True)
         (temporary/'debug_project/helper.thor').write_text('''package main
 import "core:os"
-confirm_run::proc(){when !ODIN_DEBUG {assert(os.write_entire_file("normal-run.txt", []u8{'o','k'}) == nil)}}
+confirm_run::proc(){when !ODIN_DEBUG {err:=os.write_entire_file("normal-run.txt", []u8{'o','k'});assert(err == nil)}}
 ''')
         extensions=temporary/'extensions'
         extensions.mkdir()
