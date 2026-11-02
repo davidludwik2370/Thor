@@ -81,8 +81,8 @@ zero:f64=0;nan:=zero/zero;assert(nan not_in 0.0..=1.0)
         self.invoke(self.program('''
 assert(A&&B&&C&&AUTO&&EXPLICIT&&CHOICE==7)
 value:=3;assert(inside(value))
-#if 3 in 0..<4 {assert(true)} #else {undefined_unselected()}
-#if -1 not_in -2..=0 {undefined_unselected()} #else {assert(true)}
+when 3 in 0..<4 {assert(true)} else {undefined_unselected()}
+when -1 not_in -2..=0 {undefined_unselected()} else {assert(true)}
 ''','''
 A::3 in 0..<10
 B::10 not_in 0..<10

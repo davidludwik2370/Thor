@@ -133,7 +133,7 @@ assert(4 in names&&6 not_in names)
         self.invoke(self.program('''
 assert(FOUND&&!MISSING&&SELECTED==7&&allowed(4)==4&&shape(i8(8)))
 #assert(TYPED in [4,8])
-#if TYPED in [4,8] {assert(true)} #else {missing()}
+when TYPED in [4,8] {assert(true)} else {missing()}
 when TYPED not_in [1,2] {assert(true)}
 ''','''
 TYPED::i8(4)
@@ -162,7 +162,7 @@ PROC::#run ordinary(i8(4))
             with self.subTest(prefix=prefix):self.invoke(self.program('_=BAD',prefix),command='check',fail='128')
         self.invoke(self.program('''
 when false {value:i8=4;_=value in [4,128]}
-#if false {value:i8=4;_=value in [4,missing]}
+when false {value:i8=4;_=value in [4,missing]}
 assert(OK)
 ''','OK::#switch{case true:true;case:i8(4) in [4,128]}\n'))
 

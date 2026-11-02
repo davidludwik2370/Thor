@@ -83,7 +83,7 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 - Preserve native `~`/`~=` xor and pointer assignments/calls through the shared
   parser. Parse direct Set literals in range headers. Live compiler checks also
   report temporary-view lifetime errors at original unsaved source ranges.
-- Parse selective imports, multiline ternaries, `#if` / `#else if` / `#else`,
+- Parse selective imports, multiline ternaries, `when` / `else when` / `else`,
   bracket array literals, and membership in generic constraints.
 - Resolve `import * "package"` public names through namespace-using lookup,
   retaining qualified access, navigation, hover, completion and symbol renaming.
@@ -151,7 +151,7 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 - Infer common bracket-array types (including nested arrays), indexed element
   types, and membership's boolean type. Explicit declaration types continue to
   supply contextual information through OLS.
-- Select `#if`/native `when` branches using the server's scalar constant folder,
+- Select native `when` branches using the server's scalar constant folder,
   including integer comparisons, inline-list membership, and `#config` defaults.
 - Provide OLS completion, hover, definitions, references, document symbols,
   signature help, and semantic highlighting where the underlying resolver can

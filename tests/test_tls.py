@@ -134,6 +134,21 @@ class Client:
 
 
 class TLSTests(unittest.TestCase):
+    def test_removed_conditional_directive_errors_and_unsaved_native_when_recovery(self):
+        for prefix, needle in [('#if true', 'if'), ('when false {} #else', 'else')]:
+            with self.subTest(prefix=prefix):
+                text='// 😀 original header\npackage main\n'+prefix+' {VALUE::42}\nmain::proc(){_=VALUE}\n'
+                client,main=self.open(text)
+                errors=client.diagnostic(main.as_uri(),contains="got '"+needle+"'")
+                error=next(e for e in errors if "got '"+needle+"'" in e['message'])
+                self.assertEqual(error['range']['start'],self.position(text,'#'+needle,1))
+                fixed=text.replace('#if','when').replace('#else','else')
+                client.notifications.clear()
+                client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+                client.diagnostic(main.as_uri(),empty=True)
+                self.assertIn('42',json.dumps(self.hover(client,main,fixed,'VALUE}')))
+                self.assert_original_identifier_tokens(main,fixed,self.semantic_spans(client,main,fixed))
+
     def test_type_operand_error_related_declaration_and_unsaved_recovery(self):
         text='''// 😀 header
 package main
@@ -419,7 +434,7 @@ main::proc(){_="😀";take(PAD+TITLE+" (animation off)")}
         text='''package main
 X::"a"*3
 Y::4*X+"z"
-#if "a"*3+"b"=="aaab" { SELECTED::"ok" } #else { SELECTED::17 }
+when "a"*3+"b"=="aaab" { SELECTED::"ok" } else { SELECTED::17 }
 main::proc(){
     value:=3*"ab"
     _=value;_=Y;_=SELECTED
@@ -1451,7 +1466,7 @@ main::proc(){value:Int;println(value)}
     def test_fast_redeclarations_do_not_flag_branches_or_scoped_shadowing(self):
         text='''package main
 when true {VALUE::2}else{VALUE::4}
-#if true {selected::proc(){}}#else{selected::proc(){}}
+when true {selected::proc(){}}else{selected::proc(){}}
 _::1
 _::2
 main::proc(){value:=VALUE;{value:=3;_=value};_=value;selected()}
@@ -1957,7 +1972,7 @@ main::proc(){result:=square(SIZE);data:[SIZE]int;assert(work(3)==9);_=result;_=d
         self.assertEqual(library.read_text(),original)
 
     def test_power_inference_precedence_tokens_and_unsaved_type_error(self):
-        text='package main\n#if 2**3**2==512 && -2**2 == -4 {SELECTED::42} #else {SELECTED::false}\nmain::proc(){_="😀";base:f64=2;exponent:f64 = -3;result:=base**exponent;_=result;_=SELECTED}\n'
+        text='package main\nwhen 2**3**2==512 && -2**2 == -4 {SELECTED::42} else {SELECTED::false}\nmain::proc(){_="😀";base:f64=2;exponent:f64 = -3;result:=base**exponent;_=result;_=SELECTED}\n'
         client,main=self.open(text)
         self.assertIn('result: f64',json.dumps(self.hover(client,main,text,'result')))
         self.assertIn('42',json.dumps(self.hover(client,main,text,'SELECTED}')))
@@ -2004,7 +2019,7 @@ main::proc(){
     def test_range_membership_constraints_hover_tokens_and_unsaved_errors(self):
         text='''package main
 allowed::proc($N:int)->int where N in 0..<10{return N}
-#if -2 in -3..=0 {SELECTED::42} #else {SELECTED::false}
+when -2 in -3..=0 {SELECTED::42} else {SELECTED::false}
 main::proc(){value:=3;found:=value in 0..<10;result:=allowed(9);_=found;_=result;_=SELECTED}
 '''
         client,main=self.open(text)

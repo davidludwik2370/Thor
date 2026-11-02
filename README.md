@@ -548,7 +548,7 @@ use its own locations.
 | T01 | CLI, source preservation, generated output, and compile/run/rejection harness. |
 | T02 | `import "core:math" / sin, cos`; multiline lists, retained package namespace, file-local names. |
 | T03 | Ternaries may continue before `:` without a backslash, including nesting and comments. |
-| T04 | `#if`, `#else if`, and `#else` lower to `when`; native `when` remains supported. |
+| T04 | Native `when` / `else when` / `else`, including nesting, selected declarations and lazy compile-time execution. |
 | T05 | `[1, 2, 3]` is an inferred fixed array; contextual types, empty typed arrays, nested arrays, arguments, returns, and assignments are supported. |
 | T06 | `in`/`not_in` for arrays, slices, dynamic arrays, native maps and bit sets; interval membership; constant type/value membership in generic constraints. |
 | T07 | Caller-owned integer grouping and Unicode padding helpers in `thor:format`. |
@@ -569,6 +569,10 @@ use its own locations.
 | T22 | Scratch cleanup and independently owned string/slice results, deep aggregate promotion, recursive cleanup and fresh runtime `#run` materialization. |
 | T23 | Automatic known-argument `fn` folding, forward/dependent constants, generic specialization scheduling, selected/lazy paths and fresh folded runtime results. |
 
+Conditional compilation uses Odin's `when`, `else when`, and `else` directly.
+Use ordinary `if` / `else if` for runtime branching. The `#switch` and `#run`
+directives retain their existing behavior.
+
 ```odin
 import "core:math" / sin,
     cos
@@ -578,9 +582,9 @@ numeric :: proc(value: $T) -> T where T in [int, f64] {
 }
 
 MODE :: 2
-#if MODE in [1, 2] {
+when MODE in [1, 2] {
     ENABLED :: true
-} #else {
+} else {
     ENABLED :: false
 }
 
@@ -635,7 +639,7 @@ comparisons; string intervals are lexicographic.
 
 Runtime operands execute once in value/low/high order, including the high bound
 when the value is outside the interval. Anonymous owned strings/views are freed
-after comparison. Constants, `#if`, `#switch`, `fn`/`#run` and constraints work too:
+after comparison. Constants, `when`, `#switch`, `fn`/`#run` and constraints work too:
 
 ```odin
 allowed_size_range :: proc($N: int) -> int where N in 0..<10 {
@@ -712,7 +716,7 @@ Integer powers require a nonnegative exponent (a compile error when known, a
 panic otherwise). `0 ** 0` is `1`; runtime integer overflow follows ordinary
 Odin multiplication. Untyped integer constants retain exact values through 128
 bits. Operands execute once in base/exponent order and retain lazy surrounding
-control flow. Powers work in constants, array sizes, `#if`/`#switch`, specialized
+control flow. Powers work in constants, array sizes, `when`/`#switch`, specialized
 procedure generics and `fn`/`#run`, using the existing native evaluation cache.
 Type-level generic expressions without a resolvable call site currently require
 a fixed nonnegative integer exponent through 128; other generic constant powers
@@ -1088,7 +1092,7 @@ work :: proc($N:int, value:$T) -> int {
 bytes :: fn($T:typeid) -> int { return size_of(T) }
 ```
 
-The scheduler follows selected `when`/`#if`, both `#switch` forms and known lazy
+The scheduler follows selected `when`, both `#switch` forms and known lazy
 conditions. Calls under unknown runtime branches/loop bodies remain runtime;
 this avoids executing a failing call on a path that may never be taken. Explicit
 `#run` remains a compile-time directive even in runtime code. Type queries inspect

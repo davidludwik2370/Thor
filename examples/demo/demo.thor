@@ -412,27 +412,27 @@ compile_time_selection :: proc() {
     println("\n# compile-time selection and ordinary when")
 
     {
-        // #if is compile-time selection. Inactive branches do not need valid
+        // when is compile-time selection. Inactive branches do not need valid
         // names or executable calls. Runtime if is a separate language construct.
-        #if TOUR_MODE == 1 {
+        when TOUR_MODE == 1 {
             SEASON :: "spring"
-        } #else if TOUR_MODE == 2 {
+        } else when TOUR_MODE == 2 {
             SEASON :: "summer"
-        } #else {
+        } else {
             SEASON :: "winter"
         }
 
         println("  Selected season:", SEASON)
 
-        #if true {
+        when true {
             assert(len(SEASON) > 0)
-        } #else {
+        } else {
             this_name_is_deliberately_undefined()
         }
 
-        // Native when still works, including next to and inside Thor branches.
+        // Native when branches can nest and contain Thor expressions.
         when true {
-            #if TOUR_MODE in 1..=3 {
+            when TOUR_MODE in 1..=3 {
                 assert(true)
             }
         }
@@ -1196,7 +1196,7 @@ pure_functions_and_constants :: proc() {
         result := flag ? never_evaluate() : 23
         assert(result == 23)
 
-        #if false {
+        when false {
             UNREACHED :: #run never_evaluate()
         }
     }
@@ -1675,7 +1675,7 @@ big_constants_and_evaluation :: proc() {
         assert(TOUR_BIG_FRACTION == Rational(3, 10))
         assert(TOUR_BIG_POWER == Integer(705429498686404044207947776))
 
-        // Both #switch forms and #if can consume exact big-number constants.
+        // Both #switch forms and when can consume exact big-number constants.
         CHOICE :: #switch TOUR_BIG_BASE {
             case 0..<100: Integer(0)
             case: TOUR_BIG_NEXT
@@ -1684,9 +1684,9 @@ big_constants_and_evaluation :: proc() {
             case TOUR_BIG_BASE > 100: Rational(1, 3)
             case: Rational(0)
         }
-        #if TOUR_BIG_NEXT > TOUR_BIG_BASE {
+        when TOUR_BIG_NEXT > TOUR_BIG_BASE {
             assert(CHOICE == TOUR_BIG_NEXT)
-        } #else {
+        } else {
             missing_name_is_in_an_inactive_branch()
         }
         assert(BOOLEAN_CHOICE == Rational(1, 3))

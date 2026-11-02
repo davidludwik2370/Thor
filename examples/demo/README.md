@@ -28,7 +28,7 @@ The walkthrough covers:
 | `arrays_and_context` | Inferred fixed arrays, empty/nested literals, enum context, private imported types, evaluation order |
 | `membership_and_constraints` | Sequence/map/bit-set membership, interval endpoints, exact type lists, value constraints, loop ambiguity |
 | `conditional_expressions` | Multiline/lazy ternaries, selector and boolean switches, contextual results, default/enum coverage rules |
-| `compile_time_selection` | Both `#switch` forms, declaration selection, `#if`/`#else if`, inactive names and native `when` |
+| `compile_time_selection` | Both `#switch` forms, declaration selection, native `when`/`else when`, inactive names and nesting |
 | `immutable_storage` | Runtime initialization, protected subobjects, mutable copies, shallow slice/pointer immutability |
 | `formatting_and_strings` | Quoted/raw/nested fstrings, literal braces, quoted Unicode fills, grouping, order, named owners, borrowed views, anonymous argument cleanup, mixed branches and f! ownership transfer |
 | `sets_and_ownership` | Type/library spellings, lazy allocation, all operators, independent results, anonymous cleanup, shallow keys and aliases |

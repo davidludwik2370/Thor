@@ -1,14 +1,14 @@
 {
   "Conditional compilation": {
-    "prefix": "#if",
+    "prefix": "when",
     "body": [
-      "#if ${1:CONDITION} {",
+      "when ${1:CONDITION} {",
       "\t$2",
-      "} #else {",
+      "} else {",
       "\t$0",
       "}"
     ],
-    "description": "Thor compile-time branch"
+    "description": "Odin compile-time branch"
   },
   "Selective import": {
     "prefix": "importsel",

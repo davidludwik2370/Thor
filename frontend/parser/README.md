@@ -2,7 +2,7 @@ This is a modified copy of Odin's tooling parser from
 `odin-lang/Odin`, version `dev-2026-10:8169255b9`.
 
 Thor additions are marked by `p.thor` and the `Edit` / `Selection` metadata.
-They add selective imports, `#if` / `#else`, newline continuation before a
+They add selective imports, newline continuation before a
 ternary colon, inferred array literals, membership in generic constraints, and
 immutable runtime declarations (`:>` / `: Type >`), quoted/raw interpolation,
 switch expressions, statement/expression `#switch`, contextual `set[T]` types and

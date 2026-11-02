@@ -736,7 +736,7 @@ double::fn(n:int)->int{return n*2}
 SIZE::#run double(3)
 main::proc(){
     data:[SIZE]int
-    #if false {
+    when false {
         missing()
     }
     assert(len(data)==6)

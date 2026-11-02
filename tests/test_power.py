@@ -81,7 +81,7 @@ change::proc(value:^int)->int{value^=9;return 3}
 assert(SIZE==8 && len(data)==8 && VALUE==.125 && ONE==1 && SMALL==0)
 small:i8=SIZE;assert(small==8)
 wide:u128=2**100;assert(wide==(u128(1)<<100))
-#if 2**3==8 {assert(true)} #else {undefined_unselected()}
+when 2**3==8 {assert(true)} else {undefined_unselected()}
 CHOICE::#switch {case 2**3 in 0..<10:7;case:9}
 assert(CHOICE==7)
 ''','''
@@ -119,7 +119,7 @@ assert(callback(2,3)==8)
 
     def test_inactive_branches_do_not_instantiate_invalid_power(self):
         self.invoke(self.program('''
-#if false {bad::2**-3} #else {assert(true)}
+when false {bad::2**-3} else {assert(true)}
 assert(true || 2**-3==0)
 '''))
 

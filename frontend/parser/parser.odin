@@ -323,12 +323,6 @@ next_token0 :: proc(p: ^Parser) -> bool {
 			t.pos = start
 			t.text = "#switch"
 			p.curr_tok = t
-		} else if t.kind == .If || t.kind == .Else {
-			replacement := "when" if t.kind == .If else "else"
-			if !p.peeking { append(&p.edits, Edit{start.offset, t.pos.offset+len(t.text), replacement}) }
-			t.kind = .When if t.kind == .If else .Else
-			t.pos = start
-			p.curr_tok = t
 		} else {
 			p.tok = old
 		}
@@ -774,11 +768,6 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 	skip_possible_newline_for_literal(p)
 	if p.curr_tok.kind == .Else {
 		else_tok := expect_token(p, .Else)
-		if p.thor && p.curr_tok.kind == .If {
-			t := p.curr_tok
-			if !p.peeking { append(&p.edits, Edit{t.pos.offset, t.pos.offset+len(t.text), "when"}) }
-			p.curr_tok.kind = .When
-		}
 		#partial switch p.curr_tok.kind {
 		case .When:
 			else_stmt = parse_when_stmt(p)

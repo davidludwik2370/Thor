@@ -91,7 +91,7 @@ CHOSEN:[2]Color:#switch SEED{case 6:[.Red,.Blue];case:[.Blue,.Red]}
     def test_early_redeclarations_preserve_conditional_scopes_and_blank_names(self):
         self.invoke('''package main
 when true {VALUE::2}else{VALUE::4}
-#if true {selected::proc()->int{return 2}}#else{selected::proc()->int{return 4}}
+when true {selected::proc()->int{return 2}}else{selected::proc()->int{return 4}}
 _::1
 _::2
 A::struct{value:int}

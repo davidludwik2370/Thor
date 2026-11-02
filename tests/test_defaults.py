@@ -92,7 +92,7 @@ outer::proc($Offset:int)->bool{
 '''))
 
     def test_conditional_and_nested_declarations_keep_native_checking(self):
-        for directive in ['when', '#if']:
+        for directive in ['when', 'when false {} else when']:
             with self.subTest(directive=directive):
                 self.invoke(self.program('assert(compare([]int{1,2}))', directive+''' true {
 compare::proc(data:[]$E,less:=proc(a,b:E)->bool{return a<b})->bool{return less(data[0],data[1])}
@@ -170,12 +170,12 @@ calls:int
 values:[2]int={1,2}
 data::proc()->[]int{calls+=1;return values[:]}
 '''), files={'library/main.thor': '''package library
-#if true{
+when true{
 work::proc(data:[]$E,less:=proc(a,b:E)->bool{return a<b})->E{return less(data[0],data[1]) ? data[0] : data[1]}
 }else{
 work::proc(data:[]$E,less:=proc(a,b:E)->bool{return missing})->E{return data[0]}
 }
-#if false{
+when false{
 inactive::proc(data:[]$E,less:=proc(a,b:E)->bool{return missing})->E{return data[0]}
 }
 '''})
@@ -183,10 +183,10 @@ inactive::proc(data:[]$E,less:=proc(a,b:E)->bool{return missing})->E{return data
     def test_else_branch_helpers_are_selected_by_odin_even_across_files(self):
         for split in [False, True]:
             with self.subTest(split=split):
-                first = '''#if false {
+                first = '''when false {
 work::proc(data:[]$E,less:=proc(a,b:E)->bool{return a<b})->E{return less(data[0],data[1]) ? data[0] : data[1]}
 }'''
-                second = '''#if true {
+                second = '''when true {
 work::proc(data:[]$E,less:=proc(a,b:E)->bool{return a>b})->E{return less(data[0],data[1]) ? data[0] : data[1]}
 }'''
                 files = {'library/main.thor': 'package library\n'+first+'\n'}

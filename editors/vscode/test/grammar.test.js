@@ -88,8 +88,8 @@ for (const [name, source, word, scope, line] of [
     ['named import', 'import math "core:math" / sin', 'math', 'variable.other.namespace'],
     ['multiline import ends', 'import "core:math" / sin,\n cos\nmain :: proc() {}', 'main', 'entity.name.function', 2],
     ['comma continuation', 'import "core:math" /\n sin, // comment\n cos', 'cos', 'variable', 2],
-    ['Thor if', '#if true {', '#if', 'entity.name.tag'],
-    ['Thor else', '} #else if false {', '#else', 'entity.name.tag'],
+    ['compile-time when', 'when true {', 'when', 'keyword.control'],
+    ['compile-time else', '} else when false {', 'else', 'keyword.control'],
     ['compile switch', 'x :: #switch 1 {case:2}', '#switch', 'entity.name.tag'],
     ['pure function keyword', 'square :: fn(x:int)->int{return x*x}', 'fn', 'storage.type'],
     ['pure function name', 'square :: fn(x:int)->int{return x*x}', 'square', 'entity.name.function'],
@@ -153,9 +153,9 @@ for (const [name, source, word, scope, line] of [
 }
 
 test('comments hide Thor syntax and nested comments close correctly', () => {
-    const lines = tokenize('/* outer\n /* #if x in [1,2] */\n still a comment */\n#if true {}');
+    const lines = tokenize('/* outer\n /* #switch x {case:2} */\n still a comment */\nwhen true {}');
     for (const token of lines[1]) assert.ok(token.scopes.some(s => s.startsWith('comment.block')));
-    assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
+    assert.ok(lines[3].find(t => t.text === 'when').scopes.includes('keyword.control.thor'));
 });
 
 test('typed range and grouped index annotations keep binding/type/keyword scopes distinct',()=>{
@@ -219,9 +219,9 @@ test('comments inside interpolation disable only their own bracket pairing',()=>
 });
 
 test('raw strings retain syntax-looking text across lines', () => {
-    const lines = tokenize('text := `#if\nx in [1,2]\n`\n#if true {}');
+    const lines = tokenize('text := `#run\nx in [1,2]\n`\nwhen true {}');
     for (const token of lines[1]) assert.ok(token.scopes.some(s => s.startsWith('string.quoted.raw')));
-    assert.ok(lines[3].find(t => t.text === '#if').scopes.includes('entity.name.tag.thor'));
+    assert.ok(lines[3].find(t => t.text === 'when').scopes.includes('keyword.control.thor'));
 });
 
 test('label declarations and branch targets share their own purple scope',()=>{
@@ -249,46 +249,49 @@ test('label declarations and branch targets share their own purple scope',()=>{
 });
 
 test('escaped quotes stay inside strings', () => {
-    const tokens = tokenize('s := "\\\"#if in [1,2]"')[0];
-    for (const token of tokens.filter(t => t.text.includes('#if'))) {
+    const tokens = tokenize('s := "\\\"#run in [1,2]"')[0];
+    for (const token of tokens.filter(t => t.text.includes('#run'))) {
         assert.ok(token.scopes.some(s => s.startsWith('string.quoted.double')));
     }
 });
 
-test('compile-time directive colors include the if in an else-if chain',()=>{
-    for(const source of ['#if true {}','#else {}','#else if condition {}','value :: #switch 1 {case:2}','value :: #run compute(3)','#partial switch x {}','#assert(true)']){
+test('directives retain blue scopes and native compile-time branches use keyword scopes',()=>{
+    for(const source of ['value :: #switch 1 {case:2}','value :: #run compute(3)','#partial switch x {}','#assert(true)']){
         const tokens=themedTokens(source)[0];
-        for(const match of source.matchAll(/#(?:if|else|switch|run|partial|assert)\b/g)){
+        for(const match of source.matchAll(/#(?:switch|run|partial|assert)\b/g)){
             assert.ok(tokens.slice(match.index,match.index+match[0].length).every(t=>t.color==='#569CD6'),source);
         }
-        if(source.startsWith('#else if')){
-            assert.ok(tokens.slice(6,8).every(t=>t.color==='#569CD6'));
-            assert.ok(tokens.slice(9,18).every(t=>t.color==='#9CDCFE'),'Condition keeps its own color');
-        }
     }
-    const source='if x {} else if y {} switch z {}';
-    for(const match of source.matchAll(/\b(if|else|switch)\b/g)){
+    const source='if x {} else if y {} switch z {} when X {} else when Y {} else {}';
+    for(const match of source.matchAll(/\b(if|else|switch|when)\b/g)){
         assert.ok(themedTokens(source)[0].slice(match.index,match.index+match[0].length).every(t=>t.color==='#C586C0'));
     }
 });
 
-test('compile-time else-if handles trivia without coloring later runtime keywords',()=>{
+test('native else-when handles trivia without directive styling',()=>{
     for(const between of [' ','\t  ','\n',' /* comment */ ',' // comment\n',' /* outer /* nested */ comment */\n']){
-        const source='#else'+between+'if condition {if runtime {}}';
+        const source='when first {} else'+between+'when condition {if runtime {}}';
         const tokens=tokenize(source).flat();
-        const ifs=tokens.filter(t=>t.text==='if');
-        assert.equal(ifs.length,2,source);
-        assert.ok(ifs[0].scopes.includes('entity.name.tag.thor'),source);
-        assert.ok(ifs[1].scopes.includes('keyword.control.thor'),source);
+        const keywords=tokens.filter(t=>['when','else','if'].includes(t.text));
+        assert.equal(keywords.length,4,source);
+        assert.ok(keywords.every(t=>t.scopes.includes('keyword.control.thor')),source);
         const condition=tokens.find(t=>t.text==='condition');
         assert.ok(!condition.scopes.includes('entity.name.tag.thor'),source);
     }
-    for(const source of ['#else { if runtime {} }','#else iffy { if runtime {} }']){
+    for(const source of ['#else { if runtime {} }','#else if condition { if runtime {} }']){
         assert.ok(tokenize(source).flat().filter(t=>t.text==='if').every(t=>t.scopes.includes('keyword.control.thor')),source);
     }
-    for(const source of ['text := "#else if"','text := `#else if`','// #else if','/* #else if */']){
+    for(const source of ['text := "else when"','text := `else when`','// else when','/* else when */']){
         assert.ok(!tokenize(source).flat().some(t=>t.scopes.includes('entity.name.tag.thor')),source);
     }
+});
+
+test('conditional compilation snippets use native when syntax',()=>{
+    const snippets=require('../snippets/thor.json');
+    assert.equal(snippets['Conditional compilation'].prefix,'when');
+    assert.ok(snippets['Conditional compilation'].body[0].startsWith('when '));
+    assert.ok(!JSON.stringify(snippets).includes('#if'));
+    assert.ok(!JSON.stringify(snippets).includes('#else'));
 });
 
 test('whole import paths retain string scopes', () => {

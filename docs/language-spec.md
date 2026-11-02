@@ -29,15 +29,15 @@ This is the numbered implementation reference for v1. It supersedes the earlier
 exploratory notes. Later additions are linked above and documented in README.md.
 
 Thor is a source-language superset of Odin plus the additions specified here.
-Existing Odin constructs remain accepted in Thor source; additions such as #if
-do not replace or remove Odin's original syntax. Thor transpiles to ordinary Odin
+Existing Odin constructs remain accepted in Thor source. Thor additions do not
+replace Odin's original syntax. Thor transpiles to ordinary Odin
 and invokes the existing Odin compiler. Odin remains responsible for ordinary
 type checking, machine-code generation, linking, and its existing runtime rules.
 
 V1 includes:
 - Selective imports with file-private aliases.
 - Multiline ternaries without explicit line continuation.
-- Compile-time #if and statement/expression forms of #switch.
+- Native compile-time when and Thor statement/expression forms of #switch.
 - Inferred fixed-array literals and general in / not_in membership.
 - Runtime switch expressions.
 - Runtime-initialized immutable storage.
@@ -137,26 +137,25 @@ This must parse without a continuation character:
 4. COMPILE-TIME BRANCHING
 
 Statement syntax:
-    #if CONDITION {
+    when CONDITION {
         VALUE :: 1
-    } #else if OTHER_CONDITION {
+    } else when OTHER_CONDITION {
         VALUE :: 2
-    } #else {
+    } else {
         VALUE :: 3
     }
 
-- Lower #if / #else if / #else to Odin when / else when / else.
+- Use Odin when / else when / else directly, without an alternate directive spelling.
 - Conditions must be compile-time-known booleans, including values obtained from
   eligible compile-time function calls.
 - Match Odin when behavior for declarations and their visibility. Parse untaken
   branches, but do not execute compile-time calls or enforce active-branch
   semantic requirements in branches that Odin would leave unchecked.
-- Ordinary Odin when statements, else when chains, and compile-time conditional
+- Odin when statements, else when chains, and compile-time conditional
   expressions remain valid in both .thor and .odin files, with Odin's normal
-  meaning. #if is an additional spelling, not a mandatory replacement.
+  meaning. Runtime if / else if remains a separate construct.
 - Preserve when control flow in generated Odin. Lower any nested Thor constructs
   as needed while retaining the same branch-selection and declaration-scope rules.
-  Odin when and Thor #if may coexist in one file and be nested within each other.
 
 #switch uses the same case layout in statement and expression positions:
     #switch MODE {
@@ -265,7 +264,7 @@ Range membership (runtime and compile time):
   String intervals use lexicographic ordering; this is not substring search.
 - Release anonymous owned operands/views after comparing; named owners remain
   the programmer's responsibility. The interval itself allocates no storage.
-- Support constant declarations, #if, #switch, generic constraints and fn/#run.
+- Support constant declarations, when, #switch, generic constraints and fn/#run.
   Constant contexts lower to checked comparisons, without runtime evaluation.
 - Arithmetic bounds bind within the interval; comparisons and logical operators
   follow membership, so N in 0..<10 && N != 5 has the intended boolean meaning.
@@ -323,7 +322,7 @@ Numeric power (post-v1 extension):
   Untyped integer constants remain exact up to Odin's 128-bit integer range.
 - Evaluate base then exponent exactly once, including right-associated chains.
   Preserve enclosing lazy branches and per-iteration evaluation; allocate nothing.
-- Support constant declarations, #if/#switch, array sizes, generic procedure
+- Support constant declarations, when/#switch, array sizes, generic procedure
   specialization, fn and #run using the existing checked native evaluation/cache.
   Preserve literal coercion for untyped folded results and validate operand types.
 - Uninstantiated type-level generic expressions with no executable call site
@@ -741,7 +740,7 @@ Examples:
 - Serialize before helper storage is released. A helper crash, compilation error,
   invalid result, allocation failure, or timeout is a compilation failure. Use
   bounded execution with a configurable timeout and an actionable basic message.
-- Values used in :: declarations, array lengths, #if, or #switch must remain
+- Values used in :: declarations, array lengths, when, or #switch must remain
   valid Odin constants after substitution. Diagnose unsuitable types, such as a
   non-integral array size. Runtime-initialized globals are not an equivalent.
 - T22 constant contexts support strings and fixed aggregates containing strings
@@ -787,8 +786,8 @@ Minimum observable checks:
 - Ordinary Odin examples still transpile/build, including comments, generics,
   normal operators, directives, mixed source packages, and imported user packages.
 - Ordinary when / else when / else statements and compile-time conditional
-  expressions work in Thor source. Fixtures must cover coexistence and nesting
-  with #if, preserving selected branches and declaration visibility.
+  expressions work in Thor source. Fixtures must cover nested branches and Thor
+  expressions while preserving selected declarations and their visibility.
 - Import aliases stay file-private; duplicate and unsupported selections fail.
 - Multiline/nested ternaries compile and produce the expected selected value.
 - Literal/member operands with counters execute once, in order; every literal
@@ -842,7 +841,7 @@ T02. Implement selective-import list parsing and file-private alias emission.
 T03. Implement multiline ternary termination and valid Odin emission.
      Depends on tokenizer/parser support; test nested and commented forms.
 
-T04. Implement #if / #else if / #else lowering with Odin when scope behavior.
+T04. Preserve native when / else when / else branching, scopes, and lazy selection.
      Pure-call conditions integrate after compile-time execution exists.
 
 T05. Implement fixed-array literal parsing, contextual/first-element inference,

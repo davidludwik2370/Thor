@@ -287,7 +287,7 @@ sorted :: proc(
         self.assert_builds(root, expected)
 
     def test_compile_time_conditional_declarations_and_conflicts(self):
-        for directive in ['when true', '#if true']:
+        for directive in ['when true', 'when false {} else when true']:
             with self.subTest(directive=directive):
                 text = 'package main\nother::3\n'+directive+'{value::2}\nmain::proc(){_=value}\n'
                 client, root, main = self.project({'main.thor': text})

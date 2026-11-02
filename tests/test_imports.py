@@ -77,7 +77,7 @@ public::7
     def test_unused_conditionals_do_not_force_missing_exports(self):
         self.invoke(self.program('assert(chosen==7 && choose(2)==2)', 'import * "lib"\n'), files={
             'lib/library.thor': '''package lib
-#if true {chosen::7} #else {not_chosen::9}
+when true {chosen::7} else {not_chosen::9}
 when false {absent::3}
 choose::proc(value:$T)->T{return value}
 '''})
@@ -114,9 +114,9 @@ item:=Record{value=9};assert(item.value==9)
         self.invoke(self.program('', 'import * "lib"\nimport * "other"\n'),
                     files={'lib/main.odin':lib, 'other/main.odin':'package other\nwhen false {VALUE::9}\n'},
                     command='check', fail='Conflicting wildcard import: VALUE')
-        self.invoke(self.program('assert(VALUE==7)', 'import * "lib"\n#if false {VALUE::8}\n'),
+        self.invoke(self.program('assert(VALUE==7)', 'import * "lib"\nwhen false {VALUE::8}\n'),
                     files={'lib/main.odin':lib})
-        self.invoke(self.program('', 'import * "lib"\n#if true {VALUE::8}\n'),
+        self.invoke(self.program('', 'import * "lib"\nwhen true {VALUE::8}\n'),
                     files={'lib/main.odin':lib}, command='check', fail='conflicts with wildcard import')
 
     def test_native_core_exports_and_source_comments(self):

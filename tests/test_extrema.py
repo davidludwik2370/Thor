@@ -203,7 +203,7 @@ same::proc(a,b:f64)->bool{return (math.is_nan(a)&&math.is_nan(b)) || (transmute(
 
     def test_constant_branches_type_queries_and_generic_constants(self):
         self.invoke(self.program('''
-#if max(**[3]int{2,8,3}) == 8 {assert(true)} #else {missing()}
+when max(**[3]int{2,8,3}) == 8 {assert(true)} else {missing()}
 selected::#switch min(..[]int{2,1}) {case 1:7;case:missing}
 assert(selected==7&&size(3)==4)
 order:=0

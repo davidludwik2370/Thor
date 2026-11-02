@@ -99,7 +99,7 @@ infinite compile-time helper and verifies graceful exit and scratch cleanup.
 
 | Features | Existing and extended checks |
 | --- | --- |
-| T01–T06 | CLI modes; ordinary Odin; selective-import privacy/shadowing; lazy ternaries; native `when`; selected `#if`; contextual/nested/empty arrays; membership and generic constraints; native rejections and source maps. |
+| T01–T06 | CLI modes; ordinary Odin; selective-import privacy/shadowing; lazy ternaries; native `when` selection and nesting; contextual/nested/empty arrays; membership and generic constraints; native rejections and source maps. |
 | T07–T12 | Unicode formatting; Set ownership; shared lexer; mixed packages, build tags and resources; overload/private/generic contexts; shallow immutable storage, aliases, addresses and generic guards; editor resolution and mapped errors. |
 | T13–T17 | Nested/raw interpolation; escaping/formatting/order; both runtime and compile-time switch forms; lazy arms; Set operations/aliases/temporary cleanup; negative reads/writes/slices; signed and unsigned widths; loops, callbacks and contextless helpers. |
 | T18–T20 | Purity/borrow rejection; recursive/generic/ordinary eligible calls; native value protocol and exact bits; selected/lazy execution; runtime/global dependency isolation; timeout/panic/cycle errors and imported unsaved sources. |

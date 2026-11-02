@@ -297,12 +297,12 @@ assert(f(2)==3 && x==7)
                     files={'lib/state.thor':'package lib\nSTATE:>1\n'}, fail="immutable storage 'STATE'")
 
     def test_conditional_immutable_declaration_uses_selected_branch(self):
-        prefix='#if #config(IMMUTABLE,false) {x:>1} #else {x:=1}\n'
+        prefix='when #config(IMMUTABLE,false) {x:>1} else {x:=1}\n'
         self.invoke(self.program('x=2; assert(x==2)',prefix))
         self.invoke(self.program('x=2',prefix),flags=['-define:IMMUTABLE=true'],fail="immutable storage 'x'")
 
     def test_inactive_immutable_violations_are_unchecked(self):
-        self.invoke(self.program('#if false {x:>1; x=2; p:=&x; _=p}\nwhen false {a:>[1,2]; _=a[:]}'))
+        self.invoke(self.program('when false {x:>1; x=2; p:=&x; _=p}\nwhen false {a:>[1,2]; _=a[:]}'))
 
     def test_generic_shape_checks_distinguish_array_slice_and_map(self):
         prefix='write::proc(value:$T){x:>value; x[0]=7}\n'
@@ -348,9 +348,9 @@ choose::proc{a,b}
     def test_conditional_generic_context_follows_native_branch(self):
         prefix='''A::enum{Red,Blue}
 B::enum{Red,Blue}
-#if #config(BRANCH,false) {
+when #config(BRANCH,false) {
     f::proc(value:$T/[2]A)->int{return 1}
-} #else {
+} else {
     f::proc(value:$T/[2]B)->int{return 2}
 }
 '''

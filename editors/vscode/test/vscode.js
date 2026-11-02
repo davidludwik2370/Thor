@@ -695,7 +695,7 @@ async function run() {
         assert.equal(testDocument.getText(membershipErrors.find(value=>value.message.includes('128')).range),'128');
         await replace(membershipSource);
         await eventually(()=>vscode.languages.getDiagnostics(testDocument.uri),values=>values.length===0);
-        const intervalSource='package main\nallowed_range::proc($N:int)->int where N in 0..<10{return N}\n#if -2 in -3..=0 {SELECTED::42} #else {SELECTED::false}\nmain::proc(){value:=3;found:=value in 0..<10;result:=allowed_range(9);_=found;_=result;_=SELECTED}\n';
+        const intervalSource='package main\nallowed_range::proc($N:int)->int where N in 0..<10{return N}\nwhen -2 in -3..=0 {SELECTED::42} else {SELECTED::false}\nmain::proc(){value:=3;found:=value in 0..<10;result:=allowed_range(9);_=found;_=result;_=SELECTED}\n';
         await replace(intervalSource);
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
             testDocument.positionAt(intervalSource.indexOf('found:=')+2)),values=>values?.some(value=>value.contents.some(content=>(content.value||'').includes('found: bool'))));

@@ -127,7 +127,7 @@ bounded::proc($text:string,$n:int)->int where len(text*n)<10 {return n}
 
     def test_conditionals_switches_array_lengths_and_interpolation(self):
         self.invoke(self.program('''
-#if "x"*3 == "xxx" {assert(true)} #else {undefined_unselected()}
+when "x"*3 == "xxx" {assert(true)} else {undefined_unselected()}
 CHOICE::#switch "a"*2 {case "aa":7;case:undefined_unselected}
 assert(CHOICE==7)
 values:[len("ab"*3)]int
@@ -138,7 +138,7 @@ assert(text=="ababab xx"); delete(text)
 
     def test_unselected_compile_time_branches_remain_unchecked(self):
         self.invoke(self.program('''
-#if false {BAD::"x"*(-1);_=BAD} #else {assert(true)}
+when false {BAD::"x"*(-1);_=BAD} else {assert(true)}
 when false {BAD::"x"*1.5;_=BAD}
 GOOD::"ok" when true else "x"*(-1)
 assert(GOOD=="ok")

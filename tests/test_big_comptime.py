@@ -24,7 +24,7 @@ NEXT::VALUE*2+1
 RATIO::Rational(numerator=22,denominator=13)
 EXACT::Rational(0.1)+0.2
 CHECK::NEXT>VALUE
-#if NEXT>VALUE {SELECTED::7} #else {SELECTED::8}
+when NEXT>VALUE {SELECTED::7} else {SELECTED::8}
 ''')
 
     def test_readonly_constants_do_not_allocate_until_copied(self):
@@ -102,7 +102,7 @@ expect(a,"22");expect(b,"33")
 delete(a);delete(b)
 ''','''VALUE::Integer(123456789012345678901234567890)
 identity::fn(n:int)->Integer{return Integer(n)}
-#if VALUE>0 {SELECTED::#run identity(22)} #else {SELECTED::#run missing()}
+when VALUE>0 {SELECTED::#run identity(22)} else {SELECTED::#run missing()}
 CHOICE::#switch VALUE {case 0..<100: Integer(0);case: #run identity(33)}
 ''')
 

@@ -312,12 +312,12 @@ main::proc(){
 
     def test_generic_default_guard_preserves_native_conditional_checking(self):
         bad = 'work::proc(a:[]$E,value:=proc()->E{return {}})->[]E{return a}'
-        for wrapper in ['when false {%s}', '#if false {%s}',
+        for wrapper in ['when false {%s}', 'when false {} else when false {%s}',
                         'outer::proc(a:[]$T){%s}',
-                        '#if #config(ENABLE_BAD,false) {%s}']:
+                        'when #config(ENABLE_BAD,false) {%s}']:
             with self.subTest(wrapper=wrapper):
                 self.invoke('package basic\n'+wrapper % bad+'\n', flags=('-no-entry-point',), success=True)
-        self.at('package basic\n#if #config(ENABLE_BAD,false) {'+bad+'}\n',
+        self.at('package basic\nwhen #config(ENABLE_BAD,false) {'+bad+'}\n',
                 'proc()->E',flags=('-no-entry-point','-define:ENABLE_BAD=true'),message='cannot be inferred')
         self.at('package main\nouter::proc($T:typeid){'+bad+'}\nmain::proc(){outer(int)}\n',
                 'proc()->E', message='cannot be inferred')
@@ -748,7 +748,7 @@ main::proc(){
         self.assertEqual(errors[0]['pos']['file'], str(entry.parent / 'lib/lib.thor'))
 
     def test_inactive_branch_does_not_create_diagnostics(self):
-        self.invoke('package main\nmain :: proc(){ #if false { a := []; _ = a; _ = missing } }\n', success=True)
+        self.invoke('package main\nmain :: proc(){ when false { a := []; _ = a; _ = missing } }\n', success=True)
 
     def test_source_map_sidecar_is_complete_and_round_trips(self):
         entry, output, _, _ = self.invoke('package main\nmain :: proc(){ a := [1,2]; _ = a }\n', success=True,flags=['-debug'])

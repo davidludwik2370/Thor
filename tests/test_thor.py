@@ -236,9 +236,9 @@ main :: proc() {
 ''')
 
     def test_strings_comments_and_utf8_are_not_rewritten(self):
-        source = self.program('''s := "λ #if x in [1,2] ? : / sin"
-raw := `#else [3,4] // not code`
-// #if missing [1, 2] ? :
+        source = self.program('''s := "λ when x in [1,2] ? : / sin"
+raw := `else [3,4] // not code`
+// when missing [1, 2] ? :
 /* nested /* [1,2] */ comment */
 assert(len(s) > 0 && len(raw) > 0)
 a := ["café", "日本語"]
@@ -286,10 +286,10 @@ f :: proc(x:$T)->T {return x}
 
     def test_selective_import_conditional_conflicts(self):
         self.invoke(self.program('println("ok")', '''import "core:fmt" / println
-#if false {println :: 3}
+when false {println :: 3}
 '''), expected="ok")
         self.invoke(self.program("", '''import "core:fmt" / println
-#if true {println :: 3}
+when true {println :: 3}
 '''), fail="conflicts with selective import")
 
     def test_selective_import_is_file_private(self):
@@ -342,37 +342,37 @@ assert(next == 4)''', 'Color :: enum {Red, Blue}\nbad :: proc()->int {assert(fal
     def test_multiline_ternary_missing_colon(self):
         self.invoke(self.program("x := true ? 1\n2\n_ = x"), fail="expected ':'")
 
-    # T04: additive conditional compilation, scopes, nesting, and skipped code.
-    def test_if_else_if_else(self):
+    # T04: native conditional compilation, scopes, nesting, and skipped code.
+    def test_when_else_when_else(self):
         for value in (1, 2, 3):
             with self.subTest(value=value):
                 self.invoke(self.program(f"assert(V == {value})", f'''MODE :: {value}
-#if MODE == 1 {{V :: 1}} #else if MODE == 2 {{V :: 2}} #else {{V :: 3}}
+when MODE == 1 {{V :: 1}} else when MODE == 2 {{V :: 2}} else {{V :: 3}}
 '''))
 
-    def test_if_nested_and_original_when(self):
-        self.invoke(self.program('''#if true {
+    def test_when_nested_and_conditional_expression(self):
+        self.invoke(self.program('''when true {
     when true {chosen := 3; assert(chosen == 3)}
-} #else {this_is_undefined()}
+} else {this_is_undefined()}
 when true {
-    #if false {also_undefined()} #else {assert(V == 4)}
+    when false {also_undefined()} else {assert(V == 4)}
 }
 x := 2 when V == 4 else 0
 assert(x == 2)''', '''when true {
-    #if true { V :: 4 }
+    when true { V :: 4 }
 } else when false { V :: 5 } else { V :: 6 }
 '''))
 
-    def test_if_define_forwarding(self):
+    def test_when_define_forwarding(self):
         self.invoke(self.program("assert(V == 8)", '''MODE :: #config(MODE, 1)
-#if MODE == 8 {V :: 8} #else {V :: 1}
+when MODE == 8 {V :: 8} else {V :: 1}
 '''), flags=("-define:MODE=8",))
 
-    def test_if_nonconstant_rejected(self):
-        self.invoke(self.program("x := 1\n#if x == 1 {assert(true)}"), fail="Error:")
+    def test_when_nonconstant_rejected(self):
+        self.invoke(self.program("x := 1\nwhen x == 1 {assert(true)}"), fail="Error:")
 
-    def test_if_skips_unsupported_array_in_untaken_branch(self):
-        self.invoke(self.program("#if false {x := []; _ = x} #else {assert(true)}"))
+    def test_when_skips_unsupported_array_in_untaken_branch(self):
+        self.invoke(self.program("when false {x := []; _ = x} else {assert(true)}"))
 
     # T05: type inference, context, values, nesting, and precise array lengths.
     def test_array_literal_scalar_families(self):
@@ -566,7 +566,7 @@ assert(Item{n=2} in [Item{n=1},Item{n=2}])''', 'Item :: struct {n:int}\n'))
 
     def test_membership_constant_contexts(self):
         self.invoke(self.program('''assert(OK && !NO)
-#if 2 in [1,2,3] {assert(true)} #else {assert(false)}
+when 2 in [1,2,3] {assert(true)} else {assert(false)}
 when 4 not_in [1,2,3] {assert(true)}
 #assert(2 in [1,2])''', 'OK :: 2 in [1,2,3]\nNO :: 4 in [1,2,3]\n'))
 

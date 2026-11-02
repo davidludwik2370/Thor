@@ -90,7 +90,7 @@ class DefaultCallbacks:
             self.errors[procedure] = (signature if symbol.node.kind == 'PolyType' else node, message)
             return
 
-        # Alternate when/#if declarations share a native scope. Give the same
+        # Alternate when declarations share a native scope. Give the same
         # procedure/parameter the same helper name in every branch and file,
         # letting Odin select the active helper rather than guessing a branch.
         scope = source.scope(declaration)

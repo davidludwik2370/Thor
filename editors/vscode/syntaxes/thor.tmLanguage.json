@@ -975,28 +975,8 @@
           "match": "\\bproc\\b"
         },
         {
-          "name": "meta.conditional.directive.thor",
-          "begin": "#else\\b",
-          "beginCaptures": {
-            "0": {
-              "name": "entity.name.tag.thor"
-            }
-          },
-          "end": "(?<=\\bif)|(?=\\S)",
-          "applyEndPatternLast": true,
-          "patterns": [
-            {
-              "include": "#comments"
-            },
-            {
-              "name": "entity.name.tag.thor",
-              "match": "\\bif\\b"
-            }
-          ]
-        },
-        {
           "name": "entity.name.tag.thor",
-          "match": "#(?:if|switch|run)\\b"
+          "match": "#(?:switch|run)\\b"
         },
         {
           "name": "keyword.control.thor",

@@ -19,6 +19,32 @@ thor_source :: proc(source: string) -> test.Source {
 }
 
 @(test)
+thor_removed_conditional_directives_are_parser_errors :: proc(t:^testing.T) {
+    builtin:=server.get_builtin_path()
+    defer delete(builtin)
+    server.setup_index(builtin)
+    defer server.free_index()
+    for text in ([3]string{
+        "package test\n#if true {VALUE::42}\n",
+        "package test\nwhen false {} #else {VALUE::42}\n",
+        "package test\nwhen false {} else if true {VALUE::42}\n",
+    }) {
+        arena:virtual.Arena
+        _=virtual.arena_init_growing(&arena)
+        defer virtual.arena_destroy(&arena)
+        document:=server.Document{fullpath="test/removed_conditional.thor",
+            text=transmute([]u8)text,used_text=len(text),allocator=&arena,package_name="test"}
+        config:common.Config
+        errors,ok:=server.parse_document(&document,&config)
+        testing.expect(t,ok&&len(errors)>0,"removed directive must produce an ordinary parser diagnostic")
+        for error in errors {
+            testing.expect_value(t,error.file,document.fullpath)
+            testing.expect_value(t,error.line,2)
+        }
+    }
+}
+
+@(test)
 thor_parallel_parser_diagnostics_keep_their_document :: proc(t:^testing.T) {
     Job :: struct {
         barrier: ^sync.Barrier,
@@ -393,7 +419,7 @@ main::proc(){value:=3;found:=value in 0..=9;fou{*}nd}
 @(test)
 thor_if_range_membership_condition :: proc(t:^testing.T){
     source:=thor_source(`package test
-#if -2 in (-3..=0) && 5 not_in 0..<5 {VALUE::42} #else {VALUE::false}
+when -2 in (-3..=0) && 5 not_in 0..<5 {VALUE::42} else {VALUE::false}
 main::proc(){VAL{*}UE}
 `)
     test.expect_hover_contains(t,&source,"42")
@@ -480,29 +506,29 @@ thor_selected_import_file_privacy :: proc(t: ^testing.T) {
 }
 
 @(test)
-thor_if_integer_condition :: proc(t: ^testing.T) {
+thor_when_integer_condition :: proc(t: ^testing.T) {
     source := thor_source(`package test
 MODE :: 2
-#if MODE == 1 { VALUE :: "wrong" } #else if MODE == 2 { VALUE :: 42 } #else { VALUE :: false }
+when MODE == 1 { VALUE :: "wrong" } else when MODE == 2 { VALUE :: 42 } else { VALUE :: false }
 main :: proc() { VAL{*}UE }
 `)
     test.expect_hover_contains(t, &source, "42")
 }
 
 @(test)
-thor_if_membership_condition :: proc(t: ^testing.T) {
+thor_when_membership_condition :: proc(t: ^testing.T) {
     source := thor_source(`package test
-#if 2 in [1,2] { VALUE :: 42 } #else { VALUE :: false }
+when 2 in [1,2] { VALUE :: 42 } else { VALUE :: false }
 main :: proc() { VAL{*}UE }
 `)
     test.expect_hover_contains(t, &source, "42")
 }
 
 @(test)
-thor_if_config_default :: proc(t: ^testing.T) {
+thor_when_config_default :: proc(t: ^testing.T) {
     source := thor_source(`package test
 MODE :: #config(MODE, 2)
-#if MODE == 2 { VALUE :: 42 } #else { VALUE :: false }
+when MODE == 2 { VALUE :: 42 } else { VALUE :: false }
 main :: proc() { VAL{*}UE }
 `)
     test.expect_hover_contains(t, &source, "42")
@@ -538,7 +564,7 @@ main::proc(){base:f32=2;result:=base**-3;res{*}ult}
 @(test)
 thor_if_power_precedence :: proc(t:^testing.T){
     source:=thor_source(`package test
-#if 2**3**2 == 512 && -2**2 == -4 {SELECTED::42} #else {SELECTED::false}
+when 2**3**2 == 512 && -2**2 == -4 {SELECTED::42} else {SELECTED::false}
 main::proc(){SEL{*}ECTED}
 `)
     test.expect_hover_contains(t,&source,":: 42")

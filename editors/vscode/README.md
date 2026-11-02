@@ -324,10 +324,9 @@ including nested quotes and braces. Negative indices use native expression scope
 Explicit interpolation fills use Odin rune literals, e.g. `{"é😀":'界'^5}` or
 `{1234567:'0'12,}`. Rune fills and numeric widths keep their ordinary literal
 colors; alignment and grouping punctuation stay neutral. Bare fills are rejected.
-Compile-time `#if`, `#else`, `#switch` and `#run` use directive scopes, matching
-`#assert` and `#partial`. The entire `#else if` branch introducer has that styling,
-including when comments or line breaks separate the words. Ordinary runtime
-`if`, `else` and `switch` retain their normal control-flow scopes.
+Compile-time `#switch` and `#run` use directive scopes, matching `#assert` and
+`#partial`. Native `when`, `else when`, and runtime `if` / `else if` use ordinary
+control-flow scopes. Conditional compilation snippets insert native `when`.
 Range membership (`value in low..<high`, inclusive `..=`, and `not_in`) uses the
 shared parser, retains boolean inference and original token positions, and is
 checked in generic constraints by the compiler. TLS's limited branch folder also

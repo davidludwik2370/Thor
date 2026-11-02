@@ -124,19 +124,19 @@ generic_known :: proc(value:$T,$N:int)->int {
 #assert(AUTO_LATER==81)
 
 DEMO_MODE :: #config(DEMO_MODE, 2)
-#if DEMO_MODE == 1 {
+when DEMO_MODE == 1 {
     BRANCH :: "first"
-} #else if DEMO_MODE == 2 {
+} else when DEMO_MODE == 2 {
     BRANCH :: "second"
-} #else {
+} else {
     BRANCH :: "default"
 }
 
 // Original Odin syntax is still valid and may surround Thor syntax.
 when true {
-    #if 4 in [2, 4, 8] {
+    when 4 in [2, 4, 8] {
         ALLOWED :: true
-    } #else {
+    } else {
         ALLOWED :: false
     }
 }
@@ -165,12 +165,12 @@ main :: proc() {
                          : .Blue
     assert(answer == 27 && nested == 2 && color == .Blue)
 
-    println("T04: #if / #else if / #else, nesting, defines, and native when")
+    println("T04: native when / else when / else, nesting, and defines")
     println("  Selected compile-time branch:", BRANCH)
     assert(ALLOWED)
-    #if true {
+    when true {
         when true { assert(ALLOWED) }
-    } #else {
+    } else {
         intentionally_undefined_in_an_unselected_branch()
     }
     native_conditional := 8 when ALLOWED else 0
@@ -512,7 +512,7 @@ main :: proc() {
     println("T23: automatic constants, dependencies, generic instances, and lazy paths")
     auto_buffer:[AUTO_LATER]int
     assert(len(auto_buffer)==81&&AUTO_FIRST==9&&AUTO_TEXT=="label 23")
-    #if AUTO_FIRST==9 {assert(true)} #else {intentionally_undefined()}
+    when AUTO_FIRST==9 {assert(true)} else {intentionally_undefined()}
     AUTO_CHOICE :: #switch {
         case pure_square(2)==4: pure_square(4)
         case pure_never(): 0

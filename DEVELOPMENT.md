@@ -224,11 +224,10 @@ TLS tests, two allocation-tracked lexer tests, the demo and actual VS Code
 integration pass. Install the 0.7.3 VSIX and run **Developer: Reload Window** to
 load its grammar changes in an existing editor window.
 
-The 0.7.4 editor update styles `#if`, `#else`, `#switch` and `#run` like existing
-directives. The `if` following `#else` shares that scope, across whitespace and
-comments; conditions and subsequent runtime keywords retain their own scopes.
-All 67 grammar tests pass, including actual color checks, comments/strings,
-multiline chains and runtime-keyword boundaries. This changes editor styling only.
+The 0.7.4 editor checkpoint standardized compile-time directive styling.
+The conditional-compilation aliases from that checkpoint were subsequently
+removed; native `when` and `else when` use normal control-flow scopes.
+`#switch`, `#run`, `#assert` and `#partial` retain directive styling.
 
 ## Early redeclarations: compiler/TLS 0.7.5
 
@@ -532,7 +531,7 @@ other genuinely locationless failures keep the labeled package fallback.
 
 Regression coverage includes Unicode ranges, parenthesized defaults, explicit
 generic and typed defaults, generic array lengths, multiple callbacks, inactive
-when/#if/config branches, unused and specialized enclosing bodies, valid concrete
+when/config branches, unused and specialized enclosing bodies, valid concrete
 callbacks, type/member shadowing, named generic defaults, native imported sources
 and unsaved correction. The locationless fallback regression now uses a test
 compiler to keep testing unknown failures independently from this recovered
@@ -602,7 +601,7 @@ procedure-value signature intact. Defaults are not carried by ordinary Odin
 procedure-value types; unresolved overload calls require an explicit callback.
 
 Helpers for alternate declarations of the same procedure/parameter share a
-scope-specific name across when/#if branches and package files. Odin selects the
+scope-specific name across when branches and package files. Odin selects the
 active declaration/helper; Thor does not guess conditional values. Unused helper
 bodies stay uninstantiated. Imports, selected aliases, outer compile-time bindings,
 comments, nested Thor expressions and exact copied source spans remain available.
@@ -1779,7 +1778,7 @@ Validation: 601 existing compiler regression cases pass, along with 15 dedicated
 repetition tests. Coverage includes precedence/chaining, zero/one, empty strings
 with huge counts, Unicode/raw/escaped/invalid-UTF-8 bytes, typed counts and distinct
 strings, record-field constants, imports/shadowing, generic bodies/constraints,
-default values, fn/#run, #if/#switch, arrays, sets, negative indexing, interpolation,
+default values, fn/#run, when/#switch, arrays, sets, negative indexing, interpolation,
 debug tracking and logarithmic generated size with zero execution-cache writes.
 All 122 stdio TLS/rename cases, 1,126 native TLS cases and 95 Node/editor cases pass;
 the isolated real VS Code integration passes with its new repetition check. Run
@@ -1987,7 +1986,7 @@ Tests cover signed/unsigned widths through 128 bits, distinct types, floats,
 untyped constants and expressions, imported constants, stored containers,
 arrays/slices/dynamic/fixed arrays/maps/bit sets/Sets, enums/runes/strings/nil,
 nested arrays/records, arithmetic/conditional/call/field/index/pointer needles,
-generic type/value constraints, #if/when/#switch, pure/#run/automatic execution,
+generic type/value constraints, when/#switch, pure/#run/automatic execution,
 inactive branches, empty lists, type lists, ownership and execution order. Add
 real VS Code checks for contextual field hovers and precise unsaved overflow
 diagnostics, with stdio tests for enum completion/navigation in both directions.
@@ -2842,3 +2841,32 @@ ASTs and errors, and exercise the compiler itself under Python `-O`.
 All 1,133 native TLS tests pass with assertions/bounds/type checks disabled, as do
 the four native tokenizer tests and both actual VS Code run/debug integration
 suites. See [the audit scope, findings and guard limitations](docs/assertion-audit.md).
+
+## Native conditional compilation only: Thor 0.33.0 / TLS 0.26.0
+
+Remove the redundant `#if` and `#else` language aliases. The shared parser no
+longer rewrites hash-prefixed keywords into native conditional tokens, nor
+accepts `else if` as a continuation of `when`. Both Thor and Odin sources use
+`when` / `else when` / `else` with Odin's normal behavior. Runtime `if` / `else if`
+and the Thor `#switch` / `#run` directives retain their existing behavior.
+
+Convert the evaluation demo, commented walkthrough, fixtures, compiler tests,
+TLS/rename/debugger tests and language references to native conditional syntax.
+Keep T04 as coverage of native compile-time branching, declaration visibility,
+configuration, laziness and interaction with Thor expressions. Rejection tests
+cover removed spellings at package/procedure scope, whitespace, inactive arms,
+original Unicode-aware diagnostic positions and live unsaved correction. Plain
+string/comment contents remain data.
+
+The editor 0.20.0 grammar removes conditional-directive state and the special
+color for `if` after a hash-prefixed else. Its conditional snippet now inserts
+`when`. Native conditional keywords use ordinary control-flow scopes. Rebuild
+TLS and install the updated VSIX, then reload VS Code to refresh both layers.
+
+Validation: 200 core/compiler/default/diagnostic tests and 380 cross-feature
+tests pass, along with the extended native-conditional rejection cases, six
+assertion-hygiene tests, 149 live TLS/rename tests, 26 real debugger tests, 1,134
+native TLS tests, 123 Node grammar/extension tests and the isolated VS Code
+integration suite. Both demos pass checked runs and full unchecked release
+runs, including `-disable-assert`. The packaged and locally installed extension
+is verified as 0.20.0 and the rebuilt TLS executable reports 0.26.0.
