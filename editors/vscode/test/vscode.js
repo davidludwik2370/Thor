@@ -127,6 +127,23 @@ async function run() {
         await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,widthPosition),values=>hoverText(values||[]).includes('width: int'));
         const widthRename=await vscode.commands.executeCommand('vscode.executeDocumentRenameProvider',testDocument.uri,widthPosition,'padding');
         assert.equal(widthRename.get(testDocument.uri).length,2);
+        const bareWidth=widthExample.replace(':{width}',':width');
+        await replace(bareWidth);
+        await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.some(v=>v.message.includes('variable width needs nested braces')));
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(bareWidth.indexOf('width:>')+1)),values=>hoverText(values||[]).includes('width: int'));
+        const bareWidthStart=bareWidth.indexOf(':width}')+1;
+        await eventually(()=>vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens',testDocument.uri),value=>{
+            if(!value?.data?.length)return false;
+            let line=0,column=0;
+            for(let i=0;i<value.data.length;i+=5){
+                const [delta,char,length]=value.data.slice(i,i+3);
+                line+=delta;column=delta?char:column+char;
+                const at=testDocument.offsetAt(new vscode.Position(line,column));
+                if(at<bareWidthStart+'width'.length && at+length>bareWidthStart)return false;
+            }
+            return true;
+        });
         const badWidth=widthExample.replace('width:>6','width:>"bad"');
         await replace(badWidth);
         const widthError=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.some(v=>v.message.includes('width must have an integer type')));
@@ -782,6 +799,7 @@ async function run() {
             'multiple switch results, assignment-only break, corresponding enum hovers and unsaved diagnostics',
             'range membership inference and unsaved constraint diagnostics', 'power inference and unsaved type diagnostics', 'canonical set types in variable and procedure hovers', 'built-in big-number types, long literals, read-only property hovers and completion'];
         result.checks.push('dynamic width hover, rename and precise unsaved type diagnostics');
+        result.checks.push('invalid bare format names retain diagnostics and surrounding semantic highlighting');
         result.checks.push('undeclared interpolation names keep one precise root diagnostic and no false literal underline');
         result.checks.push('Odin-style precision formats, Rational g/G contract and mapped unsaved recovery');
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');

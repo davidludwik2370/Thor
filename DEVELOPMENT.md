@@ -2687,3 +2687,18 @@ T01–T23 evaluation demo and the commented walkthrough run successfully with
 their new variable-width examples. Distinct integer widths are also covered.
 The installed local extension is 0.19.0; reload the VS Code window to refresh
 its TextMate grammar along with TLS.
+
+## Invalid format-name highlighting: extension 0.19.1
+
+An unsupported bare width such as `f"{value:round_pad}"` remains a compiler
+error, but the grammar previously colored individual letters of `round_pad`
+as formatting verbs. Format verbs now require a token boundary, and unknown
+names are consumed as whole neutral tokens. Valid verbs, numeric widths,
+nested width expressions, quoted fills, and following string/code scopes
+retain their existing colors. No compiler or TLS protocol change is needed.
+
+Grammar regressions cover quoted/raw strings, identifier suffixes with digits
+and Unicode, literal brackets after the field, and the following code line.
+The VS Code integration regression keeps the nested-braces diagnostic and
+surrounding hover/semantic tokens through an unsaved invalid-to-valid edit.
+All 122 Node extension tests and the isolated VS Code integration suite pass.

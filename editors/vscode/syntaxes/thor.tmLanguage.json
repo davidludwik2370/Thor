@@ -1544,7 +1544,11 @@
         },
         {
           "name": "storage.type.format.thor",
-          "match": "[vwTtdibozxXcrUqfFeEgGhHspmM%]"
+          "match": "[vwTtdibozxXcrUqfFeEgGhHspmM%](?![\\p{L}\\p{N}_])"
+        },
+        {
+          "name": "meta.interpolation.invalid-format.thor",
+          "match": "[\\p{L}_][\\p{L}\\p{N}_]*"
         }
       ]
     }

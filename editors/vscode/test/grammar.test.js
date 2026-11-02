@@ -554,3 +554,24 @@ test('dynamic format widths contain ordinary code and keep following format and 
         assert.equal(tokens[after+1].color,'#CE9178');assert.equal(tokens[after+1].type,2);
     }
 });
+
+test('invalid bare format names stay whole and do not color individual letters as verbs',()=>{
+    for(const suffix of ['round_pad','current_bet_pad','width2','f64','round_幅2']){
+        for(const quote of ['"','`']){
+            const source=`print(f${quote}Round {i+1:${suffix}} after (text)${quote})\nnext := 7`;
+            const tokens=themedTokens(source),at=source.indexOf(suffix);
+            for(let i=0;i<suffix.length;i++){
+                assert.equal(tokens[0][at+i].color,'#D4D4D4',`${suffix} character ${i}`);
+                assert.equal(tokens[0][at+i].type,0);
+            }
+            const after=source.indexOf(' after');
+            for(let i=after;i<source.lastIndexOf(quote);i++){
+                assert.equal(tokens[0][i].color,'#CE9178');
+                assert.equal(tokens[0][i].type,2);
+                assert.equal(tokens[0][i].balanced,false);
+            }
+            assert.equal(tokens[1][0].color,'#9CDCFE');
+            assert.equal(tokens[1].at(-1).color,'#B5CEA8');
+        }
+    }
+});
