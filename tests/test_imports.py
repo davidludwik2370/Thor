@@ -12,7 +12,7 @@ class ImportTests(unittest.TestCase):
         self.invoke(self.program('''
 values := sorted([]int{3, 1, 2})
 defer delete(values)
-assert(values[0] == 1 && basic.asc(1, 2, 3))
+assert(values[0] == 1 && basic.type(values) == []int)
 assert(_i16("42") == 42 && type(values) == []int)
 print("wildcard works")
 ''', 'import * "thor:basic"\n'), expected='wildcard works')
@@ -36,8 +36,8 @@ println("selected", values[0])
         self.invoke(self.program('other()', 'import _ "lib" / chosen\n'),
                     files={'lib/library.odin': 'package lib\nchosen::proc(){}\nother::proc(){}\n'},
                     command='check', fail='Undeclared name: other')
-        self.invoke(self.program('assert(asc(1,2) && desc(2,1))',
-                    'import _ "thor:basic" / asc\nimport _ "thor:basic" / desc\n'))
+        self.invoke(self.program('assert(sum([]int{1,2}) == 3 && size(i32(2)) == 4)',
+                    'import _ "thor:basic" / sum\nimport _ "thor:basic" / size\n'))
 
     def test_all_public_declaration_kinds_and_live_globals(self):
         self.invoke(self.program('''

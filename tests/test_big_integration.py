@@ -167,13 +167,11 @@ through::proc(value:$T)->Integer{return identity(value).numerator}
         self.run_big('''
 values:=[Integer(1),Integer(2),Integer(3)]
 a:=basic.sum(values[:]);expect(a,"6")
-assert(basic.asc(values[0],values[1],values[2]))
-assert(basic.ordered(..values[:]))
 sorted:=basic.sorted(values[:]);assert(sorted[0]==values[0]);delete(sorted)
 for &v in values {delete(v)}
 delete(a)
 native_values:=[1,2,3]
-assert(basic.sum(native_values[:])==6 && basic.ordered(..native_values[:]))
+assert(basic.sum(native_values[:])==6)
 ''','import "thor:basic"\n')
 
     def test_generic_property_guards_preserve_writable_ordinary_fields(self):

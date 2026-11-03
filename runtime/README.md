@@ -16,7 +16,7 @@ copying are later stages; the current package uses ordinary native ownership.
 
 ## Basic helpers
 
-`import "thor:basic"` provides `basic.print`, `basic.sorted`, order checks, parsing,
+`import "thor:basic"` provides `basic.print`, `basic.sorted`, parsing,
 file/line I/O, and small collection/string helpers. It resolves automatically from
 any Thor project. For unqualified names, use the existing selection syntax, such
 as `import "thor:basic" / print, sorted`.

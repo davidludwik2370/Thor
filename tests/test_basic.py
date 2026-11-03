@@ -95,7 +95,7 @@ assert(len(PARTS) == 2 && PARTS[0] == "Thor" && PARTS[1] == "basic")
         self.invoke(self.program('''
 result := sorted([]int{2, 1})
 defer delete(result)
-assert(result[0] == 1 && b.asc(1, 2, 3) && native())
+assert(result[0] == 1 && b.type(result) == []int && native())
 print("basic imported")
 ''', 'import b "thor:basic" / sorted, print\n'), directory=True, files={
             'native.odin': '''package main
@@ -106,16 +106,6 @@ native :: proc() -> bool {
     return values[0] == 2
 }
 '''}, expected='basic imported')
-
-    def test_order_checks_including_empty_and_variadic_forwarding(self):
-        self.invoke(self.program('''
-assert(basic.asc(1) && basic.asc(1, 1, 2) && !basic.asc(2, 1))
-assert(basic.desc(1) && basic.desc(3, 3, 1) && !basic.desc(1, 2))
-assert(basic.ordered(..[]int{1, 2, 3}) && basic.ordered(..[]int{3, 2, 1}))
-assert(basic.ordered(..[]int{4, 4}) && !basic.ordered(..[]int{1, 3, 2}))
-assert(basic.ordered(..[]int{}))
-assert(basic.ordered(..[]f64{3, 2, 1}))
-''', 'import "thor:basic"\n'))
 
     def test_print_separator_and_terminator(self):
         self.invoke(self.program('basic.print("red", "blue", sep="|", end=".", flush=false)',

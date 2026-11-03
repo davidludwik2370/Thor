@@ -29,7 +29,6 @@ main :: proc() {
     defer delete(largest)
     assert(found && total == 8 && largest == 7)
     assert(value in [1, 3, 8] && 7 in values)
-    assert(basic.ordered(..values[:]) == false)
 
     // Canonical fractions and independently owned components need no float.
     ratio := Rational(22, 13)

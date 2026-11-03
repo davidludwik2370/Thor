@@ -43,36 +43,6 @@ print :: proc(args:..any, sep:=" ", flush:=true, end:="\n"){
 type :: proc(_: $T) -> typeid { return typeid_of(T) }
 size :: proc(_: $T) -> int    { return size_of  (T) }
 
-asc :: proc(first: $T, rest: ..T) -> bool {
-    when T==Integer || T==Rational {return big.ascending(first,..rest)}
-    else {
-    previous := first
-    for v in rest {
-        if previous > v do return false
-        previous = v
-    }
-    return true
-    }
-}
-
-// Equal adjacent values are allowed by both asc and desc.
-desc :: proc(first: $T, rest: ..T) -> bool {
-    when T==Integer || T==Rational {return big.descending(first,..rest)}
-    else {
-    previous := first
-    for v in rest {
-        if previous < v do return false
-        previous = v
-    }
-    return true
-    }
-}
-
-ordered :: proc(vals: ..$T) -> bool {
-    if len(vals) < 2 do return true
-    return asc(vals[0], ..vals[1:]) || desc(vals[0], ..vals[1:])
-}
-
 swap :: proc(a, b: ^$T) {
 	a^, b^ = b^, a^
 }

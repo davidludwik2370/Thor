@@ -64,9 +64,9 @@ class InstallationTests(unittest.TestCase):
         project=self.root/'checked';project.mkdir()
         (project/'main.thor').write_text('''package main
 import "thor:basic"
-work::fn(n:int)->bool{return basic.asc(n,n+1,n+2)}
+work::fn(n:int)->int{return basic.sum([]int{n,n+1,n+2})}
 VALUE::work(3)
-main::proc(){n:=4;assert(work(n)&&VALUE)}
+main::proc(){n:=4;assert(work(n)==15&&VALUE==12)}
 ''')
         result=subprocess.run([str(ROOT/'thor'),'build','.'],cwd=project,capture_output=True,text=True,timeout=40)
         self.assertEqual(result.returncode,0,result.stderr)

@@ -1777,12 +1777,12 @@ big_formatting_and_libraries :: proc() {
         sorted := basic.sorted(values[:])
         defer delete(total)
         defer delete(sorted)
-        assert(total == 9 && basic.ordered(..sorted))
+        assert(total == 9)
         assert(sorted[0] == -2 && sorted[-1] == 8)
         // sorted owns its outer slice, but its numeric elements are shallow
         // aliases of values. Delete the elements through values exactly once.
         native := [1, 2, 3]
-        assert(basic.sum(native[:]) == 6 && basic.asc(1, 2, 3))
+        assert(basic.sum(native[:]) == 6)
     }
 
     {

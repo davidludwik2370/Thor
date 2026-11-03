@@ -299,8 +299,8 @@ Integer grouping and numeric alignment work normally. Decimal and percentage
 formats use exact rational rounding; grouping is allowed for Rational decimal
 output, while grouping its default fraction is rejected. Rational g/G requires
 explicit significant-digit precision. See [interpolation formatting](interpolation-formatting.md). `basic.print` and `basic.table` format numeric values automatically;
-table numeric columns align right. Shared `basic.sum`, `asc`, `desc`, `ordered`
-and the default `sorted` comparator support these logical types. Sorting/filtering
+table numeric columns align right. Shared `basic.sum` and the default `sorted`
+comparator support these logical types. Sorting/filtering
 and whole aggregate copies retain their documented shallow element ownership.
 
 Odin `fmt` owns a global custom-formatter registry. Thor does **not** install or

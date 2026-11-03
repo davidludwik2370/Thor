@@ -51,9 +51,6 @@ main :: proc() {
     defer delete(descending)
 
     assert(descending[0] == 8 && descending[3] == 3)
-    assert(basic.asc(3, 3, 5, 8))
-    assert(basic.desc(8, 5, 3, 3))
-    assert(basic.ordered(..descending))
 
     // A custom comparator also allows types that do not support native <.
     Item :: struct { name: string, score: int }

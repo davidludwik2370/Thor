@@ -45,8 +45,6 @@ do not mark names private, so `_int` and the other conversion helpers are public
 | --- | --- |
 | `print(values, sep=" ", flush=true, end="\n")` | Print values with a separator and terminator. |
 | `type(value)`, `size(value)` | Return the value's type ID or its type's size in bytes. |
-| `asc(first, ..rest)`, `desc(first, ..rest)` | Check nondecreasing or nonincreasing order; equal neighbors are allowed. |
-| `ordered(..values)` | Check either direction. Empty and single-element typed slices are ordered. Pass a typed slice with `..values`, following Odin's generic variadic rules. |
 | `sorted(data, less=..., allocator=...)` | Allocate a sorted copy of a slice; the default comparison is `<`. Pass a comparator for records or custom ordering. |
 | `_int`, `_uint`, `_i8`/`16`/`32`/`64`/`128`, `_u8`/`16`/`32`/`64` | Parse a string, returning `(value, ok)`. `base=0` infers prefixes; another base parses digits in that base. Narrow conversions check bounds. |
 | `_f32`, `_f64`, `_bool` | Parse a float or boolean string, returning `(value, ok)`. Their retained `base` argument has no effect. |

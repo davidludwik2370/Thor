@@ -26,7 +26,7 @@ main :: proc() {
     print("wildcard:", ascending)
 
     // The default package namespace remains available with a wildcard import.
-    assert(basic.asc(ascending[0], ..ascending[1:]))
+    assert(basic.sum(ascending) == 16)
     parsed, ok := _int("42")
     assert(ok && parsed == 42)
 

@@ -2908,3 +2908,17 @@ The wider basic/installation regression run has four existing failures because
 the working tree's pre-existing edits removed asc, desc and ordered. Those edits
 are preserved separately from this feature; their old tests/demo still reference
 the removed names.
+
+## Remove basic ordering predicates
+
+Confirm the removal of basic.asc, basic.desc and basic.ordered. Delete their
+API-specific tests and documentation, and remove their uses from the bundled
+demos. Keep unrelated import, native-consumer, big-number and project-local
+purity-adaptation coverage by using the remaining basic helpers. Standalone TLS
+fixtures that declare their own comparison procedures still test generic loop
+classification and do not depend on the removed library API.
+
+All 58 affected basic/import/installation/big-integration/assertion-hygiene tests
+pass, resolving the four baseline failures recorded above. The basic, imports
+and big-integration demos also pass optimized unchecked builds with allocation
+tracking. The full commented language walkthrough passes a checked debug run.
