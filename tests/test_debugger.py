@@ -110,6 +110,33 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_partial_and_exhaustive_enum_switch_step_over_original_lines(self):
+        text='''package main
+Kind::enum{A,B}
+main::proc(){
+    kind:Kind=.A
+    first:=switch kind{case .A:7;case .B:panic("unreachable")}
+    second:=#partial switch kind{case .A:9;case:panic("unreachable")}
+    total:=first+second
+    if total!=16 {panic("incorrect results")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        for name,expected in [('first','7'),('second','9')]:
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':name,'context':'watch'})
+            self.assertEqual(value['result'],expected,value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_graph_copy_breakpoint_and_step_over_keep_original_thor_locations(self):
         text='''package main
 import "thor:basic"

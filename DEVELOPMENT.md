@@ -2922,3 +2922,42 @@ All 58 affected basic/import/installation/big-integration/assertion-hygiene test
 pass, resolving the four baseline failures recorded above. The basic, imports
 and big-integration demos also pass optimized unchecked builds with allocation
 tracking. The full commented language walkthrough passes a checked debug run.
+
+## Partial expressions and exhaustive enum switches: Thor 0.33.1 / TLS 0.26.1
+
+Accept #partial before runtime switch expressions in the shared parser. Keep the
+complete directive/switch source span and carry the partial flag into lowering;
+native #partial switch statements and enumerated-array literals remain unchanged.
+
+Allow runtime enum expressions without a default when Odin verifies coverage of
+all enum values. Native checking retains grouped/range cases, aliases, imported
+and generic enum types, duplicates and operand errors. Non-enum selectors,
+compile-time #switch expressions and #partial expressions still need a default.
+A partial value switch cannot silently leave a result uninitialized.
+
+Centralize native switch emission across scalar results, multiple results,
+assignment cancellation and temporary ownership selection. Keep exhaustive enum
+checking separate from a mandatory panic on unmatched enum casts; adding a
+synthetic default would incorrectly hide missing members. Assignment/ownership
+paths track whether an arm ran before their continuation. Generated panics use
+the contextless form where necessary, and native-name hygiene preserves shadowed
+user panic/type_of procedures. Scalar global switch helpers now use the same
+contextless convention as staged global multi-result initializers.
+
+Add focused tests for all four reported Othello variants, laziness/selector
+counts, inferred/contextual strings and records, generic/imported/sparse enums,
+multiple/global results, global initialization order, skip assignments, owned
+f-strings/sets/big numbers, pure/#run evaluation, native partial syntax and
+unmatched-cast failures with assertions/bounds/type checks disabled. Stdio TLS
+tests verify original tokens, hover, enum navigation, rename excluding #partial,
+Unicode-aware missing-case/default errors and unsaved recovery. Real CodeLLDB
+checks original-line stepping and locals across both switch forms.
+
+Validation: all 124 focused switch/parser/TLS/assertion-hygiene tests pass, as do
+326 broader compiler/diagnostic/ownership regressions, 1,134 native TLS tests,
+123 editor tests and two real debugger tests. Both evaluation demos pass checked
+debug runs. All four variants also build in isolated copies of the full Othello
+project; the original external file is unchanged. The checked and unchecked
+frontend AST comparison includes both updated demos. Rebuild TLS and restart
+Thor: Restart Language Server to load the new parser; no client/grammar update
+is needed. Preserve the user's one-line basic.swap definition as requested.

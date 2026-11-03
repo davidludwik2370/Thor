@@ -43,9 +43,7 @@ print :: proc(args:..any, sep:=" ", flush:=true, end:="\n"){
 type :: proc(_: $T) -> typeid { return typeid_of(T) }
 size :: proc(_: $T) -> int    { return size_of  (T) }
 
-swap :: proc(a, b: ^$T) {
-	a^, b^ = b^, a^
-}
+swap :: proc(a, b: ^$T) { a^, b^ = b^, a^ }
 
 // Return a sorted copy without changing data. Delete the result with allocator.
 sorted :: proc(

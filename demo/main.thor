@@ -363,6 +363,16 @@ main :: proc() {
         case: [.Green, .Green]
     }
     assert(boolean_switched == 7 && contextual[1] == .Blue)
+    enum_label := switch contextual[1] {
+        case .Red: "red"
+        case .Green: "green"
+        case .Blue: "blue"
+    }
+    partial_label := #partial switch contextual[1] {
+        case .Blue: "blue"
+        case: panic("expected blue")
+    }
+    assert(enum_label == "blue" && partial_label == enum_label)
     COMPILED :: #switch DEMO_MODE {
         case 1: "first"
         case 2: "second"

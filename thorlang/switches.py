@@ -24,6 +24,59 @@ class Switches:
     def arms(self, node):
         return [self.s.at(case['result'], node) for case in node.data['cases']]
 
+    def closed(self, node, builder, **options):
+        # Global initializers have no implicit context, even when a switch has
+        # only one result and does not use the staged multi-result initializer.
+        global_scope = not any(owner.kind == 'Procedure' for owner in node.ancestors())
+        self.global_context += int(global_scope)
+        try:
+            return self.e.closed(node, builder, **options)
+        finally:
+            self.global_context -= int(global_scope)
+
+    def default_error(self, node):
+        defaults = [case for case in node.data['cases'] if not case['matches']]
+        if len(defaults) > 1:
+            return 'A switch may have only one default arm.'
+        if defaults:
+            return None
+        if node.data.get('partial'):
+            return 'A #partial switch expression requires a default arm.'
+        selector = node.role('selector')
+        if (node.kind != 'SwitchExpr' or selector is None or
+                self.e.shape(selector).kind not in {'enum', 'generic', 'unknown'}):
+            return 'A switch expression requires a default arm.'
+        # Odin checks enum coverage, including aliases/ranges/imported types.
+        # Unknown generic selectors are checked again at specialization below.
+        return None
+
+    def runtime_code(self, node, selector, kind, branches, *, returns=True):
+        """Retain native enum coverage; never manufacture a result on fallthrough."""
+        missing_default = not any(not case['matches'] for case, _ in branches)
+        lines = []
+        matched = None
+        if missing_default:
+            self.s.needs_intrinsics = True
+            lines.append(f'when {self.s.prefix}meta.type_is_enum(type_of({selector})) {{')
+            if not returns:
+                matched = self.e.ownership.fresh('switch_matched')
+                lines.append(f'{matched} := false')
+        directive = '#partial ' if node.data.get('partial') else ''
+        lines.append(directive+'switch '+('' if kind else selector)+' {')
+        for case, content in branches:
+            matches = self.runtime_matches(node, case, selector, kind)
+            mark = f'{matched} = true; ' if matched else ''
+            lines.append(f'case {matches}: {mark}{content}')
+        lines.append('}')
+        if missing_default:
+            # The hygiene pass qualifies generated builtins if user bindings
+            # shadow them; user-authored panic calls keep their own meaning.
+            name = 'panic' if self.e.has_context(node) and not self.global_context else 'panic_contextless'
+            panic = f'{name}("Unmatched enum value in switch expression")'
+            lines.append(f'if !{matched} {{{panic}}}' if matched else panic)
+            lines.append('} else { #panic("A switch expression requires a default arm unless its selector is an enum") }')
+        return '\n'.join(lines)
+
     def runtime_selector(self,node,code):
         selector=node.role('selector')
         kind=self.e.shape(selector).kind if selector else None
@@ -141,9 +194,9 @@ class Switches:
 
     def validate(self, node, count):
         cases = node.data['cases']
-        defaults = [c for c in cases if not c['matches']]
-        if len(defaults) != 1:
-            return self.e.error(node, 'A switch expression requires a default arm.' if not defaults else 'A switch may have only one default arm.')
+        problem = self.default_error(node)
+        if problem:
+            return self.e.error(node, problem)
         for arm in self.arms(node) if node.kind == 'SwitchExpr' else []:
             if arm.kind == 'SwitchBreak' or self.s.resolver.is_panic_call(arm): continue
             unwrapped = unwrap(arm)
@@ -222,21 +275,23 @@ class Switches:
             cases = node.data['cases']
             if node.kind == 'SwitchExpr':
                 selector,kind=self.runtime_selector(node,lines)
-                lines.append('switch '+('' if kind else selector)+' {')
             else:
                 cases = [c for c in cases if c['matches']] + [c for c in cases if not c['matches']]
                 lines.append('when '+e.validation(node)+' {')
+            branches = []
             for i, case in enumerate(cases):
                 arm = s.at(case['result'], node)
                 value = s.render(arm) if s.resolver.is_panic_call(arm) else self.consume(arm, generic, discarded=discarded)
                 if node.kind == 'SwitchExpr':
-                    matches = self.runtime_matches(node,case,selector,kind)
-                    lines.append(f'case {matches}: {value}')
+                    branches.append((case, value))
                 else:
                     lines.append(('when ' if i == 0 else 'else when ')+e.switch_condition(node, case)+' { '+value+' }')
-            lines.append('}')
+            if node.kind == 'SwitchExpr':
+                lines.append(self.runtime_code(node, selector, kind, branches))
+            else:
+                lines.append('}')
             return '\n'.join(lines)
-        name, args = e.closed(node, body, result=(None,) * count, flavor='switch_multi')
+        name, args = self.closed(node, body, result=(None,) * count, flavor='switch_multi')
         return name+'('+', '.join([*args, *types])+')'
 
     def statement(self, owner, constant):
@@ -324,10 +379,10 @@ class Switches:
             cases = node.data['cases']
             if node.kind == 'SwitchExpr':
                 selector,kind=self.runtime_selector(node,code)
-                code.append('switch '+('' if kind else selector)+' {')
             else:
                 cases = [c for c in cases if c['matches']] + [c for c in cases if not c['matches']]
                 code.append('when '+e.validation(node)+' {')
+            branches = []
             for i, case in enumerate(cases):
                 arm = s.at(case['result'], node)
                 if skip and arm.kind != 'SwitchBreak' and not s.resolver.is_panic_call(arm):
@@ -338,11 +393,13 @@ class Switches:
                     content = self.consume(arm, typed, lhs_codes)
                 else: content = selected(arm)
                 if node.kind == 'SwitchExpr':
-                    matches = self.runtime_matches(node,case,selector,kind)
-                    code.append(f'case {matches}: {content}')
+                    branches.append((case, content))
                 else:
                     code.append(('when ' if i == 0 else 'else when ')+e.switch_condition(node, case)+' { '+content+' }')
-            code.append('}')
+            if node.kind == 'SwitchExpr':
+                code.append(self.runtime_code(node, selector, kind, branches, returns=False))
+            else:
+                code.append('}')
             return '\n'.join(code)
 
         if not skip: return body(None)

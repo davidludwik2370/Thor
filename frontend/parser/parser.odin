@@ -2515,6 +2515,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return original_type
 
 		case "partial":
+			if p.thor && p.curr_tok.kind == .Switch {
+				return parse_switch_expression(p, tok)
+			}
 			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			tag.tok = tok
 			tag.name = name.text

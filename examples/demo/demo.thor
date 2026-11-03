@@ -368,8 +368,8 @@ conditional_expressions :: proc() {
         assert(grade == "ready")
         assert(sign == "positive")
 
-        // The current implementation requires a default on every expression
-        // switch. There is no invented zero value for an unmatched arm.
+        // Numeric/boolean selectors require a default. There is no invented
+        // zero value for an unmatched arm.
         // Not valid: result := switch score {case 1: 10}
     }
 
@@ -381,17 +381,29 @@ conditional_expressions :: proc() {
             case: [.Rain, .Snow]
         }
 
-        // Odin also checks explicit coverage of named enum values. List them
-        // all, then include the default Thor currently requires even here.
+        // Enum selectors may omit the default when every member is covered.
+        // Odin checks coverage, so adding a new member makes this a compile
+        // error until its case is supplied. An invalid unmatched cast panics.
         packing := switch forecast[1] {
             case .Sun: "hat"
             case .Rain: "shell"
             case .Snow: "gloves"
-            case: "unknown weather"
+        }
+
+        // Partial enum switches still need a result for the omitted members.
+        // That default may be a value or the built-in panic call.
+        winter_note := #partial switch forecast[1] {
+            case .Snow: "bring gloves"
+            case: "no snow"
+        }
+        winter_only := #partial switch forecast[1] {
+            case .Snow: "gloves"
+            case: panic("expected snow")
         }
 
         assert(forecast[0] == .Rain)
         assert(packing == "gloves")
+        assert(winter_note == "bring gloves" && winter_only == packing)
     }
 
     {

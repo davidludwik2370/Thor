@@ -871,7 +871,12 @@ string-returning procedures are not automatically deleted at call sites.
 Ordinary factory results still need the lifetime specified by their API.
 See [the lifetime implementation and validation notes](docs/fstring-lifetimes.md).
 
-Expression switches require a default arm. Arms may supply one result or a
+Expression switches require a default arm unless a runtime enum switch covers
+every named value. Odin checks that coverage; missing enum cases are errors.
+`#partial switch` also works in expression position, with a default supplying
+the omitted cases' result (or `panic(...)`). An unmatched enum value produced
+by an explicit cast panics rather than returning a fabricated zero value.
+Arms may supply one result or a
 comma-separated list of results. They support comma-separated cases and native ranges, check duplicate
 constant cases, evaluate the selector once, and execute only the first matching
 arm. Expected destination/argument/return types supply result context.
@@ -897,8 +902,8 @@ allowed only when the switch is the entire RHS of an ordinary `=` assignment
 (parentheses are fine), in any arm. It does not break an enclosing loop. It is
 rejected in declarations, returns, arguments, nested arithmetic and compound
 assignments. Destination locations/indices are evaluated once before switch
-selection, as in native assignment; skipping performs no stores. A default is
-still required. `#switch` supports the same result lists and assignment-only
+selection, as in native assignment; skipping performs no stores. The same
+default/enum-coverage rule applies. `#switch` supports the same result lists and assignment-only
 skip; compile-time constants and unchecked inactive arms retain native `when`
 behavior. Anonymous Thor allocations discarded into `_` are cleaned up; named
 values remain borrowed. Run the [commented examples](examples/switch-results/demo.thor)

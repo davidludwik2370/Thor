@@ -389,15 +389,20 @@ Syntax:
   store in that assignment, not an outer loop. Destination locations/indices
   are evaluated once before selection, following native assignment order.
   break is forbidden in declarations, returns, arguments, compound assignments
-  and nested value contexts. fallthrough remains forbidden. A default remains
-  required even when the destinations already hold values.
+  and nested value contexts. fallthrough remains forbidden. Existing destination
+  values do not relax the default/exhaustiveness requirement.
 - These rules apply to runtime switch and expression #switch alike. Native
   when selection preserves compile-time constants and unchecked inactive arms.
 - Only the unshadowed built-in panic call may replace a value arm with a
   nonreturning call. It supplies no result types. Other void/nonreturning calls
   remain ordinary type errors. All-panic switches require expected types.
-- Require a default unless finite exhaustiveness is actually established. The
-  first implementation may require a default for every expression switch.
+- Runtime enum selectors may omit the default when Odin establishes complete
+  coverage of their named values, including imported/generic enum types and
+  grouped/range cases. Missing enum cases remain compile errors. An unmatched
+  value fabricated by an explicit enum cast panics, even in unchecked builds.
+- Other runtime selectors and expression #switch still require a default.
+  #partial switch is allowed in expression position but requires a default,
+  because an omitted enum member must still produce a value (or panic).
 - Never manufacture a zero-valued fallback for a missing arm.
 - Use Odin's ternary typing/assignability rules and surrounding expected type.
   Permit explicit destination types where inference is ambiguous.

@@ -133,16 +133,17 @@ class Ownership:
             code.append(f'{word} {cond} {{\n{arm(n.role("x"))}\n}} else {{\n{arm(n.role("y"))}\n}}')
         else:
             cases = n.data['cases']
-            if not any(not c['matches'] for c in cases):
-                code.append(self.e.error(n, 'A switch expression requires a default arm.'))
+            problem=self.e.switches.default_error(n)
+            if problem:
+                code.append(self.e.error(n, problem))
             elif n.kind == 'SwitchExpr':
                 lines=[]
                 selector,kind=self.e.switches.runtime_selector(n,lines)
-                lines.append('switch '+('' if kind else selector)+' {')
+                branches=[]
                 for case in cases:
-                    matches = self.e.switches.runtime_matches(n,case,selector,kind)
-                    lines.append(f'case {matches}:\n{arm(self.s.at(case["result"], n))}')
-                code.append('{\n'+'\n'.join([*lines, '}'])+'\n}')
+                    branches.append((case,arm(self.s.at(case["result"], n))))
+                lines.append(self.e.switches.runtime_code(n,selector,kind,branches,returns=False))
+                code.append('{\n'+'\n'.join(lines)+'\n}')
             else:
                 clauses = []
                 for case in [c for c in cases if c['matches']]+[c for c in cases if not c['matches']]:

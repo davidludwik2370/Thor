@@ -173,6 +173,7 @@ Feature :: struct {
     cases: []Feature_Case,
     parts: []tokenizer.Interpolation_Part,
     manual_lifetime: bool,
+    partial: bool,
 }
 thor_span :: proc(node: ^ast.Node) -> [2]int {
     return [2]int{-1,-1} if node == nil else [2]int{node.pos.offset,node.end.offset}
@@ -258,8 +259,9 @@ parse_set_type :: proc(p: ^Parser) -> ^ast.Expr {
     return call
 }
 
-parse_switch_expression :: proc(p: ^Parser) -> ^ast.Expr {
+parse_switch_expression :: proc(p: ^Parser, partial: tokenizer.Token = {}) -> ^ast.Expr {
     token := advance_token(p)
+    start := partial.pos if partial.kind == .Hash else token.pos
     selector: ^ast.Expr
     if p.curr_tok.kind != .Open_Brace {
         old := p.expr_level
@@ -309,9 +311,9 @@ parse_switch_expression :: proc(p: ^Parser) -> ^ast.Expr {
     }
     close := expect_token(p,.Close_Brace)
     append(&results,..args[:])
-    call := thor_call("__thor_switch_expression",token.pos,end_pos(close),results[:])
+    call := thor_call("__thor_switch_expression",start,end_pos(close),results[:])
     kind := "CompileSwitchExpr" if token.text == "#switch" else "SwitchExpr"
-    append(&p.features,Feature{kind=kind,start=call.pos.offset,end=call.end.offset,selector=thor_span(selector),cases=cases[:]})
+    append(&p.features,Feature{kind=kind,start=call.pos.offset,end=call.end.offset,selector=thor_span(selector),cases=cases[:],partial=partial.kind==.Hash})
     return call
 }
 

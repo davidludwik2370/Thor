@@ -868,10 +868,9 @@ class Expressions:
         cases=n.data['cases']
         defaults=[c for c in cases if not c['matches']]
         expression=n.kind!='CompileSwitch'
-        if len(defaults)>1:
-            return self.error(n,'A switch may have only one default arm.')
-        if expression and not defaults:
-            return self.error(n,'A switch expression requires a default arm.')
+        problem=self.switches.default_error(n) if expression else 'A switch may have only one default arm.' if len(defaults)>1 else None
+        if problem:
+            return self.error(n,problem)
         selector=n.role('selector')
         def at(span): return s.at(span,n)
         if n.kind!='SwitchExpr':
@@ -893,15 +892,14 @@ class Expressions:
             def body(hint):
                 code=[]
                 selected,kind=self.switches.runtime_selector(n,code)
-                code.append('switch '+('' if kind else selected)+' {')
+                branches=[]
                 for case in cases:
-                    matches=self.switches.runtime_matches(n,case,selected,kind)
                     arm=at(case['result'])
                     result=s.render(arm) if s.resolver.is_panic_call(arm) else 'return '+s.render(arm,hint)
-                    code.append(f'case {matches}: {result}')
-                code.append('}')
+                    branches.append((case,result))
+                code.append(self.switches.runtime_code(n,selected,kind,branches))
                 return '\n'.join(code)
-            name,args=self.closed(n,body,result=None,flavor='switch')
+            name,args=self.switches.closed(n,body,result=None,flavor='switch')
             return f'{name}({", ".join([*args,result])})'
         def condition(case): return self.switch_condition(n,case)
         nondefault=[c for c in cases if c['matches']]
