@@ -2961,3 +2961,37 @@ project; the original external file is unchanged. The checked and unchecked
 frontend AST comparison includes both updated demos. Rebuild TLS and restart
 Thor: Restart Language Server to load the new parser; no client/grammar update
 is needed. Preserve the user's one-line basic.swap definition as requested.
+
+## Source-located I/O purity errors: Thor 0.33.2
+
+Reproduce the Hilo SIGBUS with an unused fn that calls fmt.print/println. The
+purity adapter was following the printing implementation and generating checked
+copies of its variadic, callback, reflection and OS dependencies instead of
+rejecting the observable I/O at the call. Native checking/code generation could
+crash before returning a source diagnostic.
+
+Recognize the canonical fmt output procedures and basic print/input/read/write
+by library identity, including selected imports, aliases and transitive calls.
+Emit purity errors at the original callee span and name the declared fn when
+available. Stop traversing those implementations in both checked call graphs
+and compile-time evaluation closures. Preserve generic overload candidates until
+native instantiation; an I/O candidate gets a lazy failing checked body, so a
+different eligible overload is still usable. Keep inactive when arms and
+unevaluated type queries lazy. Ordinary procs retain printing behavior; unrelated
+user procedures and custom collections named print/basic are not rejected by
+spelling alone. In-memory formatting retains its existing purity rules.
+
+The CLI's existing mapped JSON errors supply TLS with precise UTF-16 ranges;
+no TLS/client changes are needed. Live tests cover unsaved fn-to-proc fixes,
+restoring errors, transitive alias locations and generic branch activation.
+Run `Thor: Restart Language Server` to clear an existing stale crash report.
+Unclassified native backend crashes still use the honest locationless fallback;
+this change prevents the invalid I/O call chain from reaching that backend path.
+
+Validation: 318 compiler, native-evaluation, diagnostic, basic-library, live TLS
+and assertion-hygiene tests, plus two real CodeLLDB tests. Rejection and valid
+formatting/ordinary printing are checked in debug and optimized unchecked builds,
+including -disable-assert. The unchanged external Hilo source reports its two
+fmt.print calls and fmt.println at lines 78, 80 and 83. An isolated full-project
+copy builds with -debug after changing only print_board from fn to proc; no
+external project source was edited.

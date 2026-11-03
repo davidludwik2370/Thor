@@ -58,10 +58,22 @@ class PureCalls:
                 proc=queue.pop()
                 if proc in visited:continue
                 visited.add(proc)
+                if self.purity.io_procedure(proc):continue
                 for node in self.purity.walk(proc):
                     if node.kind!='Call' or self.queried(node) or any(a.kind=='Run' for a in node.ancestors()):continue
+                    if self.purity.io_call(node):
+                        self.purity.problem(node.role('callee'),self.purity.io_message(node))
+                        continue
                     if self.purity.builtin(node) or self.purity.approved(node) or node.source.denotes_type(node.role('callee')):continue
                     targets=self.purity.targets(node)
+                    if r.generic_parameters(proc.role('type')):
+                        # A resolver approximation for an unbound $T must not
+                        # choose a variadic-any overload ahead of an exact
+                        # overload available at native instantiation.
+                        candidates=r.procedure_candidates(node.role('callee'))
+                        implementations=[signature.parent for _,signature in candidates]
+                        if len(implementations)>1 and all(target and target.kind=='Procedure' and target.role('body') for target in implementations):
+                            targets=list(dict.fromkeys(implementations))
                     conditional=False
                     for target in list(targets):
                         declaration=target.parent
@@ -75,6 +87,9 @@ class PureCalls:
                                         conditional=True
                                         if alternative.value not in targets:targets.append(alternative.value)
                     self.targets[node]=targets
+                    if targets and all(self.purity.io_procedure(target) for target in targets):
+                        self.purity.problem(node.role('callee'),self.purity.io_message(node))
+                        continue
                     native=getattr(p,'native_sources',None)
                     if native:
                         try:native.verify_access(node.role('callee'),r,context='pure code')

@@ -649,6 +649,12 @@ Inputs and operations:
 - No mutable-global reads or writes, I/O, ambient context queries, time/randomness,
   foreign calls, assembly, unsafe casts, pointer extraction/address observation,
   or indirect procedure calls.
+- Recognized stdout/stderr/file/stream printing and basic file/console I/O are
+  rejected at their original call sites, without compiling checked copies of
+  the I/O implementation. Follow constant aliases and transitive proc calls;
+  preserve inactive-branch/type-query laziness and native overload selection.
+  Ordinary proc calls outside a pure chain retain their I/O behavior. A user
+  procedure with the same name is not classified by spelling alone.
 - Permit reading genuine compile-time constants. An immutable runtime binding
   does not become a constant merely because it cannot be reassigned.
 - A declared fn may call fn or ordinary Thor/Odin proc targets whose transitive

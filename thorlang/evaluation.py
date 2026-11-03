@@ -477,6 +477,8 @@ class Evaluator:
                 self.register(n,value,self.specializations.relevant(n))
                 return None
             call=self.call(n)
+            if self.purity.io_call(call):
+                self.fail(n,self.purity.io_message(call))
             if n.kind=='Run':
                 cached=self.scalar_sites.load(n)
                 if cached is not None:
@@ -662,6 +664,12 @@ class Evaluator:
                 self.evaluate(node);visit(node.role('expr'));return
             if node.kind=='Call':
                 callee=node.role('callee')
+                if self.purity.io_call(node):
+                    # Retain the source call for the helper's lazy purity
+                    # diagnostic, not the I/O implementation/dependencies.
+                    # Inactive when arms must remain unchecked.
+                    for arg in node.group('args'):visit(arg)
+                    return
                 self.p.native_sources.verify_access(callee,self.r)
                 builtin=self.purity.builtin(node)
                 library=self.purity.library(node)

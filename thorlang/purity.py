@@ -55,6 +55,14 @@ class Purity:
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}
     libraries |= {('thor:big',name) for name in ['from_integer','rational_from_integer','fraction','parse_integer','parse_rational','parse_fraction','clone','numerator','denominator','to_string','equal','is_zero','sum','ascending','descending']}
     native_constants={('core:math',name) for name in ['PI','TAU','E','SQRT_TWO','SQRT_THREE','SQRT_FIVE']}
+    # These APIs perform observable I/O, rather than formatting into owned or
+    # caller-provided memory. Reject them at the call, before cloning their
+    # variadic/callback-heavy implementation into the checked call graph.
+    io_libraries={('core:fmt',name) for name in [
+        'print','println','printf','printfln','eprint','eprintln','eprintf','eprintfln',
+        'fprint','fprintln','fprintf','fprintfln','fprint_type','fprint_typeid',
+        'wprint','wprintln','wprintf','wprintfln','wprint_type','wprint_typeid']}
+    io_libraries |= {('thor:basic',name) for name in ['print','input','read','write']}
     scalar_intrinsics = {'sqrt', 'fused_mul_add', 'count_ones', 'count_zeros',
         'count_leading_zeros', 'count_trailing_zeros', 'count_leading_ones',
         'count_trailing_ones', 'reverse_bits', 'byte_swap', 'saturating_add',
@@ -129,6 +137,52 @@ class Purity:
         return None
 
     def library(self,call):return self.imported(call.role('callee'))
+
+    def io_procedure(self,proc):
+        """Recognize library identity, never a user procedure's spelling."""
+        if proc is None:return False
+        declaration=proc.parent
+        while declaration and declaration.kind=='Paren':declaration=declaration.parent
+        if not declaration or declaration.kind!='Declaration':return False
+        names={name.text for name in declaration.group('names')}
+        source=proc.source
+        basic=Path(__file__).resolve().parents[1]/'runtime'/'basic'
+        if source.path.parent==basic:
+            return any(('thor:basic',name) in self.io_libraries for name in names)
+        native=getattr(self.project,'native_sources',None) or self.r.native
+        if native and native.root and getattr(source,'native_inspected',False):
+            if source.path.parent==(Path(native.root)/'core'/'fmt').resolve():
+                return any(('core:fmt',name) in self.io_libraries for name in names)
+        return False
+
+    def io_call(self,call):
+        def effect(callee,seen):
+            if callee is None or callee in seen:return False
+            seen.add(callee)
+            if callee.kind=='Paren':return effect(callee.role('expr'),seen)
+            imported=self.imported(callee)
+            if imported in self.io_libraries:
+                directory=callee.source.import_dir(imported[0])
+                if imported[0]=='core:fmt' and directory is None:return True
+                if imported[0]=='thor:basic' and directory==Path(__file__).resolve().parents[1]/'runtime'/'basic':return True
+            symbol=self.r.symbol(callee)
+            if not symbol or symbol.declaration.data.get('mutable') or symbol.immutable:return False
+            value=symbol.value
+            if value and value.kind=='Procedure':return self.io_procedure(value)
+            if value and value.kind in {'Ident','Selector','Paren'}:return effect(value,seen)
+            return False
+        return effect(call.role('callee'),set())
+
+    def io_message(self,call):
+        subject='Pure code'
+        proc=self.owner(call)
+        if self.pure(proc):
+            declaration=proc.parent
+            while declaration and declaration.kind=='Paren':declaration=declaration.parent
+            names=declaration.group('names') if declaration and declaration.kind=='Declaration' else []
+            if len(names)==1:subject=f"Pure function '{names[0].text}'"
+        return (f"{subject} cannot call '{call.role('callee').text}' because it performs I/O. "
+                'Use proc for I/O and keep it outside fn/#run call chains.')
 
     def approved(self,call):
         if self.primitive(call.role('callee')):return True
@@ -398,6 +452,12 @@ class Purity:
     def _analyze(self,proc):
         if proc in self.analyzed:return
         self.analyzed.add(proc)
+        if self.io_procedure(proc):
+            # Overload groups can select this target only at instantiation.
+            # Keep its signature/laziness, with a failing checked body instead
+            # of traversing or compiling the actual I/O implementation.
+            self.contracts[proc]=(proc,'Pure code cannot call this library procedure because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.')
+            return
         nodes=self.walk(proc);env={}
         for field in proc.role('type').role('params').children:
             if field.kind=='Field':
@@ -479,7 +539,7 @@ class Purity:
                 if imported and symbol is None and n.source.import_dir(imported[0]) is None and imported not in self.native_constants:
                     call=n.parent
                     if not(call and call.kind=='Call' and call.role('callee') is n and
-                           (self.approved(call) or self.builtin(call) or self.targets(call))):
+                           (self.io_call(call) or self.approved(call) or self.builtin(call) or self.targets(call))):
                         self.problem(n,'Pure code cannot read unverified native package storage or values; only approved constants/helpers are eligible.')
             if n.kind=='Implicit':self.problem(n,'Pure code cannot access the ambient context or implicit runtime state.')
             if n.kind=='Unsafe':self.problem(n,'Assembly, uninitialized storage and unsafe operations are not permitted in pure code.')
@@ -507,7 +567,10 @@ class Purity:
                     if binding else 'Pure code cannot take or expose raw addresses.')
             if n.kind=='Call':
                 builtin=self.builtin(n);library=self.library(n)
-                if builtin=='make':
+                if self.calls.queried(n):continue
+                if self.io_call(n):
+                    self.problem(n.role('callee'),self.io_message(n))
+                elif builtin=='make':
                     args=n.group('args')
                     if not args or n.source.resolver.type_node(args[0]).kind not in {'slice','dynamic'}:
                         self.problem(n,'Pure allocation supports fresh slice/dynamic buffers only.')

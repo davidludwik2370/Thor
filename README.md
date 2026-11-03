@@ -1089,6 +1089,14 @@ retain their original behavior and ownership; their known arguments alone do
 not trigger automatic compile-time evaluation. See
 [the transitive-call demo](examples/pure_calls/demo.thor).
 
+Printing, file/stream I/O, and the basic library's `print`, `input`, `read` and
+`write` are excluded from pure call chains. Calls such as `fmt.print(...)` in a
+`fn` report a purity error on the original call, including in an unused
+non-generic `fn`. Use `proc` for I/O. Aliases and transitive calls retain the same
+rule; inactive compile-time branches and unevaluated type queries remain unchecked.
+Formatting into a value is separate from observable I/O and remains subject to
+the usual pure formatting, allocation and input-type rules.
+
 Generic `$T`/`$N` bindings are scheduled separately for each resolved instantiation,
 including forwarding through imported procedures and inferred fixed-array counts.
 A normal parameter is still runtime storage inside a generic body. For example:
