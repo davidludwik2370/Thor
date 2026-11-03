@@ -26,6 +26,11 @@ former top-level `basic/` directory. See the [API and ownership notes](basic/REA
 and [runnable example](../examples/basic/demo.thor). Allocated results remain
 caller-owned; `clone` retains shallow value-copy semantics.
 
+`basic.deepclone` and `basic.deepfree` expose the native `thor:graph` helper
+package for independent copies of supported data graphs, including cycles and
+interior aliases. The returned heap root has explicit ownership and error
+handling. See [the contract and limitations](../docs/deepclone.md).
+
 ## Formatting (T07)
 
 Import `f "thor:format"`. `f.group_integer(value)` groups decimal integer digits,

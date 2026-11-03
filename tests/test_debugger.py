@@ -110,6 +110,39 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_graph_copy_breakpoint_and_step_over_keep_original_thor_locations(self):
+        text='''package main
+import "thor:basic"
+Node::struct{value:int,next:^Node}
+main::proc(){
+    source:=Node{value=7}
+    source.next=&source
+    copy,err:=basic.deepclone(&source)
+    if err!=.None {panic("clone")}
+    copied_value:=copy.value
+    if copied_value!=7||copy.next!=copy {panic("graph")}
+    free_error:=basic.deepfree(copy)
+    if free_error!=.None {panic("free")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[7,9,11])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),9),frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),11),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'copied_value','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_dynamic_width_steps_into_original_width_function(self):
         text='''package main
 width_for::proc()->int {

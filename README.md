@@ -112,6 +112,12 @@ Run the [import walkthrough](examples/imports/demo.thor) with
 Run the [commented example](examples/basic/demo.thor) with
 `thor run /path/to/thor/examples/basic`.
 
+`basic.deepclone(&source)` returns an independently allocated graph root and an
+error, preserving cycles, shared storage and interior references.
+`basic.deepfree(root)` releases it once. See the [ownership contract](docs/deepclone.md)
+and [graph-copy demo](examples/deepclone/demo.thor); these are library procedures
+and require no changes to the Thor/Odin compilers.
+
 ## Spread minimum and maximum
 
 Thor extends Odin's builtins with fixed-array expansion and slice spreading:

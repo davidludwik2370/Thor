@@ -15,6 +15,14 @@ import "core:math/rand"
 import "thor:sets"
 import "thor:big"
 import "thor:format"
+import "thor:graph"
+
+// Clone supported data graphs, preserving cycles and shared/interior references.
+// Pass a pointer to the source; the result is a heap root. Check Deep_Error and
+// release the whole result once with deepfree, using the same allocator.
+deepclone :: graph.deepclone
+deepfree  :: graph.deepfree
+Deep_Error :: graph.Error
 
 // Allocating, shallow collection conversions. Free each returned container;
 // to_slice returns keys in unspecified order. Both accept allocator=.

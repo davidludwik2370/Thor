@@ -2870,3 +2870,41 @@ native TLS tests, 123 Node grammar/extension tests and the isolated VS Code
 integration suite. Both demos pass checked runs and full unchecked release
 runs, including `-disable-assert`. The packaged and locally installed extension
 is verified as 0.20.0 and the rebuilt TLS executable reports 0.26.0.
+
+## Library-only graph copying
+
+Add `basic.deepclone`, `basic.deepfree` and `basic.Deep_Error`, backed by ordinary
+Odin procedures in `runtime/graph`. The Thor/Odin compilers, TLS implementation,
+syntax and implicit ownership rules are unchanged. A clone returns a heap root
+and an error; freeing is explicit, with no persistent allocation registry.
+
+Validate recursive schemas before copying. Discover supported reachable objects
+iteratively, coalesce overlapping ordinary spans, rebuild maps with cloned keys,
+then relocate descriptors/pointers after all map insertions. This preserves
+cycles, shared objects, buffer/field aliases and pointers into map value cells.
+Use unaligned-safe descriptor loads/stores for packed records. Dynamic capacity
+is retained, unused slots zeroed, and only active tagged-union payloads traversed;
+single-pointer union representations are handled without reading a nonexistent
+tag. Sets and Integer/Rational work through their regular runtime layouts.
+
+Discover the whole graph before deepfree releases anything. Check allocation
+failures in traversal bookkeeping as well as destinations; roll back partial
+clones, use exact free sizes, and reject known resource/unbounded schemas.
+Map-cell references used as map keys and ambiguous empty views between disjoint
+extents return Unsupported_Reference. Document caller obligations around retaining
+owners/extents, shared mutations, allocator lifetime and borrowed storage in
+[the graph contract](docs/deepclone.md). Add a separate commented runnable demo.
+
+Validation covers 20 native tests in checked ASan and unchecked optimized ASan
+builds, including 5,000 nodes, 300 mutually linked map cells, aliasing, strings,
+slices, packed/aligned records, unions, zero-sized aggregates, custom sized
+allocators, allocation-failure sweeps and retryable failed-free discovery. Six
+Thor integration tests cover imports, big numbers/sets, original-source errors,
+the commented demo and checked/unchecked tracking. Live TLS verifies hover,
+completion, navigation and unsaved diagnostic recovery; real CodeLLDB verifies
+original-source breakpoints/stepping across both calls. Assertion hygiene passes.
+
+The wider basic/installation regression run has four existing failures because
+the working tree's pre-existing edits removed asc, desc and ordered. Those edits
+are preserved separately from this feature; their old tests/demo still reference
+the removed names.

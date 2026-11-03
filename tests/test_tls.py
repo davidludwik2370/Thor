@@ -929,6 +929,52 @@ main::proc(){box:=Box{items=make(map[int]int)};defer delete(box.items);_=read(bo
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
 
+    def test_graph_library_exports_hover_completion_and_original_diagnostic(self):
+        text='''package main
+import "thor:basic"
+Node::struct{value:int,next:^Node}
+main::proc(){
+    source:=Node{value=7}
+    source.next=&source
+    copy,err:=basic.deepclone(&source)
+    if err!=.None {panic("clone")}
+    free_error:=basic.deepfree(copy)
+    _=free_error
+}
+'''
+        client,main=self.open(text)
+        for name,typ in [('copy,err:=','^Node'),('free_error:=','Error')]:
+            hover=self.hover(client,main,text,name)
+            self.assertIsNotNone(hover)
+            if typ=='^Node':
+                self.assertRegex(hover['contents']['value'],r'\^[^\n]*Node')
+            else:
+                self.assertIn(typ,hover['contents']['value'])
+        for helper in ['deepclone','deepfree']:
+            hover=self.hover(client,main,text,helper)
+            self.assertIn(helper,hover['contents']['value'])
+            completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,'basic.'+helper,len('basic.')+len(helper)),
+                'context':{'triggerKind':1}})
+            self.assertIn(helper,{item['label'] for item in completion['items']})
+            target=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,helper)})
+            targets=target if isinstance(target,list) else [target]
+            self.assertTrue(any(item and ('runtime/basic/basic.thor' in item['uri'] or
+                'runtime/graph/api.odin' in item['uri']) for item in targets),target)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+        changed=text.replace('basic.deepclone(&source)','basic.deepclone(source)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},
+            'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains="Did you mean '&source'?")
+        self.assertTrue(any(e['range']['start']['line']==6 for e in errors),errors)
+        self.assertNotIn('Thor expression',json.dumps(errors))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},
+            'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_new_basic_helpers_hover_navigation_completion_and_callback_error(self):
         text='''package main
 import "thor:basic"

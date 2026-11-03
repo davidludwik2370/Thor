@@ -55,6 +55,8 @@ do not mark names private, so `_int` and the other conversion helpers are public
 | `read(file_path, allocator=...)` | Read the whole file into `(text, ok)`. |
 | `write(file_path, text)` | Create or truncate a file and return `(bytes_written, os.Error)`. |
 | `clone(value, allocator=...)` | Shallow value copy; references still share storage, as with assignment. Its temporary allocation is freed internally. |
+| `deepclone(source: ^T, allocator=..., scratch_allocator=...)` | Return a heap root and `Deep_Error`; copy supported reachable data while preserving cycles, shared storage, overlapping views and interior pointers. |
+| `deepfree(root: ^T, allocator=..., scratch_allocator=...)` | Free a clone-owned graph once, returning `Deep_Error`. Use the same destination allocator and preserve ownership boundaries/reachability until cleanup. |
 | `fmap(values, callback, allocator=...)` | Allocate an element-wise mapped slice with the same element type. |
 | `split(text, sep="\n", allocator=...)` | Allocate a slice of borrowed string views into `text`. |
 | `join(values, sep="", allocator=...)` | Allocate a joined string. |
@@ -72,6 +74,10 @@ using its allocator. For `split`, delete the outer slice and keep the input text
 alive while its views are used. `clone` preserves ordinary shallow copy behavior;
 it does not make independent backing storage for slices, strings, maps or sets.
 Use the corresponding collection/string clone operation when that is needed.
+For full graph copies, see the [deepclone/deepfree contract](../../docs/deepclone.md)
+and [commented demo](../../examples/deepclone/demo.thor). These are ordinary
+library procedures, with runtime rejection of recursively unsupported schemas;
+they do not change assignment or add automatic ownership management.
 The allocation-error tuples on `clone`, `fmap`, `split` and `join` keep their
 original optional-error behavior.
 
