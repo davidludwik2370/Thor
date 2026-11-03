@@ -23,6 +23,7 @@ class PureCalls:
         self.prepared=False
         self.marker='__thor_checked_call'
         self.wrapping=set()
+        self.origins={}
 
     def queried(self,node):
         return any(parent.kind=='Call' and self.purity.builtin(parent) in self.purity.type_queries
@@ -59,6 +60,8 @@ class PureCalls:
                 if proc in visited:continue
                 visited.add(proc)
                 if self.purity.io_procedure(proc):continue
+                self.purity.analyze(proc)
+                if proc in self.purity.contracts:continue
                 for node in self.purity.walk(proc):
                     if node.kind!='Call' or self.queried(node) or any(a.kind=='Run' for a in node.ancestors()):continue
                     if self.purity.io_call(node):
@@ -97,6 +100,7 @@ class PureCalls:
                             message=error.diagnostics[0]['msgs'][0] if error.diagnostics else str(error)
                             self.purity.problem(node.role('callee'),message)
                     for target in targets:
+                        self.origins.setdefault(target, self.origins.get(proc,node) if getattr(node.source,'native_inspected',False) else node)
                         checked_group=conditional or any(not self.purity.pure(candidate) for candidate in targets)
                         if checked_group and self.name(target) is None:
                             self.purity.problem(node,'Pure calls require a named, inspectable procedure body.')
@@ -185,6 +189,7 @@ class PureCalls:
 
     def arguments(self,call):
         if self.purity.eval_mode or not self.purity.checked(self.purity.owner(call)):return []
+        if self.purity.invalid_default(call):return []
         if call in self.purity.problems or call.role('callee') in self.purity.problems:return []
         targets=self.targets.get(call,[])
         if not any(target in self.names for target in targets):return []

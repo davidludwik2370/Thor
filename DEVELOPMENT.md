@@ -27,7 +27,7 @@ python3 -m unittest discover -s tests -v
 ./thor run demo
 python3 tools/build_tls.py test
 odin test runtime/pure -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-odin test runtime/eval -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+odin test runtime/eval -collection:thor=runtime -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
 cd editors/vscode
 npm test
 npm run package
@@ -2995,3 +2995,91 @@ including -disable-assert. The unchanged external Hilo source reports its two
 fmt.print calls and fmt.println at lines 78, 80 and 83. An isolated full-project
 copy builds with -debug after changing only print_board from fn to proc; no
 external project source was edited.
+
+## Pure contracts and compile-time diagnostic hardening: Thor 0.33.3
+
+Audit declared fn bodies, transitively checked ordinary procedures, automatic
+folding and explicit #run together. The shared rejection inventory exercises
+54 source patterns through runtime fn checking, automatic evaluation and #run,
+with matching ordinary-procedure controls. Stdio TLS tests apply each violation
+and its correction to unsaved buffers and verify original UTF-16 ranges.
+The detailed contract and remaining conservative boundaries are documented in
+[docs/purity-diagnostics.md](docs/purity-diagnostics.md).
+
+Fix named/reordered copy arguments, nested borrowed-element propagation and
+parenthesized builtin/library aliases. Keep effectful defaults syntactically
+valid and reject them through lazy body contracts, avoiding false missing-argument
+and invalid-type errors. Reject bodyless fn declarations explicitly. Distinguish
+foreign calls, indirect runtime calls and ineligible intrinsics from genuine
+native undeclared-name errors. Preserve inactive when branches, native optional
+status/allocator-error results, ordinary proc effects, type queries, valid panic
+bodies, delete location arguments and owned or_return results.
+
+Give checked expression helpers separate identities from ordinary helpers; an
+unchecked cached interpolation/switch/index body must not bypass transitive
+purity contracts. Map formatting errors to the original interpolation field.
+Use per-type source markers that survive truncated native instantiation stacks,
+including zero-width typeid frontend nodes. Standard-library effect errors point
+to the user's call and retain the library location as related information.
+Use nominal raw-union identities where visible instead of rejecting unrelated
+records merely because their field names match. Reject unsupported C/UTF-16
+string representations and report the bounded recursive schema check clearly.
+
+A real ASan-confirmed ownership error involved Integer/Rational member headers
+in shallow aggregate copies: updating such a member could free the caller's
+backing allocation. Keep these member aliases read-only under purity checking.
+Direct numeric copies remain independent, including fields and local aliases
+whose exact type is supplied by an unconstrained generic. Preserve ordinary
+scalar records and borrowed slice provenance. Avoid cloning already-owned
+Rational component results twice; doing so leaked their first allocations.
+Type-dependent ownership checks preserve valid independent numeric cleanup while
+rejecting borrowed user fields named numerator/denominator. Hide numeric backing
+storage from checked generic code without reserving those names in user records.
+
+Execution failures remain distinct from purity violations. Check explicit #run
+result arity before generating a helper. Report compiler/executable launch
+failures, bounded compile/run timeouts, native signals and malformed serialized
+results at the evaluation request. Panics/assertions/bounds errors retain an
+original failing-function location when the native runtime supplies one; forward
+sequence-check caller locations and preserve related notes through the outer CLI
+adapter into TLS. Silent native traps identify the signal and evaluation site,
+without inventing an inner cause or source location. Changed dependencies cannot
+reuse successful compile-time results to hide a new purity error.
+
+An earlier apparently intermittent independent-error test was reproducible under
+repetition: Odin's default error budget was exhausted by repeated helper errors
+before checking another indexed assignment. The native counter advances before
+deduplication, and checker ordering determines which source errors are visited.
+Reserve 1,000 native errors for structured final/helper checks, preserve explicit
+user limits and raw-diagnostic mode, then apply the existing source-level cleanup.
+This adds no compilation pass and changes no successful program behavior. Real
+CLI and TLS tests retain twelve independent undeclared indexing errors and clear
+them after unsaved fixes. The original flaky case passes 40 consecutive repeats.
+The larger budget exposed additional f-string ownership/type-query cascades;
+classify only generated query/condition failures and suppress them only when
+the same value operation contains a real primary error. Preserve independent
+arguments, interpolation fields, statements and genuine native conditions.
+
+No editor grammar/client change is required: TLS uses the shared compiler and
+source maps. Rebuild TLS and use Thor: Restart Language Server to replace stale
+crash/error reports. Keep inaccessible/raw schemas conservative, bound recursive
+validation at 24 levels, and do not infer resource ownership from ordinary
+integer values. Assertions remain read-only checks; release validation uses
+explicit panic conditions or Python verdicts with native assertions disabled.
+
+Validation: 542 Python compiler, live TLS and assertion-hygiene tests across the
+46-test hardening inventory, 299 broader purity/evaluation/diagnostic tests,
+130 expression/basic/typed-loop interactions and 67 big-number regressions.
+The final ownership/purity rerun also passes all 179 tests in its overlapping
+scope. The 54-pattern unchecked release matrix passes separately. Native checks
+pass 1,134 TLS tests, six pure-runtime tests and one serialization-runtime test.
+Five real CodeLLDB cases cover checked proc frames/locals, allocated fn bodies,
+user calls inside generated expressions, exhaustive/partial switches and numeric
+property breakpoints. Both bundled demos pass: checked debug and optimized
+unchecked release with allocation tracking. Hilo now reports its three I/O calls
+at original lines 78, 80 and 83 instead of a backend crash. External project
+sources remain unchanged.
+
+After the final native-budget/cascade correction, all 143 diagnostic, evaluation
+and assertion-hygiene tests and all 29 purity/live-TLS tests pass again. The
+forty-run diagnostic repeat and the twelve-error CLI/TLS cases also pass.

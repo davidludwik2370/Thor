@@ -10,12 +10,13 @@ import os
 import platform
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 
 from .compiler import ThorError, unquote
-from .diagnostics import Diagnostics
+from .diagnostics import Diagnostics, backend_error_flags
 from .semantics import descendants
 from .sourcemap import Origin
 from . import values
@@ -243,7 +244,7 @@ class Evaluator:
         plan=call.source.resolver.resolve_call(call)
         if not plan and not(self.purity.approved(call) or self.purity.builtin(call)):
             self.fail(call,'Compile-time result type requires an unambiguous resolved procedure target.')
-        if plan and len(self.r.fields(plan.signature.role('results')))!=1 and not plan.signature.data.get('optional_ok'):
+        if plan and len(self.r.fields(plan.signature.role('results')))!=1 and not any(plan.signature.data.get(flag) for flag in ['optional_ok','optional_allocator_error']):
             self.fail(call,'Compile-time execution requires exactly one supported result value.')
         source=call.source;source.needs_intrinsics=True
         saved=source.run_values.pop(call,None)
@@ -513,6 +514,10 @@ class Evaluator:
                 self.fail(n,'#run requires a resolved direct call; indirect and foreign calls are not eligible.')
             if self.purity.explicit_allocator(call):
                 self.fail(call,'Compile-time calls cannot select an allocator; use the evaluation scratch allocator.')
+            plan=self.r.resolve_call(call)
+            if n.kind=='Run' and plan and not any(plan.signature.data.get(flag) for flag in ['optional_ok','optional_allocator_error']):
+                results=self.r.fields(plan.signature.role('results'))
+                if len(results)!=1:self.fail(n,f'#run requires exactly one supported result value; this procedure returns {len(results)} values.')
             if n.kind=='Run':self.explicit_arguments+=1
             try:
                 for arg in call.group('args'):
@@ -695,7 +700,16 @@ class Evaluator:
                             declaration(alternative.declaration)
                     for arg in node.group('args'):visit(arg)
                     return
-            if node.kind=='Procedure' and node.role('body'):procedures.add(node)
+            if node.kind=='Procedure' and node.role('body'):
+                procedures.add(node)
+                self.purity.analyze(node)
+                if node in self.purity.contracts:
+                    # An invalid default/deferred callback is already a lazy
+                    # body contract. Its unrelated implementation dependencies
+                    # must not be expanded into the evaluation helper.
+                    for child in node.children:
+                        if child is not node.role('body'):visit(child)
+                    return
             if node.kind=='Ident' and self.purity.reference(node):
                 s=node.source
                 if node.text in s.selected and self.r.lookup(node.text,node) is None:
@@ -900,7 +914,8 @@ class Evaluator:
             if library in self.purity.libraries:
                 source.needs_intrinsics=True
                 parameter=f'{source.prefix}meta.type_proc_parameter_type(type_of({source.prefix}meta.procedure_of({expr})),0)'
-                guards.append(f'{helper.purity.validator(source)}({parameter},false,true,0)')
+                token,_,_=helper.purity.type_site(source,site,'argument to compile-time call')
+                guards.append(f'{helper.purity.validator(source)}({parameter},false,true,0,{json.dumps(token)})')
                 if library[0]=='thor:format':
                     guards.append(f'{source.expressions.module("format")}.validate_pure_value({parameter})')
         output='\n'.join([*guards,f'{result_name}:={emitted}\n{alias}.emit({result_name})'])
@@ -978,6 +993,7 @@ class Evaluator:
             target=helper.outputs[entry_source.path].parent
             executable=directory/('helper.exe' if sys.platform=='win32' else 'helper')
             command=[self.odin,'build',str(target),*helper.odin_flags(),f'-out:{executable}','-json-errors']
+            command.extend(backend_error_flags(command))
             key=self.cache.key(self.p,helper,target,self.odin,self.root) if self.cache else None
             self.execution_records[n]=(key,keep,procedures)
             cached=self.cache.get(key) if self.cache and key not in {failed_prepared,self.failed_scalar_targets.get(n)} else None
@@ -995,6 +1011,7 @@ class Evaluator:
             helper.write()
             try:built=subprocess.run(command,capture_output=True,timeout=max(30,self.timeout))
             except subprocess.TimeoutExpired:self.fail(error_site,label+' helper compilation timed out.')
+            except OSError as exc:self.fail(error_site,f'{label} could not start the helper compiler: {exc.strerror or type(exc).__name__}.')
             diagnostics=Diagnostics(helper.sources,helper.maps,helper.generated)
             if built.returncode:
                 try:errors=diagnostics.translate(json.loads(built.stderr).get('errors',[]))
@@ -1008,7 +1025,10 @@ class Evaluator:
                         for internal,original in helper.native_package_names.items():
                             error['msgs']=[re.sub(r'\b'+re.escape(internal)+r'\b',original,msg) for msg in error['msgs']]
                         pos=error.get('pos')
-                        if pos and pos['file'] in native_files and str(error_site.source.path) not in native_files:
+                        if not pos:
+                            error['pos']=diagnostics.locate(Origin(str(error_site.source.path),error_site.start,error_site.end))
+                            error['msgs'].append('While compiling this evaluation request; Odin did not provide an inner source location.')
+                        elif pos['file'] in native_files and str(error_site.source.path) not in native_files:
                             error['msgs'].append(f"In standard-library source: {pos['file']}({pos['line']}:{pos['column']})")
                             error['pos']=diagnostics.locate(Origin(str(error_site.source.path),error_site.start,error_site.end))
                         elif pos and error['msgs'] and error['msgs'][0].startswith('No procedures or ambiguous call'):
@@ -1019,19 +1039,48 @@ class Evaluator:
                                 error['pos']=diagnostics.locate(Origin(str(callee.source.path),callee.start,callee.end))
                     raise ThorError('Compile-time helper compilation failed.',diagnostics=errors)
                 detail=(built.stderr or built.stdout).decode(errors='replace').strip()[:1000]
+                if built.returncode<0:
+                    from .driver import backend_failure
+                    detail=' '.join(backend_failure(built.returncode)['msgs'])
                 self.fail(error_site,f'{label} helper compilation failed (exit {built.returncode}).'+(' '+detail if detail else ''))
             try:result=subprocess.run([str(executable)],capture_output=True,timeout=self.timeout)
             except subprocess.TimeoutExpired:self.fail(error_site,f'{label} execution exceeded the {self.timeout:g} second timeout.')
+            except OSError as exc:self.fail(error_site,f'{label} could not start the evaluation helper: {exc.strerror or type(exc).__name__}.')
             if result.returncode:
                 message=result.stderr.decode(errors='replace').strip().splitlines()
-                detail=next((line for line in message if 'panic' in line.lower() or 'assertion' in line.lower()),'')
+                detail=next((line for line in message if any(word in line.lower() for word in
+                            ['panic','assertion','runtime error','out of range','division by zero'])),'')
                 detail=re.sub(r'^.*?((?:runtime )?(?:assertion|panic)(?: failure)?\s*:)',r'\1',detail,flags=re.I)
                 detail=re.sub(r'__thor_\w+','Thor expression',detail)
-                self.fail(error_site,f'{label} execution failed (exit {result.returncode}).'+(' '+detail[:300] if detail else ''))
+                for _,pattern in diagnostics.reference_patterns:
+                    match=pattern.search(detail)
+                    if match:detail=detail[match.end():].lstrip();break
+                status=f'exit {result.returncode}'
+                if result.returncode<0:
+                    try:name=signal.Signals(-result.returncode).name
+                    except ValueError:name='unknown signal'
+                    status=f'{name}, signal {-result.returncode}'
+                text=f'{label} execution failed ({status}).'+(' '+detail[:300] if detail else
+                    ' The helper terminated without a runtime error message; run this call in a debug build to investigate.')
+                error={'type':'error','stage':'evaluation',
+                       'pos':diagnostics.locate(Origin(str(error_site.source.path),error_site.start,error_site.end)),
+                       'msgs':[text]}
+                for line in message:
+                    found=False
+                    for file,pattern in diagnostics.reference_patterns:
+                        match=pattern.search(line)
+                        if match:
+                            from .diagnostics import reference_coordinates
+                            origin=diagnostics.reference_origin(file,*reference_coordinates(match)[:2])
+                            if origin and not Path(origin.file).is_relative_to(self.root/'runtime'):
+                                error['related']=[{'pos':diagnostics.locate(origin),'message':'Compile-time execution failed here.'}]
+                                found=True;break
+                    if found:break
+                raise ThorError(text,diagnostics=[error])
             try:
                 value=values.decode(result.stdout)
                 values.validate(value)
-            except values.ValueErrorProtocol as exc:self.fail(error_site,str(exc))
+            except values.ValueErrorProtocol as exc:self.fail(error_site,f'{label} returned an invalid compile-time result: {exc}')
             if self.cache:
                 if key and self.cache.key(self.p,helper,target,self.odin,self.root)!=key:
                     self.fail(error_site,'#run resource inputs changed during evaluation; compile again with stable inputs.')

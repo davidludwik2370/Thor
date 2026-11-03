@@ -9,7 +9,7 @@ from tests import test_thor as base
 from thorlang.hygiene import qualify
 from thorlang.sourcemap import MappingBuilder
 from thorlang.sourcemap import SourceMap
-from thorlang.diagnostics import Diagnostics
+from thorlang.diagnostics import Diagnostics, backend_error_flags
 
 
 class DiagnosticHardeningTests(unittest.TestCase):
@@ -53,6 +53,18 @@ class DiagnosticHardeningTests(unittest.TestCase):
         source='package main\nmain::proc(){values:=[1,2];record:=struct{x:int}{1};_=values[record.missing]}\n'
         errors=self.at(source,'record.missing',message='has no field')
         self.assertEqual(len(errors),1,errors)
+
+    def test_native_error_budget_keeps_independent_index_roots(self):
+        names={f'missing_{i}' for i in range(12)}
+        source='package main\nmain::proc(){/* 😀 */ i:=1;'+''.join(f'missing_{i}[i]=2;' for i in range(12))+'}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertEqual({e['msgs'][0] for e in errors},{'Undeclared name: '+name for name in names})
+        self.assertEqual(len(errors),len(names),errors)
+        for error in errors:
+            name=error['msgs'][0].removeprefix('Undeclared name: ')
+            self.assertEqual(error['pos']['offset'],source.encode().index((name+'[').encode()))
+        self.assertEqual(backend_error_flags(['-max-error-count:1']),[])
+        self.assertEqual(backend_error_flags(['-max-error-count:2500']),[])
 
     def test_missing_interpolation_operands_do_not_report_generated_type_cascades(self):
         for imports in ['', 'import * "thor:basic"\n']:

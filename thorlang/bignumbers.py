@@ -119,6 +119,20 @@ class BigNumbers:
             return node.role('field').text
         return None
 
+    def generic_reference(self,node,seen=None):
+        """A value reference whose exact type is supplied by a generic input."""
+        seen=set() if seen is None else seen
+        node=unwrap(node)
+        if node in seen:return False
+        seen.add(node)
+        if self.shape(node).kind=='generic':return True
+        if node.kind in {'Selector','Index','Deref'}:
+            return self.generic_reference(node.role('expr'),seen)
+        if node.kind=='Ident':
+            symbol=self.s.resolver.symbol(node)
+            if symbol and symbol.value is not None:return self.generic_reference(symbol.value,seen)
+        return False
+
     def owned(self, node, hint=None, constant=False):
         from .compiler import Hint
         if not self.enabled or constant: return self.s.render(node, hint, constant)
@@ -129,6 +143,20 @@ class BigNumbers:
             return self.s.splice(node, [(value.start,value.end,self.owned(value,hint,constant))])
         typ, expected = self.shape(node), self.expected(hint)
         wanted = expected if expected and expected.kind in {*KINDS,'generic'} else typ
+        # Generic Rational properties already return independent owners. A
+        # second reference-copy wrapper would lose that first allocation.
+        if typ.kind=='unknown' and node.kind in {'Ident','Selector','Index','Deref','Paren'} and not self.fresh(node):
+            if self.generic_reference(node):
+                # A field/element of an unconstrained generic can still be a
+                # logical number. Preserve direct-copy ownership using Odin's
+                # exact instantiated type, while aggregates stay shallow.
+                def body(result):
+                    target=self.e.type_code(result);code=self.s.render(node,hint,constant)
+                    return (f'when {target}=={self.module()}.Integer || {target}=={self.module()}.Rational '
+                            f'{{return {self.module()}.compiler_clone({code})}} else {{return {code}}}')
+                name,args=self.e.closed(node,body,result=None,flavor='big_reference_copy')
+                target=self.e.type_code(hint) if hint else self.e.ownership.native_type(node)
+                return name+'('+', '.join([*args,target])+')'
         if wanted.kind not in {*KINDS,'generic'} or node.kind in {'ImplicitSelector','Compound'} and wanted.kind=='generic':
             return self.s.render(node,hint,constant)
         if self.s.denotes_type(node) or node.text in {'nil','---','_'}: return self.s.render(node,hint,constant)

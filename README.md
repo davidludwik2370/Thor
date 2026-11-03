@@ -1096,6 +1096,8 @@ non-generic `fn`. Use `proc` for I/O. Aliases and transitive calls retain the sa
 rule; inactive compile-time branches and unevaluated type queries remain unchecked.
 Formatting into a value is separate from observable I/O and remains subject to
 the usual pure formatting, allocation and input-type rules.
+See [pure-function and evaluation diagnostics](docs/purity-diagnostics.md) for
+the rejection categories, CLI/TLS source locations and execution-failure limits.
 
 Generic `$T`/`$N` bindings are scheduled separately for each resolved instantiation,
 including forwarding through imported procedures and inferred fixed-array counts.

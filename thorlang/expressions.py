@@ -93,6 +93,10 @@ class Expressions:
         from .semantics import descendants
         s=self.source
         name=s.prefix+f'{flavor}_{node.start}_{node.end}'
+        # An ordinary procedure and its checked pure variant share AST spans,
+        # but their helper bodies have different call targets and contracts.
+        # Reusing an unchecked helper would bypass transitive purity checks.
+        if s.purity and (s.purity.eval_mode or s.purity.checked(s.purity.owner(node))):name+='_pure'
         lifetime=self.fstrings.current
         if lifetime:name+='_fstrings'
         if self.switches.global_context: name += '_global'
@@ -734,7 +738,8 @@ class Expressions:
                                                    s.path,width.start,width.end,'interpolation-width'))
                         self.ownership.release(evaluated_width,code)
                     if s.purity and (s.purity.eval_mode or s.purity.checked(s.purity.owner(n))):
-                        code.append(f'{formatting}.validate_pure_value(type_of({expression}))')
+                        code.append(s.mapping.wrap(f'{formatting}.validate_pure_value(type_of({expression}))',
+                                                   s.path,field.start,field.end,'interpolation-field'))
                     field_code=f'{formatting}.write_spec(&{builder}.builder, {expression}, {options})'
                     code.append(s.mapping.wrap(field_code,s.path,field.start,field.end,'interpolation-field'))
                     if widths:

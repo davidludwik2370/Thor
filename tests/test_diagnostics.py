@@ -404,7 +404,7 @@ main::proc(){
         errors=self.at(source,'alias[0]=7',message='borrowed from an input')
         self.assertNotIn('runtime/',json.dumps(errors))
         source='package main\nbad::fn()->^int{return nil}\nmain::proc(){_=bad()}\n'
-        errors=self.at(source,'fn()->^int',message='Unsupported pure value type')
+        errors=self.at(source,'^int',message='Unsupported pure value type')
         self.assertNotIn('runtime/',json.dumps(errors))
 
     def test_pure_reference_iteration_reports_original_loop_without_body_cascades(self):

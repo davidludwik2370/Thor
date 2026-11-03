@@ -28,17 +28,17 @@ checked_loop_index :: proc "contextless"(index:int,$I:typeid,location:=#caller_l
 
 // Widen signed arithmetic before adding the length. Unsigned values retain
 // their original type and never take a negative path or undergo narrowing.
-normalize_signed :: proc "contextless"(length: int, index: $I) -> i128 where intrinsics.type_is_integer(I) && !intrinsics.type_is_unsigned(I) {
+normalize_signed :: proc "contextless"(length: int, index: $I, location:=#caller_location) -> i128 where intrinsics.type_is_integer(I) && !intrinsics.type_is_unsigned(I) {
     value := i128(index)
     result := value < 0 ? i128(length)+value : value
     // Odin's machine index conversion can truncate very wide integers. Check
     // the wide result first; the final access distinguishes index < len from
     // the inclusive upper bound allowed by slicing.
-    assert_contextless(result >= 0 && result <= i128(length), "Bounds check failed: normalized sequence bound is out of range")
+    assert_contextless(result >= 0 && result <= i128(length), "Bounds check failed: normalized sequence bound is out of range",location)
     return result
 }
-normalize_unsigned :: proc "contextless"(length: int, index: $I) -> I where intrinsics.type_is_integer(I) && intrinsics.type_is_unsigned(I) {
-    assert_contextless(u128(index)<=u128(length), "Bounds check failed: sequence bound is out of range")
+normalize_unsigned :: proc "contextless"(length: int, index: $I, location:=#caller_location) -> I where intrinsics.type_is_integer(I) && intrinsics.type_is_unsigned(I) {
+    assert_contextless(u128(index)<=u128(length), "Bounds check failed: sequence bound is out of range",location)
     return index
 }
 normalize :: proc{normalize_signed,normalize_unsigned}

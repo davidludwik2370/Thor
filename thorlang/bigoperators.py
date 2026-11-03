@@ -104,6 +104,7 @@ class BigOperators:
         return self.update(node,lhs[0],rhs[0],op[:-1])
 
     def update(self,node,lhs,rhs,op):
+        from .semantics import Type
         def body(_):
             lines=[]
             target=self.big.capture_targets([lhs],lines,node)[0]
@@ -113,7 +114,7 @@ class BigOperators:
             right=self.s.prefix+f'big_update_rhs_{node.start}'
             result=self.s.prefix+f'big_update_result_{node.start}'
             lines.extend([f'{old} := {self.big.module()}.compiler_clone({target})',f'defer {self.big.module()}.compiler_destroy(&{old})'])
-            value=self.big.owned(rhs,Hint(self.s,lhs,typ))
+            value=self.big.owned(rhs,Hint(self.s,lhs,typ,Type('generic')))
             lines.extend([self.big.mapped(rhs,f'{right}: {typ} = {value}','debug-capture'),f'defer {self.big.module()}.compiler_destroy(&{right})',
                           f'{result} := {self.big.module()}.binary({old},{right},{json.dumps(op)})'])
             self.big.commit([target],[result],lines)

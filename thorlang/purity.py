@@ -16,13 +16,16 @@ class Flow:
     borrowed: bool = False
     fields: dict = field(default_factory=dict)
     element: object = None
+    numeric_copy: bool = False
 
     def merge(self, other, seen=None):
         if other is self: return False
         seen=set() if seen is None else seen
         if (id(self),id(other)) in seen: return False
         seen.add((id(self),id(other)))
-        changed=other.borrowed and not self.borrowed
+        numeric_copy=(self.numeric_copy and other.numeric_copy if self.borrowed else other.numeric_copy) if other.borrowed else self.numeric_copy
+        changed=(other.borrowed and not self.borrowed) or numeric_copy!=self.numeric_copy
+        self.numeric_copy=numeric_copy
         self.borrowed |= other.borrowed
         for name,value in other.fields.items():
             if name not in self.fields: self.fields[name]=value;changed=True
@@ -34,7 +37,9 @@ class Flow:
 
     def member(self,name):
         value=self.fields.setdefault(name,Flow())
-        value.borrowed |= self.borrowed
+        if self.borrowed:
+            value.borrowed=True
+            value.numeric_copy=False
         # An elided aggregate may not yet have an exact record type. Its
         # positional contents still taint a subsequently selected member.
         if self.element:value.merge(self.element)
@@ -42,11 +47,14 @@ class Flow:
 
     def item(self):
         if self.element is None:self.element=Flow()
-        self.element.borrowed |= self.borrowed
+        if self.borrowed:
+            self.element.borrowed=True
+            self.element.numeric_copy=False
         return self.element
 
 
 class Purity:
+    storage_message='Pure code cannot inspect Integer/Rational implementation storage; use numeric operators and public properties.'
     builtins={'len','cap','size_of','align_of','offset_of','type_of','min','max','abs','clamp',
               'complex','quaternion','real','imag','jmag','kmag','conj','swizzle',
               'make','copy','delete','assert','assert_contextless','panic'}
@@ -91,6 +99,8 @@ class Purity:
         self.contracts={}
         self.inner_bodies=set()
         self.scalar_casts=set()
+        self.invalid_defaults=set()
+        self.storage_reads={}
         from .purecalls import PureCalls
         self.calls=PureCalls(self)
         for source in self.r.sources:source.purity=self
@@ -110,6 +120,8 @@ class Purity:
         return cc in {'','odin'}
 
     def checked(self,proc):return bool(proc and (self.pure(proc) or self.eval_mode and proc in self.active or proc in self.calls.emitting))
+
+    def invalid_default(self,node):return any(parent in self.invalid_defaults for parent in (node,*node.ancestors()))
 
     def module(self,source):return source.expressions.module('pure')
 
@@ -136,7 +148,46 @@ class Purity:
             return callee.source.imports.get(namespace),name
         return None
 
-    def library(self,call):return self.imported(call.role('callee'))
+    def library(self,call):
+        def resolve(callee,seen):
+            if callee is None or callee in seen:return None
+            seen.add(callee)
+            if callee.kind=='Paren':return resolve(callee.role('expr'),seen)
+            imported=self.imported(callee)
+            if imported:return imported
+            symbol=self.r.symbol(callee)
+            if symbol and not symbol.declaration.data.get('mutable') and not symbol.immutable:
+                value=symbol.value
+                if value and value.kind in {'Ident','Selector','Paren'}:return resolve(value,seen)
+            return None
+        return resolve(call.role('callee'),set())
+
+    @staticmethod
+    def arguments(call,names):
+        """Bind effect-sensitive arguments by parameter, not source order."""
+        bound={};position=0
+        for arg in call.group('args'):
+            if arg.kind=='FieldValue':bound[arg.role('field').text]=arg.role('value')
+            else:
+                if position<len(names):bound[names[position]]=arg
+                position+=1
+        return [bound.get(name) for name in names]
+
+    def call_error(self,call):
+        callee=call.role('callee');symbol=self.r.symbol(callee);library=self.library(call)
+        if library and library[0]=='base:intrinsics':
+            return f"Pure code cannot call compiler intrinsic '{callee.text}': it is not an eligible pure operation."
+        reason='indirect, foreign and unknown calls are forbidden.'
+        if symbol:
+            candidates=self.r.procedure_candidates(callee)
+            if candidates and any(not signature.parent or signature.parent.kind!='Procedure' or not signature.parent.role('body') for _,signature in candidates):
+                reason=f"The foreign or bodyless procedure '{callee.text}' has no inspectable implementation."
+            elif symbol.declaration.kind in {'Field','Range','TypeSwitch'} or symbol.declaration.data.get('mutable') or symbol.immutable:
+                reason=f"An indirect call through runtime procedure value '{callee.text}' is not eligible."
+        elif callee.kind=='Ident' and not library:
+            # Preserve Odin's actual undeclared-name diagnostic.
+            return None
+        return 'Pure code requires a resolved direct call to an eligible procedure; '+reason
 
     def io_procedure(self,proc):
         """Recognize library identity, never a user procedure's spelling."""
@@ -221,12 +272,13 @@ class Purity:
         seen=set() if seen is None else seen
         if callee in seen:return None
         seen.add(callee)
+        if callee.kind=='Paren':return self.builtin_name(callee.role('expr'),seen)
         imported=self.imported(callee)
         if imported and imported[0]=='base:builtin' and callee.source.import_dir(imported[0]) is None:
             return imported[1] if imported[1] in self.builtins else None
         symbol=self.r.symbol(callee)
         if symbol and not symbol.declaration.data.get('mutable') and not symbol.immutable and symbol.value:
-            if symbol.value.kind in {'Ident','Selector'}:return self.builtin_name(symbol.value,seen)
+            if symbol.value.kind in {'Ident','Selector','Paren'}:return self.builtin_name(symbol.value,seen)
         if callee.kind=='Ident' and symbol is None and not imported and callee.text in self.builtins:return callee.text
         return None
 
@@ -272,39 +324,62 @@ class Purity:
         names=sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
                       for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
-        parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types")}}']
+        parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}}']
         if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
-            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc")}}}}')
+            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
         count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
-        parts.append(f'#assert({meta}.type_struct_field_count(T)==({count}),"Pure record fields could not be fully resolved")')
-        raw_shapes={tuple(n.text for f in record.role('fields').children if f.kind=='Field' for n in f.group('names'))
-                    for unit in self.r.sources for record in unit.nodes
-                    if record.kind=='StructType' and record.data.get('op')=='raw_union'}
+        parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
+        raw_shapes=set()
+        from .imports import file_private
+        for unit in self.r.sources:
+            for record in unit.nodes:
+                if record.kind!='StructType' or record.data.get('op')!='raw_union':continue
+                declaration=record.parent
+                raw_name=declaration.group('names')[0].text if declaration and declaration.kind=='Declaration' and len(declaration.group('names'))==1 else None
+                accessible=(raw_name and unit.scope(declaration).kind=='File' and not record.role('params')
+                            and not(file_private(declaration) and unit is not s))
+                reference=self.r.access(s,unit,raw_name) if accessible else None
+                if reference and (unit.path.parent==s.path.parent or reference!=raw_name):
+                    parts.append(f'when T=={reference} {{#panic("Raw-union storage cannot be proved pure"+Site)}}')
+                else:
+                    raw_shapes.add(tuple(n.text for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')))
         for shape in sorted(raw_shapes):
             matches=' && '.join([f'{meta}.type_struct_field_count(T)=={len(shape)}']+
                                 [f'{meta}.type_has_field(T,{json.dumps(name)})' for name in shape])
-            parts.append(f'#assert(!({matches}),"Raw-union storage cannot be proved pure")')
+            parts.append(f'when {matches} {{#panic("Raw-union storage cannot be proved pure: an inaccessible raw-union schema has this field layout"+Site)}}')
         for field in names:
             field=json.dumps(field)
-            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Depth+1)}}')
+            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Depth+1,Site)}}')
         parts.extend(['}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
-                      f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc")}}',
-                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Depth+1)}}','}',
+                      f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}}',
+                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Depth+1,Site)}}','}',
                       f'else when {meta}.type_is_union(T) {{',
-                      f'{name}_union(T,Result,Allow_Owned,Depth,0)','}',
-                      f'else {{{native}.validate(T,Result && !Allow_Owned,Depth)}}'])
-        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int){{\n'+ '\n'.join(parts)+'\n}\n'
-        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int,$Index:int){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Depth+1);{name}_union(T,Result,Allow_Owned,Depth,Index+1)}}\n}}\n'
+                      f'{name}_union(T,Result,Allow_Owned,Depth,0,Site)','}',
+                      f'else {{{native}.validate(T,Result && !Allow_Owned,Depth,Site)}}'])
+        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int,$Site:string){{\n'+ '\n'.join(parts)+'\n}\n'
+        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int,$Index:int,$Site:string){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Depth+1,Site);{name}_union(T,Result,Allow_Owned,Depth,Index+1,Site)}}\n}}\n'
         s.expressions.helpers[key]=s.mapping.wrap(code,s.path,0,0,'pure-type-validator')
         return name
+
+    def type_site(self,s,site,description):
+        start,end=site.start,site.end
+        if end==start:
+            token=re.match(rb'\w+|.',s.raw[start:])
+            if token:end=start+len(token[0])
+        if not hasattr(s,'pure_type_checks'):s.pure_type_checks={}
+        if not hasattr(s,'pure_type_tokens'):s.pure_type_tokens={}
+        s.pure_type_checks[start,end]=description
+        token=f' [{s.prefix}pure_type_site_{start}_{end}]'
+        s.pure_type_tokens[token]=(start,end)
+        return token,start,end
 
     def walk(self,proc):
         def visit(n):
             yield n
             for child in n.children:
                 if child.kind!='Procedure':yield from visit(child)
-        nodes=list(visit(proc.role('body')))
+        nodes=list(visit(proc.role('body'))) if proc.role('body') else []
         for field in proc.role('type').role('params').children:
             default=field.role('default')
             if default:nodes.extend(visit(default))
@@ -356,12 +431,21 @@ class Purity:
             if n.source.denotes_type(n.role('callee')):
                 return self.flow(args[0],env) if args else Flow()
             if self.library(n)==('core:slice','clone'):
-                return Flow(element=self.flow(args[0],env).item()) if args else Flow()
+                value=self.arguments(n,['a'])[0]
+                return Flow(element=self.flow(value,env).item()) if value else Flow()
             return Flow() # checked callees promote independent result storage
         return Flow()
 
     def copied(self,value,n):
         typ=self.r.type_of(n)
+        # Thor clones direct logical-number assignments. Aggregate copies keep
+        # shallow member headers, so their borrowed fields must stay tainted.
+        if n.source.big.enabled and typ.kind in {'big_integer','big_rational'}:return Flow()
+        if n.source.big.enabled and typ.kind in {'generic','unknown'} and (n.source.big.fresh(n) or n.source.big.generic_reference(n)):
+            # Direct generic numeric copies are independent. Ordinary user
+            # fields can still contain borrowed reference storage; retain its
+            # provenance and let native type checking distinguish the cases.
+            return Flow(value.borrowed,value.fields,value.element,numeric_copy=True)
         if typ.kind=='array':return Flow(element=value.item())
         if typ.kind=='struct':
             result=Flow()
@@ -405,6 +489,10 @@ class Purity:
                         # captures and native generic type queries remain valid.
                         conditions.append(base)
         visit(lhs)
+        if lhs.source.big.enabled and lhs.kind in {'Selector','Index','Deref'} and self.flow(lhs,env).borrowed:
+            kind=self.r.type_of(lhs).kind
+            if kind in {'big_integer','big_rational'}:conditions.append('true')
+            elif kind in {'unknown','generic'} and lhs.source.big.enabled:conditions.append(('big',lhs))
         return conditions
 
     def unsafe_storage(self,typ,seen=None):
@@ -452,6 +540,8 @@ class Purity:
     def _analyze(self,proc):
         if proc in self.analyzed:return
         self.analyzed.add(proc)
+        if self.pure(proc) and not proc.role('body'):
+            proc.source.error('Declared pure functions require an inspectable body; use proc for foreign or bodyless declarations.',proc.start,proc.start+2)
         if self.io_procedure(proc):
             # Overload groups can select this target only at instantiation.
             # Keep its signature/laziness, with a failing checked body instead
@@ -486,8 +576,8 @@ class Purity:
                         else:changed |= env[key].merge(value)
                     else:changed |= self.flow(lhs,env).merge(value)
                 if n.kind=='Call' and self.builtin(n)=='copy' and len(n.group('args'))>=2:
-                    dst,src=n.group('args')[:2]
-                    changed |= self.flow(dst,env).item().merge(self.flow(src,env).item())
+                    dst,src=self.arguments(n,['dst','src'])
+                    if dst and src:changed |= self.flow(dst,env).item().merge(self.flow(src,env).item())
                 if n.kind=='Range' and n.group('names'):
                     name=n.group('names')[0]
                     key=n,name.data.get('name') or name.text.lstrip('&')
@@ -529,6 +619,15 @@ class Purity:
                     self.imported(n)==('base:builtin','ODIN_BUILD_PROJECT_NAME')):
                     self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
                 if any(a.kind=='Call' and self.builtin(a) in self.type_queries and a.role('callee') is not n for a in n.ancestors() if a is not proc):continue
+                if n.kind=='Selector' and n.role('field').text in {'_value','_numerator','_denominator'}:
+                    base=n.role('expr');kind=self.r.type_of(base).kind
+                    if kind in {'big_integer','big_rational'}:self.problem(n,self.storage_message)
+                    elif kind in {'generic','unknown'} and (n.source.big.enabled or
+                            not getattr(n.source,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources)):
+                        assignment=next((parent for parent in n.ancestors() if parent.kind=='Assignment' and any(
+                            lhs.start<=n.start and n.end<=lhs.end for lhs in parent.group('lhs'))),None)
+                        if assignment:self.problem(assignment,self.storage_message,[('big',base)])
+                        else:self.storage_reads[n]=base
                 symbol=self.r.symbol(n)
                 if symbol and symbol.declaration.kind=='Declaration' and self.source_location_dependent(symbol.value):
                     self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
@@ -553,17 +652,19 @@ class Purity:
                 if allowed is False:self.problem(n,message)
                 elif allowed is None:
                     self.scalar_casts.add(n)
-            if n.kind=='Directive' and n.data['name'] not in {'assert','config','type','file','line','directory','procedure'}:
-                self.problem(n,'This directive is not permitted in pure code.')
-            if n.kind=='Directive' and n.data['name'] in {'file','line','directory'}:
-                self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
+            if n.kind=='Directive':
+                if n.data['name'] in {'file','line','directory','caller_location','defined'}:
+                    self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
+                elif n.data['name'] not in {'assert','config','type','procedure'}:
+                    self.problem(n,f"Directive '#{n.data['name']}' is not permitted in pure code.")
             if n.kind=='Unary' and n.data['op']=='&':
                 # A range binding is a declaration, so replacing just `&value`
                 # with an error token silently declares that token instead.
                 # Diagnose the statement, keeping its body from cascading.
-                binding=n.parent and n.parent.kind=='Range' and n in n.parent.group('names')
-                self.problem(n.parent if binding else n,
-                    'Pure code cannot iterate by mutable reference; use indexed writes to a fresh local buffer.'
+                binding=next((parent for parent in n.ancestors() if parent.kind in {'Range','TypeSwitch'} and n in parent.group('names')),None)
+                self.problem(binding or n,
+                    ('Pure code cannot bind a type-switch value by mutable reference; use a value binding and fresh local storage.'
+                     if binding.kind=='TypeSwitch' else 'Pure code cannot iterate by mutable reference; use indexed writes to a fresh local buffer.')
                     if binding else 'Pure code cannot take or expose raw addresses.')
             if n.kind=='Call':
                 builtin=self.builtin(n);library=self.library(n)
@@ -578,17 +679,25 @@ class Purity:
                         self.problem(n,'Pure code cannot select an allocator or invoke allocator callbacks.')
                 elif builtin in {'copy','delete'}:
                     if n.group('args'):
-                        target=n.group('args')[0]
-                        borrowed=self.flow(target,env).borrowed
-                        if borrowed:self.problem(n,'Pure code cannot mutate or delete storage borrowed from an input.')
-                        if builtin=='delete' and len(n.group('args'))>1:self.problem(n,'Pure code cannot select an allocator.')
+                        target=self.arguments(n,['dst'])[0] if builtin=='copy' else next(
+                            (a.role('value') for a in n.group('args') if a.kind=='FieldValue' and a.role('field').text in {'array','str','m'}),n.group('args')[0])
+                        provenance=self.flow(target,env)
+                        if provenance.borrowed:
+                            self.problem(n,'Pure code cannot mutate or delete storage borrowed from an input.',
+                                         [('not-big',target)] if provenance.numeric_copy else None)
+                        if builtin=='delete':
+                            positional=[arg for arg in n.group('args') if arg.kind!='FieldValue']
+                            allocator=any(arg.kind=='FieldValue' and arg.role('field').text=='allocator' for arg in n.group('args'))
+                            allocator |= len(positional)>1 and self.r.type_of(target).kind not in {'dynamic','map'}
+                            if allocator:self.problem(n,'Pure code cannot select an allocator.')
                 elif builtin or n.source.denotes_type(n.role('callee')):pass
                 elif self.approved(n):
                     if self.explicit_allocator(n):
                         self.problem(n,'Pure code cannot select an allocator.')
                 else:
                     targets=self.targets(n)
-                    if not targets:self.problem(n,'Pure code requires a resolved direct call to an eligible procedure; indirect, foreign and unknown calls are forbidden.')
+                    message=self.call_error(n) if not targets else None
+                    if message:self.problem(n.role('callee'),message)
             if n.kind=='Assignment':
                 for lhs in n.group('lhs'):
                     checks=self.borrowed_write(lhs,env)
@@ -598,11 +707,26 @@ class Purity:
                 typ=self.r.type_node(target)
                 if typ.kind in {'pointer','procedure'} or typ.name in {'rawptr','cstring','any','typeid'}:
                     self.problem(n,'Pure code cannot convert values to pointers, procedure values, any or runtime type identities.')
+        # Keep defaults syntactically valid. Replacing an effectful default
+        # with an error expression corrupts inference and reports missing
+        # parameters before the actual purity violation. Fail lazily in the
+        # checked body, mapped to the original offending default expression.
+        for field in proc.role('type').role('params').children:
+            default=field.role('default')
+            failures=[(node,message) for node,message in self.problems.items()
+                      if default and node.source is default.source and default.start<=node.start<default.end]
+            if failures:
+                self.invalid_defaults.add(default)
+                self.contracts.setdefault(proc,min(failures,key=lambda item:item[0].start))
 
     def predicate(self,checks,source):
         pieces=[]
         for check in checks:
             if isinstance(check,str):pieces.append(check)
+            elif isinstance(check,tuple):
+                typ='type_of('+source.render(check[1])+')';big=source.big.module()
+                predicate=f'({typ}=={big}.Integer || {typ}=={big}.Rational)'
+                pieces.append('!'+predicate if check[0]=='not-big' else predicate)
             else:
                 source.needs_intrinsics=True
                 t=f'type_of({source.render(check)})';meta=source.prefix+'meta'
@@ -626,6 +750,7 @@ class Purity:
             return n.source.expressions.error(n,'#run requires compile-time-known arguments and types at this source location.')
         if not self.checked(proc):return None
         self.analyze(proc)
+        if self.invalid_default(n):return None
         if n in self.rendering:return None
         checked_body=self.calls.body(n,expected,constant)
         if checked_body is not None:return checked_body
@@ -644,7 +769,7 @@ class Purity:
             return self.parameter_name(n)
         message=self.problems.get(n)
         if message:
-            if n.kind=='Range':
+            if n.kind in {'Range','TypeSwitch'}:
                 return '#panic('+json.dumps(message)+')\n'
             if n.kind=='Declaration' and not(n.parent and n.parent.role('init') is n):
                 added=set(descendants(n))-self.rendering
@@ -657,6 +782,27 @@ class Purity:
         if checked_callee is not None:return checked_callee
         checked_params=self.calls.parameters(n)
         if checked_params is not None:return checked_params
+        if n in self.storage_reads:
+            self.rendering.add(n)
+            try:
+                source=n.source
+                def body(_):
+                    condition=self.predicate([('big',self.storage_reads[n])],source)
+                    return f'when {condition} {{#panic({json.dumps(self.storage_message)})}} else {{return '+source._render(n,expected,constant)+'}'
+                name,args=source.expressions.closed(n,body,result=None,flavor='pure_storage')
+                args.append(source.expressions.ownership.native_type(n))
+                return name+'('+', '.join(args)+')'
+            finally:self.rendering.remove(n)
+        if (n.kind=='ExpressionStatement' and n.role('expr').kind=='Call' and self.builtin(n.role('expr'))=='panic'
+                and n.parent and n.parent.kind=='Block'):
+            # Odin rejects a defer followed directly by a diverging call. The
+            # compiler's scratch/promotion defers must not invalidate user panic.
+            # A nested statement scope retains divergence and all user lifetimes.
+            self.rendering.add(n)
+            try:
+                if n.source.raw[n.parent.start:n.parent.start+1]!=b'{':n.source.expressions.convert_do(n.parent)
+                return '{'+n.source._render(n,expected,constant)+'}'
+            finally:self.rendering.remove(n)
         if n in self.scalar_casts:
             self.rendering.add(n)
             try:
@@ -722,6 +868,12 @@ class Purity:
                 if post:
                     name,args=n.source.expressions.closed(n,lambda _:body(None)+'\nreturn true',result='bool',flavor='pure_write')
                     return f'_ = {name}({", ".join(args)})'
+                if any(not isinstance(check,str) for checks,_ in conditions for check in checks):
+                    # Odin collects when branches before local runtime
+                    # declarations. Put type-dependent guards in an explicitly
+                    # captured helper, where the inspected value is a parameter.
+                    name,args=n.source.expressions.closed(n,body,result=False,flavor='pure_write')
+                    return f'{name}({", ".join(args)})'
                 return body(None)
             finally:self.rendering.remove(n)
         return None
@@ -802,17 +954,24 @@ class Purity:
         self.analyze(proc)
         s=block.source;module=self.module(s);prefix=s.prefix+'scratch_'+str(proc.start)
         code=[]
+        declaration=proc.parent
+        while declaration and declaration.kind=='Paren':declaration=declaration.parent
+        names=declaration.group('names') if declaration and declaration.kind=='Declaration' else []
+        function=names[0].text if names else 'anonymous procedure'
+        def validate(site,expression,role):
+            token,start,end=self.type_site(s,site,f"{role} in pure call '{function}'")
+            return s.mapping.wrap(expression[:-1]+','+json.dumps(token)+')',s.path,start,end,'pure-type-check')
         for field in proc.role('type').role('params').children:
             if field.kind!='Field':continue
             for name in field.group('names'):
                 if name.kind=='PolyType':
                     annotation=field.role('type')
                     if annotation and (annotation.kind=='TypeidType' or annotation.text=='typeid'):
-                        code.append(f'{self.validator(s)}({name.text.lstrip("$")},false,true,0)')
+                        code.append(validate(name,f'{self.validator(s)}({name.text.lstrip("$")},false,true,0)',f"type parameter '{name.text}'"))
                     continue
-                code.append(f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,0)')
-        for _,typ in self.r.fields(proc.role('type').role('results')):
-            if typ:code.append(f'{self.validator(s)}({self.r.template(typ)},true,{str(self.contextual(proc)).lower()},0)')
+                code.append(validate(field.role('type') or name,f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,0)',f"parameter '{name.text}'"))
+        for index,(name,typ) in enumerate(self.r.fields(proc.role('type').role('results'))):
+            if typ:code.append(validate(typ,f'{self.validator(s)}({"typeid" if typ.kind=="TypeidType" else self.r.template(typ)},true,{str(self.contextual(proc)).lower()},0)',f"result '{name}'" if name else f'result {index+1}'))
         if not self.contextual(proc):
             return s.mapping.wrap('\n'+'\n'.join(code)+'\n',s.path,proc.start,proc.role('type').end,'pure-contract')
         if self.wraps(proc):code.append(f'{prefix}_caller:=context.allocator')

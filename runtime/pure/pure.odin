@@ -57,27 +57,30 @@ scratch_destroy :: proc(s:^Scratch) {
     s^={}
 }
 
-validate :: proc "contextless"($T:typeid,$Result:bool,$Depth:int) {
-    when Depth>24 {#panic("Pure functions do not support recursive reference-containing types")}
+validate :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Site:string) {
+    when Depth>24 {#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}
     else when intrinsics.type_is_boolean(T)||intrinsics.type_is_numeric(T)||intrinsics.type_is_enum(T)||intrinsics.type_is_bit_set(T) {}
+    else when intrinsics.type_is_cstring(T)||intrinsics.type_is_cstring16(T)||intrinsics.type_is_string16(T) {
+        #panic("Unsupported pure value type: cstring, cstring16 and string16 are not supported; use UTF-8 string values"+Site)
+    }
     else when intrinsics.type_is_string(T) {
-        when Result {#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc")}
+        when Result {#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}
     } else when intrinsics.type_is_slice(T) {
-        when Result {#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc")}
-        else {validate(intrinsics.type_elem_type(T),false,Depth+1)}
+        when Result {#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}
+        else {validate(intrinsics.type_elem_type(T),false,Depth+1,Site)}
     } else when intrinsics.type_is_array(T)||intrinsics.type_is_enumerated_array(T) {
-        validate(intrinsics.type_elem_type(T),Result,Depth+1)
+        validate(intrinsics.type_elem_type(T),Result,Depth+1,Site)
     } else when intrinsics.type_is_struct(T) {
-        #panic("Pure record fields require a resolved compiler schema")
+        #panic("Pure record fields require a resolved compiler schema"+Site)
     } else when intrinsics.type_is_union(T) {
-        validate_union(T,Result,Depth,0)
-    } else {#panic("Unsupported pure value type: pointers, handles, maps, dynamic arrays, any and procedure values are not pure inputs/results")}
+        validate_union(T,Result,Depth,0,Site)
+    } else {#panic("Unsupported pure value type: pointers, handles, maps, dynamic arrays, any and procedure values are not pure inputs/results"+Site)}
 }
 
-validate_union :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Index:int) {
+validate_union :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Index:int,$Site:string) {
     when Index<intrinsics.type_union_variant_count(T) {
-        validate(intrinsics.type_variant_type_of(T,Index),Result,Depth+1)
-        validate_union(T,Result,Depth,Index+1)
+        validate(intrinsics.type_variant_type_of(T,Index),Result,Depth+1,Site)
+        validate_union(T,Result,Depth,Index+1,Site)
     }
 }
 

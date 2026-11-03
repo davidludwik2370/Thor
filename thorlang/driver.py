@@ -13,12 +13,12 @@ import sys
 import tempfile
 
 from .compiler import Source, ThorError, unquote
-from .diagnostics import Diagnostics, payload
+from .diagnostics import Diagnostics, payload, backend_error_flags
 from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.33.2"
+VERSION = "0.33.3"
 
 
 def backend_failure(status):
@@ -511,6 +511,7 @@ def _main(argv=None):
                 report([backend_failure(result.returncode)])
         else:
             command.append("-json-errors")
+            command.extend(backend_error_flags(command))
             result = subprocess.run(command, stderr=subprocess.PIPE,
                 env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
             if result.returncode < 0:

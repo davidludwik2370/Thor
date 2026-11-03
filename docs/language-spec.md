@@ -672,6 +672,13 @@ Inputs and operations:
   because graph traversal encounters a cycle.
 - Lower runtime fn calls to Odin procedures with the necessary generated support.
   contextless alone is not evidence of purity.
+- Diagnose unsupported parameter/result types at their individual annotations,
+  retaining instantiated-type information. Recognize bounded UTF-8 string values;
+  reject cstring/cstring16/string16 in the current pure-value subset.
+- Bind mutation/copy/delete contracts by parameter identity, including named and
+  reordered arguments. Checked variants cannot reuse unchecked expression helpers.
+- Reject bodyless fn declarations with an original-source diagnostic. Preserve
+  ordinary proc prototypes and valid fn bodies ending in panic.
 
 Allocation and results:
 - Allow approved temporary allocation and locally owned mutable buffers inside fn.
@@ -751,6 +758,11 @@ Examples:
 - Serialize before helper storage is released. A helper crash, compilation error,
   invalid result, allocation failure, or timeout is a compilation failure. Use
   bounded execution with a configurable timeout and an actionable basic message.
+- Preserve the execution request as the primary location and attach an original
+  inner failure location when supplied by the helper. Retain those related notes
+  through CLI JSON and TLS. Name process signals without guessing an unknown cause.
+- #run requires one supported value; native optional status/allocator-error results
+  retain their ordinary single-value use. Diagnose arity before helper inference.
 - Values used in :: declarations, array lengths, when, or #switch must remain
   valid Odin constants after substitution. Diagnose unsuitable types, such as a
   non-integral array size. Runtime-initialized globals are not an equivalent.

@@ -10,6 +10,20 @@ class DiagnosticHardeningTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_many_independent_index_roots_and_unsaved_recovery(self):
+        names=[f'missing_{i}' for i in range(12)]
+        text='// 😀\npackage main\nmain::proc(){i:=1;'+''.join(name+'[i]=2;' for name in names)+'}\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='Undeclared name: missing_11')
+        self.assertEqual({e['message'] for e in errors},{'Undeclared name: '+name for name in names})
+        for name in names:
+            error=next(e for e in errors if e['message']=='Undeclared name: '+name)
+            self.assertEqual(error['range']['start'],self.position(text,name+'[',0))
+        fixed=text.replace('i:=1;','i:=1;'+''.join(name+':=[1,2];' for name in names))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_interpolation_root_error_is_precise_and_unsaved_fix_clears_all_cascades(self):
         text='''// 😀 header
 package main

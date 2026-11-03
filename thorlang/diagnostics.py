@@ -8,6 +8,16 @@ import re
 from .sourcemap import Origin, position
 
 
+def backend_error_flags(flags):
+    """Leave room for native helper cascades before source-level deduplication.
+
+    Odin counts repeated errors before merging them. Its small default budget
+    can otherwise stop checking before an independent source error is visited.
+    Explicit user limits retain their ordinary native meaning.
+    """
+    return [] if any(flag.startswith('-max-error-count:') for flag in flags) else ['-max-error-count:1000']
+
+
 class Diagnostics:
     def __init__(self, sources=None, maps=None, generated=None, overlays=None, *, path_aliases=None):
         self.sources = {str(p): s for p, s in (sources or {}).items()}
@@ -21,6 +31,16 @@ class Diagnostics:
         self.sequence_bounds = {str(path): s.sequence_bounds for path, s in (sources or {}).items()}
         self.hidden_parameters={calls.marker for s in (sources or {}).values()
             if (calls:=getattr(getattr(s,'purity',None),'calls',None)) and calls.names}
+        self.pure_type_checks={(str(path),start,end):description for path,s in (sources or {}).items()
+                               for (start,end),description in getattr(s,'pure_type_checks',{}).items()}
+        self.pure_type_tokens={token:Origin(str(path),start,end,'pure-type-check') for path,s in (sources or {}).items()
+                               for token,(start,end) in getattr(s,'pure_type_tokens',{}).items()}
+        self.purity_messages={message for s in (sources or {}).values() if (purity:=getattr(s,'purity',None))
+                              for message in [purity.storage_message,*purity.problems.values(),*(message for _,message in purity.contracts.values()),
+                                              *(message for conditions in purity.conditions.values() for _,message in conditions)]}
+        self.native_pure_origins={proc:site for s in (sources or {}).values()
+                                  if (calls:=getattr(getattr(s,'purity',None),'calls',None))
+                                  for proc,site in calls.origins.items() if getattr(proc.source,'native_inspected',False)}
         self.raw.update({str(p): b for p, b in (overlays or {}).items()})
         self.maps = maps or {}
         self.generated = generated or {}
@@ -74,7 +94,7 @@ class Diagnostics:
             generated_type_failure = False
             type_operand = None
             index_dependencies = []
-            related = []
+            related = list(error.get('related') or []) if not backend else []
             for name in self.hidden_parameters:
                 msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false))?', '',m) for m in msgs]
             for token, message in self.error_messages.items():
@@ -239,7 +259,9 @@ class Diagnostics:
                     if origin.kind != "membership-helper":
                         break
                 msgs = ["Membership requires comparable elements. " + msgs[0]]
-            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin'} or origin.kind=='pure-type-validator')
+            pure_format=bool(origin and Path(origin.file)==runtime/'format'/'format.odin' and msgs
+                             and msgs[0].removeprefix('Compile time panic: ').startswith('Pure formatting supports'))
+            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin'} or origin.kind=='pure-type-validator' or pure_format)
             if compiler_support:
                 # Generic dispatch is part of language lowering. Its checker
                 # failures belong to the user's operation, not the support file.
@@ -254,6 +276,22 @@ class Diagnostics:
                         if caller: break
                     if caller: break
                 if caller: origin=caller
+            pure_type=self.pure_type_checks.get((origin.file,origin.start,origin.end)) if origin else None
+            for token,site in self.pure_type_tokens.items():
+                if msgs and token in msgs[0]:
+                    origin=site
+                    pure_type=self.pure_type_checks[site.file,site.start,site.end]
+                    msgs=[message.replace(token,'') for message in msgs]
+                    break
+            if pure_type and msgs:
+                # Keep the rejected type, without compiler validator frames.
+                instantiated=next((match[1] for message in msgs if (match:=re.search(r"\$T\s*=\s*(.+?),\s*\$Result:",message))),None)
+                msgs=[msgs[0].removeprefix('Compile time panic: '),f'While checking {pure_type}.'+
+                      (f' Rejected type: {instantiated}.' if instantiated else '')]
+            elif msgs and msgs[0].removeprefix('Compile time panic: ') in self.purity_messages:
+                msgs=[msgs[0].removeprefix('Compile time panic: ')]
+            elif pure_format:
+                msgs=[msgs[0].removeprefix('Compile time panic: ')]
             msgs=[m for m in msgs if not ('instantiated as' in m and any(prefix in m for prefix in self.prefixes))]
             if compiler_support:
                 msgs=[m for m in msgs if not re.search(r"instantiated as '(?:compiler_[a-z_]+|normalize_signed|normalize_unsigned|validate|validate_format|write|emit)\(",m)]
@@ -302,6 +340,10 @@ class Diagnostics:
                 )
                 generated_type_failure |= bool(not origin.exact and (
                     msgs and msgs[0].startswith('Invalid operands for ') and any('invalid type' in message for message in msgs)
+                    or msgs and msgs[0] in {'Expected a constant boolean condition in ternary when expression',
+                                           "Non-constant condition in 'when' statement"}
+                    or any(message.startswith("Expected a type for 'type_is_") and any(prefix in message for prefix in self.prefixes)
+                           for message in msgs)
                     or origin.kind in {'expression-helper','interpolation-field','debug-capture'}
                     and any(prefix in message and ('is not an expression but a type' in message
                                 or message.startswith("'type_of(") and message.endswith("' is not a type"))
@@ -322,12 +364,21 @@ class Diagnostics:
                 msgs = [pattern.sub(lambda m: self.reference(generated_file, *reference_coordinates(m)), text) for text in msgs]
             for generated_prefix,original_prefix in self.path_aliases.items():
                 msgs=[text.replace(generated_prefix,original_prefix) for text in msgs]
+            if origin:
+                proc=min((proc for proc in self.native_pure_origins if str(proc.source.path)==origin.file
+                          and proc.start<=origin.start<proc.end),key=lambda proc:proc.end-proc.start,default=None)
+                if proc:
+                    note=self.locate(origin);site=self.native_pure_origins[proc].role('callee')
+                    related.append({'pos':note,'message':'Purity violation in standard-library implementation.'})
+                    msgs.append(f"In standard-library source: {note['file']}({note['line']}:{note['column']})")
+                    origin=Origin(str(site.source.path),site.start,site.end,'pure-native-call')
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             if related: diagnostic['related'] = related
             diagnostic['_type_operand'] = type_operand
             diagnostic['_index_dependencies'] = index_dependencies
             diagnostic['_type_query_cascade'] = bool(origin and not origin.exact and self.inference_query_failure(msgs))
+            diagnostic['_pure_type_context']=(origin.file,origin.start,origin.end) if pure_type and origin else None
             diagnostic['_inference_failure'] = generated_type_failure or diagnostic['_type_query_cascade']
             diagnostic['_inference_contexts'] = self.inference_contexts(origin) if diagnostic['_inference_failure'] else ()
             diagnostic["_cascade"] = bool(origin and not origin.exact and (
@@ -347,6 +398,10 @@ class Diagnostics:
         filtered = []
         for diagnostic in result:
             pos = diagnostic["pos"]
+            if diagnostic['_pure_type_context'] and self.inference_query_failure(diagnostic['msgs']) and any(
+                    other is not diagnostic and other['_pure_type_context']==diagnostic['_pure_type_context']
+                    and any(message.startswith('Undeclared name:') or 'is not a type' in message for message in other['msgs'])
+                    for other in result):continue
             contexts=diagnostic['_inference_contexts']
             if contexts and any(
                 other is not diagnostic and other['type']=='error' and other['pos']
