@@ -27,6 +27,11 @@ class Binding:
 def type_code(typ,source,resolver):
     if isinstance(typ,int):return str(typ)
     if typ.nominal is None and typ.kind in {'scalar','string'} and typ.name:return typ.name
+    # A pointer/sequence inferred from a local value is a structural type. Its
+    # expression's enclosing declaration does not declare a named local type.
+    if typ.nominal is None:
+        if typ.kind=='array' and typ.length is not None:return f'[{typ.length}]'+type_code(typ.elem,source,resolver)
+        if typ.kind in {'slice','pointer','dynamic'}:return {'slice':'[]','pointer':'^','dynamic':'[dynamic]'}[typ.kind]+type_code(typ.elem,source,resolver)
     if typ.nominal:
         node=typ.nominal
     else:node=typ.node

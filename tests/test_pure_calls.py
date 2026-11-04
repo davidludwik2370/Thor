@@ -134,7 +134,7 @@ count::fn(text:string,n:int)->int{return scratch(text,n)}
         cases=[
             ('state:int\nleaf::proc(n:int)->int{return state+n}', 'outside the function'),
             ('leaf::proc(n:int)->int{_=context;return n}', 'ambient context'),
-            ('leaf::proc(n:int)->int{x:=n;_= &x;return x}', 'raw addresses'),
+            ('leaf::proc(n:int)->int{x:=n;y:=n;return (&x==&y)?1:0}', 'pointer identities'),
             ('foreign libc { external::proc(n:int)->int--- }\nleaf::proc(n:int)->int{return external(n)}', 'resolved direct call'),
             ('target::proc(n:int)->int{return n}\nleaf::proc(n:int)->int{callback:=target;return callback(n)}', 'indirect'),
         ]

@@ -1906,13 +1906,13 @@ main::proc(){
         self.assertEqual(main.read_text(),text)
 
     def test_pure_reference_iteration_unsaved_diagnostic_and_recovery(self):
-        text='package main\nwork::fn()->int{values:=[1,2];for i in 0..<len(values){values[i]+=1};return values[0]}\nmain::proc(){_=work()}\n'
+        text='package main\nwork::fn(input:[]int)->int{values:=make([]int,len(input));copy(values,input);for i in 0..<len(values){values[i]+=1};return values[0]}\nmain::proc(){values:=[1,2];_=work(values[:])}\n'
         client,main=self.open(text)
-        changed=text.replace('for i in 0..<len(values){values[i]+=1}', 'for &value in values{value+=1}')
+        changed=text.replace('for i in 0..<len(values){values[i]+=1}', 'for &value in input{value+=1}')
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
-        errors=client.diagnostic(main.as_uri(),contains='Pure code cannot iterate by mutable reference')
-        error=next(e for e in errors if 'Pure code cannot iterate by mutable reference' in e['message'])
-        self.assertEqual(error['range']['start'],self.position(changed,'for &value',0))
+        errors=client.diagnostic(main.as_uri(),contains='borrowed from an input')
+        error=next(e for e in errors if 'borrowed from an input' in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'value+=1',0))
         self.assertFalse(any('Undeclared name' in e['message'] for e in errors),errors)
         self.assertNotIn('__thor_',json.dumps(errors))
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})

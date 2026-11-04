@@ -1084,7 +1084,32 @@ VALUE :: calculate(3) // 10
 ```
 
 Calls from `fn` use checked versions of ordinary bodies, including the same
-scratch cleanup and independent returned storage as `fn`. Direct ordinary calls
+scratch cleanup and independent returned storage as `fn`. An ordinary helper may
+mutate storage created within the enclosing `fn`, recursively through other
+helpers. Typed pointers may be used internally to address that storage:
+
+```odin
+set_y :: proc(out: ^int) { out^ = 7 }
+calculate :: fn(x: int) -> int {
+    y: int
+    set_y(&y)
+    return x + y
+}
+```
+
+The permission follows the affected storage. A local record/header containing an
+input slice still borrows that slice; forwarding it through a pointer, field,
+subslicing, reference loop or another helper does not permit writing its elements.
+Fresh local arrays/buffers and scalar fields may be changed. Helpers may allocate
+buffers through output parameters; their storage lives until the enclosing pure
+invocation finishes. Helpers cannot store references to their own stack locals
+or slice literals through output parameters; use `make` for surviving buffers.
+Pointer-bearing results and public `fn` inputs remain
+outside the supported value subset; pointer identity comparisons and numeric
+address conversions remain forbidden. Provenance joins are conservative across
+branches and reassignments, rather than a full flow-sensitive borrow checker.
+
+Direct ordinary calls
 retain their original behavior and ownership; their known arguments alone do
 not trigger automatic compile-time evaluation. See
 [the transitive-call demo](examples/pure_calls/demo.thor).
@@ -1126,7 +1151,7 @@ bit sets and tagged unions. Borrowed contents are protected through aliases,
 fields, slices, shallow copies, loops, union matches/assertions and calls. Local fixed-array
 copies and fresh buffers can be mutated. Pointers, maps, dynamic-array inputs,
 `any`, procedure values, runtime global storage, ambient context, uninspectable
-foreign/indirect calls, raw addresses, pointer/aggregate bit casts, uninitialized
+foreign/indirect calls, pointer identity observation, pointer/aggregate bit casts, uninitialized
 storage and unapproved operations are rejected. Numeric, boolean, enum and bit-set
 scalar bit casts are eligible. Checks inside
 inactive native `when` branches remain inactive.
@@ -1136,7 +1161,8 @@ length/type/size queries, `make` for local slice/dynamic buffers, `copy`, `delet
 assertions, `core:strings.clone`, `core:slice.clone`, and Thor's scalar/string
 formatters. Other direct calls require inspectable, transitively eligible bodies. Explicit
 allocator overrides and custom record formatters are rejected. Each checked
-function uses private tracking scratch storage, including for interpolation;
+invocation uses private tracking scratch storage, including for interpolation;
+mutating ordinary helpers share the enclosing invocation's scratch lifetime;
 all outstanding internal allocations are released on every return. Ordinary
 `proc` results and named f-string owners retain explicit cleanup. Anonymous
 f-string arguments follow the expression lifetime rule described above.

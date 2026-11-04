@@ -646,8 +646,23 @@ Inputs and operations:
   call targets establish purity; an unknown foreign/resource operation is rejected.
 - Local variables and mutation of fresh local storage are allowed. An explicit
   supported copy of input data can be changed without changing the input.
+- Ordinary Thor/Odin proc helpers may mutate storage owned by the current fn
+  invocation, recursively through other eligible helpers. Track permissions per
+  affected field/element/pointee; copying an input slice header into a local
+  variable or record does not make the backing elements writable. Typed pointers,
+  reference iteration and reference type-switch bindings may address local
+  storage internally. Do not permit pointer identity observation, numeric address
+  conversions or pointer-bearing public fn inputs/results. Reject helper-local
+  stack addresses/views escaping through output parameters. Propagate reference
+  stores through output parameters so later calls cannot mutate borrowed inputs.
+- Mutating helpers share their enclosing pure invocation's scratch lifetime;
+  allocations assigned through output parameters must remain valid after the
+  helper returns. Returned supported values retain independent promotion. These
+  permissions are compile-time metadata and do not add runtime tracking. Ordinary
+  calls outside checked paths retain native behavior. Conservative provenance
+  joins may reject a reference reassignment after an earlier borrowed alias.
 - No mutable-global reads or writes, I/O, ambient context queries, time/randomness,
-  foreign calls, assembly, unsafe casts, pointer extraction/address observation,
+  foreign calls, assembly, unsafe casts, pointer identity/address observation,
   or indirect procedure calls.
 - Recognized stdout/stderr/file/stream printing and basic file/console I/O are
   rejected at their original call sites, without compiling checked copies of

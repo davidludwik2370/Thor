@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.33.3"
+VERSION = "0.34.0"
 
 
 def backend_failure(status):
@@ -154,6 +154,9 @@ class Project:
                 self.discover(dependency)
 
     def emit(self, destination, *, persist_maps=None, materialize=True):
+        if self.purity.eval_mode:
+            for proc in self.purity.active:self.purity.analyze(proc)
+            self.purity.borrowing.finish(self.purity.active)
         self.purity.calls.prepare()
         self.persist_maps='-debug' in self.flags if persist_maps is None else persist_maps
         destination = Path(destination).resolve()

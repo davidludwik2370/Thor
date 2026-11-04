@@ -30,6 +30,24 @@ change_copy :: fn(input: []int) -> []int {
     return result
 }
 
+// Helpers can mutate storage owned by this fn invocation. They still cannot
+// mutate any slice borrowed from its caller, or read globals/perform I/O.
+set_y :: proc(out: ^int) { out^ = 7 }
+increase :: proc(values: []int) {
+    for &value in values { value += 1 }
+}
+with_helpers :: fn(input: []int) -> int {
+    y: int
+    set_y(&y)
+    local := make([]int, len(input))
+    copy(local, input)
+    increase(local)
+    return y + local[0]
+    // Rejected: increase(input) -- its elements belong to the caller.
+}
+COMPILED_MUTATION :: #run with_helpers([]int{1, 2})
+#assert(COMPILED_MUTATION == 9)
+
 main :: proc() {
     // A variable keeps these calls at runtime. Purity applies here as well.
     value := 4
@@ -38,6 +56,8 @@ main :: proc() {
     assert(root(number) == 3)
 
     input := [1, 2, 3]
+    changed := with_helpers(input[:])
+    if changed != 9 || input[0] != 1 { panic("confined mutation") }
     result := change_copy(input[:])
     assert(len(result) == 2 && result[0] == 9 && result[1] == 3 && input == [1, 2, 3])
     delete(result) // visible fn results retain the usual manual lifetime
@@ -51,6 +71,7 @@ main :: proc() {
     // impure :: proc() -> int { return context.user_index }
     // invalid :: fn() -> int { return impure() }
     // Also rejected: mutable globals, borrowed writes, indirect/foreign calls,
-    // unsupported pointer/procedure values and explicit allocator selection.
+    // pointer-bearing public inputs/results, procedure values and explicit
+    // allocator selection. Internal typed pointers to owned storage are allowed.
     println("Transitive fn/proc calls passed at compile time and runtime.")
 }

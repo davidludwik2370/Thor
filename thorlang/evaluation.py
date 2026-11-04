@@ -805,6 +805,11 @@ class Evaluator:
             return next((a for a in source.by_span.get((old.start,old.end),[]) if a.kind==old.kind),None)
         helper.purity.eval_mode=True
         helper.purity.active={node_copy(p) for p in procedures}
+        # Nested calls in the requested expression are entry calls too, rather
+        # than calls from an enclosing checked body. Their inputs are read-only
+        # and their source signatures must not acquire helper-only parameters.
+        helper.purity.entry_roots={node_copy(p) for call in descendants(n) if call.kind=='Call'
+                                   for p in self.purity.targets(call) if p.source in by_original}
         for query,code in queries.items():
             node=node_copy(query)
             node.source.run_values[node]=code
@@ -915,7 +920,7 @@ class Evaluator:
                 source.needs_intrinsics=True
                 parameter=f'{source.prefix}meta.type_proc_parameter_type(type_of({source.prefix}meta.procedure_of({expr})),0)'
                 token,_,_=helper.purity.type_site(source,site,'argument to compile-time call')
-                guards.append(f'{helper.purity.validator(source)}({parameter},false,true,0,{json.dumps(token)})')
+                guards.append(f'{helper.purity.validator(source)}({parameter},false,true,false,0,{json.dumps(token)})')
                 if library[0]=='thor:format':
                     guards.append(f'{source.expressions.module("format")}.validate_pure_value({parameter})')
         output='\n'.join([*guards,f'{result_name}:={emitted}\n{alias}.emit({result_name})'])

@@ -1105,9 +1105,28 @@ copied_sum :: fn(values: []int) -> int {
 
     // Not valid in fn: values[0] = 99
     // Not valid in fn: fmt.println(total)
-    // Mutable-reference iteration (`for &value in scratch`) is currently
-    // rejected along with raw addresses. Use indexed writes as above.
+    // Reference iteration (`for &value in scratch`) also works on fresh storage.
+    // The same writes through `for &value in values` would change borrowed input.
 }
+
+// A helper need not be declared fn. Its effects are checked transitively, and
+// writes are allowed only to storage owned by this pure invocation.
+set_local :: proc(out: ^int) { out^ = 7 }
+increase_local :: proc(values: []int) {
+    for &value in values { value += 1 }
+}
+confined_mutation :: fn(input: []int) -> int {
+    y: int
+    set_local(&y)
+
+    scratch := make([]int, len(input))
+    copy(scratch, input)
+    increase_local(scratch)
+    return y + scratch[0]
+    // Not valid: increase_local(input)
+    // A local header or record containing input still borrows its elements.
+}
+COMPILED_MUTATION :: #run confined_mutation([]int{2, 5, 8})
 
 ordinary_total :: proc() -> int {
     values := [3, 7, 11]
@@ -1190,6 +1209,8 @@ pure_functions_and_constants :: proc() {
         // Not valid: FORCED :: #run double_value(value)
 
         values := [2, 5, 8]
+        changed := confined_mutation(values[:])
+        if changed != 10 || COMPILED_MUTATION != 10 { panic("confined helpers") }
         assert(copied_sum(values[:]) == 18)
         assert(values[0] == 2) // mutation was confined to the fresh scratch copy
     }

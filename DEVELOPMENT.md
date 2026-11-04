@@ -3083,3 +3083,59 @@ sources remain unchanged.
 After the final native-budget/cascade correction, all 143 diagnostic, evaluation
 and assertion-hygiene tests and all 29 purity/live-TLS tests pass again. The
 forty-run diagnostic repeat and the twelve-error CLI/TLS cases also pass.
+
+## Confined mutation in pure call graphs (Thor 0.34.0)
+
+An ordinary proc called from fn may write through its inputs when the affected
+storage belongs to the enclosing pure invocation. This applies recursively to
+Thor and inspected Odin procedures, named/default arguments, overloads and
+generic helpers. Public fn inputs remain transitively read-only. A fresh scalar,
+array or allocated buffer may be passed to a mutator; copying an input slice
+header or placing it in a local record does not grant ownership of its elements.
+Reference loops and reference type-switch bindings follow the selected storage's
+permission. Odin's type-switch tag is a binding, not a write to its alias.
+
+`pureborrow.py` supplies static symbolic field/element/pointee permissions and
+reference-store summaries. Checked ordinary variants accept zero-sized type
+metadata describing the actual arguments. Native compile-time guards retain
+generic/when laziness; no runtime ownership table or reference count is added.
+Profile fields distinguish overload targets. Calls outside checked paths retain
+their original signatures and behavior. Type reflection, hover, rename, backend
+overload messages and debugger frames expose the source declarations.
+
+Reference stores through output parameters and shallow `copy` update caller provenance. A helper
+cannot redirect a local header to borrowed input and then hide a later write,
+or export its own stack address/view or slice literal through another helper. Caller-local pointer
+redirection remains valid. Mutating helpers share the enclosing scratch allocator
+so buffers they allocate through output parameters outlive the helper call.
+Supported returned values still receive independent promotion and visible results
+retain caller-managed cleanup. This distinction is exercised with allocation
+tracking, ASan debug builds and unchecked release builds.
+
+Internal typed pointers support addressing and nil checks, while pointer identity
+comparisons, membership/switch identity tests, numeric address conversions and
+pointer/aggregate bit casts remain ineligible. Integer/Rational implementation
+storage remains opaque through typed/generic helper pointers. Public pointer-bearing
+inputs/results, unsupported containers and recursive reference schemas retain
+their existing restrictions. Provenance joins across branches, reassignments and
+array elements are deliberately conservative; this is not a general borrow checker.
+
+The regression pass also preserves nested ordinary #run entries, approved library
+helpers, native enum shorthand and original procedure type reflection. Updated old
+reference-binding rejection fixtures now reject actual borrowed writes and accept
+mutation of fresh storage. New acceptance/editor tests live in
+`test_pure_mutation.py` and `test_pure_mutation_tls.py`; both demos and the dedicated
+`examples/pure_calls` walkthrough demonstrate the rule. Real CodeLLDB coverage
+stops inside a mutator and observes the updated local in its caller afterward.
+
+Validation across focused regression runs: 497 distinct Python compiler, live TLS
+and assertion-hygiene tests, including 29 mutation tests and the shared effect/type
+inventory; 1,134 native TLS tests; six allocation-tracked pure-runtime tests and
+one serialization-runtime test. Four real CodeLLDB checks cover mutator writes,
+caller locals, checked procedure frames, allocated fn frames and stepping through
+generated expressions. The main demo and commented walkthrough pass checked debug
+and optimized unchecked release runs with allocation tracking. Output-buffer and
+numeric-mutator acceptance cases also run with assertions, bounds checks and type
+assertions disabled, using explicit panic/Python verdicts. Slice-literal escapes
+are covered with explicit, elided, temporary-array, nested-record, parenthesized
+and named-argument forms, along with shallow-copy escapes and safe owned copies.

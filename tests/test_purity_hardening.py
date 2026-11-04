@@ -97,7 +97,9 @@ never_owned::fn()->string{panic("not called")}
         for case in EFFECTS:
             with self.subTest(case=case.name):
                 text=case.source('proc').split('main::proc()')[0]
-                text+='work::fn()->int{return bad('+case.args+')}\nmain::proc(){_=work()}\n'
+                if case.name.startswith('borrow_') or case.name in {'range_reference','type_switch_reference'}:
+                    text+='work::fn('+case.params+')->int{return bad(input)}\nmain::proc(){_=work('+case.args+')}\n'
+                else:text+='work::fn()->int{return bad('+case.args+')}\nmain::proc(){_=work()}\n'
                 _,result=self.invoke(text,command='check',flags=['-debug','-json-errors'],fail=case.message)
                 errors=json.loads(result.stderr)['errors'];offset=case.offset(text)
                 self.assertTrue(any(e['pos'] and e['pos']['offset']<=offset<e['pos']['end_offset']

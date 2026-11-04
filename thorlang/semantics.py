@@ -710,6 +710,9 @@ class Resolver:
                     return -1000
             score = self.unify(formal.role("elem"), actual.elem or Type(), substitutions)
             return score + 3 if score >= 0 else score
+        if formal.kind=='PointerType' and actual.kind=='pointer':
+            score=self.unify(formal.role('elem'),actual.elem or Type(),substitutions)
+            return score+3 if score>=0 else score
         if actual.kind == "unknown" or expected.kind in {"unknown", "generic"}:
             return 0
         if expected.kind != actual.kind:

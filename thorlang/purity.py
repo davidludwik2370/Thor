@@ -9,14 +9,30 @@ from pathlib import Path
 import re
 from .compiler import Hint
 from .semantics import descendants
+from .pureborrow import Borrowing, Permission, OWNED, READONLY, permission
 
 
 @dataclass(eq=False)
 class Flow:
-    borrowed: bool = False
+    borrowed: object = OWNED
     fields: dict = field(default_factory=dict)
     element: object = None
     numeric_copy: bool = False
+    target: object = None
+    location: object = OWNED
+    locations: set = field(default_factory=set)
+    origins: set = field(default_factory=set)
+    copied_from: object = None
+    aliases: tuple = ()
+    owner: object = None
+    stack: set = field(default_factory=set)
+    kind: str = 'unknown'
+    copied_base: object = None
+
+    def __post_init__(self):
+        self.borrowed=permission(self.borrowed)
+        self.location=permission(self.location)
+        if self.locations and not self.origins:self.origins=set(self.locations)
 
     def merge(self, other, seen=None):
         if other is self: return False
@@ -24,33 +40,139 @@ class Flow:
         if (id(self),id(other)) in seen: return False
         seen.add((id(self),id(other)))
         numeric_copy=(self.numeric_copy and other.numeric_copy if self.borrowed else other.numeric_copy) if other.borrowed else self.numeric_copy
-        changed=(other.borrowed and not self.borrowed) or numeric_copy!=self.numeric_copy
+        borrowed=self.borrowed|other.borrowed
+        changed=borrowed!=self.borrowed or numeric_copy!=self.numeric_copy
         self.numeric_copy=numeric_copy
-        self.borrowed |= other.borrowed
+        self.borrowed=borrowed
+        if not other.origins.issubset(self.origins):self.origins.update(other.origins);changed=True
+        if not other.stack.issubset(self.stack):self.stack.update(other.stack);changed=True
         for name,value in other.fields.items():
             if name not in self.fields: self.fields[name]=value;changed=True
             else: changed |= self.fields[name].merge(value,seen)
         if other.element:
             if self.element is None:self.element=other.element;changed=True
             else:changed |= self.element.merge(other.element,seen)
+        if other.target and self.target is None:self.target=other.target;changed=True
+        elif other.target and other.target is not self.target:
+            targets=self.target.aliases or (self.target,)
+            incoming=other.target.aliases or (other.target,)
+            combined=tuple(dict.fromkeys([*targets,*incoming]))
+            if len(combined)>len(targets):self.target=Flow(aliases=combined);changed=True
         return changed
 
     def member(self,name):
-        value=self.fields.setdefault(name,Flow())
+        if self.kind=='pointer':return self.deref().member(name)
+        value=self.fields.setdefault(name,Flow(owner=self.owner))
+        value.origins.update(origin.step(('field',name)) for origin in self.origins if len(origin.path)<24)
         if self.borrowed:
-            value.borrowed=True
+            value.borrowed|=self.borrowed.project(('field',name))
             value.numeric_copy=False
+        if self.locations:
+            value.locations.update(location.step(('field',name)) for location in self.locations if len(location.path)<24)
+            value.location=self.location_for(('field',name))
+        elif self.copied_from and self.origins:
+            value.location=self.origin_location(('field',name))&Permission('type',('pointer',self.copied_from))
+        else:value.location=self.location
         # An elided aggregate may not yet have an exact record type. Its
         # positional contents still taint a subsequently selected member.
         if self.element:value.merge(self.element)
         return value
 
     def item(self):
-        if self.element is None:self.element=Flow()
+        if self.element is None:self.element=Flow(owner=self.owner if self.kind in {'array','fixed','generic','unknown'} else None)
+        self.element.origins.update(origin.step(('item',)) for origin in self.origins if len(origin.path)<24)
         if self.borrowed:
-            self.element.borrowed=True
+            self.element.borrowed|=self.borrowed.project(('item',))
             self.element.numeric_copy=False
+        if self.locations:
+            self.element.locations.update(location.step(('item',)) for location in self.locations if len(location.path)<24)
+            self.element.location=self.location_for(('item',))
+        else:self.element.location=self.borrowed
         return self.element
+
+    def location_for(self,step):
+        result=OWNED
+        for location in self.locations:
+            if len(location.path)>=24:return READONLY
+            result|=Permission('access',(location.step(step,'location'),))
+        if self.copied_from:
+            trait='pointer' if step[0]=='field' else 'sequence'
+            return result&Permission('type',(trait,self.copied_from))
+        return result
+
+    def origin_location(self,step):
+        result=OWNED
+        for origin in self.origins:
+            if len(origin.path)>=24:return READONLY
+            result|=Permission('access',(origin.step(step,'location'),))
+        return result
+
+    def deref(self):
+        if self.target and self.target.aliases:return Flow.joined(self.target.aliases)
+        if self.target is None:
+            if self.copied_base is not None:
+                self.target=self.copied_base.deref()
+                return self.target
+            if any(len(origin.path)>=24 for origin in self.origins):return Flow(READONLY,location=READONLY)
+            self.target=Flow(self.borrowed.project(('deref',)),location=self.origin_location(('deref',)),
+                             locations={origin.step(('deref',)) for origin in self.origins})
+        return self.target
+
+    def header_copy(self,typ,node=None,seen=None,owner=None):
+        seen={} if seen is None else seen
+        if id(self) in seen:return seen[id(self)]
+        result=Flow(self.borrowed,numeric_copy=self.numeric_copy,target=self.target,copied_from=node,owner=owner,stack=set(self.stack),kind=typ.kind)
+        if typ.kind in {'pointer','generic','unknown'}:result.copied_base=self
+        result.origins=set(self.origins)
+        seen[id(self)]=result
+        if typ.kind=='struct':
+            fields=typ.node.role('fields') if typ.node else None
+            for field in fields.children if fields else []:
+                if field.kind=='Field':
+                    for name in field.group('names'):
+                        result.fields[name.text]=self.member(name.text).header_copy(field.source.resolver.type_node(field.role('type'),typ.substitutions),node,seen,owner)
+            result.borrowed=OWNED
+        elif typ.kind in {'array','fixed'}:
+            result.borrowed=OWNED
+            result.element=self.item().header_copy(typ.elem,node,seen,owner)
+        else:
+            result.fields=dict(self.fields);result.element=self.element
+        return result
+
+    @staticmethod
+    def joined(values,seen=None):
+        values=tuple(dict.fromkeys(values))
+        if len(values)==1:return values[0]
+        seen={} if seen is None else seen
+        key=tuple(map(id,values))
+        if key in seen:return seen[key]
+        result=Flow(aliases=values);seen[key]=result
+        for value in values:
+            result.borrowed|=value.borrowed;result.location|=value.location
+            result.locations.update(value.locations);result.origins.update(value.origins)
+            result.stack.update(value.stack)
+        names={name for value in values for name in value.fields}
+        result.fields={name:Flow.joined([value.member(name) for value in values],seen) for name in names}
+        if any(value.element for value in values):result.element=Flow.joined([value.item() for value in values],seen)
+        targets=[value.target for value in values if value.target]
+        if targets:result.target=Flow(aliases=tuple(targets))
+        return result
+
+    def write(self,other,seen=None):
+        seen=set() if seen is None else seen
+        if id(self) in seen:return False
+        seen.add(id(self));changed=self.merge(other)
+        for alias in self.aliases:changed|=alias.write(other,seen)
+        return changed
+
+    def stack_owners(self,seen=None):
+        seen=set() if seen is None else seen
+        if id(self) in seen:return set()
+        seen.add(id(self));result=set(self.stack)
+        children=[*self.fields.values(),self.element,self.target,*self.aliases]
+        for child in children:
+            if child:result.update(child.stack_owners(seen))
+        return result
 
 
 class Purity:
@@ -101,6 +223,10 @@ class Purity:
         self.scalar_casts=set()
         self.invalid_defaults=set()
         self.storage_reads={}
+        self.storage_writes={}
+        self.pointer_checks={}
+        self.entry_roots=set()
+        self.borrowing=Borrowing(self)
         from .purecalls import PureCalls
         self.calls=PureCalls(self)
         for source in self.r.sources:source.purity=self
@@ -327,6 +453,7 @@ class Purity:
         parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}}']
         if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
             parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
+        parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
         count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
         parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
@@ -350,15 +477,15 @@ class Purity:
             parts.append(f'when {matches} {{#panic("Raw-union storage cannot be proved pure: an inaccessible raw-union schema has this field layout"+Site)}}')
         for field in names:
             field=json.dumps(field)
-            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Depth+1,Site)}}')
+            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.extend(['}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
                       f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}}',
-                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Depth+1,Site)}}','}',
+                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}','}',
                       f'else when {meta}.type_is_union(T) {{',
-                      f'{name}_union(T,Result,Allow_Owned,Depth,0,Site)','}',
+                      f'{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site)','}',
                       f'else {{{native}.validate(T,Result && !Allow_Owned,Depth,Site)}}'])
-        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int,$Site:string){{\n'+ '\n'.join(parts)+'\n}\n'
-        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Depth:int,$Index:int,$Site:string){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Depth+1,Site);{name}_union(T,Result,Allow_Owned,Depth,Index+1,Site)}}\n}}\n'
+        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{\n'+ '\n'.join(parts)+'\n}\n'
+        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site)}}\n}}\n'
         s.expressions.helpers[key]=s.mapping.wrap(code,s.path,0,0,'pure-type-validator')
         return name
 
@@ -395,16 +522,25 @@ class Purity:
             return env.setdefault((symbol.declaration,symbol.name),Flow()) if symbol else Flow()
         if n.kind in {'Paren','Cast','AutoCast','TypeAssertion','OrReturn','OrBranch'}:return self.flow(n.role('expr'),env)
         if n.kind=='FieldValue':return self.flow(n.role('value'),env)
-        if n.kind=='Selector':return self.flow(n.role('expr'),env).member(n.role('field').text)
+        if n.kind=='Unary' and n.data['op']=='&':
+            target=self.flow(n.role('expr'),env)
+            return Flow(target=target,stack={target.owner} if target.owner else set(),kind='pointer')
+        if n.kind=='Deref':return self.flow(n.role('expr'),env).deref()
+        if n.kind=='Selector':
+            base=n.role('expr');value=self.flow(base,env)
+            if self.r.type_of(base).kind=='pointer':value=value.deref()
+            return value.member(n.role('field').text)
         if n.kind=='Index':return self.flow(n.role('expr'),env).item()
         if n.kind=='Slice':
             base=self.flow(n.role('expr'),env)
-            return Flow(base.borrowed,element=base.item())
+            result=Flow(base.borrowed,element=base.item(),stack=set(base.stack))
+            if self.r.type_of(n.role('expr')).kind in {'array','fixed','generic','unknown'} and base.owner:result.stack.add(base.owner)
+            return result
         if n.kind=='Compound':
             result=Flow()
-            typ=self.r.type_of(n)
-            if not n.role('type') and n.parent and n.parent.kind=='Declaration' and n.parent.role('type'):
-                typ=self.r.type_node(n.parent.role('type'))
+            typ=self.context_type(n)
+            if typ.kind in {'array','fixed'}:result.owner=self.owner(n)
+            if typ.kind=='slice' and n.group('elems') and self.owner(n):result.stack.add(self.owner(n))
             fields=[]
             if typ.kind=='struct' and typ.node:
                 for field in typ.node.role('fields').children:
@@ -436,6 +572,40 @@ class Purity:
             return Flow() # checked callees promote independent result storage
         return Flow()
 
+    def context_type(self,node):
+        """Recover aggregate context without changing native literal coercion."""
+        typ=self.r.type_of(node)
+        if typ.kind not in {'unknown','generic'} or node.kind!='Compound' or node.role('type'):return typ
+        child=node;parent=node.parent
+        while parent and parent.kind=='Paren':child,parent=parent,parent.parent
+        if not parent:return typ
+        if parent.kind=='Declaration' and parent.role('type'):return self.r.type_node(parent.role('type'))
+        if parent.kind=='Assignment' and child in parent.group('rhs'):
+            index=parent.group('rhs').index(child);lhs=parent.group('lhs')
+            if index<len(lhs):return self.r.type_of(lhs[index])
+        aggregate=parent.parent if parent.kind=='FieldValue' else parent
+        if aggregate and aggregate.kind=='Compound':
+            record=self.context_type(aggregate)
+            if parent.kind=='FieldValue':
+                field=self.r.field(record,parent.role('field').text)
+                if field:return field[0]
+            elif record.kind=='struct' and record.node and child in aggregate.group('elems'):
+                fields=self.r.fields(record.node.role('fields'));index=aggregate.group('elems').index(child)
+                if index<len(fields):return self.r.type_node(fields[index][1],record.substitutions)
+            elif record.elem:return record.elem
+        if aggregate and aggregate.kind=='Call':
+            plan=self.r.resolve_call(aggregate)
+            if plan:
+                fields=self.r.fields(plan.signature.role('params'))
+                if parent.kind=='FieldValue':
+                    annotation=next((annotation for name,annotation in fields if name.lstrip('$')==parent.role('field').text),None)
+                else:
+                    positional=[arg for arg in aggregate.group('args') if arg.kind!='FieldValue']
+                    index=positional.index(child) if child in positional else len(fields)
+                    annotation=fields[index][1] if index<len(fields) else None
+                if annotation:return self.r.type_node(annotation,plan.substitutions)
+        return typ
+
     def copied(self,value,n):
         typ=self.r.type_of(n)
         # Thor clones direct logical-number assignments. Aggregate copies keep
@@ -445,7 +615,9 @@ class Purity:
             # Direct generic numeric copies are independent. Ordinary user
             # fields can still contain borrowed reference storage; retain its
             # provenance and let native type checking distinguish the cases.
-            return Flow(value.borrowed,value.fields,value.element,numeric_copy=True)
+            result=value.header_copy(typ,n)
+            result.numeric_copy=True
+            return result
         if typ.kind=='array':return Flow(element=value.item())
         if typ.kind=='struct':
             result=Flow()
@@ -477,26 +649,32 @@ class Purity:
 
     def borrowed_write(self,lhs,env):
         conditions=[]
-        def visit(n):
-            if n.kind=='Paren':visit(n.role('expr'))
-            elif n.kind in {'Selector','Index','Slice','Deref'}:
-                base=n.role('expr');visit(base)
-                if self.flow(base,env).borrowed and n.kind in {'Index','Slice','Deref'}:
-                    kind=self.r.type_of(base).kind
-                    if kind in {'slice','string','dynamic','map','pointer'}:conditions.append('true')
-                    elif kind in {'generic','unknown'}:
-                        # The predicate is rendered at the write site so helper
-                        # captures and native generic type queries remain valid.
-                        conditions.append(base)
-        visit(lhs)
+        storage=self.storage(lhs,env)
+        if storage:conditions.append(storage)
         if lhs.source.big.enabled and lhs.kind in {'Selector','Index','Deref'} and self.flow(lhs,env).borrowed:
             kind=self.r.type_of(lhs).kind
-            if kind in {'big_integer','big_rational'}:conditions.append('true')
-            elif kind in {'unknown','generic'} and lhs.source.big.enabled:conditions.append(('big',lhs))
+            borrowed=self.flow(lhs,env).borrowed
+            if kind in {'big_integer','big_rational'}:conditions.append(borrowed)
+            elif kind in {'unknown','generic'}:conditions.append(borrowed&Permission('type',('big',lhs)))
         return conditions
 
+    def storage(self,node,env):
+        if node.kind=='Paren':return self.storage(node.role('expr'),env)
+        if node.kind=='Index':
+            base=node.role('expr');value=self.flow(base,env);typ=self.r.type_of(base)
+            if typ.kind in {'slice','dynamic','string','map'}:return value.borrowed
+            if typ.kind=='pointer':return value.deref().location
+            if typ.kind in {'generic','unknown'}:
+                pointer=Permission('type',('pointer',base));sequence=Permission('type',('sequence',base))
+                # Arrays are copied by value; slice/pointer backing storage is
+                # shared. A generic instantiation supplies the distinction.
+                return (pointer&value.deref().location)|(sequence&value.borrowed)
+            return self.storage(base,env)
+        if node.kind=='Slice':return self.flow(node.role('expr'),env).borrowed
+        return self.flow(node,env).location
+
     def unsafe_storage(self,typ,seen=None):
-        """Local annotations must not introduce implicit any/pointer boxing.
+        """Local annotations must not introduce raw pointers or any boxing.
 
         Inferred generics originate in natively validated parameters/types.
         Fresh local dynamic buffers are allowed, but maps/sets and reference
@@ -506,7 +684,7 @@ class Purity:
         key=typ.kind,typ.node
         if key in seen:return False
         seen.add(key)
-        if typ.kind in {'pointer','procedure','map','set'} or typ.name in {'any','typeid','rawptr','cstring'}:return True
+        if typ.kind in {'procedure','map','set'} or typ.name in {'any','typeid','rawptr','cstring'}:return True
         if typ.elem and self.unsafe_storage(typ.elem,seen):return True
         if typ.kind=='struct' and typ.node:
             if typ.node.data.get('op')=='raw_union':return True
@@ -515,6 +693,23 @@ class Purity:
         if typ.kind=='union' and typ.node:
             return any(self.unsafe_storage(self.r.type_node(v,typ.substitutions),seen) for v in typ.node.group('variants'))
         return False
+
+    def pointer_comparison(self,typ,seen=None):
+        """Whether a value comparison can inspect a pointer representation."""
+        seen=set() if seen is None else seen
+        key=typ.kind,typ.node
+        if key in seen:return None
+        seen.add(key)
+        if typ.kind=='pointer' or typ.name in {'rawptr','cstring'}:return True
+        if typ.kind in {'unknown','generic'}:return None
+        if typ.kind in {'big_integer','big_rational','string'}:return False
+        children=[]
+        if typ.elem and typ.kind in {'array','fixed'}:children.append(typ.elem)
+        if typ.kind=='struct' and typ.node:
+            children.extend(self.r.type_node(field.role('type'),typ.substitutions) for field in typ.node.role('fields').children if field.kind=='Field')
+        if typ.kind=='union' and typ.node:children.extend(self.r.type_node(value,typ.substitutions) for value in typ.node.group('variants'))
+        results=[self.pointer_comparison(child,seen.copy()) for child in children]
+        return True if True in results else None if None in results else False
 
     def source_location_dependent(self,n,seen=None):
         if n is None:return False
@@ -548,49 +743,10 @@ class Purity:
             # of traversing or compiling the actual I/O implementation.
             self.contracts[proc]=(proc,'Pure code cannot call this library procedure because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.')
             return
-        nodes=self.walk(proc);env={}
+        nodes=self.walk(proc);env=self.borrowing.environment(proc)
         for field in proc.role('type').role('params').children:
-            if field.kind=='Field':
-                if field.data.get('using_field') and self.r.type_node(field.role('type')).kind in {'generic','unknown'}:
-                    self.contracts[proc]=(field,'Pure using parameters require a resolved record schema; access members explicitly for unconstrained generic inputs.')
-                for name in field.group('names'):
-                    symbol=self.r.by_decl.get((field,name.data.get('name') or name.text.lstrip('$')))
-                    if symbol:env[symbol.declaration,symbol.name]=Flow(True)
-        # Conservative joins reach aliases carried through branches and loops.
-        for _ in range(max(2,len(nodes)+1)):
-            changed=False
-            for n in nodes:
-                if n.kind=='Declaration':names,values=n.group('names'),n.group('values')
-                elif n.kind=='Assignment' and n.data['op']=='=':names,values=n.group('lhs'),n.group('rhs')
-                else:names,values=[],[]
-                pairs=list(zip(names,values))
-                from .switches import unwrap
-                if len(values)==1 and unwrap(values[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:
-                    pairs=[(lhs,values[0]) for lhs in names]
-                for index,(lhs,rhs) in enumerate(pairs):
-                    if lhs.text=='_':continue
-                    value=self.copied(self.result_flow(rhs,index,env) if len(values)==1 else self.flow(rhs,env),rhs)
-                    if n.kind=='Declaration':
-                        key=n,lhs.data.get('name') or lhs.text
-                        if key not in env:env[key]=value;changed=True
-                        else:changed |= env[key].merge(value)
-                    else:changed |= self.flow(lhs,env).merge(value)
-                if n.kind=='Call' and self.builtin(n)=='copy' and len(n.group('args'))>=2:
-                    dst,src=self.arguments(n,['dst','src'])
-                    if dst and src:changed |= self.flow(dst,env).item().merge(self.flow(src,env).item())
-                if n.kind=='Range' and n.group('names'):
-                    name=n.group('names')[0]
-                    key=n,name.data.get('name') or name.text.lstrip('&')
-                    value=self.flow(n.role('expr'),env).item()
-                    if key not in env:env[key]=value;changed=True
-                    else:changed |= env[key].merge(value)
-                if n.kind=='TypeSwitch' and n.group('names'):
-                    name=n.group('names')[0]
-                    key=n,name.data.get('name') or name.text
-                    value=self.flow(n.role('expr'),env)
-                    if key not in env:env[key]=value;changed=True
-                    else:changed |= env[key].merge(value)
-            if not changed:break
+            if field.kind=='Field' and field.data.get('using_field') and self.r.type_node(field.role('type')).kind in {'generic','unknown'}:
+                self.contracts[proc]=(field,'Pure using parameters require a resolved record schema; access members explicitly for unconstrained generic inputs.')
         cc=proc.role('type').data.get('calling_convention','')
         if self.pure(proc) and cc not in {'','odin'}:
             self.problem(proc,'Declared pure functions require the Odin calling convention.')
@@ -603,13 +759,14 @@ class Purity:
                 if any(name.startswith('deferred_') for name in names):
                     self.contracts[proc]=(attribute,'Pure calls cannot use implicit deferred procedure callbacks; make eligible calls explicit in the body.')
         for n in nodes:
+            if n in self.borrowing.escapes:self.problem(n,self.borrowing.escapes[n])
             typ=self.r.type_node(n.role('type')) if n.kind=='Declaration' and n.role('type') else self.r.type_of(n) if n.kind=='Compound' else None
             if typ and typ.kind=='struct' and typ.node and typ.node.data.get('op')=='raw_union':
                 self.problem(n,'Raw-union storage cannot be proved pure.')
             if n.kind=='Compound' or n.kind=='Declaration' and (n.data.get('mutable') or n.data.get('immutable')):
                 local_types=[typ] if typ else [self.r.type_of(value) for value in n.group('values')]
                 if any(t and self.unsafe_storage(t) for t in local_types):
-                    self.problem(n,'Pure local storage cannot contain pointers, any, procedure values, maps, sets or raw unions.')
+                    self.problem(n,'Pure local storage cannot contain raw pointers, any, procedure values, maps, sets or raw unions.')
             if n.kind=='Using' or n.kind=='Declaration' and n.data.get('using_field'):
                 owners=n.group('values' if n.kind=='Using' else 'names')
                 if any(self.r.type_of(owner).kind in {'generic','unknown'} for owner in owners):
@@ -620,13 +777,15 @@ class Purity:
                     self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
                 if any(a.kind=='Call' and self.builtin(a) in self.type_queries and a.role('callee') is not n for a in n.ancestors() if a is not proc):continue
                 if n.kind=='Selector' and n.role('field').text in {'_value','_numerator','_denominator'}:
-                    base=n.role('expr');kind=self.r.type_of(base).kind
+                    base=n.role('expr');typ=self.r.type_of(base)
+                    while typ.kind=='pointer':typ=typ.elem
+                    kind=typ.kind
                     if kind in {'big_integer','big_rational'}:self.problem(n,self.storage_message)
                     elif kind in {'generic','unknown'} and (n.source.big.enabled or
                             not getattr(n.source,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources)):
                         assignment=next((parent for parent in n.ancestors() if parent.kind=='Assignment' and any(
                             lhs.start<=n.start and n.end<=lhs.end for lhs in parent.group('lhs'))),None)
-                        if assignment:self.problem(assignment,self.storage_message,[('big',base)])
+                        if assignment:self.storage_writes.setdefault(assignment,[]).append(base)
                         else:self.storage_reads[n]=base
                 symbol=self.r.symbol(n)
                 if symbol and symbol.declaration.kind=='Declaration' and self.source_location_dependent(symbol.value):
@@ -642,6 +801,38 @@ class Purity:
                         self.problem(n,'Pure code cannot read unverified native package storage or values; only approved constants/helpers are eligible.')
             if n.kind=='Implicit':self.problem(n,'Pure code cannot access the ambient context or implicit runtime state.')
             if n.kind=='Unsafe':self.problem(n,'Assembly, uninitialized storage and unsafe operations are not permitted in pure code.')
+            operands=[]
+            if n.kind=='Binary' and n.data['op'] in {'==','!=','<','<=','>','>=','in','not_in'}:
+                operands=[n.role('left'),n.role('right')]
+                if n.data['op'] in {'in','not_in'}:operands=operands[:1]
+                if any(value.text=='nil' for value in operands):operands=[]
+            elif n.kind=='Call' and self.builtin(n) in {'min','max','clamp'}:
+                operands=[arg.role('value') if arg.kind=='FieldValue' else arg.role('expr') if arg.kind=='Unary' and arg.data['op']=='**' else arg for arg in n.group('args')]
+            elif n.kind in {'Cast','Call'} and not(n.kind=='Cast' and n.data['op']=='transmute'):
+                target=n.role('type') if n.kind=='Cast' else n.role('callee')
+                if target and n.source.denotes_type(target):
+                    value=n.role('expr') if n.kind=='Cast' else next(iter(n.group('args')),None)
+                    if value:operands=[value]
+            if operands and not self.calls.queried(n) and not n.source.denotes_type(n) and not any(value.source.denotes_type(value) for value in operands):
+                shapes=[self.pointer_comparison(self.r.type_of(value)) for value in operands]
+                message='Pure code cannot observe pointer identities or convert pointers to numeric values.'
+                if True in shapes:self.problem(n,message)
+                elif None in shapes:
+                    # Enum shorthand obtains its type from the other operand;
+                    # it cannot itself contain/observe a pointer representation.
+                    self.pointer_checks[n]=[value for value in operands if value.kind!='ImplicitSelector' and value.text!='nil']
+            if n.kind in {'Switch','SwitchExpr','CompileSwitchExpr'}:
+                selector=n.role('selector')
+                if selector is None and n.kind=='Switch':selector=next((child for child in reversed(n.children) if child.kind not in {'Block','Declaration'}),None)
+                if selector:
+                    if n.kind=='Switch':
+                        cases=[child for block in n.children if block.kind=='Block' for child in block.children if child.kind=='Case']
+                        matches=[child for case in cases for child in case.children if child.end<=case.data.get('roles',{}).get('colon',[0])[0]]
+                    else:matches=[n.source.at(span,n) for case in n.data['cases'] for span in case['matches']]
+                    if any(match.text!='nil' for match in matches):
+                        kind=self.pointer_comparison(self.r.type_of(selector))
+                        if kind is True:self.problem(selector,'Pure code cannot observe pointer identities in switch selection.')
+                        elif kind is None:self.pointer_checks[selector]=[selector]
             if n.kind=='OrReturn' and self.wraps(proc):
                 results=self.r.fields(proc.role('type').role('results'))
                 if len(results)>1 and any(not name for name,_ in results):
@@ -657,15 +848,6 @@ class Purity:
                     self.problem(n,'Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.')
                 elif n.data['name'] not in {'assert','config','type','procedure'}:
                     self.problem(n,f"Directive '#{n.data['name']}' is not permitted in pure code.")
-            if n.kind=='Unary' and n.data['op']=='&':
-                # A range binding is a declaration, so replacing just `&value`
-                # with an error token silently declares that token instead.
-                # Diagnose the statement, keeping its body from cascading.
-                binding=next((parent for parent in n.ancestors() if parent.kind in {'Range','TypeSwitch'} and n in parent.group('names')),None)
-                self.problem(binding or n,
-                    ('Pure code cannot bind a type-switch value by mutable reference; use a value binding and fresh local storage.'
-                     if binding.kind=='TypeSwitch' else 'Pure code cannot iterate by mutable reference; use indexed writes to a fresh local buffer.')
-                    if binding else 'Pure code cannot take or expose raw addresses.')
             if n.kind=='Call':
                 builtin=self.builtin(n);library=self.library(n)
                 if self.calls.queried(n):continue
@@ -683,8 +865,10 @@ class Purity:
                             (a.role('value') for a in n.group('args') if a.kind=='FieldValue' and a.role('field').text in {'array','str','m'}),n.group('args')[0])
                         provenance=self.flow(target,env)
                         if provenance.borrowed:
+                            condition=provenance.borrowed
+                            if provenance.numeric_copy:condition&=Permission('type',('not-big',target))
                             self.problem(n,'Pure code cannot mutate or delete storage borrowed from an input.',
-                                         [('not-big',target)] if provenance.numeric_copy else None)
+                                         [condition])
                         if builtin=='delete':
                             positional=[arg for arg in n.group('args') if arg.kind!='FieldValue']
                             allocator=any(arg.kind=='FieldValue' and arg.role('field').text=='allocator' for arg in n.group('args'))
@@ -698,8 +882,10 @@ class Purity:
                     targets=self.targets(n)
                     message=self.call_error(n) if not targets else None
                     if message:self.problem(n.role('callee'),message)
-            if n.kind=='Assignment':
-                for lhs in n.group('lhs'):
+            # Odin represents a type-switch binding as an assignment with `in`.
+            # It declares the alias; only writes in its case bodies are effects.
+            if n.kind=='IncDec' or n.kind=='Assignment' and n.data['op']!='in':
+                for lhs in n.group('lhs') if n.kind=='Assignment' else [n.role('expr')]:
                     checks=self.borrowed_write(lhs,env)
                     if checks:self.problem(n,'Pure code cannot mutate storage borrowed from an input.',checks)
             if n.kind=='Cast' or n.kind=='Call' and n.source.denotes_type(n.role('callee')):
@@ -722,7 +908,8 @@ class Purity:
     def predicate(self,checks,source):
         pieces=[]
         for check in checks:
-            if isinstance(check,str):pieces.append(check)
+            if isinstance(check,Permission):pieces.append(check.render(self,source))
+            elif isinstance(check,str):pieces.append(check)
             elif isinstance(check,tuple):
                 typ='type_of('+source.render(check[1])+')';big=source.big.module()
                 predicate=f'({typ}=={big}.Integer || {typ}=={big}.Rational)'
@@ -732,6 +919,15 @@ class Purity:
                 t=f'type_of({source.render(check)})';meta=source.prefix+'meta'
                 pieces.append('('+' || '.join(f'{meta}.type_is_{kind}({t})' for kind in ['slice','string','dynamic_array','map','pointer','multi_pointer'])+')')
         return ' || '.join(pieces) or 'false'
+
+    def validate_storage(self,source,value):
+        source.needs_intrinsics=True;meta=source.prefix+'meta';big=source.big.module()
+        name=source.prefix+'pure_big_storage_'+str(value.start);key=source.root,name
+        code=(f'\n@(private="file")\n{name}::proc "contextless"($T:typeid){{'
+              f'when {meta}.type_is_pointer(T){{{name}({meta}.type_elem_type(T))}}'
+              f'else when T=={big}.Integer || T=={big}.Rational{{#panic({json.dumps(self.storage_message)})}}}}\n')
+        source.expressions.helpers[key]=source.mapping.wrap(code,source.path,value.start,value.end,'pure-storage-type')
+        return f'{name}(type_of({source.render(value)}))'
 
     def result_flow(self,n,index,env):
         if n.kind=='Paren':return self.result_flow(n.role('expr'),index,env)
@@ -782,15 +978,41 @@ class Purity:
         if checked_callee is not None:return checked_callee
         checked_params=self.calls.parameters(n)
         if checked_params is not None:return checked_params
+        queried_type=self.calls.query(n)
+        if queried_type is not None:return queried_type
+        if n in self.pointer_checks:
+            self.rendering.add(n)
+            try:
+                source=n.source;source.needs_default=True
+                def body(_):
+                    checks=[]
+                    for value in self.pointer_checks[n]:
+                        token,_,_=self.type_site(source,value,'pointer-free comparison/conversion operand')
+                        checks.append(f'{self.validator(source)}(type_of({source.prefix}default_value({value.source.render(value)})),false,true,false,0,{json.dumps(token)})')
+                    return '\n'.join([*checks,'return '+source._render(n,expected,constant)])
+                result='bool' if n.kind=='Binary' and n.data['op'] in {'==','!=','<','<=','>','>=','in','not_in'} else None
+                name,args=source.expressions.closed(n,body,result=result,flavor='pure_pointer_identity')
+                if result is None:args.append(source.expressions.ownership.native_type(n))
+                return name+'('+', '.join(args)+')'
+            finally:self.rendering.remove(n)
         if n in self.storage_reads:
             self.rendering.add(n)
             try:
                 source=n.source
                 def body(_):
-                    condition=self.predicate([('big',self.storage_reads[n])],source)
-                    return f'when {condition} {{#panic({json.dumps(self.storage_message)})}} else {{return '+source._render(n,expected,constant)+'}'
+                    return self.validate_storage(source,self.storage_reads[n])+'\nreturn '+source._render(n,expected,constant)
                 name,args=source.expressions.closed(n,body,result=None,flavor='pure_storage')
                 args.append(source.expressions.ownership.native_type(n))
+                return name+'('+', '.join(args)+')'
+            finally:self.rendering.remove(n)
+        if n in self.storage_writes:
+            self.rendering.add(n)
+            try:
+                source=n.source
+                def body(_):
+                    checks=[self.validate_storage(source,value) for value in self.storage_writes[n]]
+                    return '\n'.join([*checks,source._render(n,expected,constant)])
+                name,args=source.expressions.closed(n,body,result=False,flavor='pure_storage_write')
                 return name+'('+', '.join(args)+')'
             finally:self.rendering.remove(n)
         if (n.kind=='ExpressionStatement' and n.role('expr').kind=='Call' and self.builtin(n.role('expr'))=='panic'
@@ -967,14 +1189,18 @@ class Purity:
                 if name.kind=='PolyType':
                     annotation=field.role('type')
                     if annotation and (annotation.kind=='TypeidType' or annotation.text=='typeid'):
-                        code.append(validate(name,f'{self.validator(s)}({name.text.lstrip("$")},false,true,0)',f"type parameter '{name.text}'"))
+                        code.append(validate(name,f'{self.validator(s)}({name.text.lstrip("$")},false,true,{str(self.borrowing.internal(proc)).lower()},0)',f"type parameter '{name.text}'"))
                     continue
-                code.append(validate(field.role('type') or name,f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,0)',f"parameter '{name.text}'"))
+                code.append(validate(field.role('type') or name,f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,{str(self.borrowing.internal(proc)).lower()},0)',f"parameter '{name.text}'"))
         for index,(name,typ) in enumerate(self.r.fields(proc.role('type').role('results'))):
-            if typ:code.append(validate(typ,f'{self.validator(s)}({"typeid" if typ.kind=="TypeidType" else self.r.template(typ)},true,{str(self.contextual(proc)).lower()},0)',f"result '{name}'" if name else f'result {index+1}'))
+            if typ:code.append(validate(typ,f'{self.validator(s)}({"typeid" if typ.kind=="TypeidType" else self.r.template(typ)},true,{str(self.contextual(proc)).lower()},false,0)',f"result '{name}'" if name else f'result {index+1}'))
         if not self.contextual(proc):
             return s.mapping.wrap('\n'+'\n'.join(code)+'\n',s.path,proc.start,proc.role('type').end,'pure-contract')
         if self.wraps(proc):code.append(f'{prefix}_caller:=context.allocator')
+        if self.borrowing.internal(proc) and proc in self.borrowing.mutates:
+            # Out parameters can receive buffers allocated by a helper. Keep
+            # those buffers in the enclosing invocation's scratch lifetime.
+            return s.mapping.wrap('\n'+'\n'.join(code)+'\n',s.path,proc.start,proc.role('type').end,'pure-contract')
         code += [f'{prefix}: {module}.Scratch',f'{module}.scratch_init(&{prefix})',
                  f'defer {module}.scratch_destroy(&{prefix})',
                  f'context.allocator = {module}.scratch_allocator(&{prefix})',

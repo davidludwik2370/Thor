@@ -407,11 +407,11 @@ main::proc(){
         errors=self.at(source,'^int',message='Unsupported pure value type')
         self.assertNotIn('runtime/',json.dumps(errors))
 
-    def test_pure_reference_iteration_reports_original_loop_without_body_cascades(self):
-        for call in ['work()', '#run work()']:
+    def test_pure_reference_iteration_reports_original_write_without_body_cascades(self):
+        for call in ['work([]int{1,2})', '#run work([]int{1,2})']:
             with self.subTest(call=call):
-                source='package main\nwork::fn()->int{_="😀";values:=[1,2];for &value in values{value+=1};return values[0]}\nmain::proc(){_='+call+'}\n'
-                errors=self.at(source,'for &value',message='Pure code cannot iterate by mutable reference')
+                source='package main\nwork::fn(values:[]int)->int{_="😀";for &value in values{value+=1};return values[0]}\nmain::proc(){_='+call+'}\n'
+                errors=self.at(source,'value+=1',message='borrowed from an input')
                 self.assertEqual(len(errors),1,errors)
                 self.assertNotIn('Undeclared name',json.dumps(errors))
 

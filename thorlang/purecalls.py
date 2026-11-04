@@ -21,9 +21,16 @@ class PureCalls:
         self.declarations={}
         self.emitting=set()
         self.prepared=False
-        self.marker='__thor_checked_call'
+        self.marker=next(iter(purity.project.sources.values())).prefix+'checked_call'
         self.wrapping=set()
         self.origins={}
+        self.original_types=set()
+
+    @property
+    def ownership(self):return self.marker+'_ownership'
+
+    @property
+    def ownership_type(self):return self.ownership+'_Type'
 
     def queried(self,node):
         return any(parent.kind=='Call' and self.purity.builtin(parent) in self.purity.type_queries
@@ -106,6 +113,7 @@ class PureCalls:
                             self.purity.problem(node,'Pure calls require a named, inspectable procedure body.')
                             continue
                         queue.append(target)
+            self.purity.borrowing.finish(visited)
             self.marker=next(iter(p.sources.values())).prefix+'checked_call'
             while any(self.marker.encode() in source.raw for source in r.sources):self.marker+='_'
             native=getattr(p,'native_sources',None)
@@ -157,19 +165,38 @@ class PureCalls:
         return source.mapping.wrap(name,source.path,node.start,node.end,'pure-call-target')
 
     def parameters(self,node):
-        if self.purity.eval_mode:return None
+        if node in self.original_types:return None
         proc=self.purity.owner(node)
-        if proc not in self.emitting or node is not proc.role('type'):return None
+        evaluated=self.purity.eval_mode and proc in self.purity.active and self.purity.borrowing.internal(proc)
+        if not evaluated and proc not in self.emitting or node is not proc.role('type'):return None
         params=node.role('params')
         source=node.source
         # Delay native body checking until this checked version is instantiated.
         # An inactive fn/when arm must not make an unrelated ordinary definition
         # fail merely because a checked version was generated beside it.
-        extra=(',' if params.children else '')+self.marker+':$'+self.marker+'_Type=true'
+        extra=(',' if params.children else '')
+        if not evaluated:extra+=self.marker+':$'+self.marker+'_Type=true,'
+        extra+=self.ownership+':$'+self.ownership_type+'=struct{}{}'
         code=source.splice(params,[(child.start,child.end,source.render(child)) for child in params.children],[(params.end,extra)])
         replacements=[(child.start,child.end,source.render(child)) for child in node.children if child is not params]
         replacements.append((params.start,params.end,code))
         return source.splice(node,replacements,[(params.start,code)] if params.start==params.end else [])
+
+    def query(self,node):
+        # Evaluation adds permission parameters to internal helpers in place.
+        # Type reflection must still see the source procedure's signature.
+        if not self.purity.eval_mode or node.kind!='Call' or self.purity.builtin(node)!='type_of':return None
+        args=node.group('args')
+        if len(args)!=1:return None
+        candidates=self.purity.r.procedure_candidates(args[0])
+        if len(candidates)!=1:return None
+        _,signature=candidates[0]
+        proc=signature.parent
+        if proc not in self.purity.active or not self.purity.borrowing.internal(proc):return None
+        if self.purity.r.generic_parameters(signature):return None
+        self.original_types.add(signature)
+        try:return signature.source.render(signature)
+        finally:self.original_types.remove(signature)
 
     def body(self,node,expected,constant):
         proc=self.purity.owner(node)
@@ -188,13 +215,17 @@ class PureCalls:
         return json.dumps(names[0].text) if names else None
 
     def arguments(self,call):
-        if self.purity.eval_mode or not self.purity.checked(self.purity.owner(call)):return []
+        if not self.purity.checked(self.purity.owner(call)):return []
         if self.purity.invalid_default(call):return []
         if call in self.purity.problems or call.role('callee') in self.purity.problems:return []
-        targets=self.targets.get(call,[])
-        if not any(target in self.names for target in targets):return []
+        targets=self.purity.targets(call) if self.purity.eval_mode else self.targets.get(call,[])
+        targets=[target for target in targets if self.purity.borrowing.internal(target)]
+        if not targets or not self.purity.eval_mode and not any(target in self.names for target in targets):return []
         args=call.group('args');position=args[-1].end if args else call.end-1
-        inserts=[(position,(', ' if args else '')+self.marker+'=true')]
+        profile=self.purity.borrowing.argument(call,targets)
+        extra=self.ownership+'='+profile
+        if not self.purity.eval_mode:extra=self.marker+'=true,'+extra
+        inserts=[(position,(', ' if args else '')+extra)]
         callee=call.role('callee')
         if callee.kind=='Selector' and callee.data.get('op')=='->':
             inserts.append((args[0].start if args else call.end-1,callee.source.render(callee.role('expr'))+', '))

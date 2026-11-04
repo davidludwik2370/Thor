@@ -29,8 +29,13 @@ class Diagnostics:
                                for (start, end), message in s.guard_messages.items()}
         self.type_operand_errors = {str(path): s.type_operand_errors for path, s in (sources or {}).items()}
         self.sequence_bounds = {str(path): s.sequence_bounds for path, s in (sources or {}).items()}
-        self.hidden_parameters={calls.marker for s in (sources or {}).values()
-            if (calls:=getattr(getattr(s,'purity',None),'calls',None)) and calls.names}
+        self.hidden_parameters={name for s in (sources or {}).values()
+            if (calls:=getattr(getattr(s,'purity',None),'calls',None))
+            for name in (calls.marker,calls.ownership)}
+        self.checked_names={name:proc.parent.group('names')[0].text for s in (sources or {}).values()
+            if (calls:=getattr(getattr(s,'purity',None),'calls',None)) for proc,name in calls.names.items()}
+        self.checked_callable_markers={calls.ownership_type for s in (sources or {}).values()
+            if (calls:=getattr(getattr(s,'purity',None),'calls',None))}
         self.pure_type_checks={(str(path),start,end):description for path,s in (sources or {}).items()
                                for (start,end),description in getattr(s,'pure_type_checks',{}).items()}
         self.pure_type_tokens={token:Origin(str(path),start,end,'pure-type-check') for path,s in (sources or {}).items()
@@ -90,13 +95,17 @@ class Diagnostics:
         result, seen = [], set()
         for error in errors:
             msgs = list(error.get("msgs") or [])
+            if msgs and msgs[0].startswith('Invalid use of a non-specialized polymorphic type') and any(name in msgs[0] for name in self.checked_callable_markers):
+                msgs=['Pure code cannot store or indirectly call procedure values.']
             generated_result_failure = False
             generated_type_failure = False
             type_operand = None
             index_dependencies = []
             related = list(error.get('related') or []) if not backend else []
             for name in self.hidden_parameters:
-                msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false))?', '',m) for m in msgs]
+                msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false|struct\s*\{\s*\}\s*\{\s*\}))?', '',m) for m in msgs]
+                msgs=[re.sub(r'^[ \t]*•[ \t]*'+re.escape(name)+r'[ \t]*=.*(?:\n|$)','',m,flags=re.MULTILINE) for m in msgs]
+            msgs=[message for message in msgs if message.strip()]
             for token, message in self.error_messages.items():
                 if any(token in m for m in msgs):
                     msgs = [message]
@@ -352,6 +361,8 @@ class Diagnostics:
                 # Generated implementation names never belong in user diagnostics.
                 for name in self.hidden_parameters:
                     msgs=[re.sub(r'(?:,\s*)?'+re.escape(name)+r'\s*=\s*true\b','',m) for m in msgs]
+                for name,original in self.checked_names.items():
+                    msgs=[re.sub(r'\b'+re.escape(name)+r'\b',lambda _:original,m) for m in msgs]
                 for alias, name in self.namespace_aliases.items():
                     if name == 'big':
                         for logical in ('Integer','Rational'):

@@ -102,12 +102,12 @@ work::fn(input:string,n:int)->int{
         self.invoke(self.program('a:=[1,2];assert(work(a)==9&&a[0]==1)',
             'work::fn(input:[2]int)->int{copy:=input;copy[0]=9;return copy[0]}\n'))
 
-    def test_mutable_range_binding_reports_pure_restriction_without_cascades(self):
-        for declaration,call in [('fn','work()'),('proc','#run work()')]:
+    def test_mutable_range_binding_reports_borrowed_write_without_cascades(self):
+        for declaration,call in [('fn','work([]int{1,2})'),('proc','#run work([]int{1,2})')]:
             with self.subTest(declaration=declaration):
                 _,result=self.invoke(self.program('_='+call,
-                    'work::'+declaration+'()->int{data:=[1,2];total:=0;for &value in data{value+=1;total+=value};return total}\n'),
-                    command='check',fail='Pure code cannot iterate by mutable reference')
+                    'work::'+declaration+'(data:[]int)->int{total:=0;for &value in data{value+=1;total+=value};return total}\n'),
+                    command='check',fail='borrowed from an input')
                 self.assertNotIn('Undeclared name: value',result.stderr)
                 self.assertNotIn('__thor_',result.stderr)
 
@@ -147,7 +147,7 @@ outer::fn(input:[]int)->int{return inner(input)}
             ('global:>7\nbad::fn()->int{return global}', 'outside the function'),
             ('bad::fn()->int{_=context;return 0}', 'ambient context'),
             ('bad::fn()->int{p:=ordinary;return p()}\nordinary::proc()->int{return 7}', 'indirect'),
-            ('bad::fn()->int{x:=7;_= &x;return x}', 'raw addresses'),
+            ('bad::fn()->int{x:=7;y:=7;return (&x==&y)?1:0}', 'pointer identities'),
             ('bad::fn()->[8]u8{return transmute([8]u8)f64(1)}', 'transmute'),
             ('bad::fn()->int{value:int=---;return value}', 'uninitialized storage'),
             ('global:int\nnotify::proc(){global+=1}\n@(deferred_none=notify) bad::fn()->int{return 7}', 'implicit deferred procedure callbacks'),

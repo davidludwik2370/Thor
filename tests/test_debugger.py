@@ -587,6 +587,37 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_confined_mutation_helper_breakpoints_and_caller_locals(self):
+        text='''package main
+change::proc(out:^int){
+    out^+=7
+}
+work::fn(n:int)->int{
+    local:=n
+    change(&local)
+    total:=local+1
+    return total
+}
+main::proc(){
+    n:=3
+    result:=work(n)
+    if result!=11{panic("mutation")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[3,8])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line'],frame['name']),(str(source),3,'change'),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'*out','context':'watch'})
+        self.assertEqual(value['result'],'3',value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'local','context':'watch'})
+        self.assertEqual(value['result'],'10',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def build(self, text, files=None):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
         self.addCleanup(temporary.cleanup)

@@ -68,6 +68,18 @@ pure_sum :: fn(values: []int) -> int {
     for value in values { total += value }
     return total
 }
+set_local :: proc(out: ^int) { out^ = 7 }
+increase_local :: proc(values: []int) { for &value in values { value += 1 } }
+pure_mutation :: fn(input: []int) -> int {
+    y: int
+    set_local(&y)
+    local := make([]int, len(input))
+    copy(local, input)
+    increase_local(local)
+    return y + local[0]
+    // increase_local(input) is rejected: local headers do not own input elements.
+}
+PURE_MUTATION :: #run pure_mutation([]int{1, 2})
 pure_work :: fn(text: string, value: int) -> int {
     buffer := make([]int, 3)
     buffer[0] = value
@@ -476,6 +488,8 @@ main :: proc() {
     println("T18: pure runtime functions, generic/recursive calls, and scratch storage")
     runtime_values := [1, 2, 3]
     assert(pure_sum(runtime_values[:]) == 6 && runtime_values[0] == 1)
+    changed := pure_mutation(runtime_values[:])
+    if changed != 9 || PURE_MUTATION != 9 || runtime_values[0] != 1 { panic("confined mutation") }
     assert(pure_square(f64(1.5)) == 2.25 && pure_factorial(5) == 120)
     assert(pure_work("input", 7) == 14)
 
