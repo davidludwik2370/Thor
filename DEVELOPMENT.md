@@ -3277,3 +3277,42 @@ and optimized assertion-/bounds-/type-check-disabled configurations pass. Two
 CodeLLDB regressions cover ordinary and generic nonreturning arms. Both updated
 demos also run in optimized unchecked builds. Restart the language server to
 load TLS 0.27.0; no extension reinstall is needed.
+
+## Owned dynamic pure results (Thor 0.36.0)
+
+`loadPoints::fn()->[dynamic]Pos` was blocked by the pure result-type restriction,
+even though its local append loop already satisfied purity. Contextful checked
+results now accept dynamic arrays recursively, and internal checked helpers may
+receive locally owned dynamic headers/pointers. Public fn dynamic-array inputs
+still require slice views; pointer/resource elements and contextless allocated
+returns retain their existing restrictions and source-mapped diagnostics.
+
+Result promotion treats a dynamic header as owned storage. It preserves length,
+capacity, nil backing and live elements, recursively copies nested owned values,
+and installs the caller allocator instead of letting scratch metadata escape.
+`pure.destroy` follows a dynamic header's stored allocator for recursive cleanup.
+Empty/nil and zero-sized elements remain supported. Allocation/descriptor guards
+use ordinary conditionals and remain active with assertions disabled.
+
+The contents-only evaluation protocol adds dynamic sequence storage and capacity;
+runtime materialization reconstructs fresh buffers directly, including on cache
+hits. Such results require runtime bindings (:=), while pure scalar consumers
+can still yield constants. Generic, named/multiple, deferred and nested results,
+borrowed element protection, strings, big numbers and later appends are covered
+by `test_pure_dynamic_results.py`. The old rejected dynamic-result inventory case
+now checks an unsupported dynamic array of pointers instead.
+
+Validation: 339 distinct compiler/evaluation/cache/purity/diagnostic/hygiene tests,
+12 live editor tests, ten native pure/evaluation tests in both checked and
+optimized assertion-/bounds-/type-check-disabled modes, and a real CodeLLDB test
+are verified. Initial fixture errors (slicing a native constant and expecting a
+typedef spelling in hover) were corrected and rerun. The guided demo runs in
+unchecked release mode. The actual circles_on_dots source checks and builds in
+debug and unchecked release modes without edits or launching its GUI.
+
+One existing intrinsic regression hit an intermittent stock Odin SIGSEGV. Its
+leading faulting frames match the previously captured code-generation crash;
+the isolated retry and three further repeats passed. Details are retained in
+`upstream/odin-codegen-race/evidence/recurrence-2026-11-04.txt`. No Odin compiler
+changes or TLS engine changes were needed; saving/rechecking refreshes the new
+compiler diagnostics.

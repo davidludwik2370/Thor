@@ -69,8 +69,13 @@ def expression(value,typ,meta,depth=0,big=None):
         return f'{typ}({kind}('+','.join(components)+'))'
     if kind=='sequence':
         items=value.get('values')
-        if value.get('storage','array') not in {'array','slice'}:raise ValueErrorProtocol('Invalid sequence storage.')
+        storage=value.get('storage','array')
+        if storage not in {'array','slice','dynamic'}:raise ValueErrorProtocol('Invalid sequence storage.')
         if not isinstance(items,list) or type(value.get('nil')) is not bool:raise ValueErrorProtocol('Invalid sequence result.')
+        if storage=='dynamic':
+            capacity=value.get('capacity')
+            if type(capacity) is not int or not len(items)<=capacity<=sys.maxsize:raise ValueErrorProtocol('Invalid dynamic-array capacity.')
+            if value['nil'] and capacity and value.get('zero_sized') is not True:raise ValueErrorProtocol('A nil dynamic array cannot have nonzero-sized capacity.')
         if value['nil'] and not items:
             return f'{typ}(nil)'
         if value['nil'] and value.get('zero_sized') is not True:raise ValueErrorProtocol('A nil sequence cannot have nonzero-sized elements.')
@@ -105,10 +110,18 @@ def has_owned(value, *, slices_only=False):
     kind=value['kind']
     if kind in {'string','big_integer','big_rational'}:return not slices_only
     if kind=='sequence':
-        if value.get('storage')=='slice' or value.get('nil'):return True
+        if value.get('storage') in {'slice','dynamic'} or value.get('nil'):return True
         return any(has_owned(v,slices_only=slices_only) for v in value['values'])
     if kind in {'record','enum_array'}:return any(has_owned(v,slices_only=slices_only) for _,v in value['fields'])
     if kind=='union' and value['variant']>=0:return has_owned(value['value'],slices_only=slices_only)
+    return False
+
+
+def has_dynamic(value):
+    kind=value['kind']
+    if kind=='sequence':return value.get('storage')=='dynamic' or any(has_dynamic(v) for v in value['values'])
+    if kind in {'record','enum_array'}:return any(has_dynamic(v) for _,v in value['fields'])
+    if kind=='union' and value['variant']>=0:return has_dynamic(value['value'])
     return False
 
 
@@ -124,6 +137,11 @@ def materialize(value,typ,meta,module,prefix,big=None):
         if kind=='string':return f'{module}.clone({expression(v,t,meta,big=big)})'
         if kind=='sequence':
             elem=f'{meta}.type_elem_type({t})'
+            if v.get('storage')=='dynamic':
+                serial+=1;name=prefix+str(serial)
+                statements.append(f'{name}:={module}.allocate_dynamic({t},{len(v["values"])},{v["capacity"]},{str(not v["nil"]).lower()})')
+                for i,item in enumerate(v['values']):statements.append(f'{name}[{i}]={build(item,elem)}')
+                return name
             if v.get('storage')=='slice' or v['nil']:
                 serial+=1;name=prefix+str(serial)
                 statements.append(f'{name}:={module}.allocate_slice({t},{len(v["values"])},{str(not v["nil"]).lower()})')

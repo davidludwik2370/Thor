@@ -25,7 +25,7 @@ generic, ownership, helper-process and editor tests in:
 | --- | --- |
 | Missing implementation | `fn` declarations need an inspectable body. Foreign/bodyless prototypes use `proc`. Highlight `fn`; do not emit a Python traceback. |
 | Calling convention | Declared `fn` uses Odin's calling convention. An inspectable ordinary contextless/C procedure can still qualify when its operations and value types qualify. |
-| Input/result types | Public fn inputs and checked results reject raw/typed/multiple pointers, runtime type identities, `any`, procedure values, maps/sets, dynamic arrays and unsupported nested members. Internal ordinary helper parameters may contain typed pointers and fixed-capacity arrays of supported storage. Public signature failures highlight the parameter/result type; helper failures link that annotation from the responsible fn call. Name the rejected instantiated type. |
+| Input/result types | Public fn inputs and checked results reject raw/typed/multiple pointers, runtime type identities, `any`, procedure values, maps/sets and unsupported nested members. Dynamic-array results and internal helper parameters are supported, including nested owned values. Public dynamic-array inputs remain unsupported; pass a slice view instead. Internal ordinary helper parameters may contain typed pointers and fixed-capacity arrays of supported storage. Public signature failures highlight the parameter/result type; helper failures link that annotation from the responsible fn call. Name the rejected instantiated type. |
 | String representation | Support bounded UTF-8 `string`; reject `cstring`, `cstring16` and `string16` as pure inputs/results. C strings are pointer storage, rather than ordinary bounded value strings. |
 | Numeric representation | Integer/Rational are logical values. Pure code uses their numeric operators and public properties; inspecting their implementation headers is rejected, including through unconstrained generics. Unrelated user fields with the same names remain valid. |
 | Record schemas | Validate all fields and union variants recursively. Reject raw unions, unresolved schemas and recursive/excessively deep value shapes. A public raw union no longer causes an unrelated normal record with the same field names to fail. |
@@ -74,9 +74,10 @@ is the shuffle's default ambient generator; linked notes show the shuffle call,
 the standard-library context access and `simulate_game`'s fn contract. Changing
 the caller to `proc`, or making the helper deterministic, clears the error.
 
-Internal helper parameters accept fixed-capacity arrays recursively, including
-through typed pointers. Public pure inputs/results retain their existing
-container restrictions. `append` and pop-family operations preserve borrowed
+Internal helper parameters accept dynamic/fixed-capacity arrays recursively,
+including through typed pointers. Dynamic-array results are promoted into the
+caller allocator; public dynamic-array inputs still require slice views.
+`append` and pop-family operations preserve borrowed
 element provenance, including native/Thor spreads and named arguments; putting
 a borrowed slice in a local container does not grant permission to mutate it.
 Generated inference cascades are compared with the underlying cause location

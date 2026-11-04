@@ -1272,9 +1272,39 @@ empty_slots :: fn(count: int) -> []Empty {
     return make([]Empty, count)
 }
 
+// Growing a private buffer is deterministic. The returned dynamic header gets
+// fresh caller-owned storage; its allocator never points back into fn scratch.
+growing_samples :: fn(start, count: int) -> [dynamic]int {
+    values: [dynamic]int
+    for i in 0..<count {
+        append(&values, start + i)
+    }
+    return values
+}
+
 
 owned_pure_results :: proc() {
     println("\n# owned pure results and independent storage")
+
+    {
+        start := 10
+        runtime := growing_samples(start, 3)
+        compiled := #run growing_samples(10, 3)
+        automatic := growing_samples(10, 3)
+        defer delete(runtime)
+        defer delete(compiled)
+        defer delete(automatic)
+
+        // All three paths own separate buffers and retain their capacities.
+        // Later appends/deletion use this caller's allocator normally.
+        append(&runtime, 13)
+        compiled[0] = 90
+        if len(runtime) != 4 || automatic[0] != 10 || cap(compiled) != cap(automatic) {
+            panic("dynamic result ownership")
+        }
+        // Not valid: VALUES :: #run growing_samples(10, 3)
+        // A dynamic array needs a runtime binding, even with constant contents.
+    }
 
     {
         route_name := "cedar"

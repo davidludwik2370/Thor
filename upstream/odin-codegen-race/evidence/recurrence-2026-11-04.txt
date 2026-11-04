@@ -1,0 +1,20 @@
+Odin backend recurrence during Thor dynamic pure-result regressions
+
+macOS report: odin-2026-11-04-132515.ips
+Exception: EXC_BAD_ACCESS / SIGSEGV / KERN_INVALID_ADDRESS at 0x0
+Test: tests.test_native_run.NativeRunTests.test_deterministic_compiler_primitives_are_distinguished_from_state
+Operation: #run intrinsics.sqrt(f64(9))
+
+Leading faulting frames:
+  alloc_cstring(gbAllocator, String) +896
+  lb_type_internal(lbModule*, Type*) +680
+  lb_type(lbModule*, Type*) +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*) +636
+
+The first three symbol/offset pairs match the earlier captured code-generation
+crashes. This is consistent with the documented name-cache race; a matching
+stack alone is not new proof of its underlying cause.
+The isolated regression retry and three additional repeats all passed.
+Thor reported a backend compiler failure, rather than a false source-type error.
+The installed Odin compiler is unchanged. No upstream report was sent.

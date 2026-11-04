@@ -6,6 +6,45 @@ import "core:testing"
 import "base:runtime"
 
 @(test)
+dynamic_results_preserve_capacity_and_own_allocator_and_nested_values :: proc(t:^testing.T) {
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,context.allocator,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracker)
+    allocator:=mem.tracking_allocator(&tracker)
+    original:=make([dynamic]string,2,11)
+    defer delete(original)
+    original[0]="first";original[1]="second"
+    result:=clone(original,allocator)
+    testing.expect(t,len(result)==2&&cap(result)==11&&raw_data(result)!=raw_data(original))
+    testing.expect(t,raw_data(result[0])!=raw_data(original[0]))
+    added:=clone("third",allocator)
+    append(&result,added)
+    testing.expect(t,len(result)==3&&result[2]=="third")
+    // Dynamic headers carry their allocator, independently of ambient context.
+    destroy(result)
+    testing.expect(t,len(tracker.allocation_map)==0&&len(tracker.bad_free_array)==0)
+}
+
+@(test)
+dynamic_nil_empty_and_zero_sized_results_keep_descriptor_semantics :: proc(t:^testing.T) {
+    empty:[dynamic]int
+    nil_copy:=clone(empty)
+    testing.expect(t,len(nil_copy)==0&&cap(nil_copy)==0&&raw_data(nil_copy)==nil)
+    destroy(nil_copy)
+    allocated:=allocate_dynamic([dynamic]int,0,0,true)
+    copy_empty:=clone(allocated)
+    testing.expect(t,len(copy_empty)==0&&cap(copy_empty)==0&&raw_data(copy_empty)!=nil)
+    append(&copy_empty,7)
+    testing.expect(t,len(copy_empty)==1&&copy_empty[0]==7)
+    destroy(copy_empty);destroy(allocated)
+    Empty::struct{}
+    zeros:=allocate_dynamic([dynamic]Empty,3,9,false)
+    copied:=clone(zeros)
+    testing.expect(t,len(copied)==3&&cap(copied)==9&&raw_data(copied)==nil)
+    destroy(copied);destroy(zeros)
+}
+
+@(test)
 scratch_frees_live_buffers_and_handles_explicit_deletion :: proc(t:^testing.T) {
     backing:=context.allocator
     outer:mem.Tracking_Allocator

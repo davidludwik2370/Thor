@@ -457,6 +457,7 @@ class Purity:
             parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
         parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
+        parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
         count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
         parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
@@ -1121,7 +1122,7 @@ class Purity:
         key=typ.kind,typ.node
         if key in seen:return True
         seen.add(key)
-        if typ.kind in {'string','slice','generic','unknown','big_integer','big_rational'}:return True
+        if typ.kind in {'string','slice','dynamic','generic','unknown','big_integer','big_rational'}:return True
         if typ.elem:return self.owned_type(typ.elem,seen)
         if typ.kind=='struct' and typ.node:
             return any(self.owned_type(self.r.type_node(f.role('type'),typ.substitutions),seen.copy())

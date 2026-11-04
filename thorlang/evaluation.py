@@ -203,6 +203,8 @@ class Evaluator:
             label='#run' if n.kind=='Run' else 'fn'
             constant=(s.expressions.error(n,f'A slice-containing {label} result needs a runtime binding (:=); use a pure consumer to compute a scalar constant.')
                       if values.has_owned(data,slices_only=True) else literal)
+            if values.has_dynamic(data):
+                constant=s.expressions.error(n,f'A dynamic-array-containing {label} result needs a runtime binding (:=); use a pure consumer to compute a scalar constant.')
             from .bigvalues import contains
             if contains(data) and data['kind'] not in {'big_integer','big_rational'}:
                 constant=s.expressions.error(n,'An aggregate containing Integer/Rational results needs a runtime binding (:=); use :: for individual numeric constants.')

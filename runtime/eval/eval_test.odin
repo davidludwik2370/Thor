@@ -5,6 +5,28 @@ import "core:strings"
 import "core:testing"
 
 @(test)
+dynamic_protocol_encodes_capacity_contents_and_nested_headers :: proc(t:^testing.T) {
+    builder:strings.Builder
+    strings.builder_init(&builder)
+    defer strings.builder_destroy(&builder)
+    values:=make([dynamic]int,2,17)
+    defer delete(values)
+    values[0]=7;values[1]=9
+    write(&builder,values,0)
+    text:=strings.to_string(builder)
+    testing.expect(t,strings.contains(text,`"storage":"dynamic","nil":false,"capacity":17`))
+    testing.expect(t,strings.contains(text,`"value":"9"`))
+    strings.builder_reset(&builder)
+    Record::struct{values:[dynamic]int}
+    write(&builder,Record{values},0)
+    testing.expect(t,strings.contains(strings.to_string(builder),`"capacity":17`))
+    strings.builder_reset(&builder)
+    empty:[dynamic]int
+    write(&builder,empty,0)
+    testing.expect(t,strings.contains(strings.to_string(builder),`"nil":true,"capacity":0`))
+}
+
+@(test)
 contents_and_descriptor_protocol_releases_builder_storage :: proc(t:^testing.T) {
     builder:strings.Builder
     strings.builder_init(&builder)

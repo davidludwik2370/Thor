@@ -52,8 +52,9 @@ Deferred:
   debugging are implemented and maintained alongside the compiler.
 - General ownership, borrow checking, or automatic cleanup in ordinary proc code.
 - Fixed-capacity maps/sets and implicit method syntax.
-- Maps, sets, and dynamic arrays as pure-function inputs or results. Dynamic
-  buffers may be used internally through approved pure allocation operations.
+- Maps/sets as pure-function inputs or results, and dynamic arrays as public
+  pure-function inputs. Dynamic buffers may be used internally and returned
+  through supported allocation operations; use slice views for pure inputs.
 - Arbitrary pointers, foreign calls, or side effects during compile-time execution.
 - Cross-compilation correctness for compile-time execution; v1 runs natively.
 - Full Python formatting, including locale support and dynamic format fields.
@@ -658,7 +659,7 @@ Inputs and operations:
   conversions or pointer-bearing public fn inputs/results. Reject helper-local
   stack addresses/views escaping through output parameters. Propagate reference
   stores through output parameters so later calls cannot mutate borrowed inputs.
-- Internal helper parameters may carry locally owned fixed-capacity arrays,
+- Internal helper parameters may carry locally owned dynamic/fixed-capacity arrays,
   including typed pointers to them. Preserve borrowed references in their
   elements through append/spread/pop operations. A helper purity violation
   highlights the responsible call inside the fn and links its underlying cause
@@ -708,9 +709,9 @@ Allocation and results:
   Inputs remain protected. User-supplied allocator callbacks are not allowed.
 - Use compiler-managed scratch storage for internal work. Dispose of it on every
   function exit after any returned contents have been preserved.
-- Intended result support includes scalar values, strings, slices, and supported
+- Intended result support includes scalar values, strings, slices, dynamic arrays, and supported
   aggregates. No raw pointers, resources, cyclic graphs, or arbitrary alias graphs.
-- String/slice results have value semantics and independent backing storage;
+- String/slice/dynamic-array results have value semantics and independent backing storage;
   returning an input view produces an independent result, not an escaping alias.
 - Runtime allocation-bearing results are copied out into caller-owned storage
   using the saved caller allocator before scratch storage is released. For nested
@@ -718,7 +719,11 @@ Allocation and results:
 - Apply copying recursively to supported allocation-bearing aggregate members.
   The support library must document cleanup of such results; shallow delete of
   an outer container alone must not be presented as recursive destruction.
-- T22 selects independent tree ownership: each string/slice occurrence gets its
+- Preserve dynamic-array length, capacity, nil backing and supported elements.
+  Rebind promoted headers to the caller allocator. Dynamic-array-containing
+  compile-time results require runtime storage (:=), just like slice results.
+  Public fn dynamic-array inputs remain unsupported; use a slice view instead.
+- T22 selects independent tree ownership: each string/slice/dynamic-array occurrence gets its
   own backing, even repeated aliases. Import pure "thor:pure" and call
   pure.destroy(result) once to free a nested owned result recursively;
   pure.clone(value) makes another owned deep copy in ordinary proc code.

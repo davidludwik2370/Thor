@@ -110,6 +110,31 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_dynamic_pure_results_keep_original_frames_and_live_caller_storage(self):
+        text='''package main
+build::fn(n:int)->[dynamic]int{
+    points:[dynamic]int
+    for i in 0..<n{append(&points,i)}
+    return points
+}
+main::proc(){
+    n:=3
+    points:=build(n)
+    defer delete(points)
+    append(&points,9)
+    if len(points)!=4||points[3]!=9{panic("wrong dynamic result")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,11])
+        for line,expected_length in [(5,'3'),(11,'3')]:
+            thread,frame=self.frame(client)
+            self.assertEqual((frame['source']['path'],frame['line']),(str(source),line),frame)
+            length=client.request('evaluate',{'frameId':frame['id'],'expression':'points.len','context':'watch'})
+            self.assertEqual(length['result'],expected_length,length)
+            client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_generic_nonreturning_arm_skips_specialization_helpers_when_stepping(self):
         text='''package main
 stop::proc()->!{panic("unexpected")}

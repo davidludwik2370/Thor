@@ -1160,7 +1160,8 @@ scalar bit casts are eligible. Checks inside
 inactive native `when` branches remain inactive.
 
 Compiler-controlled deterministic operations include numeric conversions/operations,
-length/type/size queries, `make` for local slice/dynamic buffers, `copy`, `delete`,
+length/type/size queries, `make` for local slice/dynamic buffers, `append`, `clear`,
+pop-family operations, `copy`, `delete`,
 assertions, `core:strings.clone`, `core:slice.clone`, and Thor's scalar/string
 formatters. Other direct calls require inspectable, transitively eligible bodies. Explicit
 allocator overrides and custom record formatters are rejected. Each checked
@@ -1170,7 +1171,7 @@ all outstanding internal allocations are released on every return. Ordinary
 `proc` results and named f-string owners retain explicit cleanup. Anonymous
 f-string arguments follow the expression lifetime rule described above.
 
-String/slice results own independent backing storage, including input views and
+String/slice/dynamic-array results own independent backing storage, including input views and
 repeated aliases inside arrays, records and tagged unions. Promotion uses the
 saved caller allocator after user defers and before local/scratch storage expires.
 Nested calls allocate their returned copies in the receiving function's scratch.
@@ -1184,7 +1185,22 @@ defer delete(text)
 // For nested allocated fields/elements, call pure.destroy(result) once instead.
 ```
 
-`pure.destroy` recursively frees owned strings/slices and their supported
+Dynamic-array results retain their length and capacity and use the caller's
+allocator, so later `append` and ordinary `delete` work normally. For example:
+
+```odin
+load_points :: fn() -> [dynamic]Pos {
+    points: [dynamic]Pos
+    for point in STARTING_POINTS { append(&points, point) }
+    return points
+}
+points := load_points() // May fold automatically when all inputs are constants.
+defer delete(points)
+compiled := #run load_points()
+defer delete(compiled)
+```
+
+`pure.destroy` recursively frees owned strings/slices/dynamic arrays and their supported
 aggregate members. `pure.clone(value)` creates another deep owned copy. Both
 accept an explicit allocator outside pure code. Ordinary assignments remain
 shallow: destroy an owner once; free an owned field before overwriting it. Do not
@@ -1197,11 +1213,13 @@ use `fn` or a contextful `proc` for those results.
 Runtime `x := #run work()` and automatically folded calls materialize fresh owned storage on every execution,
 including loop iterations and cache hits. In constant contexts, strings and fixed
 aggregates containing strings become ordinary borrowed Odin constants. A
-slice-containing result needs a runtime binding (`:=`), or a pure consumer that
-returns a scalar constant. Native slice constants are not implemented.
+slice- or dynamic-array-containing result needs a runtime binding (`:=`), or a
+pure consumer that returns a scalar constant. Native slice/dynamic-array constants
+are not implemented. Public pure inputs still accept slice views instead of
+dynamic-array headers.
 
 The value protocol preserves arbitrary string bytes, nil/non-nil empty slices,
-zero-sized slice elements, fields, active union variants and exact float bits. It
+zero-sized sequence elements, dynamic-array capacities, fields, active union variants and exact float bits. It
 serializes contents without padding or process addresses.
 
 Explicit `#run` can execute an eligible ordinary Odin or Thor procedure,

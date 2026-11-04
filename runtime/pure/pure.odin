@@ -74,7 +74,9 @@ validate :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Site:string) {
         #panic("Pure record fields require a resolved compiler schema"+Site)
     } else when intrinsics.type_is_union(T) {
         validate_union(T,Result,Depth,0,Site)
-    } else {#panic("Unsupported pure value type: pointers, handles, maps, dynamic arrays, any and procedure values are not pure inputs/results"+Site)}
+    } else when intrinsics.type_is_dynamic_array(T) {
+        #panic("Unsupported pure value type: dynamic arrays are not public fn inputs; pass a slice view instead"+Site)
+    } else {#panic("Unsupported pure value type: pointers, handles, maps, any and procedure values are not pure inputs/results"+Site)}
 }
 
 validate_union :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Index:int,$Site:string) {
@@ -96,7 +98,7 @@ validate_format :: proc "contextless"($T:typeid) {
     }
 }
 
-// Results have tree ownership. Every string/slice occurrence receives its own
+// Results have tree ownership. Every string/slice/dynamic-array occurrence owns
 // storage, including input views and repeated aliases. Padding is copied only
 // within this process; no address is serialized by the compile-time protocol.
 clone :: proc(value:$T,allocator:=context.allocator)->T {
@@ -120,6 +122,27 @@ allocate_slice :: proc($T:typeid/[]$E,count:int,nonnull:bool=true)->T {
     storage,err:=runtime.mem_alloc_bytes(max(1,count*size_of(E)),align_of(E))
     if err!=.None||raw_data(storage)==nil {panic("Pure result allocation failed")}
     return T((cast([^]E)raw_data(storage))[:count])
+}
+
+// A promoted dynamic header must use the caller's allocator, never a scratch
+// allocator whose bookkeeping is destroyed when its pure invocation returns.
+allocate_dynamic :: proc($T:typeid/[dynamic]$E,count,capacity:int,nonnull:bool=true)->T {
+    header:=allocate_dynamic_storage(count,capacity,size_of(E),align_of(E),nonnull,context.allocator)
+    return transmute(T)header
+}
+
+allocate_dynamic_storage :: proc(count,capacity,elem_size,alignment:int,nonnull:bool,allocator:runtime.Allocator)->runtime.Raw_Dynamic_Array {
+    if count<0||capacity<count||elem_size<0||capacity>max(int)/max(1,elem_size) {panic("Pure result allocation size overflow")}
+    result:=runtime.Raw_Dynamic_Array{len=count,cap=capacity,allocator=allocator}
+    if !nonnull {
+        if capacity!=0&&elem_size!=0 {panic("Null dynamic-array storage requires zero capacity or zero-sized elements")}
+        return result
+    }
+    amount:=max(1,capacity*elem_size)
+    storage,err:=runtime.mem_alloc_bytes(amount,alignment,allocator)
+    if err!=.None||len(storage)<amount||raw_data(storage)==nil {panic("Pure result allocation failed")}
+    result.data=raw_data(storage)
+    return result
 }
 
 // dst carries a pointer so its type and address remain explicit in this
@@ -162,6 +185,13 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
             for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
         }
         (cast(^runtime.Raw_Slice)dst)^=result
+    case runtime.Type_Info_Dynamic_Array:
+        value:=(cast(^runtime.Raw_Dynamic_Array)src)^
+        result:=allocate_dynamic_storage(value.len,value.cap,item.elem_size,item.elem.align,value.data!=nil,allocator)
+        if value.data!=nil {
+            for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
+        }
+        (cast(^runtime.Raw_Dynamic_Array)dst)^=result
     case runtime.Type_Info_Array:
         for i in 0..<item.count {clone_at(offset(dst,i*item.elem_size),offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
     case runtime.Type_Info_Enumerated_Array:
@@ -195,6 +225,12 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocato
         if value.data!=nil {
             for i in 0..<value.len {destroy_at(offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
             runtime.mem_free(value.data,allocator)
+        }
+    case runtime.Type_Info_Dynamic_Array:
+        value:=(cast(^runtime.Raw_Dynamic_Array)src)^
+        if value.data!=nil {
+            for i in 0..<value.len {destroy_at(offset(value.data,i*item.elem_size),item.elem,value.allocator,depth+1)}
+            runtime.mem_free(value.data,value.allocator)
         }
     case runtime.Type_Info_Array:
         for i in 0..<item.count {destroy_at(offset(src,i*item.elem_size),item.elem,allocator,depth+1)}

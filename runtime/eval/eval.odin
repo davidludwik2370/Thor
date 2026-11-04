@@ -67,6 +67,8 @@ write :: proc(builder:^strings.Builder,value:$T,$Depth:int) {
         hex(builder,transmute([]u8)value);strings.write_string(builder,`"}`)
     } else when intrinsics.type_is_enumerated_array(T) {
         write_dynamic(builder,any(value),Depth)
+    } else when intrinsics.type_is_dynamic_array(T) {
+        write_dynamic(builder,any(value),Depth)
     } else when intrinsics.type_is_array(T)||intrinsics.type_is_slice(T) {
         strings.write_string(builder,`{"kind":"sequence","storage":"`)
         strings.write_string(builder,"slice" when intrinsics.type_is_slice(T) else "array")
@@ -191,20 +193,26 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
             write_dynamic(builder,item,depth+1);strings.write_byte(builder,']')
         }
         strings.write_string(builder,` ]}`)
-    case runtime.Type_Info_Array,runtime.Type_Info_Slice:
-        count,stride:=0,0
+    case runtime.Type_Info_Array,runtime.Type_Info_Slice,runtime.Type_Info_Dynamic_Array:
+        count,stride,capacity:=0,0,0
         pointer:=value.data;elem:^runtime.Type_Info;is_nil:=false
         #partial switch item in info.variant {
         case runtime.Type_Info_Array:count=item.count;stride=item.elem_size;elem=item.elem
         case runtime.Type_Info_Slice:
             slice:=(cast(^runtime.Raw_Slice)value.data)^;count=slice.len;pointer=slice.data
             stride=item.elem_size;elem=item.elem;is_nil=pointer==nil
+        case runtime.Type_Info_Dynamic_Array:
+            array:=(cast(^runtime.Raw_Dynamic_Array)value.data)^;count=array.len;capacity=array.cap;pointer=array.data
+            stride=item.elem_size;elem=item.elem;is_nil=pointer==nil
+            if count<0||capacity<count||(is_nil&&capacity!=0&&stride!=0) {panic("Invalid pure dynamic-array result")}
         }
         strings.write_string(builder,`{"kind":"sequence","storage":"`)
         storage:="array"
         if _,ok:=info.variant.(runtime.Type_Info_Slice);ok {storage="slice"}
+        if _,ok:=info.variant.(runtime.Type_Info_Dynamic_Array);ok {storage="dynamic"}
         strings.write_string(builder,storage);strings.write_string(builder,`","nil":`)
         fmt.sbprintf(builder,"%t",is_nil)
+        if storage=="dynamic" {strings.write_string(builder,`,"capacity":`);fmt.sbprintf(builder,"%d",capacity)}
         if stride==0 {strings.write_string(builder,`,"zero_sized":true`)}
         strings.write_string(builder,`,"values":[`)
         for i in 0..<count {

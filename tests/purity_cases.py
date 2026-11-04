@@ -83,6 +83,6 @@ TYPES=[
     Case('recursive_slice','return 0','recursive reference-containing types','Node',prefix='Node::struct{children:[]Node}',params='input:Node',args='Node{}'),
     Case('result_pointer','return nil','Unsupported pure value type','^int',result='^int'),
     Case('result_typeid','return int','Unsupported pure value type','typeid',result='typeid'),
-    Case('result_dynamic','return nil','Unsupported pure value type','[dynamic]int',result='[dynamic]int'),
+    Case('result_dynamic_pointer','return nil','Unsupported pure value type','[dynamic]^int',result='[dynamic]^int'),
     Case('result_any','return nil','Unsupported pure value type','any',result='any'),
 ]
