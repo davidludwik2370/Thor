@@ -3158,3 +3158,44 @@ optimized unchecked/assertion-disabled builds, and six assertion-hygiene tests
 pass. A read-only check of the actual Hilo document confirms the three `:>`
 occurrences are readonly and the three `:=` occurrences remain mutable. Rebuild
 TLS and use Thor: Restart Language Server; no grammar/extension reinstall is needed.
+
+## Binding inference and resilient immutable colors (TLS 0.26.3)
+
+Hilo's `drawn_card :> pop(&deck)` exposed a second inference gap: fixed-capacity
+dynamic arrays lost their capacity when converted back to an AST type, and the
+generic resolver did not match or substitute their element/capacity parameters.
+Preserve `[dynamic; N]E` throughout conversion, generic calls, result types and
+generic record fields. Overload matching must check both capacity and element
+type. Instantiation now retains the original procedure's calling convention,
+builtin/pure identity, attributes and other metadata. Explicit `base:runtime`
+imports can find their actual `@builtin` declarations in the shared index,
+without exposing unrelated compiler builtins such as `len` as runtime exports.
+
+Semantic highlighting no longer requires successful type inference to describe
+a known value binding. The file resolver records lexical binding flags for
+unresolved local/global values, parameters and iteration variables. Unresolved
+loop containers receive unknown-type lexical entries before element inference;
+concrete results replace them when available. This preserves `:>`/parameter/value
+iteration colors, `&` iteration mutability, scope/shadowing and constant colors
+while code is incomplete. These entries belong only to the semantic-token map;
+they do not fabricate a hover type, select an overload, resolve an undeclared
+name or suppress compiler diagnostics.
+
+The related builtin audit covers fixed-capacity `raw_data`, numeric constructors,
+component extraction and conjugates. Complex/quaternion construction no longer
+renames an operand's shared type AST. Cast/nested arguments and real-valued
+magnitudes preserve f16/f32/f64 precision through aliases and repeated requests.
+
+`tests/test_binding_inference_tls.py` checks real LSP requests, checked compiler
+fixtures, builtin/native/imported/aliased generic calls, tuple results, mutable
+controls, all numeric precisions, unknown initializers/types, scoped shadowing,
+unsaved recovery and source-mapped invalid writes. Native regressions live in
+`tls/tests/fixed_capacity_inference_test.odin`. A read-only audit of the actual
+Hilo document verifies all 11 named immutable declarations and all `drawn_card`
+references; its hover reports `int // immutable storage`.
+
+Validation: 133 live editor/purity-interaction tests, 1,140 native TLS tests in
+both checked and optimized assertion-/bounds-/type-check-disabled builds, and
+six assertion-hygiene tests pass. The server is rebuilt locally as TLS 0.26.3;
+use Thor: Restart Language Server to load it. No extension or grammar reinstall
+is required.

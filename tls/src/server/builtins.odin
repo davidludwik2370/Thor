@@ -101,7 +101,13 @@ check_builtin_proc_return_type :: proc(
 				if lit, _, ok := get_basic_lit_value(arg); ok {
 					return convert_candidate(lit, is_mutable), true
 				}
-				return get_return_expr(ast_context, arg, is_mutable), true
+				expr := get_return_expr(ast_context, arg, is_mutable)
+				if ident, ok := expr.derived.(^ast.Ident); ok {
+					if component := builtin_numeric_component(ident.name); component != "" {
+						return make_ident_ast(ast_context, call.pos, call.end, component), true
+					}
+				}
+				return expr, true
 			}
 		case "clamp":
 			if len(call.args) == 3 {
@@ -129,6 +135,16 @@ check_builtin_proc_return_type :: proc(
 
 				return convert_candidate(value_lit, is_mutable), true
 			}
+		case "conj":
+			if len(call.args) == 1 { return get_return_expr(ast_context, call.args[0], is_mutable), true }
+		case "real", "imag", "jmag", "kmag":
+			if len(call.args) == 1 {
+				expr := get_return_expr(ast_context, call.args[0], true)
+				if ident, ok := expr.derived.(^ast.Ident); ok {
+					component := builtin_numeric_component(ident.name)
+					if component != "" { return make_ident_ast(ast_context, call.pos, call.end, component), true }
+				}
+			}
 		case "complex":
 			candidate: ^ast.Basic_Lit
 			for arg in call.args {
@@ -139,14 +155,11 @@ check_builtin_proc_return_type :: proc(
 					if ident, ok := expr.derived.(^ast.Ident); ok {
 						switch ident.name {
 						case "f16":
-							ident.name = "complex32"
-							return ident, true
+							return make_ident_ast(ast_context, call.pos, call.end, "complex32"), true
 						case "f32":
-							ident.name = "complex64"
-							return ident, true
+							return make_ident_ast(ast_context, call.pos, call.end, "complex64"), true
 						case "f64":
-							ident.name = "complex128"
-							return ident, true
+							return make_ident_ast(ast_context, call.pos, call.end, "complex128"), true
 						}
 					}
 				}
@@ -164,14 +177,11 @@ check_builtin_proc_return_type :: proc(
 					if ident, ok := expr.derived.(^ast.Ident); ok {
 						switch ident.name {
 						case "f16":
-							ident.name = "quaternion64"
-							return ident, true
+							return make_ident_ast(ast_context, call.pos, call.end, "quaternion64"), true
 						case "f32":
-							ident.name = "quaternion128"
-							return ident, true
+							return make_ident_ast(ast_context, call.pos, call.end, "quaternion128"), true
 						case "f64":
-							ident.name = "quaternion256"
-							return ident, true
+							return make_ident_ast(ast_context, call.pos, call.end, "quaternion256"), true
 						}
 					}
 				}
@@ -280,6 +290,16 @@ check_builtin_proc_return_type :: proc(
 }
 
 @(private = "file")
+builtin_numeric_component :: proc(name: string) -> string {
+	switch name {
+	case "complex32", "quaternion64": return "f16"
+	case "complex64", "quaternion128": return "f32"
+	case "complex128", "quaternion256": return "f64"
+	}
+	return ""
+}
+
+@(private = "file")
 get_return_expr :: proc(ast_context: ^AstContext, expr: ^ast.Expr, is_mutable: bool) -> ^ast.Expr {
 	if v, ok := expr.derived.(^ast.Field_Value); ok {
 		return get_return_expr(ast_context, v.value, is_mutable)
@@ -316,17 +336,14 @@ get_complex_return_expr :: proc(ast_context: ^AstContext, expr: ^ast.Expr) -> ^a
 	if v, ok := expr.derived.(^ast.Field_Value); ok {
 		return get_complex_return_expr(ast_context, v.value)
 	}
-	if ident, ok := expr.derived.(^ast.Ident); ok {
-		symbol := Symbol{}
-		if ok := internal_resolve_type_expression(ast_context, ident, &symbol); ok {
-			if v, ok := symbol.value.(SymbolBasicValue); ok {
-				return v.ident
-			} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
-				// There isn't a token for `Complex` so we just set it to `f64` instead
-				ident := new_type(ast.Ident, expr.pos, expr.end, context.temp_allocator)
-				ident.name = "f64"
-				return ident
-			}
+	if symbol, ok := resolve_value_type_expression(ast_context, expr); ok {
+		if v, ok := symbol.value.(SymbolBasicValue); ok {
+			return v.ident
+		} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
+			// There isn't a token for `Complex` so we just set it to `f64` instead
+			ident := new_type(ast.Ident, expr.pos, expr.end, context.temp_allocator)
+			ident.name = "f64"
+			return ident
 		}
 	}
 	return expr
@@ -348,17 +365,14 @@ get_quaternion_return_expr :: proc(ast_context: ^AstContext, expr: ^ast.Expr) ->
 	if v, ok := expr.derived.(^ast.Field_Value); ok {
 		return get_quaternion_return_expr(ast_context, v.value)
 	}
-	if ident, ok := expr.derived.(^ast.Ident); ok {
-		symbol := Symbol{}
-		if ok := internal_resolve_type_expression(ast_context, ident, &symbol); ok {
-			if v, ok := symbol.value.(SymbolBasicValue); ok {
-				return v.ident
-			} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
-				// There isn't a token for `Quaternion` so we just set it to `quaternion256` instead
-				ident := new_type(ast.Ident, expr.pos, expr.end, context.temp_allocator)
-				ident.name = "f64"
-				return ident
-			}
+	if symbol, ok := resolve_value_type_expression(ast_context, expr); ok {
+		if v, ok := symbol.value.(SymbolBasicValue); ok {
+			return v.ident
+		} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
+			// There isn't a token for `Quaternion` so we just set it to `quaternion256` instead
+			ident := new_type(ast.Ident, expr.pos, expr.end, context.temp_allocator)
+			ident.name = "f64"
+			return ident
 		}
 	}
 	return expr

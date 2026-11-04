@@ -41,11 +41,12 @@ package ols_builtin
 
 @(private="file") _raw_data_slice   :: proc(value: []$E)         -> [^]E    ---
 @(private="file") _raw_data_dynamic :: proc(value: [dynamic]$E)  -> [^]E    ---
+@(private="file") _raw_data_fixed   :: proc(value: ^[dynamic; $N]$E) -> [^]E ---
 @(private="file") _raw_data_array   :: proc(value: ^[$N]$E)      -> [^]E    ---
 @(private="file") _raw_data_simd    :: proc(value: ^#simd[$N]$E) -> [^]E    ---
 @(private="file") _raw_data_string  :: proc(value: string)       -> [^]byte ---
 // raw_data is a built-in procedure which returns the underlying data of a built-in data type as a Multi-Pointer.
-@builtin raw_data :: proc{_raw_data_slice, _raw_data_dynamic, _raw_data_array, _raw_data_simd, _raw_data_string}
+@builtin raw_data :: proc{_raw_data_slice, _raw_data_dynamic, _raw_data_fixed, _raw_data_array, _raw_data_simd, _raw_data_string}
 
 /*
 	This is interally from the compiler

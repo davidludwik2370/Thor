@@ -75,7 +75,16 @@ lookup :: proc(name: string, pkg: string, current_file: string, loc := #caller_l
 		return lookup_builtin_symbol(name, current_pkg, current_file_uri)
 	}
 
-	return lookup_symbol(name, pkg, current_pkg, current_file_uri)
+	if symbol, ok := lookup_symbol(name, pkg, current_pkg, current_file_uri); ok { return symbol, true }
+	// Runtime @builtin declarations live in the shared builtin index. They are
+	// also accessible through an explicit base:runtime import in source code.
+	if pkg == indexer.runtime_package {
+		if symbol, found := lookup_builtin_symbol(name, current_pkg, current_file_uri); found &&
+		   get_package_from_filepath(common.uri_to_path(symbol.uri, context.temp_allocator)) == pkg {
+			return symbol, true
+		}
+	}
+	return {}, false
 }
 
 @(private = "file")

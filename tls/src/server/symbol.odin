@@ -1037,6 +1037,11 @@ symbol_to_expr :: proc(symbol: Symbol, file: string, allocator := context.temp_a
 
 	#partial switch v in symbol.value {
 	case SymbolDynamicArrayValue:
+		if v.cap != nil {
+			type := new_type(ast.Fixed_Capacity_Dynamic_Array_Type, pos, end, allocator)
+			type.elem, type.capacity = v.expr, v.cap
+			return type
+		}
 		type := new_type(ast.Dynamic_Array_Type, pos, end, allocator)
 		type.elem = v.expr
 		if .Soa in symbol.flags {

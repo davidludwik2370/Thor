@@ -275,6 +275,37 @@ resolve_binary_expr :: proc(binary: ^ast.Binary_Expr, data: ^FileResolveData) {
 }
 
 @(private = "file")
+unresolved_binding_symbol :: proc(ctx: ^AstContext, ident: ast.Ident) -> (Symbol, bool) {
+	// Binding mutability is a lexical fact even while its initializer/type is
+	// incomplete. Keep this fallback in the semantic map; it is not an inferred
+	// type and must never make overload/type checking claim success.
+	binding_context := ctx^
+	binding_context.current_package = ctx.document_package
+	symbol := Symbol{type = .Variable, name = ident.name}
+	if local, found := get_local(binding_context, ident); found {
+		if !local.parameter && .Mutable not_in local.flags && .Variable not_in local.flags &&
+		   .Immutable not_in local.flags && .ReadOnlyBinding not_in local.flags { return {}, false }
+		symbol.flags += {.Local}
+		if local.parameter { symbol.flags += {.Parameter} } else { symbol.flags += {.Variable} }
+		if .Mutable in local.flags { symbol.flags += {.Mutable} }
+		if .Immutable in local.flags { symbol.flags += {.Immutable} }
+		if .ReadOnlyBinding in local.flags { symbol.flags += {.ReadOnlyBinding} }
+		if .CompileTime in local.flags { symbol.flags += {.CompileTime} }
+		return symbol, true
+	}
+	if global, found := ctx.globals[ident.name]; found {
+		if .Mutable not_in global.flags && .Variable not_in global.flags &&
+		   .Immutable not_in global.flags { return {}, false }
+		symbol.flags += {.Variable}
+		if .Mutable in global.flags { symbol.flags += {.Mutable} }
+		if .Immutable in global.flags { symbol.flags += {.Immutable} }
+		if .Mutable not_in global.flags && .Immutable not_in global.flags { symbol.flags += {.CompileTime} }
+		return symbol, true
+	}
+	return {}, false
+}
+
+@(private = "file")
 resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 	if node == nil {
 		return
@@ -307,6 +338,12 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 				data.symbols[cast(uintptr)node] = SymbolAndNode {
 					node   = n,
 					symbol = symbol,
+				}
+			} else if data.save_unresolved {
+				if binding, found := unresolved_binding_symbol(data.ast_context, n^); found {
+					data.symbols[cast(uintptr)node] = SymbolAndNode {
+						node = n, symbol = binding, is_unresolved = true,
+					}
 				}
 			}
 		}

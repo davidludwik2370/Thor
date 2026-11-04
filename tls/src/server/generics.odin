@@ -179,6 +179,17 @@ resolve_poly_specialization :: proc(
 				return resolve_poly_expression(ast_context, call_array.elem, p.elem, poly_map)
 			}
 		}
+	case ^ast.Fixed_Capacity_Dynamic_Array_Type:
+		if call_array, ok := call_node.derived.(^ast.Fixed_Capacity_Dynamic_Array_Type); ok {
+			found := false
+			if expr_contains_poly(p.elem) {
+				found |= resolve_poly_expression(ast_context, call_array.elem, p.elem, poly_map)
+			}
+			if expr_contains_poly(p.capacity) {
+				found |= resolve_poly_expression(ast_context, call_array.capacity, p.capacity, poly_map)
+			}
+			return found
+		}
 	case ^ast.Array_Type:
 		if call_array, ok := call_node.derived.(^ast.Array_Type); ok {
 			found := false
@@ -425,6 +436,9 @@ find_and_replace_poly_type :: proc(expr: ^ast.Expr, poly_map: ^map[string]^ast.E
 				v.pos.file = expr.pos.file
 				v.end.file = expr.end.file
 			}
+		case ^ast.Fixed_Capacity_Dynamic_Array_Type:
+			if expr, ok := get_poly_map(v.elem, poly_map); ok { v.elem = expr }
+			if expr, ok := get_poly_map(v.capacity, poly_map); ok { v.capacity = expr }
 		case ^ast.Array_Type:
 			if expr, ok := get_poly_map(v.elem, poly_map); ok {
 				v.elem = expr
@@ -704,13 +718,13 @@ resolve_generic_function_symbol :: proc(
 
 
 	symbol := proc_symbol
-	symbol.value = SymbolProcedureValue {
-		return_types      = return_types[:],
-		arg_types         = argument_types[:],
-		orig_arg_types    = params[:],
-		orig_return_types = results[:],
-		inlining          = inlining,
-	}
+	// Instantiation replaces parameter/result types, not procedure identity,
+	// calling convention, builtin/pure metadata, attributes or divergence.
+	procedure := proc_symbol.value.(SymbolProcedureValue)
+	procedure.return_types, procedure.arg_types = return_types[:], argument_types[:]
+	procedure.orig_arg_types, procedure.orig_return_types = params[:], results[:]
+	procedure.inlining, procedure.generic = inlining, false
+	symbol.value = procedure
 
 	return symbol, true
 }
@@ -859,6 +873,9 @@ resolve_poly_struct :: proc(ast_context: ^AstContext, b: ^SymbolStructValueBuild
 						if expr_matches_poly_name(v.elem, ident.name) {
 							v.elem = expr
 						}
+					case ^ast.Fixed_Capacity_Dynamic_Array_Type:
+						if expr_matches_poly_name(v.elem, ident.name) { v.elem = expr }
+						if expr_matches_poly_name(v.capacity, ident.name) { v.capacity = expr }
 					case ^ast.Pointer_Type:
 						if expr_matches_poly_name(v.elem, ident.name) {
 							v.elem = expr
@@ -893,6 +910,7 @@ resolve_poly_struct :: proc(ast_context: ^AstContext, b: ^SymbolStructValueBuild
 		#partial switch v in node.derived {
 		case ^ast.Array_Type,
 		     ^ast.Dynamic_Array_Type,
+		     ^ast.Fixed_Capacity_Dynamic_Array_Type,
 		     ^ast.Selector_Expr,
 		     ^ast.Pointer_Type,
 		     ^ast.Map_Type,

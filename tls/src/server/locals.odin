@@ -846,6 +846,16 @@ get_locals_range_vals :: proc(
 			if binding,ok:=val.derived.(^ast.Field_Value);ok{vals[i]=binding.field}else{vals[i]=val}
 		}
 	}
+	// Register lexical bindings before resolving their container. In incomplete
+	// code the element type may be unknown, but value vs &reference mutability
+	// and scope are still known. Concrete entries below replace these sentinels.
+	for val in vals {
+		if ident, ok := unwrap_ident(val); ok {
+			unknown := new_type(ast.Bad_Expr, ident.pos, ident.end, ast_context.allocator)
+			store_local(ast_context, ident, unknown, ident.pos.offset, ident.name,
+				ast_context.non_mutable_only, false, range_binding_flags(val), "", false)
+		}
+	}
 	defer {
 		if typed {
 			for val in original_vals {

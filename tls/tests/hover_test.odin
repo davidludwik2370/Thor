@@ -5327,7 +5327,7 @@ ast_hover_proc_overload_generic_map :: proc(t: ^testing.T) {
 		}
 		`,
 	}
-	test.expect_hover(t, &source, "test.clear :: proc(m: ^$T/map[$K]$V)")
+	test.expect_hover(t, &source, "test.clear :: proc \"contextless\" (m: ^$T/map[$K]$V)")
 }
 
 @(test)

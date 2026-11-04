@@ -620,7 +620,8 @@ is_symbol_same_typed :: proc(ast_context: ^AstContext, a, b: Symbol, flags: ast.
 			return is_symbol_same_typed(ast_context, a_symbol, b_symbol)
 		}
 
-		return are_same_size(ast_context, a_value.cap, b_value.cap)
+		return are_same_size(ast_context, a_value.cap, b_value.cap) &&
+		       is_symbol_same_typed(ast_context, a_symbol, b_symbol)
 
 	case SymbolMapValue:
 		b_value := b.value.(SymbolMapValue)
@@ -1919,6 +1920,8 @@ resolve_location_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 		return resolve_location_type_expression(ast_context, n.elem)
 	case ^ast.Dynamic_Array_Type:
 		return resolve_location_type_expression(ast_context, n.elem)
+	case ^ast.Fixed_Capacity_Dynamic_Array_Type:
+		return resolve_location_type_expression(ast_context, n.elem)
 	case ^ast.Pointer_Type:
 		return resolve_location_type_expression(ast_context, n.elem)
 	case ^ast.Multi_Pointer_Type:
@@ -1943,6 +1946,7 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 	if node == nil {
 		return false
 	}
+	if _, incomplete := node.derived.(^ast.Bad_Expr); incomplete { return false }
 
 	spall.trace(#procedure)
 
@@ -3906,6 +3910,8 @@ resolve_location_type_identifier :: proc(ast_context: ^AstContext, node: ast.Ide
 		case ^ast.Array_Type:
 			return resolve_location_type_expression(ast_context, n.elem)
 		case ^ast.Dynamic_Array_Type:
+			return resolve_location_type_expression(ast_context, n.elem)
+		case ^ast.Fixed_Capacity_Dynamic_Array_Type:
 			return resolve_location_type_expression(ast_context, n.elem)
 		case ^ast.Selector_Expr:
 			return resolve_selector_expression(ast_context, n)
