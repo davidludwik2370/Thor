@@ -553,6 +553,9 @@ class Resolver:
         if kind in {"Ternary", "WhenExpr"}:
             return self.type_of(n.role("x"), seen)
         if kind == "Binary":
+            if n.source.thor and n.data['op'] == '++':
+                from .concatenation import result_type
+                return result_type(n, seen)
             if n.data["op"] in {"in", "not_in", "==", "!=", "<", ">", "<=", ">=", "&&", "||"}:
                 return Type("scalar", "bool", n)
             operands=[self.type_of(n.role(side),seen.copy()) for side in ['left','right']]

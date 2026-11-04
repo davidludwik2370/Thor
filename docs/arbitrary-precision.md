@@ -189,7 +189,9 @@ there is no lexer reservation of these type names.
 [The operator walkthrough](../examples/big_operators/demo.thor) exercises the
 implemented arithmetic, exact comparisons, unary signs, Integer complement,
 bitwise operations (`&`, `|`, `~`, `&~`), shifts, powers and ordinary compound
-assignments. Odin's unsupported `++`/`--` syntax remains unsupported.
+assignments. Increment/decrement forms such as `x++` and `--x` remain
+unsupported. Thor's infix `++` concatenates compile-time arrays/slices; it is
+not a numeric increment operator.
 
 Untyped literal expressions adopt a requested big-number context before native
 inference can overflow or round: `r: Rational = 1/3 + 0.25` is exactly `7/12`.

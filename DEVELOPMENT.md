@@ -3345,3 +3345,59 @@ restart the language server to load TLS 0.27.1.
 Validation: all 126 stdio editor tests and 1,143 native TLS tests pass. The native
 suite also passes with assertions, bounds checks and type assertions disabled;
 all six assertion-hygiene tests pass.
+
+## Constant sequence concatenation (Thor 0.37.0, TLS 0.28.0)
+
+`++` concatenates compile-time fixed arrays or constant slices, with additive
+precedence and left associativity. The shared parser reuses the previously
+unsupported increment token only in Thor mode; the lexer permits continuation
+after `++`. Ordinary Odin parsing, array arithmetic, string `+`, and unsupported
+increment/compound-concatenation syntax retain their existing behavior.
+
+Chains, including grouped chains, lower to one native `intrinsics.concatenate`
+call. Operand mappings retain original diagnostic locations. Element-only hints
+give new/empty bracket literals context without forcing the result length or
+container kind onto an operand. Typed nested compound literals preserve native
+constant eligibility where casts would turn arrays into runtime values. This
+also fixes nested inferred constant arrays when basic/big ownership support is
+enabled. Large literals are not repeated in each operand's element-type query.
+No runtime concatenation routine or evaluation cache is added.
+
+The original operand ASTs remain available to TLS. Result shapes include summed
+array lengths and established operand element types, with normal source-based
+enum completion, semantic tokens, references and rename. Nested queries retain
+the resolver's recursion guard so cyclic/incomplete constant edits recover.
+Backend errors name `++` and the offending source operand; literal type errors
+take precedence over dependent constant-eligibility failures.
+
+`runtime/basic/basic.thor` no longer exports `CONCAT`. The README and both main
+demos use `++`. The operator intentionally follows the intrinsic's existing
+constant-value boundaries, including positional entries and native constant
+types; runtime array arithmetic and aggregates of allocated logical big numbers
+are not silently evaluated. Pure functions can return concatenated constant
+slices through their usual independent-storage promotion.
+
+Coverage lives in `test_concatenation.py`, `test_concatenation_tls.py`, the native
+TLS/lexer tests and the CodeLLDB source-breakpoint regression. Node grammar tests
+cover `++` in ordinary code and interpolation fields.
+
+A broad editor run exposed a tooling rebuild race: the linker temporarily
+removed `tls/bin/tls` while another client tried to start it. `build_tls.py`
+now builds in a private directory and atomically replaces the published server
+only on success. `test_build_tls.py` verifies availability during a deliberately
+paused build and preservation of the old executable after a failed build.
+The broader compiler run also found an old inline-default callback test still
+expecting purity's former generic error text. It now checks the existing precise
+indirect-call diagnostic and the callback-parameter context; the rejection rule
+has not changed.
+
+Validation: 25 concatenation compiler cases, all 179 editor regressions, 126
+diagnostic/hygiene cases, and the real CodeLLDB breakpoint/step test pass. The
+428-case compiler regression run passed except for that stale callback-message
+assertion; the corrected default-callback suite and atomic-builder test then
+passed all 16 cases. All 1,146 native TLS tests and five lexer tests pass in both
+checked and assertion/bounds/type-check-disabled modes. All 125 Node tests pass.
+Both main demos run successfully in unchecked optimized builds; checked and
+allocation-tracked walkthrough coverage is included in the compiler regressions.
+The common runtime was prepared and the installed local extension grammar was
+updated. Reload the VS Code window to load TLS 0.28.0 and the new grammar.

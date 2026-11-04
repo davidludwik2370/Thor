@@ -124,6 +124,8 @@ for (const [name, source, word, scope, line] of [
     ['membership', 'x in [1, 2]', 'in', 'keyword.control'],
     ['range membership', 'x in 0..<10', '..<', 'keyword.operator.range'],
     ['power operator', 'x := 2**3**2', '**', 'keyword.operator.power-or-expansion'],
+    ['array concatenation', 'ALL :: [1] ++ [2]', '++', 'keyword.operator.concatenation'],
+    ['interpolated concatenation', 's := f"{[1] ++ [2]}"', '++', 'keyword.operator.concatenation'],
     ['native expansion operator', 'sum(**pair)', '**', 'keyword.operator.power-or-expansion'],
     ['interpolated power', 's := f"power {value**3}"', '**', 'keyword.operator.power-or-expansion'],
     ['inclusive range membership', 'x not_in 0..=10', '..=', 'keyword.operator.range'],

@@ -41,6 +41,8 @@ including names in conditional branches. Internal imports such as `fmt`
 and the private `_parse_int` helper are not exported. Leading underscores alone
 do not mark names private, so `_int` and the other conversion helpers are public.
 
+Compile-time array/slice concatenation uses the language's `A ++ B` operator.
+
 | Helper | Behavior |
 | --- | --- |
 | `print(values, sep=" ", flush=true, end="\n")` | Print values with a separator and terminator. |
@@ -48,7 +50,6 @@ do not mark names private, so `_int` and the other conversion helpers are public
 | `sorted(data, less=..., allocator=...)` | Allocate a sorted copy of a slice; the default comparison is `<`. Pass a comparator for records or custom ordering. |
 | `_int`, `_uint`, `_i8`/`16`/`32`/`64`/`128`, `_u8`/`16`/`32`/`64` | Parse a string, returning `(value, ok)`. `base=0` infers prefixes; another base parses digits in that base. Narrow conversions check bounds. |
 | `_f32`, `_f64`, `_bool` | Parse a float or boolean string, returning `(value, ok)`. Their retained `base` argument has no effect. |
-| `CONCAT` | Alias of `intrinsics.concatenate` for constant array/slice concatenation. |
 | `input(message="", allocator=...)` | Read one stdin line; remove LF or CRLF. Return `(text, io.Error)`, preserving a final partial line with `.EOF`. |
 | `read(file_path, allocator=...)` | Read the whole file into `(text, ok)`. |
 | `write(file_path, text)` | Create or truncate a file and return `(bytes_written, os.Error)`. |

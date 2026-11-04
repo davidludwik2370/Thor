@@ -110,6 +110,32 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_constant_concatenation_keeps_original_breakpoints_and_step_lines(self):
+        text='''package main
+A::[1,2]
+B::[3]
+main::proc(){
+    combined:=A ++ B ++ [4]
+    last:=combined[3]
+    total:=combined[0]+last
+    if total!=5 {panic("concatenation")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'last','context':'watch'})
+        self.assertEqual(value['result'],'4',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_dynamic_pure_results_keep_original_frames_and_live_caller_storage(self):
         text='''package main
 build::fn(n:int)->[dynamic]int{

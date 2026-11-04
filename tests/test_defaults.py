@@ -128,11 +128,12 @@ choose::proc(data:[2]$E,less:=fn(a,b:E)->bool{return a<b})->E{
 '''))
 
     def test_purity_still_forbids_indirect_callback_inputs(self):
-        self.invoke(self.program('assert(choose([7,3])==3)', '''
+        _,result=self.invoke(self.program('assert(choose([7,3])==3)', '''
 choose::fn(data:[2]$E,less:=fn(a,b:E)->bool{return a<b})->E{
     return less(data[0],data[1]) ? data[0] : data[1]
 }
-'''), fail='indirect, foreign and unknown calls are forbidden')
+'''), fail="An indirect call through runtime procedure value 'less' is not eligible")
+        self.assertIn("While checking parameter 'less'",result.stderr)
 
     def test_imported_thor_callbacks_keep_their_own_imports(self):
         self.invoke(self.program('assert(library.compare([]int{2,5}))', 'import "library"\n'), files={

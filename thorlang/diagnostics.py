@@ -105,6 +105,8 @@ class Diagnostics:
                 msgs=['Pure code cannot store or indirectly call procedure values.']
             generated_result_failure = False
             generated_type_failure = False
+            concatenation_constant_failure = False
+            concatenation_declaration_failure = False
             type_operand = None
             index_dependencies = []
             related = list(error.get('related') or []) if not backend else []
@@ -136,6 +138,22 @@ class Diagnostics:
                 message = self.guard_messages.get((origin.file, origin.start, origin.end))
                 if message:
                     msgs = [message, *[m for m in msgs if "instantiated as" in m or "Called within" in m]]
+            if origin and any("'concatenate'" in message or message.startswith('Invalid declaration value') for message in msgs):
+                source = self.sources.get(origin.file)
+                operation = source and next((node for node in source.nodes if node.kind == 'Binary'
+                    and node.data['op'] == '++' and node.start <= origin.start and origin.end <= node.end), None)
+                if operation:
+                    concatenation_constant_failure = any("'concatenate' expects a constant array or slice" in message for message in msgs)
+                    concatenation_declaration_failure = any(message.startswith('Invalid declaration value') for message in msgs)
+                    msgs = [message.replace("'concatenate' expects a constant array or slice",
+                                "Array concatenation ('++') requires compile-time constant arrays or slices")
+                            .replace("'concatenate' expects constant values of the same element-type, got",
+                                "Array concatenation ('++') requires matching element types; got")
+                            .replace("'concatenate' expects constant values of the same slice type, got",
+                                "Array concatenation ('++') requires matching slice types; got")
+                            .replace("'concatenate' does not allow the use of 'field = value' to be concatenated together",
+                                "Array concatenation ('++') requires positional entries; named/indexed literal entries are not supported")
+                            for message in msgs]
             if origin and origin.kind=='range-type':
                 msgs=[m.replace('ternary expression','range membership') for m in msgs]
             if origin:
@@ -408,6 +426,8 @@ class Diagnostics:
                 generated_result_failure or origin.kind in {'range-type','power-type'}
                 or origin.kind=='typed-loop-check' and msgs and msgs[0].startswith('A typed numeric range requires ')
                 or origin.kind in {"array", "Compound"} and any("type_of" in m for m in msgs)))
+            diagnostic['_cascade'] |= concatenation_declaration_failure
+            diagnostic['_concatenation_constant_failure'] = concatenation_constant_failure
             if msgs and msgs[0].startswith("Power ('**') requires"):
                 diagnostic['_cascade']=False
             if origin and origin.kind=='power-type' and msgs and (msgs[0].startswith('Cannot convert numeric value') or 'truncated to' in msgs[0]):
@@ -433,6 +453,12 @@ class Diagnostics:
         filtered = []
         for diagnostic in result:
             pos = diagnostic["pos"]
+            if diagnostic['_concatenation_constant_failure'] and pos and any(
+                other is not diagnostic and not other['_cascade'] and other['type']=='error' and other['pos']
+                and not other['_concatenation_constant_failure']
+                and other['pos']['file']==pos['file']
+                and pos['offset'] <= other['pos']['offset'] < other['pos']['end_offset'] <= pos['end_offset']
+                for other in result):continue
             if diagnostic['_pure_type_context'] and self.inference_query_failure(diagnostic['msgs']) and any(
                     other is not diagnostic and other['_pure_type_context']==diagnostic['_pure_type_context']
                     and any(message.startswith('Undeclared name:') or 'is not a type' in message for message in other['msgs'])

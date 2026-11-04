@@ -6,6 +6,26 @@ import "core:testing"
 import "core:fmt"
 
 @(test)
+thor_concatenation_continues_after_a_newline :: proc(t:^testing.T) {
+    for thor in ([2]bool{false,true}) {
+        lexer:Tokenizer
+        init(&lexer,"left ++\nright\n","source.thor")
+        lexer.thor=thor
+        lexer.flags={.Insert_Semicolon}
+        first:=scan(&lexer)
+        op:=scan(&lexer)
+        next:=scan(&lexer)
+        testing.expect_value(t,first.kind,.Ident)
+        testing.expect_value(t,op.kind,.Increment)
+        testing.expect_value(t,next.kind,.Ident if thor else .Semicolon)
+        if !thor {next=scan(&lexer)}
+        testing.expect_value(t,next.text,"right")
+        testing.expect_value(t,next.pos.line,2)
+        testing.expect_value(t,lexer.error_count,0)
+    }
+}
+
+@(test)
 native_token_and_position_compatibility :: proc(t: ^testing.T) {
     context.allocator = context.temp_allocator
     sources := []string{

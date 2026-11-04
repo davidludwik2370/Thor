@@ -554,5 +554,20 @@ main :: proc() {
     assert(other_owned.values[0]==7&&raw_data(auto_owned.rows)!=raw_data(other_owned.rows))
     pure.destroy(auto_owned);pure.destroy(other_owned)
 
+    println("Compile-time concatenation: fixed arrays, slices, nested rows, and contextual literals")
+    {
+        FIRST :: [1, 2]
+        ALL :: FIRST ++ [3] ++ [4, 5]
+        ROWS :: [[1, 2]] ++ [[3, 4]]
+        LABELS :: []string{"Thor"} ++ []string{"Odin"}
+        SMALL :: [1]i8{1}
+        CONTEXTUAL :: [0] ++ SMALL ++ []
+        assert(ALL == [1, 2, 3, 4, 5] && type_of(ALL) == [5]int)
+        assert(ROWS[1] == [3, 4] && type_of(ROWS) == [2][2]int)
+        assert(len(LABELS) == 2 && CONTEXTUAL == [2]i8{0, 1})
+        // These are compile-time values. No allocation or delete is needed.
+        // :> variables are runtime values and cannot be operands of ++.
+    }
+
     println("All T01-T23 demos passed.")
 }

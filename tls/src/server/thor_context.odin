@@ -315,6 +315,9 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
             if node.op.kind == .Cmp_Eq || node.op.kind == .Not_Eq || node.op.kind == .Lt || node.op.kind == .Gt || node.op.kind == .Lt_Eq || node.op.kind == .Gt_Eq {
                 expected, _ = thor_context_value(ctx, other)
             }
+            if node.op.kind == .Increment && !thor_context_concrete(ctx, expected) {
+                expected, _ = thor_context_switch_value(ctx, other)
+            }
             return thor_context_expression(ctx, pc, branch, expected, wanted, depth+1)
         }
     }

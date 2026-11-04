@@ -74,6 +74,10 @@ class Hint:
     node: Node
     expression: str | None = None
     semantic: object = None
+    # Supply only the element type, preserving an inferred literal's length.
+    element_only: bool = False
+    # A typed compound literal stays constant where an array cast may not.
+    constant_literal: bool = False
 
 
 class Source:
@@ -341,7 +345,8 @@ class Source:
     def type_hint(self, expression, seen=None):
         if expression is None:
             return None
-        if self.resolver and expression.kind in {"Ident", "Selector", "Index", "Call", "Deref", "Paren"}:
+        if self.resolver and (expression.kind in {"Ident", "Selector", "Index", "Call", "Deref", "Paren"}
+                              or expression.kind == 'Binary' and expression.data['op'] == '++'):
             symbol = self.resolver.symbol(expression)
             if symbol and symbol.projection:
                 # A promoted field shares its owner's declaration for storage
@@ -451,6 +456,10 @@ class Source:
             return self.constant_array_length(expression.role("expr"), seen)
         if self.is_array(expression):
             return len(expression.group("elems"))
+        if expression.kind == 'Binary' and expression.data['op'] == '++':
+            left = self.constant_array_length(expression.role('left'), seen.copy())
+            right = self.constant_array_length(expression.role('right'), seen.copy())
+            return left + right if left is not None and right is not None else None
         if expression.kind == "Compound":
             hint = self.type_hint(expression.role("type"))
             if hint and hint.node.kind == "ArrayType":
@@ -954,17 +963,21 @@ class Source:
         target_type = None
         first_rendered = None
         if expected:
-            if expected.expression:
+            if expected.element_only:
+                element_type = expected.expression
+            elif expected.expression:
                 target_type = expected.expression
             elif expected.node.kind == "Compound":
                 target_type = f"type_of({expected.source.render(expected.node)})"
             else:
                 target_type = expected.source.render(expected.node)
             self.needs_intrinsics = True
-            element_type = f"{self.prefix}meta.type_elem_type({target_type})"
+            if not expected.element_only:
+                element_type = f"{self.prefix}meta.type_elem_type({target_type})"
             elem_node = self.array_hint(expected)
             node = elem_node if isinstance(elem_node, Node) else expected.node
-            nested_hint = Hint(node.source, node, element_type)
+            nested_hint = Hint(node.source, node, element_type,
+                               constant_literal=constant and (expected.element_only or expected.constant_literal))
         elif elements:
             first = elements[0]
             if needle and (first.kind == "ImplicitSelector" or first.text == "nil"
@@ -977,14 +990,15 @@ class Source:
                 element_type = f"type_of({self.prefix}default_value({first_rendered}))"
             # Later elements receive the inferred element type as their context,
             # including inner array literals and elided struct literal types.
-            nested_hint = Hint(self, first, element_type)
+            nested_hint = Hint(self, first, element_type, constant_literal=constant)
         elif needle:
             self.needs_default = True
             element_type, nested_hint = f"type_of({self.prefix}default_value({self.render(needle)}))", None
         else:
             # Let Odin reject this only if the containing branch is active.
             element_type, nested_hint = self.prefix + "array_literal_needs_element_type", None
-        values = ", ".join(self.big.owned(e, nested_hint, constant) if self.big.enabled else
+        values = ", ".join(first_rendered if constant and i == 0 and first_rendered is not None else
+                           self.big.owned(e, nested_hint, constant) if self.big.enabled else
                            first_rendered if i == 0 and first_rendered is not None else self.render(e, nested_hint, constant)
                            for i, e in enumerate(elements))
         comments = self.comments(n.start, n.end, [(e.start, e.end) for e in elements])
@@ -993,10 +1007,11 @@ class Source:
         # A named distinct array target needs an explicit same-length conversion.
         # Ordinary arrays must stay compound literals: wrapping them in even an
         # identity cast makes them invalid as Odin default parameter constants.
-        resolved = expected.source.type_hint(expected.node) if expected else None
+        resolved = expected.source.type_hint(expected.node) if expected and not expected.element_only else None
         plain_array = expected and (expected.node.kind == "ArrayType" or resolved and resolved.node.kind == "ArrayType")
-        if target_type and not plain_array:
-            literal = f"cast({target_type})({literal})"
+        if target_type and not plain_array and not expected.element_only:
+            literal = (f'{target_type}{{{comments}{values}}}' if expected.constant_literal
+                       else f"cast({target_type})({literal})")
         return f"({literal})"
 
     def using_feature_origin(self):

@@ -687,6 +687,41 @@ In generic signatures and type expressions, a repetition depending on generic
 parameters currently needs a fixed integer count from 0 through 128. A count
 that varies with a generic parameter works inside the procedure body.
 
+Compile-time sequence concatenation uses `++`:
+
+```odin
+FIRST :: [1, 2]
+SECOND :: [3, 4, 5]
+ALL :: FIRST ++ SECOND ++ [6] // [6]int
+WORDS :: []string{"hello"} ++ []string{"Thor"} // []string
+ROWS :: [[1, 2]] ++ [[3, 4]] // [2][2]int; rows stay nested
+
+SMALL :: [1]i8{1}
+MORE :: SMALL ++ [2] // New literals inherit the established element type.
+EMPTY:[0]i8: [] ++ [] // Empty literals need an element type from context.
+```
+
+Operands must be native compile-time values. Runtime variables, including `:>`
+bindings and ordinary procedure parameters, do not qualify; `$` constant
+parameters do. Arrays may have different lengths but must have matching element
+types. Slices must have the same slice type. Arrays and slices cannot be mixed
+implicitly. An array result is a plain fixed array of the combined length; a
+slice result retains its slice type. Concatenation is shallow and combines only
+the outer sequence. Constant backing storage follows Odin's usual materialization
+rules, including for nested slices; no independent heap clone is made.
+
+`++` has the same precedence as `+` and associates left to right. Native array
+`+` keeps its element-wise meaning, and strings keep their existing constant
+`+`. There is no `++=` or increment operation. Chains lower to one
+`intrinsics.concatenate` call, with no evaluation helper, heap allocation or
+cache entries. A runtime binding may copy the resulting fixed array normally;
+constant slice backing must not be deleted. Odin's intrinsic restrictions still
+apply: positional constant literals are supported; named/indexed literal entries
+and runtime array arithmetic are not silently evaluated as constants.
+
+See `constant_concatenation` in [the commented tour](examples/demo/demo.thor).
+The old `basic.CONCAT` alias has been removed; use `A ++ B` instead.
+
 Power uses infix `**`; native prefix `**values` expansion remains available.
 It associates to the right and binds above multiplication and unary signs:
 `2 ** 3 ** 2 == 512`, `-2 ** 2 == -4`, and `(-2) ** 2 == 4`.

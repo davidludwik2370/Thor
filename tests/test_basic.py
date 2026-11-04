@@ -87,7 +87,7 @@ empty := basic.sorted([]int{})
 defer delete(empty)
 assert(len(empty) == 0)
 assert(basic.type(data) == []int && basic.size(data) == size_of([]int))
-PARTS :: basic.CONCAT([1]string{"Thor"}, [1]string{"basic"})
+PARTS :: ["Thor"] ++ ["basic"]
 assert(len(PARTS) == 2 && PARTS[0] == "Thor" && PARTS[1] == "basic")
 ''', 'import "thor:basic"\n'))
 

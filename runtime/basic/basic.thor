@@ -91,8 +91,6 @@ _u32 :: proc(s: string, base:=0) -> (value: u32, ok: bool) #optional_ok { return
 _u16 :: proc(s: string, base:=0) -> (value: u16, ok: bool) #optional_ok { return _parse_int(s, u16, base) }
 _u8  :: proc(s: string, base:=0) -> (value: u8,  ok: bool) #optional_ok { return _parse_int(s, u8,  base) }
 
-CONCAT :: intrinsics.concatenate
-
 // Read one line, removing its LF or CRLF terminator. The result is caller-owned,
 // including a partial line returned with EOF. Delete it with allocator.
 input :: proc(message := "", allocator := context.allocator) -> (res: string, err: io.Error) {

@@ -1654,6 +1654,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
+	case .Increment:
+		if p.thor { return 6 } // Constant sequence concatenation, like +.
+		return 0
 	case .Mul_Mul:
 		if p.thor { return 8 }
 		return 0
@@ -3579,7 +3582,9 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			}
 
 		case .Increment, .Decrement:
-			if !lhs {
+			if p.thor && p.curr_tok.kind == .Increment {
+				loop = false // Leave infix ++ for the binary-expression parser.
+			} else if !lhs {
 				tok := advance_token(p)
 				error(p, tok.pos, "postfix '%s' operator is not supported", tok.text)
 			} else {

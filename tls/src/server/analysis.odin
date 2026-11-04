@@ -4381,6 +4381,9 @@ resolve_binary_expression :: proc(ast_context: ^AstContext, binary: ^ast.Binary_
 	}
 
 	set_ast_package_scoped(ast_context)
+	if binary.op.kind == .Increment && filepath.ext(ast_context.fullpath) == ".thor" {
+		return thor_concatenation_type(ast_context, binary)
+	}
 
 	symbol_a, symbol_b: Symbol
 	ok_a, ok_b: bool

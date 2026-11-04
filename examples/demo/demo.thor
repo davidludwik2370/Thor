@@ -1902,11 +1902,56 @@ big_formatting_and_libraries :: proc() {
 }
 
 
+// ++ combines native compile-time sequence values. It does no runtime work and
+// does not allocate a heap buffer. Strings retain their existing + spelling.
+constant_concatenation :: proc() {
+    println("\nCompile-time array and slice concatenation")
+
+    TOP :: [1, 2]
+    BOTTOM :: [3, 4, 5]
+    ALL :: TOP ++ BOTTOM ++ [6]
+    assert(ALL == [1, 2, 3, 4, 5, 6])
+    assert(type_of(ALL) == [6]int)
+
+    // A new literal can inherit an established operand's element type. An
+    // empty literal also needs context, either here or from an annotation.
+    SMALL :: [2]i8{1, 2}
+    MORE :: SMALL ++ [3]
+    EMPTY:[0]i8: [] ++ []
+    assert(type_of(MORE) == [3]i8 && len(EMPTY) == 0)
+
+    // Concatenation operates on the outer sequence, without flattening rows.
+    ROWS :: [[1, 2]] ++ [[3, 4]]
+    assert(type_of(ROWS) == [2][2]int)
+    assert(ROWS[1] == [3, 4])
+
+    // Constant slices produce another constant slice. There is nothing to
+    // delete, including when a runtime binding refers to that constant data.
+    WORDS :: []string{"hello"} ++ []string{"Thor"}
+    words := WORDS
+    assert(len(words) == 2 && words[1] == "Thor")
+
+    // ++ shares +'s precedence and associates to the left. The concatenation
+    // below is constant; the following + keeps Odin's element-wise addition.
+    sum := [1] ++ [2] + [10, 20]
+    assert(sum == [11, 22])
+
+    // Constant and immutable have different meanings. A :> binding is still
+    // a runtime value, even if its initializer happens to be a constant.
+    immutable :> ALL
+    assert(immutable[-1] == 6)
+    // Not valid: immutable ++ [7]
+    // Not valid: TOP ++ []int{7} // Explicitly choose arrays or slices.
+    // Not valid: "hello" ++ "Thor" // Use string + instead.
+}
+
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
     imports_and_odin()
     arrays_and_context()
+    constant_concatenation()
     membership_and_constraints()
     conditional_expressions()
     compile_time_selection()

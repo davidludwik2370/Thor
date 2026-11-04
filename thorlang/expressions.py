@@ -300,6 +300,9 @@ class Expressions:
                 return None
         if n.kind=='Binary' and n.data['op']=='**':
             return self.power(n,constant)
+        if n.kind=='Binary' and n.data['op']=='++':
+            from .concatenation import render
+            return render(self, n, expected)
         if n.kind=='Binary' and n.data['op']=='*':
             from .repetition import render
             repeated = render(self, n)
