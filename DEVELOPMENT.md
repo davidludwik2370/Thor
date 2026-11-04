@@ -3316,3 +3316,32 @@ the isolated retry and three further repeats passed. Details are retained in
 `upstream/odin-codegen-race/evidence/recurrence-2026-11-04.txt`. No Odin compiler
 changes or TLS engine changes were needed; saving/rechecking refreshes the new
 compiler diagnostics.
+
+## Selected-import usage follows declarations (TLS 0.27.1)
+
+`to_radians` in a selected `core:math` import could be dimmed despite a source
+call. Unused-import analysis had depended on successful result/overload type
+inference and the inferred symbol's package. That also missed re-exported aliases
+whose underlying procedure belongs to a different package.
+
+Selected names now use the existing scoped reference resolver and compare the
+imported declaration's URI/range identity. This retains uses with unresolved
+generic arguments or invalid calls, while excluding local/parameter shadows,
+qualified member access, named argument keys and record fields. Namespace and
+wildcard handling keeps its existing rules. Indexed literal keys are resolved
+as expressions, preserving map/array key references and import usage. If a
+generic literal's type is unresolved, unused-import analysis conservatively
+retains a possible key reference; that fallback does not affect rename edits.
+The extra reference pass runs only for selected imports and sizes its temporary
+map from the existing semantic map instead of reserving 10,000 entries.
+
+Coverage is in `test_selected_import_usage_tls.py` and
+`tls/tests/thor_import_usage_test.odin`, including unsaved edits, re-exports,
+overloads, generic/invalid calls, initializer scope, namespace shadowing and keys.
+A read-only check of the actual circles_on_dots document confirms `to_radians`
+receives no unused diagnostic. No source or extension changes are needed;
+restart the language server to load TLS 0.27.1.
+
+Validation: all 126 stdio editor tests and 1,143 native TLS tests pass. The native
+suite also passes with assertions, bounds checks and type assertions disabled;
+all six assertion-hygiene tests pass.

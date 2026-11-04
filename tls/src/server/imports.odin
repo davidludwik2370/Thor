@@ -151,14 +151,33 @@ find_import_usage :: proc(document: ^Document, allocator := context.temp_allocat
 			if v.symbol.type == .Package && ident.end.offset > ident.pos.offset {
 				used_names[ident.name] = true
 			}
-			if namespace, selected := selections[ident.name]; selected && !selector_fields[cast(uintptr)ident] {
-				for imp in document.imports {
-					// A local that shadows a selected name is not an import use.
-					if imp.base == namespace && imp.name == v.symbol.pkg {
-						used_names[namespace] = true
-						used_selections[ident.name] = true
-					}
+		}
+	}
+	if len(selected_names) > 0 {
+		// Usage is a reference to the imported declaration, not a successful
+		// overload/result-type query. Incomplete calls can still use an import;
+		// exported aliases can resolve to a type owned by a different package.
+		targets := make(map[string]Symbol, context.temp_allocator)
+		for name in selected_names {
+			for imp in document.imports {
+				if imp.base == selections[name.name] {
+					if symbol, ok := lookup(name.name, imp.name, document.fullpath); ok { targets[name.name] = symbol }
 				}
+			}
+		}
+		references := resolve_entire_file_for_references(document, context.temp_allocator, .Identifier, "", capacity=max(32,len(symbols)), import_usage=true)
+		for _, reference in references {
+			if reference.node == nil || synthetic_positions[reference.node.pos.offset] { continue }
+			ident, named := reference.node.derived.(^ast.Ident)
+			if !named || selector_fields[cast(uintptr)ident] { continue }
+			target, selected := targets[ident.name]
+			if !selected { continue }
+			// Exact declaration identity excludes locals, parameters, named
+			// argument keys and record fields, even when their types come from
+			// the imported package or they have the same spelling.
+			if reference.symbol.uri == target.uri && reference.symbol.range == target.range {
+				used_names[selections[ident.name]] = true
+				used_selections[ident.name] = true
 			}
 		}
 	}

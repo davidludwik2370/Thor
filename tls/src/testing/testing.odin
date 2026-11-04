@@ -825,6 +825,22 @@ expect_prepare_rename_range :: proc(t: ^testing.T, src: ^Source, expect_range: c
 }
 
 
+expect_import_usage :: proc(t: ^testing.T, src: ^Source, unused_packages: int, unused_names: []string) {
+	setup(src)
+	defer teardown(src)
+	if src.document.ast.syntax_error_count > 0 {
+		testing.expectf(t,false,"import-usage fixture has syntax errors: %s",src.document.ast.src)
+		return
+	}
+	usage := server.find_import_usage(src.document, context.temp_allocator)
+	testing.expect_value(t, len(usage.unused_packages), unused_packages)
+	if len(usage.unused_selections) != len(unused_names) {
+		testing.expectf(t, false, "expected %d unused selected names, got %d", len(unused_names), len(usage.unused_selections))
+		return
+	}
+	for name, i in unused_names { testing.expect_value(t, usage.unused_selections[i].name, name) }
+}
+
 expect_action :: proc(t: ^testing.T, src: ^Source, expect_action_names: []string, ctx: server.CodeActionContext = {}) {
 	spall.trace(#procedure)
 

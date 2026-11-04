@@ -115,6 +115,8 @@ resolve_entire_file_for_references :: proc(
 	allocator:   runtime.Allocator,
 	flag:        ResolveReferenceFlag,
 	target_name: string,
+	capacity: int = 10000,
+	import_usage: bool = false,
 ) -> (symbols: SymbolAndNodeMap) {
 	spall.trace(#procedure, document.fullpath)
 
@@ -136,7 +138,7 @@ resolve_entire_file_for_references :: proc(
 
 	ast_context.current_package = ast_context.document_package
 
-	symbols = make(SymbolAndNodeMap, 10000, allocator)
+	symbols = make(SymbolAndNodeMap, capacity, allocator)
 
 	for decl in document.ast.decls {
 		resolve_decl(
@@ -148,6 +150,7 @@ resolve_entire_file_for_references :: proc(
 			flag = flag,
 			save_unresolved = false,
 			target_name = target_name,
+			import_usage = import_usage,
 		)
 		clear(&ast_context.locals)
 	}
@@ -166,6 +169,7 @@ FileResolveData :: struct {
 	save_unresolved:  bool,
 	should_cancel:    ResolveCancelProc,
 	cancelled:        ^bool,
+	import_usage:     bool,
 }
 
 @(private = "file")
@@ -180,6 +184,7 @@ resolve_decl :: proc(
 	target_name := "",
 	should_cancel: ResolveCancelProc = nil,
 	cancelled: ^bool = nil,
+	import_usage: bool = false,
 ) {
 	data := FileResolveData {
 		position_context = position_context,
@@ -191,6 +196,7 @@ resolve_decl :: proc(
 		save_unresolved  = save_unresolved,
 		should_cancel    = should_cancel,
 		cancelled        = cancelled,
+		import_usage     = import_usage,
 	}
 
 	resolve_node(decl, &data)
@@ -430,14 +436,37 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 	case ^ast.Field_Value:
 		data.position_context.field_value = n
 
-		if data.flag != .None && data.position_context.comp_lit != nil {
+		if data.flag != .None && data.position_context.comp_lit != nil && position_in_node(data.position_context.comp_lit,n.pos.offset) {
 			data.position_context.position = n.pos.offset
+			named_fields := false
+			if data.import_usage && data.position_context.comp_lit.type != nil {
+				if literal_type, resolved := thor_context_type(data.ast_context,data.position_context.comp_lit.type); resolved {
+					#partial switch _ in literal_type.value {
+					case SymbolStructValue, SymbolBitFieldValue: named_fields = true
+					}
+				}
+			}
 
 			if symbol, ok := resolve_location_comp_lit_field(data.ast_context, data.position_context); ok {
-				data.symbols[cast(uintptr)node] = SymbolAndNode {
-					node   = n.field,
-					symbol = symbol,
+				key_expression := data.import_usage && !named_fields
+				#partial switch _ in symbol.value {
+				case SymbolMapValue, SymbolFixedArrayValue, SymbolSliceValue, SymbolDynamicArrayValue:
+					key_expression = true
+				case SymbolStructValue, SymbolBitFieldValue:
+					key_expression = false
 				}
+				if key_expression {
+					resolve_node(n.field, data)
+				} else {
+					data.symbols[cast(uintptr)node] = SymbolAndNode {
+						node   = n.field,
+						symbol = symbol,
+					}
+				}
+			} else if data.import_usage && !named_fields {
+				// An unresolved generic literal might be a map/array. Retain
+				// possible import uses, without guessing rename/reference edits.
+				resolve_node(n.field, data)
 			}
 
 			resolve_node(n.value, data)
