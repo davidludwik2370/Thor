@@ -908,18 +908,21 @@ skip; compile-time constants and unchecked inactive arms retain native `when`
 behavior. Anonymous Thor allocations discarded into `_` are cleaned up; named
 values remain borrowed. Run the [commented examples](examples/switch-results/demo.thor)
 with `thor run examples/switch-results`.
-A switch result arm may be a call to the built-in `panic(...)`: it terminates
-instead of supplying a value, so it does not contribute to result-type inference.
+A switch result arm may call any procedure declared `-> !`, such as `panic`,
+`unreachable`, or a custom/imported nonreturning procedure. It terminates instead
+of supplying a value, so it does not contribute to result-type inference.
 For example, `direction: Coord > switch { case valid: {-1, 0}; case: panic("invalid move") }`
-is valid. Other void calls, including user procedures declared `-> !`, are not
-result arms. A switch with only panic arms needs an expected result type.
+is valid. Aliases, procedure-valued parameters and generic specializations follow
+the same rule. Ordinary void calls are not result arms. A switch with only
+nonreturning arms needs an expected result type, or expected types for multiple
+results. Normal argument checking, calling conventions and purity rules apply.
 `#switch` has the same selector forms in statement and expression positions;
 it uses native `when` semantics for constant selection, declaration visibility,
 control flow, and unchecked inactive arms. Later conditions, including those in
 a comma-separated case, stay unchecked after a match. Explicit `#run` follows
 selected compile-time branches and known lazy conditions.
-A selected panic arm in a `#switch` expression also needs an expected result
-type; an inactive panic arm is unchecked. `fn` may call `panic`, and a panic
+A selected nonreturning arm in a `#switch` expression also needs an expected
+result type; inactive arms are unchecked. `fn` may call `panic`, and a panic
 reached during `#run` or automatic compile-time execution fails the compilation.
 
 Sets use `|`, `&`, `-`, `~`, `==` and `!=`, with `|=`, `&=`, `-=`, `~=`

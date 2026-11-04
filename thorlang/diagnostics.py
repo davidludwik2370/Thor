@@ -98,6 +98,9 @@ class Diagnostics:
         for error in errors:
             msgs = list(error.get("msgs") or [])
             original_messages=list(msgs)
+            if msgs and msgs[0].startswith('Missing diverging call at the end of the procedure') and any(
+                    prefix+'switch_nonreturning_' in msgs[0] for prefix in self.prefixes):
+                msgs=['This switch arm does not return a value. A valueless arm must call a nonreturning (-> !) procedure.']
             if msgs and msgs[0].startswith('Invalid use of a non-specialized polymorphic type') and any(name in msgs[0] for name in self.checked_callable_markers):
                 msgs=['Pure code cannot store or indirectly call procedure values.']
             generated_result_failure = False

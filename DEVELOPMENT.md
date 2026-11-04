@@ -3242,3 +3242,38 @@ checks and type assertions disabled. The actual Hilo document is also checked
 through TLS using temporary compiler output/cache directories, preserving the
 user's source and project files. No TLS binary or extension update is required;
 save the file or use Thor: Restart Language Server to refresh diagnostics.
+
+## Nonreturning switch result arms (Thor 0.35.0, TLS 0.27.0)
+
+Switch expressions now accept any call with a `-> !` procedure signature,
+replacing the earlier builtin-panic-only rule. The frontend exports the parser's
+`diverging` flag; the resolver follows signatures through aliases, imports,
+overloads, typed callbacks, fields and anonymous procedures. Standard-library
+signatures are inspected on demand without changing their purity eligibility.
+Builtin identity still respects lexical shadowing. Ordinary void procedures
+remain invalid value arms, including procedures named `panic` or `unreachable`.
+
+Nonreturning arms contribute neither a value nor result arity/type evidence.
+The scalar, multi-result, assignment-skip and ownership paths emit them as calls
+rather than fabricated return values. A switch with only nonreturning arms needs
+expected result types. Compile-time switches keep inactive arms unchecked.
+Unconstrained callbacks and conditional `when` signatures use native compile-time
+result-count selection; a zero-result specialization is additionally checked
+inside a `-> !` helper, so a void callback cannot masquerade as a nonreturning
+one. Queries do not execute user calls. Invalid void specializations get an
+original-source call diagnostic rather than a generated-helper error.
+
+TLS uses `SymbolProcedureValue.diverging` when selecting switch result types.
+The live editor regressions cover hover types, overloads, aliases, imports,
+callbacks, Unicode source ranges and unsaved signature/error recovery. Compiler
+coverage includes runtime and compile-time selection, purity checks, ownership,
+multiple results, shadowing, conditional signatures and checked/unchecked builds.
+A real CodeLLDB test verifies original Thor breakpoints, stepping and locals.
+The original Othello program checks successfully without changing its source.
+
+Validation: 300 distinct compiler, switch, evaluation, diagnostic and assertion
+hygiene tests; 128 live editor tests; and 1,140 native TLS tests in both checked
+and optimized assertion-/bounds-/type-check-disabled configurations pass. Two
+CodeLLDB regressions cover ordinary and generic nonreturning arms. Both updated
+demos also run in optimized unchecked builds. Restart the language server to
+load TLS 0.27.0; no extension reinstall is needed.

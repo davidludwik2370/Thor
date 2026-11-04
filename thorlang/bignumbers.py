@@ -479,7 +479,7 @@ class BigNumbers:
                 lines.append(f'if {success} {{return {own}}}')
                 if is_fresh:lines.append(f'{self.module()}.compiler_destroy(&{value})')
                 fallback=node.role('y')
-                lines.append(self.s.render(fallback) if self.s.resolver.is_panic_call(fallback) else 'return '+self.owned(fallback,hints))
+                lines.append(self.s.render(fallback) if self.s.resolver.is_diverging_call(fallback) else 'return '+self.owned(fallback,hints))
             else:
                 if discarded:
                     if is_fresh:lines.append(f'{self.module()}.compiler_destroy(&{value})')

@@ -42,25 +42,22 @@ thor_context_adapter :: proc(call: ^ast.Call_Expr) -> bool {
     return sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break"
 }
 
-// Only the builtin panic call is a valueless switch result. Other void or
-// diverging procedures still need the compiler's ordinary value diagnostic.
-thor_context_panic_arm :: proc(ctx: ^AstContext, expr: ^ast.Expr) -> bool {
+// A nonreturning call supplies no switch result type. Use its procedure type,
+// rather than its spelling, so aliases and procedure-valued parameters agree.
+thor_context_diverging_arm :: proc(ctx: ^AstContext, expr: ^ast.Expr) -> bool {
     if expr == nil { return false }
     if paren, ok := expr.derived.(^ast.Paren_Expr); ok {
-        return thor_context_panic_arm(ctx, paren.expr)
+        return thor_context_diverging_arm(ctx, paren.expr)
     }
     call, ok := expr.derived.(^ast.Call_Expr)
     if !ok { return false }
-    callee := call.expr
-    for {
-        paren, wrapped := callee.derived.(^ast.Paren_Expr)
-        if !wrapped { break }
-        callee = paren.expr
-    }
-    ident, named := callee.derived.(^ast.Ident)
-    if !named || ident.name != "panic" { return false }
-    symbol, resolved := thor_context_type(ctx, callee)
-    return resolved && .Builtin in symbol.flags
+    old_call, old_specific := ctx.call, ctx.resolve_specific_overload
+    defer { ctx.call, ctx.resolve_specific_overload = old_call, old_specific }
+    ctx.call, ctx.resolve_specific_overload = call, true
+    symbol, resolved := thor_context_type(ctx, call.expr)
+    if !resolved { return false }
+    value, procedure := symbol.value.(SymbolProcedureValue)
+    return procedure && value.diverging
 }
 
 thor_context_switch_value :: proc(ctx: ^AstContext, expr: ^ast.Expr) -> (Symbol, bool) {
@@ -91,7 +88,7 @@ thor_context_dependent_switch :: proc(ctx: ^AstContext, expr: ^ast.Expr, depth :
     case: return false
     }
     for arm in arms {
-        if thor_context_panic_arm(ctx, arm) { continue }
+        if thor_context_diverging_arm(ctx, arm) { continue }
         candidate, ok := thor_context_switch_value(ctx, arm)
         if ok && thor_context_concrete(ctx, candidate) { return false }
     }
@@ -255,7 +252,7 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
             }
             if !thor_context_concrete(ctx, expected) {
                 for arm in node.args[:count] {
-                    if thor_context_panic_arm(ctx, arm) { continue }
+                    if thor_context_diverging_arm(ctx, arm) { continue }
                     candidate, ok := thor_context_switch_value(ctx, arm)
                     if ok && thor_context_concrete(ctx, candidate) { expected = candidate; break }
                 }

@@ -888,9 +888,9 @@ class Expressions:
                 result=self.type_code(expected)
             else:
                 s.needs_default=True
-                values=[s.render(a) for a in arms if not s.resolver.is_panic_call(a)]
+                values=self.switches.queries(n,arms,scalar=True)
                 if not values:
-                    return self.error(n,'A switch expression with only panic arms requires an expected result type.')
+                    return self.error(n,'A switch expression with only nonreturning arms requires an expected result type.')
                 query=values[-1]
                 for value in reversed(values[:-1]): query=f'(false ? ({value}) : ({query}))'
                 result=f'type_of({s.prefix}default_value({query}))'
@@ -900,7 +900,7 @@ class Expressions:
                 branches=[]
                 for case in cases:
                     arm=at(case['result'])
-                    result=s.render(arm) if s.resolver.is_panic_call(arm) else 'return '+s.render(arm,hint)
+                    result=self.switches.branch(arm,lambda:'return '+s.render(arm,hint))
                     branches.append((case,result))
                 code.append(self.switches.runtime_code(n,selected,kind,branches))
                 return '\n'.join(code)
@@ -912,12 +912,20 @@ class Expressions:
         if expression:
             def value(case):
                 arm=at(case['result'])
-                if not s.resolver.is_panic_call(arm): return s.render(arm,expected,True)
+                if self.switches.deferred_call(arm) and expected:
+                    name,args=self.closed(arm,lambda hint:self.switches.branch(arm,lambda:'return '+s.render(arm,hint)),
+                                          result=None,flavor='switch_selected_call')
+                    return name+'('+', '.join([*args,self.type_code(expected)])+')'
+                condition=self.switches.result_condition(arm)
+                if condition is not None:
+                    invalid=self.error(arm,'A selected nonreturning arm requires an expected result type.')
+                    return f'({s.render(arm,expected,True)} when {condition} else {invalid})'
+                if not s.resolver.is_diverging_call(arm): return s.render(arm,expected,True)
                 if not expected:
                     # A compile-time switch derives its type only from the
                     # selected arm. Keep this error lazy, just like its values.
-                    return self.error(arm,'A selected panic arm requires an expected result type.')
-                # Keep constant selection lazy. Only a selected panic calls
+                    return self.error(arm,'A selected nonreturning arm requires an expected result type.')
+                # Keep constant selection lazy. Only a selected terminal arm calls
                 # this runtime helper; inactive arms remain entirely unchecked.
                 name,args=self.closed(arm,lambda _:s.render(arm),result=None,flavor='switch_panic')
                 return f'{name}({", ".join([*args,self.type_code(expected)])})'

@@ -110,6 +110,58 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_generic_nonreturning_arm_skips_specialization_helpers_when_stepping(self):
+        text='''package main
+stop::proc()->!{panic("unexpected")}
+choose::proc(callback:$P)->int{
+    value:=switch{
+        case true:7
+        case:callback()
+    }
+    return value
+}
+main::proc(){value:=choose(stop);if value!=7{panic("wrong result")}}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,8])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'value','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
+    def test_nonreturning_switch_arms_keep_original_breakpoints_and_step_lines(self):
+        text='''package main
+Kind::enum{A,B}
+stop::proc()->!{panic("unexpected")}
+main::proc(){
+    kind:Kind=.A
+    first:=switch kind{case .A:7;case .B:unreachable()}
+    second:=switch{case first==7:9;case:stop()}
+    total:=first+second
+    if total!=16{panic("incorrect results")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6,8])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        for name,expected in [('first','7'),('second','9')]:
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':name,'context':'watch'})
+            self.assertEqual(value['result'],expected,value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_partial_and_exhaustive_enum_switch_step_over_original_lines(self):
         text='''package main
 Kind::enum{A,B}

@@ -109,6 +109,46 @@ class Switches:
     def values(self, arm):
         return arm.group('args') if arm.kind == 'SwitchResults' else [arm]
 
+    def deferred_call(self, arm):
+        """Generic callbacks and conditional signatures need native checking."""
+        node=unwrap(arm)
+        if node.kind!='Call':return False
+        if self.s.resolver.conditional_callable(node.role('callee')):return True
+        if self.s.resolver.is_diverging_call(node) or self.s.signature(node) or self.s.denotes_type(node.role('callee')):return False
+        if self.s.purity and self.s.purity.builtin(node):return False
+        owner=next((parent for parent in node.ancestors() if parent.kind=='Procedure'),None)
+        return bool(owner and self.s.resolver.generic_parameters(owner.role('type')))
+
+    def result_condition(self, arm, index=0):
+        if not self.deferred_call(arm):return None
+        self.s.needs_intrinsics=True
+        return f'{self.s.prefix}meta.type_proc_return_count(type_of({self.s.prefix}meta.procedure_of({self.s.render(unwrap(arm))}))) > {index}'
+
+    def branch(self, arm, value):
+        """Keep valueless calls out of returns/assignments, without executing twice."""
+        if self.s.resolver.is_diverging_call(arm):return self.s.render(arm)
+        condition=self.result_condition(arm)
+        if condition is None:return value()
+        # Zero results alone do not imply divergence. Odin validates the -> !
+        # wrapper's body, rejecting a specialized ordinary void callback here.
+        name,args=self.closed(arm,lambda _:self.s.render(arm),result='!',flavor='switch_nonreturning')
+        terminal=name+'('+', '.join(args)+')'
+        return f'when {condition} {{\n{value()}\n}} else {{\n{terminal}\n}}'
+
+    def queries(self, node, arms, index=0, scalar=False):
+        candidates=[]
+        for arm in arms:
+            if arm.kind=='SwitchBreak' or self.s.resolver.is_diverging_call(arm):continue
+            if arm.kind=='SwitchResults' and index>=len(arm.group('args')):continue
+            query=self.s.render(arm) if scalar else self.result(arm,index)
+            candidates.append((query,self.result_condition(arm,index)))
+        if not candidates:return []
+        fallback=next((query for query,condition in reversed(candidates) if condition is None),None)
+        if fallback is None:
+            fallback=self.e.error(node,'A switch expression with only nonreturning arms requires an expected result type.')
+            for query,condition in reversed(candidates):fallback=f'({query} when {condition} else {fallback})'
+        return [f'({query} when {condition} else {fallback})' if condition else query for query,condition in candidates]
+
     def special(self, node, expected=None):
         return node.kind in {'SwitchExpr', 'CompileSwitchExpr'} and (
             isinstance(expected, tuple) and len(expected) > 1
@@ -119,12 +159,13 @@ class Switches:
         node = unwrap(node)
         if node.kind in {'SwitchExpr','CompileSwitchExpr'}: return self.count(node)
         if node.kind != 'Call': return 1
+        if self.deferred_call(node):return 1
         signature = self.s.signature(node)
         return len(self.s.fields(signature.role('results'))) if signature else 1
 
     def count(self, node, expected=None):
         counts = [len(a.group('args')) if a.kind == 'SwitchResults' else self.call_count(a)
-                  for a in self.arms(node) if a.kind != 'SwitchBreak' and not self.s.resolver.is_panic_call(a)]
+                  for a in self.arms(node) if a.kind != 'SwitchBreak' and not self.s.resolver.is_diverging_call(a)]
         return len(expected) if isinstance(expected, tuple) else max(counts, default=1)
 
     def hints(self, owner):
@@ -163,23 +204,24 @@ class Switches:
         for i, hint in enumerate(hints):
             if hint:
                 types.append(self.e.type_code(hint)); continue
-            values = []
-            for arm in self.arms(node):
-                if arm.kind == 'SwitchBreak' or s.resolver.is_panic_call(arm): continue
-                if arm.kind == 'SwitchResults' and i >= len(arm.group('args')): continue
-                values.append(self.result(arm, i))
+            values = self.queries(node,self.arms(node),i)
             if not values:
-                types.append(self.e.error(node, 'A switch expression with only panic/break arms requires expected result types.'))
+                types.append(self.e.error(node, 'A switch expression with only nonreturning/break arms requires expected result types.'))
                 continue
             query = values[-1]
             if node.kind == 'CompileSwitchExpr':
                 selected = {}
                 for case,arm in zip(node.data['cases'],self.arms(node)):
-                    if arm.kind == 'SwitchBreak' or s.resolver.is_panic_call(arm):
-                        # Context-free all-panic selection is diagnosed by the
-                        # normal value renderer. Inactive panic is unchecked.
-                        selected[id(case)] = self.e.error(arm,'A selected panic arm requires expected result types.')
-                    else: selected[id(case)] = self.result(arm,i)
+                    if arm.kind == 'SwitchBreak' or s.resolver.is_diverging_call(arm):
+                        # Context-free nonreturning selection is diagnosed by
+                        # the value renderer. Inactive arms stay unchecked.
+                        selected[id(case)] = self.e.error(arm,'A selected nonreturning arm requires expected result types.')
+                    else:
+                        selected[id(case)] = self.result(arm,i)
+                        condition=self.result_condition(arm,i)
+                        if condition is not None:
+                            invalid=self.e.error(arm,'A selected nonreturning arm requires expected result types.')
+                            selected[id(case)]=f'({selected[id(case)]} when {condition} else {invalid})'
                 default = next(c for c in node.data['cases'] if not c['matches'])
                 query = selected[id(default)]
                 for case in reversed([c for c in node.data['cases'] if c['matches']]):
@@ -187,7 +229,7 @@ class Switches:
             else:
                 for value in reversed(values[:-1]): query = f'(false ? ({value}) : ({query}))'
             s.needs_default = True
-            origin=next((arm for arm in self.arms(node) if arm.kind!='SwitchBreak' and not s.resolver.is_panic_call(arm)),node)
+            origin=next((arm for arm in self.arms(node) if arm.kind!='SwitchBreak' and not s.resolver.is_diverging_call(arm)),node)
             if origin.kind=='SwitchResults' and i<len(origin.group('args')):origin=origin.group('args')[i]
             types.append(s.mapping.wrap(f'type_of({s.prefix}default_value({query}))',s.path,origin.start,origin.end,'switch-result-type'))
         return types
@@ -198,9 +240,9 @@ class Switches:
         if problem:
             return self.e.error(node, problem)
         for arm in self.arms(node) if node.kind == 'SwitchExpr' else []:
-            if arm.kind == 'SwitchBreak' or self.s.resolver.is_panic_call(arm): continue
+            if arm.kind == 'SwitchBreak' or self.s.resolver.is_diverging_call(arm): continue
             unwrapped = unwrap(arm)
-            if unwrapped.kind == 'Call' and not self.s.signature(unwrapped): continue
+            if unwrapped.kind == 'Call' and (self.deferred_call(unwrapped) or not self.s.signature(unwrapped)): continue
             actual = len(arm.group('args')) if arm.kind == 'SwitchResults' else self.call_count(arm)
             if actual != count:
                 error = self.e.error(arm, f'Every switch value arm must return {count} results; this arm returns {actual}.')
@@ -211,7 +253,7 @@ class Switches:
 
     def arm_code(self, arm, hints, constant=False):
         unwrapped=unwrap(arm)
-        known = arm.kind == 'SwitchResults' or unwrapped.kind != 'Call' or self.s.signature(unwrapped)
+        known = arm.kind == 'SwitchResults' or unwrapped.kind != 'Call' or (not self.deferred_call(unwrapped) and self.s.signature(unwrapped))
         actual=len(arm.group('args')) if arm.kind == 'SwitchResults' else self.call_count(arm)
         if known and actual != len(hints):
             error=self.e.error(arm,f'Every switch value arm must return {len(hints)} results; this arm returns {actual}.')
@@ -281,7 +323,7 @@ class Switches:
             branches = []
             for i, case in enumerate(cases):
                 arm = s.at(case['result'], node)
-                value = s.render(arm) if s.resolver.is_panic_call(arm) else self.consume(arm, generic, discarded=discarded)
+                value = self.branch(arm,lambda:self.consume(arm, generic, discarded=discarded))
                 if node.kind == 'SwitchExpr':
                     branches.append((case, value))
                 else:
@@ -320,19 +362,23 @@ class Switches:
 
         def selected(arm):
             if arm.kind == 'SwitchBreak': return ''
-            panic = s.resolver.is_panic_call(arm)
-            if panic and owner.kind != 'Declaration': return s.render(arm)
+            diverging = s.resolver.is_diverging_call(arm)
+            if diverging and owner.kind != 'Declaration': return s.render(arm)
             self.statements.add(owner)
-            if panic:
+            if diverging:
                 values=[]
                 for i,hint in enumerate(hints):
                     if hint:
                         name,args=e.closed(arm,lambda _:s.render(arm),result=None,flavor=f'switch_decl_panic_{i}')
                         values.append(name+'('+', '.join([*args,e.type_code(hint)])+')')
                     else:
-                        values.append(s.mapping.wrap(e.error(arm,'A selected panic arm requires expected result types.'),
+                        values.append(s.mapping.wrap(e.error(arm,'A selected nonreturning arm requires expected result types.'),
                                                      s.path,arm.start,arm.end,'switch-panic'))
                 replacement=', '.join(values)
+            elif self.deferred_call(arm):
+                name,args=self.closed(arm,lambda generic:self.branch(arm,lambda:self.consume(arm,generic)),
+                                      result=(None,)*len(hints),flavor='switch_selected_call')
+                replacement=name+'('+', '.join([*args,*self.types(node,hints)])+')'
             else: replacement = self.arm_code(arm, hints, constant)
             names = owner.group('names') if owner.kind == 'Declaration' else owner.group('lhs') if owner.kind == 'Assignment' else []
             blanks = tuple(name.text == '_' for name in names)
@@ -385,12 +431,12 @@ class Switches:
             branches = []
             for i, case in enumerate(cases):
                 arm = s.at(case['result'], node)
-                if skip and arm.kind != 'SwitchBreak' and not s.resolver.is_panic_call(arm):
+                if skip and arm.kind != 'SwitchBreak' and not s.resolver.is_diverging_call(arm):
                     # Supply a native type for blank destinations only when
                     # cleanup needs a temporary to hold their value.
                     typed = tuple(hint or Hint(s,arm,self.types(node,(None,)*len(local_hints))[j])
                                   for j,hint in enumerate(local_hints))
-                    content = self.consume(arm, typed, lhs_codes)
+                    content = self.branch(arm,lambda:self.consume(arm, typed, lhs_codes))
                 else: content = selected(arm)
                 if node.kind == 'SwitchExpr':
                     branches.append((case, content))

@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.34.1"
+VERSION = "0.35.0"
 
 
 def backend_failure(status):

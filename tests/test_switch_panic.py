@@ -1,4 +1,4 @@
-"""Panic-only switch arms: native typing, laziness, ownership and source spans."""
+"""Nonreturning switch arms: native typing, laziness, ownership and source spans."""
 import unittest
 
 from tests import test_thor as base
@@ -68,11 +68,9 @@ assert(value==2&&count==2)
         self.invoke(self.program('value:int=switch{case true:panic("a");case:panic("b")};_=value'),
                     command='check')
 
-    def test_void_calls_and_other_diverging_procedures_are_not_result_arms(self):
+    def test_void_calls_are_not_result_arms(self):
         for declaration, arm in [
             ('work::proc(){}', 'work()'),
-            ('stop::proc()->!{panic("stop")}', 'stop()'),
-            ('', 'unreachable()'),
             ('panic::proc(message:string){}', 'panic("shadowed")'),
         ]:
             with self.subTest(arm=arm, declaration=declaration):
@@ -83,13 +81,11 @@ assert(value==2&&count==2)
         self.invoke(self.program('value:=switch{case:panic("ordinary")};assert(value==9)',
                                  'panic::proc(message:string)->int{return 9}\n'))
 
-    def test_imported_panic_and_alias_are_not_builtin_panic_arms(self):
+    def test_imported_void_panic_is_not_a_nonreturning_arm(self):
         self.invoke(self.program('value:int=switch{case true:7;case:panic("shadowed")};_=value',
                                  'import "library" / panic\n'),
                     files={'library/main.thor':'package library\npanic::proc(message:string){}\n'},
                     command='check', fail='does not return a value')
-        self.invoke(self.program('value:int=switch{case true:7;case:stop("alias")};_=value',
-                                 'stop::panic\n'), command='check', fail='does not return a value')
 
     def test_panic_arguments_and_other_arm_types_are_still_checked(self):
         self.invoke(self.program('value:int=switch{case true:7;case:panic(123)};_=value'),

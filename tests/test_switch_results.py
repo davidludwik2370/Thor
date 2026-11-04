@@ -112,11 +112,11 @@ f::fn(value:Record)->Record{r:=value;r.a,r.b=switch{case true:r.b,r.a;case:panic
 R::#run f(Record{1,2})
 '''))
 
-    def test_panic_only_builtin_exception_for_multi_results(self):
+    def test_nonreturning_calls_supply_no_multi_result_values(self):
         self.invoke(self.program('a,b:=f(true);assert(a==3&&b=="ok")',
             'f::proc(ok:bool)->(int,string){return switch{case ok:3,"ok";case:panic("bad")}}\n'))
-        self.invoke(self.program('a,b:=switch{case true:1,2;case:no_value()};_=a;_=b',
-            'no_value::proc()->!{panic("bad")}\n'),command='check',fail='Error:')
+        self.invoke(self.program('a,b:=switch{case true:1,2;case:no_value()};if a!=1||b!=2{panic("wrong results")}',
+            'no_value::proc()->!{panic("bad")}\n'))
 
     def test_mismatched_arity_and_missing_default(self):
         for expr in ['switch{case true:1,2;case:3,4,5}', 'switch{case true:1,2}']:

@@ -19,6 +19,7 @@ Info :: struct {
     mutable: bool,
     using_field: bool,
     variadic: bool,
+    diverging: bool,
     optional_ok: bool,
     optional_allocator_error: bool,
     roles: map[string]Span,
@@ -169,6 +170,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.lists["where"] = spans(n.where_clauses)
     case ^ast.Proc_Type:
         info.kind = "ProcedureType"; info.roles["params"] = span(n.params); info.roles["results"] = span(n.results)
+        info.diverging = n.diverging
         info.optional_ok = .Optional_Ok in n.tags || .Optional_Allocator_Error in n.tags
         info.optional_allocator_error = .Optional_Allocator_Error in n.tags
         if cc,ok:=n.calling_convention.(string);ok {info.calling_convention=strings.trim(cc,"\"`")}

@@ -118,8 +118,10 @@ class Ownership:
         value, owned = self.fresh('selected'), self.fresh('selected_flag')
         code.extend([f'{value}: {self.e.type_code(hint)}', f'{owned}: bool'])
         def arm(expr):
-            if n.kind in {'SwitchExpr', 'CompileSwitchExpr'} and self.s.resolver.is_panic_call(expr):
-                return self.s.render(expr)
+            if n.kind in {'SwitchExpr', 'CompileSwitchExpr'}:
+                return self.e.switches.branch(expr,lambda:value_arm(expr))
+            return value_arm(expr)
+        def value_arm(expr):
             statements = []
             selected = self.evaluate(expr, statements, hint)
             # Dependencies cannot outlive a returned borrowed view.

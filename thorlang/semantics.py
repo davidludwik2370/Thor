@@ -420,7 +420,7 @@ class Resolver:
             return self.type_of(args[index], seen) if index < len(args) else Type(node=n)
         if n.kind == 'SwitchExpr':
             arms = [n.source.at(c['result'], n) for c in n.data['cases']]
-            value = next((a for a in arms if a.kind != 'SwitchBreak' and not self.is_panic_call(a)), None)
+            value = next((a for a in arms if a.kind != 'SwitchBreak' and not self.is_diverging_call(a)), None)
             return self.result_type(value, index, seen) if value else Type(node=n)
         if n.kind == 'CompileSwitchExpr':
             data=n.source.big.constants.payloads.get(n,{})
@@ -454,6 +454,8 @@ class Resolver:
             return Type(node=n,witness=n)
         if kind=='SwitchExpr':
             return self.result_type(n, 0, seen)
+        if kind=='Procedure':
+            return self.type_node(n.role('type'))
         if kind in {"Paren", "FieldValue"}:
             return self.type_of(n.role("expr") if kind == "Paren" else n.role("value"), seen)
         if kind == "Literal":
@@ -617,20 +619,62 @@ class Resolver:
                     return not runtime_operand(args[0])
         return self.type_of(node).untyped
 
-    def is_panic_call(self, node):
-        """Only the unshadowed builtin is a bottom-valued switch arm.
+    def conditional_callable(self, node, seen=None):
+        """A native when may select different procedure signatures."""
+        seen=set() if seen is None else seen
+        if node is None or node in seen:return False
+        seen.add(node)
+        if node.kind=='Paren':return self.conditional_callable(node.role('expr'),seen)
+        symbol=self.symbol(node)
+        if not symbol:return False
+        if len(symbol.candidates)>1 and any(any(parent.kind in {'When','CompileSwitch'} for parent in candidate.declaration.ancestors())
+                                            for candidate in symbol.candidates):return True
+        return bool(symbol.value and symbol.value.kind in {'Ident','Selector','Paren'} and self.conditional_callable(symbol.value,seen))
 
-        A void procedure (even one declared -> !) is not a result expression.
-        Keep aliases and user declarations named panic under native checking.
+    def is_diverging_call(self, node):
+        """A -> ! call terminates an arm without supplying any result types.
+
+        Use parsed procedure signatures, including aliases and procedure values.
+        Ordinary void calls remain value errors; names alone never grant a user
+        declaration permission to terminate a value-producing arm.
         """
         while node and node.kind == 'Paren': node = node.role('expr')
         if node is None or node.kind != 'Call': return False
-        callee = node.role('callee')
-        while callee and callee.kind == 'Paren': callee = callee.role('expr')
-        return bool(callee and callee.kind == 'Ident' and callee.text == 'panic'
-                    and self.symbol(callee) is None
-                    and callee.text not in callee.source.selected
-                    and callee.text not in callee.source.imports)
+        if self.conditional_callable(node.role('callee')):return False
+        key=(node,'diverging')
+        if key in self.active:return False
+        self.active.add(key)
+        try:
+            signature=node.source.signature(node)
+            if signature:return signature.data.get('diverging',False)
+            # Builtins have no project AST. Follow aliases but respect lexical
+            # shadowing and selected imports, just as for normal call resolution.
+            def builtin(callee,seen):
+                if callee is None or callee in seen:return False
+                seen.add(callee)
+                if callee.kind=='Paren':return builtin(callee.role('expr'),seen)
+                symbol=self.symbol(callee)
+                if symbol:
+                    return not symbol.annotation and builtin(symbol.value,seen)
+                names={'panic','panic_contextless','unreachable'}
+                imported=callee.source.purity.imported(callee) if callee.source.purity else None
+                if imported:return (imported[0]=='base:builtin' and imported[1] in names
+                                    or imported[0]=='base:runtime' and imported[1] in {'panic','panic_contextless'})
+                return (callee.kind=='Ident' and callee.text in names
+                        and callee.text not in callee.source.selected and callee.text not in callee.source.imports)
+            if builtin(node.role('callee'),set()):return True
+            # Standard-library procedures are not emitted into project mirrors.
+            # Inspect their source signature on demand, without treating their
+            # effects or implementation as eligible for pure evaluation.
+            if self.native:
+                enabled=self.native_enabled;self.native_enabled=True
+                try:
+                    self.call_plans.pop(node,None)
+                    signature=node.source.signature(node)
+                finally:self.native_enabled=enabled
+                if signature:return signature.data.get('diverging',False)
+            return False
+        finally:self.active.remove(key)
 
     @staticmethod
     def fields(node):

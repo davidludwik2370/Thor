@@ -69,11 +69,11 @@ main :: proc() {
     number, text := choose(7)
     assert(number == NUMBER && text == TEXT)
 
-    // A panic arm terminates instead of producing values. Ordinary void calls
-    // cannot stand in for result expressions.
+    // Any -> ! call terminates instead of producing values: panic, unreachable,
+    // or your own nonreturning procedure. Ordinary void calls cannot do this.
     number, text = switch {
         case number == 7: 8, "eight"
-        case:            panic("unexpected number")
+        case:            unreachable()
     }
     assert(number == 8 && text == "eight")
 

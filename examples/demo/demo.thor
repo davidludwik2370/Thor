@@ -391,7 +391,8 @@ conditional_expressions :: proc() {
         }
 
         // Partial enum switches still need a result for the omitted members.
-        // That default may be a value or the built-in panic call.
+        // That default may be a value or any -> ! call, such as panic or
+        // unreachable. Ordinary void calls cannot replace a value arm.
         winter_note := #partial switch forecast[1] {
             case .Snow: "bring gloves"
             case: "no snow"

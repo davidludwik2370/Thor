@@ -393,9 +393,12 @@ Syntax:
   values do not relax the default/exhaustiveness requirement.
 - These rules apply to runtime switch and expression #switch alike. Native
   when selection preserves compile-time constants and unchecked inactive arms.
-- Only the unshadowed built-in panic call may replace a value arm with a
-  nonreturning call. It supplies no result types. Other void/nonreturning calls
-  remain ordinary type errors. All-panic switches require expected types.
+- A call whose procedure type is -> ! may replace a value arm. This includes
+  panic, unreachable, custom/imported procedures, aliases and procedure values.
+  It supplies no result types, including for multiple-result switches. Ordinary
+  void calls remain type errors. Switches with only nonreturning arms require
+  expected result types. Argument checking, calling conventions and purity
+  requirements still apply; a nonreturning signature does not grant purity.
 - Runtime enum selectors may omit the default when Odin establishes complete
   coverage of their named values, including imported/generic enum types and
   grouped/range cases. Missing enum cases remain compile errors. An unmatched
