@@ -3199,3 +3199,46 @@ both checked and optimized assertion-/bounds-/type-check-disabled builds, and
 six assertion-hygiene tests pass. The server is rebuilt locally as TLS 0.26.3;
 use Thor: Restart Language Server to load it. No extension or grammar reinstall
 is required.
+
+## Purity call-chain diagnostics and local fixed-capacity helpers (Thor 0.34.1)
+
+`simulate_game::fn` calling `reset_shuffled(&deck)` with a local fixed-capacity
+array exposed a false type-contract error: internal typed pointers were allowed,
+but validation then rejected their `[dynamic; N]E` pointee. Internal helper
+validation now handles that container recursively. Public fn input/result
+restrictions remain in place, and the existing provenance rules still protect
+borrowed elements inside locally created headers.
+
+`PureCalls.chains` retains actual caller edges. `purediagnostics.py` combines
+those edges with native instantiation locations to report transitive purity
+failures at the responsible call inside the declared fn. Related notes keep
+the underlying operation, intermediate calls, fn signature and any inspected
+standard-library implementation. Ordinary proc uses and inactive generic paths
+remain valid. The same adapter handles CLI JSON/text and TLS unsaved overlays,
+including no-argument functions and explicit/automatic compile-time evaluation.
+Cascade filtering keeps the original cause position after moving the primary
+underline, so failed generated index/type inference does not obscure the reason.
+
+The supporting mutation audit tracks borrowed element provenance through
+`append` and the pop-family operations. Native `..` spreads, Thor array/record
+`**` spreads, generic record spreads and named variadic arguments retain that
+provenance. Writing through a popped borrowed slice remains forbidden. Exporting
+a helper's stack view through an appended output element is rejected; an allocated
+output element retains its enclosing fn scratch lifetime. Checked and unchecked
+release fixtures validate results with explicit conditionals rather than relying
+on enabled assertions.
+
+New coverage is in `test_pure_call_context.py` and
+`test_pure_call_context_tls.py`; earlier transitive diagnostic tests now require
+both the fn call location and the preserved cause note. A copy of the complete
+Hilo program reports exactly one ambient-generator error at
+`reset_shuffled(&deck)`. Removing the shuffle, or making `simulate_game` an
+ordinary proc, checks successfully. The user's original Hilo file is not edited.
+
+Validation: 264 compiler, evaluation, diagnostic and assertion-hygiene tests;
+151 live editor tests; and six native pure-runtime tests pass. Runtime coverage
+includes checked debug builds and optimized builds with assertions, bounds
+checks and type assertions disabled. The actual Hilo document is also checked
+through TLS using temporary compiler output/cache directories, preserving the
+user's source and project files. No TLS binary or extension update is required;
+save the file or use Thor: Restart Language Server to refresh diagnostics.

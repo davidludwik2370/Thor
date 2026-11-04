@@ -180,6 +180,8 @@ class Purity:
     builtins={'len','cap','size_of','align_of','offset_of','type_of','min','max','abs','clamp',
               'complex','quaternion','real','imag','jmag','kmag','conj','swizzle',
               'make','copy','delete','assert','assert_contextless','panic'}
+    sequence_mutators={'append','clear','pop','pop_safe','pop_front','pop_front_safe'}
+    builtins |= sequence_mutators
     type_queries={'type_of','size_of','align_of','offset_of'}
     libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),('thor:format','format_spec'),
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}
@@ -454,6 +456,7 @@ class Purity:
         if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
             parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
         parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
+        parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
         count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
         parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
@@ -566,6 +569,9 @@ class Purity:
             args=n.group('args')
             if n.source.denotes_type(n.role('callee')):
                 return self.flow(args[0],env) if args else Flow()
+            if self.builtin(n) in {'pop','pop_safe','pop_front','pop_front_safe'}:
+                target=self.arguments(n,['array'])[0]
+                if target:return self.flow(target,env).deref().item().header_copy(self.r.type_of(n),n)
             if self.library(n)==('core:slice','clone'):
                 value=self.arguments(n,['a'])[0]
                 return Flow(element=self.flow(value,env).item()) if value else Flow()
@@ -874,6 +880,12 @@ class Purity:
                             allocator=any(arg.kind=='FieldValue' and arg.role('field').text=='allocator' for arg in n.group('args'))
                             allocator |= len(positional)>1 and self.r.type_of(target).kind not in {'dynamic','map'}
                             if allocator:self.problem(n,'Pure code cannot select an allocator.')
+                elif builtin in self.sequence_mutators:
+                    # These operations change dynamic/fixed-capacity headers.
+                    # Public pure inputs cannot contain either header type, so
+                    # reachable headers are local. Borrowed element references
+                    # are still propagated by Borrowing and protected on writes.
+                    pass
                 elif builtin or n.source.denotes_type(n.role('callee')):pass
                 elif self.approved(n):
                     if self.explicit_allocator(n):

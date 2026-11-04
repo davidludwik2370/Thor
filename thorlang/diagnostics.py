@@ -46,6 +46,8 @@ class Diagnostics:
         self.native_pure_origins={proc:site for s in (sources or {}).values()
                                   if (calls:=getattr(getattr(s,'purity',None),'calls',None))
                                   for proc,site in calls.origins.items() if getattr(proc.source,'native_inspected',False)}
+        self.pure_callgraphs=list(dict.fromkeys(calls for source in (sources or {}).values()
+            if (calls:=getattr(getattr(source,'purity',None),'calls',None))))
         self.raw.update({str(p): b for p, b in (overlays or {}).items()})
         self.maps = maps or {}
         self.generated = generated or {}
@@ -95,6 +97,7 @@ class Diagnostics:
         result, seen = [], set()
         for error in errors:
             msgs = list(error.get("msgs") or [])
+            original_messages=list(msgs)
             if msgs and msgs[0].startswith('Invalid use of a non-specialized polymorphic type') and any(name in msgs[0] for name in self.checked_callable_markers):
                 msgs=['Pure code cannot store or indirectly call procedure values.']
             generated_result_failure = False
@@ -301,6 +304,7 @@ class Diagnostics:
                 msgs=[msgs[0].removeprefix('Compile time panic: ')]
             elif pure_format:
                 msgs=[msgs[0].removeprefix('Compile time panic: ')]
+            purity_failure=bool(msgs and (pure_type or pure_format or msgs[0] in self.purity_messages))
             msgs=[m for m in msgs if not ('instantiated as' in m and any(prefix in m for prefix in self.prefixes))]
             if compiler_support:
                 msgs=[m for m in msgs if not re.search(r"instantiated as '(?:compiler_[a-z_]+|normalize_signed|normalize_unsigned|validate|validate_format|write|emit)\(",m)]
@@ -375,6 +379,7 @@ class Diagnostics:
                 msgs = [pattern.sub(lambda m: self.reference(generated_file, *reference_coordinates(m)), text) for text in msgs]
             for generated_prefix,original_prefix in self.path_aliases.items():
                 msgs=[text.replace(generated_prefix,original_prefix) for text in msgs]
+            purity_origin=origin
             if origin:
                 proc=min((proc for proc in self.native_pure_origins if str(proc.source.path)==origin.file
                           and proc.start<=origin.start<proc.end),key=lambda proc:proc.end-proc.start,default=None)
@@ -386,6 +391,10 @@ class Diagnostics:
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
             if related: diagnostic['related'] = related
+            # Call-context diagnostics move the primary underline. Cascades
+            # still depend on the original failing expression, not on every
+            # location mentioned by explanatory notes (such as an fn header).
+            diagnostic['_cause_pos']=diagnostic['pos'] if purity_failure else None
             diagnostic['_type_operand'] = type_operand
             diagnostic['_index_dependencies'] = index_dependencies
             diagnostic['_type_query_cascade'] = bool(origin and not origin.exact and self.inference_query_failure(msgs))
@@ -400,10 +409,22 @@ class Diagnostics:
                 diagnostic['_cascade']=False
             if origin and origin.kind=='power-type' and msgs and (msgs[0].startswith('Cannot convert numeric value') or 'truncated to' in msgs[0]):
                 diagnostic['_cascade']=False
-            key = json.dumps([diagnostic["type"], diagnostic["pos"], msgs], sort_keys=True)
-            if key not in seen:
-                result.append(diagnostic)
-                seen.add(key)
+            contexts=[]
+            if purity_failure and purity_origin:
+                from .purediagnostics import call_contexts, contextualize
+                hints=[self.reference_origin(file,*reference_coordinates(match)[:2])
+                       for file,pattern in self.reference_patterns for message in original_messages
+                       if 'instantiated as' in message for match in pattern.finditer(message)]
+                contexts=call_contexts(self.pure_callgraphs,purity_origin,hints)
+            variants=[(origin,msgs,related)] if not contexts else [
+                contextualize(self,context,origin,msgs,related) for context in contexts]
+            for site,messages,notes in variants:
+                item={**diagnostic,'pos':self.locate(site) if site else None,'msgs':messages}
+                if notes:item['related']=notes
+                key=json.dumps([item['type'],item['pos'],messages],sort_keys=True)
+                if key not in seen:
+                    result.append(item)
+                    seen.add(key)
         # Inference duplicates user expressions inside type queries. Keep the
         # underlying error; discard only query failures covering that same error.
         filtered = []
@@ -415,29 +436,29 @@ class Diagnostics:
                     for other in result):continue
             contexts=diagnostic['_inference_contexts']
             if contexts and any(
-                other is not diagnostic and other['type']=='error' and other['pos']
+                other is not diagnostic and other['type']=='error' and location
                 and not other['_inference_failure'] and not other['_cascade']
-                and other['pos']['file']==str(context.source.path)
-                and context.start <= other['pos']['offset'] < other['pos']['end_offset'] <= context.end
-                for context in contexts for other in result
+                and location['file']==str(context.source.path)
+                and context.start <= location['offset'] < location['end_offset'] <= context.end
+                for context in contexts for other in result for location in [other['pos'],other['_cause_pos']]
             ): continue
             if diagnostic['_index_dependencies'] and any(
-                other['type']=='error' and other['pos'] and other['msgs']
+                other['type']=='error' and location and other['msgs']
                 and (other['msgs'][0].startswith('Undeclared name:')
-                     or re.search(r"of type '.+' has no field '",other['msgs'][0]))
-                and any(other['pos']['file']==str(operation.source.path)
-                        and operation.start <= other['pos']['offset'] < operation.end
+                     or re.search(r"of type '.+' has no field '",other['msgs'][0]) or other['_cause_pos'])
+                and any(location['file']==str(operation.source.path)
+                        and operation.start <= location['offset'] < operation.end
                         for operation in diagnostic['_index_dependencies'])
-                for other in result
+                for other in result for location in [other['pos'],other['_cause_pos']]
             ): continue
             if pos and any(self.type_operand_cascade(diagnostic, other['_type_operand'])
                            for other in result if other['_type_operand'] is not None):
                 continue
             if diagnostic["_cascade"] and any(
-                not other["_cascade"] and other["type"] == "error" and other["pos"]
-                and other["pos"]["file"] == pos["file"]
-                and pos["offset"] <= other["pos"]["offset"] < pos["end_offset"]
-                for other in result
+                not other["_cascade"] and other["type"] == "error" and location
+                and location['file'] == pos['file']
+                and pos['offset'] <= location['offset'] < pos['end_offset']
+                for other in result for location in [other['pos'],other['_cause_pos']]
             ):
                 continue
             filtered.append({k: v for k, v in diagnostic.items() if not k.startswith('_')})

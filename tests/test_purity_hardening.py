@@ -102,8 +102,12 @@ never_owned::fn()->string{panic("not called")}
                 else:text+='work::fn()->int{return bad('+case.args+')}\nmain::proc(){_=work()}\n'
                 _,result=self.invoke(text,command='check',flags=['-debug','-json-errors'],fail=case.message)
                 errors=json.loads(result.stderr)['errors'];offset=case.offset(text)
-                self.assertTrue(any(e['pos'] and e['pos']['offset']<=offset<e['pos']['end_offset']
-                                    and case.message in ' '.join(e['msgs']) for e in errors),errors)
+                call='bad(input)' if case.name.startswith('borrow_') or case.name in {'range_reference','type_switch_reference'} else 'bad('+case.args+')'
+                expected=text.encode().index(call.encode(),text.encode().index(b'work::fn'))
+                self.assertTrue(any(e['pos'] and e['pos']['offset']==expected and
+                                    case.message in ' '.join(e['msgs']) for e in errors),errors)
+                self.assertTrue(any(note['pos']['offset']<=offset<note['pos']['end_offset']
+                                    for error in errors for note in error.get('related',[])),errors)
                 self.assertNotIn('Thor expression',result.stderr)
 
     def test_generic_branch_laziness_for_multiple_effect_categories(self):
@@ -286,7 +290,9 @@ bad::fn(input:Integer)->int{return library.read(input)}
                     _,result=self.invoke(text,command='check',flags=['-json-errors',*(['-debug'] if mode=='runtime' else [])],fail=message)
                     errors=json.loads(result.stderr)['errors']
                     offset=text.index(needle,text.index('leaf::')) if needle!='state+n' else text.index(needle)
-                    self.assertTrue(any(e['pos'] and e['pos']['offset']<=offset<e['pos']['end_offset'] for e in errors),errors)
+                    self.assertTrue(any(e['pos'] and e['pos']['offset']==text.index('leaf(n)') for e in errors),errors)
+                    self.assertTrue(any(note['pos']['offset']<=offset<note['pos']['end_offset']
+                                        for error in errors for note in error.get('related',[])),errors)
                     ordinary=prefix.split('work::fn')[0]
                     self.invoke(self.program('n:=7;_=leaf(n)',ordinary),command='check',flags=['-debug'])
 

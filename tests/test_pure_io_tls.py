@@ -46,7 +46,7 @@ main::proc(){}
         saved=main.read_text()
         self.assertEqual(saved,text)
 
-    def test_transitive_alias_error_points_to_the_leaf_call(self):
+    def test_transitive_alias_error_links_the_leaf_from_the_fn_call(self):
         text='''package main
 import _ "core:fmt" / println
 output::println
@@ -57,7 +57,9 @@ main::proc(){n:=3;work(n)}
         client,main=self.open(text)
         errors=client.diagnostic(main.as_uri(),contains='performs I/O')
         error=next(e for e in errors if 'performs I/O' in e['message'])
-        self.assertEqual(error['range']['start'],self.position(text,'output(n)',0))
+        self.assertEqual(error['range']['start'],self.position(text,'leaf(n)',0))
+        self.assertTrue(any(note['location']['range']['start']==self.position(text,'output(n)',0)
+                            for note in error['relatedInformation']))
         self.assertNotIn('Thor expression',json.dumps(errors))
         fixed=text.replace('work::fn','work::proc')
         client.notifications.clear()

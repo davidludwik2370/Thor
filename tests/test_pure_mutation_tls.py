@@ -27,7 +27,9 @@ main::proc(){data:=[1,2];if work(data[:])!=9{panic("result")}}
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':broken}]})
         errors=client.diagnostic(main.as_uri(),contains='borrowed from an input')
         self.assertEqual(len(errors),1,errors)
-        self.assertEqual(errors[0]['range']['start'],self.position(broken,'data[0]=9',0))
+        self.assertEqual(errors[0]['range']['start'],self.position(broken,'change(input)',0))
+        self.assertTrue(any(note['location']['range']['start']==self.position(broken,'data[0]=9',0)
+                            for note in errors[0]['relatedInformation']))
         for hidden in ['Thor expression','checked_call','pure_validate','SIGBUS']:
             self.assertNotIn(hidden,json.dumps(errors))
         client.notifications.clear()
@@ -68,7 +70,11 @@ main::proc(){n:=3;_=work(n)}
                 client,main=self.open(text)
                 errors=client.diagnostic(main.as_uri(),contains=message)
                 relevant=[error for error in errors if message in error['message']]
-                self.assertEqual(relevant[0]['range']['start'],self.position(text,needle,0),errors)
+                expected='change(&p)' if message=='local stack storage' else needle
+                self.assertEqual(relevant[0]['range']['start'],self.position(text,expected,0),errors)
+                if message=='local stack storage':
+                    self.assertTrue(any(note['location']['range']['start']==self.position(text,needle,0)
+                                        for note in relevant[0]['relatedInformation']))
                 self.assertNotIn('Thor expression',json.dumps(errors))
                 client.notifications.clear()
                 client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':text.replace(helper,fixed)}]})

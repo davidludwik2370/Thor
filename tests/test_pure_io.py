@@ -68,7 +68,7 @@ main::proc(){}
                 self.invoke(self.program('', 'import "core:fmt"\nwork::fn(){'+call+'}\n'),
                             command='check',fail='performs I/O')
 
-    def test_transitive_ordinary_helper_points_to_its_actual_io_call(self):
+    def test_transitive_ordinary_helper_links_actual_io_from_the_fn_call(self):
         source=self.program('n:=3;work(n)','''import "core:fmt"
 leaf::proc(n:int){/* 😀 */fmt.println(n)}
 middle::proc(n:int){leaf(n)}
@@ -76,7 +76,9 @@ work::fn(n:int){middle(n)}
 ''')
         _,result=self.invoke(source,command='build',flags=['-debug','-json-errors'],fail='performs I/O')
         errors=json.loads(result.stderr)['errors']
-        self.assertTrue(any(e.get('pos') and e['pos']['offset']==source.encode().index(b'fmt.println') for e in errors),errors)
+        self.assertTrue(any(e.get('pos') and e['pos']['offset']==source.encode().index(b'middle(n)',source.encode().index(b'work::fn')) for e in errors),errors)
+        self.assertTrue(any(note['pos']['offset']==source.encode().index(b'fmt.println')
+                            for error in errors for note in error.get('related',[])),errors)
         self.assertNotIn('__thor_',result.stderr)
 
     def test_basic_io_is_rejected_without_inspecting_its_implementation(self):

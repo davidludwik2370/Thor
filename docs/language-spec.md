@@ -655,6 +655,11 @@ Inputs and operations:
   conversions or pointer-bearing public fn inputs/results. Reject helper-local
   stack addresses/views escaping through output parameters. Propagate reference
   stores through output parameters so later calls cannot mutate borrowed inputs.
+- Internal helper parameters may carry locally owned fixed-capacity arrays,
+  including typed pointers to them. Preserve borrowed references in their
+  elements through append/spread/pop operations. A helper purity violation
+  highlights the responsible call inside the fn and links its underlying cause
+  and call chain; it does not label the ordinary proc as invalid for all callers.
 - Mutating helpers share their enclosing pure invocation's scratch lifetime;
   allocations assigned through output parameters must remain valid after the
   helper returns. Returned supported values retain independent promotion. These

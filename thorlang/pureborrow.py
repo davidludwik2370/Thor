@@ -206,6 +206,42 @@ class Borrowing:
                     changed|=self.store(proc,target,value,node)
             if node.kind=='Call':
                 builtin=self.p.builtin(node)
+                if builtin in self.p.sequence_mutators:
+                    target=self.p.arguments(node,['array'])[0]
+                    if target:
+                        container=self.p.flow(target,env).deref()
+                        if container.locations and proc not in self.mutates:self.mutates.add(proc);changed=True
+                        if builtin=='append':
+                            ellipsis=node.data.get('roles',{}).get('ellipsis')
+                            for argument in node.group('args'):
+                                value=argument.role('value') if argument.kind=='FieldValue' else argument
+                                if value is target or argument.kind=='FieldValue' and argument.role('field').text in {'loc','allocator'}:continue
+                                spread=value.kind=='Unary' and value.data.get('op')=='**'
+                                base=value.role('expr') if spread else value
+                                flow=self.p.flow(base,env)
+                                expanded=spread or ellipsis and value.start>=ellipsis[1] or (
+                                    argument.kind=='FieldValue' and argument.role('field').text=='args')
+                                typ=self.r.type_of(base)
+                                if expanded and typ.kind=='struct' and typ.node:
+                                    values=[(flow.member(name.text),self.r.type_node(field.role('type'),typ.substitutions))
+                                            for field in typ.node.role('fields').children if field.kind=='Field'
+                                            for name in field.group('names')]
+                                elif expanded and typ.kind in {'unknown','generic'}:
+                                    # A generic **spread can instantiate as a
+                                    # record as well as an array. Preserve all
+                                    # inspectable field paths; nonexistent paths
+                                    # resolve to unborrowed metadata at callers.
+                                    fields={name.text for source in self.r.sources for record in source.nodes if record.kind=='StructType'
+                                            for field in record.role('fields').children if field.kind=='Field'
+                                            for name in field.group('names')}
+                                    values=[(flow.item(),typ),*[(flow.member(name),typ) for name in sorted(fields)]]
+                                elif expanded:values=[(flow.item(),typ.elem or typ)]
+                                else:values=[(self.p.copied(flow,value),typ)]
+                                for incoming,element_type in values:
+                                    incoming=incoming.header_copy(element_type,value)
+                                    element=container.item()
+                                    changed|=element.write(incoming)
+                                    changed|=self.store(proc,element,incoming,node)
                 if builtin in {'copy','delete'}:
                     target=self.p.arguments(node,['dst'])[0] if builtin=='copy' else next(
                         (arg.role('value') if arg.kind=='FieldValue' else arg for arg in node.group('args')

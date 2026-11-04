@@ -36,6 +36,28 @@ class PureCalls:
         return any(parent.kind=='Call' and self.purity.builtin(parent) in self.purity.type_queries
                    and parent.role('callee') is not node for parent in node.ancestors())
 
+    def chains(self,target):
+        """Shortest source call chains from declared fn bodies to a checked proc.
+
+        Keep real call nodes rather than one arbitrary origin per callee. The
+        diagnostic adapter selects active chains using native instantiation
+        locations, retaining lazy generic/when checking and shared helpers.
+        """
+        incoming={}
+        for call,targets in self.targets.items():
+            for proc in targets:incoming.setdefault(proc,[]).append(call)
+        queue=[(target,())];visited=set();result=[]
+        for proc,tail in queue:
+            if proc in visited:continue
+            visited.add(proc)
+            for call in incoming.get(proc,[]):
+                caller=self.purity.owner(call)
+                if caller is None:continue
+                path=(call,*tail)
+                if self.purity.pure(caller):result.append((caller,path))
+                else:queue.append((caller,path))
+        return result
+
     def name(self,proc):
         if proc in self.names:return self.names[proc]
         declaration=proc.parent

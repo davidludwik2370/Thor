@@ -276,7 +276,9 @@ main::proc(){n:=3;_=work(n)}
         errors=json.loads(result.stderr)['errors']
         error=next(e for e in errors if 'outside the function' in ' '.join(e['msgs']))
         self.assertEqual(Path(error['pos']['file']),root.resolve()/'input/main.thor')
-        self.assertEqual(error['pos']['offset'],source.encode().index(b'state+n'))
+        self.assertEqual(error['pos']['offset'],source.encode().index(b'middle(n)',source.encode().index(b'work::fn')))
+        self.assertTrue(any(note['pos']['offset']==source.encode().index(b'state+n')
+                            for note in error['related']))
         self.assertNotIn('__thor_',result.stderr)
 
     def test_return_mismatches_show_original_calls_without_checked_arguments(self):

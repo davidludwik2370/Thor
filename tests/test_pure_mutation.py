@@ -36,7 +36,9 @@ work::fn(input:[]int)->int{fill(input);return 0}
 ''')
         _,result=self.invoke(text,command='check',flags=['-json-errors'],fail='borrowed from an input')
         errors=json.loads(result.stderr)['errors']
-        self.assertTrue(any(e['pos'] and text.index('data[0]=9')<=e['pos']['offset']<text.index('data[0]=9')+len('data[0]=9') for e in errors),errors)
+        self.assertTrue(any(e['pos'] and e['pos']['offset']==text.index('fill(input)') for e in errors),errors)
+        self.assertTrue(any(note['pos']['offset']==text.index('data[0]=9')
+                            for error in errors for note in error.get('related',[])),errors)
 
     def test_recursive_named_and_forwarded_pointer_calls(self):
         self.invoke(self.program('n:=3;if work(n)!=6||VALUE!=8{panic("forwarding")}', '''
@@ -276,7 +278,9 @@ work::fn(n:int)->int{number:=Integer(n);ordinary:=Box{n};return read(&number,&or
         _,result=self.invoke(text,command='check',flags=['-json-errors'],fail='implementation storage')
         errors=json.loads(result.stderr)['errors']
         relevant=[error for error in errors if 'implementation storage' in ' '.join(error['msgs'])]
-        self.assertEqual(relevant[0]['pos']['offset'],text.index('a._value'),errors)
+        self.assertEqual(relevant[0]['pos']['offset'],text.index('read(&number,&ordinary)'),errors)
+        self.assertTrue(any(note['pos']['offset']==text.index('a._value')
+                            for note in relevant[0]['related']),errors)
 
     def test_invalid_pointer_call_keeps_native_argument_errors(self):
         prefix='set::proc(out:^int,value:int){out^=value}\n'
