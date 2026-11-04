@@ -12,6 +12,7 @@ thor_extrema_return :: proc(ast_context: ^AstContext, symbol: Symbol, call: ^ast
     if !strings.has_suffix(ast_context.fullpath, ".thor") ||
        (symbol.pkg != "$builtin" && .Builtin not_in symbol.flags) { return }
     name := symbol.name
+    if procedure, found := symbol.value.(SymbolProcedureValue); found && procedure.builtin_name != "" { name = procedure.builtin_name }
     if name != "min" && name != "max" && symbol.value_expr != nil {
         #partial switch original in ast.unparen_expr(symbol.value_expr).derived {
         case ^ast.Ident: name = original.name
@@ -63,15 +64,24 @@ check_builtin_proc_return_type :: proc(
 	bool,
 ) {
 	if element, _, found := thor_extrema_return(ast_context, symbol, call); found { return element, true }
-	if symbol.pkg == "$builtin" {
-		switch symbol.name {
+	procedure, builtin := symbol.value.(SymbolProcedureValue)
+	if symbol.pkg == "$builtin" || builtin && procedure.builtin_name != "" {
+		name := symbol.name
+		if procedure.builtin_name != "" { name = procedure.builtin_name }
+		// Resolving an imported callee changes package/local lookup settings;
+		// its arguments still belong to the caller's lexical scope.
+		argument_context := ast_context^
+		argument_context.use_locals = true
+		argument_context.current_package = get_package_from_node(call)
+		ast_context := &argument_context
+		switch name {
 		case "max", "min":
 			curr_candidate: ^ast.Basic_Lit
 			curr_value := 0.0
 			for arg, i in call.args {
 				if lit, value, ok := get_basic_lit_value(arg); ok {
 					if i != 0 {
-						if compare_basic_lit_value(value, curr_value, symbol.name) {
+						if compare_basic_lit_value(value, curr_value, name) {
 							curr_candidate = lit
 							curr_value = value
 						}
@@ -274,16 +284,13 @@ get_return_expr :: proc(ast_context: ^AstContext, expr: ^ast.Expr, is_mutable: b
 	if v, ok := expr.derived.(^ast.Field_Value); ok {
 		return get_return_expr(ast_context, v.value, is_mutable)
 	}
-	if ident, ok := expr.derived.(^ast.Ident); ok {
-		symbol := Symbol{}
-		if ok := internal_resolve_type_expression(ast_context, ident, &symbol); ok {
-			if v, ok := symbol.value.(SymbolBasicValue); ok {
-				return v.ident
-			} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
-				lit := new_type(ast.Basic_Lit, expr.pos, expr.end, context.temp_allocator)
-				lit.tok = v.tok
-				return convert_candidate(lit, is_mutable)
-			}
+	if symbol, ok := resolve_value_type_expression(ast_context, expr); ok {
+		if v, ok := symbol.value.(SymbolBasicValue); ok {
+			return v.ident
+		} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
+			lit := new_type(ast.Basic_Lit, expr.pos, expr.end, context.temp_allocator)
+			lit.tok = v.tok
+			return convert_candidate(lit, is_mutable)
 		}
 	}
 	return expr

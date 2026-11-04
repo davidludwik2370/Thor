@@ -2618,6 +2618,80 @@ raise SystemExit(bool(errors))
                 occurrences += 1
         self.assertEqual(occurrences, 2)
 
+    def test_immutable_imported_builtin_result_in_fn_loop_and_unsaved_recovery(self):
+        text='''// 😀 original source
+package main
+import "core:math"
+Board::[3]int
+find::fn(board:Board)->int{
+    total:=0
+    for top_card in board {
+        diff:=7-top_card
+        guess_dist :> math.abs(diff)
+        total+=guess_dist
+    }
+    return total
+}
+main::proc(){board:=Board{1,2,3};_=find(board)}
+'''
+        client,main=self.open(text)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        def check(source,expected):
+            spans=[(kind,mods) for _,_,kind,name,mods in self.semantic_spans(client,main,source) if name=='guess_dist']
+            count=source.count('guess_dist')
+            self.assertEqual(len(spans),count,spans)
+            self.assertEqual([(kind,bool(mods&readonly)) for kind,mods in spans],[('variable',expected)]*count)
+            hover=self.hover(client,main,source,'guess_dist\n')['contents']['value']
+            self.assertIn('guess_dist: int',hover)
+            self.assertEqual('immutable storage' in hover,expected)
+        check(text,True)
+        mutable=text.replace('guess_dist :>','guess_dist :=')
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':mutable}]})
+        check(mutable,False)
+        broken=text.replace('        total+=guess_dist','        guess_dist=0\n        total+=guess_dist')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains="immutable storage 'guess_dist'")
+        self.assertEqual(errors[0]['range']['start'],self.position(broken,'guess_dist=0',0))
+        check(broken,True)
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':4},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        check(text,True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_imported_builtin_aliases_keep_result_types_and_binding_mutability(self):
+        text='''package main
+import m "core:math"
+import _ "core:math" / abs
+import builtin "base:builtin"
+import user "library"
+magnitude::m.abs
+again::magnitude
+main::proc(){
+    n:=-3
+    aliased :> again(n)
+    selected :> abs(n)
+    explicit :> builtin.abs(n)
+    floating :> m.abs(f64(n))
+    bounded :> m.clamp(n,-7,7)
+    minimum :> m.min(n,0)
+    maximum :> m.max(n,0)
+    mutable := m.abs(n)
+    user_value :> user.abs(n)
+    _=aliased;_=selected;_=explicit;_=floating;_=bounded;_=minimum;_=maximum;_=mutable
+    _=user_value
+}
+'''
+        client,main=self.open(text,files={'library/main.odin':'package library\nabs::proc(n:int)->string{return "user"}\n'},compiler=False)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        for name in ['aliased','selected','explicit','floating','bounded','minimum','maximum','mutable','user_value']:
+            with self.subTest(name=name):
+                tokens=[(kind,bool(mods&readonly)) for _,_,kind,word,mods in self.semantic_spans(client,main,text) if word==name]
+                self.assertEqual(tokens,[('variable',name!='mutable')]*2,tokens)
+                hover=self.hover(client,main,text,name+' :')['contents']['value']
+                self.assertIn(name+(': f64' if name=='floating' else ': string' if name=='user_value' else ': int'),hover)
+
     def test_multi_expression_immutable_coordinates_hover_and_write_diagnostic(self):
         text='''package main
 main::proc(){

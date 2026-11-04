@@ -83,6 +83,7 @@ SymbolPackageValue :: struct {}
 
 SymbolProcedureValue :: struct {
     thor_pure: bool,
+	builtin_name: string, // Original builtin identity survives imported/renamed aliases.
 	return_types:       []^ast.Field,
 	arg_types:          []^ast.Field,
 	orig_return_types:  []^ast.Field, //When generics have overloaded the types, we store the original version here.

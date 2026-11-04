@@ -3787,6 +3787,8 @@ resolve_symbol_return :: proc(ast_context: ^AstContext, symbol: Symbol, ok := tr
 			return s, false
 		}
 	case SymbolProcedureValue:
+		// Keep builtin identity when an imported/local alias changes name/pkg.
+		if symbol.pkg == "$builtin" && v.builtin_name == "" { v.builtin_name = symbol.name }
 		if v.generic {
 			if resolved_symbol, ok := resolve_generic_function(
 				ast_context,

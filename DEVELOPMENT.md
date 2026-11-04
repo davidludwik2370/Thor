@@ -3139,3 +3139,22 @@ numeric-mutator acceptance cases also run with assertions, bounds checks and typ
 assertions disabled, using explicit panic/Python verdicts. Slice-literal escapes
 are covered with explicit, elided, temporary-array, nested-record, parenthesized
 and named-argument forms, along with shallow-copy escapes and safe owned copies.
+
+## Imported builtin result highlighting (TLS 0.26.2)
+
+An inferred `guess_dist :> math.abs(diff)` had no semantic token or hover because
+OLS lost builtin identity through the reexport and attempted to resolve its
+placeholder result type `T` as an ordinary declaration. Preserve builtin identity
+through reexports/renamed aliases, and resolve result-dependent arguments in the
+caller's lexical scope, including casts and nested calls. This restores
+the actual result type and lets the existing immutable-binding rules apply; it
+does not infer mutability from the initializer. Ordinary user functions with the
+same name remain ordinary functions. Live editor tests cover fn/loop scope,
+declarations/references, hover, selective imports, chained aliases, int/f64 results,
+mutable controls, unsaved binding changes and mapped invalid-write diagnostics.
+
+Validation: all 122 live TLS tests, 1,134 native TLS tests in both checked and
+optimized unchecked/assertion-disabled builds, and six assertion-hygiene tests
+pass. A read-only check of the actual Hilo document confirms the three `:>`
+occurrences are readonly and the three `:=` occurrences remain mutable. Rebuild
+TLS and use Thor: Restart Language Server; no grammar/extension reinstall is needed.
