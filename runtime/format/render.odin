@@ -2,6 +2,7 @@
 package thor_format
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
@@ -16,30 +17,45 @@ float_text :: proc(value:f64,bits:int,verb:rune,precision:int)->string {
 
 @(private="package")
 float_into :: proc(builder:^strings.Builder,value:f64,bits:int,verb:rune,precision:int) {
+    if try_float_into(builder,value,bits,verb,precision)!=nil {panic("format allocation failed")}
+}
+
+// The conversion API must return failures rather than panic or return partial
+// text. Interpolation keeps its existing panicking wrapper above.
+@(private="package")
+try_float_into :: proc(builder:^strings.Builder,value:f64,bits:int,verb:rune,precision:int,
+                       allocator:=context.allocator)->runtime.Allocator_Error {
     p:=precision
     v:=verb
     if v=='v'||v=='w'||v=='G' {v='g'}
     if v=='F'||v=='%' {v='f'}
     if p<0 {p=3 if v=='f' else 6 if v=='e'||v=='E' else -1}
-    assert(p<max(int)-400,"format precision overflow")
+    if p>=max(int)-400 {return .Invalid_Argument}
     // f64 needs at most 309 integer digits. Common precisions fit on stack;
     // larger precisions retain the original checked, appropriately sized path.
     size:=max(400,p+400)
     local:[512]u8
     heap:[]u8
-    defer delete(heap)
+    defer delete(heap,allocator)
     data:=local[:]
     if size>len(local) {
-        heap=make([]u8,size)
-        if len(heap)!=size {panic("format allocation failed")}
+        err:runtime.Allocator_Error
+        heap,err=make([]u8,size,allocator)
+        if err!=nil {return err}
+        if len(heap)!=size {return .Out_Of_Memory}
         data=heap
     }
     text:=strconv.write_float(data,value*100 if verb=='%' else value,u8(v),p,bits)
     if len(text)>1 && text[0]=='+' && text[1]!='I' {text=text[1:]}
-    if strings.write_string(builder,text)!=len(text) {panic("format allocation failed")}
+    written,err:=append(&builder.buf,..transmute([]u8)text)
+    if err!=nil {return err}
+    if written!=len(text) {return .Out_Of_Memory}
     if verb=='%' {
-        if strings.write_byte(builder,'%')!=1 {panic("format allocation failed")}
+        count,write_err:=append(&builder.buf,u8('%'))
+        if write_err!=nil {return write_err}
+        if count!=1 {return .Out_Of_Memory}
     }
+    return nil
 }
 
 @(private="package")

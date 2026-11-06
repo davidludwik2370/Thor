@@ -118,6 +118,14 @@ _f32  :: proc(s: string, base:=0) -> (value: f32,  ok: bool) #optional_ok { retu
 _f64  :: proc(s: string, base:=0) -> (value: f64,  ok: bool) #optional_ok { return strconv.parse_f64 (s) }
 _bool :: proc(s: string, base:=0) -> (value: bool, ok: bool) #optional_ok { return strconv.parse_bool(s) }
 
+// Allocate independent text. Numeric/Boolean/enum output matches f"{value}";
+// byte/rune sequences become text. Delete the result with the same allocator.
+@(require_results)
+_string :: proc(value:$T,allocator:=context.allocator) ->
+(text:string,err:runtime.Allocator_Error) #optional_allocator_error {
+    return format.try_string(value,allocator)
+}
+
 @private
 _parse_int :: proc(s: string, $T: typeid, base:=0) -> (value: T, ok: bool)
 where intrinsics.type_is_integer(T) #optional_ok {

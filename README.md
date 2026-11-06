@@ -141,6 +141,19 @@ Select `.XXH64` or `.FNV64a` with `algorithm=`, or use the default `.XXH3_64`.
 Strings/ordered containers hash contents, structs ignore padding, and pointers
 hash addresses. See the [hashing contract](runtime/hash/README.md).
 
+`basic._string(value, allocator=...)` returns owned text and an optional
+`runtime.Allocator_Error`. It supports numeric values including `Integer` and
+`Rational`, bools, enums, runes, strings/cstrings, and byte/rune sequences:
+
+```odin
+text := basic._string([]rune{'a', '界', '😀'}) or_panic
+defer delete(text)
+```
+
+Strings/bytes are copied; rune sequences are UTF-8 encoded. Scalar formatting
+matches plain interpolation. Failures return empty text and release temporary
+allocations. See the [conversion contract](runtime/basic/README.md#converting-values-to-strings).
+
 ## Optional results with `or_panic`
 
 Use postfix `or_panic` when an optional result must succeed:

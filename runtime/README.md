@@ -25,6 +25,12 @@ copying are later stages; the current package uses ordinary native ownership.
 with XXH3_64 (default), XXH64 and FNV64a. See the [hashing contract](hash/README.md)
 for content versus pointer identity, composite values and unsupported cases.
 
+`basic._string(value, allocator=...)` creates owned text from numbers (including
+Integer/Rational), bools, enums, strings/cstrings and byte/rune sequences. Its
+`runtime.Allocator_Error` result is optional. Empty output allocates nothing;
+failed conversions free intermediates and return empty text. See the
+[conversion and ownership rules](basic/README.md#converting-values-to-strings).
+
 `import "thor:basic"` provides `basic.print`, `basic.sorted`, parsing,
 file/line I/O, and small collection/string helpers. It resolves automatically from
 any Thor project. For unqualified names, use the existing selection syntax, such

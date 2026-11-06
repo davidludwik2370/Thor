@@ -106,6 +106,31 @@ main :: proc() {
     _, overflow := basic._u8("256")
     assert(!overflow)
 
+    // Conversions in the other direction return independent owned text. Rune
+    // slices are UTF-8 encoded; numbers/bools use normal interpolation output.
+    // Check the optional allocator error, omit it, or use Thor's or_panic.
+    {
+        letters := []rune{'a', '界', '😀'}
+        text, err := basic._string(letters)
+        if err != nil { panic("could not allocate text") }
+        defer delete(text)
+        letters[0] = '?'
+        if text != "a界😀" { panic("_string must own its result") }
+        number := basic._string(12345) or_panic
+        flag := basic._string(true)
+        defer delete(number); defer delete(flag)
+        integer: Integer = 123456789012345678901234567890
+        ratio := Rational(22, 13)
+        defer delete(integer); defer delete(ratio)
+        large := basic._string(integer) or_panic
+        fraction := basic._string(ratio) or_panic
+        defer delete(large); defer delete(fraction)
+        if number != "12345" || flag != "true" || fraction != "22/13" { panic("_string formatting") }
+        basic.print("owned conversions:", text, number, flag, large, fraction)
+        // Unlike an anonymous f-string, an anonymous _string result has no
+        // automatic cleanup. Bind it as above or use a scoped arena.
+    }
+
     // split allocates only the outer slice. Its strings borrow the input text.
     // join creates a new string that must also be deleted.
     parts := basic.split("oak,elm,ash", ",")

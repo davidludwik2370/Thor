@@ -241,6 +241,7 @@ class Diagnostics:
                     'Precision is supported for scalar numbers and strings, not aggregate values.',
                     'Decimal formatting requires a numeric value.',
                     'Byte precision requires s, q, w, x, or X.',
+                    '_string supports byte/rune sequences, numeric values, Integer, Rational, booleans, enums, strings and cstrings',
                 ] if any(text in m for m in msgs)),None)
             elif origin and Path(origin.file) == runtime / "sets" / "sets.odin" and any(
                 "type_is_valid_map_key(T)" in m or "Invalid type of a key for a map" in m for m in msgs

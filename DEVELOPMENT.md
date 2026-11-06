@@ -3572,3 +3572,38 @@ completion/definition and an unsaved diagnostic repair. The basic demo passes
 with automatic debug tracking/ASan; both main walkthroughs pass optimized with
 assertions, bounds and type checks disabled. References and all three demos
 document the new API and limits. The common installed runtime is rebuilt.
+
+## Owned string conversions (Thor 0.38.3)
+
+`basic._string(value, allocator=...)` returns `(string, runtime.Allocator_Error)`
+with `#optional_allocator_error`. Scalar numbers, Integer/Rational, bools and
+enums retain plain interpolation output. Runes and rune sequences are UTF-8
+encoded; strings/cstrings and byte sequences are copied into exact-sized owned
+storage. Arrays, slices, dynamic arrays and fixed-capacity dynamic arrays are
+supported for bytes/runes. Empty text needs no allocation. Unsupported values
+produce a public support-contract diagnostic at the call, including in TLS.
+
+The library implementation is `thor:format.try_string`; the native float writer
+now has a fallible internal entry point shared with interpolation. No syntax,
+automatic cleanup or purity exception is added. Inputs remain borrowed and all
+work uses the requested allocator. Intermediates are freed on failure, with
+empty output and the original allocator error returned. The allocator adapter
+also detects `core:mem.nil_allocator`'s silent `(nil, nil)` allocation failures;
+unsupported resize can still use Odin's ordinary allocate/copy/free fallback.
+Big-number errors preserve their underlying allocation cause. A size that cannot
+be represented maps to Out_Of_Memory. Invalid rune scalars normalize to U+FFFD
+before encoding, avoiding the installed Odin encoder's stale-width bug for
+negative/above-range code points. UTF-16 inputs remain unsupported explicitly.
+
+All 11 conversion/TLS acceptance cases pass, including primitive/endian/distinct
+types, exact logical-number round trips, char containers, aliases/immutables,
+selected/wildcard imports, anonymous f-string inputs, supplied allocators,
+scoped arenas, optional-error propagation, long enum names, custom formatter
+growth, mapped unsupported-type errors and unsaved repair. The 10 native
+formatter tests pass checked, assertion/bounds/type-check-disabled release and
+ASan. Failure injection covers every allocation stage of large Integer/Rational
+text, all allocator error codes, silent nil allocators, resize fallback and
+cleanup without partial results. Related runs pass 130 basic/diagnostic/hygiene
+cases and 53 formatting/lifetime/hygiene cases. The documented basic demo runs
+cleanly under debug tracking/ASan and unchecked release; the shared runtime is
+rebuilt. See runtime/basic/README.md for ownership and custom-formatter limits.

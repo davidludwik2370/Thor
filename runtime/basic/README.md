@@ -53,6 +53,7 @@ Compile-time array/slice concatenation uses the language's `A ++ B` operator.
 | `sorted(data, less=..., allocator=...)` | Allocate a sorted copy of a slice; the default comparison is `<`. Pass a comparator for records or custom ordering. |
 | `_int`, `_uint`, `_i8`/`16`/`32`/`64`/`128`, `_u8`/`16`/`32`/`64` | Parse a string, returning `(value, ok)`. `base=0` infers prefixes; another base parses digits in that base. Narrow conversions check bounds. |
 | `_f32`, `_f64`, `_bool` | Parse a float or boolean string, returning `(value, ok)`. Their retained `base` argument has no effect. |
+| `_string(value, allocator=...)` | Return independent text and an optional `runtime.Allocator_Error`. Supports all scalar numeric types, `Integer`, `Rational`, bools, enums, runes, strings/cstrings, and byte/rune sequences. |
 | `input(message="", allocator=...)` | Read one stdin line; remove LF or CRLF. Return `(text, io.Error)`, preserving a final partial line with `.EOF`. |
 | `read(file_path, allocator=...)` | Read the whole file into `(text, ok)`. |
 | `write(file_path, text)` | Create or truncate a file and return `(bytes_written, os.Error)`. |
@@ -82,6 +83,53 @@ library procedures, with runtime rejection of recursively unsupported schemas;
 they do not change assignment or add automatic ownership management.
 The allocation-error tuples on `clone`, `fmap`, `split` and `join` keep their
 original optional-error behavior.
+
+## Converting values to strings
+
+```odin
+letters := []rune{'a', '界', '😀'}
+text, err := basic._string(letters)
+if err != nil { panic("could not allocate text") }
+defer delete(text)
+
+// The allocation error is optional, just like Odin's string cloning helpers.
+number := basic._string(12345) or_panic
+defer delete(number)
+unchecked := basic._string(true) // Discard the allocation error explicitly by omission.
+defer delete(unchecked)
+```
+
+Numeric/Boolean/enum output matches a plain `f"{value}"` field: native integer,
+float, complex and quaternion types (including distinct/endian variants), bool
+and `b8`/`b16`/`b32`/`b64`, and enum names. `Integer` emits exact decimal digits;
+`Rational` emits a normalized exact fraction, including `"0/1"` for zero. Use an
+f-string when precision, a decimal Rational expansion, padding or grouping is
+needed.
+
+A rune becomes its UTF-8 character. Byte/rune slices, fixed arrays, dynamic
+arrays and fixed-capacity dynamic arrays become text without list punctuation.
+Rune sequences are UTF-8 encoded; negative, surrogate and out-of-range code
+points become U+FFFD. Byte sequences are copied verbatim, including embedded
+zero bytes and invalid UTF-8. Strings are copied without quotes; `cstring` is
+read up to its first zero byte (nil becomes empty). General structs, pointers,
+maps, arbitrary numeric sequences, `any`, and UTF-16 string types are unsupported
+and fail at compile time. These remain available for inspection with f-strings.
+
+Every nonempty successful result owns an exact-sized allocation, even when the
+input is already a string. Inputs are borrowed and never freed or modified.
+Delete the result with the same allocator; empty output needs no allocation.
+Every internal allocation uses the requested allocator. Failed conversions
+release intermediates and return `("", err)`, never truncated/partial output.
+Ignoring the optional error therefore produces an empty string on failure.
+Custom native scalar formatters follow their normal callback behavior; the
+helper detects destination allocation failures, but cannot recover a callback
+that explicitly panics or undo its own unrelated side effects.
+
+This is an ordinary allocating procedure: `_string` results passed directly to
+another procedure do not receive anonymous f-string cleanup. Keep the result in
+a variable or use a scoped arena. The implementation is shared with the native
+`thor:format` package's `try_string` procedure; no new language syntax or purity
+exception is introduced.
 
 ## Scoped arena allocations
 
