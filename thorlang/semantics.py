@@ -415,6 +415,7 @@ class Resolver:
 
     def result_type(self, n, index, seen=None):
         if n.kind == 'Paren': return self.result_type(n.role('expr'), index, seen)
+        if n.kind == 'OrPanic': return self.result_type(n.role('expr'), index, seen)
         if n.kind == 'SwitchResults':
             args = n.group('args')
             return self.type_of(args[index], seen) if index < len(args) else Type(node=n)
@@ -531,7 +532,7 @@ class Resolver:
                     return self.type_node(results[0][1], plan.substitutions)
         if kind in {"Cast","TypeAssertion"}:
             return self.type_node(n.role("type"))
-        if kind in {'AutoCast','OrReturn','OrBranch'}:return self.type_of(n.role('expr'),seen)
+        if kind in {'AutoCast','OrReturn','OrBranch','OrPanic'}:return self.type_of(n.role('expr'),seen)
         if kind=='OrElse':return self.type_of(n.role('x'),seen)
         if kind == "Deref":
             return self.type_of(n.role("expr"), seen).elem or Type(node=n)

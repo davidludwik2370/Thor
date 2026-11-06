@@ -5,6 +5,11 @@ The driver supplies `thor:` automatically unless explicitly overridden with
 Odin by supplying `-collection:thor=/path/to/thor/runtime`. The `basic` package is
 written in Thor and uses its inline generic default callbacks.
 
+`optional/optional.odin` is internal support for the `or_panic` operator. Its
+generic status check allocates nothing; failure reporting passes original source
+coordinates and expression text to Odin's panic machinery. No explicit import
+is required to use the operator. See [the language reference](../README.md#optional-results-with-or_panic).
+
 ## Arbitrary-precision foundation
 
 `import "thor:big"` provides the stage-one Integer/Rational runtime: exact

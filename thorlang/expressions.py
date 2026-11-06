@@ -293,6 +293,9 @@ class Expressions:
                         return aliases[key]
         if not s.thor:
             return None
+        if n.kind == 'OrPanic':
+            from .optional import render
+            return render(self, n)
         if n.kind == 'Assignment':
             from .semantics import descendants
             if any(child.kind in {'Index','Slice'} and self.type_operand(child)
@@ -488,7 +491,7 @@ class Expressions:
             value=n
             while value.parent and value.parent.kind=='Paren':value=value.parent
             parent=value.parent
-            optional=parent and parent.kind in {'OrElse','OrReturn','OrBranch'}
+            optional=parent and parent.kind in {'OrElse','OrReturn','OrBranch','OrPanic'}
             if parent and parent.kind in {'Declaration','Assignment'}:
                 names=parent.group('names' if parent.kind=='Declaration' else 'lhs')
                 values=parent.group('values' if parent.kind=='Declaration' else 'rhs')

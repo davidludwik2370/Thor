@@ -569,5 +569,16 @@ main :: proc() {
         // :> variables are runtime values and cannot be operands of ++.
     }
 
+    println("Optional results: or_panic, lookups, assertions, and multiple values")
+    {
+        lookup :: proc(value: int) -> (int, bool) { return value, value >= 0 }
+        value :> lookup(7) or_panic
+        item: any = value
+        unwrapped := item.(int) or_panic
+        pair :: proc() -> (int, string, bool) { return 2, "two", true }
+        number, word := pair() or_panic
+        if unwrapped != 7 || number != 2 || word != "two" { panic("or_panic") }
+    }
+
     println("All T01-T23 demos passed.")
 }

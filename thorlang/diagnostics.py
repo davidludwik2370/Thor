@@ -294,7 +294,7 @@ class Diagnostics:
                 msgs = ["Membership requires comparable elements. " + msgs[0]]
             pure_format=bool(origin and Path(origin.file)==runtime/'format'/'format.odin' and msgs
                              and msgs[0].removeprefix('Compile time panic: ').startswith('Pure formatting supports'))
-            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin'} or origin.kind=='pure-type-validator' or pure_format)
+            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin',runtime/'optional'/'optional.odin'} or origin.kind=='pure-type-validator' or pure_format)
             if compiler_support:
                 # Generic dispatch is part of language lowering. Its checker
                 # failures belong to the user's operation, not the support file.
@@ -309,6 +309,10 @@ class Diagnostics:
                         if caller: break
                     if caller: break
                 if caller: origin=caller
+            source = self.sources.get(origin.file) if origin else None
+            if source and any(n.kind == 'OrPanic' and n.start <= origin.start and origin.end <= n.end for n in source.nodes) \
+                    and not any(n.kind == 'OrElse' and n.start <= origin.start and origin.end <= n.end for n in source.nodes):
+                msgs = [message.replace("'or_else'", "'or_panic'") for message in msgs]
             pure_type=self.pure_type_checks.get((origin.file,origin.start,origin.end)) if origin else None
             for token,site in self.pure_type_tokens.items():
                 if msgs and token in msgs[0]:
@@ -513,7 +517,7 @@ class Diagnostics:
         source=self.sources.get(origin.file) if origin else None
         if source is None:return ()
         propagate={'Binary','Unary','Paren','Ternary','Index','Slice','Selector',
-                   'Deref','Compound','SwitchExpr','CompileSwitchExpr'}
+                   'Deref','Compound','SwitchExpr','CompileSwitchExpr','OrPanic'}
         operations=propagate|{'Call','Interpolation','Run'}
         atoms={'Ident','Literal','ImplicitSelector'}
         candidates=[node for node in source.nodes if node.kind in operations|atoms

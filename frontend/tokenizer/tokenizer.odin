@@ -676,6 +676,11 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	case is_letter(ch):
 		lit = scan_identifier(t)
 		kind = .Ident
+		if t.thor && lit == "or_panic" {
+			// Reuse the shared postfix AST; the original token text identifies
+			// Thor's unwrap operation without extending Odin's AST or tokens.
+			kind = .Or_Return
+		}
 		check_keyword: if 1 < len(lit) && len(lit) < 16 {
 			if intrinsics.atomic_load(&_global_keyword_lut_initialized) {
 				entry := &global_keyword_lut[keyword_hash(lit) & KEYWORD_LUT_MASK]

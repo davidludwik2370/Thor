@@ -984,7 +984,7 @@
         },
         {
           "name": "keyword.control.thor",
-          "match": "\\b(if|else|or_else|when|where|for|in|not_in|defer|switch|return|or_return)\\b"
+          "match": "\\b(if|else|or_else|or_panic|when|where|for|in|not_in|defer|switch|return|or_return)\\b"
         },
         {
           "match": "\\b(break|or_break|continue|or_continue)\\b\\s*(\\w+)?",

@@ -65,6 +65,7 @@ DocumentPositionContext :: struct {
 	type_cast:              ^ast.Type_Cast,
 	call_commas:            []int,
 	directive:              ^ast.Basic_Directive,
+	or_panic:               ^ast.Or_Return_Expr,
 }
 
 
@@ -947,6 +948,9 @@ get_document_position_node :: proc(node: ^ast.Node, position_context: ^DocumentP
 		get_document_position(n.x, position_context)
 		get_document_position(n.y, position_context)
 	case ^ast.Or_Return_Expr:
+		if n.token.text == "or_panic" && int(position_context.position) >= n.token.pos.offset {
+			position_context.or_panic = n
+		}
 		get_document_position(n.expr, position_context)
 	case ^ast.Or_Branch_Expr:
 		get_document_position_label(n.label, position_context)

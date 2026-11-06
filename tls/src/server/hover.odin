@@ -131,6 +131,14 @@ get_hover_information :: proc(
 
 	}
 
+	if position_context.or_panic != nil {
+		hover.contents.kind = "markdown"
+		hover.contents.value = OR_PANIC_DOCS
+		token := position_context.or_panic.token
+		hover.range = common.get_token_range(ast.Ident{pos=token.pos, end=position_context.or_panic.end, name=token.text}, ast_context.file.src)
+		return hover, true, true
+	}
+
 	if position_context.type_cast != nil &&
 	   !position_in_node(position_context.type_cast.type, position_context.position) &&
 	   !position_in_node(position_context.type_cast.expr, position_context.position) { 	// check that we're actually on the 'cast' word

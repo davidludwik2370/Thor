@@ -125,6 +125,8 @@ for (const [name, source, word, scope, line] of [
     ['range membership', 'x in 0..<10', '..<', 'keyword.operator.range'],
     ['power operator', 'x := 2**3**2', '**', 'keyword.operator.power-or-expansion'],
     ['array concatenation', 'ALL :: [1] ++ [2]', '++', 'keyword.operator.concatenation'],
+    ['optional panic', 'value := get() or_panic', 'or_panic', 'keyword.control'],
+    ['interpolated optional panic', 's := f"{get() or_panic}"', 'or_panic', 'keyword.control'],
     ['interpolated concatenation', 's := f"{[1] ++ [2]}"', '++', 'keyword.operator.concatenation'],
     ['native expansion operator', 'sum(**pair)', '**', 'keyword.operator.power-or-expansion'],
     ['interpolated power', 's := f"power {value**3}"', '**', 'keyword.operator.power-or-expansion'],

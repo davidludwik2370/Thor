@@ -524,7 +524,7 @@ class Purity:
                 owner,name=symbol.projection
                 return self.flow(owner,env).member(name)
             return env.setdefault((symbol.declaration,symbol.name),Flow()) if symbol else Flow()
-        if n.kind in {'Paren','Cast','AutoCast','TypeAssertion','OrReturn','OrBranch'}:return self.flow(n.role('expr'),env)
+        if n.kind in {'Paren','Cast','AutoCast','TypeAssertion','OrReturn','OrBranch','OrPanic'}:return self.flow(n.role('expr'),env)
         if n.kind=='FieldValue':return self.flow(n.role('value'),env)
         if n.kind=='Unary' and n.data['op']=='&':
             target=self.flow(n.role('expr'),env)

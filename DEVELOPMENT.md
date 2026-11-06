@@ -3401,3 +3401,45 @@ Both main demos run successfully in unchecked optimized builds; checked and
 allocation-tracked walkthrough coverage is included in the compiler regressions.
 The common runtime was prepared and the installed local extension grammar was
 updated. Reload the VS Code window to load TLS 0.28.0 and the new grammar.
+
+## Optional-result panic operator (Thor 0.38.0 / TLS 0.29.0)
+
+`or_panic` is a Thor-only postfix operator. The shared lexer reuses the native
+postfix AST while preserving the original token text; the frontend exports a
+distinct `OrPanic` node for lowering, type/provenance analysis, and ownership.
+Native Odin files keep `or_panic` available as an ordinary identifier.
+
+Expression-local helpers evaluate the operand once, save all successful values
+and the final status, and return those values after a boolean/nil status check.
+SDK signatures are inspected on demand to preserve multiple successful results
+such as `os.pipe` and `strconv.parse_f64_prefix`. Native optional promotion and
+overload selection remain authoritative through unevaluated type queries. The
+`#load` case retains native constant handling. Direct logical numeric results
+keep Thor's established independent-ownership rule; ordinary aggregates remain
+shallow. F-string lifetimes and short-circuiting use the existing expression
+machinery.
+
+The internal `runtime/optional` package allocates/formats only on failure and
+invokes the normal/contextless panic machinery with explicitly embedded original
+source coordinates. Release builds preserve those coordinates even though
+Odin's default handler ordinarily omits its location prefix with disabled
+assertions. Compile-time failures retain the expression/procedure/error details
+and a related location for the failing unwrap, including Unix position style
+and unsaved TLS overlays. Generated-query cascades and native `or_else` token
+names are translated back to the source operation. Parser diagnostics likewise
+retain `or_panic`, rather than the reused AST token's `or_return` spelling.
+
+TLS supports ordinary/immutable and multiple-result inference, semantic tokens,
+source references and rename, keyword hover and completion, and compile-time
+error details. Thor-only help is kept out of the native keyword table so native
+Odin identifiers retain their full hover/type behavior. The VS Code grammar and
+both executable demos document the new operator. The common runtime and local
+TLS executable are rebuilt; reload the VS Code window for the installed grammar.
+
+Validation includes 24 operator compiler cases, 95 diagnostic regressions,
+29 pure-mutation and 21 f-string lifetime cases, 20 TLS integration cases,
+1,150 native TLS cases in checked/unchecked configurations, six lexer cases
+checked/unchecked, 127 Node cases, assertion hygiene, and a real CodeLLDB
+breakpoint/step/result-inspection check. Other compiler regressions covering
+purity, switch panic arms, big numbers, and concatenation also pass. Both main
+demos run in optimized builds with assertions, bounds, and type checks disabled.

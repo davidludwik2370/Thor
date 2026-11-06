@@ -2171,6 +2171,13 @@ get_identifier_completion :: proc(
 		}
 	}
 
+	if strings.has_suffix(ast_context.file.fullpath, ".thor") {
+		if score, ok := common.fuzzy_match(matcher, "or_panic"); ok == 1 {
+			item := CompletionItem{label="or_panic", kind=.Keyword, documentation=OR_PANIC_DOCS}
+			append(results, CompletionResult{score=score*1.1, completion_item=item})
+		}
+	}
+
 	if config.enable_snippets {
 		for k, v in snippets {
 			if score, ok := common.fuzzy_match(matcher, k); ok == 1 {

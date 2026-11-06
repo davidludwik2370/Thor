@@ -1946,12 +1946,45 @@ constant_concatenation :: proc() {
 }
 
 
+// Optional results keep their ordinary ownership. or_panic is the concise
+// spelling when a missing value is a programming error rather than a fallback.
+// Failures identify this .thor source, even in unchecked release builds.
+optional_results :: proc() {
+    println("\nOptional results: unwrap or panic with source context")
+
+    lookup :: proc(value: int) -> (int, bool) {
+        return value * 2, value >= 0
+    }
+
+    value :> lookup(6) or_panic
+    if value != 12 { panic("unexpected optional result") }
+
+    entries: map[string]int
+    entries["Thor"] = 7
+    defer delete(entries)
+    selected :> entries["Thor"] or_panic
+    if selected != 7 { panic("lookup result") }
+
+    pair :: proc() -> (int, string, bool) { return 4, "four", true }
+    number, word := pair() or_panic
+    if number != 4 || word != "four" { panic("multiple values") }
+
+    values := [4, 2, 9]
+    smallest := min(..values[:]) or_panic
+    if smallest != 2 { panic("minimum") }
+
+    // This would panic with expression, procedure, location and status:
+    // missing := entries["Odin"] or_panic
+    // Use `or_else default_value` when absence is expected instead.
+}
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
     imports_and_odin()
     arrays_and_context()
     constant_concatenation()
+    optional_results()
     membership_and_constraints()
     conditional_expressions()
     compile_time_selection()

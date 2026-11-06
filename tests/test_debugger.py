@@ -136,6 +136,30 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_or_panic_keeps_original_breakpoints_and_result_storage(self):
+        text='''package main
+get::proc(n:int)->(int,bool){return n,true}
+main::proc(){
+    value:=get(7) or_panic
+    next:=value+1
+    if next!=8 {panic("optional result")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[4,6])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),4),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'value','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_dynamic_pure_results_keep_original_frames_and_live_caller_storage(self):
         text='''package main
 build::fn(n:int)->[dynamic]int{

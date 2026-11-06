@@ -118,6 +118,52 @@ error, preserving cycles, shared storage and interior references.
 and [graph-copy demo](examples/deepclone/demo.thor); these are library procedures
 and require no changes to the Thor/Odin compilers.
 
+## Optional results with `or_panic`
+
+Use postfix `or_panic` when an optional result must succeed:
+
+```odin
+value := strconv.parse_int("42") or_panic
+entry := records[key] or_panic
+node := item.(^Node) or_panic
+first, second := get_pair() or_panic // Drops only the final status.
+minimum := min(..values) or_panic
+```
+
+Like `or_else panic(...)`, it unwraps optional lookups/assertions and procedure
+results whose final value is a success boolean or a nil-comparable error.
+Booleans succeed when true; error values succeed when nil. The operand executes
+exactly once, at its original expression site; short-circuited expressions stay
+unevaluated. Ordinary type checking and ownership rules still apply. The
+operator does not free the successful result or introduce automatic cleanup of
+user-owned values.
+
+On failure the ordinary panic handler receives the original `.thor` file, line,
+column, and procedure, plus a message containing the original expression and
+returned error/status. The default handler writes to stderr, for example:
+
+```text
+/path/main.thor(27:13) panic: unexpected failure
+  expression: strconv.parse_int(text)
+  procedure: main
+  error: false
+```
+
+The location remains present with `-disable-assert`; panic is never compiled out.
+The status check itself allocates nothing and formats no text; result allocation
+and numeric-copy ownership retain their usual rules. Only the failure path
+formats the returned error, using the temporary allocator.
+Contextless procedures use a contextless panic; ordinary procedures retain the
+current custom panic handler. `fn` and `#run` use the same unwrap semantics:
+failed evaluations report both the evaluation request and the original failing
+unwrap. `#run` still requires a direct call: put the unwrap inside the called
+procedure rather than writing `#run (operation() or_panic)`. Native `#load`
+retains its own constant-expression restrictions.
+
+TLS supports result types, immutable highlighting, keyword help/completion,
+references/rename, and diagnostics. Original-source debug mapping applies as
+usual. `or_panic` is reserved in Thor; native `.odin` files remain unchanged.
+
 ## Spread minimum and maximum
 
 Thor extends Odin's builtins with fixed-array expansion and slice spreading:

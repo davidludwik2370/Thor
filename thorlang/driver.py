@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.37.0"
+VERSION = "0.38.0"
 
 
 def backend_failure(status):
@@ -121,7 +121,7 @@ class Project:
         # Compiler support has its own native test command. Importing its test
         # files into a program can add core-library dependencies to bootstrap
         # support used by checked versions of those same libraries.
-        if entry.parent==ROOT/'runtime' and entry.name in {'basic','big','pure','eval','format','numeric','sequence','sets'} and entry!=self.entry:
+        if entry.parent==ROOT/'runtime' and entry.name in {'basic','big','pure','eval','format','numeric','sequence','sets','optional'} and entry!=self.entry:
             paths=[path for path in paths if not path.name.endswith('_test.odin')]
         for path in paths:
             if path in self.sources:

@@ -229,6 +229,7 @@ class Source:
         spreading = self.thor and any(n.kind=='Call' and (n.data.get('roles',{}).get('ellipsis') or
             any(a.kind=='Unary' and a.data['op']=='**' for a in n.group('args'))) for n in self.nodes)
         for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
+                              ('optional',self.thor and any(n.kind=='OrPanic' for n in self.nodes)),
                               ('temporaries',self.thor and any(n.kind=='Interpolation' for n in self.nodes)),
                               ('pure',spreading or any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
                               ('sets',self.thor and any(n.kind in {'SetType','Binary','Call','Range'} for n in self.nodes)),

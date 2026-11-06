@@ -6,6 +6,25 @@ import "core:testing"
 import "core:fmt"
 
 @(test)
+thor_or_panic_is_a_postfix_keyword_only_in_thor :: proc(t:^testing.T) {
+    for thor in ([2]bool{false,true}) {
+        lexer:Tokenizer
+        init(&lexer,"value or_panic\nnext", "optional.thor")
+        lexer.thor=thor
+        lexer.flags={.Insert_Semicolon}
+        first:=scan(&lexer)
+        keyword:=scan(&lexer)
+        separator:=scan(&lexer)
+        next:=scan(&lexer)
+        testing.expect_value(t,first.text,"value")
+        testing.expect_value(t,keyword.text,"or_panic")
+        testing.expect_value(t,keyword.kind,.Or_Return if thor else .Ident)
+        testing.expect_value(t,separator.kind,.Semicolon)
+        testing.expect_value(t,next.text,"next")
+    }
+}
+
+@(test)
 thor_concatenation_continues_after_a_newline :: proc(t:^testing.T) {
     for thor in ([2]bool{false,true}) {
         lexer:Tokenizer

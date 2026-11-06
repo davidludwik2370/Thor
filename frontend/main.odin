@@ -142,7 +142,9 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.kind="TypeAssertion";info.roles["expr"]=span(n.expr);info.roles["type"]=span(n.type)
     case ^ast.Or_Else_Expr:
         info.kind="OrElse";info.roles["x"]=span(n.x);info.roles["y"]=span(n.y)
-    case ^ast.Or_Return_Expr: info.kind="OrReturn";info.roles["expr"]=span(n.expr)
+    case ^ast.Or_Return_Expr:
+        info.kind="OrPanic" if n.token.text=="or_panic" else "OrReturn"
+        info.roles["expr"]=span(n.expr)
     case ^ast.Or_Branch_Expr: info.kind="OrBranch";info.roles["expr"]=span(n.expr)
     case ^ast.Proc_Group: info.kind = "ProcedureGroup"; info.lists["args"] = spans(n.args)
     case ^ast.Field_Value:

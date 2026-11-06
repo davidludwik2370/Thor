@@ -103,7 +103,7 @@ class BigNumbers:
         if node.kind in {'Binary','Unary'} and self.ops.handles(node):return node.data['op'] not in self.ops.comparisons
         if node.kind == 'Selector': return self.property(node) is not None or self.integration.dynamic_property(node)
         if node.kind == 'Compound': return typ.kind in KINDS
-        if node.kind in {'OrElse','OrReturn','OrBranch','Run'}:return typ.kind in {*KINDS,'generic'}
+        if node.kind in {'OrElse','OrReturn','OrBranch','OrPanic','Run'}:return typ.kind in {*KINDS,'generic'}
         if node.kind == 'Call' and not self.s.denotes_type(node):
             if self.integration.result(node) is not None:return True
             signature=self.s.signature(node)

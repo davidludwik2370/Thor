@@ -1072,6 +1072,24 @@ class Evaluator:
                 error={'type':'error','stage':'evaluation',
                        'pos':diagnostics.locate(Origin(str(error_site.source.path),error_site.start,error_site.end)),
                        'msgs':[text]}
+                if 'panic: unexpected failure' in detail and any(line.startswith('  expression: ') for line in message):
+                    error['msgs'].extend(line.strip()[:2000] for line in message
+                                         if line.startswith(('  expression: ', '  procedure: ', '  error: ')))
+                    # or_panic embeds original coordinates, not helper paths.
+                    # Locate its complete source span while retaining the
+                    # evaluation request as the primary compile-time error.
+                    for original in self.p.sources.values():
+                        pattern = re.compile(re.escape(str(original.path)) + r'(?:\((\d+):(\d+)\)|:(\d+):(\d+):) panic: unexpected failure')
+                        match = next((m for line in message if (m := pattern.search(line))), None)
+                        if match:
+                            from .diagnostics import reference_coordinates
+                            row, col, _ = reference_coordinates(match)
+                            lines = original.raw.splitlines(keepends=True)
+                            offset = sum(map(len, lines[:row-1])) + len(lines[row-1].decode('utf-8')[:col-1].encode('utf-8'))
+                            site = next((a for a in original.nodes if a.kind == 'OrPanic' and a.start == offset), None)
+                            origin = Origin(str(original.path), offset, site.end if site else offset+1)
+                            error['related'] = [{'pos': diagnostics.locate(origin), 'message': 'or_panic failed here.'}]
+                            break
                 for line in message:
                     found=False
                     for file,pattern in diagnostics.reference_patterns:

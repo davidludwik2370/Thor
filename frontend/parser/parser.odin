@@ -6,6 +6,7 @@ import "core:odin/ast"
 import tokenizer "../tokenizer"
 
 import "core:fmt"
+import "core:strings"
 
 Warning_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
@@ -105,7 +106,14 @@ warn :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
 
 error :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
 	if p.err != nil {
-		p.err(pos, msg, ..args)
+		if p.thor && p.file != nil && pos.offset >= 0 && pos.offset+8 <= len(p.file.src) &&
+		   p.file.src[pos.offset:pos.offset+8] == "or_panic" {
+			message := fmt.tprintf(msg, ..args)
+			message, _ = strings.replace_all(message, "or_return", "or_panic", context.temp_allocator)
+			p.err(pos, "%s", message)
+		} else {
+			p.err(pos, msg, ..args)
+		}
 	}
 	p.file.syntax_error_count += 1
 	p.error_count += 1

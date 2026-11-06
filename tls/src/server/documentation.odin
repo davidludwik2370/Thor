@@ -1044,6 +1044,8 @@ construct_package_docs :: proc(pkg_docs: map[string]string, allocator := context
 }
 
 // Docs taken from https://pkg.odin-lang.org/base/builtin
+OR_PANIC_DOCS :: "```thor\nvalue := operation() or_panic\n```\nUnwraps an optional result. On failure, panics with the original Thor source location, expression, procedure, and returned error. Remains enabled in release builds."
+
 keywords_docs: map[string]string = {
 	"typeid"        = "```odin\ntypeid :: typeid\n```\n`typeid` is a unique identifier for an Odin type at runtime. It can be mapped to relevant type information through `type_info_of`.",
 	"string"        = "```odin\nstring :: string\n```\n`string` is the set of all strings of 8-bit bytes, conventionally but not necessarily representing UTF-8 encoding text. A `string` may be empty but not `nil`. Elements of `string` type are immutable and indexable.",
