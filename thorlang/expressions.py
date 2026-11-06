@@ -139,7 +139,19 @@ class Expressions:
             try:
                 hint = (tuple(Hint(s,node,typ or s.prefix+f'Result_{i}') for i,typ in enumerate(result))
                         if isinstance(result,tuple) else Hint(s,node,s.prefix+'Result') if result is None else None)
-                body=builder(hint)
+                cleanup_call = next((child for child in descendants(node)
+                    if child.kind == 'Call' and s.has_scope_cleanup(child)
+                    and not any(parent.kind == 'Procedure' for parent in child.ancestors()
+                                if node.start <= parent.start and parent.end <= node.end)
+                    and not any(parent.kind == 'Call' and s.purity and s.purity.builtin(parent) in s.purity.type_queries
+                                for parent in child.ancestors() if parent.start >= node.start and parent.end <= node.end)), None)
+                if cleanup_call:
+                    token = self.error(cleanup_call,
+                        'A procedure with automatic scope cleanup must be called directly in its owning scope. '
+                        'Assign its result to a named value first, then use that value in this expression.')
+                    body = s.mapping.wrap('#panic('+json.dumps(token)+')',s.path,cleanup_call.start,cleanup_call.end,'scope-cleanup')
+                else:
+                    body=builder(hint)
             finally:
                 self.captures.pop()
             convention=' "odin"' if self.has_context(node) and not self.switches.global_context else ' "contextless"'

@@ -528,6 +528,15 @@ class Source:
                 return values[0].role("type")
         return None
 
+    def has_scope_cleanup(self, call):
+        """The call registers native deferred cleanup in its enclosing scope."""
+        signature = self.signature(call)
+        procedure = signature.parent if signature else None
+        declaration = procedure.parent if procedure and procedure.kind == 'Procedure' else None
+        return bool(declaration and declaration.kind == 'Declaration' and any(
+            item.kind == 'FieldValue' and item.role('field').text.startswith('deferred_')
+            for attribute in declaration.group('attributes') for item in attribute.group('elems')))
+
     @staticmethod
     def fields(node):
         result = []

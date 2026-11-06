@@ -16,6 +16,19 @@ main :: proc() {
     // a prefix instead, write: import "thor:basic" / sorted, print
     basic.print("Thor basic helpers")
 
+    // Use one growing arena for this block, including allocations inside called
+    // helpers. Caller-scope cleanup also runs on early return/break/continue.
+    // The allocator must be created directly in this scope, not in a switch arm.
+    {
+        context.allocator = basic.scoped_arena()
+        values := make([]int, 100)
+        text := f"Created {len(values)} values"
+        if len(values) != 100 || text != "Created 100 values" { panic("scoped arena") }
+        basic.print(text)
+        // No individual deletes here. Keep these allocations inside the block.
+    }
+    // The enclosing allocator is restored; context.temp_allocator is unchanged.
+
     // Sorting returns independent slice storage and leaves its input alone.
     // The inline generic default comparator supplies ascending order.
     numbers := []int{8, 3, 5, 3}

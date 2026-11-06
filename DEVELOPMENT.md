@@ -3443,3 +3443,41 @@ checked/unchecked, 127 Node cases, assertion hygiene, and a real CodeLLDB
 breakpoint/step/result-inspection check. Other compiler regressions covering
 purity, switch panic arms, big numbers, and concatenation also pass. Both main
 demos run in optimized builds with assertions, bounds, and type checks disabled.
+
+## Scoped arena library helper (Thor 0.38.1)
+
+`basic.scoped_arena()` returns a growing `core:mem/virtual` arena allocator.
+Odin's native `deferred_out` callback destroys it at the end of the calling
+scope; assigning it to `context.allocator` uses ordinary scoped context
+restoration. Its management record has a stable address, comes from the saved
+parent allocator, and is freed with its original size after releasing the arena
+blocks. A nil allocation result and initialization errors panic explicitly,
+including with assertions disabled. Nested arenas, explicit allocator arguments,
+and `free_all` resets retain the same ownership rules. The helper does not change
+the temporary allocator or manage non-memory resources.
+
+The implementation exposed a lowering interaction: moving a native deferred
+callback into an expression helper shortens its lifetime. Calls to known
+procedures with deferred attributes now receive a mapped diagnostic in those
+helpers, asking for a direct binding in the owning scope. Native constant-index
+lowering, unevaluated type queries, nested user procedure scopes, and inactive
+`when` branches retain their normal behavior. Ownership inference also leaves
+callback-managed results in the caller scope rather than wrapping explicitly
+discarded opaque results in an unnecessary temporary scope. There is no new
+language syntax or general escape analysis; allocations must still remain
+within their owning scope.
+
+The main README, basic-library reference, and all three relevant demos include
+examples and the allocation lifetime contract. Seventeen compiler/runtime test
+cases cover management/block cleanup order, sized parent frees, nil allocation,
+context replacement/restoration, nesting, early returns/breaks/continues,
+explicit and immutable bindings, multiple factories, resets, imports/aliases,
+native Odin consumers, and interaction with strings, sets and logical numbers.
+Runtime fixtures run checked and in optimized builds with assertions, bounds
+and type checks disabled; a debug/ASan case reports no outstanding allocations.
+Two live TLS cases verify hover, completion, definition, mapped diagnostics and
+recovery after an unsaved edit. All 19 cases and 95 related library, lifetime,
+optional-result, switch and assertion-hygiene regressions pass. Both main demos
+and the basic-library demo pass in unchecked optimized builds; the basic demo
+also passes with debug allocation tracking and ASan. The common installed
+runtime has been rebuilt.

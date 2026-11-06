@@ -1978,6 +1978,28 @@ optional_results :: proc() {
     // Use `or_else default_value` when absence is expected instead.
 }
 
+scoped_allocations :: proc() {
+    println("\nScoped arena: release this block's allocations together")
+    outer := context.allocator
+    {
+        context.allocator = basic.scoped_arena()
+        values := basic.range(10)
+        text := f"Created {len(values)} values"
+        basic.print(text)
+
+        // A nested arena can be destroyed without invalidating outer storage.
+        {
+            context.allocator = basic.scoped_arena()
+            temporary := basic.to_set([1, 2, 2, 3])
+            if len(temporary) != 3 { panic("nested scoped arena") }
+        }
+        if values[9] != 9 { panic("outer arena storage") }
+        // No individual deletes. Returning/storing these allocations outside
+        // this block would leave dangling references after cleanup.
+    }
+    if context.allocator != outer { panic("allocator restoration") }
+}
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
@@ -1985,6 +2007,7 @@ main :: proc() {
     arrays_and_context()
     constant_concatenation()
     optional_results()
+    scoped_allocations()
     membership_and_constraints()
     conditional_expressions()
     compile_time_selection()

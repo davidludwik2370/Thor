@@ -13,6 +13,7 @@ import "library" / Record, identity, overloaded
 import format "thor:format"
 import sets "thor:sets"
 import pure "thor:pure"
+import "thor:basic"
 
 Color :: enum {Red, Green, Blue}
 calls: int
@@ -578,6 +579,15 @@ main :: proc() {
         pair :: proc() -> (int, string, bool) { return 2, "two", true }
         number, word := pair() or_panic
         if unwrapped != 7 || number != 2 || word != "two" { panic("or_panic") }
+    }
+
+    println("Scoped arenas: allocator selection and automatic block cleanup")
+    {
+        context.allocator = basic.scoped_arena()
+        values := basic.range(10)
+        text := f"Created {len(values)} values"
+        if text != "Created 10 values" { panic("scoped arena") }
+        println(text)
     }
 
     println("All T01-T23 demos passed.")

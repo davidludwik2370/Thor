@@ -118,6 +118,23 @@ error, preserving cycles, shared storage and interior references.
 and [graph-copy demo](examples/deepclone/demo.thor); these are library procedures
 and require no changes to the Thor/Odin compilers.
 
+For allocations that all share a block's lifetime:
+
+```odin
+{
+    context.allocator = basic.scoped_arena()
+    values := make([]int, 100)
+    text := f"Created {len(values)} values"
+    basic.print(text)
+}
+// The arena is destroyed and the enclosing allocator restored.
+```
+
+The arena uses Odin's native caller-scope deferred cleanup, including early
+returns. Keep its allocations within that scope; explicit allocator choices and
+`context.temp_allocator` retain their usual behavior. See the
+[scoped arena contract](runtime/basic/README.md#scoped-arena-allocations).
+
 ## Optional results with `or_panic`
 
 Use postfix `or_panic` when an optional result must succeed:

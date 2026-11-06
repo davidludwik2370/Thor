@@ -12,6 +12,8 @@ import "core:io"
 import "base:runtime"
 import "core:slice"
 import "core:math/rand"
+import "core:mem"
+import "core:mem/virtual"
 import "thor:sets"
 import "thor:big"
 import "thor:format"
@@ -44,6 +46,39 @@ type :: proc(_: $T) -> typeid { return typeid_of(T) }
 size :: proc(_: $T) -> int    { return size_of  (T) }
 
 swap :: proc(a, b: ^$T) { a^, b^ = b^, a^ }
+
+@(private="file")
+_Scoped_Arena :: struct {
+    // Keep the arena first: Allocator.data points at this stable record.
+    arena: virtual.Arena,
+    parent: runtime.Allocator,
+    location: runtime.Source_Code_Location,
+}
+
+@(private="file")
+_destroy_scoped_arena :: proc(allocator: runtime.Allocator) {
+    state := cast(^_Scoped_Arena)allocator.data
+    parent, loc := state.parent, state.location
+    virtual.arena_destroy(&state.arena, loc)
+    _ = mem.free_with_size(state, size_of(_Scoped_Arena), parent, loc)
+}
+
+// Return a growing arena allocator, automatically destroyed when this calling
+// scope exits. Use: context.allocator = basic.scoped_arena(). Keep all arena
+// allocations within that scope. Does not change context.temp_allocator.
+@(require_results, deferred_out=_destroy_scoped_arena)
+scoped_arena :: proc(loc := #caller_location) -> runtime.Allocator {
+    parent := context.allocator
+    state, err := mem.new(_Scoped_Arena, allocator=parent, loc=loc)
+    if err != nil || state == nil { panic("scoped_arena: could not allocate arena management state", loc) }
+    state.parent, state.location = parent, loc
+    err = virtual.arena_init_growing(&state.arena)
+    if err != nil {
+        _ = mem.free_with_size(state, size_of(_Scoped_Arena), parent, loc)
+        panic("scoped_arena: could not initialize the growing arena", loc)
+    }
+    return virtual.arena_allocator(&state.arena)
+}
 
 // Return a sorted copy without changing data. Delete the result with allocator.
 sorted :: proc(

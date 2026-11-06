@@ -41,7 +41,8 @@ class Ownership:
     def may_own(self, n):
         if n is None: return False
         if n.kind == 'Paren': return self.may_own(n.role('expr'))
-        if self.s.big.enabled and self.s.big.fresh(n): return True
+        if self.s.big.enabled and self.s.big.fresh(n):
+            return n.kind != 'Call' or not self.s.has_scope_cleanup(n)
         if n.kind == 'Interpolation': return not n.data.get('manual_lifetime',False)
         if n.kind == 'Compound' and n.role('type'):
             return self.s.resolver.type_node(n.role('type')).kind == 'set'

@@ -47,6 +47,7 @@ Compile-time array/slice concatenation uses the language's `A ++ B` operator.
 | --- | --- |
 | `print(values, sep=" ", flush=true, end="\n")` | Print values with a separator and terminator. |
 | `type(value)`, `size(value)` | Return the value's type ID or its type's size in bytes. |
+| `scoped_arena()` | Return a growing arena allocator with automatic cleanup at the end of the calling scope, including early returns, breaks and continues. |
 | `sorted(data, less=..., allocator=...)` | Allocate a sorted copy of a slice; the default comparison is `<`. Pass a comparator for records or custom ordering. |
 | `_int`, `_uint`, `_i8`/`16`/`32`/`64`/`128`, `_u8`/`16`/`32`/`64` | Parse a string, returning `(value, ok)`. `base=0` infers prefixes; another base parses digits in that base. Narrow conversions check bounds. |
 | `_f32`, `_f64`, `_bool` | Parse a float or boolean string, returning `(value, ok)`. Their retained `base` argument has no effect. |
@@ -79,6 +80,48 @@ library procedures, with runtime rejection of recursively unsupported schemas;
 they do not change assignment or add automatic ownership management.
 The allocation-error tuples on `clone`, `fmap`, `split` and `join` keep their
 original optional-error behavior.
+
+## Scoped arena allocations
+
+```odin
+{
+    context.allocator = basic.scoped_arena()
+    values := make([]int, 100)
+    text := f"Created {len(values)} values"
+    basic.print(text)
+    // Arena storage is released together; no individual deletes are needed.
+}
+// The enclosing context.allocator is restored by Odin's block-scoping rules.
+```
+
+The returned allocator owns a growing `core:mem/virtual` arena. Odin's native
+`@(deferred_out=...)` attribute registers its destruction in the calling scope.
+A small, stable management record comes from the parent allocator, which is
+saved for cleanup; all arena blocks are released before that record is freed.
+Initialization failure panics, including in unchecked release builds. Nested
+calls create independent arenas and clean up from inner to outer scope.
+
+Creation does not modify context by itself. To use an explicit allocator, write
+`arena := basic.scoped_arena()` and pass `arena` to allocation procedures. The
+factory's result must be handled. The allocator and its allocations must not
+escape the calling scope. Copy any required results into a longer-lived
+allocator before exit. Manual early destruction of the arena is unsupported.
+
+Only allocations using this allocator belong to the arena. Explicit allocator
+arguments and existing maps/dynamic arrays keep their own allocator choices.
+`context.temp_allocator` is unchanged. File/socket/resource cleanup remains
+separate. Individual frees generally do not reclaim arena memory; it remains
+reserved until scope exit or an explicit `free_all(arena)` reset. Such a reset
+invalidates previous arena allocations, but keeps the scoped allocator usable.
+
+Create the allocator directly in its owning scope. Calls with automatic scope
+cleanup are rejected inside Thor expressions lowered to an internal procedure
+(for example a switch-result arm or interpolation field), since that would
+destroy the arena before the surrounding code could use it. Bind the allocator
+first, then reference the named value inside those expressions. The helper is a
+runtime procedure and is not eligible for `fn`/`#run` execution.
+
+## Additional allocation and value rules
 
 `input` retains the capacity of its temporary read buffer until cleanup and
 returns an exact-size string, so trimming LF/CRLF does not invalidate a sized
