@@ -93,15 +93,24 @@ Server** channel in VS Code's Output panel.
 ## Running and debugging
 
 The extension provides **Thor: Run Project** on **Cmd+R**. It saves edits, shows
-the active integrated terminal, and sends `thor run .` followed by Enter. It
-uses that terminal's current directory and shell environment, without scanning
-or launching tasks. If no live terminal exists, it creates a regular terminal
-in the project folder or the saved file's directory. Repeated runs reuse it.
+the active integrated terminal, changes to the active saved file's directory
+when necessary, and runs `thor run .`. A nested project uses its own directory,
+rather than the enclosing workspace root. The terminal's shell environment is
+preserved, and no tasks are scanned or launched. Shell integration supplies the
+current directory when available; otherwise a shell condition checks it before
+calling `cd`. If no live terminal exists, a regular terminal opens directly in
+the file's directory. Repeated runs reuse it. Without a saved file, the workspace
+folder is used, or an existing terminal keeps its directory in an empty window.
 It also provides **Thor: Debug Project**, bound to **Cmd+Shift+R** in
 Thor editors on macOS, and a `thor-lldb` debug adapter using ordinary CodeLLDB.
 Run `thor new my_project` to create a local folder containing `my_project.thor`
 and only VS Code task/launch files. `mkthor my_project` creates the same layout
 in `~/Code/Thor` and opens VS Code. TLS needs no generated project settings.
+Debugging also targets the active file's directory. Existing project-root launch
+configurations retain their custom build flags and settings. For a nested
+directory or a folder without a launch configuration, the extension supplies a
+local build task and matching `.vscode/bin/debug` executable and source maps;
+restart rebuilds the same package. A workspace folder is still required to debug.
 Breakpoints, stepping and stack locations map back to the original Thor source.
 This uses DAP separately from TLS's LSP connection. See the
 [debugger guide](DEBUGGING.md) for setup, architecture and supported behavior.

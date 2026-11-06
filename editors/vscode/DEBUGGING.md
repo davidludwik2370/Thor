@@ -24,17 +24,24 @@ the creator warns about these names and preserves the requested source filename.
 
 Install the local Thor VSIX and CodeLLDB, open the generated Thor file, set a
 breakpoint and press **Cmd+Shift+R**, or **F5**. The Thor extension's
-**Thor: Debug Project** command supplies the shortcut. It saves files and selects
-the folder's first `thor-lldb` launch configuration. The shortcut applies to Thor
+**Thor: Debug Project** command supplies the shortcut. It saves files and targets
+the directory containing the active source file. In the workspace root it uses
+the first existing `thor-lldb` launch configuration. Nested projects and folders
+without a launch configuration get a local build task and matching executable
+and manifest under their own `.vscode/bin`; restarting rebuilds that package.
+This also works when a larger workspace contains several Thor projects.
+The shortcut applies to Thor
 editors while a debug session is not already active. Standard debug toolbar
 buttons and existing VS Code stepping shortcuts continue to work.
 
 **Cmd+R** runs **Thor: Run Project** without the debugger. It saves edits and
-sends the literal `thor run .` command to the active integrated terminal. Its
-current directory, PATH, aliases and shell environment apply, just as for a
-manually typed command. It does not enumerate or execute VS Code tasks or read
-the TLS compiler setting. An existing terminal is reused; if there is no live
-terminal, one is opened in the project folder or the saved file's directory.
+sends `thor run .` to the active integrated terminal after changing to the
+active file's directory if necessary. When the terminal already reports that
+directory, only the run command is sent. Without directory reporting, a shell
+condition checks before changing it. PATH, aliases and shell environment apply,
+just as for a manually typed command. It does not enumerate or execute VS Code
+tasks or read the TLS compiler setting. An existing terminal is reused; if
+there is no live terminal, one is opened in the file's directory.
 Non-macOS shortcuts are Ctrl+R and Ctrl+Shift+R. The debug shortcut still uses
 its original pre-launch build task and mapped CodeLLDB adapter.
 Keyboard shortcuts are contributed by the extension, not a workspace

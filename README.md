@@ -405,12 +405,15 @@ settings file is needed. The default source comes from the editable shared
 **Cmd+R** runs the project in VS Code's integrated terminal; **Cmd+Shift+R**
 builds with debugging and starts CodeLLDB. Use **Ctrl+R / Ctrl+Shift+R** elsewhere.
 Both commands save edits first. **F5** also starts debugging. The shortcuts apply
-to Thor editors and leave existing Odin shortcuts alone. Cmd+R sends the literal
-`thor run .` command to the active integrated terminal, using its current
-directory and shell environment. It reuses that terminal without looking up or
-launching VS Code tasks. If no live terminal exists, it opens one in the project
-folder (or the saved file's directory outside a workspace). Normal runs include
-sibling source files, just like typing `thor run .` yourself.
+to Thor editors and leave existing Odin shortcuts alone. Both shortcuts target
+the active file's containing directory, including projects nested inside a
+larger workspace. Cmd+R reuses the active integrated terminal, changes directory
+if necessary, and runs `thor run .` with its existing shell environment. If the
+terminal already reports that directory, only `thor run .` is sent; otherwise
+a shell condition avoids a redundant `cd`. If no live terminal exists, it opens
+one directly in that directory. Normal runs include sibling source files and
+do not launch VS Code tasks. Cmd+Shift+R builds and launches the debugger in that
+same source directory, using matching local executable and source-map paths.
 
 Install **CodeLLDB** (`vadimcn.vscode-lldb`) as well as the locally built Thor
 extension. Rebuild/install the VSIX and reload VS Code after updating from an

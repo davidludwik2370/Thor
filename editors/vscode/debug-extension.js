@@ -25,19 +25,6 @@ function activateDebugging(context) {
             return config;
         }
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('thor.debug', async () => {
-        const activeUri = vscode.window.activeTextEditor?.document.uri;
-        const folder = (activeUri && vscode.workspace.getWorkspaceFolder(activeUri))
-            || vscode.workspace.workspaceFolders?.[0];
-        if (!folder) throw new Error('Open a Thor project folder first.');
-        await vscode.workspace.saveAll(false);
-        const configurations = vscode.workspace.getConfiguration('launch',folder.uri).get('configurations',[]);
-        const config = configurations.find(config => config.type === 'thor-lldb');
-        if (!config) {
-            void vscode.window.showErrorMessage('This folder has no Thor debug configuration. Create a project with thor new, or add a thor-lldb launch configuration.');
-            return;
-        }
-        return vscode.debug.startDebugging(folder,config.name);
-    }));
+    require('./project-debug').activateProjectDebugging(context, vscode);
 }
 module.exports = {activateDebugging};

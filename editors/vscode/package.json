@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
@@ -16,7 +16,8 @@
   "main": "./extension.js",
   "activationEvents": [
     "onLanguage:thor",
-    "onDebugResolve:thor-lldb"
+    "onDebugResolve:thor-lldb",
+    "onTaskType:thor-debug-build"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -162,6 +163,15 @@
         "key": "ctrl+shift+r",
         "mac": "cmd+shift+r",
         "when": "editorLangId == thor && !inDebugMode"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "thor-debug-build",
+        "required": ["directory"],
+        "properties": {
+          "directory": {"type": "string", "description": "Thor source directory to build for debugging."}
+        }
       }
     ],
     "breakpoints": [

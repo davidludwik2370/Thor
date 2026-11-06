@@ -28,7 +28,8 @@ async function run() {
         const original=document.getText();
         setup.insert(document.uri,document.positionAt(original.indexOf('main :: proc() {')+'main :: proc() {'.length),
             '\n    confirm_run()\n    state := struct { marker: int }{1}\n    using state\n    assert(marker == 1)\n');
-        assert.ok(await vscode.workspace.applyEdit(setup));
+        const setupApplied=await vscode.workspace.applyEdit(setup);
+        assert.ok(setupApplied);
         const startedTasks=[];
         subscriptions.push(vscode.tasks.onDidStartTask(event=>startedTasks.push(event.execution.task.name)));
         assert.ok(document.isDirty);
@@ -108,7 +109,8 @@ async function run() {
         current=await frame();
         const edit=new vscode.WorkspaceEdit();
         edit.insert(document.uri,document.positionAt(document.getText().length),'\n// Rebuild maps on restart.\n');
-        assert.ok(await vscode.workspace.applyEdit(edit));
+        const restartEditApplied=await vscode.workspace.applyEdit(edit);
+        assert.ok(restartEditApplied);
         await document.save();
         await vscode.commands.executeCommand('workbench.action.debug.restart');
         current=await frame();
@@ -117,11 +119,48 @@ async function run() {
         vscode.debug.removeBreakpoints([breakpoint]);
         await session.customRequest('continue',{threadId:current.thread});
         await until(()=>vscode.debug.activeDebugSession,s=>!s);
+        // A nested package must build and launch locally even though only its
+        // parent has a VS Code launch configuration.
+        const nested=path.join(root,'nested project');
+        fs.mkdirSync(nested);
+        const nestedSource=path.join(nested,'nested.thor');
+        fs.writeFileSync(nestedSource,`package main
+import "core:os"
+main::proc(){
+ value:=42
+ err:=os.write_entire_file("debug-cwd.txt", []u8{'o','k'})
+ if err!=nil {panic("write marker")}
+ _=value
+}
+`);
+        const nestedDocument=await vscode.workspace.openTextDocument(nestedSource);
+        await vscode.window.showTextDocument(nestedDocument);
+        const nestedPosition=nestedDocument.positionAt(nestedDocument.getText().indexOf('value:=42'));
+        const nestedBreakpoint=new vscode.SourceBreakpoint(new vscode.Location(nestedDocument.uri,new vscode.Range(nestedPosition,nestedPosition)));
+        vscode.debug.addBreakpoints([nestedBreakpoint]);
+        await vscode.commands.executeCommand('thor.debug');
+        session=await until(()=>vscode.debug.activeDebugSession,s=>s?.type==='thor-lldb');
+        assert.equal(session.configuration.cwd,nested);
+        let nestedStop=await until(()=>stops.shift(),Boolean);
+        let nestedFrames=(await session.customRequest('stackTrace',{threadId:nestedStop.threadId})).stackFrames;
+        assert.equal(nestedFrames[0].source.path,nestedSource);
+        assert.equal(nestedFrames[0].line,nestedPosition.line+1);
+        await vscode.commands.executeCommand('workbench.action.debug.restart');
+        nestedStop=await until(()=>stops.shift(),Boolean);
+        session=await until(()=>vscode.debug.activeDebugSession,s=>s?.type==='thor-lldb');
+        nestedFrames=(await session.customRequest('stackTrace',{threadId:nestedStop.threadId})).stackFrames;
+        assert.equal(nestedFrames[0].source.path,nestedSource);
+        vscode.debug.removeBreakpoints([nestedBreakpoint]);
+        await session.customRequest('continue',{threadId:nestedStop.threadId});
+        await until(()=>vscode.debug.activeDebugSession,s=>!s);
+        assert.equal(fs.readFileSync(path.join(nested,'debug-cwd.txt'),'utf8'),'ok');
+        assert.ok(!fs.existsSync(path.join(root,'debug-cwd.txt')));
         result.success=true;
         result.checks=['minimal mkthor project with project-named source','Cmd+R sends thor run . to a normal terminal and saves edits',
             'repeated runs reuse the active terminal without starting VS Code tasks',
             'Cmd+Shift+R debug command','pre-launch build task','automatic using header','CodeLLDB launch',
-            'Thor breakpoint','Step Over','Step Into fn through fstring','locals/watch','Step Out','restart/rebuild','clean exit'];
+            'Thor breakpoint','Step Over','Step Into fn through fstring','locals/watch','Step Out','restart/rebuild',
+            'nested source-folder build and debug cwd','nested project breakpoint and restart','clean exit'];
     } catch (error) {
         result.error=error.stack || String(error);
         throw error;

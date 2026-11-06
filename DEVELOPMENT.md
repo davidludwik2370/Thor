@@ -3481,3 +3481,43 @@ optional-result, switch and assertion-hygiene regressions pass. Both main demos
 and the basic-library demo pass in unchecked optimized builds; the basic demo
 also passes with debug allocation tracking and ASan. The common installed
 runtime has been rebuilt.
+
+## Active-file run/debug directories (extension 0.20.1)
+
+Cmd+R now selects the directory containing the active saved source file before
+running `thor run .`, including nested projects in a larger workspace. A live
+terminal is reused. When shell integration already reports that directory, the
+extension sends only the run command. Otherwise a shell condition checks the
+current directory before changing it; a failed change prevents running the
+wrong package. Terminal creation starts directly in the selected directory.
+No task discovery, compiler-setting lookup, shell-integration polling or new
+compiler work is added to normal run dispatch. POSIX, fish, PowerShell and cmd
+receive their appropriate directory syntax; paths cmd cannot represent safely
+use a fresh terminal's cwd option instead of interpolating them into a command.
+
+Cmd+Shift+R remains the CodeLLDB shortcut. Existing project-root configurations
+keep their custom build task/settings. Nested source directories and roots with
+no launch configuration get a provided `thor-debug-build` task, with build cwd,
+executable, source-map manifest and launch cwd all rooted in the selected source
+directory. The prelaunch task is retained for restart. The existing workspace
+requirement for debugging is unchanged, while normal standalone-file running
+still works without a workspace. Failed saves and untrusted workspaces do not
+launch commands or debug builds.
+
+All 139 Node tests and six assertion-hygiene tests pass. Shell regressions execute
+the POSIX command in real shells with spaces, apostrophes and command-looking
+path text, check that an already-correct cwd skips `cd`, and ensure a failed cd
+does not run Thor. Live VS Code tests verify a wrong-directory terminal, switching
+between standalone source directories, terminal reuse, unsaved edits and spaced
+paths. CodeLLDB integration verifies both the original project and a nested
+package, including mapped breakpoints, stepping, watches and restart/rebuild.
+Normal run dispatch measured 33 ms initially and 1 ms on reuse in that test,
+excluding compilation and execution.
+
+The quoted-path integration probe also confirmed a separate existing Odin
+restriction: `-out` validation rejects apostrophes in output paths. The shortcut
+correctly changes into such a directory, but plain `thor run .` has the same
+compiler rejection there. That compiler limitation is unchanged by this client
+update. Real compiler integration uses spaced paths; shell quoting is tested
+independently. Reinstall the VSIX and reload the window to load the client code;
+restarting TLS alone does not reload VS Code command handlers.
