@@ -940,6 +940,10 @@ class Resolver:
         annotation = fields[index][1]
         if not annotation:
             return None
+        if annotation.kind == 'PolyType' and not annotation.role('specialization'):
+            # A bare $T is inferred from this argument. It cannot also supply
+            # the contextual element type used to construct that argument.
+            return None
         parameters = self.generic_parameters(plan.signature)
         # Specialization binders ($C/[$N]$E) supply the constrained shape, not C.
         identifiers = {n.text for n in descendants(annotation) if n.kind == "Ident" and (not n.parent or n.parent.kind != "PolyType")}

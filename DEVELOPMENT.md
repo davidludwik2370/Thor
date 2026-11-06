@@ -3521,3 +3521,54 @@ compiler rejection there. That compiler limitation is unchanged by this client
 update. Real compiler integration uses spaced paths; shell quoting is tested
 independently. Reinstall the VSIX and reload the window to load the client code;
 restarting TLS alone does not reload VS Code command handlers.
+
+## Runtime value hashing (Thor 0.38.2)
+
+`thor:basic` exports `hash`, `try_hash`, `Hash_Algorithm` and `Hash_Error` from the
+native `thor:hash` package. The default is XXH3_64, with XXH64/FNV64a and explicit
+seeds available. Strings and ordinary byte sequences use one-shot hashing;
+composite values stream field/element encodings into stack-held state. The
+implementation allocates no heap or temporary-allocator storage and borrows its
+inputs. Record padding, spare capacity, allocator metadata and inactive union
+storage are excluded. Numeric endianness and signed floating zero are normalized;
+Integer/Rational values ignore their ownership/storage details. Pointer/type-ID
+hashes retain process-local identity.
+
+Both schema and value traversal are bounded at 128 levels. Active-path address
+and type pairs detect container cycles while allowing shared acyclic storage;
+pointers are not followed. Known resource wrappers, maps/sets, raw unions and SOA
+are rejected. Sparse enum arrays skip unused cells. Packed fields are loaded
+through byte copies rather than unaligned typed dereferences. Failure discards
+the partial hash: `try_hash` returns an error enum and zero, while `hash` panics
+with a field/index path and type. This retains native `#caller_location`
+behavior; runtime panic filenames can still name generated Odin source. Compiler
+and TLS diagnostics retain their existing source mapping. The library does not
+extend `fn`/`#run` eligibility or promise a versioned composite persistence format.
+
+Tests uncovered two defects in the installed Odin XXH3 streaming implementation:
+the short-input finalizer reverses its seed test, and large updates preserve the
+wrong stripe for short tails. Bounded updates avoid the latter path, and short
+finalization uses the standard buffered one-shot function. No Odin fork or new
+hash algorithm implementation is introduced. Tests compare 1,125 combinations
+of algorithms, seeds, lengths and chunk sizes against one-shot backends, plus
+26 independent XXH3 vectors from the C xxHash 0.8.3 reference implementation.
+
+Hashing literal arrays also exposed an existing contextual-typing problem.
+An `any` target now boxes the inferred whole array instead of supplying `any`
+as its element type. Explicit `[N]any` contexts still permit heterogeneous
+elements. An unconstrained `$T` parameter likewise supplies no contextual
+element type for the argument from which T is inferred; omitting its circular
+type witness also removes an undeclared-helper diagnostic. The fix applies to
+all callers rather than introducing a hash-specific lowering rule. Tests cover
+calls, named arguments, procedure variables, generic wrappers, nested literals,
+single evaluation, empty/heterogeneous rejection and explicit arrays of any.
+
+Validation: all 18 Python/TLS/contextual-array acceptance cases pass. All 13 native
+hash cases pass with Odin's allocation checker in checked and assertion/bounds/
+type-check-disabled release builds, and with debug/AddressSanitizer. The broader
+runs pass 93 compiler/assertion-hygiene cases and 68 related basic, arena and
+logical-number regressions. TLS coverage checks API hover/type inference,
+completion/definition and an unsaved diagnostic repair. The basic demo passes
+with automatic debug tracking/ASan; both main walkthroughs pass optimized with
+assertions, bounds and type checks disabled. References and all three demos
+document the new API and limits. The common installed runtime is rebuilt.

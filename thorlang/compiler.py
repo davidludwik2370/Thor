@@ -968,6 +968,13 @@ class Source:
         return None
 
     def _render_array(self, n, expected=None, needle=None, constant=False):
+        if expected and not expected.element_only and self.resolver:
+            shape = self.big.expected(expected)
+            if shape and shape.kind == 'scalar' and shape.name == 'any':
+                # `any` boxes the entire inferred value. It supplies no element
+                # context; an array of boxed elements requires an explicit
+                # array/slice-of-any target instead.
+                expected = None
         needle = needle or self.membership_needle(n)
         elements = n.group("elems")
         target_type = None

@@ -135,6 +135,12 @@ returns. Keep its allocations within that scope; explicit allocator choices and
 `context.temp_allocator` retain their usual behavior. See the
 [scoped arena contract](runtime/basic/README.md#scoped-arena-allocations).
 
+`basic.hash(value)` returns a runtime `u64` value hash without allocating.
+Select `.XXH64` or `.FNV64a` with `algorithm=`, or use the default `.XXH3_64`.
+`basic.try_hash(value)` returns `(hash, Hash_Error)` for recoverable failures.
+Strings/ordered containers hash contents, structs ignore padding, and pointers
+hash addresses. See the [hashing contract](runtime/hash/README.md).
+
 ## Optional results with `or_panic`
 
 Use postfix `or_panic` when an optional result must succeed:

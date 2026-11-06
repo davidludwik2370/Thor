@@ -21,6 +21,10 @@ copying are later stages; the current package uses ordinary native ownership.
 
 ## Basic helpers
 
+`basic.hash` and `basic.try_hash` expose allocation-free runtime value hashing
+with XXH3_64 (default), XXH64 and FNV64a. See the [hashing contract](hash/README.md)
+for content versus pointer identity, composite values and unsupported cases.
+
 `import "thor:basic"` provides `basic.print`, `basic.sorted`, parsing,
 file/line I/O, and small collection/string helpers. It resolves automatically from
 any Thor project. For unqualified names, use the existing selection syntax, such

@@ -48,6 +48,8 @@ Compile-time array/slice concatenation uses the language's `A ++ B` operator.
 | `print(values, sep=" ", flush=true, end="\n")` | Print values with a separator and terminator. |
 | `type(value)`, `size(value)` | Return the value's type ID or its type's size in bytes. |
 | `scoped_arena()` | Return a growing arena allocator with automatic cleanup at the end of the calling scope, including early returns, breaks and continues. |
+| `hash(value, algorithm=.XXH3_64, seed=0)` | Return an allocation-free `u64` content hash; panic with a field path for unsupported/cyclic data. |
+| `try_hash(value, algorithm=.XXH3_64, seed=0)` | Return `(u64, Hash_Error)`; failed results are zero. `Hash_Algorithm` also supports `.XXH64` and `.FNV64a`. |
 | `sorted(data, less=..., allocator=...)` | Allocate a sorted copy of a slice; the default comparison is `<`. Pass a comparator for records or custom ordering. |
 | `_int`, `_uint`, `_i8`/`16`/`32`/`64`/`128`, `_u8`/`16`/`32`/`64` | Parse a string, returning `(value, ok)`. `base=0` infers prefixes; another base parses digits in that base. Narrow conversions check bounds. |
 | `_f32`, `_f64`, `_bool` | Parse a float or boolean string, returning `(value, ok)`. Their retained `base` argument has no effect. |
@@ -122,6 +124,13 @@ first, then reference the named value inside those expressions. The helper is a
 runtime procedure and is not eligible for `fn`/`#run` execution.
 
 ## Additional allocation and value rules
+
+Runtime hashes read strings, ordered containers and record fields by value;
+pointers hash their addresses. Padding, spare capacity and allocator metadata
+are ignored. `Integer`/`Rational` use logical numeric values. Maps/sets and known
+opaque resources are unsupported in this first version, and recursive
+containers fail clearly. See the [hashing contract](../hash/README.md) for seeds,
+supported types, error handling, depth limits and portability.
 
 `input` retains the capacity of its temporary read buffer until cleanup and
 returns an exact-size string, so trimming LF/CRLF does not invalidate a sized

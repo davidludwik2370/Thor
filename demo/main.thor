@@ -590,5 +590,16 @@ main :: proc() {
         println(text)
     }
 
+    println("Runtime value hashing: contents, algorithms, and explicit errors")
+    {
+        h := basic.hash("hello", algorithm=.FNV64a)
+        if h != #hash("hello", "fnv64a") { panic("runtime hash") }
+        values := [1, 2, 3]
+        if basic.hash(values) != basic.hash(values[:]) { panic("sequence hash") }
+        unsupported: map[string]int
+        _, err := basic.try_hash(unsupported)
+        if err != .Unsupported_Type { panic("hash boundary") }
+    }
+
     println("All T01-T23 demos passed.")
 }

@@ -2000,6 +2000,48 @@ scoped_allocations :: proc() {
     if context.allocator != outer { panic("allocator restoration") }
 }
 
+value_hashes :: proc() {
+    println("\nRuntime hashes: contents, pointer identity, and explicit errors")
+
+    // The default is XXH3_64; named alternatives and seeds are available.
+    text := "hello"
+    h := basic.hash(text, algorithm=.FNV64a)
+    if h != #hash("hello", "fnv64a") { panic("hash counterpart") }
+    println("  FNV64a:", h)
+
+    // Same live values, different capacities and independent storage.
+    data := [1, 2, 3]
+    growing := make([dynamic]int, 0, 100)
+    defer delete(growing)
+    append(&growing, ..data[:])
+    if basic.hash(data) != basic.hash(growing) { panic("sequence hash") }
+
+    // Logical numbers ignore ownership/storage differences too.
+    a: Integer = 123456789012345678901234567890
+    b := a
+    defer delete(a); defer delete(b)
+    if basic.hash(a) != basic.hash(b) { panic("Integer hash") }
+
+    // Pointers hash addresses, so ordinary pointer cycles are valid.
+    Link :: struct {next: ^Link}
+    link: Link
+    link.next = &link
+    _, pointer_error := basic.try_hash(link)
+    if pointer_error != .None { panic("pointer hash") }
+
+    // Slices are read recursively. A slice can form a cycle without an
+    // explicit pointer field; try_hash reports this instead of looping.
+    Tree :: struct {children: []Tree}
+    nodes := make([]Tree, 1)
+    defer delete(nodes)
+    nodes[0].children = nodes
+    result, cycle_error := basic.try_hash(nodes[0])
+    if result != 0 || cycle_error != .Cyclic_Data { panic("container cycle") }
+
+    // Maps/sets, opaque resources and raw unions are unsupported initially.
+    // Shared acyclic slices are allowed; see runtime/hash/README.md.
+}
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
@@ -2008,6 +2050,7 @@ main :: proc() {
     constant_concatenation()
     optional_results()
     scoped_allocations()
+    value_hashes()
     membership_and_constraints()
     conditional_expressions()
     compile_time_selection()

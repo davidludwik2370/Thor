@@ -18,6 +18,14 @@ import "thor:sets"
 import "thor:big"
 import "thor:format"
 import "thor:graph"
+import hashing "thor:hash"
+
+// Runtime value hashes. Strings/bytes hash contents, records/sequences ignore
+// padding and allocator metadata, pointers hash addresses. No heap allocation.
+hash :: hashing.hash
+try_hash :: hashing.try_hash
+Hash_Algorithm :: hashing.Algorithm
+Hash_Error :: hashing.Error
 
 // Clone supported data graphs, preserving cycles and shared/interior references.
 // Pass a pointer to the source; the result is a heap root. Check Deep_Error and

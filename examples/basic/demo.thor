@@ -29,6 +29,25 @@ main :: proc() {
     }
     // The enclosing allocator is restored; context.temp_allocator is unchanged.
 
+    // Runtime hashing needs no allocation or deletion. FNV64a on a string
+    // matches Odin's compile-time #hash when using its default seed.
+    {
+        h := basic.hash("hello", algorithm=.FNV64a)
+        if h != #hash("hello", "fnv64a") { panic("FNV compatibility") }
+        data := [1, 2, 3]
+        owned := make([dynamic]int, 0, 100)
+        defer delete(owned)
+        append(&owned, ..data[:])
+        if basic.hash(data) != basic.hash(owned) { panic("hash live contents") }
+
+        // Maps/sets need order-independent hashing and are deferred. The
+        // non-panicking API lets a caller handle unsupported data explicitly.
+        unsupported: map[string]int
+        result, err := basic.try_hash(unsupported)
+        if result != 0 || err != .Unsupported_Type { panic("hash error") }
+        basic.print("runtime hash:", h)
+    }
+
     // Sorting returns independent slice storage and leaves its input alone.
     // The inline generic default comparator supplies ascending order.
     numbers := []int{8, 3, 5, 3}
