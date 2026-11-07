@@ -3704,3 +3704,78 @@ constant construction, nested expression helpers, and mapped invalid fallbacks
 with unsaved editor recovery. Checked/debug/ASan and assertion/bounds/type-check-
 disabled builds pass; the commented demo and specification include the example.
 Shared runtime output and the local TLS server are rebuilt.
+
+
+## Read-only slice views and per-name access contracts (Thor 0.40.0)
+
+The accepted contract is in [docs/slice-access.md](docs/slice-access.md). `:>`
+now protects slice element access, including nested slices, sliced views and
+returned aliases. Existing writable aliases still observe and modify the same
+backing allocation. Inline value copies and pointer targets retain their existing
+behavior. This does not add a runtime type, ownership tracker or ABI parameter.
+
+`thorlang/sliceaccess.py` infers per-parameter requirements separately from purity.
+It follows aliases, returned values, helper calls, named and spread arguments,
+container stores, loops, conditional declarations and concrete generic shapes.
+Writable escapes and unknown/opaque callees are conservative. Explicit `#mut`
+belongs only to the immediately following name and is erased by the shared parser.
+Reviewed core/basic APIs have source-identity-checked contracts.
+
+TLS consumes compiler metadata tied to the exact UTF-8 source hash. It shows an
+inferred grey `#mut ` before each affected name, preserves explicit annotations
+in hover/signature help, refreshes hints and semantic tokens after accepted
+checks, and colors protected element fields read-only. JSON-RPC replies to the
+server's refresh requests are consumed without treating them as editor requests.
+Source diagnostics include the argument/operation, view origin and mutation chain.
+Original source maps continue to drive CodeLLDB breakpoints and stepping.
+
+The audit also repaired an existing conditional `#run` entry-target gap: all
+retained conditional alternatives now keep the external entry contract. Pure
+record schema field-count expressions are balanced, avoiding a deterministic
+Odin checker stack overflow after SDK inspection expands the schema inventory.
+A stale nested-f-string lifetime expectation was updated to reflect the existing
+streaming formatter's elimination of the inner allocation. Evaluation helper
+access checks examine their retained closure and do not schedule new evaluations
+while inspecting native source facts.
+
+Coverage includes the compiler matrix in `test_slice_access.py`, live LSP cases
+in `test_slice_access_tls.py`, VS Code inlay/hover/error/refresh checks, a real
+CodeLLDB source breakpoint and step test, native parser/server suites, and the
+commented `examples/slice_access/demo.thor`. Checked debug and assertion-disabled,
+unchecked optimized builds exercise allocation ownership with verdicts that stay
+enabled. The broader regression suite checks the interactions with comprehensions,
+f-strings, purity, `#run`, generics, native `when`, negative indexing and imports.
+
+
+Validation for this batch: the full Python matrix ran 1,664 cases, including
+CodeLLDB breakpoint/step tests. Four cases encountered native Odin SIGSEGV or
+SIGTRAP failures; each passed independently with a temporary `-thread-count:1`
+compiler wrapper, without changing Thor's compiler flags or installed Odin.
+The new feature matrix was rerun after the final analysis fixes. Native TLS's
+1,150 cases pass in checked and unchecked/assertion-disabled configurations;
+all 140 Node extension tests pass. Both large demos pass, and the slice-access
+demo passes with debug tracking and optimized unchecked flags without leaks.
+
+`python3 tools/test_vscode.py --scope slice-access` passes the actual VS Code
+inlay, hover, original-source diagnostic, related-location and unsaved-edit
+checks. The full UI harness remains limited by its existing simulated typing
+step for selective-import suggestions: the typing command leaves the document
+unchanged in this environment. Programmatic completion and all live LSP import
+coverage pass. This is recorded separately from the focused editor result.
+TLS was rebuilt and the local VSIX was packaged/installed as version 0.21.0.
+
+
+The final reference-escape audit also covers mutating map-literal key expressions,
+reference-bearing map/Set keys, nested references forwarded by helpers, mutable
+callback reassignment, overridden default callbacks, and opaque returned slices.
+Unknown callback/foreign slice results require a read-only binding and an explicit
+clone before writable use; fixed immutable aliases of inspectable procedures
+retain their exact contract. The editable basic library's own view declarations
+are checked even when the containing helper is not called.
+
+
+Final acceptance after the callback/reference audit: all 109 focused compiler,
+live TLS, assertion-hygiene and basic-library cases pass. Another 88 default
+callback, comprehension, graph-clone and pure-call interaction cases pass. The
+focused VS Code suite passes with TLS refresh responses enabled. No upstream
+compiler binary or ordinary Thor build flag defaults were changed.

@@ -110,6 +110,36 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_mut_annotation_keeps_original_breakpoints_and_slice_values(self):
+        text='''package main
+copy_values::proc(source, #mut destination:[]int) {
+    copy(destination, source)
+}
+main::proc(){
+    source :> []int{7,8}
+    destination := []int{0,0}
+    copy_values(source, destination)
+    last:=destination[1]
+    if last!=8 {panic("slice permissions")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[8,9])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[2,3],frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),9),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'last','context':'watch'})
+        self.assertEqual(value['result'],'8',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_comprehension_breakpoint_steps_into_original_output_and_returns(self):
         text='''package main
 transform::proc(value:int)->int {

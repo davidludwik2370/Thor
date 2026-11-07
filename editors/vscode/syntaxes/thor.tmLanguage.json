@@ -976,7 +976,7 @@
         },
         {
           "name": "entity.name.tag.thor",
-          "match": "#(?:switch|run)\\b"
+          "match": "#(?:switch|run|mut)\\b"
         },
         {
           "name": "keyword.control.thor",

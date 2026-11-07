@@ -62,7 +62,7 @@ class Evaluator:
         if n in seen:return None
         seen.add(n)
         key=self.key(n)
-        if key not in self.results and key not in self.busy and (n.kind=='Run' or self.automatic(n)):self.evaluate(n)
+        if not getattr(self.r,'suspend_evaluation',False) and key not in self.results and key not in self.busy and (n.kind=='Run' or self.automatic(n)):self.evaluate(n)
         data=self.results.get(key)
         if data and data['kind']=='integer':return int(data['value'])
         symbol=self.r.symbol(n)
@@ -852,6 +852,14 @@ class Evaluator:
         # and their source signatures must not acquire helper-only parameters.
         helper.purity.entry_roots={node_copy(p) for call in descendants(n) if call.kind=='Call'
                                    for p in self.purity.targets(call) if p.source in by_original}
+        for call in descendants(n):
+            if call.kind!='Call':continue
+            for symbol,_ in self.r.procedure_candidates(call.role('callee')):
+                for candidate in symbol.candidates:
+                    target=candidate.value
+                    if target and target.kind=='Procedure' and target in procedures and any(
+                        a.kind in {'When','CompileSwitch'} for a in target.ancestors()):
+                        helper.purity.entry_roots.add(node_copy(target))
         for query,code in queries.items():
             node=node_copy(query)
             node.source.run_values[node]=code

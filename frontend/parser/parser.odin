@@ -23,6 +23,7 @@ Parser :: struct {
 	edits: [dynamic]Edit,
 	selections: [dynamic]Selection,
 	immutables: [dynamic][2]int,
+	mut_parameters: [dynamic][3]int, // parameter-name offset, directive start/end
 	features: [dynamic]Feature,
 	declaration_separators: [dynamic][3]int,
 	file: ^ast.File,
@@ -1866,8 +1867,17 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 
 parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
 	counts: [len(ast.Field_Flag)]int
+	mut_start, mut_end := -1, -1
 
 	for {
+		if p.thor && p.curr_tok.kind == .Hash && peek_token(p).text == "mut" {
+			tok := advance_token(p)
+			if mut_start >= 0 { error(p, tok.pos, "duplicate #mut on this parameter") }
+			mut_start = tok.pos.offset
+			mut_end = end_pos(advance_token(p)).offset
+			append(&p.edits, Edit{mut_start, mut_end, ""})
+			continue
+		}
 		kind := is_token_field_prefix(p)
 		if kind == .Invalid {
 			break
@@ -1879,6 +1889,12 @@ parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
 		}
 
 		counts[kind] += 1
+	}
+	if mut_start >= 0 {
+		if p.curr_tok.kind != .Ident && p.curr_tok.kind != .Dollar {
+			error(p, p.curr_tok.pos, "#mut must be followed by a parameter name")
+		}
+		append(&p.mut_parameters, [3]int{p.curr_tok.pos.offset, mut_start, mut_end})
 	}
 
 	for kind in ast.Field_Flag {
@@ -1984,10 +2000,16 @@ check_procedure_name_list :: proc(p: ^Parser, names: []^ast.Expr) -> bool {
 	return any_polymorphic_names
 }
 
-parse_ident_list :: proc(p: ^Parser, allow_poly_names: bool) -> []^ast.Expr {
+parse_ident_list :: proc(p: ^Parser, allow_poly_names: bool, allow_mut: bool = false) -> []^ast.Expr {
 	list: [dynamic]^ast.Expr
 
 	for {
+		if allow_mut && p.thor && p.curr_tok.kind == .Hash && peek_token(p).text == "mut" {
+			other_flags := parse_field_prefixes(p)
+			if other_flags != {} {
+				error(p, p.curr_tok.pos, "Only #mut may be applied per name; put other parameter directives before the shared name list")
+			}
+		}
 		if allow_poly_names && p.curr_tok.kind == .Dollar {
 			tok := expect_token(p, .Dollar)
 			ident := parse_ident(p)
@@ -2131,7 +2153,11 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 	for p.curr_tok.kind != follow &&
 	    p.curr_tok.kind != .Colon &&
 	    p.curr_tok.kind != .EOF {
+		mut_count := len(p.mut_parameters)
 		prefix_flags := parse_field_prefixes(p)
+		if len(list) > 0 && len(p.mut_parameters) > mut_count && prefix_flags != {} {
+			error(p, p.curr_tok.pos, "Only #mut may be applied per name; put other parameter directives before the shared name list")
+		}
 		param := parse_var_type(p, allowed_flags & {.Typeid_Token, .Ellipsis})
 		if _, ok := param.derived.(^ast.Ellipsis); ok {
 			if seen_ellipsis {
@@ -2189,7 +2215,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 		for p.curr_tok.kind != follow && p.curr_tok.kind != .EOF {
 			docs = p.lead_comment
 			set_flags = parse_field_prefixes(p)
-			names = parse_ident_list(p, allow_poly_names)
+			names = parse_ident_list(p, allow_poly_names, true)
 
 			total_name_count += len(names)
 			handle_field(p, &seen_ellipsis, &fields, docs, names, allowed_flags, set_flags) or_break

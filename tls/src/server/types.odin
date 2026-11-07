@@ -226,6 +226,8 @@ ClientCapabilities :: struct {
 
 WorkspaceCapabilities :: struct {
 	didChangeWatchedFiles: DidChangeWatchedFilesClientCapabilities,
+	inlayHint: struct {refreshSupport: bool},
+	semanticTokens: struct {refreshSupport: bool},
 }
 
 DidChangeWatchedFilesClientCapabilities :: struct {

@@ -117,6 +117,11 @@ class Diagnostics:
             for token, message in self.error_messages.items():
                 if any(token in m for m in msgs):
                     msgs = [message]
+                    for source in self.sources.values():
+                        for note in getattr(source,'slice_related',{}).get(token,[]):
+                            if note:
+                                related.append({'pos':self.locate(Origin(str(note.source.path),note.start,note.end)),
+                                                'message':'Read-only slice origin or operation requiring writable access.'})
                     break
             pos = error.get("pos") or {}
             file = pos.get("file", "")
@@ -138,6 +143,10 @@ class Diagnostics:
                 message = self.guard_messages.get((origin.file, origin.start, origin.end))
                 if message:
                     msgs = [message, *[m for m in msgs if "instantiated as" in m or "Called within" in m]]
+                    source=self.sources.get(origin.file)
+                    for note in getattr(source,'slice_guard_related',{}).get((origin.start,origin.end),[]):
+                        if note:related.append({'pos':self.locate(Origin(str(note.source.path),note.start,note.end)),
+                                                'message':'Read-only slice origin or operation requiring writable access.'})
             if origin and any("'concatenate'" in message or message.startswith('Invalid declaration value') for message in msgs):
                 source = self.sources.get(origin.file)
                 operation = source and next((node for node in source.nodes if node.kind == 'Binary'

@@ -41,6 +41,7 @@ get_inlay_hints :: proc(
 		procs    = make([dynamic]Proc_Data, context.temp_allocator),
 		hints    = make([dynamic]InlayHint, context.temp_allocator),
 	}
+	for hint in thor_slice_access_hints(document, range) { append(&data.hints, hint) }
 
 	visitor := ast.Visitor{
 		data  = &data,

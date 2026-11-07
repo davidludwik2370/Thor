@@ -143,10 +143,10 @@ assert(x==3 && y==4)
                 self.invoke(self.program(body), fail='mutable address')
 
     def test_fixed_array_cannot_escape_as_mutable_slice(self):
-        for body in ['x:>[1,2]; _=x[:]', 'x:>[1,2]; _=x[0:1]',
-                     'S::struct{a:[2]int}; x:>S{}; _=x.a[:]']:
+        for body in ['x:>[1,2]; view:=x[:];_=view', 'x:>[1,2]; view:=x[0:1];_=view',
+                     'S::struct{a:[2]int}; x:>S{}; view:=x.a[:];_=view']:
             with self.subTest(body=body):
-                self.invoke(self.program(body), fail='mutable slice')
+                self.invoke(self.program(body), fail='read-only slice')
 
     def test_immutable_array_slice_can_be_consumed_by_value_iteration(self):
         self.invoke(self.program('''
@@ -200,12 +200,14 @@ runtime::proc(n:int)->int{return prefix_sum(n)}
 '''))
 
     def test_immutable_iteration_exception_does_not_expose_mutable_aliases(self):
-        for operation in ['view:=data[:];_=view', 'consume(data[:])', 'for &value in data[:]{value=9}',
-                          'for &value in (data[:]){value=9}', 'for value in identity(data[:]){_=value}']:
+        for operation in ['view:=data[:];_=view', 'for &value in data[:]{value=9}',
+                          'for &value in (data[:]){value=9}']:
             with self.subTest(operation=operation):
                 self.invoke(self.program('data:>[1,2];'+operation,
                     'consume::proc(values:[]int){}\nidentity::proc(values:[]int)->[]int{return values}\n'),
-                    command='check',fail='mutable slice')
+                    command='check',fail='read-only slice')
+        self.invoke(self.program('data:>[1,2];consume(data[:]);for value in identity(data[:]){_=value}',
+                    'consume::proc(values:[]int){}\nidentity::proc(values:[]int)->[]int{return values}\n'))
         for operation in ['value=9','_= &value']:
             with self.subTest(operation=operation):
                 self.invoke(self.program('data:>[1,2];for value in data[:]{'+operation+'}'),
@@ -214,16 +216,16 @@ runtime::proc(n:int)->int{return prefix_sum(n)}
     def test_direct_array_mutable_iteration_is_rejected(self):
         self.invoke(self.program('x:>[1,2]; for &v in x {v=3}'), fail='mutable reference')
 
-    def test_existing_slice_elements_and_addresses_remain_mutable(self):
+    def test_readonly_slice_views_observe_changes_through_original_storage(self):
         self.invoke(self.program('''
 data:=[1,2,3]
 x:>data[:]
-x[0]=4
-p:=&x[1]; p^=5
-for &value in x {value+=1}
+data[0]=4
+p:=&data[1]; p^=5
+for &value in data {value+=1}
 assert(data[0]==5 && data[1]==6 && data[2]==4)
-view:=x[:2]; view[0]=7
-assert(data[0]==7)
+view:>x[:2]; data[0]=7
+assert(view[0]==7)
 '''))
 
     def test_slice_header_cannot_be_reassigned_or_addressed(self):
@@ -306,14 +308,14 @@ assert(f(2)==3 && x==7)
 
     def test_generic_shape_checks_distinguish_array_slice_and_map(self):
         prefix='write::proc(value:$T){x:>value; x[0]=7}\n'
-        self.invoke(self.program('data:=[1,2]; write(data[:]); assert(data[0]==7)',prefix))
+        self.invoke(self.program('data:=[1,2]; write(data[:])',prefix),fail='read-only slice')
         self.invoke(self.program('data:=make(map[int]int);write(data);delete(data)',prefix),fail="immutable storage 'x'")
         self.invoke(self.program('write([1,2])',prefix),fail="immutable storage 'x'")
 
     def test_generic_record_members_and_substitutions(self):
         prefix='Box::struct($T:typeid){value:T}\n'
         self.invoke(self.program('x:>Box([2]int){value=[1,2]}; x.value[0]=3',prefix),fail="immutable storage 'x'")
-        self.invoke(self.program('data:=[1,2]; x:>Box([]int){value=data[:]}; x.value[0]=3; assert(data[0]==3)',prefix))
+        self.invoke(self.program('data:=[1,2]; x:>Box([]int){value=data[:]}; x.value[0]=3',prefix),fail='read-only slice')
 
     def test_generic_guard_preserves_control_header_scopes_and_do_bodies(self):
         bodies = [
@@ -325,12 +327,13 @@ assert(f(2)==3 && x==7)
         for body in bodies:
             with self.subTest(body=body):
                 prefix='modify::proc(p:^int)->bool{p^=7;return false}\nf::proc(value:$T){'+body+'}\n'
-                self.invoke(self.program('data:=[1,2]; f(data[:]); assert(data[0]==7)',prefix))
+                self.invoke(self.program('data:=[1,2]; f(data[:])',prefix),fail='read-only slice')
                 self.invoke(self.program('f([1,2])',prefix),fail="immutable storage 'x'")
 
     def test_tuple_result_shapes_and_discard_names(self):
         prefix='pair::proc(value:[]int)->(int,[]int){return 1,value}\n'
-        self.invoke(self.program('data:=[1,2]; a,b:>pair(data[:]); b[0]=3; assert(a==1&&data[0]==3); _,spare:>1,2; _=spare',prefix))
+        self.invoke(self.program('data:=[1,2]; a,b:>pair(data[:]); data[0]=3; assert(a==1&&b[0]==3); _,spare:>1,2; _=spare',prefix))
+        self.invoke(self.program('data:=[1,2]; a,b:>pair(data[:]);_=a;b[0]=3',prefix),fail='read-only slice')
 
     def test_contextual_array_through_overloaded_target(self):
         prefix='''Color::enum{Red,Blue}

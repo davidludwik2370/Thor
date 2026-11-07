@@ -389,8 +389,9 @@ m:map[int]int;write(&m,&i);assert(i==1&&m[1]==9);delete(m)
     def test_very_wide_negative_bound_does_not_wrap_into_a_valid_index(self):
         self.invoke(self.program('a:=[7,8];i:i128=-18446744073709551617;_=a[i]'),fail='Bounds check')
 
-    def test_negative_fixed_array_readonly_and_slice_shallow_writes(self):
-        self.invoke(self.program('data:=[1,2];a:>data;assert(a[-1]==2);s:>data[:];s[-1]=8;assert(data[1]==8)'))
+    def test_negative_fixed_array_and_slice_readonly_views(self):
+        self.invoke(self.program('data:=[1,2];a:>data;assert(a[-1]==2);s:>data[:];data[-1]=8;assert(s[-1]==8)'))
+        self.invoke(self.program('data:=[1,2];s:>data[:];s[-1]=8'),command='check',fail='read-only slice')
         self.invoke(self.program('a:>[1,2];a[-1]=8'),command='check',fail='immutable storage')
 
     def test_enum_array_and_pointer_indices_keep_native_meaning(self):

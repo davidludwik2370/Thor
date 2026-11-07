@@ -528,13 +528,13 @@ immutable_storage :: proc() {
     }
 
     {
-        // This is shallow storage immutability. A fixed slice header does not
-        // make the pre-existing storage to which it points read-only.
+        // A slice bound with :> is a read-only view. Existing writable aliases
+        // can still change the shared backing storage.
         backing := [2, 4, 6]
         view :> backing[:]
-        view[-1] = 12
+        backing[2] = 12
 
-        assert(backing[2] == 12)
+        assert(view[-1] == 12)
 
         point := Point{x=1, y=2}
         pointer :> &point
@@ -542,6 +542,7 @@ immutable_storage :: proc() {
 
         assert(point.y == 8)
         // Not valid: view = backing[:2] // replacing the fixed header
+        // Not valid: view[0] = 9; writable := view; address := &view[0]
     }
 }
 

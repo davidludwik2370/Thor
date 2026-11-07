@@ -444,17 +444,27 @@ Syntax:
   decrements, and writes to directly stored fields/fixed-array elements.
 - Reject obtaining a mutable address of the binding or its directly stored
   subobjects, including implicitly through a generated Thor operation.
-- A slice of an immutable array may be consumed directly by a value-iteration
-  loop, including parenthesized slices and runtime bounds. The loop copies
-  elements into Odin's readonly, non-addressable iteration bindings; it exposes
-  no mutable slice header to user code. This does not allocate or copy the whole
-  array. Named, passed, returned and reference-iterated slices remain rejected.
+- A slice of an immutable array is a read-only view. Named immutable views,
+  read-only procedure consumption, returned aliases and value iteration are
+  supported without allocation or copying the whole array. Writable aliases,
+  mutable addresses and reference iteration remain rejected.
 - Track actual symbols and scopes, not identifier spelling; ordinary shadowing
   rules still apply.
-- This is shallow storage immutability. It does not make data reached through an
-  existing pointer/slice/map deeply immutable. Operations that require writing
-  the immutable container header or taking its mutable address are rejected.
-- Copying a reference-containing value does not create a read-only reference.
+- Slices reached through an immutable binding are read-only views: reject
+  element writes, writable aliases, raw data extraction, mutable element
+  addresses and reference iteration. Nested slices and returned aliases retain
+  permissions. Existing writable aliases can still change shared storage.
+- Fixed-array/record copies retain independent inline storage. Their contained
+  slice references preserve permissions. Existing pointer targets, maps, Sets
+  and dynamic-array rules are unchanged. Lifetimes and deletion remain manual.
+- Infer each procedure parameter's writable-access requirement through helper
+  calls, writes, writable escapes and return provenance. Read-only slices may
+  enter readers, including ordinary impure procedures. Unknown/foreign calls
+  cannot erase permissions. Explicit #mut applies only to the immediately
+  following parameter name and requires writable slice input even in a reader.
+  It supports slice-shaped generics and variadics; reject non-slice parameters.
+  No unnecessary-#mut warning is required. TLS shows inferred #mut in grey per
+  parameter. See docs/slice-access.md for the complete access contract.
 - Preserve Odin :: compile-time constants and normal mutable declarations.
 - Lower to ordinary Odin storage plus Thor checks. Suitable constant-initialized
   global/static storage may use rodata when semantics are preserved. Do not

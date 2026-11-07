@@ -652,7 +652,7 @@ use its own locations.
 | T09 | Shared Thor-owned lexer/parser and source emitter; native AST/token compatibility, comments, and byte spans retained. |
 | T10 | Mixed-source/import graphs, target/tag selection, collections, resource/foreign paths, managed output and CLI flag forwarding. |
 | T11 | Lexical symbols and shapes; contextual arrays through procedure aliases, overloads, generic specializations and private types. |
-| T12 | `x :> expr` and `x: Type > expr`: runtime initialization once, shallow immutable storage, scoped mutation/address checks. |
+| T12 | `x :> expr` and `x: Type > expr`: runtime initialization once, immutable storage and read-only slice views; inferred/per-name `#mut` procedure contracts. |
 | T13 | `f"hello {name}"` and raw f-strings; nested expressions, brace escaping, integer grouping, Unicode padding and owned output. |
 | T14 | Runtime switch expressions and compile-time `#switch` statements/expressions, with optional selectors, lazy matching and contextual results. |
 | T15 | `set[T]`, literals, mathematical/in-place operators, logical equality, membership, len, iteration, clear and delete. |
@@ -874,13 +874,16 @@ main :: proc() {
     value :> len(text) // runtime value; direct writes and &value are rejected
     data := [1, 2]
     view :> data[:]
-    view[0] = value // shallow: referenced elements remain writable
+    data[0] = value // writable aliases can change what the read-only view sees
+    // view[0] = value // rejected
 }
 ```
 
 Immutable records and fixed arrays also protect directly stored subobjects.
-An existing pointer, slice, or dynamic-array view still permits writes to its
-pointee/elements. Taking an immutable header's mutable address is rejected.
+Slices reached through an immutable binding become read-only views, including
+nested slice references. Existing writable aliases can still modify the shared
+storage. Pointer targets and dynamic arrays retain their existing behavior.
+Taking an immutable header's mutable address is rejected.
 Native map entry assignment can change the map header, so it requires a mutable
 header (a mutable shallow copy may still access shared entries). Ordinary Odin
 copying and ownership rules apply; this feature does not add lifetime checking.
@@ -897,7 +900,20 @@ for value in values[:2] { fmt.println(value) }
 ```
 
 This reads the original storage without allocating or copying the whole array.
-Named or passed mutable views and `for &value in values[:]` remain rejected.
+Named immutable views and passing them to readers are supported. Writable aliases
+and `for &value in values[:]` remain rejected. Thor infers per-parameter writable
+access requirements; explicit `#mut` applies to the next name only:
+
+```odin
+copy_values :: proc(source, #mut destination: []int) {
+    copy(destination, source)
+}
+```
+
+TLS displays inferred `#mut` in grey and includes requirements in hover text.
+See [the complete slice access contract](docs/slice-access.md) and the commented
+[slice access demo](examples/slice_access/demo.thor).
+
 `:>` enforces storage immutability in Thor; Odin's `@(rodata)` is a storage
 placement attribute and does not provide the same compile-time checks.
 

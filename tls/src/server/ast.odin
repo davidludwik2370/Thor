@@ -114,6 +114,7 @@ parse_file :: proc (p: ^parser.Parser, file: ^ast.File, allocator := context.all
 	clear(&p.selections)
 	clear(&p.edits)
 	clear(&p.immutables)
+	clear(&p.mut_parameters)
 	clear(&p.features)
 	ok := parser.parse_file(p, file)
 	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file); thor_adapt_switches(p,file); thor_adapt_expressions(p,file) }
@@ -1378,6 +1379,7 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 		build_string(n.elems, builder, remove_pointers)
 	case ^ast.Field:
 		for name, i in n.names {
+			if thor_slice_parameter_mut(name.pos.file, name.pos.offset) { strings.write_string(builder, "#mut ") }
 			build_string(name, builder, remove_pointers)
 			if len(n.names) - 1 != i {
 				strings.write_string(builder, ", ")

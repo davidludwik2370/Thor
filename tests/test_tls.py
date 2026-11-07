@@ -17,10 +17,11 @@ BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False):
+    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
+        self.server_requests = []
         self.sequence = 0
         self.log = tempfile.TemporaryFile()
         self.process = subprocess.Popen([str(BINARY)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -33,7 +34,9 @@ class Client:
         self.capabilities = self.request('initialize', {
             'processId': os.getpid(), 'rootUri': directory.as_uri(),
             'workspaceFolders': [{'uri': directory.as_uri(), 'name': 'test'}],
-            'capabilities': {'textDocument': {'hover': {'contentFormat': ['markdown']},
+            'capabilities': {'workspace': {'inlayHint': {'refreshSupport': refresh},
+                                           'semanticTokens': {'refreshSupport': refresh}},
+                            'textDocument': {'hover': {'contentFormat': ['markdown']},
                             'completion': {'completionItem': {'snippetSupport': True}},
                             'semanticTokens': {'requests': {'full': True}}}},
             'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
@@ -86,6 +89,7 @@ class Client:
             self.log.seek(0)
             raise AssertionError(f'TLS stopped: {value}\n{self.log.read().decode(errors="replace")}')
         if 'method' in value and 'id' in value:
+            self.server_requests.append(value)
             self.write({'jsonrpc': '2.0', 'id': value['id'], 'result': None})
         else:
             self.notifications.append(value)
@@ -630,7 +634,7 @@ inspect::proc(node:Node,pointer:^Node,items:[]Node,fixed:[2]Node,
             ('_=frozen.nested.value',[True,True]),
             ('_=frozen.pointer.value',[True,False]),
             ('_=frozen.fixed[0].value',[True,True]),
-            ('_=frozen.view[0].value',[True,False]),
+            ('_=frozen.view[0].value',[True,True]),
             ('_=frozen.table[0].value',[True,True]),
             ('_=mutable.nested.value',[False,False]),
             ('_=global_frozen.value',[True]),
@@ -845,8 +849,8 @@ main::proc(){
 }
 '''
         client,main=self.open(text)
-        errors=client.diagnostic(main.as_uri(),contains='mutable slice')
-        error=next(e for e in errors if 'mutable slice' in e['message'])
+        errors=client.diagnostic(main.as_uri(),contains='read-only slice')
+        error=next(e for e in errors if 'read-only slice' in e['message'])
         self.assertEqual(error['range']['start'],self.position(text,'directions[:limit]',0))
         fixed=text.replace('for &dir','for dir').replace('dir.x=9','_=dir.x')
         client.notifications.clear()

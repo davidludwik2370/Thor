@@ -45,6 +45,7 @@ Json_Errors :: struct {
 	error_count: int,
 	errors:      []Json_Error,
 	check_paths: []string, // Local provenance, supplied after reading the compiler's JSON.
+	slice_access: []Thor_Slice_Info,
 }
 
 Check_Mode :: enum {
@@ -195,7 +196,17 @@ run_check_consumer :: proc(c: Consumer) {
 			check(request.check_mode, paths[:], buffers, request.config, generation)
 		}
 
-		if generation == intrinsics.atomic_load(&checker.generation) { push_diagnostics(c.w) }
+		if generation == intrinsics.atomic_load(&checker.generation) {
+			push_diagnostics(c.w)
+			if request.config.inlay_refresh_support {
+				send_request(RequestMessage{jsonrpc="2.0", method="workspace/inlayHint/refresh",
+					id=fmt.tprintf("THOR_SLICE_REFRESH_%d",generation)}, c.w)
+			}
+			if request.config.semantic_refresh_support {
+				send_request(RequestMessage{jsonrpc="2.0", method="workspace/semanticTokens/refresh",
+					id=fmt.tprintf("THOR_SLICE_TOKENS_%d",generation)}, c.w)
+			}
+		}
 		for path in paths {
 			delete(path, checker.allocator)
 		}
@@ -563,6 +574,19 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 	// Ignore results from an older snapshot after another edit arrived.
 	if generation != intrinsics.atomic_load(&checker.generation) { return }
 	clear_diagnostics(.Check)
+	for result in errors {
+		thor_update_slice_info(result.slice_access)
+		for info in result.slice_access {
+			for buffer in buffers {
+				if buffer.canonical != info.file { continue }
+				ensure_diagnostic_path(.Check, common.create_uri(buffer.path, context.temp_allocator).uri)
+				if buffer.path != info.file {
+					alias := info; alias.file = buffer.path
+					thor_update_slice_info([]Thor_Slice_Info{alias})
+				}
+			}
+		}
+	}
 
 	DiagnosticKey :: struct {
 		path:    string,
@@ -694,6 +718,7 @@ start_check_process :: proc(
 	}
 	append(&cmd, entry_point_opt, "-json-errors")
 	if thor {
+		append(&cmd, "--editor-info")
 		odin := config.odin_command
 		if odin == "" { odin = "odin" }
 		append(&cmd, "--odin", odin, "--output-dir", fmt.tprintf("%s/thor-%x", checker.overlay.dir, hash.fnv64a(transmute([]u8)check_paths[0])))

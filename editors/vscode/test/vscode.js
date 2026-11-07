@@ -108,6 +108,34 @@ async function run() {
             edit.replace(testDocument.uri, new vscode.Range(testDocument.positionAt(0), testDocument.positionAt(testDocument.getText().length)), text);
             assert.ok(await vscode.workspace.applyEdit(edit));
         };
+        const sliceAccess='package main\ncopy_values::proc(source,destination:[]int){copy(destination,source)}\nexplicit::proc(a,#mut b:[]int){_=a;_=b}\nmain::proc(){values :> []int{1};output:=[]int{0};copy_values(values,output);explicit(values,output)}\n';
+        await replace(sliceAccess);
+        await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.length===0);
+        const sliceHints=async()=>vscode.commands.executeCommand('vscode.executeInlayHintProvider',testDocument.uri,
+            new vscode.Range(testDocument.positionAt(0),testDocument.positionAt(testDocument.getText().length)));
+        const mutHints=values=>(values||[]).filter(hint=>(typeof hint.label==='string'?hint.label:hint.label.map(part=>part.value).join('')).includes('#mut'));
+        const inferredHints=await eventually(sliceHints,values=>mutHints(values).length===1);
+        assert.ok(mutHints(inferredHints)[0].position.isEqual(testDocument.positionAt(sliceAccess.indexOf('destination:'))));
+        await eventually(()=>vscode.commands.executeCommand('vscode.executeHoverProvider',testDocument.uri,
+            testDocument.positionAt(sliceAccess.indexOf('copy_values(values')+1)),values=>hoverText(values||[]).includes('#mut destination'));
+        const sliceError=sliceAccess.replace('copy_values(values,output)','copy_values(output,values)');
+        await replace(sliceError);
+        const accessErrors=await eventually(()=>Promise.resolve(vscode.languages.getDiagnostics(testDocument.uri)),values=>values.some(value=>value.message.includes('read-only slice')));
+        const accessError=accessErrors.find(value=>value.message.includes('read-only slice'));
+        assert.ok(accessError.range.start.isEqual(testDocument.positionAt(sliceError.indexOf('values)',sliceError.indexOf('copy_values(output')))));
+        assert.ok(accessError.relatedInformation?.length>0);
+        await replace(sliceAccess.replace('copy(destination,source)','_=source;_=destination'));
+        await eventually(sliceHints,values=>mutHints(values).length===0);
+        if(process.env.THOR_VSCODE_TEST_SCOPE==='slice-access'){
+            await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+            await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+            result.success=true;
+            result.checks=['demo language/hover/semantic tokens and source definitions',
+                'inferred per-name #mut inlay and explicit annotation deduplication',
+                'hover write contract', 'read-only argument diagnostic and related locations',
+                'unsaved reader edit removes inferred #mut', 'refresh replies preserve the server process'];
+            return;
+        }
         fs.mkdirSync(path.join(temporary,'completion_library'));
         fs.writeFileSync(path.join(temporary,'completion_library/main.thor'),'package completion_library\n// Alpha accepts a number.\nalpha::proc(value:int)->int{return value}\nalpine::proc(){}\n@(private) hidden::proc(){}\n');
         const importExample='package main\nimport "completion_library" / \nmain::proc(){}\n';

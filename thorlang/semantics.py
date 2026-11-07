@@ -1065,7 +1065,7 @@ class Resolver:
                 elif n.kind == "Unary" and n.data["op"] == "&":
                     targets = [(n, n.role("expr"), "take a mutable address of")]
                 elif n.kind == "Slice":
-                    if not self.value_iteration_slice(n):
+                    if not source.thor and not self.value_iteration_slice(n):
                         targets = [(n, n.role("expr"), "create a mutable slice of")]
                 elif n.kind == "Range" and any(name.kind == "Unary" and name.data["op"] == "&" for name in n.group("names")):
                     targets = [(n.role("expr"), n.role("expr"), "iterate by mutable reference over")]
@@ -1085,7 +1085,7 @@ class Resolver:
                     elif typ.kind in {"unknown", "generic"}:
                         targets = [(n, receiver, "take an implicit mutable address of")]
                 elif n.kind == "Cast" and self.type_node(n.role("type")).kind == "slice":
-                    targets = [(n, n.role("expr"), "create a mutable slice of")]
+                    if not source.thor:targets = [(n, n.role("expr"), "create a mutable slice of")]
                 for origin, target, action in targets:
                     protected = self.protection(target)
                     if not protected:

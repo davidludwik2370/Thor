@@ -316,7 +316,7 @@ main :: proc() {
     assert(library.accept_colors([.Red,.Blue]) == 1)
     assert(last_color([.Red,.Blue], Color.Red) == .Blue)
 
-    println("T12: runtime-initialized immutable storage and shallow references")
+    println("T12: runtime-initialized immutable storage and read-only slice views")
     calls, order = 0, 0
     immutable :> mark(5)
     typed_immutable: int > mark(6)
@@ -327,10 +327,10 @@ main :: proc() {
     assert(frozen_record.number==3 && mutable_copy.number==9)
     backing := [1,2]
     view :> backing[:]
-    view[0]=8 // existing referenced data remains mutable; the header is fixed
-    assert(backing[0]==8)
+    backing[0]=8 // writable aliases can still change what the read-only view sees
+    assert(view[0]==8)
     // Rejections are separate executable fixtures under tests/fixtures/:
-    // immutable = 9; &frozen_record.number; frozen_array[:]
+    // immutable = 9; &frozen_record.number; view[0]=9; writable:=view
 
     println("T13: quoted/raw interpolation, braces, nested expressions, and formatting")
     calls, order = 0, 0

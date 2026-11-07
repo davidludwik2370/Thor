@@ -36,6 +36,7 @@ Output :: struct {
     comments: [dynamic]Span,
     diagnostics: []Parse_Error,
     immutables: [dynamic][2]int,
+    mut_parameters: [dynamic][3]int,
     do_tokens: [dynamic]Span,
     selection_tags: [dynamic]Span,
     file_tags: [dynamic]string,
@@ -101,6 +102,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         if n.pkg_decl!=nil {info.roles["package"]={n.pkg_decl.pos.offset,n.pkg_decl.pos.offset+len(n.pkg_name)}}
     case ^ast.Package_Decl: info.kind="Package"
     case ^ast.Ident: info.kind = "Ident"; info.name = n.name
+    case ^ast.Ellipsis: info.kind="Ellipsis";info.roles["expr"]=span(n.expr)
     case ^ast.Implicit: info.kind="Implicit";info.name=tokenizer.to_string(n.tok.kind)
     case ^ast.Basic_Directive: info.kind="Directive";info.name=n.name
     case ^ast.Asm_Template, ^ast.Undef: info.kind="Unsafe"
@@ -244,6 +246,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Switch_Stmt: info.kind = "Switch"
     case ^ast.Type_Switch_Stmt:
         info.kind = "TypeSwitch"
+        info.roles["body"]=span(n.body)
         info.roles["expr"]=span(n.expr)
         if n.tag != nil {
             if assignment, ok := n.tag.derived.(^ast.Assign_Stmt); ok {
@@ -254,6 +257,9 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Expr_Stmt: info.kind = "ExpressionStatement"; info.roles["expr"] = span(n.expr)
     case ^ast.Case_Clause:
         info.kind = "Case"
+        info.lists["types"] = spans(n.list)
+        info.lists["body"] = make([]Span,len(n.body))
+        for statement,i in n.body {info.lists["body"][i]=span(statement)}
         info.roles["colon"] = {n.terminator.pos.offset,n.terminator.pos.offset+1}
     case ^ast.Enum_Type: info.kind = "EnumType"
     case ^ast.Pointer_Type: info.kind = "PointerType"; info.roles["elem"] = span(n.elem)
@@ -350,7 +356,7 @@ main :: proc() {
     }
     file.end.offset = len(data)
     out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public, private_file=tags.private==.File,
-                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,features=p.features[:],declaration_separators=p.declaration_separators}
+                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,mut_parameters=p.mut_parameters,features=p.features[:],declaration_separators=p.declaration_separators}
     for tag in file.tags {
         append(&out.file_tags, tag.text)
         text := strings.trim_space(tag.text)

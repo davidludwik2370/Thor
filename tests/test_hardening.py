@@ -242,7 +242,9 @@ tracker:mem.Tracking_Allocator
 mem.tracking_allocator_init(&tracker,backing)
 context.allocator=mem.tracking_allocator(&tracker)
 text:=f"{f"inner {7}"} {active(&tracker)}"
-testing.expect(t,text=="inner 7 1")
+// Nested formatting now writes directly to the outer builder. At the later
+// field there is no separately allocated inner string still alive.
+testing.expect(t,text=="inner 7 0")
 delete(text);testing.expect(t,len(tracker.allocation_map)==0)
 context.allocator=backing;mem.tracking_allocator_destroy(&tracker)
 ''','import "core:mem"\nactive::proc(tracker:^mem.Tracking_Allocator)->int{return len(tracker.allocation_map)}\n')

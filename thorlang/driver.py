@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.39.1"
+VERSION = "0.40.0"
 
 
 def backend_failure(status):
@@ -106,6 +106,8 @@ class Project:
         self.resolver.prepare_storage_checks()
         from .purity import Purity
         self.purity=Purity(self)
+        from .sliceaccess import SliceAccess
+        self.slice_access=SliceAccess(self)
 
     def discover(self, entry):
         entry = entry.resolve()
@@ -154,6 +156,7 @@ class Project:
                 self.discover(dependency)
 
     def emit(self, destination, *, persist_maps=None, materialize=True):
+        self.slice_access.prepare()
         if self.purity.eval_mode:
             for proc in self.purity.active:self.purity.analyze(proc)
             self.purity.borrowing.finish(self.purity.active)
@@ -355,6 +358,7 @@ def _main(argv=None):
     parser.add_argument("--diagnostic-format", choices=["text", "json"], default="text")
     parser.add_argument("--overlay", type=Path, help="editor overlay JSON: {\"Replace\": {original: replacement_file}}")
     parser.add_argument("--raw-diagnostics", action="store_true", help="show unmodified Odin diagnostics for transpiler debugging")
+    parser.add_argument('--editor-info',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument("--run-timeout",type=float,default=5,help="maximum seconds for each native #run execution (default: 5)")
     parser.add_argument('--cache-dir',type=Path,help='cache root (default: .thor-cache beside the entry package)')
     parser.add_argument('--no-cache',action='store_true',help='bypass compile-time result and per-file parser caching')
@@ -383,6 +387,7 @@ def _main(argv=None):
     if runtime_args and options.command not in {"run", "test"}:
         parser.error("arguments after -- are only supported by run and test")
     diagnostics = Diagnostics()
+    project = None
     json_output = options.diagnostic_format == "json" or "-json-errors" in flags
     flags = [f for f in flags if f != "-json-errors"]
     reported_errors = False
@@ -408,7 +413,9 @@ def _main(argv=None):
             if options.command == 'publish':
                 publish_diagnostics.extend(errors)
             else:
-                print(json.dumps(payload(errors), ensure_ascii=False), file=sys.stderr)
+                output=payload(errors)
+                if options.editor_info and project is not None:output['slice_access']=project.slice_access.editor_info()
+                print(json.dumps(output, ensure_ascii=False), file=sys.stderr)
         else:
             for error in errors:
                 print(diagnostics.text(error, terse="-terse-errors" in flags,
@@ -451,6 +458,7 @@ def _main(argv=None):
                 parsecache.clear(frontend,cache_root)
             project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
                               cache_frontend=not options.no_cache,cache_directory=cache_root)
+            project.slice_access.enabled|=options.editor_info
             if publisher:
                 project.publish_layout = publisher.system
             if '-debug' in flags:

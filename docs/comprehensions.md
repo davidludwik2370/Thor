@@ -77,8 +77,10 @@ nested ordinary array literals or calls to procedures that build collections.
 
 Runtime results allocate through `context.allocator`. Delete every owned result
 once, including one passed anonymously into a procedure. Comprehensions do not
-introduce automatic argument cleanup. `:>` keeps its existing shallow rules;
-it does not make the underlying slice/map/set storage deeply readonly.
+introduce automatic argument cleanup. A slice bound with `:>` is a read-only
+view; nested slice references retain that permission. Existing writable aliases
+can still change the backing storage. Map, Set and dynamic-array rules are
+unchanged. See [slice access](slice-access.md).
 
 Elements use ordinary shallow aggregate ownership. Copying a slice element
 copies its header; it does not duplicate its backing storage. Fresh allocated

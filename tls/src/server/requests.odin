@@ -115,9 +115,17 @@ thread_request_main :: proc(data: rawptr) {
 			}
 		}
 
-		sync.mutex_lock(&requests_mutex)
+		method, has_method := root["method"].(json.String)
+		if !has_method {
+			// Responses to server-initiated requests (including inlay/semantic
+			// refresh) contain an id and result/error, but no method. There is
+			// no pending result to consume for these fire-and-refresh requests.
+			json.destroy_value(root)
+			free_all(context.temp_allocator)
+			continue
+		}
 
-		method := root["method"].(json.String)
+		sync.mutex_lock(&requests_mutex)
 
 		spall.trace("request", fmt.tprint(method, id))
 
@@ -712,6 +720,8 @@ request_initialize :: proc(
 	}
 
 	config.client_name = strings.clone(initialize_params.clientInfo.name)
+	config.inlay_refresh_support = initialize_params.capabilities.workspace.inlayHint.refreshSupport
+	config.semantic_refresh_support = initialize_params.capabilities.workspace.semanticTokens.refreshSupport
 	config.workspace_folders = make([dynamic]common.WorkspaceFolder)
 
 	for s in initialize_params.workspaceFolders {
@@ -866,10 +876,7 @@ request_initialize :: proc(
 						tokenModifiers = semantic_token_modifier_names,
 					},
 				},
-				inlayHintProvider = (config.enable_inlay_hints_params ||
-					config.enable_inlay_hints_default_params ||
-					config.enable_inlay_hints_implicit_return ||
-					config.enable_inlay_hints_optional_result),
+				inlayHintProvider = true, // Thor's compiler-inferred #mut hints are enabled by default.
 				documentSymbolProvider = config.enable_document_symbols,
 				hoverProvider = config.enable_hover,
 				documentFormattingProvider = config.enable_format,

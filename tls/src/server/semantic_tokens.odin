@@ -654,7 +654,11 @@ semantic_field_is_readonly :: proc(
 		case SymbolMapValue:
 			// Thor :> protects map entries; an ordinary readonly map header does not.
 			return semantic_field_is_readonly(ast_context, n.expr, true, depth+1)
+		case SymbolSliceValue:
+			return semantic_field_is_readonly(ast_context, n.expr, true, depth+1)
 		}
+	case ^ast.Slice_Expr:
+		return semantic_field_is_readonly(ast_context, n.expr, true, depth+1)
 	case ^ast.Matrix_Index_Expr:
 		base: Symbol
 		if !internal_resolve_type_expression(ast_context, n.expr, &base) || base.pointers > 0 { return false }
@@ -683,6 +687,7 @@ visit_ident :: proc(
 	}
 
 	modifiers := modifiers
+	if thor_slice_storage_readonly(ident.pos.file, ident.pos.offset) { modifiers += {.ReadOnly} }
 
 	if .Builtin in symbol.flags {
 		modifiers += {.DefaultLibrary}

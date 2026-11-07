@@ -459,7 +459,15 @@ class Purity:
         parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
-        count='+'.join(f'(1 when {meta}.type_has_field(T,{json.dumps(field)}) else 0)' for field in names) or '0'
+        def count_fields(fields):
+            if not fields:return '0'
+            if len(fields)==1:return f'(1 when {meta}.type_has_field(T,{json.dumps(fields[0])}) else 0)'
+            middle=len(fields)//2
+            return '('+count_fields(fields[:middle])+'+'+count_fields(fields[middle:])+')'
+        # Keep checker recursion logarithmic even when SDK access inference has
+        # inspected many record schemas. A left-associated sum can exhaust the
+        # native compiler's stack before it can report any useful diagnostic.
+        count=count_fields(names)
         parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
         raw_shapes=set()
         from .imports import file_private

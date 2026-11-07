@@ -88,6 +88,14 @@ add_diagnostics :: proc(type: DiagnosticType, uri: string, diagnostic: Diagnosti
 	append(diagnostic_array, diagnostic)
 }
 
+ensure_diagnostic_path :: proc(type: DiagnosticType, uri: string) {
+	sync.lock(&diagnostic_mutex)
+	defer sync.unlock(&diagnostic_mutex)
+	if _, found := diagnostics[type][uri]; !found {
+		diagnostics[type][strings.clone(uri)] = make([dynamic]Diagnostic)
+	}
+}
+
 remove_diagnostics :: proc(type: DiagnosticType, uri: string) {
 	sync.lock(&diagnostic_mutex)
 	defer sync.unlock(&diagnostic_mutex)

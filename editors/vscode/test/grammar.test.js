@@ -91,6 +91,7 @@ for (const [name, source, word, scope, line] of [
     ['compile-time when', 'when true {', 'when', 'keyword.control'],
     ['compile-time else', '} else when false {', 'else', 'keyword.control'],
     ['compile switch', 'x :: #switch 1 {case:2}', '#switch', 'entity.name.tag'],
+    ['per-name mutable slice directive', 'copy :: proc(source, #mut destination: []int) {}', '#mut', 'entity.name.tag'],
     ['pure function keyword', 'square :: fn(x:int)->int{return x*x}', 'fn', 'storage.type'],
     ['pure function name', 'square :: fn(x:int)->int{return x*x}', 'square', 'entity.name.function'],
     ['inline procedure default keyword', 'less := proc(i,j:E)->bool{return i<j}', 'proc', 'storage.type'],

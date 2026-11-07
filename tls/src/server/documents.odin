@@ -94,6 +94,7 @@ destroy_document_symbol_cache :: proc(document: ^Document) {
 }
 
 document_storage_shutdown :: proc() {
+	thor_delete_slice_info()
 	for k, &v in document_storage.documents {
 		if v.allocator != nil {
 			virtual.arena_destroy(v.allocator)

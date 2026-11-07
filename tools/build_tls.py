@@ -21,7 +21,7 @@ def main():
         output = output.with_suffix('.exe')
     command = [options.odin, options.mode, str(ROOT / 'tls' / ('tests' if options.mode == 'test' else 'src')),
                f'-collection:src={ROOT / "tls" / "src"}', f'-collection:thor={ROOT / "frontend"}',
-               '-define:VERSION=thor-0.29.0+ols-0c9438f']
+               '-define:VERSION=thor-0.40.0+ols-0c9438f']
     if options.mode != 'check':
         command.extend(['-o:speed', f'-out:{output}'])
     if options.mode == 'test':
