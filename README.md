@@ -1144,6 +1144,9 @@ The suite also builds TLS and runs stdio LSP tests against the actual executable
 The [post-v1 audit](AUDIT.md) records cross-feature fixes, coverage and concrete
 remaining editor limitations. Contextual enum navigation, completion and rename
 through switch-arm arrays have dedicated regression coverage.
+The [November hardening report](docs/hardening-2026-11.md) inventories the
+features added since the purity audit, their documentation, interaction tests,
+and remaining conservative boundaries.
 
 Readable rejection examples are under [tests/fixtures](tests/fixtures). Each
 directory includes `main.thor` and the expected diagnostic fragment:

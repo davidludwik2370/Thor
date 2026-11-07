@@ -110,6 +110,67 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_map_comprehension_keys_keep_breakpoints_and_step_into_user_code(self):
+        text='''package main
+key::proc(values:[]int)->int {
+    values[0]+=1
+    return values[0]
+}
+main::proc(){
+    values:=[]int{1}
+    table:=map[int]int{key(values)=x for x in 0..<1}
+    last:=values[0]+table[2]
+    delete(table)
+    if last!=2 {panic("key evaluation")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[8,9])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[2,3],frame)
+        self.assertIn('key',frame['name'])
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),9),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'last','context':'watch'})
+        self.assertEqual(value['result'],'2',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
+    def test_parenthesized_optional_tuple_retains_locals_and_original_step_locations(self):
+        text='''package main
+pair::proc(values:[]int)->(int,[]int,bool) {
+    return 7,values,true
+}
+main::proc(){
+    values :> []int{2}
+    count,view :> (pair(values) or_panic)
+    total:=count+view[0]
+    if total!=9 {panic("tuple")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[7,8])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[2,3],frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'total','context':'watch'})
+        self.assertEqual(value['result'],'9',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_mut_annotation_keeps_original_breakpoints_and_slice_values(self):
         text='''package main
 copy_values::proc(source, #mut destination:[]int) {

@@ -31,7 +31,8 @@ test('run saves changes and sends only thor run . when the terminal is already i
     const active=terminal({cwd:'/some/initial/directory'});
     active.shellIntegration={cwd:{scheme:'file',fsPath:'/projects/my project'}};
     vscode.window.activeTerminal=active;
-    assert.equal(await runProject(vscode),active);
+    const result=await runProject(vscode);
+    assert.equal(result,active);
     assert.equal(calls.saved,1);
     assert.deepEqual(calls.created,[]);
     assert.deepEqual(active.commands,[{text:'thor run .',newline:true}]);
@@ -43,7 +44,8 @@ test('a terminal opens in the active file directory even inside a larger workspa
     const first=await runProject(vscode);
     assert.deepEqual(first.options,{name:'Thor',cwd:'/projects/my project/lib'});
     first.shellIntegration={cwd:{scheme:'file',fsPath:'/projects/my project/lib'}};
-    assert.equal(await runProject(vscode),first);
+    const second=await runProject(vscode);
+    assert.equal(second,first);
     assert.equal(calls.created.length,1);
     assert.equal(first.commands.length,2);
     assert.deepEqual(first.commands.map(c=>c.text),['thor run .','thor run .']);

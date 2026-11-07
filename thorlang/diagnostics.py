@@ -24,6 +24,11 @@ class Diagnostics:
         self.raw = {str(p): s.raw for p, s in (sources or {}).items()}
         self.prefixes = [s.prefix for s in (sources or {}).values()]
         self.error_messages = {name: message for s in (sources or {}).values() for name, message in s.error_messages.items()}
+        # Linked/overlaid native files can be metadata-only source objects.
+        self.slice_sites={token:Origin(str(path),node.start,node.end,'slice-access',True)
+                          for path,source in (sources or {}).items()
+                          for node,(token,_) in getattr(source,'blocked',{}).items()
+                          if token in getattr(source,'slice_related',{})}
         self.namespace_aliases = {alias: name for s in (sources or {}).values() for name, alias in s.hidden_namespaces.items()}
         self.guard_messages = {(str(path), start, end): message for path, s in (sources or {}).items()
                                for (start, end), message in s.guard_messages.items()}
@@ -110,6 +115,7 @@ class Diagnostics:
             type_operand = None
             index_dependencies = []
             related = list(error.get('related') or []) if not backend else []
+            slice_site=None
             for name in self.hidden_parameters:
                 msgs=[re.sub(r'(?:,\s*)?\$?'+re.escape(name)+r'\s*:\s*\$?(?:bool|'+re.escape(name)+r'_Type)(?:\s*=\s*(?:true|false|struct\s*\{\s*\}\s*\{\s*\}))?', '',m) for m in msgs]
                 msgs=[re.sub(r'^[ \t]*•[ \t]*'+re.escape(name)+r'[ \t]*=.*(?:\n|$)','',m,flags=re.MULTILINE) for m in msgs]
@@ -117,6 +123,7 @@ class Diagnostics:
             for token, message in self.error_messages.items():
                 if any(token in m for m in msgs):
                     msgs = [message]
+                    slice_site=self.slice_sites.get(token)
                     for source in self.sources.values():
                         for note in getattr(source,'slice_related',{}).get(token,[]):
                             if note:
@@ -139,6 +146,10 @@ class Diagnostics:
                     token = re.match(r"\w+|.", raw[offset:].decode("utf-8", errors="replace"))
                     end = pos.get("end_offset", offset + (len(token[0].encode()) if token else 0))
                     origin = Origin(file, offset, end)
+            # The same blocked operation may be rendered inside a type witness
+            # and the runtime helper. The token identifies its precise source
+            # site even when the generated span maps to the whole expression.
+            if slice_site:origin=slice_site
             if origin and origin.kind == "immutable":
                 message = self.guard_messages.get((origin.file, origin.start, origin.end))
                 if message:

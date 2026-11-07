@@ -78,6 +78,11 @@ turn such a result into writable access. A fresh clone has independent writable
 outer storage; its reference-containing elements remain shallow. Use a deep copy
 when independent nested storage is needed.
 
+This applies separately to each result of a multiple-result call, including
+parentheses, forwarded returns, argument expansion and `or_else`/`or_panic`
+unwrapping. A Boolean or allocator-error status is an independent scalar value;
+copying that status does not copy the accompanying slice's restriction.
+
 Declared `fn` results retain their existing deep-copy guarantee. Returning an
 input slice from a `fn` produces independent owned storage, so the result can be
 mutable even when the input is a read-only view. An ordinary `proc` returning
@@ -90,6 +95,11 @@ part :> tail(view)
 ```
 
 Inference is conservative. Runtime conditions include every possible branch.
+Statically resolved `when`/`#switch` expressions use their selected branch;
+conditions the access analysis cannot resolve keep a conservative join until
+their native specialization is known. Calls in switch selectors, case matches,
+comprehension keys and filter/output expressions follow the same access rules
+as direct calls.
 Unresolved callbacks, foreign/bodyless procedures and opaque `any`/raw-pointer
 conversions cannot silently shed permissions. Core printing, cloning, and the
 reviewed basic string/hash interfaces have argument-specific contracts. Ordinary
@@ -127,6 +137,8 @@ the qualifiers on any nested slice references.
 Errors highlight the read-only argument or forbidden operation and include
 related locations for the view's origin and the operation needing writable
 access. No generated implementation types are part of the user contract.
+Repeated instances of the same access failure in generated type witnesses and
+runtime helpers collapse to one diagnostic at that original operation.
 
 `examples/slice_access/demo.thor` is the commented runnable demonstration.
 `tests/test_slice_access.py`, `tests/test_slice_access_tls.py`, the grammar suite,

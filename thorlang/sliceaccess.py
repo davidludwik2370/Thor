@@ -429,7 +429,9 @@ class SliceAccess:
                 elif base.typ.kind in {'array','fixed'} and isinstance(base.typ.length,int):
                     positional.extend((arg,self.item(base)) for _ in range(base.typ.length))
                 else:positional.append((arg,base))
-            else:positional.append((arg,self.eval(arg,context)))
+            else:
+                values=self.expression_results(arg,context,len(params)) if len(args)==1 else [self.eval(arg,context)]
+                positional.extend((arg,value) for value in values)
         receiver=node.role('callee')
         if receiver.kind=='Selector' and receiver.data.get('op')=='->':positional.insert(0,(receiver.role('expr'),self.eval(receiver.role('expr'),context)))
         named={a.role('field').text:a.role('value') for a in args if a.kind=='FieldValue'}
@@ -511,15 +513,26 @@ class SliceAccess:
             if path=='core:fmt':
                 return Value(Type('string','string') if name.startswith(('aprint','tprint')) else Type('scalar','int'))
             if path=='thor:basic' and name in {'print','hash','try_hash','_string'}:
-                return Value(Type('string','string') if name=='_string' else Type('scalar','u64'))
-            return Value(self.type(node,context))
+                result=Value(Type('string','string') if name=='_string' else Type('scalar','u64'))
+                if name in {'try_hash','_string'}:
+                    return self.fresh_call_results(node,context,result)
+                return result
+            result=Value(self.type(node,context))
+            # deepclone returns an independent graph and a reference-free
+            # library error, including when both names are immutable.
+            return self.fresh_call_results(node,context,result)
         builtin=self.project.purity.builtin(node) or self.reference_builtin(callee)
         if builtin or library:
             values=[self.eval(a.role('value') if a.kind=='FieldValue' else a,context) for a in args]
             if builtin=='new_clone' and values:
                 return Value(self.type(node,context),target=self.copied(values[0]))
             if builtin in self.readers:
-                return Value(self.type(node,context))
+                result=Value(self.type(node,context))
+                if builtin in {'make','new'}:
+                    self.record_results(node,context,[result,Value(Type('enum','Allocator_Error'))],optional=True)
+                elif builtin in {'min','max'} and node.source.expressions.extrema.plan(node) and node.source.expressions.extrema.plan(node)[2]:
+                    self.record_results(node,context,[result,Value(Type('scalar','bool'))],optional=True)
+                return result
             if builtin=='copy':
                 byname=self.project.purity.arguments(node,['dst','src'])
                 dst,src=[self.eval(arg,context) for arg in byname]
@@ -558,7 +571,7 @@ class SliceAccess:
         if self.indirect_callee(callee):
             for arg in args:self.require(self.references(self.eval(arg,context)),arg,context,
                                           'verify an indirect call with a read-only slice')
-            return self.opaque_result(self.type(node,context),node)
+            return self.opaque_call(node,context)
         plan=self.r.resolve_call(node)
         if plan is None:
             candidates=self.r.procedure_candidates(callee)
@@ -571,7 +584,7 @@ class SliceAccess:
             for arg in args:
                 self.require(self.references(self.eval(arg,context)),node,context,
                     'verify an indirect or foreign call with a read-only slice')
-            return self.opaque_result(self.type(node,context),node)
+            return self.opaque_call(node,context)
         plan=candidates[0]
         alternatives=plan.symbol.candidates
         if any(any(a.kind in {'When','CompileSwitch'} for a in symbol.declaration.ancestors()) for symbol in alternatives):
@@ -586,6 +599,8 @@ class SliceAccess:
                 if index>=len(results):results.append(self.copied(incoming))
                 else:results[index].merge(incoming)
         if results:context.expressions[node,'results']=results
+        if plan.signature.data.get('optional_ok') or plan.signature.data.get('optional_allocator_error'):
+            context.expressions[node,'optional']=True
         return result or Value(self.type(node,context))
 
     def reference_builtin(self,callee,seen=None):
@@ -634,6 +649,30 @@ class SliceAccess:
                         result.fields[name.text]=self.opaque_result(self.r.field(typ,name.text)[0],node,seen)
         return result
 
+    def opaque_call(self,node,context):
+        plan=self.r.resolve_call(node)
+        candidates=self.r.procedure_candidates(node.role('callee'))
+        signature=plan.signature if plan else candidates[0][1] if len(candidates)==1 else None
+        if signature:
+            substitutions={**context.substitutions,**(plan.substitutions if plan else {})}
+            values=[self.opaque_result(self.r.type_node(annotation,substitutions),node)
+                    for _,annotation in self.r.fields(signature.role('results'))]
+            if values:return self.record_results(node,context,values,optional=bool(
+                signature.data.get('optional_ok') or signature.data.get('optional_allocator_error')))
+        return self.opaque_result(self.type(node,context),node)
+
+    def fresh_call_results(self,node,context,first):
+        plan=self.r.resolve_call(node)
+        candidates=self.r.procedure_candidates(node.role('callee'))
+        signature=plan.signature if plan else candidates[0][1] if len(candidates)==1 else None
+        if signature:
+            substitutions=plan.substitutions if plan else context.substitutions
+            fields=self.r.fields(signature.role('results'))
+            values=[first,*[Value(self.r.type_node(annotation,substitutions)) for _,annotation in fields[1:]]]
+            return self.record_results(node,context,values,optional=bool(
+                signature.data.get('optional_ok') or signature.data.get('optional_allocator_error')))
+        return first
+
     def active_definition(self,node,context):
         for parent in node.ancestors():
             if parent.kind!='When':continue
@@ -662,7 +701,7 @@ class SliceAccess:
                 self.require(bindings[index].data,sites[index],context,'pass a read-only slice to #mut parameter '+repr(name.text),[name])
         if not target or not target.role('body'):
             for value in bindings:self.require(self.references(value),node,context,'verify a foreign or bodyless slice call')
-            return self.opaque_result(self.type(node,context),node)
+            return self.opaque_call(node,context)
         result_references=any(self.contains_slice(self.r.type_node(annotation,plan.substitutions))
                               for _,annotation in self.r.fields(signature.role('results')))
         local_checks=bool(target.source.info.get('immutables') and self.r.generic_parameters(signature)
@@ -739,12 +778,20 @@ class SliceAccess:
                     self.publish(owner)
                 return self.globals.get(key,Value(typ))
             return Value(typ)
-        if node.kind in {'Paren','OrReturn','OrBranch','OrPanic','AutoCast'}:return self.eval(node.role('expr'),context)
+        if node.kind in {'Paren','OrReturn','OrBranch','OrPanic','AutoCast'}:
+            inner=node.role('expr');value=self.eval(inner,context)
+            values=context.expressions.get((inner,'results'))
+            if values is not None:
+                unwrap=node.kind in {'OrReturn','OrBranch','OrPanic'}
+                return self.record_results(node,context,values[:-1] if unwrap else values,
+                    optional=not unwrap and context.expressions.get((inner,'optional'),False))
+            return value
         if node.kind=='TypeAssertion':
             original=self.eval(node.role('expr'),context)
             result=self.copied(original);result.typ=typ
             if typ.kind not in {'slice','generic','unknown','union'}:result.data.clear()
             if typ.kind in {'struct','array','fixed'}:result=self.qualify(result,original.data)
+            self.record_results(node,context,[result,Value(Type('scalar','bool'))],optional=True)
             return result
         if node.kind=='FieldValue':return self.eval(node.role('value'),context)
         if node.kind=='Selector':
@@ -754,7 +801,9 @@ class SliceAccess:
             return value
         if node.kind=='Index':
             self.eval(node.role('index'),context)
-            return self.item(self.eval(node.role('expr'),context))
+            container=self.eval(node.role('expr'),context);result=self.item(container)
+            if container.typ.kind=='map':self.record_results(node,context,[result,Value(Type('scalar','bool'))],optional=True)
+            return result
         if node.kind=='Deref':return self.deref(self.eval(node.role('expr'),context))
         if node.kind=='Slice':
             value=self.eval(node.role('expr'),context)
@@ -799,26 +848,88 @@ class SliceAccess:
                 if expected and expected.name in {'any','rawptr'}:
                     self.require(self.references(incoming),element,context,'erase read-only slice permissions in an opaque element')
             return value
-        if node.kind in {'Ternary','WhenExpr','OrElse'}:
+        if node.kind=='OrElse':
+            first=node.role('x');value=self.eval(first,context)
+            values=context.expressions.get((first,'results'))
+            values=[self.copied(item) for item in values[:-1]] if values is not None else [self.copied(value)]
+            fallback=self.expression_results(node.role('y'),context,len(values))
+            for index,item in enumerate(fallback):
+                if index<len(values):values[index].merge(item)
+            return self.record_results(node,context,values)
+        if node.kind in {'Ternary','WhenExpr'}:
             self.eval(node.role('cond'),context)
+            selected=self.condition(node.role('cond'),context) if node.kind=='WhenExpr' else None
+            if selected is not None:
+                values=self.expression_results(node.role('x' if selected else 'y'),context)
+                return self.record_results(node,context,[self.copied(value) for value in values])
             result=Value(typ)
             for role in ('x','y'):result.merge(self.copied(self.eval(node.role(role),context)))
             return result
         if node.kind in {'SwitchExpr','CompileSwitchExpr'}:
-            result=Value(typ)
-            for case in node.data['cases']:result.merge(self.copied(self.eval(node.source.at(case['result'],node),context)))
-            return result
+            self.eval(node.role('selector'),context);results=[]
+            for case in self.switch_cases(node,context):
+                for match in case['matches']:self.eval(node.source.at(match,node),context)
+                arm=node.source.at(case['result'],node)
+                values=self.expression_results(arm,context)
+                if arm.kind=='SwitchBreak' or self.r.is_diverging_call(arm):continue
+                for index,value in enumerate(values):
+                    if index>=len(results):results.append(self.copied(value))
+                    else:results[index].merge(value)
+            if results and typ.kind not in {'unknown','generic'}:results[0].typ=typ
+            return self.record_results(node,context,results)
+        if node.kind=='SwitchResults':
+            return self.record_results(node,context,[self.eval(arg,context) for arg in node.group('args')])
         if node.kind=='Comprehension':
             loop=node.role('loop');self.bind_loop(loop,context)
             self.eval(node.role('cond'),context)
+            key=node.role('key')
+            if key:self.require(self.references(self.eval(key,context)),key,context,
+                                'preserve read-only slice references in a map key')
             value=self.eval(node.role('output'),context)
             if node.data.get('spread'):value=self.item(value)
+            if typ.kind=='set':self.require(self.references(value),node.role('output'),context,
+                                           'preserve read-only slice references in a Set key')
             return Value(typ,element=self.copied(value))
         # Operators, interpolation fields and other value expressions may call
         # mutating helpers even when their own result contains no references.
         for child in node.children:
             if child.kind not in {'Procedure','ProcedureType','ArrayType','StructType'}:self.eval(child,context)
         return Value(typ)
+
+    @staticmethod
+    def record_results(node,context,values,optional=False):
+        context.expressions[node,'results']=list(values)
+        context.expressions[node,'optional']=optional
+        return values[0] if values else Value()
+
+    def expression_results(self,node,context,count=None):
+        first=self.eval(node,context)
+        values=context.expressions.get((node,'results'),[first])
+        return values[:1] if count==1 and context.expressions.get((node,'optional')) else values
+
+    def switch_cases(self,node,context):
+        cases=node.data['cases']
+        if node.kind!='CompileSwitchExpr':return cases
+        selector=node.role('selector')
+        def constant(value):
+            boolean=self.condition(value,context)
+            return boolean if boolean is not None else value.source.constant_int(value)
+        selected=constant(selector) if selector else None
+        if selector and selected is None:return cases
+        default=None
+        for case in cases:
+            if not case['matches']:default=case;continue
+            for span in case['matches']:
+                match=node.source.at(span,node)
+                if selector:
+                    value=constant(match)
+                    matched=value==selected if value is not None else None
+                else:matched=self.condition(match,context)
+                # Keep conservative joins when specialization/native checking
+                # must select the branch. Never execute #run work in this pass.
+                if matched is None:return cases
+                if matched:return [case]
+        return [default] if default else []
 
     def bind_loop(self,node,context):
         value=self.eval(node.role('expr'),context)
@@ -906,12 +1017,10 @@ class SliceAccess:
         if node.kind=='Declaration':
             names,values=node.group('names'),node.group('values')
             if any(value.kind in {'Procedure','ProcedureType','StructType','EnumType','UnionType'} for value in values):return
+            incoming_values=self.expression_results(values[0],context,len(names)) if len(values)==1 else [self.eval(value,context) for value in values]
             for index,name in enumerate(names):
                 rhs=values[index] if index<len(values) else values[0] if len(values)==1 else None
-                incoming=self.eval(rhs,context)
-                if len(values)==1 and index>0:
-                    results=context.expressions.get((rhs,'results'),[])
-                    if index<len(results):incoming=results[index]
+                incoming=incoming_values[index] if index<len(incoming_values) else Value()
                 value=self.copied(incoming)
                 typ=self.r.type_node(node.role('type'),context.substitutions) if node.role('type') else value.typ
                 value.typ=self.substitute_type(typ,context.substitutions)
@@ -926,9 +1035,8 @@ class SliceAccess:
             return
         if node.kind=='Assignment' and node.data.get('op')!='in':
             left,right=node.group('lhs'),node.group('rhs')
-            incoming=[self.copied(self.eval(value,context)) for value in right]
-            if len(right)==1 and (right[0],'results') in context.expressions:
-                incoming=[self.copied(value) for value in context.expressions[right[0],'results']]
+            incoming=[self.copied(value) for value in (self.expression_results(right[0],context,len(left)) if len(right)==1 else
+                                                      [self.eval(value,context) for value in right])]
             for index,lhs in enumerate(left):
                 if lhs.text=='_':continue
                 target=self.eval(lhs,context)
@@ -960,12 +1068,14 @@ class SliceAccess:
             if not values:
                 for index,key in enumerate(context.named_results):
                     if key:self.changed|=context.results[index].merge(self.copied(context.env[key]))
-            for index,value in enumerate(values):
-                incoming=self.copied(self.eval(value,context))
+            returned=self.expression_results(values[0],context,len(context.results)) if len(values)==1 else [self.eval(value,context) for value in values]
+            for index,value in enumerate(returned):
+                incoming=self.copied(value)
                 while len(context.results)<=index:context.results.append(Value(incoming.typ))
                 self.changed|=context.results[index].merge(incoming)
             return
         if node.kind in {'When','If'}:
+            self.statement(node.role('init'),context)
             self.eval(node.role('cond'),context)
             selected=self.condition(node.role('cond'),context) if node.kind=='When' else None
             if selected is not False:self.statement(node.role('body'),context)

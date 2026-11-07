@@ -113,5 +113,44 @@ main::proc(){
         client.diagnostic(path.as_uri(),empty=True)
         self.assertFalse(any('#mut' in hint['label'] for hint in self.hints(client,path)))
 
+    def test_switch_and_comprehension_argument_errors_use_original_utf16_locations(self):
+        for expression in ['switch change(values){case 2:7;case:8}',
+                           'switch 2{case change(values):7;case:8}',
+                           'map[int]int{change(values)=x for x in 0..<1}']:
+            with self.subTest(expression=expression):
+                text='// 😀\npackage main\nchange::proc(data:[]int)->int{data[0]+=1;return data[0]}\nmain::proc(){values :> []int{1};/* 😀 */result:='+expression+';_=result}\n'
+                client,path=self.open(text)
+                errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+                relevant=[error for error in errors if 'read-only slice' in error['message']]
+                self.assertEqual(len(relevant),1,errors)
+                self.assertTrue(any(error['range']['start']==self.position(text,'values)',0) for error in relevant),errors)
+                self.assertTrue(any(note['location']['range']['start']==self.position(text,'data[0]+=1',0)
+                                    for error in relevant for note in error.get('relatedInformation',[])),errors)
+                self.assertNotIn('Thor expression',json.dumps(errors))
+                corrected=text.replace('values :>','values :=')
+                client.notifications.clear()
+                client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':corrected}]})
+                client.diagnostic(path.as_uri(),empty=True)
+
+    def test_parenthesized_optional_tuple_errors_and_status_hovers_recover_unsaved(self):
+        text='''// 😀
+package main
+pair::proc(values:[]int)->(int,[]int,bool){return 7,values,true}
+main::proc(){values :> []int{1};_,view :> (pair(values) or_panic);/* 😀 */view[0]=9}
+'''
+        client,path=self.open(text)
+        errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+        self.assertTrue(any(error['range']['start']==self.position(text,'view[0]',0) for error in errors),errors)
+        corrected=text.replace('view[0]=9','_=view[0]')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':corrected}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        status='package main\nmain::proc(){values,err :> make([]int,1);if err!=nil{panic("allocation")};defer delete(values);copy:=err;_=copy}\n'
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':3},'contentChanges':[{'text':status}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        hover=self.hover(client,path,status,'err :>')['contents']['value']
+        self.assertIn('Allocator_Error',hover)
+
 
 if __name__=='__main__':unittest.main()

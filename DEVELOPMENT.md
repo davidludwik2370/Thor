@@ -34,6 +34,9 @@ npm run package
 ```
 
 Run `python3 tools/test_vscode.py` from the root for the isolated VS Code test.
+The automated completion tests apply real provider edits without depending on
+background-window keyboard focus. Add `--interactive-typing` to exercise the
+suggestion widget in a foreground test window.
 Use **Thor: Restart Language Server** after rebuilding TLS. Install the local
 VSIX when extension code, grammar, or settings change.
 
@@ -3762,6 +3765,8 @@ checks. The full UI harness remains limited by its existing simulated typing
 step for selective-import suggestions: the typing command leaves the document
 unchanged in this environment. Programmatic completion and all live LSP import
 coverage pass. This is recorded separately from the focused editor result.
+The background typing limitation is resolved in the 0.40.1 test harness below;
+real keyboard/widget simulation remains an explicit foreground option.
 TLS was rebuilt and the local VSIX was packaged/installed as version 0.21.0.
 
 
@@ -3779,3 +3784,73 @@ live TLS, assertion-hygiene and basic-library cases pass. Another 88 default
 callback, comprehension, graph-clone and pure-call interaction cases pass. The
 focused VS Code suite passes with TLS refresh responses enabled. No upstream
 compiler binary or ordinary Thor build flag defaults were changed.
+
+## General hardening (Thor 0.40.1)
+
+Review all changes since the previous general purity audit (`d012351`, 0.33.3),
+including confined local mutation, dynamic pure results, nonreturning switches,
+selected-import inference, concatenation, `or_panic`, arenas, run/debug directories,
+hashing, string conversions, comprehensions and read-only slice access. The
+[hardening report](docs/hardening-2026-11.md) maps each feature to its public
+contract and test coverage, and records the remaining conservative boundaries.
+
+Fix access-analysis traversal through runtime switch selectors/case matches,
+if initializers and map-comprehension keys. Apply the existing map/Set key
+reference boundary to comprehensions. Propagate each multiple result through
+parentheses, forwarding, optional unwrapping, sole-call argument expansion and
+opaque callbacks. Keep lookup/assertion Boolean statuses and allocation/helper
+error statuses independent from the first result's slice permissions. Retain
+trusted runtime allocator-error enum facts, including namespace/type aliases,
+without opening the compiler runtime as general SDK source or trusting unrelated
+same-named user types. Statically selected `when`/`#switch` arms supply their own
+provenance; unresolved native conditions retain conservative joins without
+scheduling new compile-time evaluation.
+
+Anchor access-check tokens to the actual original operation before diagnostic
+deduplication. Generated type-query/runtime repetitions now produce one precise
+argument/write underline. Live TLS checks verify UTF-16 positions after Unicode,
+related mutation notes, status hovers and recovery without saving. Real CodeLLDB
+cases step into map-comprehension key calls and parenthesized optional tuples,
+then verify original source lines and scalar locals.
+
+Move required editor edits/run commands out of assertion predicates and extend
+the maintenance guard. Repair the full editor test's background-window typing
+dependency: its default completion path uses the real client provider and edit
+ranges, while `--interactive-typing` retains an optional foreground widget test.
+The full VS Code suite now completes, covering comment-toggle bracket repair,
+rename, inlays, completion, hovers, unsaved errors and source mapping. No editor
+product change or extension reinstall is needed for these harness changes.
+
+The new checked/unchecked runtime integration combines confined pure mutation,
+independent dynamic `#run` results, `++`, constant/runtime comprehensions,
+read-only views, optional scalar statuses, arenas, hash/string conversions,
+big numbers and f-string formatting. It checks output and tracker/ASan reports
+with assertions disabled as well as in checked debug. Extend the slice-access
+demo with multiple-result views, status copies and inactive-arm behavior.
+
+Validation: both large demos and the extended slice-access demo pass checked
+`-debug` and optimized `-disable-assert -no-bounds-check -no-type-assert` builds
+with allocation tracking and no tracker/ASan reports. The slice demo also passes
+with the ordinary installed Odin invocation. Native TLS passes all 1,150 tests
+in each of checked and unchecked configurations; all 140 Node tests pass. The
+full isolated VS Code suite and end-to-end VS Code run/debug suite pass. The
+Finder launch integration, normally opt-in, passes separately.
+
+The complete Python matrix ran all 1,696 discovered cases in three groups
+(526, 593 and 577), including 39 CodeLLDB/DAP cases. The 526- and 577-case groups
+passed cleanly. The 593-case group found the SDK-overlay metadata regression
+described below and skipped the opt-in Finder check. After the correction, all
+60 compilation, diagnostic-hardening and slice-access live-TLS cases passed on
+rerun, including that overlay test. Finder passed separately. There are no
+retained failing or expected-failure cases from this audit.
+
+Both full matrix runs used a temporary Odin wrapper adding `-thread-count:1`
+to native compiler invocations, isolating the previously documented upstream
+parallel-codegen race. The installed compiler and Thor's ordinary flag defaults
+were not changed. The original 1,675-case baseline also passed (one opt-in skip).
+This batch adds 21 test methods, with additional accepted/rejected subcases.
+
+The full regression run caught a compatibility error in this new diagnostic
+anchoring: native SDK overlay source records intentionally omit Thor-only
+blocked-expression tables. Use an empty table for those metadata-only records;
+the existing unsaved SDK/source-resource integration test exercises that path.

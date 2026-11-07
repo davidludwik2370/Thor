@@ -45,13 +45,16 @@ Run:
 python3 -m unittest tests.test_assertion_hygiene
 ```
 
-The six tests cover:
+The seven tests cover:
 
 - Native implementation conditions and messages, using the real frontend AST.
   Calls must appear on a reviewed list of read-only operations. File build tags
   are neutralized during this check so other platforms are examined too.
 - Python implementation assertions, including hidden calls and assignment,
   await/yield expressions.
+- Required JavaScript editor-test edits, file setup and run commands. These
+  execute before assertions inspect their results; intentional failure tests
+  using `assert.rejects`/`assert.throws` remain supported.
 - Regression examples containing nested/multiline mutations, assertion message
   calls, contextless assertions and allocating interpolation. Comments and
   quoted text are excluded by parsing.
@@ -72,3 +75,8 @@ Validation also includes all 1,133 native TLS tests under
 with assertions disabled, and isolated VS Code standalone-run and CodeLLDB
 integration suites. The evaluation, walkthrough and basic-library demos are
 checked in ordinary optimized and fully unchecked release builds.
+
+The 0.40.1 hardening pass also removed required `applyEdit` and `runProject`
+operations from editor-test assertion arguments. The complete editor suite and
+1,150 native TLS tests now pass with the extended guard; see the
+[November hardening report](hardening-2026-11.md) for the current results.

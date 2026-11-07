@@ -329,6 +329,19 @@ class Resolver:
             return Type(node=n)
         seen.add(key)
         kind = n.kind
+        # The runtime namespace is intentionally not loaded as ordinary SDK
+        # source. Its allocator status is nevertheless a known enum, rather
+        # than an unknown value which might contain slice references.
+        imported=None
+        if kind=='Selector' and n.role('field').text=='Allocator_Error' and n.role('expr').kind=='Ident' and self.lookup(n.role('expr').text,n.role('expr')) is None:
+            imported=(n.source.imports.get(n.role('expr').text),n.role('field').text)
+        elif kind=='Ident' and n.source.selected.get(n.text,'').endswith('.Allocator_Error') and self.lookup(n.text,n) is None:
+            namespace,name=n.source.selected[n.text].split('.',1)
+            imported=(n.source.imports.get(namespace),name)
+        if imported==('base:runtime','Allocator_Error'):
+            directory=n.source.import_dir(imported[0]);root=n.source.info.get('odin_root')
+            if directory is None or root and directory==(Path(root)/'base/runtime').resolve():
+                return Type('enum','Allocator_Error',witness=('type',n))
         if kind=='Comprehension':return n.source.comprehensions.result_type(n,seen)
         if kind=='Call' and self.native_builtin(n.role('callee'),'type_of') and len(n.group('args'))==1:
             return self.type_of(n.group('args')[0],seen)
@@ -418,8 +431,10 @@ class Resolver:
         return Type(node=n)
 
     def result_type(self, n, index, seen=None):
-        if n.kind == 'Paren': return self.result_type(n.role('expr'), index, seen)
-        if n.kind == 'OrPanic': return self.result_type(n.role('expr'), index, seen)
+        if n.kind in {'Paren','OrPanic','OrReturn','OrBranch','AutoCast'}: return self.result_type(n.role('expr'), index, seen)
+        if n.kind=='OrElse':return self.result_type(n.role('x'),index,seen)
+        if index==1 and (n.kind=='TypeAssertion' or n.kind=='Index' and self.type_of(n.role('expr')).kind in {'map','generic','unknown'}):
+            return Type('scalar','bool',n)
         if n.kind == 'SwitchResults':
             args = n.group('args')
             return self.type_of(args[index], seen) if index < len(args) else Type(node=n)
@@ -435,6 +450,9 @@ class Resolver:
             target=self.type_node(n.role('callee'))
             if target.kind in {'big_integer','big_rational'}:
                 return Type('scalar','bool',n) if index else target
+            extrema=n.source.expressions.extrema.plan(n)
+            if index==1 and extrema and extrema[2]:return Type('scalar','bool',n)
+            if index==1 and self.native_builtin(n.role('callee'),'make'):return Type('enum','Allocator_Error')
             plan = self.resolve_call(n)
             results = self.fields(plan.signature.role('results')) if plan else []
             if index < len(results): return self.type_node(results[index][1], plan.substitutions)
@@ -481,6 +499,8 @@ class Resolver:
                 return replace(self.type_node(symbol.annotation), witness=n)
             if symbol.value:
                 from .switches import unwrap
+                if symbol.declaration.kind=='Declaration' and symbol.index and len(symbol.declaration.group('values'))==1:
+                    return replace(self.result_type(symbol.value,symbol.index,seen),witness=n)
                 if unwrap(symbol.value).kind in {'SwitchExpr','CompileSwitchExpr'}:
                     index = symbol.index if len(symbol.declaration.group('values')) == 1 else 0
                     return replace(self.result_type(symbol.value,index,seen),witness=n)

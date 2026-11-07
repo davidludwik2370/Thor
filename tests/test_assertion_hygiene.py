@@ -67,6 +67,13 @@ def python_issues(tree):
     return issues
 
 
+def editor_issues(text):
+    # Deliberately narrow guard for required editor/test setup. Operations in
+    # assert.rejects/throws callbacks are intentional failure tests.
+    return re.findall(r'assert\.(?!rejects\b|throws\b)\w+\([^;]*?'
+                      r'\b(applyEdit|runProject|writeFileSync|mkdirSync|unlinkSync|renameSync|executeCommand)\s*\(', text)
+
+
 class AssertionHygieneTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -98,6 +105,14 @@ class AssertionHygieneTests(unittest.TestCase):
             for path in sorted((ROOT/directory).glob('*.py')):
                 with self.subTest(path=path.relative_to(ROOT)):
                     self.assertEqual(python_issues(ast.parse(path.read_text())), [])
+
+    def test_editor_assertions_do_not_perform_required_work(self):
+        for path in sorted((ROOT/'editors/vscode/test').glob('*.js')):
+            with self.subTest(path=path.name):
+                self.assertEqual(editor_issues(path.read_text()), [])
+        self.assertEqual(editor_issues('assert.ok(await vscode.workspace.applyEdit(edit));'), ['applyEdit'])
+        self.assertEqual(editor_issues('assert.equal(await runProject(vscode),terminal);'), ['runProject'])
+        self.assertEqual(editor_issues('assert.rejects(()=>runProject(vscode));'), [])
 
     def test_guard_detects_nested_operations_messages_and_contextless_asserts(self):
         for statement, target in [

@@ -32,6 +32,10 @@ tail :: proc(values: []int) -> []int {
     return values[1:]
 }
 
+optional_tail :: proc(values: []int) -> (int, []int, bool) {
+    return len(values)-1, values[1:], len(values)>1
+}
+
 Row :: struct {count: int, items: []int}
 
 main :: proc() {
@@ -97,6 +101,23 @@ main :: proc() {
     fixed_copy[0] = 99
     fixed_view :> fixed[:2]
     if sum(fixed_view) != 30 || fixed[0] != 10 { panic("fixed arrays") }
+
+    println("Multiple results preserve each view; statuses are scalar values.")
+    count_tail, tail_view :> (optional_tail(view) or_panic)
+    if count_tail != 2 || tail_view[0] != 2 { panic("optional tuple") }
+    // tail_view[0] = 0 // Rejected, including through parentheses/or_panic.
+    // _, writable := optional_tail(view) or_panic // Also rejected.
+
+    allocated, error :> make([]int, 1)
+    if error != nil { panic("allocation failed") }
+    defer delete(allocated)
+    copied_status := error // Independent enum; not an alias to allocated.
+    if copied_status != nil { panic("status copy") }
+
+    // Compile-time selection does not inherit an inactive arm's restriction.
+    selected := output when true else view
+    selected[0] = 10 // output still owns the shared allocation.
+    if output[0] != 10 || view[0] != 9 { panic("selected writable view") }
 
     println("slice access demo passed")
 }

@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--code', default=shutil.which('code') or '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code')
     parser.add_argument('--standalone-run', action='store_true', help='test running a file with no workspace folder')
     parser.add_argument('--scope', choices=['full','slice-access'], default='full', help='select the full editor suite or slice access checks')
+    parser.add_argument('--interactive-typing', action='store_true', help='also exercise the suggestion widget; requires a foreground editor window')
     options = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='thor-vscode-') as directory:
         temporary = Path(directory)
@@ -32,6 +33,7 @@ def main():
                 f'--extensionTestsPath={ROOT / "editors/vscode/test" / suite}', str(target)]
         completed = subprocess.run(args, env={**os.environ, 'THOR_VSCODE_TEST_RESULT': str(result_file),
                                               'THOR_VSCODE_TEST_SCOPE':options.scope,
+                                              'THOR_VSCODE_INTERACTIVE_TYPING':'1' if options.interactive_typing else '0',
                                               'THOR_VSCODE_TEST_SOURCE':str(target)}, timeout=180)
         if not result_file.exists():
             raise SystemExit(f'VS Code did not report test results (exit {completed.returncode})')
