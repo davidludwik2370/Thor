@@ -12,6 +12,8 @@ square :: proc(x: int) -> int {return x*x}
 // length determines the native fixed-array type. There is no runtime owner.
 EVEN_SQUARES :: [square(x) for x in 0..<10 if x%2==0]
 
+maybe_number :: proc(x: int) -> (int, bool) {return x*10,x>0}
+
 main :: proc() {
     println("Thor collection comprehensions")
 
@@ -23,6 +25,12 @@ main :: proc() {
     defer delete(squares)
     if len(squares)!=3 || squares[0]!=4 || squares[2]!=9 {panic("filtered slice")}
     if EVEN_SQUARES!=[0,4,16,36,64] {panic("compile-time fixed array")}
+
+    // An output is one value after normal error/ok handling. The call runs
+    // once per item; or_else evaluates its fallback only on failure.
+    recovered := [maybe_number(x) or_else 2 for x in [-1,0,1]]
+    defer delete(recovered)
+    if len(recovered)!=3 || recovered[0]!=2 || recovered[1]!=2 || recovered[2]!=10 {panic("optional output")}
 
     // Pick the destination explicitly. Slices and dynamic arrays preserve
     // duplicates; sets remove them. Map entries use key = value, and the last

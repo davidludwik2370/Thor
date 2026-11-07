@@ -31,6 +31,24 @@ The explicit element type supplies normal literal/record/enum context. An
 expected slice type also supplies context to a bare runtime comprehension.
 Typed values retain Odin's usual conversion requirements.
 
+## Handling a value and status
+
+Normal `or_else` handling works in the output expression:
+
+```odin
+my_proc :: proc(a:int)->(int,bool) {return a*10,a>0}
+my_ary := [-1,0,1,2]
+x := [my_proc(a) or_else 2 for a in my_ary] // []int{2,2,10,20}
+defer delete(x)
+```
+
+The call runs once per accepted item, and the fallback runs only on failure.
+The status can be a Boolean or a nil-comparable error, following Odin's normal
+`or_else` rules. The resulting element has the procedure's value type, with the
+usual literal coercion for its fallback. Eligible calls also work in compile-time
+comprehensions and pure-function bodies. This unwraps a value/status pair into
+one element; it does not add tuple elements or multiple iteration bindings.
+
 ## Flattening and merging
 
 Use a leading `..` for all unpacking in a comprehension:

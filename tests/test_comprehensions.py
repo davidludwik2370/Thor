@@ -342,6 +342,113 @@ delete(r)
     def test_multiple_result_iterators_have_a_source_diagnostic(self):
         self.invoke(self.program('_=[x for x in step()]','step::proc()->(int,bool){return 1,false}\n'),command='check',fail='iterator procedures with multiple results')
 
+    def test_or_else_unwraps_output_once_with_lazy_fallback(self):
+        text=self.program('''
+values:=[-1,0,1,2]
+x:=[my_proc(a) or_else fallback(a) for a in values]
+defer delete(x)
+if len(x)!=4||x[0]!=2||x[1]!=2||x[2]!=10||x[3]!=20||calls!=4||fallbacks!=2 {panic("optional output")}
+empty:=[my_proc(a) or_else fallback(a) for a in values if false]
+defer delete(empty)
+if len(empty)!=0||calls!=4||fallbacks!=2 {panic("filtered calls")}
+''','''
+calls,fallbacks:int
+my_proc::proc(a:int)->(int,bool){calls+=1;return a*10,a>0}
+fallback::proc(a:int)->int{fallbacks+=1;return 2}
+''')
+        for flags in [[],['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):self.invoke(text,flags=flags)
+
+    def test_or_else_nil_error_generic_and_grouped_calls(self):
+        self.invoke(self.program('''
+values:=[i8(0),1,2]
+x:=[(get(a)) or_else 2 for a in values];defer delete(x)
+if type_of(x)!=[]i8||x[0]!=2||x[1]!=1||x[2]!=2 {panic("generic bool status")}
+y:=[parse(a) or_else 2 for a in values];defer delete(y)
+if type_of(y)!=[]int||y[0]!=2||y[1]!=10 {panic("error status")}
+z:=[pointer_error(a) or_else 2 for a in values];defer delete(z)
+if z[0]!=2||z[1]!=10 {panic("pointer error status")}
+''','''
+Failure::enum{Invalid}
+Status::union{Failure}
+failure:Failure
+pointer_error::proc(a:i8)->(int,^Failure){if a==0{return 0,&failure};return int(a)*10,nil}
+get::proc(a:$T)->(T,bool) #optional_ok{return a,a>0}
+parse::proc(a:i8)->(int,Status){if a==0{return 0,Failure.Invalid};return int(a)*10,nil}
+'''))
+
+    def test_or_else_in_typed_outputs_keys_filters_and_flattening(self):
+        self.invoke(self.program('''
+values:=[-1,0,1,2]
+a:=[]int{get(x) or_else 2 for x in values};defer delete(a)
+b:=[dynamic]int{get(x) or_else 2 for x in values};defer delete(b)
+c:=set[int]{get(x) or_else 2 for x in values};defer delete(c)
+d:=map[int]int{get(x) or_else 2=x for x in values};defer delete(d)
+e:=[x for x in values if accept(x) or_else false];defer delete(e)
+f:=[..pair(x) or_else [7,8] for x in values];defer delete(f)
+if a[0]!=2||b[3]!=2||len(c)!=2||d[2]!=2||len(e)!=2||e[0]!=1||len(f)!=8||f[0]!=7||f[4]!=1 {panic("optional combinations")}
+''','''
+get::proc(x:int)->(int,bool){return x,x>0}
+accept::proc(x:int)->(bool,bool){return x>0,x>0}
+pair::proc(x:int)->([2]int,bool){return {x,x+1},x>0}
+'''))
+
+    def test_or_else_in_compile_time_comprehensions_and_pure_results(self):
+        self.invoke(self.program('''
+if VALUES!=[2,2,10,20]||type_of(VALUES)!=[4]int {panic("constant optional")}
+runtime_input:=[-1,0,1,2]
+a:=collect(runtime_input);defer delete(a)
+b:=#run collect([-1,0,1,2]);defer delete(b)
+if a[2]!=10||b[0]!=2 {panic("pure optional")}
+''','''
+get::proc(x:int)->(int,bool){return x*10,x>0}
+VALUES::[get(a) or_else 2 for a in [-1,0,1,2]]
+collect::fn(values:[4]int)->[]int{return [get(a) or_else 2 for a in values]}
+'''),flags=['-debug'])
+
+    def test_or_else_native_library_and_collection_source(self):
+        self.invoke(self.program('''
+words:=["7","invalid","12"]
+x:=[strconv.parse_int(word) or_else 2 for word in words];defer delete(x)
+y:=[v*2 for v in source(false) or_else [1,2]];defer delete(y)
+if x[0]!=7||x[1]!=2||x[2]!=12||y[0]!=2||y[1]!=4 {panic("native optional")}
+''','import "core:strconv"\nsource::proc(ok:bool)->([2]int,bool){return {3,4},ok}\n'))
+
+    def test_or_else_map_lookup_and_optional_fallback_call(self):
+        self.invoke(self.program('''
+values:=[0,1,2]
+table:map[int]int;table[1]=7;defer delete(table)
+a:=[table[x] or_else 2 for x in values];defer delete(a)
+b:=[get(x) or_else backup(x) for x in values];defer delete(b)
+c:=[(get(x) or_else 2)+1 for x in values];defer delete(c)
+if a[0]!=2||a[1]!=7||b[0]!=9||b[1]!=1||c[0]!=3||c[2]!=3 {panic("optional contexts")}
+''','get::proc(x:int)->(int,bool){return x,x>0}\nbackup::proc(x:int)->(int,bool) #optional_ok{return 9,true}\n'))
+
+    def test_optional_values_inside_helpers_keep_runtime_calls_and_constant_types(self):
+        text=self.program('''
+x:=[(get(a) or_else 2)**2 for a in [0,1,2]];defer delete(x)
+if calls!=3||x[0]!=4||x[1]!=100||x[2]!=400 {panic("optional power")}
+y:=[get(a) or_panic for a in [1,2]];defer delete(y)
+if calls!=5||y[0]!=10||y[1]!=20 {panic("optional panic")}
+z:=[switch {case true:get(a) or_else 2;case:3} for a in [0,1,2]];defer delete(z)
+if calls!=8||z[0]!=2||z[1]!=10||z[2]!=20 {panic("optional switch")}
+''','calls:int\nget::proc(x:int)->(int,bool){calls+=1;return x*10,x>0}\n')
+        for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):self.invoke(text,flags=flags)
+        self.invoke(self.program('if VALUES!=[4,100,400]{panic("constant optional power")}','''
+get::proc(x:int)->(int,bool){return x*10,x>0}
+VALUES::[(get(a) or_else 2)**2 for a in [0,1,2]]
+'''))
+
+    def test_or_else_fallback_error_points_to_original_expression(self):
+        text=self.program('values:=[1,2];x:=[get(a) or_else "wrong" for a in values];_=x',
+                          'get::proc(a:int)->(int,bool){return a,true}\n')
+        _,result=self.invoke(text,command='check',flags=['--diagnostic-format=json'],fail='wrong')
+        errors=json.loads(result.stdout or result.stderr)['errors']
+        failures=[e for e in errors if 'wrong' in str(e['msgs'])]
+        self.assertTrue(failures,errors)
+        self.assertTrue(any(e['pos']['offset']==text.index('"wrong"') for e in failures),failures)
+
     def test_original_diagnostics(self):
         text=self.program('values:=[1,2]\nx:=[missing(v) for v in values];_=x')
         _,result=self.invoke(text,command='check',flags=['--diagnostic-format=json'],fail='Undeclared name: missing')

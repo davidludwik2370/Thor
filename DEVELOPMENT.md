@@ -3673,3 +3673,34 @@ The dedicated commented demo, the main walkthrough and the original task demo
 are exercised with debug tracking/ASan and unchecked release flags. References
 are docs/comprehensions.md and examples/comprehensions/demo.thor; common runtime
 output and TLS are rebuilt.
+
+## Optional-value comprehension outputs (Thor 0.39.1)
+
+`[my_proc(a) or_else 2 for a in values]` now preserves its value/status pair
+until native `or_else` handles it. The type-only comprehension query previously
+replaced every resolved call with its first result, prematurely dropping that
+status. A contextless, unevaluated pair witness now retains both types when a
+call is actually the operand of an optional unwrap, including through grouping.
+Fallback expressions remain single-value contexts. Runtime calls and fallbacks
+keep native exact-once/lazy behavior; no tuple elements or additional iterator
+bindings are introduced.
+
+Nested power/switch/optional helpers also receive distinct type-query identities.
+Without that separation, a helper body built from zero-value type witnesses
+could be reused for the real runtime expression, losing calls and their effects.
+Package-level query helpers have a contextless entry and an internal default
+context for type checking; they are never executed. Query state is restored even
+if binding inference raises. TLS now resolves an or_else call to the specialized
+value result rather than exposing its entire procedure signature, while keeping
+native builtin/load/map-lookup handling.
+
+Validation passes 43 comprehension compiler cases plus six assertion-hygiene
+cases, 15 comprehension/or_panic TLS cases, 59 related optional/logical-number
+cases, and a CodeLLDB breakpoint/step/variable test with optional output nested
+inside power. New checks cover bool, nil-error-union and pointer-error status,
+generics, optional flags, grouped calls, lazy side-effectful fallbacks, filters,
+typed destinations, map keys/lookups, flattening, library parsing, pure/#run and
+constant construction, nested expression helpers, and mapped invalid fallbacks
+with unsaved editor recovery. Checked/debug/ASan and assertion/bounds/type-check-
+disabled builds pass; the commented demo and specification include the example.
+Shared runtime output and the local TLS server are rebuilt.

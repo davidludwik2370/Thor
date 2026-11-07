@@ -132,6 +132,58 @@ _=explicit;_=contextual
                 self.assertIn('[]int',json.dumps(self.hover(client,main,repaired,'result}')))
                 self.assert_original_identifier_tokens(main,repaired,self.semantic_spans(client,main,repaired))
 
+    def test_optional_outputs_hover_and_rename_the_original_binding(self):
+        text='''package main
+get::proc(a:$T)->(T,bool){return a,a>0}
+main::proc(){
+values:=[i8(0),1]
+result:>[get(a) or_else 2 for a in values]
+_=result
+}
+'''
+        client,main=self.open(text,compiler=False)
+        self.assertIn('[]i8',json.dumps(self.hover(client,main,text,'result\n')))
+        params={'textDocument':{'uri':main.as_uri()},'position':self.position(text,'get(a)',4)}
+        self.assertIsNotNone(client.request('textDocument/prepareRename',params))
+        edit=client.request('textDocument/rename',{**params,'newName':'item'})
+        changes=edit.get('changes',{}).get(main.as_uri(),[])
+        if not changes:changes=[e for change in edit.get('documentChanges',[]) for e in change.get('edits',[])]
+        self.assertEqual(len(changes),2,edit)
+        self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+
+    def test_optional_fallback_diagnostic_and_unsaved_recovery(self):
+        text='''package main
+get::proc(a:int)->(int,bool){return a,a>0}
+main::proc(){
+values:=[0,1]
+result:=[get(a) or_else "wrong" for a in values]
+_=result
+}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='wrong')
+        self.assertTrue(any(e['range']['start']==self.position(text,'"wrong"',0) for e in errors),errors)
+        fixed=text.replace('"wrong"','2')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertIn('[]int',json.dumps(self.hover(client,main,fixed,'result\n')))
+
+    def test_native_optional_builtins_keep_their_value_types(self):
+        text='''package main
+main::proc(){
+text:=#load("optional.txt") or_else []u8{}
+items:=make([]int,2) or_else nil
+map_values:map[int]int
+found:=map_values[0] or_else 2
+_=text;_=items;_=found
+}
+'''
+        client,main=self.open(text,compiler=False,files={'optional.txt':'hello'})
+        for word,typ in [('text;','[]u8'),('items;','[]int'),('found\n','int')]:
+            with self.subTest(word=word):
+                self.assertIn(typ,json.dumps(self.hover(client,main,text,word)))
+
     def test_diagnostics_and_unsaved_recovery(self):
         text='package main\nmain::proc(){\nvalues:=[1,2]\nresult:=[missing(x) for x in values]\n_=result\n}\n'
         client,main=self.open(text)

@@ -53,10 +53,12 @@ class Comprehensions:
     def query(self,node):
         s=self.s;s.needs_intrinsics=s.needs_default=True
         self.querying+=1
-        aliases=self.bindings(node)
-        s.expressions.captures.append(aliases)
-        try:yield
-        finally:s.expressions.captures.pop();self.querying-=1
+        try:
+            aliases=self.bindings(node)
+            s.expressions.captures.append(aliases)
+            try:yield
+            finally:s.expressions.captures.pop()
+        finally:self.querying-=1
 
     def type_code(self,node,expected=None):
         s=self.s;annotation=node.role('type')
@@ -89,7 +91,16 @@ class Comprehensions:
                     elif call.kind=='Call' and s.resolver.resolve_call(call):
                         code=s.render(call)
                         replaced[call]=None
-                        s.run_values[call]=f'({s.prefix}meta.type_proc_return_type(type_of({s.prefix}meta.procedure_of({code})),0)){{}}'
+                        signature=s.signature(call)
+                        operand,parent=call,call.parent
+                        while parent and parent.kind=='Paren':operand,parent=parent,parent.parent
+                        optional=(parent and parent.kind in {'OrElse','OrPanic','OrReturn','OrBranch'}
+                                  and parent.role('x' if parent.kind=='OrElse' else 'expr') is operand)
+                        count=len(s.fields(signature.role('results'))) if signature else 0
+                        def result(index):
+                            return f'({s.prefix}meta.type_proc_return_type(type_of({s.prefix}meta.procedure_of({code})),{index})){{}}'
+                        s.run_values[call]=(f'{self.module()}.optional_pair({result(0)},{result(1)})'
+                                            if optional and count==2 else result(0))
                 output=s.render(node.role('output'))
             finally:
                 for call in replaced:s.run_values.pop(call,None)

@@ -105,6 +105,8 @@ class Expressions:
         lifetime=self.fstrings.current
         if lifetime:name+='_fstrings'
         if self.switches.global_context: name += '_global'
+        comprehension_query=getattr(getattr(s,'comprehensions',None),'querying',0)
+        if comprehension_query:name+='_type_query'
         scope=self.helper_scope(node)
         key=scope,name
         variables={}
@@ -160,6 +162,11 @@ class Expressions:
             finally:
                 self.captures.pop()
             convention=' "odin"' if self.has_context(node) and not self.switches.global_context and not contextless else ' "contextless"'
+            if comprehension_query and not any(a.kind=='Procedure' for a in node.ancestors()):
+                # Package-level type queries have no caller context. These
+                # helpers are never executed and must not share runtime bodies.
+                convention=' "contextless"'
+                body=f'context = {self.module("comprehension_runtime","base:runtime")}.default_context()\n'+body
             returns=(' -> (value: '+result_type+', ok: bool) #optional_ok' if optional_ok else ' -> '+result_type) if result_type else ''
             if returns and optional_tag:returns+=' #'+optional_tag
             privacy='@(private="file")\n' if scope is s.root else ''

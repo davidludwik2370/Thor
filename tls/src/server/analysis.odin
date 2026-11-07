@@ -2063,6 +2063,16 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 		}
 		return ok
 	case ^ast.Or_Else_Expr:
+		if call,found:=get_completed_call(v.x);found {
+			old_call:=ast_context.call
+			ast_context.call=call
+			defer ast_context.call=old_call
+			callee:Symbol
+			if internal_resolve_type_expression(ast_context,call.expr,&callee) {
+				results:=get_proc_return_types(ast_context,callee,call,true)
+				if len(results)>0 {return internal_resolve_type_expression(ast_context,results[0],out)}
+			}
+		}
 		ok := internal_resolve_type_expression(ast_context, v.x, out)
 		return ok
 	case ^ast.Deref_Expr:

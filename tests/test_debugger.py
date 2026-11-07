@@ -142,6 +142,38 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_comprehension_or_else_breakpoint_and_step_into_the_real_call(self):
+        text='''package main
+get::proc(value:int)->(int,bool) {
+    return value*2,value>0
+}
+main::proc(){
+    values:=[(get(x) or_else 2)**2 for x in 0..<3]
+    last:=values[2]
+    delete(values)
+    if last!=16 {panic("optional comprehension")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6,7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[2,3],frame)
+        self.assertIn('get',frame['name'])
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['line'],8,frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'last','context':'watch'})
+        self.assertEqual(value['result'],'16',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_constant_concatenation_keeps_original_breakpoints_and_step_lines(self):
         text='''package main
 A::[1,2]

@@ -18,6 +18,9 @@ second_native :: proc "contextless"(value:$S)->int where !intrinsics.type_is_map
 second :: proc{second_map,second_native}
 second_enum :: proc "contextless"(value:[$I]$T)->I {return {}}
 
+// Unevaluated type queries must keep the status until or_else consumes it.
+optional_pair :: proc "contextless"(value:$T,status:$S)->(T,S) {return value,status}
+
 // A few Odin allocators return (nil,nil) to refuse storage. Normalize this at
 // the allocation boundary before native map/dynamic-array code uses the bytes.
 // Adapters are stack-local and never escape in a returned container's header.
