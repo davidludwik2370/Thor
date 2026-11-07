@@ -96,6 +96,48 @@ class SourceMap:
             end = min(end, start + max(length, 1))
         return Origin(file, start, end, kind, exact)
 
+    def rewrite(self, raw, edits):
+        """Edit emitted source while retaining existing debug regions."""
+        edits = sorted(edits, key=lambda item: item[0])
+        segments, chunks = [], []
+        cursor = output_offset = 0
+
+        def copied(start, end):
+            nonlocal output_offset
+            chunks.append(raw[start:end])
+            for a, b, file, first, last, kind, exact in self.segments:
+                low, high = max(a, start), min(b, end)
+                if low >= high:
+                    continue
+                origin_start = first + low-a if exact else first
+                origin_end = origin_start + high-low if exact else last
+                segments.append([output_offset+low-start, output_offset+high-start,
+                                 file, origin_start, origin_end, kind, exact])
+            output_offset += end-start
+
+        for start, end, text, origin in edits:
+            if start < cursor or end < start:
+                raise ValueError('Overlapping generated-source edits')
+            copied(cursor, start)
+            encoded = text.encode('utf-8')
+            chunks.append(encoded)
+            if encoded:
+                segments.append([output_offset, output_offset+len(encoded), origin.file,
+                                 origin.start, origin.end, origin.kind, False])
+            output_offset += len(encoded)
+            cursor = end
+        copied(cursor, len(raw))
+
+        def shifted(offset, include_boundary):
+            return offset + sum(len(text.encode('utf-8')) - (end-start)
+                                for start, end, text, _ in edits
+                                if end < offset or end == offset and (start < end or include_boundary))
+
+        def regions(rows):
+            return [[shifted(row[0], True), shifted(row[1], row[0] == row[1]), *row[2:]] for row in rows]
+
+        return b''.join(chunks), SourceMap(segments, regions(self.expansions), regions(self.regions))
+
     def json(self, generated, sources):
         referenced = {s[2] for s in self.segments}
         return {"version": 1, "encoding": "utf-8", "generated": str(generated),

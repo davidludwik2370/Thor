@@ -135,7 +135,9 @@ class Diagnostics:
             origin = None
             if file:
                 offset = pos.get("offset", 0)
-                if backend:
+                if backend and file not in self.generated and 'end_offset' in pos:
+                    origin = Origin(file, offset, pos['end_offset'], 'source', True)
+                elif backend:
                     raw = self.generated.get(file, self.read(file))
                     # Native JSON stores end_column, but no end offset.
                     count = max(pos.get("end_column", 0) - pos.get("column", 0), 1)

@@ -17,6 +17,7 @@ import tempfile
 
 from .compiler import ThorError, unquote
 from .diagnostics import Diagnostics, backend_error_flags
+from .backend import run as run_backend
 from .semantics import descendants
 from .sourcemap import Origin
 from . import values
@@ -631,7 +632,7 @@ class Evaluator:
             command=[self.odin,'build' if probe.test else 'check',str(target),*probe.odin_flags(),'-json-errors','-max-error-count:10000']
             if probe.test:command.extend(['-build-mode:test',f'-out:{directory}/probe'])
             if probe.file_entry:command.append('-file')
-            try:result=subprocess.run(command,capture_output=True,timeout=30)
+            try:result=run_backend(probe,command,capture_output=True,timeout=30)
             except subprocess.TimeoutExpired:self.fail(next(iter(pending))[0],'Generic type identity checking timed out.')
             try:errors=json.loads(result.stderr).get('errors',[])
             except ValueError:errors=[]
@@ -1064,7 +1065,8 @@ class Evaluator:
                 if self.cache:self.cache.remember(prepared,key)
                 return unpack(cached)
             helper.write()
-            try:built=subprocess.run(command,capture_output=True,timeout=max(30,self.timeout))
+            emitted_inputs = dict(helper.generated)
+            try:built=run_backend(helper,command,capture_output=True,timeout=max(30,self.timeout))
             except subprocess.TimeoutExpired:self.fail(error_site,label+' helper compilation timed out.')
             except OSError as exc:self.fail(error_site,f'{label} could not start the helper compiler: {exc.strerror or type(exc).__name__}.')
             diagnostics=Diagnostics(helper.sources,helper.maps,helper.generated)
@@ -1155,7 +1157,7 @@ class Evaluator:
                 values.validate(value)
             except values.ValueErrorProtocol as exc:self.fail(error_site,f'{label} returned an invalid compile-time result: {exc}')
             if self.cache:
-                if key and self.cache.key(self.p,helper,target,self.odin,self.root)!=key:
+                if key and self.cache.key(self.p,helper,target,self.odin,self.root,generated=emitted_inputs)!=key:
                     self.fail(error_site,'#run resource inputs changed during evaluation; compile again with stable inputs.')
                 self.cache.put(key,value)
                 self.cache.remember(prepared,key)

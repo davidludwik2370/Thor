@@ -14,6 +14,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MapTests(unittest.TestCase):
+    def test_emitted_rewrites_preserve_exact_spans_expansions_and_debug_regions(self):
+        raw = 'do unused:=7;tail😀'.encode()
+        mapping = SourceMap([[0,len(raw),'/source.thor',10,10+len(raw),'source',True]],
+                            [[3,12,'/source.thor',13,22]],
+                            [[3,len(raw),'source-call-target','/source.thor',13,10+len(raw)]])
+        from thorlang.sourcemap import Origin
+        changed, result = mapping.rewrite(raw, [(0,2,'',Origin('/source.thor',10,12)),
+                                               (12,12,'\n_ = unused\n',Origin('/source.thor',13,19,'unused-local'))])
+        self.assertEqual(changed, ' unused:=7\n_ = unused\n;tail😀'.encode())
+        at = changed.index(b'tail')
+        self.assertEqual(result.lookup(at,4), Origin('/source.thor',23,27,'source',True))
+        self.assertEqual(result.expansions[0][:2],[1,10])
+        self.assertEqual(result.regions[0][1],len(changed))
+
     def test_nested_copied_and_synthetic_fragments(self):
         b = MappingBuilder()
         text = b.wrap("generated(" + b.wrap("é😀", "/source.thor", 10, 16, exact=True) + ")",

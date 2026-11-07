@@ -150,7 +150,7 @@ class EvaluationCache:
                 else: digest.update(b'missing')
         return digest.hexdigest()
 
-    def key(self, original, helper, target, odin, root):
+    def key(self, original, helper, target, odin, root, *, generated=None):
         if not self.enabled:
             self.stats['bypasses'] += 1;return None
         try:
@@ -160,7 +160,7 @@ class EvaluationCache:
             normalize = lambda text: str(text).replace(str(helper.destination), '<helper>')
             digest = hashlib.sha256(canonical(dict(identity=self.identity(odin, root), resources=resources,
                 flags=[normalize(flag) for flag in helper.odin_flags()], target=normalize(target))))
-            for filename,raw in sorted(helper.generated.items()):
+            for filename,raw in sorted((helper.generated if generated is None else generated).items()):
                 path=Path(filename)
                 if path.suffix=='.odin':
                     digest.update(canonical([str(path.relative_to(helper.destination)),normalize(raw.decode())]))

@@ -530,6 +530,14 @@ Thor validation, and Odin type-checking errors use the same display. For example
 `values := [1, "wrong"]` underlines `"wrong"` in your Thor source, even though
 the generated array declaration is much longer.
 
+A declaration that stands alone in an inner control-flow block, such as
+`if condition { x := 10 }`, produces an unused-local warning. Builds continue
+normally, and its initializer executes normally. TLS highlights the original
+variable name with warning severity. `-ignore-warnings` hides the warning and
+`-warnings-as-errors` makes it an error. Explicit vet modes and
+`--raw-diagnostics` use Odin's native policy. An affected build may need an extra
+native checking pass. Already successful checks use a single invocation.
+
 If an array type is accidentally used as an array value (for example,
 `Rows :: [3]int; Rows[i] = 1`), Thor explains the distinction and suggests a
 variable declaration such as `Rows: [3]int`. A related note points to the type's

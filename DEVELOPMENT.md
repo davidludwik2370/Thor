@@ -3854,3 +3854,29 @@ The full regression run caught a compatibility error in this new diagnostic
 anchoring: native SDK overlay source records intentionally omit Thor-only
 blocked-expression tables. Use an empty table for those metadata-only records;
 the existing unsaved SDK/source-resource integration test exercises that path.
+
+## Unused local warnings (Thor 0.40.2)
+
+Relax Odin's default error for a declaration that is the sole statement in an
+inner control-flow block. `thorlang/backend.py` recognizes the native diagnostic
+and verifies its original local identifier and emitted declaration. Add an inert
+second statement to the emitted block and retry native checking. Initializers
+and deferred cleanup retain their execution and scope. Explicit vet modes use
+Odin's native policy. Successful native checks return after one invocation.
+
+Reuse this path for compile-time helper compilation. Keep logical helper cache
+keys based on initial emission so diagnostic recovery does not appear to change
+resource inputs.
+
+`SourceMap.rewrite` retains copied byte ranges and adjusts expansion/debug regions
+for emitted changes, including wrapping a native `do` body. Update generated
+hashes and managed output together with the maps. TLS receives warning severity
+and the original identifier range. Regressions cover inner blocks, grouped names,
+initializer/deferred work, independent errors, warning controls, source positions,
+imported Odin source, compile-time calls, unsaved TLS fixes and debugger stepping.
+Runtime verdicts use explicit panic checks and Python comparisons, including in
+optimized assertion-disabled builds.
+
+Validation passes 143 compilation/edited-build/diagnostic/assertion-hygiene cases,
+13 dedicated compiler/TLS cases and the focused CodeLLDB regression. Checked and
+unchecked smoke builds also pass with the ordinary installed Odin invocation.

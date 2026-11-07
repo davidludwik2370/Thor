@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.40.1"
+VERSION = "0.40.2"
 
 
 def backend_failure(status):
@@ -523,7 +523,8 @@ def _main(argv=None):
         else:
             command.append("-json-errors")
             command.extend(backend_error_flags(command))
-            result = subprocess.run(command, stderr=subprocess.PIPE,
+            from .backend import run as run_backend
+            result = run_backend(project, command, stderr=subprocess.PIPE,
                 env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
             if result.returncode < 0:
                 error = backend_failure(result.returncode)

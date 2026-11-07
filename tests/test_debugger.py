@@ -110,6 +110,38 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_unused_do_declaration_warns_and_keeps_original_stepping(self):
+        text='''package main
+calls:int
+mark::proc()->int {
+    calls+=1
+    return 7
+}
+main::proc(){
+    if true do unused:=mark()
+    total:=calls
+    if total!=1 {panic("initializer count")}
+}
+'''
+        directory,source=self.build(text)
+        # The line also contains the if condition. Start at its initializer.
+        column=text.splitlines()[7].index('mark()')+1
+        client=self.launch(directory,source,[{'line':8,'column':column},9])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[3,4],frame)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),9),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'total','context':'watch'})
+        self.assertEqual(value['result'],'1',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_map_comprehension_keys_keep_breakpoints_and_step_into_user_code(self):
         text='''package main
 key::proc(values:[]int)->int {
