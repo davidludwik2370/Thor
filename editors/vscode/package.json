@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
@@ -98,6 +98,12 @@
           "type": "boolean",
           "default": true,
           "description": "Run the local TLS language server."
+        },
+        "tls.vet": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Enable Thor immutable-binding and pure-function convention warnings and quick fixes."
         },
         "tls.server.path": {
           "type": "string",

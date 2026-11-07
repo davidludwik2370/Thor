@@ -90,6 +90,15 @@ behavior. The server communicates through local process streams, with no network
 port or remote service required. If TLS cannot start, check the **Thor Language
 Server** channel in VS Code's Output panel.
 
+## Thor convention checks
+
+Enable `"tls.vet": true` in workspace settings for opt-in immutable-binding and
+pure-function warnings. The setting restarts TLS. Quick fixes offer `:>` and `fn`
+conversions that Thor has validated, including in unsaved files. Editing the
+buffer invalidates older correction snapshots. The compiler supports the same
+checks with `thor vet .` and `thor build . --vet`; use `thor vet . --apply` to apply
+all verified corrections or `thor vet . --ask` to review and confirm them.
+
 ## Running and debugging
 
 The extension provides **Thor: Run Project** on **Cmd+R**. It saves edits, shows

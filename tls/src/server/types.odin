@@ -297,6 +297,13 @@ Diagnostic :: struct {
 	message:  string,
 	tags:     []DiagnosticTag,
 	relatedInformation: []Diagnostic_Related_Information,
+	data: Thor_Vet_Fix,
+}
+
+Thor_Vet_Fix :: struct {
+	range: common.Range,
+	text: string,
+	snapshot: string,
 }
 
 Diagnostic_Related_Information :: struct {

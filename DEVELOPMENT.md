@@ -3880,3 +3880,53 @@ optimized assertion-disabled builds.
 Validation passes 143 compilation/edited-build/diagnostic/assertion-hygiene cases,
 13 dedicated compiler/TLS cases and the focused CodeLLDB regression. Checked and
 unchecked smoke builds also pass with the ordinary installed Odin invocation.
+
+## Opt-in Thor vetting (Thor 0.41.0, client 0.22.0)
+
+Add `thor vet`, build/check/run/test/publish `--vet[=immutable,pure]`, and explicit
+`thor vet --apply` / `--ask` correction modes. Findings are warnings and support
+`-warnings-as-errors`, `-ignore-warnings`, mapped JSON and original source ranges.
+Plain vet reports findings. Ask mode previews corrections and reads one answer,
+with empty input/EOF declining. Apply and ask are mutually exclusive and operate
+on saved files. Native Odin vet flags continue to select the native policy.
+
+`thorlang/vet.py` finds initialized local-binding and concrete named-procedure
+candidates. Reuse resolved bindings and the existing purity source analysis to
+exclude known mutations, mutable addresses, ABI attributes and purity violations.
+Validate candidate batches through the normal compiler using temporary overlays
+and subdivide rejected batches while preserving already accepted edits. Existing
+slice contracts, transitive pure helpers, type checks, compile-time execution and
+active build flags supply the final validation. Source text is edited at AST
+separator/keyword byte spans, preserving surrounding bytes. Source snapshots are
+verified before staged replacements, and completed writes roll back on failure.
+
+The initial scope favors proven conversions. Conditional declarations,
+uninitialized locals, unresolved generic procedures, attributed procedures and
+main are excluded. Reference-bearing/owned results require manual conversion:
+pure result promotion can change aliases and allocation ownership. Vetting uses
+the active target and flags. Additional analysis is opt-in.
+
+TLS preserves vet diagnostic codes and verified edit metadata. Snapshot hashes
+invalidate stale quick fixes after unsaved edits. Heap-owned diagnostic strings
+are cloned/deleted with the diagnostic store; text-edit slices use allocated
+storage. Thor quick fixes bypass the existing native import-organizer restriction
+without enabling native organizer edits for Thor imports. VS Code exposes the
+resource-scoped, default-off `tls.vet` setting through checker arguments.
+
+Acceptance covers report/apply/ask and EOF, rule selection and strict warnings,
+checked/unchecked runtime behavior, grouped/typed declarations, comments/Unicode/
+CRLF, mutations and aliases, transitive purity and confined local mutation,
+conservative ownership/ABI/generic/conditional boundaries, large accepted batches,
+invalid inputs, concurrent edits and rollback, live TLS positions and edits,
+stale-fix rejection and debugger stepping after corrections.
+
+Validation passes the 130-case diagnostic/acceptance group and the 149-case
+compiler/edited-build/evaluation/slice-access group. The focused CodeLLDB test
+passes with corrected immutable locals and a corrected fn. All 1,150 native TLS
+tests pass in both checked and assertion-disabled configurations, and all 141
+Node tests pass. The local TLS server was rebuilt, and client 0.22.0 was packaged
+and installed. Native regression runs use the temporary single-worker wrapper
+from the previous audits. Runtime fixtures also exercise optimized assertion-disabled
+code, and live vet quick fixes pass with an assertion-disabled TLS server.
+The ordinary installed Odin invocation also passes vet/apply/run smoke checks
+in debug and optimized assertion-disabled configurations.

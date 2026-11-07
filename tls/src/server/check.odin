@@ -22,9 +22,17 @@ import "src:spall"
 Json_Error :: struct {
 	type: string,
 	stage: string,
+	code: string,
+	fix: Json_Vet_Fix,
 	pos:  Json_Type_Error,
 	msgs: []string,
 	related: []Json_Related_Error,
+}
+
+Json_Vet_Fix :: struct {
+	pos: Json_Type_Error,
+	text: string,
+	snapshot: string,
 }
 
 Json_Related_Error :: struct {
@@ -667,11 +675,16 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 				})
 			}
 
+			vet_fix: Thor_Vet_Fix
+			if error.fix.snapshot != "" {
+				vet_fix = {range = compiler_error_range(error.fix.pos), text = error.fix.text, snapshot = error.fix.snapshot}
+			}
 			add_diagnostics(
 				.Check,
 				uri.uri,
 				Diagnostic {
-					code = "thor",
+					code = error.code != "" ? error.code : "thor",
+					data = vet_fix,
 					severity = diagnostic_severity,
 					range = compiler_error_range(error.pos),
 					message = message,

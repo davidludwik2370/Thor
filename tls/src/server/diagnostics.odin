@@ -37,6 +37,7 @@ remove_diagnostics_locked :: proc(type: DiagnosticType, uri: string) {
 	for diagnostic in diagnostic_array {
 		delete(diagnostic.message)
 		delete(diagnostic.code)
+		delete_vet_fix(diagnostic.data)
 		delete_related_diagnostics(diagnostic.relatedInformation)
 		if diagnostic.tags != nil {
 			delete(diagnostic.tags)
@@ -74,6 +75,8 @@ add_diagnostics :: proc(type: DiagnosticType, uri: string, diagnostic: Diagnosti
 
 	diagnostic.message = strings.clone(diagnostic.message)
 	diagnostic.code = strings.clone(diagnostic.code)
+	diagnostic.data.text = strings.clone(diagnostic.data.text)
+	diagnostic.data.snapshot = strings.clone(diagnostic.data.snapshot)
 	if diagnostic.tags != nil {
 		diagnostic.tags = slice.clone(diagnostic.tags)
 	}
@@ -118,11 +121,18 @@ clear_diagnostics :: proc(type: DiagnosticType) {
 		for diagnostic in diagnostic_array {
 			delete(diagnostic.message)
 			delete(diagnostic.code)
+			delete_vet_fix(diagnostic.data)
 			delete(diagnostic.tags)
 			delete_related_diagnostics(diagnostic.relatedInformation)
 		}
 		clear(&diagnostic_array)
 	}
+}
+
+@(private = "file")
+delete_vet_fix :: proc(fix: Thor_Vet_Fix) {
+	delete(fix.text)
+	delete(fix.snapshot)
 }
 
 @(private = "file")

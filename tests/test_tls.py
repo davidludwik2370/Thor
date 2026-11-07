@@ -17,7 +17,7 @@ BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False):
+    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
@@ -44,7 +44,8 @@ class Client:
                 'enable_parser_errors': True, 'enable_semantic_tokens': True,
                 'enable_unused_imports_reporting': unused_imports,
                 'enable_unused_imports_on_change': unused_imports, 'enable_auto_import': False,
-                'enable_checker_workspace_diagnostics': False, 'thread_count': 1}
+                'enable_checker_workspace_diagnostics': False, 'thread_count': 1,
+                'checker_args': '--vet' if vet else ''}
         })['capabilities']
         self.send('initialized', {})
 

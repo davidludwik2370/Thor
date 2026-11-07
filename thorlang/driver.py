@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.40.2"
+VERSION = "0.41.0"
 
 
 def backend_failure(status):
@@ -351,7 +351,7 @@ def _main(argv=None):
     parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T23: compile additive Odin syntax to Odin.",
                                      epilog="Create a project with thor new NAME; see thor new --help for creation options.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
-    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test", "publish", "new"])
+    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test", "publish", "new", "vet"])
     parser.add_argument("source", help="a .thor/.odin file or package directory")
     parser.add_argument("--output-dir", type=Path, help="directory for generated Odin (default: .thor-build/<source>)")
     parser.add_argument("--odin", default=os.environ.get("THOR_ODIN", "odin"), help="Odin compiler executable")
@@ -359,6 +359,11 @@ def _main(argv=None):
     parser.add_argument("--overlay", type=Path, help="editor overlay JSON: {\"Replace\": {original: replacement_file}}")
     parser.add_argument("--raw-diagnostics", action="store_true", help="show unmodified Odin diagnostics for transpiler debugging")
     parser.add_argument('--editor-info',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--vet', nargs='?', const='immutable,pure', metavar='CHECKS',
+                        help='enable Thor convention checks (default: immutable,pure)')
+    corrections = parser.add_mutually_exclusive_group()
+    corrections.add_argument('--apply', action='store_true', help='apply verified corrections with thor vet')
+    corrections.add_argument('--ask', action='store_true', help='preview and confirm corrections with thor vet')
     parser.add_argument("--run-timeout",type=float,default=5,help="maximum seconds for each native #run execution (default: 5)")
     parser.add_argument('--cache-dir',type=Path,help='cache root (default: .thor-cache beside the entry package)')
     parser.add_argument('--no-cache',action='store_true',help='bypass compile-time result and per-file parser caching')
@@ -376,7 +381,20 @@ def _main(argv=None):
     packaging.add_argument('--app-resource', action='append', default=[], help='additional project-relative resource file/directory; repeatable')
     packaging.add_argument('--app-library', action='append', default=[], help='additional native library/plugin; repeatable')
     packaging.add_argument('--publish-dir', type=Path, help='package destination (default: current directory, or parent of -out:)')
+    argv = ['--vet=immutable,pure' if argument == '--vet' else argument for argument in argv]
     options, flags = parser.parse_known_args(argv)
+    if (options.apply or options.ask) and options.command != 'vet':
+        parser.error('--apply and --ask are only supported by thor vet')
+    if (options.apply or options.ask) and options.overlay:
+        parser.error('vet corrections require saved files without --overlay')
+    if options.vet is not None:
+        from .vet import CHECKS
+        if not options.vet or any(check not in CHECKS for check in options.vet.split(',')):
+            parser.error('Thor vet checks must be selected from immutable,pure')
+        if options.command == 'transpile':
+            parser.error('--vet requires native checking. Run thor vet.')
+    if options.raw_diagnostics and (options.command == 'vet' or options.vet is not None):
+        parser.error('Thor vet requires mapped diagnostics without --raw-diagnostics')
     if options.command != 'publish' and (any(getattr(options, name) is not None for name in
             ('app_name', 'app_id', 'app_version', 'app_icon', 'app_type', 'publish_dir'))
             or options.app_resource or options.app_library):
@@ -487,7 +505,8 @@ def _main(argv=None):
             return 1 if reported_errors else 0
         # Keep the running program's streams interactive and entirely separate
         # from structured compiler output (including test runner output).
-        native_command = "build" if options.command in {"run", "test", "publish"} else options.command
+        native_command = ('check' if options.command == 'vet' else
+                          "build" if options.command in {"run", "test", "publish"} else options.command)
         command = [odin, native_command, str(target)]
         if project.file_entry:
             command.append("-file")
@@ -526,6 +545,9 @@ def _main(argv=None):
             from .backend import run as run_backend
             result = run_backend(project, command, stderr=subprocess.PIPE,
                 env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
+            if result.returncode == 0 and (options.command == 'vet' or options.vet is not None):
+                from .vet import run as vet
+                frontend_diagnostics.extend(vet(project, options, flags))
             if result.returncode < 0:
                 error = backend_failure(result.returncode)
                 if result.stderr:

@@ -110,6 +110,34 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_vet_corrections_keep_function_breakpoints_and_immutable_locals(self):
+        text='''package main
+INPUT:int=3
+twice::proc(value:int)->int {
+    doubled:=value*2
+    return doubled
+}
+main::proc(){
+    n:=INPUT
+    result:=twice(n)
+    if result!=6 {panic("result")}
+}
+'''
+        directory,source=self.build(text,vet=True)
+        self.assertIn('twice::fn',source.read_text())
+        self.assertIn('doubled:>',source.read_text())
+        client=self.launch(directory,source,[4,10])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),4),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'doubled','context':'watch'})
+        self.assertEqual(value['result'],'6',value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),10),frame)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_unused_do_declaration_warns_and_keeps_original_stepping(self):
         text='''package main
 calls:int
@@ -932,7 +960,7 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
-    def build(self, text, files=None):
+    def build(self, text, files=None, *, vet=False):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
         self.addCleanup(temporary.cleanup)
         directory = Path(temporary.name).resolve()
@@ -942,6 +970,9 @@ main::proc(){
             file=directory/name
             file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text(content)
+        if vet:
+            corrected=subprocess.run([str(ROOT/'thor'),'vet',str(directory),'--apply'],capture_output=True,text=True,timeout=90)
+            self.assertEqual(corrected.returncode,0,corrected.stdout+corrected.stderr)
         build = subprocess.run([str(ROOT/'thor'),'build',str(directory),'-debug','-o:none',
             '--output-dir',str(directory/'generated'),'-out:'+str(directory/'program')],capture_output=True,text=True,timeout=90)
         self.assertEqual(build.returncode,0,build.stdout+build.stderr)

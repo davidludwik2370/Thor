@@ -522,6 +522,44 @@ Generated trees are rejected as compiler inputs. File suffixes and build tags
 follow `-target:os_arch`, including when checking a target different from the host.
 `test` and `build -build-mode:test` include test-tagged files.
 
+## Thor vetting
+
+`thor vet` checks Thor conventions and reports warnings. Source changes are
+explicitly requested with `--apply` or confirmed through `--ask`.
+
+```sh
+thor vet .                         # Report findings
+thor vet . --apply                 # Apply verified corrections
+thor vet . --ask                   # Preview corrections and ask once [y/N]
+thor build . --vet                 # Build with convention warnings
+thor vet . --vet=immutable,pure    # Select checks
+thor vet . -warnings-as-errors     # Require corrections for a successful check
+```
+
+The `immutable` check suggests `:>` for initialized local bindings whose uses
+permit immutability. Grouped declarations qualify together. The `pure` check
+suggests `fn` for eligible procedures, including their transitive calls and
+signature requirements. Findings have stable `thor/prefer-immutable` and
+`thor/prefer-fn` diagnostic codes. `-ignore-warnings` hides the warnings.
+Odin's single-dash `-vet` flags select its native checks.
+
+Vetting examines project `.thor` files beneath the selected package directory,
+using the active target and build flags. The initial checks conservatively skip
+conditional declarations, uninitialized locals, generic procedure conversions,
+attributed procedures and the entry point. Procedures returning owned or
+reference-bearing data also require manual review, since `fn` can change result
+ownership and allocation behavior. Converting a procedure to `fn` enables its
+normal automatic compile-time evaluation with known arguments.
+
+Proposed corrections are validated together through normal Thor checking using
+temporary source overlays. Additional analysis runs for `thor vet` and `--vet`.
+Applying corrections preserves comments, formatting, line endings and file modes.
+Changed source snapshots are rejected, and write failures roll back completed
+updates. `--ask` accepts `y` or `yes`. An empty answer or end of input declines.
+
+Enable `"tls.vet": true` in VS Code to see the same warnings and quick fixes on
+unsaved text. TLS offers a correction for the document snapshot that was checked.
+
 ## Compiler diagnostics
 
 `check`, `build`, `run`, and `test` report errors against original `.thor` files
@@ -534,7 +572,7 @@ A declaration that stands alone in an inner control-flow block, such as
 `if condition { x := 10 }`, produces an unused-local warning. Builds continue
 normally, and its initializer executes normally. TLS highlights the original
 variable name with warning severity. `-ignore-warnings` hides the warning and
-`-warnings-as-errors` makes it an error. Explicit vet modes and
+`-warnings-as-errors` makes it an error. Explicit Odin vet modes and
 `--raw-diagnostics` use Odin's native policy. An affected build may need an extra
 native checking pass. Already successful checks use a single invocation.
 

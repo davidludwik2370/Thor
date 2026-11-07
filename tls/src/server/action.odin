@@ -1,10 +1,12 @@
 package server
 
 import "core:fmt"
+import "core:hash"
 import "core:log"
 import "core:odin/ast"
 import path "core:path/slashpath"
 import "core:strings"
+import "core:sync"
 
 import "src:common"
 
@@ -129,6 +131,26 @@ get_code_actions :: proc(
 	}
 
 	return actions[:], true
+}
+
+add_vet_corrections :: proc(document: ^Document, range: common.Range, actions: ^[dynamic]CodeAction) {
+	snapshot := fmt.tprintf("%016x", hash.fnv64a(document.text[:document.used_text]))
+	sync.lock(&diagnostic_mutex)
+	defer sync.unlock(&diagnostic_mutex)
+	for diagnostic in diagnostics[.Check][document.uri.uri] {
+		fix := diagnostic.data
+		if fix.snapshot != snapshot { continue }
+		first, last := diagnostic.range.start, diagnostic.range.end
+		if range.end.line < first.line || range.start.line > last.line { continue }
+		if range.end.line == first.line && range.end.character < first.character { continue }
+		if range.start.line == last.line && range.start.character > last.character { continue }
+		title := diagnostic.code == "thor/prefer-immutable" ? "Make declaration immutable" : "Declare as fn"
+		changes := make(map[string][]TextEdit, context.temp_allocator)
+		edits := make([]TextEdit, 1, context.temp_allocator)
+		edits[0] = {range = fix.range, newText = strings.clone(fix.text, context.temp_allocator)}
+		changes[document.uri.uri] = edits
+		append(actions, CodeAction{title = title, kind = "quickfix", isPreferred = true, edit = {changes = changes}})
+	}
 }
 
 

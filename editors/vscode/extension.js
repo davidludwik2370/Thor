@@ -62,6 +62,7 @@ async function start(context) {
         enable_auto_import: false,
         enable_checker_workspace_diagnostics: false
     };
+    if (config.get('vet', false)) initializationOptions.checker_args = '--vet';
     const compilerPath = config.get('compiler.path', '');
     const compiler = compilerPath ? path.resolve(folder.uri.fsPath, compilerPath)
         : path.resolve(path.dirname(executable), '..', '..', 'thor');

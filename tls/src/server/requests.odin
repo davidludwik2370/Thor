@@ -1792,6 +1792,15 @@ request_code_action :: proc(
 	code_actions: []CodeAction
 	if filepath.ext(document.fullpath) == ".thor" {
 		// Native import-organizing edits do not preserve Thor selections yet.
+		actions := make([dynamic]CodeAction, context.temp_allocator)
+		quickfix := len(code_action_params.context_.only) == 0
+		for kind in code_action_params.context_.only {
+			if kind == "quickfix" { quickfix = true; break }
+		}
+		if quickfix {
+			add_vet_corrections(document, code_action_params.range, &actions)
+		}
+		code_actions = actions[:]
 		send_response(make_response_message(params = code_actions, id = id), writer)
 		return .None
 	}
