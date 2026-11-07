@@ -2138,6 +2138,7 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 	case ^ast.Call_Expr:
 		old_call := ast_context.call
 		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
+			if strings.has_prefix(name.name,"__thor_comprehension") {out^,ok=thor_comprehension_type(ast_context,v);return ok}
 			if name.name=="__thor_run"&&len(v.args)==1 {
 				defer ast_context.call=old_call
 				if call,is_call:=v.args[0].derived.(^ast.Call_Expr);is_call {

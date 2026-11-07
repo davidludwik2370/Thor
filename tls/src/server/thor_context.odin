@@ -39,7 +39,7 @@ thor_context_adapter :: proc(call: ^ast.Call_Expr) -> bool {
     ident, ok := call.expr.derived.(^ast.Ident)
     if !ok || ident.pos.offset != ident.end.offset { return false }
     _, sw := thor_context_switch_count(call)
-    return sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break"
+    return strings.has_prefix(ident.name,"__thor_comprehension") || sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break"
 }
 
 // A nonreturning call supplies no switch result type. Use its procedure type,
@@ -239,6 +239,27 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
             return thor_context_expression(ctx, pc, elem, child, wanted, depth+1)
         }
     case ^ast.Call_Expr:
+        if _,loop,output,comp:=thor_comprehension(node);comp {
+            if len(node.args)>1 {expected,_=thor_context_type(ctx,node.args[1])}
+            for value,index in output.results {
+                if !position_in_node(value,pc.position){continue}
+                element:^ast.Expr
+                #partial switch container in expected.value {
+                case SymbolSliceValue:element=container.expr
+                case SymbolDynamicArrayValue:element=container.expr
+                case SymbolFixedArrayValue:element=container.expr
+                case SymbolMapValue:element=container.key if index==0&&len(output.results)>1 else container.value
+                case SymbolStructValue:if thor_is_set_symbol(expected)&&len(container.args)==1 {element=container.args[0]}
+                }
+                child:Symbol
+                marker:=node.expr.derived.(^ast.Ident)
+                if strings.contains(marker.name,"_unpack"){child=expected}
+                else if element!=nil {child,_=thor_context_type(ctx,element)}
+                return thor_context_expression(ctx,pc,value,child,wanted,depth+1)
+            }
+            if position_in_node(loop.expr,pc.position){return thor_context_expression(ctx,pc,loop.expr,{},wanted,depth+1)}
+            return {},false
+        }
         if group,ok:=thor_switch_group(node);ok {
             for arg in group.args {
                 if position_in_node(arg,pc.position){return thor_context_expression(ctx,pc,arg,expected,wanted,depth+1)}

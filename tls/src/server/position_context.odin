@@ -655,6 +655,12 @@ get_document_position_node :: proc(node: ^ast.Node, position_context: ^DocumentP
 	case ^ast.Ellipsis:
 		get_document_position(n.expr, position_context)
 	case ^ast.Proc_Lit:
+		if n.type!=nil&&n.type.tok.text=="__thor_comprehension_body" {
+			saved:=position_context.returns
+			get_document_position(n.body,position_context)
+			position_context.returns=saved
+			break
+		}
 		if position_in_node(n.body, position_context.position) {
 			get_document_position(n.type, position_context)
 			position_context.function = cast(^ast.Proc_Lit)node

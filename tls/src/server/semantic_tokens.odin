@@ -446,7 +446,7 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 	case ^ast.Proc_Type:
 		visit_proc_type(n, builder)
 	case ^ast.Proc_Lit:
-		visit_proc_type(n.type, builder)
+		if n.type==nil||n.type.tok.text!="__thor_comprehension_body" {visit_proc_type(n.type, builder)}
 		visit_nodes(n.where_clauses, builder)
 		visit_node(n.body, builder)
 	case ^ast.Proc_Group:

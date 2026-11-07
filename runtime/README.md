@@ -10,6 +10,13 @@ generic status check allocates nothing; failure reporting passes original source
 coordinates and expression text to Odin's panic machinery. No explicit import
 is required to use the operator. See [the language reference](../README.md#optional-results-with-or_panic).
 
+## Collection construction
+
+`comprehension/` supplies checked internal construction primitives for collection
+comprehensions. It preserves element ownership, catches allocation errors
+(including map growth), and releases outer construction buffers on failure.
+No explicit import is needed. See [the language contract](../docs/comprehensions.md).
+
 ## Arbitrary-precision foundation
 
 `import "thor:big"` provides the stage-one Integer/Rational runtime: exact

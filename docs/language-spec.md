@@ -10,6 +10,8 @@ moved out of the former root `thor.odin` so playground edits cannot remove the
 reference. The source block was preserved from the user's relocated specification;
 its status and transitive-call paragraph reflect the implemented language.
 
+Collection comprehensions are specified in [their reference](comprehensions.md).
+
 Later work also includes wildcard/namespace-free imports, spread min/max,
 inline generic default callbacks, runtime library helpers, source debugging,
 and macOS debug memory checks. Their current contracts are in the

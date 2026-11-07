@@ -43,7 +43,7 @@ class Evaluator:
         self.scalar_witnesses={};self.execution_records={};self.reused_runs=set();self.failed_scalar_targets={}
         self.has_pure_functions=any(self.purity.pure(node) for source in project.sources.values() for node in source.nodes)
         self.schedule_generics=self.has_pure_functions or any(
-            (node.kind=='Run' or self.power(node) or node.source.thor and node.kind=='Call' and
+            (node.kind=='Run' or self.power(node) or node.kind=='Comprehension' and self.constant_context(node) or node.source.thor and node.kind=='Call' and
                 node.source.expressions.extrema.plan(node) and self.constant_context(node)) and
             any(self.r.generic_parameters(a.role('type') if a.kind=='Procedure' else a)
                 for a in node.ancestors() if a.kind in {'Procedure','StructType'})
@@ -51,7 +51,7 @@ class Evaluator:
         self.work_sources=None
         if not self.has_pure_functions and not self.schedule_generics:
             self.work_sources={source for source in project.sources.values() if any(
-                node.kind=='Run' or self.power(node) or node.source.thor and node.kind=='Call' and
+                node.kind=='Run' or self.power(node) or node.kind=='Comprehension' and self.constant_context(node) or node.source.thor and node.kind=='Call' and
                 node.source.expressions.extrema.plan(node) and self.constant_context(node)
                 for node in source.nodes)}
 
@@ -101,6 +101,7 @@ class Evaluator:
         return True
 
     def automatic(self,n):
+        if n.kind=='Comprehension':return self.constant_context(n)
         if self.power(n):
             return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
         if n.kind!='Call' or n.parent and n.parent.kind=='Run':return False
@@ -179,6 +180,19 @@ class Evaluator:
     def install(self,n,data,bindings=None):
         s=n.source;s.needs_intrinsics=s.needs_default=True
         bindings=self.specializations.relevant(n) if bindings is None else bindings
+        if n.kind=='Comprehension':
+            if data.get('kind')!='sequence':self.fail(n,'Compile-time comprehension did not produce a sequence.')
+            if values.has_owned(data,slices_only=True) and any(values.has_owned(v,slices_only=True) for v in data['values']):
+                self.fail(n,'A compile-time comprehension constant cannot contain owned slices or dynamic arrays; flatten them or use a runtime binding.')
+            from .bigvalues import contains
+            if any(contains(v) for v in data['values']):self.fail(n,'An Integer/Rational-containing comprehension needs a runtime binding; :: supports individual logical-number constants.')
+            size=len(data['values']);n.data['compile_length']=size
+            runtime_type=s.comprehensions.type_code(n)
+            typ=f'[{size}]{s.prefix}meta.type_elem_type({runtime_type})'
+            constant={**data,'storage':'array','nil':False}
+            literal=values.expression(constant,typ,s.prefix+'meta',big=lambda value,_:s.big.constants.view(value,n))
+            self.register(n,{'runtime':literal,'constant':literal},bindings)
+            return
         with self.specializations.using({}):typ=self.result_type(self.call(n))
         # Like native arithmetic, expressions made entirely from untyped
         # constants retain literal coercion at their eventual use site.
@@ -231,6 +245,7 @@ class Evaluator:
         s.run_values[n]=render
 
     def result_type(self,call):
+        if call.kind=='Comprehension':return call.source.comprehensions.type_code(call)
         if call in self.scalar_witnesses:
             source=call.source;source.needs_intrinsics=True
             enabled=self.r.native_enabled;self.r.native_enabled=False
@@ -308,6 +323,9 @@ class Evaluator:
         if self.key(n) in self.results:return True
         if self.key(n) in self.busy:self.fail(n,'Cyclic #run or automatic fn constant dependency.')
         if n.kind=='Run':self.evaluate(n);return True
+        if n.kind=='Comprehension':
+            if not self.constant_context(n):return False
+            return self.evaluate(n) is not None
         if n.kind=='Directive':return n.data['name'] not in {'file','directory','line'}
         if n.kind in {'Literal','ImplicitSelector'} or n.text in {'true','false','nil'}:return True
         if self.type_query(n):return True
@@ -480,6 +498,17 @@ class Evaluator:
                 self.register(n,value,self.specializations.relevant(n))
                 return None
             call=self.call(n)
+            if n.kind=='Comprehension':
+                if n.role('type'):self.fail(n,'Use bare [expression for ...] for a compile-time fixed array; typed allocated comprehensions require a runtime binding.')
+                self.explicit_arguments+=1
+                try:known=self.known(n.role('expr'))
+                finally:self.explicit_arguments-=1
+                if not known:self.fail(n.role('expr'),'Compile-time comprehension inputs and bounds must be compile-time known; runtime storage is not a constant.')
+                self.native(n)
+                self.ensure_runs(n.role('expr'))
+                data=self.execute(n)
+                self.results[key]=data;self.result_bindings[key]=self.specializations.relevant(n).copy();self.install(n,data)
+                return data
             if self.purity.io_call(call):
                 self.fail(n,self.purity.io_message(call))
             if n.kind=='Run':
@@ -545,7 +574,7 @@ class Evaluator:
         finally:self.r.native_enabled=False
 
     def _evaluate_all(self):
-        if not any(n.kind=='Run' or self.power(n) or self.purity.pure(n) or source.expressions.extrema.plan(n)
+        if not any(n.kind=='Run' or n.kind=='Comprehension' and self.constant_context(n) or self.power(n) or self.purity.pure(n) or source.expressions.extrema.plan(n)
                    for source in self.p.sources.values() if not source.excluded for n in source.nodes):return
         for source in list(self.p.sources.values()):
             if source.excluded:continue
@@ -782,6 +811,9 @@ class Evaluator:
         error_site=n.parent if n.parent and n.parent.kind=='Run' else n
         label='#run' if error_site.kind=='Run' else 'Compile-time'
         roots=[n] if condition_case is None else list(extra)
+        if n.kind=='Comprehension':
+            declaration=next((a for a in n.ancestors() if a.kind in {'Declaration','Procedure'}),None)
+            if declaration and declaration.kind=='Declaration' and declaration.role('type'):roots.append(declaration.role('type'))
         bindings=self.specializations.relevant(n)
         roots += [b.typ.node.parent if b.typ.node.parent and b.typ.node.parent.kind=='Declaration' and
                   b.typ.node.kind in {'StructType','UnionType','EnumType','DistinctType','BitSetType'} else b.typ.node
@@ -807,6 +839,14 @@ class Evaluator:
             return next((a for a in source.by_span.get((old.start,old.end),[]) if a.kind==old.kind),None)
         helper.purity.eval_mode=True
         helper.purity.active={node_copy(p) for p in procedures}
+        if n.kind=='Comprehension':
+            # Treat the synthetic body as a checked fn only for required
+            # compile-time construction. Runtime comprehensions remain ordinary
+            # expressions and inherit their enclosing procedure's purity rules.
+            body=next(child for child in descendants(node_copy(n)) if child.kind=='ComprehensionBody')
+            body.data['checked_comprehension']=True
+            helper.purity.active.add(body)
+            helper.purity.analyze(body)
         # Nested calls in the requested expression are entry calls too, rather
         # than calls from an enclosing checked body. Their inputs are read-only
         # and their source signatures must not acquire helper-only parameters.

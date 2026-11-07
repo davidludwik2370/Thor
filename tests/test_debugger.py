@@ -110,6 +110,38 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_comprehension_breakpoint_steps_into_original_output_and_returns(self):
+        text='''package main
+transform::proc(value:int)->int {
+    return value*2
+}
+main::proc(){
+    values:=[transform(x) for x in 0..<3 if x>0]
+    last:=values[1]
+    delete(values)
+    if last!=4 {panic("comprehension")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6,7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual(frame['source']['path'],str(source),frame)
+        self.assertIn(frame['line'],[2,3],frame)
+        self.assertIn('transform',frame['name'])
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'last','context':'watch'})
+        self.assertEqual(value['result'],'4',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_constant_concatenation_keeps_original_breakpoints_and_step_lines(self):
         text='''package main
 A::[1,2]

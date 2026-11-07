@@ -234,7 +234,7 @@ class Purity:
         for source in self.r.sources:source.purity=self
 
     @staticmethod
-    def owner(n):return next((a for a in n.ancestors() if a.kind=='Procedure'),None)
+    def owner(n):return next((a for a in n.ancestors() if a.kind=='Procedure' or a.data.get('checked_comprehension')),None)
 
     @staticmethod
     def pure(proc):return proc and proc.kind=='Procedure' and proc.data.get('pure',False)
@@ -535,6 +535,12 @@ class Purity:
             if self.r.type_of(base).kind=='pointer':value=value.deref()
             return value.member(n.role('field').text)
         if n.kind=='Index':return self.flow(n.role('expr'),env).item()
+        if n.kind=='Comprehension':
+            # The new outer buffer is owned; reference-containing elements
+            # retain their input provenance because construction is shallow.
+            value=self.flow(n.role('output'),env)
+            if n.data.get('spread'):value=value.item()
+            return Flow(element=self.copied(value,n.role('output')))
         if n.kind=='Slice':
             base=self.flow(n.role('expr'),env)
             result=Flow(base.borrowed,element=base.item(),stack=set(base.stack))
@@ -767,10 +773,10 @@ class Purity:
                     self.contracts[proc]=(attribute,'Pure calls cannot use implicit deferred procedure callbacks; make eligible calls explicit in the body.')
         for n in nodes:
             if n in self.borrowing.escapes:self.problem(n,self.borrowing.escapes[n])
-            typ=self.r.type_node(n.role('type')) if n.kind=='Declaration' and n.role('type') else self.r.type_of(n) if n.kind=='Compound' else None
+            typ=self.r.type_node(n.role('type')) if n.kind=='Declaration' and n.role('type') else self.r.type_of(n) if n.kind in {'Compound','Comprehension'} else None
             if typ and typ.kind=='struct' and typ.node and typ.node.data.get('op')=='raw_union':
                 self.problem(n,'Raw-union storage cannot be proved pure.')
-            if n.kind=='Compound' or n.kind=='Declaration' and (n.data.get('mutable') or n.data.get('immutable')):
+            if n.kind in {'Compound','Comprehension'} or n.kind=='Declaration' and (n.data.get('mutable') or n.data.get('immutable')):
                 local_types=[typ] if typ else [self.r.type_of(value) for value in n.group('values')]
                 if any(t and self.unsafe_storage(t) for t in local_types):
                     self.problem(n,'Pure local storage cannot contain raw pointers, any, procedure values, maps, sets or raw unions.')

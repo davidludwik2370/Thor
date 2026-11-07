@@ -2042,12 +2042,25 @@ value_hashes :: proc() {
     // Shared acyclic slices are allowed; see runtime/hash/README.md.
 }
 
+// One loop and an optional filter construct a new slice; :: constructs a
+// fixed-array constant. See examples/comprehensions for the full ownership tour.
+COMPREHENSION_SQUARES :: [x*x for x in 0..<6 if x%2==0]
+collection_comprehensions :: proc() {
+    rows := [][]int{{1,2},{2,3}}
+    flat := [..row for row in rows]
+    unique := set[int]{..row for row in rows}
+    indexed := map[int]int{x=i for x,i in flat}
+    defer delete(flat); defer delete(unique); defer delete(indexed)
+    if COMPREHENSION_SQUARES!=[0,4,16] || len(flat)!=4 || len(unique)!=3 || indexed[2]!=2 {panic("comprehensions")}
+}
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
     imports_and_odin()
     arrays_and_context()
     constant_concatenation()
+    collection_comprehensions()
     optional_results()
     scoped_allocations()
     value_hashes()

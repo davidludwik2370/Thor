@@ -56,6 +56,8 @@ class Node:
         return self.source.text(self.start, self.end)
 
     def role(self, name):
+        index=self.data.get('role_nodes',{}).get(name)
+        if index is not None:return self.source.nodes[index]
         return self.source.at(self.data.get("roles", {}).get(name), self)
 
     def group(self, name):
@@ -113,7 +115,8 @@ class Source:
             raise ThorError(f"invalid frontend output for {path}") from exc
         self.nodes = [Node(self, i, d) for i, d in enumerate(self.info["nodes"])]
         for feature in self.info.get("features") or []:
-            node = next((n for n in self.nodes if n.start == feature["start"] and n.end == feature["end"] and n.kind in {"Call", "Switch", "Procedure"}), None)
+            kinds={'Procedure'} if feature['kind']=='ComprehensionBody' else {'Call','Switch','Procedure'}
+            node = next((n for n in self.nodes if n.start == feature["start"] and n.end == feature["end"] and n.kind in kinds), None)
             if node:
                 if feature['kind']=='PureFunction':
                     node.data['pure']=True
@@ -141,6 +144,22 @@ class Source:
                 n.parent = self.nodes[parent]
                 n.parent.children.append(n)
         self.root = self.nodes[0]
+        # Synthetic native scopes retain real expression nodes and their source
+        # spans. Select expression roles explicitly rather than confusing them
+        # with the zero/source-width wrapper statements around them.
+        for feature in self.info.get('features') or []:
+            if feature['kind']!='Comprehension':continue
+            node=next(n for n in self.nodes if n.kind=='Comprehension' and n.start==feature['start'] and n.end==feature['end'])
+            descendants=[n for n in self.nodes if node in n.ancestors()]
+            loop=next(n for n in descendants if n.kind=='Range')
+            node.data['role_nodes']={'loop':loop.index,'expr':loop.role('expr').index}
+            for role,key in [('type','container_type'),('output','output'),('key','key'),('cond','condition')]:
+                span=feature[key]
+                if span[0]<0:continue
+                candidate=next(n for n in descendants if n.start==span[0] and n.end==span[1]
+                    and n.kind not in {'Return','Block','If','Range','ComprehensionBody','ProcedureType','Fields'})
+                node.data['role_nodes'][role]=candidate.index
+            loop.data['comprehension']=node.index
         digest = hashlib.sha256(str(self.path).encode()).hexdigest()[:12]
         self.prefix = f"__thor_{digest}_"
         while self.prefix.encode() in self.raw:
@@ -192,6 +211,8 @@ class Source:
         self.typed_loops = TypedLoops(self)
         from .bignumbers import BigNumbers
         self.big = BigNumbers(self)
+        from .comprehensions import Comprehensions
+        self.comprehensions=Comprehensions(self)
         self.selected = {}
         self.selected_origins = {}
         self.wildcards = []
@@ -229,6 +250,7 @@ class Source:
         spreading = self.thor and any(n.kind=='Call' and (n.data.get('roles',{}).get('ellipsis') or
             any(a.kind=='Unary' and a.data['op']=='**' for a in n.group('args'))) for n in self.nodes)
         for module,needed in [('format',any(n.kind=='Interpolation' for n in self.nodes)),
+                              ('comprehension',any(n.kind=='Comprehension' for n in self.nodes)),
                               ('optional',self.thor and any(n.kind=='OrPanic' for n in self.nodes)),
                               ('temporaries',self.thor and any(n.kind=='Interpolation' for n in self.nodes)),
                               ('pure',spreading or any(n.data.get('pure') or n.kind=='Run' or self.thor and n.kind=='Binary' and n.data['op']=='**' for n in self.nodes)),
@@ -670,6 +692,7 @@ class Source:
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code
+        if kind=='Comprehension':return self.comprehensions.render(n,expected,constant)
         if kind=='Range':
             typed_loop=self.typed_loops.render(n)
             if typed_loop is not None:return typed_loop

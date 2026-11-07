@@ -40,6 +40,7 @@ get_locals :: proc(ast_context: ^AstContext, position_context: ^DocumentPosition
 	if position_context.function != nil {
 		get_function_locals(ast_context.file, position_context.function, ast_context, position_context)
 	}
+	thor_get_comprehension_locals(ast_context,position_context.position)
 	if position_context.enum_type != nil {
 		get_locals_enum_fields(position_context.enum_type, ast_context, position_context)
 	}
@@ -846,6 +847,7 @@ get_locals_range_vals :: proc(
 			if binding,ok:=val.derived.(^ast.Field_Value);ok{vals[i]=binding.field}else{vals[i]=val}
 		}
 	}
+	container_symbol,container_ok:=resolve_type_expression(ast_context,expr)
 	// Register lexical bindings before resolving their container. In incomplete
 	// code the element type may be unknown, but value vs &reference mutability
 	// and scope are still known. Concrete entries below replace these sentinels.
@@ -908,7 +910,7 @@ get_locals_range_vals :: proc(
 		}
 	}
 
-	symbol, ok := resolve_type_expression(ast_context, expr)
+	symbol, ok := container_symbol,container_ok
 
 	if v, ok := symbol.value.(SymbolProcedureValue); ok {
 		if len(v.return_types) == 1 {

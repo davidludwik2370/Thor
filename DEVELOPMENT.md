@@ -3607,3 +3607,69 @@ cleanup without partial results. Related runs pass 130 basic/diagnostic/hygiene
 cases and 53 formatting/lifetime/hygiene cases. The documented basic demo runs
 cleanly under debug tracking/ASan and unchecked release; the shared runtime is
 rebuilt. See runtime/basic/README.md for ownership and custom-formatter limits.
+
+## Collection comprehensions (Thor 0.39.0)
+
+Implemented the agreed single-for, optional-if forms: inferred runtime slices,
+typed slices/dynamic arrays/sets/maps, compile-time fixed arrays, and one-level
+`..` unpacking for every supported container. Duplicate set members collapse;
+map duplicates keep the last value in iteration order. Nested comprehensions and
+multiple for/filter clauses produce direct grammar diagnostics. Runtime results
+retain manual ownership and existing shallow :> semantics.
+
+The shared parser represents a comprehension using a tagged native procedure /
+range scope while preserving every original identifier and expression span.
+The compiler treats that procedure as transparent, captures enclosing locals,
+and emits one native loop with checked construction primitives. Output bindings
+are in scope before their textual for declaration; source expressions retain
+outer lookup, including `for x in x`. Helpers are declared outside the synthetic
+AST blocks. Typed range/index bindings, enum indices, reference iteration,
+contextual literals, distinct destination types and generic specializations
+preserve native types. Package runtime initializers use Odin's default context;
+allocator switches still require the original allocator when freeing global
+slice/string storage.
+
+Required constant construction uses existing fn eligibility and project-local
+result caching. The filtered length becomes a native fixed-array type; empty
+constants retain their element type. Generated construction does not weaken fn
+rules: borrowed element storage remains borrowed and anonymous map/set
+construction cannot bypass the existing local-storage restrictions. Existing
+serialization boundaries on owned nested slices and logical-number aggregates
+remain explicit. Multiple-result iterator procedures are rejected with a source
+contract diagnostic; collection/range sources are evaluated once.
+
+Allocation failure is an ordinary panic path, including unchecked builds.
+Native map assignment ignores growth errors, so construction uses map_entry's
+explicit error result. Slice/dynamic/map/set builders release outer buffers
+before failure. Allocator adapters normalize silent nil allocation refusals and
+are removed from returned headers, avoiding stack-backed callback state.
+Manually owned element values keep ordinary shallow ownership, including when a
+map duplicate overwrites a value. Fresh f-string elements remain alive. Testing
+also found and fixed Rational constructor arguments rendered before capture
+aliases were installed; constructors now render again in their actual helper
+scope.
+
+TLS resolves the same range scopes for hover, completion, readonly highlighting,
+definition and rename, including output-before-binding and shadowed sources.
+Explicit/contextual enum outputs receive element context. Simple constant
+extents are folded with bounded static arithmetic; other constant extents show
+`?` instead of running user code in the server. Synthetic signature tokens are
+hidden; incomplete edits and repair do not retain stale scope/tokens. Compiler
+errors, unsaved TLS checks and CodeLLDB break/step locations retain Thor spans.
+No extension reinstall or new grammar keywords are needed; restart TLS to load
+the rebuilt server.
+
+Validation includes 35 comprehension compiler cases, seven real-stdio TLS
+cases, a real CodeLLDB breakpoint/step/variable test, and the assertion-hygiene
+suite. Coverage includes side-effect order, filtering before output/unpacking,
+empty/zero-sized values, duplicate keys, enum/map/string/set iteration, distinct
+and generic types, pure and impure calls, shallow borrowed elements, logical
+number ownership, anonymous owners and all construction failure stages. Failure
+injection verifies zero live construction bytes before panic in checked and
+assertion/bounds/type-check-disabled builds, including silent nil allocators.
+Related runs exercised the compiler/purity/loop/lifetime regressions, 30 TLS
+regressions, logical-number language/operator tests and all 139 editor Node tests.
+The dedicated commented demo, the main walkthrough and the original task demo
+are exercised with debug tracking/ASan and unchecked release flags. References
+are docs/comprehensions.md and examples/comprehensions/demo.thor; common runtime
+output and TLS are rebuilt.

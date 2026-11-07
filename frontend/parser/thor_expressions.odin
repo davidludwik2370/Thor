@@ -174,6 +174,8 @@ Feature :: struct {
     parts: []tokenizer.Interpolation_Part,
     manual_lifetime: bool,
     partial: bool,
+    container_type, loop, output, key, condition: [2]int,
+    spread: bool,
 }
 thor_span :: proc(node: ^ast.Node) -> [2]int {
     return [2]int{-1,-1} if node == nil else [2]int{node.pos.offset,node.end.offset}

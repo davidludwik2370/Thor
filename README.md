@@ -22,6 +22,11 @@ records the original failures and their regression cases; the compiler preserves
 native range/type operands, enum indices, SOA iteration and storage rules while
 adding Thor's syntax.
 
+Collection comprehensions construct slices, dynamic arrays, sets and maps,
+with filtered compile-time fixed arrays and one-level `..` unpacking. See the
+[comprehension reference](docs/comprehensions.md) and the executable
+[commented examples](examples/comprehensions/demo.thor).
+
 ## Run the demo
 
 Requirements: Python 3.10+ and `odin` on `PATH`. The first invocation builds and

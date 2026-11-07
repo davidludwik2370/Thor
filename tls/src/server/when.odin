@@ -290,6 +290,9 @@ resolve_when_expr :: proc(
 				case .Add: return lhs_int + rhs_int, true
 				case .Sub: return lhs_int - rhs_int, true
 				case .Mul: return lhs_int * rhs_int, true
+                case .Mod:
+                    if rhs_int==0||lhs_int==min(int)&&rhs_int== -1 {return {},false}
+                    return lhs_int%rhs_int,true
 				case .Mul_Mul:
 					if rhs_int < 0 { return {}, false }
 					result, factor := i128(1), i128(lhs_int)

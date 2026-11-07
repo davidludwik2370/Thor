@@ -260,20 +260,22 @@ class BigNumbers:
             if self.statically_zero(denominator):
                 return self.error(denominator,'A Rational denominator must not be zero.')
         method='integer' if typ.kind=='big_integer' else 'rational'
-        rendered=[]
         converted=set()
-        for arg in args:
-            value=arg.role('value') if arg.kind=='FieldValue' else arg
-            literal=self.literal(value)
-            # Two-part constructors preserve arbitrary-size numerators and
-            # denominators before native default-integer inference can occur.
-            contextual=self.type_hint('big_integer') if len(values)==2 else None
-            if contextual and self.s.resolver.membership_untyped(value) and self.ops.handles(value,contextual):converted.add(value)
-            code=(self.render_literal(value,'big_integer',False) if literal is not None else
-                  self.s.render(value,contextual) if contextual and self.s.resolver.membership_untyped(value) and self.ops.handles(value,contextual) else self.s.render(value))
-            if arg.kind=='FieldValue': code=arg.role('field').text+'='+code
-            rendered.append(code)
-        return self.consume_call(node,f'{self.module()}.{method}',args,rendered,converted)
+        def render_arguments():
+            rendered=[]
+            for arg in args:
+                value=arg.role('value') if arg.kind=='FieldValue' else arg
+                literal=self.literal(value)
+                # Re-render after closed() installs its capture aliases. A
+                # constructor can be nested inside a loop/comprehension.
+                contextual=self.type_hint('big_integer') if len(values)==2 else None
+                if contextual and self.s.resolver.membership_untyped(value) and self.ops.handles(value,contextual):converted.add(value)
+                code=(self.render_literal(value,'big_integer',False) if literal is not None else
+                      self.s.render(value,contextual) if contextual and self.s.resolver.membership_untyped(value) and self.ops.handles(value,contextual) else self.s.render(value))
+                if arg.kind=='FieldValue':code=arg.role('field').text+'='+code
+                rendered.append(code)
+            return rendered
+        return self.consume_call(node,f'{self.module()}.{method}',args,render_arguments,converted)
 
     def statically_zero(self,node):
         if self.s.resolver.constant_int(node)==0:return True
@@ -295,16 +297,17 @@ class BigNumbers:
         """Known constructors borrow their inputs and own all their results."""
         # Literal converted arguments are anonymous owners too. Ordinary
         # generic/native constructor inputs remain borrowed for the call.
+        initial=rendered()
         owned=[(a.role('value') if a.kind=='FieldValue' else a) in converted or self.literal(a.role('value') if a.kind=='FieldValue' else a) is not None or
                self.e.ownership.may_own(a.role('value') if a.kind=='FieldValue' else a) for a in args]
         owned=[own and not (self.shape(a.role('value') if a.kind=='FieldValue' else a).kind=='string' and
                            self.e.fstrings.manages(a.role('value') if a.kind=='FieldValue' else a)) for a,own in zip(args,owned)]
-        if not any(owned): return callee+'('+', '.join(rendered)+')'
+        if not any(owned): return callee+'('+', '.join(initial)+')'
         types=[self.shape(a.role('value') if a.kind=='FieldValue' else a) for a in args]
         count=2 if any(t.kind=='string' for t in types) else 1
         def body(_):
             lines=[]; actual=[]
-            for i,(arg,code,own) in enumerate(zip(args,rendered,owned)):
+            for i,(arg,code,own) in enumerate(zip(args,rendered(),owned)):
                 name=self.s.prefix+f'big_arg_{node.start}_{i}'
                 value=arg.role('value') if arg.kind=='FieldValue' else arg
                 if arg.kind=='FieldValue': code=code.split('=',1)[1]

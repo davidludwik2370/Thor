@@ -49,7 +49,7 @@ thor_adapt_expressions :: proc(p: ^parser.Parser,file:^ast.File){
     defer delete(results)
     for feature in p.features {if feature.kind=="SetType"{wanted[feature.start]=feature.end}}
     for feature in p.features {if feature.kind=="SwitchExpr"{results[{feature.start,feature.end}]=len(feature.cases)}}
-    if len(wanted)==0&&len(results)==0{return}
+
     alias:="__thor_tls_sets"
     for strings.contains(file.src,alias){alias=strings.concatenate({alias,"_"})}
     import_decl:=ast.new(ast.Import_Decl,file.pos,file.pos)
@@ -62,6 +62,15 @@ thor_adapt_expressions :: proc(p: ^parser.Parser,file:^ast.File){
     visit::proc(v:^ast.Visitor,node:^ast.Node)->^ast.Visitor{
         if node==nil{return v}
         state:=cast(^State)v.data
+        if decl,found:=node.derived.(^ast.Value_Decl);found&&!decl.is_mutable {
+            for value in decl.values {
+                if call,found:=value.derived.(^ast.Call_Expr);found {
+                    if ident,found:=call.expr.derived.(^ast.Ident);found&&ident.pos.offset==ident.end.offset&&strings.has_prefix(ident.name,"__thor_comprehension") {
+                        ident.name=strings.concatenate({ident.name,"_constant"})
+                    }
+                }
+            }
+        }
         if call,ok:=node.derived.(^ast.Call_Expr);ok{
             if count,found:=state.results[{node.pos.offset,node.end.offset}];found{
                 if ident,ok:=call.expr.derived.(^ast.Ident);ok{ident.name=fmt.aprintf("__thor_switch_expression_%d",count)}

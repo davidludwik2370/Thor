@@ -157,6 +157,9 @@ class Resolver:
         self.active.add(key)
         try:
             for scope in self.lexical_scopes(context):
+                if scope.kind=='Range' and 'comprehension' in scope.data:
+                    source=scope.role('expr')
+                    if context is source or source in context.ancestors():continue
                 symbols = self.scopes.get(self.scope_key(scope), {}).get(name, [])
                 if scope.kind != 'File':
                     # Runtime locals enter scope after their initializer. In
@@ -326,6 +329,7 @@ class Resolver:
             return Type(node=n)
         seen.add(key)
         kind = n.kind
+        if kind=='Comprehension':return n.source.comprehensions.result_type(n,seen)
         if kind=='Call' and self.native_builtin(n.role('callee'),'type_of') and len(n.group('args'))==1:
             return self.type_of(n.group('args')[0],seen)
         symbol=self.symbol(n) if kind=='Ident' else None
@@ -444,6 +448,7 @@ class Resolver:
             return Type(node=n)
         seen.add(n)
         kind = n.kind
+        if kind=='Comprehension':return n.source.comprehensions.result_type(n,seen)
         data=n.source.big.constants.payloads.get(n,{})
         if data.get('kind') in {'big_integer','big_rational'}:return Type(data['kind'],'Integer' if data['kind']=='big_integer' else 'Rational',n,witness=n)
         if kind=='Run':return self.type_of(n.role('expr'),seen)
@@ -498,7 +503,24 @@ class Resolver:
                 result.untyped = not symbol.declaration.data.get("mutable", True) and result.untyped
                 return result
             if symbol.declaration.kind == "Range":
-                container = self.type_of(symbol.declaration.role("expr"), seen)
+                if 'comprehension' in symbol.declaration.data:
+                    source=symbol.declaration.role('expr')
+                    interval=source.source.comprehensions.interval(source)
+                    if interval:
+                        if symbol.index:return Type('scalar','int',n)
+                        left,right=(self.type_of(interval.role(side),seen.copy()) for side in ['left','right'])
+                        return right if left.untyped and not right.untyped else left
+                    if source.source.denotes_type(source):return self.type_node(source) if symbol.index==0 else Type('scalar','int',n)
+                    container=self.type_of(source,seen)
+                    while container.kind=='pointer' and container.elem:container=container.elem
+                    if container.kind=='map':
+                        return self.type_node(container.node.role('key')) if symbol.index==0 and container.node else container.elem or Type(node=n)
+                    if symbol.index==1 and container.kind=='array' and container.node and container.node.kind=='ArrayType':
+                        index=container.node.role('len')
+                        if index and self.type_node(index).kind=='enum':return self.type_node(index)
+                    if symbol.index==1:return Type('scalar','int',n)
+                    if container.kind=='string':return Type('scalar','rune',n)
+                else:container=self.type_of(symbol.declaration.role("expr"), seen)
                 return container.elem or Type(node=n)
         if kind == "Compound":
             if n.role("type"):

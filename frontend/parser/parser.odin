@@ -58,6 +58,9 @@ Parser :: struct {
 	fix_prev_pos: tokenizer.Pos,
 
 	peeking: bool,
+	comprehension_depth: int,
+	comprehension_filter: bool,
+	comprehension_level: int,
 }
 
 Edit :: struct {start, end: int, text: string}
@@ -2743,6 +2746,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Open_Bracket:
 		open := expect_token(p, .Open_Bracket)
+		if p.thor && !p.allow_type && thor_comprehension_follows(p,.Close_Bracket) {
+			return parse_comprehension(p,open,nil,.Close_Bracket)
+		}
 		count: ^ast.Expr
 		elems: [dynamic]^ast.Expr
 		literal := false
@@ -3279,9 +3285,12 @@ parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
 	return elems[:]
 }
 
-parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
+parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Expr {
 	elems: []^ast.Expr
 	open := expect_token(p, .Open_Brace)
+	if p.thor && thor_comprehension_follows(p,.Close_Brace) {
+		return parse_comprehension(p,open,type,.Close_Brace)
+	}
 	prev_expr_level := p.expr_level
 	p.expr_level = 0
 	if p.curr_tok.kind != .Close_Brace {
@@ -3691,6 +3700,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int, stop_membership:=
 		loop: for {
 			op := p.curr_tok
 			op_prec := token_precedence(p, op.kind)
+			if p.comprehension_filter && p.expr_level==p.comprehension_level && op.kind==.If {op_prec=0}
 			if stop_membership && (op.kind==.In || op.kind==.Not_In) {op_prec=0}
 			if op_prec != prec {
 				break loop

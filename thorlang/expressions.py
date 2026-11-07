@@ -45,6 +45,11 @@ class Expressions:
         # surrounding declaration scope; their explicit inputs keep evaluation
         # at the original expression site.
         ancestors = list(node.ancestors())
+        comprehension = next((a for a in ancestors if a.kind == 'Comprehension'), None)
+        if comprehension:
+            # Its native AST blocks model lexical scope only. The custom
+            # renderer emits the loop; helper declarations belong outside it.
+            ancestors = list(comprehension.ancestors())
         deferred = [a for a in ancestors if a.kind == 'Defer']
         if deferred:
             ancestors = list(deferred[-1].ancestors())
@@ -88,7 +93,7 @@ class Expressions:
             return None
         return symbol
 
-    def closed(self,node,builder,result='string',pointer=False,flavor='value',optional_ok=False,optional_tag=None):
+    def closed(self,node,builder,result='string',pointer=False,flavor='value',optional_ok=False,optional_tag=None,contextless=False):
         from .compiler import Hint
         from .semantics import descendants
         s=self.source
@@ -154,7 +159,7 @@ class Expressions:
                     body=builder(hint)
             finally:
                 self.captures.pop()
-            convention=' "odin"' if self.has_context(node) and not self.switches.global_context else ' "contextless"'
+            convention=' "odin"' if self.has_context(node) and not self.switches.global_context and not contextless else ' "contextless"'
             returns=(' -> (value: '+result_type+', ok: bool) #optional_ok' if optional_ok else ' -> '+result_type) if result_type else ''
             if returns and optional_tag:returns+=' #'+optional_tag
             privacy='@(private="file")\n' if scope is s.root else ''
