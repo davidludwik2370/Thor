@@ -9,6 +9,7 @@ map tables and dynamic-array backing storage keep their Odin behavior.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections import deque
 from pathlib import Path
 import sys
 from .semantics import Type, Candidate
@@ -55,7 +56,7 @@ class Value:
         return changed
 
 
-@dataclass
+@dataclass(eq=False)
 class Summary:
     proc: object
     substitutions: dict
@@ -70,6 +71,7 @@ class Summary:
     complete: bool = False
     strong_updates: bool = False
     controls: list = field(default_factory=list)
+    callers: set = field(default_factory=set)
 
 
 class SliceAccess:
@@ -106,6 +108,8 @@ class SliceAccess:
         self.summaries={};self.globals={};self.global_active=set();self.pending=[]
         self.changed=False;self.depth=0;self.enabled=False
         self.recursive=False
+        self.recursive_pending=set()
+        self.full_contracts=False
         self.readonly_access={}
         for source in project.sources.values():
             source.slice_access=self
@@ -146,7 +150,8 @@ class SliceAccess:
         # schedule evaluations while inspecting inactive or native bodies.
         self.r.suspend_evaluation=True
         self.r.native_enabled=True
-        try:self._prepare()
+        try:
+            with self.r.cached_queries():self._prepare()
         finally:
             self.r.native_enabled=previous
             self.r.suspend_evaluation=suspended
@@ -175,12 +180,11 @@ class SliceAccess:
             # both repeats work and can inspect declarations pruned from that
             # helper. Calls recursively instantiate the retained callees.
             procedures=[proc for proc in self.project.purity.active if proc.kind=='Procedure']
-        for proc in procedures:self.summary(proc,{})
-        for _ in range(24 if self.recursive else 0):
-            self.changed=False
-            for context in list(self.summaries.values()):
-                if context.complete:self.statement(context.proc.role('body'),context)
-            if not self.changed:break
+        # Check every body, but infer hypothetical parameter borrowing only
+        # when an actual reference-bearing call needs that contract. Editors
+        # also request contracts for unused declarations to display #mut hints.
+        for proc in procedures:self.summary(proc,{},contract=self.full_contracts)
+        self.stabilize()
         for context in list(self.summaries.values()):self.publish(context)
         for source in self.project.sources.values():
             context=Summary(None,{})
@@ -592,16 +596,21 @@ class SliceAccess:
                 tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.substitutions.items())),
                 tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.members.items())))
 
-    def summary(self,proc,substitutions):
-        key=proc,tuple(sorted((name,self.type_key(typ)) for name,typ in substitutions.items()))
+    def summary(self,proc,substitutions,caller=None,*,contract=True):
+        key=proc,tuple(sorted((name,self.type_key(typ)) for name,typ in substitutions.items())),contract
         if key in self.summaries:
-            if self.summaries[key].active:self.recursive=True
-            return self.summaries[key]
+            context=self.summaries[key]
+            if caller and caller.proc:context.callers.add(caller)
+            if context.active:
+                self.recursive=True
+                if caller and caller.proc:self.recursive_pending.add(caller)
+            return context
         context=Summary(proc,substitutions);self.summaries[key]=context
+        if caller and caller.proc:context.callers.add(caller)
         params=self.parameters(proc)
         for index,(name,field) in enumerate(params):
             typ=self.substitute_type(self.parameter_type(field,substitutions),substitutions)
-            context.env[field,name.text.lstrip('$')]=self.fresh(typ,(index,()))
+            context.env[field,name.text.lstrip('$')]=self.fresh(typ,(index,()) if contract else None)
             if name.data.get('slice_mut'):
                 self.require({Origin(index)},name,context,'satisfy explicit #mut')
         result_fields=proc.role('type').role('results')
@@ -634,6 +643,29 @@ class SliceAccess:
         self.depth-=1;context.active=False;context.complete=True
         self.publish(context)
         return context
+
+    def stabilize(self):
+        """Propagate completed recursive facts only to their actual callers."""
+        queue=deque();queued=set();visits={}
+        def schedule(context):
+            if context not in queued and visits.get(context,0)<24:
+                queue.append(context);queued.add(context)
+        while self.recursive_pending or queue:
+            for context in self.recursive_pending:schedule(context)
+            self.recursive_pending.clear()
+            if not queue:break
+            context=queue.popleft();queued.remove(context)
+            before=self.state(context)
+            self.statement(context.proc.role('body'),context)
+            visits[context]=visits.get(context,0)+1
+            # Header replacement may temporarily merge and then remove the
+            # same facts. That does not invalidate a completed caller summary.
+            if before==self.state(context):continue
+            if visits[context]==24:
+                for index,(name,_) in enumerate(self.parameters(context.proc)):
+                    self.require({Origin(index,aspect='all')},name,context,'verify a complex recursive slice reference graph')
+            schedule(context)
+            for caller in context.callers:schedule(caller)
 
     @staticmethod
     def state(context):
@@ -892,7 +924,7 @@ class SliceAccess:
             if annotation and annotation.kind=='Ellipsis':self.r.unify(annotation.role('expr'),value.typ.elem or Type(),substitutions)
             elif annotation:self.r.unify(annotation,value.typ,substitutions)
             if annotation and annotation.kind=='PolyType':substitutions[annotation.data['name']]=value.typ
-        summary=self.summary(target,substitutions)
+        summary=self.summary(target,substitutions,context)
         for origin,(operation,reason,chain) in list(summary.effects.items()):
             origins=self.resolve(origin,bindings)
             site=sites[origin.index] if origin.index<len(sites) else node

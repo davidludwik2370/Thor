@@ -78,3 +78,6 @@ same recursive slice-access inference loop during emission. This is a separate
 full-test analysis cost; ordinary `thor vet`/build timings above exclude those
 test files. This pass does not claim a completed full poker-suite run or resolve
 that additional performance issue.
+
+The full-test slowdown is subsequently resolved in Thor/TLS 0.41.6; see the
+[test-command performance report](test-performance-2026-11-08.md).

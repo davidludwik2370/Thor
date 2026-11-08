@@ -4061,3 +4061,25 @@ interaction tests. The additional full poker test run times out before emission;
 an untouched-source control reaches the same slow recursive slice inference
 stage. Record that separate performance observation in the report without
 claiming a completed poker-suite run.
+
+## Restore full-test slice-inference performance (Thor/TLS 0.41.6)
+
+Replace the global recursive-summary replay loop with dependency-driven
+propagation. Local header replacement can set transient change flags while
+leaving the completed graph identical; compare final graphs before rescheduling
+their callers. Preserve a conservative requirement at the iteration bound.
+Separate ordinary body checking from on-demand symbolic parameter-contract
+inference. Editors still request all contracts for unused-declaration hints.
+
+Reuse resolved symbol/type facts within fixed source-analysis phases, invalidate
+on source discovery and bypass active generic bindings and unresolved queries.
+Memoize static lexical scopes and import directories with collection identity.
+This is in-memory analysis reuse, not a persistent project/build-output cache.
+Generated program behavior, source mappings and default test flags are unchanged.
+
+Poker now completes all 213 tests in 6.98–7.85 seconds with default checks, and
+also passes assertion-disabled unchecked and speed-optimized runs. All 387 tests
+in the three compiler/TLS/native/interaction groups pass. Add seven dedicated
+performance/correctness regressions, including cached/uncached and eager/on-demand
+diagnostic comparisons, recursive aliases and unused-body checks. Four affected
+real projects build without source edits. See [the complete report](docs/test-performance-2026-11-08.md).

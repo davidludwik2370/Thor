@@ -21,8 +21,15 @@ class NativeSources:
         self.packages = {}
         self.sources = {}
         self.discovery_scope = None
+        self.directories = {}
 
     def directory(self, source, path):
+        collection=path.partition(':')[0] if ':' in path else None
+        key=source,path,source.collections.get(collection)
+        if key not in self.directories:self.directories[key]=self.resolve_directory(source,path)
+        return self.directories[key]
+
+    def resolve_directory(self, source, path):
         local = source.import_dir(path)
         if local is not None:
             # SDK packages also import siblings/children with relative paths.

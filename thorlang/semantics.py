@@ -7,6 +7,7 @@ assignability and overload validity in the defining scope.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from contextlib import contextmanager
 import hashlib
 from pathlib import Path
 
@@ -89,10 +90,14 @@ class Resolver:
         self.integer_active = set()
         self.wrappers = {}
         self.markers = {}
+        self.lexical_scope_cache = {}
+        self.query_caches = None
         self.add_sources(sources)
 
     def add_sources(self, sources):
         sources = [source for source in sources if source not in self.sources]
+        if sources and self.query_caches is not None:
+            for cache in self.query_caches.values():cache.clear()
         self.sources.extend(sources)
         for source in sources:
             source.resolver = self
@@ -145,11 +150,13 @@ class Resolver:
         return (scope.source.path.parent, "package") if scope.kind == "File" else scope
 
     def lexical_scopes(self, context):
+        if context in self.lexical_scope_cache:return self.lexical_scope_cache[context]
         result = [a for a in context.ancestors() if a.source.is_scope(a) or a.kind == "ProcedureType"]
         if context.source.is_scope(context):
             result.insert(0, context)
         if context.source.root not in result:
             result.append(context.source.root)
+        self.lexical_scope_cache[context]=result
         return result
 
     def lookup(self, name, context, *, projections=True):
@@ -213,7 +220,34 @@ class Resolver:
             directory = self.native.load(source, path) or directory
         return directory
 
+    @contextmanager
+    def cached_queries(self):
+        """Reuse resolved source facts during one fixed source-analysis phase.
+
+        Native package discovery invalidates these facts. Generic bindings and
+        recursive/partially resolved queries retain their normal uncached path.
+        Permission graphs are not cached here.
+        """
+        previous=self.query_caches
+        source_count=len(self.sources)
+        self.query_caches={'symbol':{},'type_node':{},'type_of':{}}
+        try:yield
+        finally:
+            if previous is not None and len(self.sources)!=source_count:
+                for cache in previous.values():cache.clear()
+            self.query_caches=previous
+
     def symbol(self, n, seen=None):
+        cache=self.query_caches
+        use=bool(cache is not None and n is not None and seen is None and
+                 not self.bound_types and not self.bound_constants and (n.text,n) not in self.active)
+        key=n,self.native_enabled
+        if use and key in cache['symbol']:return cache['symbol'][key]
+        result=self._symbol(n,seen)
+        if use and result is not None and not result.projection:cache['symbol'][key]=result
+        return result
+
+    def _symbol(self, n, seen=None):
         if n is None:
             return None
         seen = set() if seen is None else seen
@@ -328,6 +362,16 @@ class Resolver:
         return signature, message
 
     def type_node(self, n, substitutions=None, seen=None):
+        cache=self.query_caches
+        use=cache is not None and n is not None and seen is None and not self.bound_types and not self.bound_constants
+        if use:
+            key=n,self.native_enabled,tuple(sorted((substitutions or {}).items()))
+            if key in cache['type_node']:return cache['type_node'][key]
+        result=self._type_node(n,substitutions,seen)
+        if use and result.kind not in {'unknown','generic'}:cache['type_node'][key]=result
+        return result
+
+    def _type_node(self, n, substitutions=None, seen=None):
         if n is None:
             return Type()
         substitutions = substitutions or {}
@@ -483,6 +527,15 @@ class Resolver:
         return self.type_of(n, seen) if index == 0 else Type(node=n)
 
     def type_of(self, n, seen=None):
+        cache=self.query_caches
+        use=cache is not None and n is not None and seen is None and not self.bound_types and not self.bound_constants
+        key=n,self.native_enabled
+        if use and key in cache['type_of']:return cache['type_of'][key]
+        result=self._type_of(n,seen)
+        if use and result.kind not in {'unknown','generic'}:cache['type_of'][key]=result
+        return result
+
+    def _type_of(self, n, seen=None):
         if n is None:
             return Type()
         seen = set() if seen is None else seen

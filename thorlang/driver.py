@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.41.5"
+VERSION = "0.41.6"
 
 
 def backend_failure(status):
@@ -102,7 +102,7 @@ class Project:
         from .defaults import DefaultCallbacks
         for source in self.sources.values():
             source.defaults = DefaultCallbacks(source)
-        self.resolver.prepare_contexts()
+        with self.resolver.cached_queries():self.resolver.prepare_contexts()
         self.resolver.prepare_storage_checks()
         from .purity import Purity
         self.purity=Purity(self)
@@ -479,6 +479,7 @@ def _main(argv=None):
             project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
                               cache_frontend=not options.no_cache,cache_directory=cache_root)
             project.slice_access.enabled|=options.editor_info
+            project.slice_access.full_contracts=options.editor_info
             if publisher:
                 project.publish_layout = publisher.system
             if '-debug' in flags:

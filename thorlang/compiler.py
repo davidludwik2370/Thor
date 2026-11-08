@@ -185,6 +185,7 @@ class Source:
             self.import_names[node] = namespace
         self.project: dict[Path, list[Source]] = {}
         self.collections: dict[str, Path] = {}
+        self.import_directories = {}
         self.needs_membership = False
         self.needs_default = False
         self.needs_intrinsics = False
@@ -362,8 +363,13 @@ class Source:
         if ":" in path:
             collection, suffix = path.split(":", 1)
             base = self.collections.get(collection)
-            return (base / suffix).resolve() if base else None
-        return (self.path.parent / path).resolve()
+            key=path,base,Path.cwd() if base and not base.is_absolute() else None
+            if key not in self.import_directories:
+                self.import_directories[key]=(base/suffix).resolve() if base else None
+        else:
+            key=path,None,None
+            if key not in self.import_directories:self.import_directories[key]=(self.path.parent/path).resolve()
+        return self.import_directories[key]
 
     def type_hint(self, expression, seen=None):
         if expression is None:

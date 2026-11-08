@@ -204,3 +204,10 @@ the additional compiler and live TLS matrices in
 Normal directory builds exclude `_test.thor`/`_test.odin` sources, matching Odin;
 `thor test` includes the target package's tests. This keeps test-only examples
 from producing access errors in an ordinary application build.
+
+Ordinary compilation checks every body and infers borrowing contracts on demand
+for reference-bearing calls. Editor metadata requests infer contracts for unused
+procedures as well. Recursive summaries propagate changes only to their actual
+callers, using completed permission graphs to determine convergence. See the
+[test-command performance report](test-performance-2026-11-08.md) for validation
+of these optimizations and their cache boundaries.
