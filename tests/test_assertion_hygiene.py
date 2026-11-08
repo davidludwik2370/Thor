@@ -165,6 +165,9 @@ class AssertionHygieneTests(unittest.TestCase):
             invalid.write_text('package main\nmain::proc( {\n')
             paths = [ROOT/name for name in ['demo/main.thor', 'examples/demo/demo.thor', 'runtime/basic/basic.thor',
                                            'tests/fixtures/array_type_mismatch/main.thor']]
+            tagged=Path(directory)/'tagged.thor'
+            tagged.write_text('package main\nPoint::struct{x,y:f32}\nmain::proc(){values:#soa[]Point;lanes:#simd[4]f32;_=values;_=lanes}\n')
+            paths.append(tagged)
             for path in [*paths, invalid]:
                 args = [str(path), '--test']
                 ordinary = subprocess.run([str(self.frontend), *args], capture_output=True, timeout=30)

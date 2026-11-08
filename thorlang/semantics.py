@@ -25,6 +25,8 @@ class Type:
     untyped: bool = False
     nominal: object = None
     lexical: dict = field(default_factory=dict)
+    members: dict = field(default_factory=dict)
+    soa: bool = False
 
 
 @dataclass(eq=False)
@@ -366,6 +368,13 @@ class Resolver:
             return Type('set',node=n,elem=self.type_node(n.group('args')[0],substitutions,seen))
         if kind == "Paren":
             return self.type_node(n.role("expr"), substitutions, seen)
+        if kind=='WhenExpr':
+            left=self.type_node(n.role('x'),substitutions,seen.copy())
+            right=self.type_node(n.role('y'),substitutions,seen.copy())
+            # A target-dependent numeric alias still always has value storage.
+            # Keep its exact width deferred to Odin rather than inventing one.
+            if left.kind==right.kind=='scalar' and left.name not in {'rawptr','any','typeid'} and right.name not in {'rawptr','any','typeid'}:
+                return Type('scalar',left.name if left.name==right.name else '',n,witness=('type',n))
         if kind == "PolyType":
             name = n.data["name"]
             if name in substitutions and isinstance(substitutions[name], Type):
@@ -377,13 +386,13 @@ class Resolver:
         if kind == "ArrayType":
             length = n.role("len")
             if length is None:
-                return Type("slice", node=n, elem=self.type_node(n.role("elem"), substitutions, seen))
+                return Type("slice", node=n, elem=self.type_node(n.role("elem"), substitutions, seen),soa=n.data.get('op')=='soa')
             count = substitutions.get(binding_name(length))
             if not isinstance(count, int):
                 count = self.constant_int(length)
-            return Type("array", node=n, elem=self.type_node(n.role("elem"), substitutions, seen), length=count)
+            return Type("array", node=n, elem=self.type_node(n.role("elem"), substitutions, seen), length=count,soa=n.data.get('op')=='soa')
         if kind == "DynamicArrayType":
-            return Type("dynamic", node=n, elem=self.type_node(n.role("elem"), substitutions, seen))
+            return Type("dynamic", node=n, elem=self.type_node(n.role("elem"), substitutions, seen),soa=n.data.get('op')=='soa')
         if kind in {"PointerType", "MultiPointerType"}:
             return Type("pointer", node=n, elem=self.type_node(n.role("elem"), substitutions, seen))
         if kind == "MapType":
@@ -762,6 +771,7 @@ class Resolver:
 
     def field(self, typ, name, seen=None):
         seen = set() if seen is None else seen
+        if typ.kind=='struct' and name in typ.members:return typ.members[name],typ.node,False
         if typ.kind == "pointer":
             found = self.field(typ.elem, name, seen)
             return (*found[:2], True) if found else None
@@ -825,6 +835,7 @@ class Resolver:
             expected = self.type_node(formal, substitutions)
         if formal.kind == "ArrayType" and actual.kind in {"array", "slice"}:
             length = formal.role("len")
+            if actual.kind!=('array' if length else 'slice'):return -1000
             if length and length.kind == "PolyType":
                 substitutions[length.data["name"]] = actual.length
             elif length and actual.length is not None:

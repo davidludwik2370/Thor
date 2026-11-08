@@ -18,7 +18,7 @@ from .sourcemap import MappingBuilder
 from .semantics import Resolver
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.41.3"
+VERSION = "0.41.4"
 
 
 def backend_failure(status):
@@ -120,6 +120,8 @@ class Project:
         paths = [entry] if entry.is_file() or entry in self.overlays else sorted(
             {p for p in entry.iterdir() if p.is_file() and p.suffix in {".thor", ".odin"}} |
             {p for p in self.overlays if p.parent == entry and p.suffix in {".thor", ".odin"}})
+        if not self.test and entry.is_dir():
+            paths=[path for path in paths if not path.name.endswith(('_test.thor','_test.odin'))]
         # Compiler support has its own native test command. Importing its test
         # files into a program can add core-library dependencies to bootstrap
         # support used by checked versions of those same libraries.

@@ -48,6 +48,7 @@ class NativeSources:
             self.packages[directory] = members
             p = self.project
             files=set(directory.glob('*.odin')) | {path for path in p.overlays if path.parent==directory and path.suffix=='.odin'}
+            files={path for path in files if not path.name.endswith('_test.odin')}
             for file in sorted(files):
                 member = Source(file, p.frontend, thor=False, package=True, test=p.test,
                                 project_name=p.entry.stem, raw=p.overlays.get(file), target=p.target, mapping=p.mapping,cache=p.cache_frontend,cache_dir=p.cache_directory)

@@ -4012,3 +4012,28 @@ The circles-on-dots project still has a separate performance concern: an isolate
 warm build succeeds but takes 47.26 seconds. Record this unresolved timing issue
 in the audit without claiming that all compile-time overhead is resolved.
 See [the complete project audit](docs/project-build-audit-2026-11-07.md).
+
+## Copy boundaries in slice access analysis (Thor/TLS 0.41.4)
+
+Detach inline value-copy paths from their caller storage while preserving nested
+borrowed references. Model native conditional numeric aliases, union narrowing,
+defaulted/generic parameters, per-result builtin and procedure copies, and
+column-specific SoA access. Distinguish array and slice overloads. Preserve alias
+relationships across summary results and separate detached result snapshots from
+later local-header rebindings. Recognize independent local-header replacement
+without erasing previous aliases or potentially skipped/deferred writes. Compare
+final permission graphs when those replacements require non-monotone local facts.
+
+Keep inferred TLS `#mut` tied to actual slice-storage access: inline generic
+element copies and writes through existing pointer targets do not imply a slice
+write. Normal package discovery/native SDK inspection exclude test-only sources,
+preventing irrelevant diagnostics and expensive test-graph traversal in builds.
+No runtime representation, ownership or source-line changes are introduced.
+
+The final compiler/TLS acceptance group passes 149 tests, including 111 compiler
+programs in the new copy matrix and four new live TLS cases. The final native,
+compatibility, runtime and assertion-hygiene group passes 110 tests; an additional
+86-case purity/conditional/power/using interaction run passes. Runtime fixtures
+use checked debug and optimized assertion-disabled unchecked configurations.
+All 19 current Code/Thor projects build in normal and debug modes with unchanged
+source bytes. See [the coverage and remaining boundaries](docs/slice-copy-hardening-2026-11-07.md).

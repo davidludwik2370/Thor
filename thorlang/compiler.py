@@ -420,6 +420,8 @@ class Source:
         seen.add(expression)
         if expression.kind == 'Paren':
             return self.denotes_type(expression.role('expr'), seen)
+        if expression.kind=='WhenExpr':
+            return self.denotes_type(expression.role('x'),seen.copy()) and self.denotes_type(expression.role('y'),seen.copy())
         if expression.kind.endswith("Type"):
             return True
         if expression.kind == "Call" and self.resolver and self.resolver.native_builtin(expression.role('callee'),'type_of'):

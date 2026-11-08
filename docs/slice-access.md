@@ -27,6 +27,31 @@ record's nested slice references retain their permissions. Nested slices reached
 through a read-only slice remain read-only, including through returned records,
 shallow clones, comprehensions, and calls to other procedures.
 
+```odin
+Row :: struct { count: int, items: []int }
+rows :> []Row{{7, []int{1}}}
+copy := rows[0]
+copy.count = 9          // Independent inline field; allowed.
+// copy.items[0] = 9    // Still the borrowed nested slice; rejected.
+copy.items = make([]int, 1)
+copy.items[0] = 9       // Independent replacement storage; allowed.
+delete(copy.items)
+```
+
+These copy rules apply to indexing, value iteration, comprehensions, `copy`,
+`append`, `swizzle`, `expand_values`, `new_clone`, and procedure results. Each
+result keeps its own permission: a numeric result alongside a borrowed slice
+does not inherit that slice's restriction. Narrowing a union to a numeric,
+fixed-array or record variant uses that variant's actual copy semantics.
+Target-dependent numeric aliases such as `core:c.long` remain numeric values.
+
+`basic.clone` makes a shallow value copy. In particular, cloning a slice header
+with it does not allocate writable backing storage. `core:slice.clone` and
+`clone_to_dynamic` allocate independent outer storage; nested slices remain
+shallow references. `new_clone` allocates the outer pointed-to value and likewise
+preserves restrictions on nested slices. Use `deepclone` when independent nested
+storage is required.
+
 Odin array components (`.x`, `.y`, `.r`, etc.) and swizzles (`.yx`, `.rgba`)
 follow the same rules as indexing and copying array elements. Reading a numeric
 component from an immutable vector, including a foreign procedure's result,
@@ -106,6 +131,21 @@ conditions the access analysis cannot resolve keep a conservative join until
 their native specialization is known. Calls in switch selectors, case matches,
 comprehension keys and filter/output expressions follow the same access rules
 as direct calls.
+Defaulted parameters are checked using their inferred types. Generic procedures
+use their actual specialization, including record type arguments and fixed-array
+lengths, rather than assuming every unknown element is a borrowed reference.
+
+For `#soa` views, `soa_zip`/`soa_unzip` track permissions separately for each
+column. A helper that writes only column `b` can receive a zipped read-only
+column `a` and writable column `b`. Copying an SoA row copies its inline fields;
+nested slice fields still borrow their original storage.
+
+Replacing a copied local record's slice header with independent storage restores
+writable access through that header. Earlier copies keep their old restrictions.
+Definite fresh replacements at both ends of an `if` are recognized. A replacement
+that may be skipped, delayed by `defer`, or occur only in a loop does not erase
+an outer header's earlier permission. More complex indexed or loop-carried alias
+updates remain conservative; this is not a complete ownership analysis.
 Unresolved callbacks, foreign/bodyless procedures and opaque `any`/raw-pointer
 conversions cannot silently shed permissions. Core printing, cloning, and the
 reviewed basic string/hash interfaces have argument-specific contracts. Ordinary
@@ -157,3 +197,10 @@ runtime helpers collapse to one diagnostic at that original operation.
 and the real debugger test cover the feature and its interactions. Runtime checks
 also run with allocation tracking, assertions disabled, and unchecked release
 flags.
+
+The [copy-boundary hardening report](slice-copy-hardening-2026-11-07.md) describes
+the additional compiler and live TLS matrices in
+`tests/test_slice_copy_hardening.py` and `tests/test_slice_copy_hardening_tls.py`.
+Normal directory builds exclude `_test.thor`/`_test.odin` sources, matching Odin;
+`thor test` includes the target package's tests. This keeps test-only examples
+from producing access errors in an ordinary application build.

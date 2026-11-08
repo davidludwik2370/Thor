@@ -68,6 +68,8 @@ class Summary:
     named_results: list = field(default_factory=list)
     active: bool = False
     complete: bool = False
+    strong_updates: bool = False
+    controls: list = field(default_factory=list)
 
 
 class SliceAccess:
@@ -118,9 +120,11 @@ class SliceAccess:
 
     def parameter_type(self,field,substitutions):
         annotation=field.role('type')
+        if annotation and annotation.kind=='TypeidType':return Type('scalar','typeid',annotation)
         if annotation and annotation.kind=='Ellipsis':
             return Type('slice',elem=self.r.type_node(annotation.role('expr'),substitutions))
-        typ=self.r.type_node(annotation,substitutions)
+        typ=self.r.type_node(annotation,substitutions) if annotation else self.r.type_of(field.role('default'))
+        typ=self.substitute_type(typ,substitutions)
         return Type('slice',elem=typ) if field.data.get('variadic') and typ.kind!='slice' else typ
 
     def validate_annotations(self):
@@ -193,7 +197,19 @@ class SliceAccess:
         if node is None:return Type()
         if node.kind in {'Paren','OrReturn','OrPanic','OrBranch'}:return self.type(node.role('expr'),context)
         if node.kind=='Call':
-            builtin=self.project.purity.builtin(node)
+            builtin=self.project.purity.builtin(node) or self.reference_builtin(node.role('callee'))
+            if builtin=='new_clone':
+                operand=self.project.purity.arguments(node,['data'])[0]
+                return Type('pointer',elem=self.type(operand,context))
+            if builtin=='swizzle':
+                args=node.group('args')
+                if args:
+                    source=self.type(args[0],context)
+                    return Type('array',elem=source.elem,length=len(args)-1)
+            if builtin=='soa_zip':
+                members={arg.role('field').text:self.type(arg.role('value'),context).elem or Type()
+                         for arg in node.group('args') if arg.kind=='FieldValue'}
+                return Type('slice',elem=Type('struct',members=members),soa=True)
             if builtin in {'len','cap','size_of','align_of','offset_of'}:return Type('scalar','int',node)
             if builtin in {'min','max','abs','clamp'}:
                 args=node.group('args')
@@ -215,6 +231,8 @@ class SliceAccess:
                     total=component.name.removeprefix(prefix)
                     name='f'+str(int(total)//(2 if prefix=='complex' else 4)) if total.isdigit() else 'f64'
                 return Type('scalar',name,node)
+            target=self.substitute_type(self.r.type_node(node.role('callee')),context.substitutions)
+            if target.kind not in {'unknown','generic','procedure'}:return target
         if node.kind=='Ident' or node.kind=='Selector' and self.r.symbol(node) is not None:
             symbol=self.r.symbol(node)
             if symbol and (symbol.declaration,symbol.name) in context.env:return context.env[symbol.declaration,symbol.name].typ
@@ -229,7 +247,7 @@ class SliceAccess:
         if node.kind=='Slice':
             base=self.type(node.role('expr'),context)
             while base.kind=='pointer' and base.elem:base=base.elem
-            return base if base.kind=='string' else Type('slice',elem=base.elem)
+            return base if base.kind=='string' else Type('slice',elem=base.elem,soa=base.soa)
         if node.kind=='Unary' and node.data.get('op')=='&':return Type('pointer',elem=self.type(node.role('expr'),context))
         if node.kind=='Deref':return self.type(node.role('expr'),context).elem or Type()
         typ=self.r.type_of(node)
@@ -239,6 +257,11 @@ class SliceAccess:
 
     def substitute_type(self,typ,substitutions,seen=None):
         if typ is None:return Type()
+        if typ.node and typ.node.kind=='WhenExpr' and typ.kind in {'unknown','scalar'}:
+            selected=self.condition(typ.node.role('cond'),Summary(None,substitutions))
+            if selected is not None:
+                branch=typ.node.role('x' if selected else 'y')
+                return self.substitute_type(self.r.type_node(branch,substitutions),substitutions,seen)
         if typ.kind in {'generic','unknown'} and typ.name.lstrip('$') in substitutions:
             value=substitutions[typ.name.lstrip('$')]
             if isinstance(value,Type):return value
@@ -254,9 +277,16 @@ class SliceAccess:
             if any(resolved[name] is not value for name,value in typ.substitutions.items()):return replace(typ,substitutions=resolved)
         return typ
 
+    @staticmethod
+    def struct_names(typ):
+        if typ.members:return list(typ.members)
+        fields=typ.node.role('fields') if typ.node else None
+        return [name.text for field in fields.children if field.kind=='Field' for name in field.group('names')] if fields else []
+
     def same_type(self,a,b,depth=0):
         if depth>32:return None
         if a.kind in {'generic','unknown'} or b.kind in {'generic','unknown'}:return None
+        if a.members or b.members:return True if a is b else None
         if a.kind!=b.kind:return False
         if a.kind in {'struct','union','enum','bitset'} and a.node is not b.node:return False
         if a.substitutions or b.substitutions:
@@ -275,6 +305,8 @@ class SliceAccess:
                 same=self.same_type(self.r.type_node(a.node.role('key')),self.r.type_node(b.node.role('key')),depth+1)
                 if same is not True:return same
             return self.same_type(a.elem,b.elem,depth+1)
+        if a.kind=='scalar' and (not a.name or not b.name):
+            return True if a.node is not None and a.node is b.node and a.nominal is b.nominal else None
         if a.kind in {'scalar','enum','struct','union','bitset'}:return a.name==b.name and a.nominal==b.nominal
         return None
 
@@ -308,6 +340,12 @@ class SliceAccess:
         if value.base:
             base=self.member(value.base,name)
             return self.qualify(base,value.storage-value.base.storage)
+        if value.typ.soa and name in self.struct_names(value.typ.elem or Type()):
+            if name not in value.fields:
+                typ=self.r.field(value.typ.elem,name)[0]
+                path=(value.path[0],(*value.path[1],('field',name))) if value.path else None
+                value.fields[name]=self.fresh(Type('slice',elem=typ),path,value.storage)
+            return value.fields[name]
         if name not in value.fields:
             member=self.r.field(value.typ,name)
             typ=member[0] if member else Type()
@@ -316,6 +354,14 @@ class SliceAccess:
         return value.fields[name]
 
     def item(self,value):
+        if value.typ.soa:
+            if value.base:return self.qualify(self.item(value.base),value.storage-value.base.storage)
+            if value.element is None:
+                path=(value.path[0],(*value.path[1],('item',))) if value.path else None
+                value.element=self.fresh(value.typ.elem or Type(),path,value.data|value.storage)
+                for name in self.struct_names(value.element.typ):
+                    value.element.fields[name]=self.item(self.member(value,name))
+            return value.element
         if value.base:
             item=self.item(value.base)
             return self.qualify(item,value.data|value.storage)
@@ -339,12 +385,11 @@ class SliceAccess:
         seen={} if seen is None else seen
         if id(value) in seen:return seen[id(value)]
         data=set(value.data) if value.typ.kind in {'slice','generic','unknown','union'} else set()
-        result=Value(value.typ,data,element=value.element,target=value.target,path=value.path)
+        path=value.path if value.typ.kind in {'slice','pointer','dynamic','map','set','generic','unknown','union'} else None
+        result=Value(value.typ,data,element=value.element,target=value.target,path=path)
         seen[id(value)]=result
-        if value.typ.kind=='struct' and value.typ.node:
-            for field in value.typ.node.role('fields').children:
-                if field.kind=='Field':
-                    for name in field.group('names'):result.fields[name.text]=self.copied(self.member(value,name.text),seen)
+        if value.typ.kind=='struct':
+            for name in self.struct_names(value.typ):result.fields[name]=self.copied(self.member(value,name),seen)
         elif value.typ.kind in {'array','fixed'}:result.element=self.copied(self.item(value),seen)
         else:result.fields=dict(value.fields)
         # A copied header must preserve the view's element qualifier.
@@ -357,11 +402,30 @@ class SliceAccess:
         result=self.copied(value);seen[id(value)]=result
         if result.typ.kind in {'slice','generic','unknown','union'}:return self.qualify(result,{Origin(seed=seed)})
         if result.typ.kind in {'struct','array','fixed'}:result.storage.add(Origin(seed=seed,aspect='inline'))
-        if result.typ.kind=='struct' and result.typ.node:
-            for field in result.typ.node.role('fields').children:
-                if field.kind=='Field':
-                    for name in field.group('names'):result.fields[name.text]=self.freeze(self.member(result,name.text),seed,seen)
+        if result.typ.kind=='struct':
+            for name in self.struct_names(result.typ):result.fields[name]=self.freeze(self.member(result,name),seed,seen)
         elif result.typ.kind in {'array','fixed'}:result.element=self.freeze(self.item(result),seed,seen)
+        return result
+
+    def narrowed(self,value,typ):
+        result=self.copied(value);result.typ=typ
+        if typ.kind not in {'slice','generic','unknown','union'}:result.data.clear()
+        if typ.kind in {'scalar','enum','bitset','string'}:
+            result.fields={};result.element=None;result.target=None;result.path=None
+        if typ.kind in {'struct','array','fixed'}:result=self.qualify(result,value.data)
+        return result
+
+    def snapshot(self,value,seen=None):
+        """Detach summary facts while retaining aliasing inside the fact graph."""
+        seen={} if seen is None else seen
+        if id(value) in seen:return seen[id(value)]
+        result=Value(value.typ,set(value.data),set(value.storage),path=value.path,
+                     locations=set(value.locations))
+        seen[id(value)]=result
+        result.fields={name:self.snapshot(child,seen) for name,child in value.fields.items()}
+        for key in ('element','target','base'):
+            child=getattr(value,key)
+            if child:setattr(result,key,self.snapshot(child,seen))
         return result
 
     def references(self,value,seen=None):
@@ -372,10 +436,8 @@ class SliceAccess:
         if value.path and self.contains_slice(value.typ):
             if value.typ.kind=='pointer':self.deref(value)
             elif value.typ.kind in {'array','fixed','dynamic','map','set'}:self.item(value)
-            elif value.typ.kind=='struct' and value.typ.node:
-                for field in value.typ.node.role('fields').children:
-                    if field.kind=='Field':
-                        for name in field.group('names'):self.member(value,name.text)
+            elif value.typ.kind=='struct':
+                for name in self.struct_names(value.typ):self.member(value,name)
         for child in [*value.fields.values(),value.element,value.target]:
             if child:result.update(self.references(child,seen))
         return result
@@ -390,8 +452,59 @@ class SliceAccess:
                 if origin not in context.effects:
                     context.effects[origin]=(node,reason,tuple(related));self.changed=True
 
-    def write(self,target,value,context,node):
+    def local_header(self,node,context):
+        if node.kind=='Ident':
+            symbol=self.r.symbol(node)
+            return bool(symbol and (symbol.declaration.kind=='Declaration' and symbol.scope.kind!='File' or
+                                    (symbol.declaration,symbol.name) in context.named_results))
+        if node.kind=='Selector':
+            owner=node.role('expr')
+            return self.type(owner,context).kind=='struct' and self.local_header(owner,context)
+        return False
+
+    def header_key(self,node):
+        if node.kind=='Ident':
+            symbol=self.r.symbol(node)
+            return (symbol.declaration,symbol.name) if symbol else None
+        if node.kind=='Selector':
+            owner=self.header_key(node.role('expr'))
+            return (*owner,node.role('field').text) if owner else None
+        return None
+
+    def independent_header(self,node,context):
+        if not self.local_header(node,context):return False
+        declaration=self.header_key(node)[0]
+        ancestors=set(declaration.ancestors())
+        return all(control in ancestors for control in context.controls)
+
+    def terminal_allocations(self,node,context):
+        """Definite fresh header replacements at every continuing branch end."""
+        if node is None:return []
+        if node.kind=='Block':return self.terminal_allocations(node.children[-1],context) if node.children else []
+        if node.kind=='If':
+            left=self.terminal_allocations(node.role('body'),context)
+            right=self.terminal_allocations(node.role('else'),context)
+            return [*left,*right] if left and right else []
+        if node.kind!='Assignment' or node.data.get('op')!='=' or len(node.group('lhs'))!=1 or len(node.group('rhs'))!=1:return []
+        lhs,rhs=node.group('lhs')[0],node.group('rhs')[0]
+        if not self.local_header(lhs,context):return []
+        if rhs.kind=='Comprehension':return [node]
+        if rhs.kind!='Call':return []
+        builtin=self.project.purity.builtin(rhs)
+        library=self.project.purity.library(rhs)
+        if builtin in {'make','new'} or library==('core:slice','clone') and self.native_library(rhs,library[0]):return [node]
+        return []
+
+    def write(self,target,value,context,node,strong=False):
         self.require(target.storage,node,context,'modify slice elements')
+        if strong and not target.storage and not target.locations and self.independent_header(node,context) and self.references(target):
+            # Replacing an independent local header changes that header, not
+            # the old backing allocation or copies of its previous value.
+            incoming=self.copied(value)
+            for key in ('data','fields','element','target','path','base'):
+                setattr(target,key,getattr(incoming,key))
+            context.strong_updates=True
+            return
         self.changed|=(target.base or target).merge(value)
         for location in target.locations:
             if location not in context.stores:context.stores[location]=self.copied(value);self.changed=True
@@ -470,11 +583,17 @@ class SliceAccess:
             result.append(self.copied(incoming if incoming is not None else self.eval(arg,context)));sites.append(arg or node)
         return result,sites
 
+    @staticmethod
+    def type_key(typ,depth=0):
+        if not isinstance(typ,Type):return str(typ)
+        head=(typ.kind,typ.name,id(typ.node),typ.length,id(typ.nominal),typ.soa)
+        if depth>8:return head
+        return (*head,SliceAccess.type_key(typ.elem,depth+1) if typ.elem else None,
+                tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.substitutions.items())),
+                tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.members.items())))
+
     def summary(self,proc,substitutions):
-        def typekey(typ,depth=0):
-            if not isinstance(typ,Type):return str(typ)
-            return (typ.kind,typ.name,id(typ.node),typekey(typ.elem,depth+1) if typ.elem and depth<8 else None)
-        key=proc,tuple(sorted((name,typekey(typ)) for name,typ in substitutions.items()))
+        key=proc,tuple(sorted((name,self.type_key(typ)) for name,typ in substitutions.items()))
         if key in self.summaries:
             if self.summaries[key].active:self.recursive=True
             return self.summaries[key]
@@ -499,10 +618,15 @@ class SliceAccess:
         else:
             # Aliases and loop-carried reference stores form a finite monotone
             # graph. Revisit until no storage provenance changes.
+            state=None
             for _ in range(24):
                 previous=self.changed;self.changed=False
                 self.statement(proc.role('body'),context)
                 changed=self.changed;self.changed|=previous
+                if context.strong_updates:
+                    current=self.state(context)
+                    if current==state:break
+                    state=current
                 if not changed:break
             else:
                 for index,(name,_) in enumerate(params):
@@ -510,6 +634,23 @@ class SliceAccess:
         self.depth-=1;context.active=False;context.complete=True
         self.publish(context)
         return context
+
+    @staticmethod
+    def state(context):
+        """Compare final permission graphs, not transient local rebindings."""
+        seen={};nodes=[]
+        def visit(value):
+            if value is None:return None
+            if id(value) in seen:return seen[id(value)]
+            index=len(nodes);seen[id(value)]=index;nodes.append(None)
+            typ=value.typ
+            fields=tuple((name,visit(child)) for name,child in sorted(value.fields.items()))
+            children=tuple(visit(getattr(value,key)) for key in ('element','target','base'))
+            nodes[index]=(SliceAccess.type_key(typ),
+                          frozenset(value.data),frozenset(value.storage),frozenset(value.locations),value.path,fields,children)
+            return index
+        roots=tuple(visit(value) for value in [*context.env.values(),*context.results,*context.stores.values()])
+        return roots,tuple(nodes),frozenset(context.effects),frozenset(context.issues)
 
     def call(self,node,context):
         callee=node.role('callee');args=node.group('args')
@@ -543,7 +684,26 @@ class SliceAccess:
         if builtin or library:
             values=[self.eval(a.role('value') if a.kind=='FieldValue' else a,context) for a in args]
             if builtin=='new_clone' and values:
-                return Value(self.type(node,context),target=self.copied(values[0]))
+                operand=self.project.purity.arguments(node,['data'])[0]
+                result=Value(self.type(node,context),target=self.copied(self.eval(operand,context)))
+                return self.record_results(node,context,[result,Value(Type('enum','Allocator_Error'))],optional=True)
+            if builtin=='swizzle' and values:
+                return Value(self.type(node,context),element=self.copied(self.item(values[0])))
+            if builtin=='soa_zip':
+                result=Value(self.type(node,context))
+                for arg,value in zip(args,values):
+                    if arg.kind=='FieldValue':result.fields[arg.role('field').text]=self.copied(value)
+                    result.data.update(value.data)
+                return result
+            if builtin=='soa_unzip' and values:
+                source=values[0]
+                return self.record_results(node,context,[self.copied(self.member(source,name))
+                    for name in self.struct_names(source.typ.elem or Type())])
+            if builtin=='expand_values' and values:
+                source=values[0]
+                expanded=[self.member(source,name) for name in self.struct_names(source.typ)] if source.typ.kind=='struct' else (
+                    [self.item(source)]*source.typ.length if source.typ.kind=='array' and isinstance(source.typ.length,int) else [])
+                return self.record_results(node,context,[self.copied(value) for value in expanded])
             if builtin in self.readers:
                 result=Value(self.type(node,context))
                 if builtin in {'make','new'}:
@@ -629,13 +789,14 @@ class SliceAccess:
         seen.add(callee)
         if callee.kind=='Paren':return self.reference_builtin(callee.role('expr'),seen)
         imported=self.project.purity.imported(callee)
-        if imported and imported[0]=='base:builtin' and imported[1] in {'raw_data','new_clone','free'} and callee.source.import_dir(imported[0]) is None:return imported[1]
+        names={'raw_data','new_clone','free','soa_zip','soa_unzip','expand_values'}
+        if imported and imported[0]=='base:builtin' and imported[1] in names and callee.source.import_dir(imported[0]) is None:return imported[1]
         symbol=self.r.symbol(callee)
         if symbol:
             if not symbol.declaration.data.get('mutable') and not symbol.immutable and symbol.value:
                 return self.reference_builtin(symbol.value,seen)
             return None
-        if callee.kind=='Ident' and not imported and callee.text in {'raw_data','new_clone','free'}:return callee.text
+        if callee.kind=='Ident' and not imported and callee.text in names:return callee.text
         return None
 
     def indirect_callee(self,callee,seen=None):
@@ -653,19 +814,15 @@ class SliceAccess:
         """An erased callback cannot promise that returned slice storage is writable."""
         if typ.kind in {'unknown','generic'} or not self.contains_slice(typ):return Value(typ)
         seen={} if seen is None else seen
-        key=(typ.kind,typ.name,typ.node,typ.length,tuple(sorted(
-            (name,value.kind,value.name,value.node) for name,value in typ.substitutions.items() if isinstance(value,Type))))
+        key=self.type_key(typ)
         if key in seen:return seen[key]
         result=Value(typ);seen[key]=result
         if typ.kind in {'slice','union'}:result.data.add(Origin(seed=node))
         if typ.kind=='pointer':result.target=self.opaque_result(typ.elem or Type(),node,seen)
         elif typ.kind in {'slice','array','fixed','dynamic','map','set'}:result.element=self.opaque_result(typ.elem or Type(),node,seen)
-        elif typ.kind=='struct' and typ.node:
-            for field in typ.node.role('fields').children:
-                if field.kind=='Field':
-                    for name in field.group('names'):
-                        result.fields[name.text]=self.opaque_result(self.r.field(typ,name.text)[0],node,seen)
-        return result
+        elif typ.kind=='struct':
+            for name in self.struct_names(typ):result.fields[name]=self.opaque_result(self.r.field(typ,name)[0],node,seen)
+        return self.qualify(result,{Origin(seed=node)}) if typ.soa else result
 
     def opaque_call(self,node,context):
         plan=self.r.resolve_call(node)
@@ -755,7 +912,8 @@ class SliceAccess:
             # Declared fn results cross the existing deep-copy boundary: their
             # owned result storage is independent even when the source body
             # returned an input view. Ordinary proc results remain shallow.
-            results=[Value(value.typ) if self.project.purity.pure(target) else self.instantiate(value,bindings)
+            seen={}
+            results=[Value(value.typ) if self.project.purity.pure(target) else self.instantiate(value,bindings,seen)
                      for value in summary.results]
             context.expressions[node,'results']=results
             result=results[0]
@@ -767,6 +925,7 @@ class SliceAccess:
         seen=set() if seen is None else seen
         if typ.kind in {'slice','generic','unknown'}:return True
         if typ.kind in {'array','fixed','dynamic','map','set','pointer'}:return self.contains_slice(typ.elem or Type(),seen)
+        if typ.kind=='struct' and typ.members:return any(self.contains_slice(member,seen.copy()) for member in typ.members.values())
         if typ.kind=='struct' and typ.node and typ.node not in seen:
             seen.add(typ.node)
             return any(self.contains_slice(self.r.type_node(field.role('type'),typ.substitutions),seen)
@@ -806,9 +965,7 @@ class SliceAccess:
             return value
         if node.kind=='TypeAssertion':
             original=self.eval(node.role('expr'),context)
-            result=self.copied(original);result.typ=typ
-            if typ.kind not in {'slice','generic','unknown','union'}:result.data.clear()
-            if typ.kind in {'struct','array','fixed'}:result=self.qualify(result,original.data)
+            result=self.narrowed(original,typ)
             self.record_results(node,context,[result,Value(Type('scalar','bool'))],optional=True)
             return result
         if node.kind=='FieldValue':return self.eval(node.role('value'),context)
@@ -829,7 +986,8 @@ class SliceAccess:
             for role in ('low','high'):self.eval(node.role(role),context)
             storage={Origin(origin.index,origin.path,'data',origin.seed) if origin.seed is not None and origin.aspect=='inline' else origin
                      for origin in value.storage}
-            return Value(typ,set(value.data)|storage,element=self.item(value))
+            fields={name:self.copied(self.member(value,name)) for name in self.struct_names(value.typ.elem or Type())} if value.typ.soa else {}
+            return Value(typ,set(value.data)|storage,fields=fields,element=self.item(value))
         if node.kind=='Unary':
             value=self.eval(node.role('expr'),context)
             if node.data.get('op')=='**':return value
@@ -1044,7 +1202,7 @@ class SliceAccess:
                 value.typ=self.substitute_type(typ,context.substitutions)
                 if node.data.get('immutable'):value=self.freeze(value,name)
                 elif value.typ.kind in {'slice','generic','unknown'}:
-                    self.require(value.data,rhs or name,context,'create a writable slice alias; use :> or clone the slice')
+                    self.require(value.data,rhs or name,context,'create a writable slice alias; use :> or copy the backing storage with core:slice.clone')
                 elif value.typ.name in {'any','rawptr'}:
                     self.require(self.references(value),rhs or name,context,'erase read-only slice permissions in an opaque value')
                 key=node,name.text
@@ -1075,7 +1233,7 @@ class SliceAccess:
                     symbol=self.r.symbol(lhs)
                     if symbol and symbol.scope.kind=='File':
                         self.require(self.references(value),lhs,context,'expose a read-only slice through global writable storage')
-                self.write(target,value,context,lhs)
+                self.write(target,value,context,lhs,strong=node.data.get('op')=='=')
             return
         if node.kind=='IncDec':
             self.require(self.eval(node.role('expr'),context).storage,node,context,'modify slice elements');return
@@ -1087,8 +1245,9 @@ class SliceAccess:
                 for index,key in enumerate(context.named_results):
                     if key:self.changed|=context.results[index].merge(self.copied(context.env[key]))
             returned=self.expression_results(values[0],context,len(context.results)) if len(values)==1 else [self.eval(value,context) for value in values]
+            copies={};snapshots={} # Keep copies alive while the snapshot memo uses identity keys.
             for index,value in enumerate(returned):
-                incoming=self.copied(value)
+                incoming=self.snapshot(self.copied(value,copies),snapshots)
                 while len(context.results)<=index:context.results.append(Value(incoming.typ))
                 self.changed|=context.results[index].merge(incoming)
             return
@@ -1096,42 +1255,57 @@ class SliceAccess:
             self.statement(node.role('init'),context)
             self.eval(node.role('cond'),context)
             selected=self.condition(node.role('cond'),context) if node.kind=='When' else None
+            if selected is None:context.controls.append(node)
             if selected is not False:self.statement(node.role('body'),context)
             if selected is not True:self.statement(node.role('else'),context)
+            if selected is None:context.controls.pop()
+            if selected is None:
+                replacements=self.terminal_allocations(node,context)
+                keys={self.header_key(assignment.group('lhs')[0]) for assignment in replacements}
+                if len(keys)==1:
+                    incoming=None
+                    for assignment in replacements:
+                        value=self.snapshot(self.copied(self.eval(assignment.group('rhs')[0],context)))
+                        if incoming is None:incoming=value
+                        else:incoming.merge(value)
+                    lhs=replacements[0].group('lhs')[0]
+                    self.write(self.eval(lhs,context),incoming,context,lhs,strong=True)
             return
         if node.kind=='Range':
-            self.bind_loop(node,context);self.statement(node.role('body'),context);return
+            self.bind_loop(node,context);context.controls.append(node)
+            self.statement(node.role('body'),context);context.controls.pop();return
         if node.kind=='TypeSwitch':
             value=self.eval(node.role('expr'),context)
             names=node.group('names');body=node.role('body')
+            context.controls.append(node)
             for case in body.children if body else []:
                 patterns=case.group('types')
                 variant=self.r.type_node(patterns[0],context.substitutions) if len(patterns)==1 else value.typ
                 for name in names:
-                    incoming=self.copied(value);incoming.typ=variant
-                    if variant.kind in {'struct','array','fixed'}:incoming=self.qualify(incoming,value.data)
+                    incoming=self.narrowed(value,variant)
                     if name.kind=='Unary' and name.data.get('op')=='&':
                         self.require(value.storage,node.role('expr'),context,'take a writable union reference into a read-only slice')
                         incoming=Value(Type('pointer',elem=variant),target=incoming)
                     context.env[node,name.text.lstrip('&')]=incoming
                 for statement in case.group('body'):self.statement(statement,context)
+            context.controls.pop()
             return
         if node.kind=='Defer':
+            context.controls.append(node)
             for child in node.children:self.statement(child,context)
+            context.controls.pop()
             return
         if node.kind=='ExpressionStatement':
             for child in node.children:self.statement(child,context) if child.kind.endswith('Statement') else self.eval(child,context)
             return
         if node.kind in {'Call','Binary','Unary','Comprehension'}:self.eval(node,context);return
+        conditional=node.kind in {'For','Switch'}
+        if conditional:context.controls.append(node)
         for child in node.children:self.statement(child,context)
+        if conditional:context.controls.pop()
 
     def publish(self,context):
-        def unresolved(typ,seen=None):
-            if typ.kind in {'generic','unknown'}:return True
-            return unresolved(typ.elem) if typ.elem else False
-        if context.proc and any(unresolved(context.env[field,name.text.lstrip('$')].typ)
-                                for name,field in self.parameters(context.proc)):
-            return # Specializations supply the reference/value distinction.
+        if not self.context_ready(context):return
         for (node,reason),(seed,related) in context.issues.items():
             source=node.source
             if getattr(source,'native_inspected',False):continue
@@ -1160,6 +1334,20 @@ class SliceAccess:
                 if not hasattr(source,'slice_related'):source.slice_related={}
                 source.slice_related[token]=[seed,*related]
 
+    def context_ready(self,context):
+        def unresolved(typ,seen=None):
+            seen=set() if seen is None else seen
+            if id(typ) in seen:return False
+            seen.add(id(typ))
+            if typ.kind in {'generic','unknown'}:return True
+            return (bool(typ.elem and unresolved(typ.elem,seen)) or
+                    any(unresolved(value,seen) for value in [*typ.members.values(),*typ.substitutions.values()] if isinstance(value,Type)))
+        if not context.proc:return True
+        for name,kind in self.r.generic_parameters(context.proc.role('type')).items():
+            if kind=='typeid' and (name not in context.substitutions or unresolved(context.substitutions[name])):return False
+        return not any(unresolved(context.env[field,name.text.lstrip('$')].typ)
+                       for name,field in self.parameters(context.proc))
+
     def metadata(self):
         result={}
         for source in self.project.sources.values():
@@ -1171,12 +1359,22 @@ class SliceAccess:
                         result[key]={'file':key[0],'offset':name.start,'end':name.end,'name':name.text,'explicit':True}
         for context in self.summaries.values():
             if not context.proc:continue
+            params=self.parameters(context.proc)
+            bindings=[self.freeze(Value(context.env[field,name.text.lstrip('$')].typ),name) for name,field in params]
+            ready=self.context_ready(context)
             for origin in context.effects:
-                params=self.parameters(context.proc)
                 if origin.index>=len(params):continue
                 name,field=params[origin.index]
                 typ=self.parameter_type(field,context.substitutions)
                 if typ.kind!='slice':continue
+                if not ready:
+                    if origin.path or origin.aspect!='data':continue
+                    operation,reason,_=context.effects[origin]
+                    direct_write=(reason=='modify slice elements' and operation.kind=='Index' and
+                                  self.type(operation.role('expr'),context).kind=='slice')
+                    direct_alias=reason.startswith('create a writable slice alias') and self.type(operation,context).kind=='slice'
+                    if not direct_write and not direct_alias:continue
+                if not self.resolve(origin,bindings):continue
                 key=str(name.source.path),name.start
                 result[key]={'file':key[0],'offset':name.start,'end':name.end,'name':name.text,
                              'explicit':bool(name.data.get('slice_mut'))}

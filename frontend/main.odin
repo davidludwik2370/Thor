@@ -199,11 +199,14 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         if n.type!=nil {_,info.variadic=n.type.derived.(^ast.Ellipsis)}
     case ^ast.Array_Type:
         info.kind = "ArrayType"; info.roles["elem"] = span(n.elem); info.roles["len"] = span(n.len)
+        if n.tag!=nil {tag,ok:=n.tag.derived.(^ast.Basic_Directive);if ok {info.op=tag.name}}
     case ^ast.Dynamic_Array_Type:
         info.kind = "DynamicArrayType"; info.roles["elem"] = span(n.elem)
+        if n.tag!=nil {tag,ok:=n.tag.derived.(^ast.Basic_Directive);if ok {info.op=tag.name}}
     case ^ast.Fixed_Capacity_Dynamic_Array_Type:
         info.kind = "DynamicArrayType"; info.roles["elem"] = span(n.elem)
         info.roles["capacity"] = span(n.capacity)
+        if n.tag!=nil {tag,ok:=n.tag.derived.(^ast.Basic_Directive);if ok {info.op=tag.name}}
     case ^ast.Struct_Type:
         info.kind = "StructType"; info.roles["fields"] = span(n.fields); info.roles["params"] = span(n.poly_params)
         if n.is_raw_union {info.op="raw_union"}
