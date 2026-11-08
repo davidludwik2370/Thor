@@ -3983,3 +3983,32 @@ in debug and optimized unchecked configurations without source edits.
 Validation passes 112 slice-access/TLS/hardening cases, 40 using/context/power
 cases, and the final 66-case focused/purity/native-evaluation/assertion group.
 The final group includes all new regressions after the namespace-contract fix.
+
+## Project build audit and scalar/formatter access facts (Thor/TLS 0.41.3)
+
+Build all 19 Thor projects under Code/Thor in default and debug configurations,
+redirecting every artifact to temporary storage. The initial sweep found a false
+`hilo` access error and timeouts in `15_puzzle` and `sketch`. Preserve all result
+types on the reference-free call fast path, including optional-result unwrapping;
+previously a later numeric result became unknown and an immutable binding gained
+spurious slice permission. Resolve qualified primitive names in the genuine
+base:builtin namespace so the core:c aliases used by Raylib remain numeric.
+
+The native fmt buffer formatters now use reviewed argument contracts: buffer
+writes require writable access, formatting arguments are read-only readers, and
+the result is a string. Use the normal argument binder for named and expanded
+arguments. Avoid traversing the format engine's large recursive reference graph
+without relaxing destination checks. There are no runtime representation changes.
+
+All 18 valid projects now build in default and debug modes; sandbox's remaining
+failure is an undeclared `x` after its declaration was commented out. No project
+sources were changed by the audit. All 213 poker tests pass. New native/compiler
+and live TLS regressions cover these cases, destination hints and unsaved recovery;
+buffer runtime fixtures also check optimized assertion-disabled code.
+The 167-case compiler/TLS/native/assertion group passes 166 cases; correct an
+explicit numeric cast in the remaining new fixture and rerun all four new
+compiler cases successfully. All new live TLS cases pass in the full group.
+The circles-on-dots project still has a separate performance concern: an isolated
+warm build succeeds but takes 47.26 seconds. Record this unresolved timing issue
+in the audit without claiming that all compile-time overhead is resolved.
+See [the complete project audit](docs/project-build-audit-2026-11-07.md).

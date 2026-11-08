@@ -339,11 +339,16 @@ class Resolver:
         # source. Its allocator status is nevertheless a known enum, rather
         # than an unknown value which might contain slice references.
         imported=None
-        if kind=='Selector' and n.role('field').text=='Allocator_Error' and n.role('expr').kind=='Ident' and self.lookup(n.role('expr').text,n.role('expr')) is None:
+        if kind=='Selector' and n.role('expr').kind=='Ident' and self.lookup(n.role('expr').text,n.role('expr')) is None:
             imported=(n.source.imports.get(n.role('expr').text),n.role('field').text)
-        elif kind=='Ident' and n.source.selected.get(n.text,'').endswith('.Allocator_Error') and self.lookup(n.text,n) is None:
+        elif kind=='Ident' and n.text in n.source.selected and self.lookup(n.text,n) is None:
             namespace,name=n.source.selected[n.text].split('.',1)
             imported=(n.source.imports.get(namespace),name)
+        if imported and imported[0]=='base:builtin':
+            directory=n.source.import_dir(imported[0]);root=n.source.info.get('odin_root')
+            if directory is None or root and directory==(Path(root)/'base/builtin').resolve():
+                primitive=self.primitive_type(imported[1],n)
+                if primitive is not None:return primitive
         if imported==('base:runtime','Allocator_Error'):
             directory=n.source.import_dir(imported[0]);root=n.source.info.get('odin_root')
             if directory is None or root and directory==(Path(root)/'base/runtime').resolve():
@@ -403,13 +408,8 @@ class Resolver:
         if kind == "Ident":
             if n.text in substitutions and isinstance(substitutions[n.text], Type):
                 return substitutions[n.text]
-            if n.text in {"string", "cstring"}:
-                return Type("string", n.text, n)
-            if n.text in {"bool", "int", "uint", "uintptr", "rune", "byte", "rawptr", "typeid", "any"} or n.text in {
-                f"{p}{bits}{endian}" for p in ["i", "u", "f", "b", "complex", "quaternion"]
-                for bits in [8, 16, 32, 64, 128, 256] for endian in ["", "le", "be"]
-            }:
-                return Type("scalar", n.text, n)
+            primitive=self.primitive_type(n.text,n)
+            if primitive is not None:return primitive
         symbol = self.symbol(n)
         if symbol:
             if (symbol.declaration.source.path == BIG_TYPES_SOURCE
@@ -435,6 +435,15 @@ class Resolver:
                     return Type('set',node=n,elem=mapping.get('T',Type()))
                 return Type("struct", node=record, substitutions=mapping)
         return Type(node=n)
+
+    @staticmethod
+    def primitive_type(name, node):
+        if name in {'string','cstring'}:return Type('string',name,node)
+        if name in {'bool','int','uint','uintptr','rune','byte','rawptr','typeid','any'} or name in {
+            f'{p}{bits}{endian}' for p in ['i','u','f','b','complex','quaternion']
+            for bits in [8,16,32,64,128,256] for endian in ['', 'le','be']
+        }:return Type('scalar',name,node)
+        return None
 
     def result_type(self, n, index, seen=None):
         if n.kind in {'Paren','OrPanic','OrReturn','OrBranch','AutoCast'}: return self.result_type(n.role('expr'), index, seen)

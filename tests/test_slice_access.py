@@ -140,6 +140,61 @@ if node.count!=9{panic("pointer target")}
         self.invoke(self.program('s :> []int{7};if read(s)!=7||count!=1{panic("reader")}',
             'count:int\nread::proc(data:[]int)->int{count+=1;return data[0]}\n'))
 
+    def test_reference_free_multiple_results_keep_each_scalar_type(self):
+        prefix='''pair::proc()->(int,f32){return 2,3}
+optional::proc()->(int,int,bool){return 2,3,true}
+'''
+        for expression in ['pair()','optional() or_else panic("status")','(optional() or_panic)']:
+            with self.subTest(expression=expression):
+                self.invoke(self.program('a,b :> '+expression+';copy:=b;if a!=2||copy!=3{panic("scalar copies")}',prefix))
+
+    def test_buffer_formatters_write_only_the_buffer_and_read_other_slices(self):
+        prefix='''import "core:fmt"
+format::proc(buffer:[]byte,values:[]int)->string{return fmt.bprintf(buffer,"%v",values)}
+'''
+        text=self.program('''buffer:[64]byte
+values :> []int{1,2}
+if format(buffer[:],values)!="[1, 2]"{panic("buffer reader")}
+if fmt.bprint(buffer[:],values)!="[1, 2]"{panic("bprint")}
+if fmt.bprintln(buffer[:],values)!="[1, 2]\\n"{panic("bprintln")}
+if fmt.bprintfln(buffer[:],"%v",values)!="[1, 2]\\n"{panic("bprintfln")}
+''',prefix)
+        for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):self.invoke(text,flags=flags)
+
+    def test_buffer_formatter_contracts_reject_readonly_destinations(self):
+        prefix='''import "core:fmt"
+format::proc(buffer:[]byte)->string{return fmt.bprintf(buffer,"ok")}
+'''
+        for call in ['fmt.bprint(buffer,"ok")','fmt.bprintln(buffer,"ok")',
+                     'fmt.bprintf(buf=buffer,fmt="ok")','fmt.bprintfln(buffer,"ok")',
+                     'format(buffer)','fmt.bprintf(**struct{buf:[]byte,fmt:string}{buffer,"ok"})']:
+            with self.subTest(call=call):
+                self.invoke(self.program('buffer :> []byte{0,0,0,0};_='+call,prefix),
+                            command='check',fail='read-only slice')
+
+    def test_qualified_builtin_and_c_aliases_remain_scalar_values(self):
+        prefix='''import b "base:builtin"
+import "core:c"
+import rl "vendor:raylib"
+ScalarRecord::struct{x:c.int,y:c.uint,z:b.f32}
+number::proc()->b.i32{return 7}
+'''
+        self.invoke(self.program('''value :> number();copy:=value
+record :> ScalarRecord{1,2,3}
+x,y,z:=int(record.x),int(record.y),int(record.z)
+if int(copy)+x+y+z!=13{panic("qualified scalar types")}
+''',prefix))
+        self.invoke(self.program('''using rl
+width :> GetScreenWidth()
+height :> GetScreenHeight()
+canvas :> LoadRenderTexture(width,height)
+UnloadRenderTexture(canvas)
+x,y:=int(width),int(height);_=x;_=y
+''',prefix),command='check')
+        self.invoke(self.program('values :> b.i32{1};copy:=values;_=copy','import b "local"\n'),
+                    files={'local/types.thor':'package local\ni32::[]int\n'},command='check',fail='read-only slice')
+
     def test_writing_helpers_and_transitive_calls_fail_at_argument(self):
         text=self.program('s :> []int{7};middle(s)', '''
 leaf::proc(data:[]int){data[0]=9}

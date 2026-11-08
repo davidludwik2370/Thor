@@ -80,12 +80,13 @@ class SliceAccess:
              'make','new','new_clone','free','reserve','resize'}
     fmt_readers={'print','println','printf','printfln','eprint','eprintln','eprintf','eprintfln',
                  'aprint','aprintln','aprintf','aprintfln','tprint','tprintln','tprintf','tprintfln'}
+    fmt_buffers={'bprint','bprintln','bprintf','bprintfln'}
 
     def verified_reader(self,node,library):
         if not library:return False
         path,name=library
         directory=node.source.import_dir(path)
-        if path=='core:fmt' and name in self.fmt_readers:
+        if path=='core:fmt' and name in self.fmt_readers|self.fmt_buffers:
             return directory is None or self.r.native and self.r.native.root and directory==(Path(self.r.native.root)/'core/fmt').resolve()
         if path=='thor:basic' and name in {'hash','try_hash','_string','print'}:
             return directory==(Path(__file__).resolve().parents[1]/'runtime/basic')
@@ -521,6 +522,13 @@ class SliceAccess:
             for arg in args:self.eval(arg.role('value') if arg.kind=='FieldValue' else arg,context)
             path,name=library
             if path=='core:fmt':
+                if name in self.fmt_buffers:
+                    candidates=self.r.procedure_candidates(node.role('callee'))
+                    if len(candidates)==1:
+                        signature=candidates[0][1]
+                        bindings,sites=self.bindings(node,self.parameters(signature),context)
+                        if bindings:self.require(bindings[0].data,sites[0],context,'modify formatting buffer')
+                    return Value(Type('string','string'))
                 return Value(Type('string','string') if name.startswith(('aprint','tprint')) else Type('scalar','int'))
             if path=='thor:basic' and name in {'print','hash','try_hash','_string'}:
                 result=Value(Type('string','string') if name=='_string' else Type('scalar','u64'))
@@ -718,7 +726,7 @@ class SliceAccess:
                           and any(n.kind=='Declaration' and n.data.get('immutable')
                                   for n in self.project.purity.walk(target)))
         if not any(self.references(value) for value in bindings) and not result_references and not local_checks:
-            return Value(self.type(node,context))
+            return self.fresh_call_results(node,context,Value(self.type(node,context)))
         substitutions=dict(context.substitutions)
         substitutions.update({key:self.substitute_type(value,context.substitutions) if isinstance(value,Type) else value
                               for key,value in plan.substitutions.items()})

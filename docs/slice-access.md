@@ -110,6 +110,8 @@ Unresolved callbacks, foreign/bodyless procedures and opaque `any`/raw-pointer
 conversions cannot silently shed permissions. Core printing, cloning, and the
 reviewed basic string/hash interfaces have argument-specific contracts. Ordinary
 inspectable Odin helpers can be checked without rewriting their declarations.
+The `fmt.bprint`, `bprintln`, `bprintf` and `bprintfln` interfaces require a
+writable destination buffer while reading their other formatting arguments.
 Calls exposed by `using package_name` retain the same parameter and returned-view
 contracts as calls written with the package prefix. Reviewed library readers
 also retain their package identity; a same-named local procedure is checked by

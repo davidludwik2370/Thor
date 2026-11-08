@@ -144,6 +144,36 @@ main::proc(){
         client.diagnostic(path.as_uri(),empty=True)
         self.assertEqual(path.read_text(),text)
 
+    def test_native_multiple_scalar_results_are_not_readonly_slice_aliases(self):
+        text='''package main
+import "core:sys/info"
+main::proc(){_,cores :> info.cpu_core_count() or_panic;copy:=cores;_=copy}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        hover=self.hover(client,path,text,'copy:=')['contents']['value']
+        self.assertIn(': int',hover)
+
+    def test_buffer_formatting_contracts_and_unsaved_destination_recovery(self):
+        text='''// 😀 buffer formatting
+package main
+import "core:fmt"
+format::proc(buffer:[]byte,values:[]int)->string{return fmt.bprintf(buffer,"%v",values)}
+main::proc(){buffer :> []byte{0,0,0,0};values :> []int{7};_=format(buffer,values)}
+'''
+        client,path=self.open(text)
+        errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+        self.assertTrue(any(error['range']['start']==self.position(text,'buffer,values)}',0) for error in errors),errors)
+        hints=[hint for hint in self.hints(client,path) if '#mut' in hint['label']]
+        self.assertEqual(len(hints),1,hints)
+        self.assertEqual(hints[0]['position'],self.position(text,'buffer:[]byte',0))
+        corrected=text.replace('buffer :>','buffer :=')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+            'contentChanges':[{'text':corrected}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
     def test_switch_and_comprehension_argument_errors_use_original_utf16_locations(self):
         for expression in ['switch change(values){case 2:7;case:8}',
                            'switch 2{case change(values):7;case:8}',
