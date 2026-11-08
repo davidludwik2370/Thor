@@ -34,6 +34,9 @@ async function run() {
         const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'demo/main.thor')));
         await vscode.window.showTextDocument(document);
         assert.equal(document.languageId, 'thor');
+        const codeActionRange = new vscode.Range(0, 0, 0, 0);
+        const earlyActions = await vscode.commands.executeCommand('vscode.executeCodeActionProvider', document.uri, codeActionRange);
+        assert.ok(Array.isArray(earlyActions));
         assert.deepEqual(extension.packageJSON.contributes.semanticTokenScopes,
             [{language:'thor',scopes:{namespace:['variable.other.namespace.thor'],'parameter.readonly':['variable.other.constant.thor'],label:['entity.name.label.thor']}}]);
         const colorConfig=vscode.workspace.getConfiguration('editor');
@@ -57,6 +60,10 @@ async function run() {
             document.positionAt(source.indexOf('package main')+'package '.length+1)),
             values => hoverText(values || []).includes('main: package'));
         assert.ok(hoverText(packageHover).includes('main: package'));
+        const noFixActions = await vscode.commands.executeCommand('vscode.executeCodeActionProvider', document.uri, codeActionRange);
+        assert.ok(Array.isArray(noFixActions));
+        const symbolsAfterActions = await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', document.uri);
+        assert.ok(symbolsAfterActions.some(symbol => symbol.name === 'main'));
         const commentHover = await vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, new vscode.Position(0,0));
         assert.equal(commentHover.length,0,'A hidden set import must not create a package hover on the first comment');
         for(const [fragment,expected] of [['names: sets.Set(string)','names: set[string]'],['other_names := sets.clone','other_names: set[string]']]){
@@ -907,6 +914,7 @@ async function run() {
         result.checks.push('typed range and index hovers, header rename, precise annotation errors and unsaved recovery');
         result.checks.push('type-as-array errors have original use ranges, clickable declaration notes and unsaved recovery');
         result.checks.push('index root/type/result diagnostics, membership context notes and user builtin-spelling hovers recover without saving');
+        result.checks.push('early code actions without vet findings preserve hover, symbols and semantic tokens');
         console.log('Thor VS Code integration passed:', result.checks.join(', '));
     } catch (error) {
         result.error = error.stack || String(error);

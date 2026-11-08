@@ -134,10 +134,12 @@ get_code_actions :: proc(
 }
 
 add_vet_corrections :: proc(document: ^Document, range: common.Range, actions: ^[dynamic]CodeAction) {
-	snapshot := fmt.tprintf("%016x", hash.fnv64a(document.text[:document.used_text]))
 	sync.lock(&diagnostic_mutex)
 	defer sync.unlock(&diagnostic_mutex)
-	for diagnostic in diagnostics[.Check][document.uri.uri] {
+	entries := &diagnostics[.Check][document.uri.uri]
+	if entries == nil { return }
+	snapshot := fmt.tprintf("%016x", hash.fnv64a(document.text[:document.used_text]))
+	for diagnostic in entries^ {
 		fix := diagnostic.data
 		if fix.snapshot != snapshot { continue }
 		first, last := diagnostic.range.start, diagnostic.range.end

@@ -3930,3 +3930,27 @@ from the previous audits. Runtime fixtures also exercise optimized assertion-dis
 code, and live vet quick fixes pass with an assertion-disabled TLS server.
 The ordinary installed Odin invocation also passes vet/apply/run smoke checks
 in debug and optimized assertion-disabled configurations.
+
+## Early code-action crash (Thor/TLS 0.41.1)
+
+The 0.41.0 vet quick-fix handler assumed that the compiler diagnostic map already
+contained the requested document. VS Code also requests code actions immediately
+on opening or selecting code, including with vetting disabled. Iterating the
+missing map value dereferenced a null entry and terminated TLS. All 19 recent
+macOS crash reports from the affected editor session stopped in this handler;
+the subsequent symbol, token and hover failures followed the server exit.
+
+Look up the diagnostic entry under its existing mutex and return when absent
+before reading its array or hashing the source. Keep the same locked iteration
+for populated and empty entries. Live regressions request actions before compiler
+results, verify subsequent symbols/tokens, and cover a completed empty check
+followed by an unsaved edit that produces a valid correction. The VS Code test
+requests code actions immediately after opening its first Thor document, then
+verifies symbols, hover and semantic tokens.
+
+Validation passes the focused TLS/assertion checks, the actual Dijkstra file's
+compiler check and repeated action/symbol/token requests, all four live quick-fix
+cases with assertions disabled, and the full isolated VS Code suite. Rebuild the
+local server with its ordinary checked configuration after release validation.
+An editor that exhausted its five automatic restart attempts needs the Thor
+Restart Language Server command or a window reload to reconnect.
