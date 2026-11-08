@@ -553,6 +553,11 @@ normal automatic compile-time evaluation with known arguments.
 
 Proposed corrections are validated together through normal Thor checking using
 temporary source overlays. Additional analysis runs for `thor vet` and `--vet`.
+Procedures with definitely unsupported public `fn` parameter/result types or
+direct I/O are discarded before tracing their helper graphs. The remaining
+suggestions still pass complete compiler validation; vet normally performs the
+original check and one proposed-edit check. Mixed valid/invalid edits can require
+additional checks to isolate the safe corrections.
 Applying corrections preserves comments, formatting, line endings and file modes.
 Changed source snapshots are rejected, and write failures roll back completed
 updates. `--ask` accepts `y` or `yes`. An empty answer or end of input declines.

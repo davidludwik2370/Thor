@@ -161,6 +161,65 @@ main::proc(){values:=[]int{1,2};_=identity(values);_=text();_=holder(Holder{valu
 ''')
         self.assertEqual(self.findings('--vet=pure'), [])
 
+    def test_ineligible_signatures_and_direct_io_skip_purity_graph_analysis(self):
+        self.write('''package main
+import "core:fmt"
+Box::struct($T:typeid){value:T}
+Choice::union{int,^int}
+pointer::proc(value:^int)->int{return value^}
+dynamic_values::proc(value:[dynamic]int)->int{return len(value)}
+fixed::proc(value:[dynamic;4]int)->int{return len(value)}
+mapping::proc(value:map[int]int)->int{return len(value)}
+nested::proc(value:Box(^int))->int{return value.value^}
+variant::proc(value:Choice)->int{return 1}
+callback::proc(value:proc()->int)->int{return value()}
+returns_map::proc()->map[int]int{return nil}
+returns_inferred_map::proc()->(result:=map[int]int{}){return}
+returns_pointer::proc()->^int{return nil}
+prints::proc(){fmt.println(1)}
+reader::proc(value:[]int)->int{return value[0]}
+local_copy::proc(value:Box([2]int))->int{copy:=value;copy.value[0]=9;return copy.value[0]}
+main::proc(){}
+''')
+        frontend,_=frontend_binary(os.environ.get('THOR_ODIN','odin'))
+        project=Project(self.app,frontend,[],cache_directory=self.root/'cache')
+        original=project.purity.analyze
+        inspected=[]
+        def analyze(proc):
+            name=proc.parent.group('names')[0].text
+            inspected.append(name)
+            if name not in {'reader','local_copy'}:
+                raise RuntimeError('Ineligible candidate reached expensive provenance analysis: '+name)
+            return original(proc)
+        with patch.object(project.purity,'analyze',side_effect=analyze):
+            fixes=vet.candidates(project,['pure'])
+        self.assertEqual([fix.names for fix in fixes],['reader','local_copy'])
+        self.assertEqual(inspected,['reader','local_copy'])
+        errors=self.findings('--vet=pure')
+        self.assertEqual([error['msgs'][0] for error in errors],
+                         ["Procedure 'reader' can be declared with 'fn'.",
+                          "Procedure 'local_copy' can be declared with 'fn'."])
+
+    def test_prefilter_preserves_supported_types_defaults_and_local_helper_mutation(self):
+        self.write('''package main
+Record::struct{values:[]int}
+Choice::union{int,bool}
+increment::proc(value:^int){value^+=1}
+work::proc(record:Record,choice:Choice,x:=7)->int{
+    local:=record.values[0]+x
+    increment(&local)
+    _=choice
+    return local
+}
+main::proc(){if work(Record{[]int{1}},Choice(true))!=9{panic("result")}}
+''')
+        errors=self.findings('--vet=pure')
+        self.assertEqual(len(errors),1,errors)
+        self.assertIn("'work'",errors[0]['msgs'][0])
+        self.invoke('--vet=pure','--apply')
+        self.invoke(command='run')
+        self.invoke('-o:speed','-disable-assert','-no-bounds-check','-no-type-assert',command='run')
+
     def test_vet_flag_before_source_and_large_valid_batches(self):
         body = '\n'.join(f'value_{index}:={index};_=value_{index}' for index in range(80))
         self.write('package main\nmain::proc(){\n'+body+'\n}\n')

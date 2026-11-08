@@ -48,6 +48,29 @@ def binding(node, resolver):
     return resolver.symbol(node) if node and node.kind == 'Ident' else None
 
 
+def possible_pure_type(typ, resolver, seen=None):
+    """Discard definitely ineligible public fn values before tracing helpers.
+
+    This is only a rejection filter. Unknown/native-dependent shapes still go
+    through the complete compiler, which remains the authority for every fix.
+    """
+    seen=set() if seen is None else seen
+    key=typ.kind,typ.node
+    if key in seen:return True
+    seen.add(key)
+    if typ.kind in {'pointer','dynamic','fixed','map','set','procedure'} or typ.name in {
+            'rawptr','any','typeid','cstring','cstring16','string16'}:return False
+    if typ.elem and not possible_pure_type(typ.elem,resolver,seen.copy()):return False
+    if typ.kind=='struct' and typ.node:
+        if typ.node.data.get('op')=='raw_union':return False
+        return all(possible_pure_type(resolver.type_node(field.role('type'),typ.substitutions),resolver,seen.copy())
+                   for field in typ.node.role('fields').children if field.kind=='Field')
+    if typ.kind=='union' and typ.node:
+        return all(possible_pure_type(resolver.type_node(variant,typ.substitutions),resolver,seen.copy())
+                   for variant in typ.node.group('variants'))
+    return True
+
+
 def candidates(project, checks):
     root = project.entry.parent if project.file_entry else project.entry
     result = []
@@ -91,11 +114,18 @@ def candidates(project, checks):
             if (proc.data.get('pure') or not proc.role('body') or resolver.generic_parameters(signature)
                     or signature.data.get('calling_convention') not in {'', 'odin'}):
                 continue
-            outputs = [resolver.type_node(typ) for _, typ in resolver.fields(signature.role('results')) if typ]
+            def field_type(field):
+                return (resolver.type_node(field.role('type')) if field.role('type')
+                        else resolver.type_of(field.role('default')))
+            results=signature.role('results')
+            outputs = [field_type(field) for field in results.children if field.kind=='Field'] if results else []
             # fn promotes owned results into independent storage. Keep aliasing
             # and allocation decisions explicit for reference-bearing results.
             if any(typ.kind in {'unknown', 'generic'} or project.purity.owned_type(typ) for typ in outputs):
                 continue
+            inputs=[field_type(field) for field in signature.role('params').children if field.kind=='Field']
+            if any(not possible_pure_type(typ,resolver) for typ in [*inputs,*outputs]):continue
+            if any(n.kind=='Call' and project.purity.io_call(n) for n in project.purity.walk(proc)):continue
             # Reuse purity's source analysis to discard known violations before
             # asking the complete compiler to validate the proposed conversion.
             project.purity.analyze(proc)

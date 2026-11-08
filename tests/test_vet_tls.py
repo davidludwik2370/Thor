@@ -77,6 +77,27 @@ class VetTLSTests(unittest.TestCase):
         self.assertFalse(any(item['title']=='Make declaration immutable' for item in actions),actions)
         client.diagnostic(path.as_uri(),empty=True)
 
+    def test_ineligible_value_shapes_leave_valid_pure_quick_fixes_available(self):
+        text='''package main
+import "core:fmt"
+pointer::proc(value:^int)->int{return value^}
+mapping::proc()->map[int]int{return nil}
+prints::proc(){fmt.println(1)}
+reader::proc(value:[]int)->int{return value[0]}
+main::proc(){}
+'''
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-fn')
+        self.assertEqual(len(errors),1,errors)
+        self.assertEqual(errors[0]['range']['start'],self.position(text,'reader::',0))
+        actions=self.actions(client,path,text,'reader::')
+        action=next(item for item in actions if item['title']=='Declare as fn')
+        edit=action['edit']['changes'][path.as_uri()][0]
+        self.assertEqual(edit['range']['start'],self.position(text,'proc(value:[]int)',0))
+        self.assertEqual(edit['newText'],'fn')
+        symbols=client.request('textDocument/documentSymbol',{'textDocument':{'uri':path.as_uri()}})
+        self.assertTrue(any(item['name']=='reader' for item in symbols),symbols)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4037,3 +4037,27 @@ compatibility, runtime and assertion-hygiene group passes 110 tests; an addition
 use checked debug and optimized assertion-disabled unchecked configurations.
 All 19 current Code/Thor projects build in normal and debug modes with unchanged
 source bytes. See [the coverage and remaining boundaries](docs/slice-copy-hardening-2026-11-07.md).
+
+## Reject impossible vet purity candidates before graph inference (Thor/TLS 0.41.5)
+
+Poker vetting spent minutes preparing transitive borrowing/store graphs for
+procedures whose signatures already made conversion to `fn` impossible. Reject
+definitely unsupported public parameter/result shapes, including nested fields
+and inferred defaults, before calling the expensive purity analysis. Reuse
+purity's direct-I/O recognition as another early rejection. Unknown types still
+go through full checking; eligible callers can still mutate locally created
+storage through pointer-input ordinary helpers.
+
+Keep original-program and proposed-edit validation, batching, diagnostic maps,
+TLS quick fixes and explicit apply/ask behavior. The current poker source now
+vets in 5.35–5.46 seconds in the recorded local sequence, versus the reported
+24 minutes 40 seconds, with the same 15 warnings. The adjacent build took
+2.49 seconds. Ordinary builds without vet are unaffected. Add regressions that
+check which candidates reach graph inference rather than relying on fragile
+wall-clock limits. See [the profiling and validation report](docs/vet-performance-2026-11-08.md).
+
+Validation passes 28 vet/TLS/assertion-hygiene tests and 47 purity/slice-copy
+interaction tests. The additional full poker test run times out before emission;
+an untouched-source control reaches the same slow recursive slice inference
+stage. Record that separate performance observation in the report without
+claiming a completed poker-suite run.
