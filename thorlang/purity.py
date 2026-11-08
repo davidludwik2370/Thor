@@ -271,9 +271,19 @@ class Purity:
             base=callee.role('expr')
             if base.kind=='Ident' and base.text in callee.source.imports and self.r.lookup(base.text,base) is None:
                 return callee.source.imports.get(base.text),callee.role('field').text
-        if callee.kind=='Ident' and self.r.lookup(callee.text,callee) is None and callee.text in callee.source.selected:
-            namespace,name=callee.source.selected[callee.text].split('.',1)
-            return callee.source.imports.get(namespace),name
+        if callee.kind=='Ident':
+            symbol=self.r.lookup(callee.text,callee)
+            if symbol is None and callee.text in callee.source.selected:
+                namespace,name=callee.source.selected[callee.text].split('.',1)
+                return callee.source.imports.get(namespace),name
+            if symbol and not symbol.projection and symbol.scope.kind=='File' and symbol.node.source.path.parent!=callee.source.path.parent:
+                # A namespace using resolves to the original exported symbol.
+                # Retain its package identity for reviewed library contracts,
+                # without giving a same-named local helper that identity.
+                for path in callee.source.imports.values():
+                    directory=callee.source.import_dir(path)
+                    if directory is None and self.r.native:directory=self.r.native.directory(callee.source,path)
+                    if directory==symbol.node.source.path.parent:return path,symbol.name
         return None
 
     def library(self,call):

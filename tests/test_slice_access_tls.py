@@ -113,6 +113,37 @@ main::proc(){
         client.diagnostic(path.as_uri(),empty=True)
         self.assertFalse(any('#mut' in hint['label'] for hint in self.hints(client,path)))
 
+    def test_array_component_readers_and_foreign_results_recover_unsaved(self):
+        text='''// 😀 original source
+package main
+import rl "vendor:raylib"
+read::proc(values:[]rl.Vector2)->int{return int(values[0].x)}
+main::proc(){
+    using rl
+    position :> GetMousePosition()
+    point:=[int(position.x),int(position.y)]
+    rows :> []rl.Vector2{{1,2}}
+    _=read(rows);_=point
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        hints=self.hints(client,path)
+        self.assertFalse(any('#mut' in hint['label'] for hint in hints),hints)
+        broken=text.replace('return int(values[0].x)','values[0].x=9;return int(values[0].x)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+            'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+        self.assertTrue(any(error['range']['start']==self.position(broken,'rows);',0) for error in errors),errors)
+        self.assertTrue(any(note['location']['range']['start']==self.position(broken,'values[0].x=9',0)
+                            for error in errors for note in error.get('relatedInformation',[])),errors)
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':3},
+            'contentChanges':[{'text':text}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
     def test_switch_and_comprehension_argument_errors_use_original_utf16_locations(self):
         for expression in ['switch change(values){case 2:7;case:8}',
                            'switch 2{case change(values):7;case:8}',

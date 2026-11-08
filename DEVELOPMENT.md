@@ -3954,3 +3954,32 @@ cases with assertions disabled, and the full isolated VS Code suite. Rebuild the
 local server with its ordinary checked configuration after release validation.
 An editor that exhausted its five automatic restart attempts needs the Thor
 Restart Language Server command or a window reload to reconnect.
+
+## Vector component access through immutable bindings (Thor/TLS 0.41.2)
+
+The circles-on-dots project exposed two missing source facts in the slice-access
+analysis. Array components such as `.x` and `.y` were modeled as unknown record
+fields, and names exposed by a namespace `using rl` were unresolved. Freezing an
+unknown result conservatively created a slice permission; converting its numeric
+component to `int` then falsely looked like erasing that permission.
+
+Resolve namespace members to their original exported symbols and preserve their
+package identities for reviewed reader contracts, without granting those contracts
+to same-named local helpers. Model Odin array components and swizzles using their
+element types and shared element provenance. Numeric copies are independent;
+component writes through read-only slices and nested slice aliases still require
+writable permission. Native checking retains responsibility for selector validity
+and exact nominal types. These are source-analysis changes, with no new runtime
+storage or lowering machinery.
+
+Regressions cover qualified and namespace-imported Raylib results, both component
+alphabets, swizzle copies/writes, generic readers, nested slices, transitive
+namespace reader/writer/returned-view contracts, reviewed readers and local
+shadowing. The live TLS regression checks inferred hints, source locations and
+unsaved error recovery. Numeric fixtures run checked and with assertions, bounds
+checks and type assertions disabled. The original project passes check and builds
+in debug and optimized unchecked configurations without source edits.
+
+Validation passes 112 slice-access/TLS/hardening cases, 40 using/context/power
+cases, and the final 66-case focused/purity/native-evaluation/assertion group.
+The final group includes all new regressions after the namespace-contract fix.

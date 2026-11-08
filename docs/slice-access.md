@@ -27,6 +27,12 @@ record's nested slice references retain their permissions. Nested slices reached
 through a read-only slice remain read-only, including through returned records,
 shallow clones, comprehensions, and calls to other procedures.
 
+Odin array components (`.x`, `.y`, `.r`, etc.) and swizzles (`.yx`, `.rgba`)
+follow the same rules as indexing and copying array elements. Reading a numeric
+component from an immutable vector, including a foreign procedure's result,
+produces an ordinary numeric value. Components that contain slices retain their
+read-only permissions; writing a component through a read-only slice is rejected.
+
 This extension applies to slices. Existing standalone pointer, map, Set and
 dynamic-array rules remain in force. A pointer stored inside a protected slice
 can still modify its pointee; the stored pointer value itself cannot be replaced.
@@ -104,6 +110,10 @@ Unresolved callbacks, foreign/bodyless procedures and opaque `any`/raw-pointer
 conversions cannot silently shed permissions. Core printing, cloning, and the
 reviewed basic string/hash interfaces have argument-specific contracts. Ordinary
 inspectable Odin helpers can be checked without rewriting their declarations.
+Calls exposed by `using package_name` retain the same parameter and returned-view
+contracts as calls written with the package prefix. Reviewed library readers
+also retain their package identity; a same-named local procedure is checked by
+its own implementation.
 
 Mutable callbacks and procedure parameters do not borrow the access contract of
 their initializer or default expression. A slice returned by an unresolved

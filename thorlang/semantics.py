@@ -184,6 +184,12 @@ class Resolver:
                     for using in self.using.get(self.scope_key(scope), []):
                         owners = using.group("values") if using.kind == "Using" else using.group("names")
                         for owner in owners:
+                            if using.kind=='Using' and owner.kind=='Ident' and not self.lookup(owner.text,owner):
+                                imported=owner.source.imports.get(owner.text)
+                                if imported:
+                                    member=self.package_symbol(self.import_directory(owner.source,imported),name)
+                                    if member:return member
+                                    continue
                             owner_type = self.type_of(owner)
                             field = self.field(owner_type, name)
                             if field:
@@ -586,6 +592,8 @@ class Resolver:
             while owner_type.kind=='pointer': owner_type=owner_type.elem or Type()
             if owner_type.kind=='big_rational' and n.role('field').text in {'numerator','denominator'}:
                 return Type('big_integer','Integer',n,witness=n)
+            selection = self.array_selector_type(owner_type, n.role('field').text)
+            if selection is not None:return replace(selection,witness=n)
             result = self.field(owner_type, n.role("field").text)
             return replace(result[0], witness=n) if result else Type(node=n)
         if kind == "Index":
@@ -726,6 +734,22 @@ class Resolver:
     def fields(node):
         return [(binding_name(name) if name else "", f.role("type")) for f in node.children if f.kind == "Field"
                 for name in (f.group("names") or [None])] if node else []
+
+    @staticmethod
+    def array_selector_type(typ, name):
+        """Odin array components and swizzles have the element's real shape.
+
+        Native checking still owns selector validity and exact nominal types.
+        In particular, these are element projections, not unknown record fields.
+        """
+        if typ.kind!='array' or not 1<=len(name)<=4:return None
+        alphabet=next((letters for letters in ('xyzw','rgba') if all(c in letters for c in name)),None)
+        if alphabet is None:return None
+        if isinstance(typ.length,int):
+            if len(name)==1 and typ.length>4:return None
+            if any(alphabet.index(c)>=typ.length for c in name):return None
+        if len(name)==1:return typ.elem or Type()
+        return typ if len(name)==typ.length else Type('array',elem=typ.elem,length=len(name))
 
     def field(self, typ, name, seen=None):
         seen = set() if seen is None else seen

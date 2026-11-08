@@ -47,6 +47,84 @@ if a[0]!=1||rows[0].count!=1{panic("value copy")}
 ''','Row::struct{count:int}\n'))
         self.invoke(self.program('rows :> []Row{{1}};rows[0].count=9','Row::struct{count:int}\n'),command='check',fail='read-only slice')
 
+    def test_numeric_array_components_and_swizzles_are_value_copies(self):
+        prefix='''Vector::[4]f32
+position::proc()->Vector{return {1,2,3,4}}
+read::proc(values:[]Vector)->int{return int(values[0].x)+int(values[0].a)}
+read_generic::proc(value:$T)->int{return int(value.y)+int(value.b)}
+'''
+        text=self.program('''m :> position()
+x,y,z,w:=int(m.x),int(m.y),int(m.z),int(m.w)
+r,g,b,a:=int(m.r),int(m.g),int(m.b),int(m.a)
+if x+y+z+w!=10||r+g+b+a!=10{panic("component copies")}
+pair:=m.yx;pair.x=20
+if pair!=[f32(20),1]||m.y!=2{panic("swizzle copy")}
+rows :> []Vector{{1,2,3,4}}
+if read(rows)!=5||read_generic(m)!=5{panic("reader contracts")}
+for row in rows{value:=int(row.x);if value!=1{panic("loop component")}}
+''',prefix)
+        for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):self.invoke(text,flags=flags)
+
+    def test_foreign_numeric_array_results_have_typed_components(self):
+        for call in ['rl.GetMousePosition()','GetMousePosition()']:
+            with self.subTest(call=call):
+                self.invoke(self.program('''using rl
+position :> '''+call+'''
+point:=[int(position.x),int(position.y)]
+swizzled:=position.yx
+_=point;_=swizzled
+''','import rl "vendor:raylib"\n'),command='check')
+
+    def test_using_namespace_preserves_reader_writer_and_returned_view_contracts(self):
+        files={'library/main.odin':'''package library
+Vector::[2]f32
+position::proc()->Vector{return {1,2}}
+read::proc(values:[]int)->int{return values[0]}
+write::proc(values:[]int){values[0]=9}
+view::proc(values:[]int)->[]int{return values}
+'''}
+        prefix='import "library"\n'
+        self.invoke(self.program('''using library
+values :> []int{7}
+point :> position()
+if int(point.x)+int(point.y)!=3||read(values)!=7{panic("namespace reader")}
+''',prefix),files=files)
+        for operation in ['write(values)','alias:=view(values);_=alias']:
+            with self.subTest(operation=operation):
+                self.invoke(self.program('using library;values :> []int{7};'+operation,prefix),
+                            files=files,command='check',fail='read-only slice')
+
+    def test_using_namespace_keeps_reviewed_reader_identity_and_local_shadowing(self):
+        self.invoke(self.program('''using fmt
+values :> []int{7}
+println(values)
+{println::proc(items:[]int){items[0]=9};writable:=[]int{1};println(writable)}
+''','import "core:fmt"\n'),expected='[7]')
+        self.invoke(self.program('''using fmt
+values :> []int{7}
+{println::proc(items:[]int){items[0]=9};println(values)}
+''','import "core:fmt"\n'),command='check',fail='read-only slice')
+
+    def test_array_component_and_swizzle_writes_require_writable_slice_storage(self):
+        for operation in ['values[0].x=9','values[0].rg=[9,8]',
+                          'pointer:=&values[0].x;pointer^=9']:
+            with self.subTest(operation=operation):
+                prefix='change::proc(values:[][2]int){'+operation+'}\n'
+                text=self.program('values :> [][2]int{{1,2}};change(values)',prefix)
+                self.invoke(text,command='check',fail='read-only slice')
+                self.invoke(text.replace('values :>','values :='))
+
+    def test_array_components_and_swizzles_preserve_nested_slice_permissions(self):
+        for operation in ['alias:=rows.x;_=alias','rows.y[0]=9',
+                          'pair:=rows.yx;pair[0][0]=9',
+                          'write(rows.x)', 'write(rows.yx[0])']:
+            with self.subTest(operation=operation):
+                prefix='write::proc(values:[]int){values[0]=9}\n'
+                self.invoke(self.program('rows :> [2][]int{{1},{2}};'+operation,prefix),
+                            command='check',fail='read-only slice')
+        self.invoke(self.program('rows :> [2][]int{{1},{2}};view :> rows.x;if view[0]!=1{panic("view") }'))
+
     def test_nested_slices_and_copied_record_members_stay_readonly(self):
         prefix='Row::struct{count:int,items:[]int}\n'
         for body in ['rows :> [][]int{{1,2}};rows[0][0]=9',

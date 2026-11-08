@@ -220,6 +220,8 @@ class SliceAccess:
         if node.kind=='Selector':
             base=self.type(node.role('expr'),context)
             if base.kind=='pointer':base=base.elem or Type()
+            selection=self.r.array_selector_type(base,node.role('field').text)
+            if selection is not None:return selection
             member=self.r.field(base,node.role('field').text)
             if member:return member[0]
         if node.kind=='Index':return self.type(node.role('expr'),context).elem or Type()
@@ -294,6 +296,14 @@ class SliceAccess:
 
     def member(self,value,name):
         if value.typ.kind=='pointer':return self.member(self.deref(value),name)
+        selection=self.r.array_selector_type(value.typ,name)
+        if selection is not None:
+            element=self.item(value)
+            if len(name)==1:return element
+            # Swizzle assignments address the source array; value copies copy
+            # the selected inline elements and retain any nested slice views.
+            return Value(selection,storage=set(value.storage),element=element,
+                         locations=set(value.locations))
         if value.base:
             base=self.member(value.base,name)
             return self.qualify(base,value.storage-value.base.storage)
