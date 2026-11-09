@@ -85,7 +85,6 @@ impl Lower<'_, '_> {
             let body = self.role(target.node, "body")?;
             let prefix = format!("{}_", self.checked_name(target));
             let saved_prefix = std::mem::replace(&mut self.prefix, prefix);
-            let old_variant = std::mem::replace(&mut self.variant_mode, true);
             let old_prologue = self.body_prologues.remove(&body);
             let old_owned = self.pure_owned.contains(&target.node);
             self.emitting_variants.insert(target.node);
@@ -144,7 +143,6 @@ impl Lower<'_, '_> {
                 self.pure_owned.remove(&target.node);
             }
             self.prefix = saved_prefix;
-            self.variant_mode = old_variant;
             let code = result?;
             self.declaration_helpers
                 .entry(declaration)

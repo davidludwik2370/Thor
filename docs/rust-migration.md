@@ -22,7 +22,8 @@ cargo build --release --locked --manifest-path rust/Cargo.toml
 ./thor-rust run examples/rust_migration
 ./thor-rust --capabilities
 
-python3 -m unittest tests.test_rust_compiler tests.test_rust_reference tests.test_compiler_comparison
+python3 -m unittest discover -s tests -p 'test_rust_*.py'
+python3 -m unittest tests.test_compiler_comparison
 cargo test --locked --manifest-path rust/Cargo.toml
 cargo test --release --locked --manifest-path rust/Cargo.toml
 cargo clippy --all-targets --manifest-path rust/Cargo.toml -- -D warnings
@@ -397,3 +398,26 @@ assertion-hygiene checks; 325 Python purity, borrowing, binding and default chec
 exercise promoted fields through copied aliases and both automatic and explicit
 compile-time readers. Eight Rust unit tests passed in debug and release profiles;
 Clippy passed with warnings denied.
+
+## Initial public generic runtime contracts
+
+Unbound implicit type names now retain generic identity instead of becoming
+unknown types. Public generic functions with fully verified, type-independent
+effects can validate concrete native instantiations and recursively copy owned
+results. Coverage includes numeric/complex/quaternion operations, generic fixed
+array dimensions, read-only slice inputs, local private record types, nested
+slice construction and concrete function-pointer assignments. Their source
+procedure signatures have no added permission parameters.
+
+Abstract generic function bodies are also inspected even when a direct call does
+not instantiate them in the resolver. This prevents an indirect instantiation
+from bypassing borrowing checks. Cases that require a native conditional
+ownership proof remain migration failures, including a generic copy that could
+be either an inline array or a shared slice header. Generic native branches and
+explicit type-parameter schemas remain incomplete; this is not full generic
+purity support or completion of chunk 2.
+
+The eight new generic checks passed, including debug and unchecked allocation
+tracking. All 70 purity/checked-call/record/resolution/hygiene interaction checks
+and all 195 reused reference fixtures passed. Eight Rust unit tests passed in
+both profiles, and Clippy passed with warnings denied.

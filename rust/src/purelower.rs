@@ -319,7 +319,7 @@ impl Lower<'_, '_> {
             | Type::Dynamic(base)
             | Type::Array { elem: base, .. }
             | Type::Fixed { elem: base, .. } => Self::pure_schema_gap(base),
-            Type::Unknown | Type::Generic | Type::Soa(_) => true,
+            Type::Unknown | Type::Soa(_) => true,
             _ => false,
         }
     }

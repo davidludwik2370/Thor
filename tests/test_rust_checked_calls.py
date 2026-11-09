@@ -139,11 +139,11 @@ second::fn(n:int)->int{return helper(n)}
         for flags in (['-debug'],native.UNCHECKED):
             with self.subTest(flags=flags):self.compare(source,files=files,flags=flags,directory=True)
 
-    def test_unported_public_generic_schema_retains_migration_status(self):
+    def test_unported_public_generic_branch_retains_migration_status(self):
         import json
         self.source.write_text(self.program('n:=3;_=work(n)', '''
 identity::proc(value:$T)->T{return value}
-work::fn(value:$T)->T{return identity(value)}
+work::fn(value:$T)->T{when T==int{return identity(value)}else{return value}}
 '''))
         reference=self.invoke('python',command='check')
         self.assertEqual(reference.returncode,0,reference.stderr)

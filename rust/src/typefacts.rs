@@ -175,6 +175,13 @@ impl Resolver<'_> {
             }
             if let Some(symbol) = self.symbol(r) {
                 let symbol = self.symbols[symbol].clone();
+                if self.sources[symbol.reference.file]
+                    .node(symbol.reference.node)
+                    .kind
+                    == "PolyType"
+                {
+                    return Type::Generic;
+                }
                 if symbol.annotation.is_none() {
                     let source = &self.sources[symbol.reference.file];
                     if source.group(symbol.reference.node, "names").len() > 1

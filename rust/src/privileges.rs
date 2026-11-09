@@ -227,7 +227,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .descendants(sig.node)
                     .any(|id| this.s(sig).node(id).kind == "PolyType")
             });
-            if !generic {
+            if !generic || this.s(proc).node(proc.node).data["pure"] == true {
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
                 this.summary(proc, Substitutions::new());
                 this.pure_depth = 0;
@@ -275,7 +275,21 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     this.facts.unresolved.insert(effect.operation, conditional);
                     continue;
                 }
-                if let Some((name, _)) = params.get(origin.path.index) {
+                if let Some((name, field)) = params.get(origin.path.index) {
+                    let bindings = this.contexts[c].bindings.clone();
+                    let typ = this
+                        .role(*field, "type")
+                        .or_else(|| this.role(*field, "default"))
+                        .map(|annotation| this.r.specialized_type(annotation, &bindings))
+                        .unwrap_or(Type::Unknown);
+                    if this.unresolved_value_type(&typ, &mut HashSet::new()) {
+                        // A generic value copy may be inline storage or a
+                        // borrowed header. Until native conditional ownership
+                        // guards are emitted, this is a migration gap, not proof
+                        // that a valid array copy mutates its input.
+                        this.facts.unresolved.insert(effect.operation, *name);
+                        continue;
+                    }
                     this.facts.pure_faults.entry(proc).or_default().push(Issue {
                         operation: effect.operation,
                         seed: *name,
@@ -812,6 +826,32 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.contains_slice(&typ, seen)
                 })
             }
+            _ => false,
+        }
+    }
+    fn unresolved_value_type(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
+        if !seen.insert(typ.clone()) {
+            return false;
+        }
+        match typ {
+            Type::Unknown | Type::Generic => true,
+            Type::Nominal(_, base)
+            | Type::Pointer(base)
+            | Type::Slice(base)
+            | Type::Dynamic(base)
+            | Type::Soa(base)
+            | Type::Array { elem: base, .. }
+            | Type::Fixed { elem: base, .. } => self.unresolved_value_type(base, seen),
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
+                .r
+                .record_fields(typ)
+                .iter()
+                .any(|(_, typ)| self.unresolved_value_type(typ, seen)),
+            Type::Union(owner) => self
+                .r
+                .union_variants(*owner)
+                .iter()
+                .any(|typ| self.unresolved_value_type(typ, seen)),
             _ => false,
         }
     }
