@@ -11,6 +11,18 @@ pub struct CallPlan {
 }
 
 impl Resolver<'_> {
+    fn contextual_cast_argument(&self, mut actual: Ref) -> bool {
+        while self.sources[actual.file].node(actual.node).kind == "Paren" {
+            let Some(node) = self.sources[actual.file].role(actual.node, "expr") else {
+                break;
+            };
+            actual = Ref {
+                file: actual.file,
+                node,
+            };
+        }
+        self.sources[actual.file].node(actual.node).kind == "AutoCast"
+    }
     pub fn call_plans(&mut self, call: Ref, context: &Substitutions) -> Vec<CallPlan> {
         let key = (
             call,
@@ -133,7 +145,7 @@ impl Resolver<'_> {
                         };
                         if let Some(amount) = self.shape_score(annotation, &typ, &bindings) {
                             score += amount;
-                        } else {
+                        } else if !self.contextual_cast_argument(*arg) {
                             valid = false;
                             break;
                         }

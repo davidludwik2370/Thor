@@ -1043,7 +1043,10 @@ class Resolver:
                                 value = self.constant_int(arg)
                                 if value is not None:
                                     substitutions[param[0]] = value
+                        actual=arg
+                        while actual.kind=='Paren':actual=actual.role('expr')
                         amount = self.unify(param[1], self.type_of(arg), substitutions)
+                        if actual.kind=='AutoCast' and amount<0:amount=0
                         score += amount
                         valid &= amount >= 0
                 if valid:

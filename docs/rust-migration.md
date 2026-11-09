@@ -584,3 +584,37 @@ with empty allocation reports. An earlier full run hit a stock Odin array-bounds
 assertion during a reference-only check; its isolated retry, neighboring checks
 and the clean full rerun passed. That diagnostic alone does not identify its
 cause as the previously recorded cached-name race.
+
+## Contextual and aggregate conversion proofs
+
+Pure casts now validate the complete converted representation, including array
+and slice elements. A scalar-to-pointer `auto_cast`, or an element-wise cast from
+an integer array to a pointer array, must not bypass the ordinary pointer
+conversion restriction. Conversions from pointer representations to numeric
+representations are checked as well. Locally owned references and ordinary
+`proc` pointer casts retain their existing behavior.
+
+The contextual checks retain Odin's original `auto_cast`; they do not replace it
+with an explicit target conversion. Source types still drive generic inference
+and exact overload matches. Where necessary, an unevaluated `procedure_of` query
+obtains the selected procedure's concrete parameter type. Compile-time parameters
+are excluded from the runtime parameter index, named arguments retain their
+mapping, and variadic arguments use the element type. No new shared SDK helper
+files are needed for these proofs.
+
+The generated proofs use native type queries and compile-time `when` selection,
+without runtime wrapper calls or additional operand evaluations. Known scalar
+conversions skip the extra representation proof. Unused ordinary defaults and
+unevaluated source type queries retain their contracts. Regression coverage
+includes checked and unchecked runtime builds, overloads and generic inference,
+private types, SDK calls, compound literals, aggregate conversions, defaults,
+reference compile-time calls and unsaved TLS diagnostic recovery. This remains a
+checkpoint within the type/purity migration; it does not complete native
+compile-time execution or the other outstanding feature ports.
+
+The integrated focused run passed 29 new/reference/native/TLS checks. Neighboring
+reference runs passed 48 purity/conversion checks and 31 big-number checks. All
+seven assertion-hygiene checks passed, as did the Rust unit tests in debug and
+release and Clippy with warnings denied. The earlier captured-type checkpoint
+also completed 30 TLS checks after its commit. The broader native acceptance
+suite is rerun at the next combined checkpoint.

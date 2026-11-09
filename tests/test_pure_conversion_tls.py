@@ -34,5 +34,31 @@ main::proc(){n:=3;_=outer(^int,n)}
         client.diagnostic(main.as_uri(),contains='Pure code cannot convert values to pointers')
         self.assertEqual(main.read_text(),text)
 
+    def test_contextual_and_aggregate_cast_errors_recover_after_unsaved_edits(self):
+        for expression in ('auto_cast words','cast([1]^int)words'):
+            with self.subTest(expression=expression):
+                text='''// 😀 aggregate conversion
+package main
+work::fn(value:uintptr)->int{
+    words:=[1]uintptr{value}
+    pointers:[1]^int='''+expression+'''
+    pointers[0]^=9
+    return 0
+}
+main::proc(){n:=3;_=work(uintptr(&n))}
+'''
+                client,main=self.open(text)
+                errors=client.diagnostic(main.as_uri(),contains='Pure code cannot convert values to pointers')
+                relevant=[error for error in errors if 'Pure code cannot convert values to pointers' in error['message']]
+                self.assertEqual(len(relevant),1,errors)
+                self.assertEqual(relevant[0]['range']['start'],self.position(text,expression,0))
+                for hidden in ('conversion_type','pure_type_site','Thor expression','pure_validate'):
+                    self.assertNotIn(hidden,json.dumps(errors))
+                fixed=text.replace('pointers:[1]^int=','pointers:[1]int=').replace('cast([1]^int)','cast([1]int)').replace('pointers[0]^=9','pointers[0]=9')
+                client.notifications.clear()
+                client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+                client.diagnostic(main.as_uri(),empty=True)
+                self.assertEqual(main.read_text(),text)
+
 
 if __name__=='__main__':unittest.main()

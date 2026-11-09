@@ -261,6 +261,7 @@ class PureCalls:
         return json.dumps(names[0].text) if names else None
 
     def arguments(self,call):
+        if call in self.purity.unchecked_type_queries:return []
         if not self.purity.checked(self.purity.owner(call)):return []
         if self.purity.invalid_default(call):return []
         if call in self.purity.problems or call.role('callee') in self.purity.problems:return []

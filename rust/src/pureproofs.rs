@@ -1,7 +1,336 @@
 //! Unevaluated native type proofs preserve constants and operand lifetimes.
 //! Captured type parameters must obey the same contracts as resolved types.
 use super::*;
+use crate::semantics::Substitutions;
 impl Lower<'_, '_> {
+    pub(super) fn pure_auto_cast(
+        &mut self,
+        id: NodeId,
+        mut expected: Option<Hint>,
+        constant: bool,
+    ) -> Result<Code> {
+        let value = self.role(id, "expr")?;
+        if self.queried_pure_expression(id) {
+            let expression = self.render(value, None, constant)?;
+            return self.splice(id, vec![(self.source.node(value).span, expression)], vec![]);
+        }
+        let mut parent = self.source.node(id).parent;
+        while parent.is_some_and(|node| self.source.node(node).kind == "Paren") {
+            parent = self.source.node(parent.unwrap()).parent;
+        }
+        let source_typ = self.typ(value);
+        let source_shape = self.pure_conversion_shape(&source_typ, &mut HashSet::new());
+        let mut forced = source_shape == Some(true);
+        let call = parent
+            .and_then(|p| {
+                if self.source.node(p).kind == "FieldValue" {
+                    self.source.node(p).parent
+                } else {
+                    Some(p)
+                }
+            })
+            .filter(|p| self.source.node(*p).kind == "Call");
+        if let Some(call) = call {
+            let callee = self.role(call, "callee")?;
+            if !self
+                .resolver
+                .native_builtin(self.reference(callee), "append")
+            {
+                let args = self
+                    .source
+                    .group(call, "args")
+                    .iter()
+                    .map(|node| self.reference(*node))
+                    .collect::<Vec<_>>();
+                let mut shapes = vec![];
+                let mut indices = vec![];
+                for candidate in self.resolver.candidates(self.reference(callee)) {
+                    let owner = &self.resolver.sources[candidate.file];
+                    let signature = if owner.node(candidate.node).kind == "Procedure" {
+                        Ref {
+                            file: candidate.file,
+                            node: owner.role(candidate.node, "type").unwrap_or(candidate.node),
+                        }
+                    } else {
+                        candidate
+                    };
+                    let Some(groups) = self.resolver.arrange_arguments(signature, &args) else {
+                        continue;
+                    };
+                    let Some(index) = groups.iter().position(|group| {
+                        group.iter().any(|arg| {
+                            arg.file == self.reference(id).file
+                                && self
+                                    .source
+                                    .node(arg.node)
+                                    .span
+                                    .contains(self.source.node(id).span)
+                        })
+                    }) else {
+                        continue;
+                    };
+                    let fields = self.resolver.fields(signature, "params");
+                    let typ = fields[index]
+                        .1
+                        .map(|annotation| {
+                            self.resolver
+                                .specialized_type(annotation, &Substitutions::new())
+                        })
+                        .unwrap_or(Type::Unknown);
+                    shapes.push(self.pure_conversion_shape(&typ, &mut HashSet::new()));
+                    let owner = &self.resolver.sources[signature.file];
+                    let names = owner
+                        .role(signature.node, "params")
+                        .map(|params| {
+                            owner
+                                .node(params)
+                                .children
+                                .iter()
+                                .flat_map(|field| owner.group(*field, "names"))
+                                .copied()
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    let runtime = names[..index]
+                        .iter()
+                        .filter(|name| owner.node(**name).kind != "PolyType")
+                        .count();
+                    let variadic = fields[index].1.is_some_and(|annotation| {
+                        self.resolver.sources[annotation.file]
+                            .node(annotation.node)
+                            .kind
+                            == "Ellipsis"
+                    }) && !self.source.node(call).spans.contains_key("ellipsis");
+                    indices.push(if owner.node(names[index]).kind == "PolyType" {
+                        None
+                    } else {
+                        Some((runtime, variadic))
+                    });
+                }
+                if !shapes.is_empty() && shapes.iter().all(|shape| *shape == Some(false)) {
+                    expected = None;
+                    forced = true;
+                } else if !indices.is_empty()
+                    && indices[0].is_some()
+                    && indices.iter().all(|index| *index == indices[0])
+                {
+                    self.querying += 1;
+                    let original = self.render(call, None, false);
+                    self.querying -= 1;
+                    let original = original?;
+                    self.meta = true;
+                    let query = self.native("type_of");
+                    let (index, variadic) = indices[0].unwrap();
+                    let mut code = Code::concat([
+                        self.g(
+                            format!(
+                                "{}meta.type_proc_parameter_type({query}({}meta.procedure_of(",
+                                self.prefix, self.prefix
+                            ),
+                            id,
+                        ),
+                        original,
+                        self.g(format!(")),{index})"), id),
+                    ]);
+                    if variadic {
+                        code = Code::concat([
+                            self.g(format!("{}meta.type_elem_type(", self.prefix), id),
+                            code,
+                            self.g(")", id),
+                        ]);
+                    }
+                    expected = Some(Hint {
+                        code,
+                        element_only: false,
+                        plain_array: false,
+                    });
+                } else {
+                    expected = None;
+                }
+            }
+        }
+
+        if expected.is_none() && !forced {
+            if let Some(parent) = parent {
+                let node = self.source.node(parent);
+                if node.kind == "Binary" {
+                    if ["==", "!=", "<", "<=", ">", ">="].contains(&node.op.as_str()) {
+                        let left = self.role(parent, "left")?;
+                        let other = if self
+                            .source
+                            .node(left)
+                            .span
+                            .contains(self.source.node(id).span)
+                        {
+                            self.role(parent, "right")?
+                        } else {
+                            left
+                        };
+                        let expression = self.render(other, None, constant)?;
+                        let query = self.native("type_of");
+                        expected = Some(Hint {
+                            code: Code::concat([
+                                self.g(format!("{query}("), id),
+                                expression,
+                                self.g(")", id),
+                            ]),
+                            element_only: false,
+                            plain_array: false,
+                        });
+                    } else if [
+                        "+", "-", "*", "/", "%", "%%", "&", "|", "~", "<<", ">>", "..", "..<",
+                        "..=",
+                    ]
+                    .contains(&node.op.as_str())
+                    {
+                        forced = true;
+                    }
+                } else if ["Index", "Slice", "Range", "Unary", "AutoCast", "Cast"]
+                    .contains(&node.kind.as_str())
+                {
+                    forced = true;
+                } else if ["If", "When", "Ternary", "WhenExpr"].contains(&node.kind.as_str())
+                    && self.source.role(parent, "cond").is_some_and(|cond| {
+                        self.source
+                            .node(cond)
+                            .span
+                            .contains(self.source.node(id).span)
+                    })
+                {
+                    expected = Some(Hint {
+                        code: self.g("bool", id),
+                        element_only: false,
+                        plain_array: false,
+                    });
+                } else if ["FieldValue", "Compound"].contains(&node.kind.as_str()) {
+                    let compound = if node.kind == "FieldValue" {
+                        self.source.node(parent).parent
+                    } else {
+                        Some(parent)
+                    };
+                    if let Some(compound) =
+                        compound.filter(|node| self.source.node(*node).kind == "Compound")
+                    {
+                        if let Some(annotation) = self.source.role(compound, "type") {
+                            let typ = self.typ(annotation);
+                            let field = if node.kind == "FieldValue" {
+                                self.source
+                                    .role(parent, "field")
+                                    .map(|field| self.source.text(field).to_string())
+                            } else {
+                                let fields = self.resolver.record_fields(&typ);
+                                self.source
+                                    .group(compound, "elems")
+                                    .iter()
+                                    .position(|value| *value == id)
+                                    .and_then(|i| fields.get(i).map(|(name, _)| name.clone()))
+                            };
+                            let typ_code = self.render(annotation, None, true)?;
+                            self.meta = true;
+                            if let Some(field) = field {
+                                expected = Some(Hint {
+                                    code: Code::concat([
+                                        self.g(format!("{}meta.type_field_type(", self.prefix), id),
+                                        typ_code,
+                                        self.g(format!(",{})", json!(field)), id),
+                                    ]),
+                                    element_only: false,
+                                    plain_array: false,
+                                });
+                            } else if matches!(
+                                typ,
+                                Type::Array { .. }
+                                    | Type::Slice(_)
+                                    | Type::Dynamic(_)
+                                    | Type::Fixed { .. }
+                            ) {
+                                expected = Some(Hint {
+                                    code: Code::concat([
+                                        self.g(format!("{}meta.type_elem_type(", self.prefix), id),
+                                        typ_code,
+                                        self.g(")", id),
+                                    ]),
+                                    element_only: false,
+                                    plain_array: false,
+                                });
+                            }
+                        }
+                    }
+                } else if node.kind == "Call"
+                    && self.source.role(parent, "callee").is_some_and(|callee| {
+                        self.resolver
+                            .native_builtin(self.reference(callee), "append")
+                    })
+                    && self.source.group(parent, "args").iter().skip(1).any(|arg| {
+                        self.source
+                            .node(*arg)
+                            .span
+                            .contains(self.source.node(id).span)
+                    })
+                {
+                    let destination = self.source.group(parent, "args")[0];
+                    let expression = self.render(destination, None, false)?;
+                    let query = self.native("type_of");
+                    self.meta = true;
+                    expected = Some(Hint {
+                        code: Code::concat([
+                            self.g(format!("{}meta.type_elem_type({query}((", self.prefix), id),
+                            expression,
+                            self.g(")^))", id),
+                        ]),
+                        element_only: false,
+                        plain_array: false,
+                    });
+                }
+            }
+        }
+        if expected.is_none() && !forced {
+            return Err(self.unsupported(id, "pure auto_cast target inference"));
+        }
+        let expression = self.render(value, None, constant)?;
+        let proof = if let Some(hint) = expected {
+            Some(self.pure_conversion_proof(id, hint.code, Some(value))?)
+        } else if source_shape != Some(false) {
+            let name = format!("{}pure_auto_cast_operand", self.prefix);
+            let key = (NodeId(0), self.prefix.clone(), name.clone());
+            if !self.helpers.contains_key(&key) {
+                let validator = format!("{}_mode", self.pure_validator(id));
+                let code=format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($S:typeid,$Site:string)->S{{{validator}(S,true,true,false,0,Site,2);return {{}}}}\n");
+                self.helpers.insert(key, self.g(code, id));
+            }
+            self.default = true;
+            let query = self.native("type_of");
+            let owner = self
+                .source
+                .ancestors(id)
+                .find(|node| self.source.node(*node).kind == "Procedure")
+                .unwrap_or(id);
+            let token = self.pure_type_site(id, owner, "auto_cast operand");
+            Some(Code::concat([
+                self.g(
+                    format!("{query}({name}({query}({}default_value(", self.prefix),
+                    id,
+                ),
+                expression.clone(),
+                self.g(format!(")),{token}))"), id),
+            ]))
+        } else {
+            None
+        };
+        if let Some(proof) = proof {
+            let size = self.native("size_of");
+            return Ok(Code::concat([
+                self.g("auto_cast ((", id),
+                expression.clone(),
+                self.g(format!(") when {size}("), id),
+                proof,
+                self.g(")>=0 else (", id),
+                expression,
+                self.g("))", id),
+            ]));
+        }
+        Ok(Code::concat([self.g("auto_cast ", id), expression]))
+    }
     pub(super) fn pure_local_type(
         &mut self,
         id: NodeId,
@@ -64,41 +393,167 @@ impl Lower<'_, '_> {
             "Cast" if node.op != "transmute" => self.source.role(id, "type"),
             _ => None,
         };
-        let Some(target) = target else {
+        let Some(_target) = target else {
             return Ok(None);
         };
         if self.queried_pure_expression(id) {
             return Ok(None);
         }
-        let mut typ = self.typ(target);
-        while let Type::Nominal(_, base) = typ {
-            typ = *base;
+        if self.resolver.denotes_type(self.reference(id)) {
+            return Ok(None);
         }
-        if !matches!(typ, Type::Unknown | Type::Generic) {
+        let target_type = self.typ(_target);
+        let operand = if node.kind == "Cast" {
+            self.source.role(id, "expr")
+        } else {
+            self.source.group(id, "args").first().copied()
+        };
+        let source_safe = if let Some(operand) = operand {
+            let typ = self.typ(operand);
+            self.pure_conversion_shape(&typ, &mut HashSet::new()) == Some(false)
+        } else {
+            true
+        };
+        if source_safe
+            && self.pure_conversion_shape(&target_type, &mut HashSet::new()) == Some(false)
+        {
             return Ok(None);
         }
         self.pure_conversion_busy.insert(id);
         let expression = self.render(id, expected, constant);
         self.pure_conversion_busy.remove(&id);
         let expression = expression?;
-        let module = self.module("pure");
-        let type_of = self.native("type_of");
+        let operand = if node.kind == "Cast" {
+            self.source.role(id, "expr")
+        } else {
+            self.source.group(id, "args").first().copied()
+        };
+        let query = self.native("type_of");
+        let target = Code::concat([
+            self.g(format!("{query}("), id),
+            expression.clone(),
+            self.g(")", id),
+        ]);
+        let proof = self.pure_conversion_proof(id, target, operand)?;
+        Ok(Some(Code::concat([
+            self.g("(", id),
+            proof,
+            self.g(")(", id),
+            expression,
+            self.g(")", id),
+        ])))
+    }
+    fn pure_conversion_shape(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> Option<bool> {
+        if !seen.insert(typ.clone()) {
+            return None;
+        }
+        let children = match typ {
+            Type::Unknown | Type::Generic => return None,
+            Type::Pointer(_) | Type::Procedure(_) | Type::Map { .. } | Type::Set(_) => {
+                return Some(true)
+            }
+            Type::Scalar { name, .. } | Type::String { name, .. }
+                if [
+                    "rawptr",
+                    "any",
+                    "typeid",
+                    "cstring",
+                    "cstring16",
+                    "string16",
+                ]
+                .contains(&name.as_str()) =>
+            {
+                return Some(true)
+            }
+            Type::Nominal(_, base) => vec![*base.clone()],
+            Type::Array { elem, .. }
+            | Type::Slice(elem)
+            | Type::Dynamic(elem)
+            | Type::Fixed { elem, .. }
+            | Type::Soa(elem) => vec![*elem.clone()],
+            Type::Struct(owner) | Type::Record(owner, _)
+                if self.resolver.sources[owner.file].node(owner.node).op == "raw_union" =>
+            {
+                return Some(true)
+            }
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
+                .resolver
+                .record_fields(typ)
+                .into_iter()
+                .map(|(_, typ)| typ)
+                .collect(),
+            Type::Union(owner) => self.resolver.union_variants(*owner),
+            _ => return Some(false),
+        };
+        let shapes = children
+            .iter()
+            .map(|typ| self.pure_conversion_shape(typ, &mut seen.clone()))
+            .collect::<Vec<_>>();
+        if shapes.contains(&Some(true)) {
+            Some(true)
+        } else if shapes.contains(&None) {
+            None
+        } else {
+            Some(false)
+        }
+    }
+    fn pure_conversion_proof(
+        &mut self,
+        id: NodeId,
+        target: Code,
+        operand: Option<NodeId>,
+    ) -> Result<Code> {
+        let check = operand
+            .filter(|operand| {
+                let node = self.source.node(*operand);
+                node.kind != "ImplicitSelector"
+                    && self.source.text(*operand) != "nil"
+                    && !(node.kind == "Compound" && self.source.role(*operand, "type").is_none())
+            })
+            .filter(|operand| {
+                let typ = self.typ(*operand);
+                self.pure_conversion_shape(&typ, &mut HashSet::new()) != Some(false)
+            });
+        let name = format!(
+            "{}pure_conversion_type{}",
+            self.prefix,
+            if check.is_some() { "_source" } else { "" }
+        );
+        let key = (NodeId(0), self.prefix.clone(), name.clone());
+        if !self.helpers.contains_key(&key) {
+            let validator = format!("{}_mode", self.pure_validator(id));
+            let source = if check.is_some() { ",$S:typeid" } else { "" };
+            let checks = if check.is_some() {
+                format!(";{validator}(S,true,true,false,0,Site,2)")
+            } else {
+                String::new()
+            };
+            let code=format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid,$Site:string{source})->T{{{validator}(T,true,true,false,0,Site,1){checks};return {{}}}}\n");
+            self.helpers.insert(key, self.g(code, id));
+        }
         let owner = self
             .source
             .ancestors(id)
             .find(|node| self.source.node(*node).kind == "Procedure")
             .unwrap_or(id);
-        let token = self.pure_type_site(id, owner, "conversion target");
-        Ok(Some(Code::concat([
-            self.g(
-                format!("({type_of}({module}.conversion_type({type_of}("),
-                id,
-            ),
-            expression.clone(),
-            self.g(format!("),{token}))) ("), id),
-            expression,
-            self.g(")", id),
-        ])))
+        let token = self.pure_type_site(id, owner, "conversion target and operand");
+        let query = self.native("type_of");
+        let mut code = vec![
+            self.g(format!("{query}({name}("), id),
+            target,
+            self.g(format!(",{token}"), id),
+        ];
+        if let Some(operand) = check {
+            self.default = true;
+            let expression = self.render(operand, None, false)?;
+            code.extend([
+                self.g(format!(",{query}({}default_value(", self.prefix), id),
+                expression,
+                self.g("))", id),
+            ]);
+        }
+        code.push(self.g("))", id));
+        Ok(Code::concat(code))
     }
     fn queried_pure_expression(&self, id: NodeId) -> bool {
         if let Some(proc) = self

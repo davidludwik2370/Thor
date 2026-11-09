@@ -320,6 +320,10 @@ impl<'a, 'r> Purity<'a, 'r> {
                     else if !Self::scalar_transmute(&target) || !Self::scalar_transmute(&value) {
                         self.fault(root,node,via,"Pure transmute requires scalar numeric, boolean, enum or bit-set values; pointer and aggregate representations are not eligible.");
                     }
+                } else if self.role(node,"expr").is_some_and(|value| {
+                    let typ=self.r.specialized_type(value,bindings);self.pointers(&typ,&mut HashSet::new())
+                }) {
+                    self.fault(root,node,via,"Pure code cannot observe pointer identities or convert pointers to numeric values.");
                 } else if Self::forbidden_conversion(&target) {
                     self.fault(root,node,via,"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.");
                 }

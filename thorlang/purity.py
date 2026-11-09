@@ -240,6 +240,7 @@ class Purity:
         self.storage_writes={}
         self.pointer_checks={}
         self.conversion_checks=set()
+        self.unchecked_type_queries=set()
         self.local_type_checks=set()
         self.entry_roots=set()
         self.borrowing=Borrowing(self)
@@ -465,24 +466,29 @@ class Purity:
             else:return []
         return result
 
-    def validator(self,s):
+    def validator(self,s,mode=False):
         """Use shared AST field names, and native exact instantiated field types.
 
         This Odin release cannot unroll struct fields. A count assertion rejects
         external record schemas we cannot inspect instead of trusting them.
         """
         name=s.prefix+'pure_validate';key=s.root,name
-        if key in s.expressions.helpers:return name
+        if key in s.expressions.helpers:return name+'_mode' if mode else name
+        public=name;name+='_mode'
         names=sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
                       for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
         builtin=s.expressions.module('builtin','base:builtin')
-        parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}}']
+        forbidden=' || '.join([f'{meta}.type_is_{kind}(T)' for kind in ['pointer','multi_pointer','proc','map','cstring','cstring16','string16']]+['T==rawptr','T==any','T==typeid'])
+        target_message=json.dumps('Pure code cannot convert values to pointers, procedure values, any or runtime type identities.')
+        source_message=json.dumps('Pure code cannot observe pointer identities or convert pointers to numeric values.')
+        parts=[f'when Mode!=0 && ({forbidden}) {{#panic(({target_message} when Mode==1 else {source_message})+Site)}}',
+               f'else when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}}']
         if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
             parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
-        parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
-        parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
-        parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
+        parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
+        parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
+        parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
         def direct_field(field):
             # type_has_field includes promoted `using` members. A one-field
@@ -522,17 +528,18 @@ class Purity:
         for field in names:
             predicate=direct_field(field)
             field=json.dumps(field)
-            parts.append(f'when {predicate} {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
+            parts.append(f'when {predicate} {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
         parts.extend(['}','}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
                       f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}}',
-                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}','}',
+                      f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}','}',
                       f'else when {meta}.type_is_union(T) {{',
-                      f'{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site)','}',
+                      f'{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site,Mode)','}',
                       f'else {{{native}.validate(T,Result && !Allow_Owned,Depth,Site)}}'])
-        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{\n'+ '\n'.join(parts)+'\n}\n'
-        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site)}}\n}}\n'
+        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n'+ '\n'.join(parts)+'\n}\n'
+        code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string,$Mode:int){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site,Mode)}}\n}}\n'
+        code+=f'\n@(private="file")\n{public}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{{name}(T,Result,Allow_Owned,Allow_Refs,Depth,Site,0)}}\n'
         s.expressions.helpers[key]=s.mapping.wrap(code,s.path,0,0,'pure-type-validator')
-        return name
+        return name if mode else public
 
     def type_site(self,s,site,description):
         start,end=site.start,site.end
@@ -989,8 +996,12 @@ class Purity:
                 typ=self.r.type_node(target)
                 if typ.kind in {'pointer','procedure'} or typ.name in {'rawptr','cstring','any','typeid'}:
                     self.problem(n,'Pure code cannot convert values to pointers, procedure values, any or runtime type identities.')
-                elif typ.kind in {'generic','unknown'} and not (n.kind=='Cast' and n.data['op']=='transmute'):
-                    self.conversion_checks.add(n)
+                elif not (n.kind=='Cast' and n.data['op']=='transmute'):
+                    constructor=typ.kind in {'struct','union'} and typ.node and typ.node.role('params') and typ.node.role('params').children
+                    if not constructor and not(n.kind=='Call' and n.source.big.constructor(n)):
+                        operand=n.role('expr') if n.kind=='Cast' else next(iter(n.group('args')),None)
+                        if self.conversion_shape(typ) is not False or operand and self.conversion_shape(self.r.type_of(operand)) is not False:
+                            self.conversion_checks.add(n)
         # Keep defaults syntactically valid. Replacing an effectful default
         # with an error expression corrupts inference and reports missing
         # parameters before the actual purity violation. Fail lazily in the
@@ -1038,6 +1049,112 @@ class Purity:
             return result
         return self.flow(n,env) if index==0 else Flow()
 
+    def conversion_shape(self,typ,seen=None):
+        seen=set() if seen is None else seen
+        key=self.schema_key(typ)
+        if key in seen:return None
+        seen.add(key)
+        if typ.kind in {'unknown','generic'}:return None
+        if typ.kind in {'pointer','procedure','map','set'} or typ.name in {'rawptr','any','typeid','cstring','cstring16','string16'}:return True
+        if typ.kind in {'big_integer','big_rational','string','scalar','enum','bitset'}:return False
+        children=[]
+        if typ.elem:children.append(typ.elem)
+        if typ.kind=='struct' and typ.node:
+            if typ.node.data.get('op')=='raw_union':return True
+            children.extend(self.r.type_node(field.role('type'),typ.substitutions) for field in typ.node.role('fields').children if field.kind=='Field')
+        if typ.kind=='union' and typ.node:children.extend(self.r.type_node(value,typ.substitutions) for value in typ.node.group('variants'))
+        shapes=[self.conversion_shape(child,seen.copy()) for child in children]
+        return True if True in shapes else None if None in shapes else False
+
+    def conversion_target(self,source,target,site,operand=None):
+        validator=self.validator(source,mode=True)
+        token,_,_=self.type_site(source,site,'conversion target and operand')
+        check=bool(operand and operand.kind!='ImplicitSelector' and operand.text!='nil' and
+                   not(operand.kind=='Compound' and not operand.role('type')) and self.conversion_shape(self.r.type_of(operand)) is not False)
+        name=source.prefix+'pure_conversion_type'+('_source' if check else '')
+        key=source.root,name
+        if key not in source.expressions.helpers:
+            params='$T:typeid,$Site:string'+(',$S:typeid' if check else '')
+            checks=f'{validator}(T,true,true,false,0,Site,1)'+(f';{validator}(S,true,true,false,0,Site,2)' if check else '')
+            code=f'\n@(private="file")\n{name}::proc "contextless"({params})->T{{{checks};return {{}}}}\n'
+            source.expressions.helpers[key]=source.mapping.wrap(code,source.path,0,0,'pure-conversion-type')
+        args=[target,json.dumps(token)]
+        if check:
+            source.needs_default=True
+            args.append('type_of('+source.prefix+'default_value('+source.render(operand)+'))')
+        return 'type_of('+name+'('+','.join(args)+'))'
+
+    def render_auto_cast(self,n,expected,constant):
+        from .compiler import Hint
+        source=n.source;value=n.role('expr')
+        shape=self.conversion_shape(self.r.type_of(value))
+        if shape is True:return source.expressions.error(n,'Pure code cannot observe pointer identities or convert pointers to numeric values.')
+        parent=n.parent
+        while parent and parent.kind=='Paren':parent=parent.parent
+        argument=parent if parent and parent.kind=='FieldValue' else n
+        call=parent.parent if parent and parent.kind=='FieldValue' and parent.parent.kind=='Call' else parent if parent and parent.kind=='Call' else None
+        forced=False
+        self.rendering.add(n)
+        try:
+            if call and self.builtin(call)=='append' and any(arg.start<=n.start<arg.end for arg in call.group('args')[1:]):
+                destination=call.group('args')[0];source.needs_intrinsics=True
+                expected=Hint(source,n,source.prefix+'meta.type_elem_type(type_of(('+source.render(destination)+')^))')
+            elif call:
+                callee=call.role('callee');enabled=self.r.native_enabled;self.r.native_enabled=True
+                try:candidates=self.r.procedure_candidates(callee)
+                finally:self.r.native_enabled=enabled
+                shapes=[];indices=[]
+                receiver=callee.kind=='Selector' and callee.data.get('op')=='->'
+                position=next((i for i,arg in enumerate(call.group('args')) if arg.start<=n.start and n.end<=arg.end),None)
+                for _,signature in candidates:
+                    fields=[(name,field) for field in signature.role('params').children for name in field.group('names')]
+                    index=next((i for i,(name,_) in enumerate(fields) if argument.kind=='FieldValue' and name.text.lstrip('$')==argument.role('field').text),None) if argument.kind=='FieldValue' else position+int(receiver) if position is not None else None
+                    if index is not None and index>=len(fields) and fields and fields[-1][1].data.get('variadic'):index=len(fields)-1
+                    if index is None or index>=len(fields):continue
+                    name,field=fields[index];annotation=field.role('type')
+                    typ=self.r.type_node(annotation)
+                    shapes.append(False if annotation and annotation.kind=='PolyType' and not annotation.role('specialization') else self.conversion_shape(typ))
+                    runtime=sum(name.kind!='PolyType' for name,_ in fields[:index])
+                    if name.kind=='PolyType':indices.append(None)
+                    else:indices.append((runtime,bool(field.data.get('variadic')) and not call.data.get('roles',{}).get('ellipsis')))
+                if shapes and all(shape is False for shape in shapes):expected=None;forced=True
+                elif shapes and all(shape is True for shape in shapes):return source.expressions.error(n,'Pure code cannot convert values to pointers, procedure values, any or runtime type identities.')
+                elif indices and indices[0] is not None and all(index==indices[0] for index in indices):
+                    added=set(descendants(call))-self.rendering;self.rendering.update(added)
+                    queries=set(descendants(call))-self.unchecked_type_queries;self.unchecked_type_queries.update(queries)
+                    try:original=source._render(call,None,False)
+                    finally:
+                        self.rendering.difference_update(added)
+                        self.unchecked_type_queries.difference_update(queries)
+                    source.needs_intrinsics=True
+                    query=source.prefix+'meta.type_proc_parameter_type(type_of('+source.prefix+'meta.procedure_of('+original+')),'+str(indices[0][0])+')'
+                    if indices[0][1]:query=source.prefix+'meta.type_elem_type('+query+')'
+                    expected=Hint(source,n,query)
+            if not expected and not forced and parent:
+                if parent.kind=='Binary':
+                    op=parent.data['op']
+                    if op in {'==','!=','<','<=','>','>='}:
+                        other=parent.role('right') if parent.role('left').start<=n.start<parent.role('left').end else parent.role('left')
+                        expected=Hint(source,other,'type_of('+source.render(other)+')')
+                    elif op in {'+','-','*','/','%','%%','&','|','~','<<','>>','..','..<','..='}:forced=True
+                elif parent.kind in {'Index','Slice','Range','Unary','AutoCast','Cast'}:forced=True
+                elif parent.kind in {'If','When','Ternary','WhenExpr'} and parent.role('cond') and parent.role('cond').start<=n.start<parent.role('cond').end:expected=Hint(source,n,'bool')
+            if isinstance(expected,tuple) or expected is None and not forced:
+                return source.expressions.error(n,'Pure auto_cast requires a resolved target type; use an explicit numeric conversion in this context.')
+            expression=source.render(value,constant=constant)
+            if expected is not None:proof=self.conversion_target(source,source.expressions.type_code(expected).removeprefix('#type '),n,value)
+            elif shape is None:
+                name=source.prefix+'pure_auto_cast_operand';key=source.root,name
+                if key not in source.expressions.helpers:
+                    validator=self.validator(source,mode=True)
+                    code=f'\n@(private="file")\n{name}::proc "contextless"($S:typeid,$Site:string)->S{{{validator}(S,true,true,false,0,Site,2);return {{}}}}\n'
+                    source.expressions.helpers[key]=source.mapping.wrap(code,source.path,0,0,'pure-auto-cast')
+                source.needs_default=True;token,_,_=self.type_site(source,n,'auto_cast operand')
+                proof=f'type_of({name}(type_of({source.prefix}default_value({expression})),{json.dumps(token)}))'
+            else:return source._render(n,expected,constant)
+            return f'auto_cast (({expression}) when size_of({proof})>=0 else ({expression}))'
+        finally:self.rendering.remove(n)
+
     def render(self,n,expected,constant):
         proc=n if n.kind=='Procedure' else self.owner(n)
         if n.kind=='Run':
@@ -1078,6 +1195,8 @@ class Purity:
         if checked_params is not None:return checked_params
         queried_type=self.calls.query(n)
         if queried_type is not None:return queried_type
+        if n.kind=='AutoCast' and not self.calls.queried(n) and self.calls.default_evaluated(n):
+            return self.render_auto_cast(n,expected,constant)
         if n in self.local_type_checks and not self.calls.queried(n) and self.calls.default_evaluated(n):
             self.rendering.add(n)
             try:
@@ -1095,9 +1214,10 @@ class Purity:
             try:
                 source=n.source
                 token,_,_=self.type_site(source,n,'conversion target')
-                native=self.module(source)
                 value=source._render(n,expected,constant)
-                return f'(type_of({native}.conversion_type(type_of({value}),{json.dumps(token)})))({value})'
+                operand=n.role('expr') if n.kind=='Cast' else next(iter(n.group('args')),None)
+                target=self.conversion_target(source,'type_of('+value+')',n,operand)
+                return '('+target+')('+value+')'
             finally:self.rendering.remove(n)
         if n in self.pointer_checks and self.calls.default_evaluated(n):
             self.rendering.add(n)

@@ -67,6 +67,8 @@ impl Lower<'_, '_> {
         if self.helpers.contains_key(&key) {
             return name;
         }
+        let public = name;
+        let name = format!("{public}_mode");
         let names = self
             .resolver
             .sources
@@ -91,10 +93,11 @@ impl Lower<'_, '_> {
         self.builtin = true;
         let builtin = format!("{}builtin", self.prefix);
         let mut parts=vec![
-            format!("when Depth>24{{#panic(\"Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels\"+Site)}}"),
-            format!("else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}"),
-            format!("else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T){{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}"),
-            format!("else when {meta}.type_is_dynamic_array(T){{when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc\"+Site)}}else when Result || Allow_Refs{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}else{{{module}.validate(T,false,Depth,Site)}}}}"),
+            format!("when Mode!=0 && ({meta}.type_is_pointer(T)||{meta}.type_is_multi_pointer(T)||{meta}.type_is_proc(T)||{meta}.type_is_map(T)||{meta}.type_is_cstring(T)||{meta}.type_is_cstring16(T)||{meta}.type_is_string16(T)||T==rawptr||T==any||T==typeid){{#panic((\"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.\" when Mode==1 else \"Pure code cannot observe pointer identities or convert pointers to numeric values.\")+Site)}}"),
+            format!("else when Depth>24{{#panic(\"Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels\"+Site)}}"),
+            format!("else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}"),
+            format!("else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T){{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}"),
+            format!("else when {meta}.type_is_dynamic_array(T){{when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc\"+Site)}}else when Result || Allow_Refs{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}else{{{module}.validate(T,false,Depth,Site)}}}}"),
             format!("else when {meta}.type_is_struct(T){{\nwhen {meta}.type_struct_field_count(T)!=({}){{#panic(\"Pure record fields could not be fully resolved\"+Site)}}",field_count(&names,&meta)),
         ];
         parts.push(format!("when {}>1{{#panic(\"Raw-union storage cannot be proved pure: overlapping fields in a raw-union\"+Site)}}else{{",overlap_count(&names,&meta,&builtin)));
@@ -155,17 +158,18 @@ impl Lower<'_, '_> {
         for field in names {
             let predicate = direct_field(&field, &meta);
             let field = json!(field);
-            parts.push(format!("when {predicate}{{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}"));
+            parts.push(format!("when {predicate}{{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}"));
         }
         parts.extend([
             "}".into(),
             "}".into(),
-            format!("else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T){{when Result && !Allow_Owned && {meta}.type_is_slice(T){{#panic(\"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc\"+Site)}}else{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}}}"),
-            format!("else when {meta}.type_is_union(T){{{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site)}}"),
+            format!("else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T){{when Result && !Allow_Owned && {meta}.type_is_slice(T){{#panic(\"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc\"+Site)}}else{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}}}"),
+            format!("else when {meta}.type_is_union(T){{{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site,Mode)}}"),
             format!("else{{{module}.validate(T,Result && !Allow_Owned,Depth,Site)}}"),
         ]);
-        let code=format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{\n{}\n}}\n@(private=\"file\")\n{name}_union::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string){{when Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site)}}}}\n",parts.join("\n"));
+        let code=format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n{}\n}}\n@(private=\"file\")\n{name}_union::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string,$Mode:int){{when Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site,Mode)}}}}\n",parts.join("\n"));
+        let code = code + &format!("\n@(private=\"file\")\n{public}::proc \"contextless\"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{{name}(T,Result,Allow_Owned,Allow_Refs,Depth,Site,0)}}\n");
         self.helpers.insert(key, self.g(code, site));
-        name
+        public
     }
 }

@@ -874,6 +874,10 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if kind == "AutoCast" && self.checked_mode && self.querying == 0 {
+            return self.pure_auto_cast(id, expected, constant);
+        }
+
         if self.checked_mode && !self.pure_local_busy.contains(&id) {
             if let Some(code) = self.pure_local_type(id, expected.clone(), constant)? {
                 return Ok(code);
