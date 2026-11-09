@@ -387,6 +387,16 @@ g::proc($T:typeid, values:[2]T)->T{return values[1]}
         prefix='Color::enum{Red,Blue}\nf::proc(values:[2]$T,hint:T)->T{return values[1]}\n'
         self.invoke(self.program('assert(f([.Red,.Blue],Color.Red)==.Blue)',prefix))
 
+    def test_generic_context_from_call_result_preserves_shadowed_type_and_evaluation(self):
+        prefix='''Color::enum{A,B}
+Alias::Color
+hint::proc(calls:^int)->Alias{calls^+=1;return .A}
+choose::proc(values:[2]$T,other:T)->T{_=other;return values[1]}
+'''
+        body='Color:=42;calls:=0;value:=choose([.A,.B],hint(&calls));if value!=Alias.B||Color!=42||calls!=1{panic("context witness evaluation")}'
+        for flags in ([],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):self.invoke(self.program(body,prefix),flags=flags)
+
     def test_context_wrappers_resolve_private_types_in_defining_package(self):
         library='''package lib
 @(private="file") Color::enum{Red,Blue}
@@ -405,6 +415,12 @@ generic::proc(values:$A/[2]Color)->int{return int(values[1])}
     def test_generic_length_and_type_parameter_inference(self):
         prefix='f::proc(values:[$N]$T)->int{return N}\n'
         self.invoke(self.program('assert(f([1,2,3])==3)',prefix))
+
+    def test_generic_record_arguments_flow_into_result_dimensions(self):
+        prefix='Box::struct($N:int,$T:typeid){values:[N]T}\nget::proc(box:Box($N,$T))->[N]T{return box.values}\n'
+        body='box:=Box(2,int){values={1,2}};values:=get(box);if values[-1]!=2{panic("record dimensions")}'
+        for flags in ([],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):self.invoke(self.program(body,prefix),flags=flags)
 
     def test_selective_alias_survives_shadowed_package_namespace(self):
         self.invoke(self.program('math:=7; assert(sin(f64(0))==0 && math==7)', 'import "core:math" / sin\n'))

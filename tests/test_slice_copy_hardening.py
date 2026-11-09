@@ -8,6 +8,23 @@ class SliceCopyHardeningTests(unittest.TestCase):
     invoke=base.ThorTests.invoke
     program=base.ThorTests.program
 
+    def test_promoted_generic_fields_preserve_the_real_storage_path(self):
+        prefix='Base::struct($T:typeid){data:[]T}\nBox::struct($T:typeid){using base:Base(T)}\n'
+        for member in ('data','base.data'):
+            with self.subTest(member=member):
+                self.check('box :> Box(int){Base(int){[]int{7}}};box.'+member+'[0]=9',prefix,writable=False)
+        self.check('box:=Box(int){Base(int){[]int{7}}};box.data[0]=9',prefix)
+
+    def test_enum_parameters_select_slice_effects_by_value(self):
+        prefix='''Mode::enum{read,alias=read,write}
+use::proc(values:[]int,$mode:Mode){when mode==.write{values[0]=9}else{_=values[0]}}
+forward::proc(values:[]int,$mode:Mode){use(values,mode)}
+'''
+        for callee in ('use','forward'):
+            for mode in ('read','alias'):
+                with self.subTest(callee=callee,mode=mode):self.check('values :> []int{7};'+callee+'(values,.'+mode+')',prefix)
+            self.check('values :> []int{7};'+callee+'(values,.write)',prefix,writable=False)
+
     def check(self,body,prefix='',*,writable=True,flags=()):
         return self.invoke(self.program(body,prefix),command='check',flags=flags,
                            fail=None if writable else 'read-only slice')

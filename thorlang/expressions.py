@@ -489,7 +489,7 @@ class Expressions:
 
     def sequence_type(self,node):
         typ=self.shape(node)
-        if typ.kind=='array' and typ.node and typ.node.kind=='ArrayType':
+        if typ.kind=='array' and typ.length is None and typ.node and typ.node.kind=='ArrayType':
             length=typ.node.role('len')
             if length and typ.node.source.denotes_type(length): return False
         return typ.kind in {'array','slice','dynamic','string','generic','unknown'}

@@ -1,0 +1,164 @@
+//! Selected native branches share contextual type and constant substitutions.
+use super::*;
+impl Resolver<'_> {
+    pub fn context_condition(&mut self, r: Ref, bindings: &Substitutions) -> Option<bool> {
+        self.context_condition_seen(r, bindings, &mut HashSet::new())
+    }
+    fn context_condition_seen(
+        &mut self,
+        r: Ref,
+        bindings: &Substitutions,
+        seen: &mut HashSet<Ref>,
+    ) -> Option<bool> {
+        if !seen.insert(r) {
+            return None;
+        }
+        if let Some(Constant::Boolean(value)) = self.constant_value(r, bindings, None) {
+            return Some(value);
+        }
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        let child = |name| s.role(r.node, name).map(|node| Ref { file: r.file, node });
+        match n.kind.as_str() {
+            "Ident" | "Selector" => {
+                if let Some(symbol) = self.symbol(r) {
+                    let symbol = self.symbols[symbol].clone();
+                    if symbol.constant {
+                        if let Some(node) = symbol.value {
+                            return self.context_condition_seen(
+                                Ref {
+                                    file: symbol.reference.file,
+                                    node,
+                                },
+                                bindings,
+                                seen,
+                            );
+                        }
+                    }
+                }
+            }
+            "Paren" => return self.context_condition_seen(child("expr")?, bindings, seen),
+            "Unary" if n.op == "!" => {
+                return self
+                    .context_condition_seen(child("expr")?, bindings, seen)
+                    .map(|v| !v)
+            }
+            "Binary" => {
+                let (left, right) = (child("left")?, child("right")?);
+                let op = n.op.clone();
+                if op == "&&" || op == "||" {
+                    let a = self.context_condition_seen(left, bindings, &mut seen.clone());
+                    let b = self.context_condition_seen(right, bindings, &mut seen.clone());
+                    return match (op.as_str(), a, b) {
+                        ("&&", Some(false), _) | ("&&", _, Some(false)) => Some(false),
+                        ("&&", Some(true), Some(true)) => Some(true),
+                        ("||", Some(true), _) | ("||", _, Some(true)) => Some(true),
+                        ("||", Some(false), Some(false)) => Some(false),
+                        _ => None,
+                    };
+                }
+                if (op == "==" || op == "!=")
+                    && (self.denotes_type(left) || bindings.contains_key(s.text(left.node)))
+                    && (self.denotes_type(right) || bindings.contains_key(s.text(right.node)))
+                {
+                    let a = self.specialized_type(left, bindings);
+                    let b = self.specialized_type(right, bindings);
+                    if a.resolved() && b.resolved() {
+                        return Some((a == b) == (op == "=="));
+                    }
+                }
+            }
+            "Call" => {
+                let callee = child("callee")?;
+                let args = s.group(r.node, "args");
+                if args.len() == 1 {
+                    if let Some(name) = self.library_member(callee, "base:intrinsics") {
+                        let arg = Ref {
+                            file: r.file,
+                            node: args[0],
+                        };
+                        let typ = self.specialized_type(arg, bindings);
+                        if !typ.is_unknown() {
+                            let mut base = &typ;
+                            while let Type::Nominal(_, inner) = base {
+                                base = inner;
+                            }
+                            return Some(match name.as_str() {
+                                "type_is_slice" => matches!(base, Type::Slice(_)),
+                                "type_is_array" => matches!(base, Type::Array { .. }),
+                                "type_is_dynamic_array" => matches!(base, Type::Dynamic(_)),
+                                "type_is_pointer" => matches!(base, Type::Pointer(_)),
+                                "type_is_struct" => {
+                                    matches!(base, Type::Struct(_) | Type::Record(..))
+                                }
+                                "type_is_map" => matches!(base, Type::Map { .. }),
+                                "type_is_union" => matches!(base, Type::Union(_)),
+                                "type_is_enum" => matches!(base, Type::Enum(_)),
+                                "type_is_string" => matches!(base, Type::String { .. }),
+                                "type_is_integer" => {
+                                    matches!(base,Type::Scalar{name,..}if !name.starts_with('f')&&base.numeric())
+                                }
+                                "type_is_float" => {
+                                    matches!(base,Type::Scalar{name,..}if name.starts_with('f')&&base.numeric())
+                                }
+                                _ => return None,
+                            });
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        self.condition(r)
+    }
+    /// A recognized library symbol must come from the actual SDK collection.
+    pub fn library_member(&self, r: Ref, path: &str) -> Option<String> {
+        if !self.standard_library(r, path) {
+            return None;
+        }
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        if n.kind == "Selector" {
+            let base = s.role(r.node, "expr")?;
+            if s.node(base).kind != "Ident"
+                || self
+                    .lookup(
+                        Ref {
+                            file: r.file,
+                            node: base,
+                        },
+                        s.text(base),
+                    )
+                    .is_some()
+            {
+                return None;
+            }
+            let field = s.role(r.node, "field")?;
+            for import in s.nodes.iter().filter(|n| n.kind == "Import") {
+                if crate::lower::unquote(&import.op).ok().as_deref() != Some(path) {
+                    continue;
+                }
+                let explicit = s.names.get(import.name);
+                let alias = if explicit.is_empty() {
+                    path.rsplit(['/', ':']).next()?
+                } else {
+                    explicit
+                };
+                if alias == s.text(base) {
+                    return Some(s.text(field).into());
+                }
+            }
+        }
+        if n.kind == "Ident"
+            && self.lookup(r, s.text(r.node)).is_none()
+            && s.selections.iter().any(|selection| {
+                crate::lower::unquote(&selection.path).ok().as_deref() == Some(path)
+                    && (selection.wildcard
+                        || selection.names.iter().any(|name| name == s.text(r.node)))
+            })
+        {
+            return Some(s.text(r.node).into());
+        }
+        None
+    }
+}

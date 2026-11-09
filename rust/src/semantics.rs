@@ -2,11 +2,20 @@
 //! authority over exact types, overloads, constant evaluation and assignability.
 use crate::ast::{NodeId, Source};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+#[path = "calls.rs"]
+mod calls;
+#[path = "conditions.rs"]
+mod conditions;
 #[path = "constants.rs"]
 mod constants;
+#[path = "contexts.rs"]
+mod contexts;
 #[path = "typefacts.rs"]
 mod typefacts;
+pub use calls::CallPlan;
+pub use contexts::{ContextHint, ParameterWitness};
 pub use typefacts::Substitutions;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
@@ -152,6 +161,10 @@ pub struct Resolver<'a> {
     scopes: HashMap<(usize, NodeId, String), Vec<usize>>,
     types: HashMap<Ref, Type>,
     active: HashSet<Ref>,
+    planning: HashSet<(Ref, Vec<(String, Type)>)>,
+    conditions: RefCell<HashSet<Ref>>,
+    pub context_hints: HashMap<Ref, ContextHint>,
+    pub parameter_witnesses: BTreeMap<Ref, ParameterWitness>,
     pub conditional_immutables: HashSet<Ref>,
     pub flags: Vec<String>,
 }
@@ -199,6 +212,10 @@ impl<'a> Resolver<'a> {
             scopes: HashMap::new(),
             types: HashMap::new(),
             active: HashSet::new(),
+            planning: HashSet::new(),
+            conditions: RefCell::new(HashSet::new()),
+            context_hints: HashMap::new(),
+            parameter_witnesses: BTreeMap::new(),
             conditional_immutables: HashSet::new(),
             flags: flags.to_vec(),
         };
@@ -402,10 +419,13 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             if let Some(ids) = self.scopes.get(&(file, NodeId(0), name.to_string())) {
-                return ids
+                if let Some(id) = ids
                     .iter()
                     .find(|id| self.active_definition(self.symbols[**id].reference))
-                    .copied();
+                    .copied()
+                {
+                    return Some(id);
+                }
             }
         }
         for (index, node) in source.nodes.iter().enumerate() {
@@ -459,9 +479,12 @@ impl<'a> Resolver<'a> {
                     source
                         .selections
                         .iter()
-                        .find(|s| s.wildcard || s.names.iter().any(|item| item == name))
-                        .and_then(|selection| crate::lower::unquote(&selection.path).ok())
-                        .and_then(|path| self.package_symbol(source, &path, name))
+                        .filter(|s| s.wildcard || s.names.iter().any(|item| item == name))
+                        .find_map(|selection| {
+                            crate::lower::unquote(&selection.path)
+                                .ok()
+                                .and_then(|path| self.package_symbol(source, &path, name))
+                        })
                 })
             }
             "Selector" => {
@@ -550,6 +573,14 @@ impl<'a> Resolver<'a> {
         true
     }
     pub fn condition(&self, r: Ref) -> Option<bool> {
+        if !self.conditions.borrow_mut().insert(r) {
+            return None;
+        }
+        let value = self.condition_inner(r);
+        self.conditions.borrow_mut().remove(&r);
+        value
+    }
+    fn condition_inner(&self, r: Ref) -> Option<bool> {
         let s = &self.sources[r.file];
         let n = s.node(r.node);
         let role = |name| s.role(r.node, name).map(|node| Ref { file: r.file, node });
@@ -559,7 +590,19 @@ impl<'a> Resolver<'a> {
                 "true" => Some(true),
                 "false" => Some(false),
                 "ODIN_DEBUG" => Some(self.flags.iter().any(|f| f == "-debug")),
-                _ => None,
+                _ => self.symbol(r).and_then(|id| {
+                    let symbol = &self.symbols[id];
+                    if symbol.constant {
+                        symbol.value.and_then(|node| {
+                            self.condition(Ref {
+                                file: symbol.reference.file,
+                                node,
+                            })
+                        })
+                    } else {
+                        None
+                    }
+                }),
             },
             "Unary" if n.op == "!" => self.condition(role("expr")?).map(|x| !x),
             "Call" => {
@@ -822,7 +865,10 @@ impl<'a> Resolver<'a> {
                 result.push((String::new(), annotation));
             }
             for name in names {
-                result.push((source.text(*name).into(), annotation));
+                result.push((
+                    source.text(*name).trim_start_matches('$').into(),
+                    annotation,
+                ));
             }
         }
         result
@@ -1176,6 +1222,10 @@ impl<'a> Resolver<'a> {
                 let callee_type = self.type_of(callee);
                 match callee_type {
                     Type::Procedure(signature) => {
+                        let specialized = self.specialized_result(r, 0, &Substitutions::new());
+                        if !specialized.is_unknown() {
+                            return specialized;
+                        }
                         let fields = self.fields(signature, "results");
                         if fields.len() == 1 {
                             fields[0]
@@ -1186,7 +1236,10 @@ impl<'a> Resolver<'a> {
                             Type::Unknown
                         }
                     }
-                    Type::Unknown => Type::Unknown,
+                    Type::Struct(_) | Type::Record(..) => {
+                        self.specialized_type(r, &Substitutions::new())
+                    }
+                    Type::Unknown => self.specialized_result(r, 0, &Substitutions::new()),
                     other => other,
                 }
             }
@@ -1204,37 +1257,8 @@ impl<'a> Resolver<'a> {
                     return Type::Unknown;
                 };
                 let field = child("field").map(|r| s.text(r.node)).unwrap_or("");
-                let mut typ = self.type_of(base);
-                if let Type::Pointer(elem) = typ {
-                    typ = *elem;
-                }
-                match typ {
-                    Type::Struct(owner) => {
-                        let source = &self.sources[owner.file];
-                        if let Some(fields) = source.role(owner.node, "fields") {
-                            for item in &source.node(fields).children {
-                                if source
-                                    .group(*item, "names")
-                                    .iter()
-                                    .any(|name| source.text(*name) == field)
-                                {
-                                    return source
-                                        .role(*item, "type")
-                                        .map(|node| {
-                                            self.type_of(Ref {
-                                                file: owner.file,
-                                                node,
-                                            })
-                                        })
-                                        .unwrap_or(Type::Unknown);
-                                }
-                            }
-                        }
-                        Type::Unknown
-                    }
-                    Type::Enum(owner) => Type::Enum(owner),
-                    _ => Type::Unknown,
-                }
+                let typ = self.type_of(base);
+                self.member_type(&typ, field)
             }
             _ => Type::Unknown,
         }
@@ -1286,6 +1310,10 @@ impl<'a> Resolver<'a> {
             }
             "Call" => {
                 if let Some(callee) = child("callee") {
+                    let typ = self.specialized_result(r, index, &Substitutions::new());
+                    if !typ.is_unknown() {
+                        return typ;
+                    }
                     if let Some(signature) = self.signature(callee) {
                         let fields = self.fields(signature, "results");
                         return fields
@@ -1472,9 +1500,11 @@ impl<'a> Resolver<'a> {
                 });
         }
         if node.kind == "Call" {
-            return source
-                .role(r.node, "callee")
-                .is_some_and(|node| self.native_builtin(Ref { file: r.file, node }, "type_of"));
+            return source.role(r.node, "callee").is_some_and(|node| {
+                let callee = Ref { file: r.file, node };
+                self.native_builtin(callee, "type_of")
+                    || self.record_constructor(callee, &mut seen.clone())
+            });
         }
         let text = source.text(r.node);
         node.kind == "Ident"
@@ -1497,6 +1527,35 @@ impl<'a> Resolver<'a> {
                     | "byte"
             ) || text.starts_with(['i', 'u', 'f'])
                 && text.chars().nth(1).is_some_and(|c| c.is_ascii_digit()))
+    }
+    fn record_constructor(&self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
+        if !seen.insert(r) {
+            return false;
+        }
+        let s = &self.sources[r.file];
+        if matches!(s.node(r.node).kind.as_str(), "StructType" | "UnionType") {
+            return s
+                .role(r.node, "params")
+                .is_some_and(|params| !s.node(params).children.is_empty());
+        }
+        if s.node(r.node).kind == "Paren" {
+            return s
+                .role(r.node, "expr")
+                .is_some_and(|node| self.record_constructor(Ref { file: r.file, node }, seen));
+        }
+        self.symbol(r).is_some_and(|index| {
+            let symbol = &self.symbols[index];
+            symbol.constant
+                && symbol.value.is_some_and(|node| {
+                    self.record_constructor(
+                        Ref {
+                            file: symbol.reference.file,
+                            node,
+                        },
+                        seen,
+                    )
+                })
+        })
     }
     fn runtime(&self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
         if !seen.insert(r) {

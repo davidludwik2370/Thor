@@ -104,6 +104,21 @@ rather than behavior the native port should reproduce.
 
 ## Remaining work
 
+The remaining migration is organized into eight independently verified chunks:
+
+1. Type resolution and generic specialization.
+2. Complete pure-call verification and checked ordinary callees.
+3. Compile-time dependency extraction, execution, reconstruction and caching.
+4. Integer/Rational lowering and values.
+5. Remaining language and temporary-ownership interactions.
+6. Diagnostics, TLS editor information and full debugger mapping.
+7. Remaining commands, including vet, project creation and publishing.
+8. Whole-suite/real-project differential acceptance and performance measurement.
+
+Each checkpoint retains Python as the default and records its actual test scope;
+an implemented subset is not whole-language acceptance. Optimization and parallel
+lowering follow behavioral acceptance.
+
 - Complete symbol/type/overload resolution, imported/native type facts, generic
   specialization and conditional declarations; the initial resolver is a subset.
 - Complete immutable-slice integration with pure calls, evaluated generic dimensions
@@ -262,3 +277,51 @@ checks across the checkpoint). The Python reference compatibility run passed 284
 checks covering borrowing, defaults, basic, binding/TLS, pure calls and native
 execution. Rust unit tests pass in both profiles; Clippy denies warnings.
 This remains an incomplete migration; the pending list above still applies.
+
+## Call resolution and contextual types checkpoint
+
+The native resolver now shares call-site plans between type inference, purity
+checking and slice-effect analysis. Plans arrange named arguments and defaults,
+filter incompatible element types, dimensions and nominal record identities,
+and distinguish concrete from generic overloads. Non-selected overloads no longer
+contribute mutation or I/O effects. Native Odin still checks final assignability
+and ambiguous calls; incomplete native specialization is not treated as proof.
+
+Generic result types retain their substitutions through nested calls. Local
+record types preserve the generic parameters used from their lexical scope.
+Constant parameters include enum ordinals, aliases, flags and contextual enum
+comparisons. Conditional lookup continues across files after an inactive
+declaration, and multiple wildcard imports are searched for the requested name.
+
+Contextual bracket arrays use parameter witnesses emitted beside the selected
+declaration, including private types in imported Thor and local Odin packages.
+Generic type witnesses use the argument expressions under type queries, preserving
+lexical shadowing and evaluation frequency. Their generated code retains original
+source mappings. SDK sources remain shared; complete native SDK contextual
+adaptation and evaluated dimensions still require later migration work.
+
+Four additional Python-reference corrections were discovered and fixed:
+
+- Promoted `using` fields now follow their real nested storage path during slice
+  provenance analysis; promotion cannot bypass a read-only view.
+- Enum compile-time parameters and their forwarded aliases select slice effects
+  by ordinal rather than being treated as unresolved or compared with field text.
+- Single-result procedure calls retain an expression witness for contextual
+  generic inference, including when the original type name is shadowed locally.
+- Generic record patterns propagate their type/count arguments into procedure
+  results. A resolved integer dimension takes precedence over the source generic
+  parameter's approximate type classification during negative-index lowering.
+
+The persistent native gate includes `tests.test_rust_resolution` and twelve
+additional existing binding/context fixtures. It checks selected mutation
+rejections as well as valid readers and exercises runtime result typing and
+contextual witnesses with assertions, bounds checks and type assertions disabled.
+This is a resolution checkpoint; checked ordinary-call variants, complete generic
+purity schemas and native compile-time execution remain unfinished.
+
+The final checkpoint gate passed 320 native/differential, memory, comparator and
+assertion-hygiene checks. All 198 Python borrowing, binding and default-callback
+checks passed in the final reference run. Eight Rust unit tests passed in both
+debug and release profiles; Clippy passed with warnings denied. An earlier
+reference run hit an Odin backend SIGSEGV compiling the native format tests;
+the targeted retry and the final complete reference run both passed.

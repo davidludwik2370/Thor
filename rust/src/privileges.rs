@@ -493,6 +493,15 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let target = self.deref(v);
             return self.member(target, name);
         }
+        if let Some(path) = self.r.member_path(&self.values[v].typ.clone(), name) {
+            if path.len() > 1 {
+                let mut child = v;
+                for field in path {
+                    child = self.member(child, &field);
+                }
+                return child;
+            }
+        }
         if matches!(base_type(&self.values[v].typ), Type::Array { .. })
             && name.chars().all(|x| "xyzwrgba".contains(x))
         {
@@ -2237,11 +2246,18 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 || s.result
                 || self.s(s.reference).node(s.reference.node).mutable && !s.immutable
         });
-        let candidates = if indirect {
+        let mut candidates = if indirect {
             vec![]
         } else {
             self.r.candidates(callee)
         };
+        if !indirect {
+            let plans = self.r.call_plans(r, &self.contexts[c].bindings.clone());
+            if !plans.is_empty() {
+                candidates
+                    .retain(|candidate| plans.iter().any(|plan| plan.procedure == *candidate));
+            }
+        }
         if candidates.is_empty() {
             // Conversions keep slice provenance. Opaque calls must promise
             // nothing about write access or returned storage.
@@ -2815,8 +2831,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         None
     }
     fn condition(&mut self, r: Ref, c: C) -> Option<bool> {
-        if let Some(crate::semantics::Constant::Boolean(value)) =
-            self.r.constant_value(r, &self.contexts[c].bindings, None)
+        if let Some(value) = self
+            .r
+            .context_condition(r, &self.contexts[c].bindings.clone())
         {
             return Some(value);
         }

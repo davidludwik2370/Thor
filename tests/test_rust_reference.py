@@ -14,6 +14,7 @@ from tests import test_slice_access as slices
 from tests import test_slice_copy_hardening as copies
 from tests import test_comprehensions as comprehensions
 from tests import test_extrema as extrema
+from tests import test_t07_t12 as bindings
 
 
 class RustReferenceTests(unittest.TestCase):
@@ -93,8 +94,23 @@ LOOPS = [
     'literals_members_and_immutable_reference_restrictions',
     'comments_multiline_bindings_and_parenthesized_numeric_binding',
 ]
+RESOLUTION = [
+    'contextual_array_through_overloaded_target',
+    'contextual_array_through_generic_specialization',
+    'conditional_generic_context_follows_native_branch',
+    'distinct_overload_and_explicit_generic_context',
+    'generic_element_type_from_another_argument',
+    'generic_context_from_call_result_preserves_shadowed_type_and_evaluation',
+    'context_wrappers_resolve_private_types_in_defining_package',
+    'contextual_array_through_procedure_alias',
+    'generic_length_and_type_parameter_inference',
+    'generic_record_arguments_flow_into_result_dimensions',
+    'generic_record_members_and_substitutions',
+    'selective_alias_survives_shadowed_package_namespace',
+]
 def _install():
-    for suite, names in [(expressions.ExpressionTests, EXPRESSIONS), (loops.TypedLoopTests, LOOPS)]:
+    for suite, names in [(expressions.ExpressionTests, EXPRESSIONS), (loops.TypedLoopTests, LOOPS),
+                         (bindings.BatchTests, RESOLUTION)]:
         for name in names:
             setattr(RustReferenceTests, 'test_'+name, getattr(suite, 'test_'+name))
     # These exclusions are explicit migration gaps, not skip-on-unsupported.

@@ -12,6 +12,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 mod access;
 #[path = "comprehensions.rs"]
 mod comprehensions;
+#[path = "contextlower.rs"]
+mod contextlower;
 #[path = "defaults.rs"]
 mod defaults;
 #[path = "extrema.rs"]
@@ -101,6 +103,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         this.imports()?;
         this.resources()?;
         this.storage()?;
+        this.prepare_contexts()?;
         this.discover_fstrings();
         if this.source.thor {
             this.prepare_defaults()?;
@@ -295,7 +298,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             ));
         }
         if !self.source.thor {
-            let inserts = self
+            let mut inserts: Vec<_> = self
                 .body_prologues
                 .iter()
                 .map(|(body, parts)| {
@@ -305,6 +308,12 @@ impl<'a, 'r> Lower<'a, 'r> {
                     )
                 })
                 .collect();
+            for (declaration, parts) in &self.declaration_helpers {
+                inserts.push((
+                    self.source.node(*declaration).span.end,
+                    Code::concat(parts.iter().cloned()),
+                ));
+            }
             let mut code = vec![self.splice(NodeId(0), vec![], inserts)?];
             for (alias, path) in &self.modules {
                 code.push(self.gen(
@@ -1095,6 +1104,12 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             "Call" => {
                 let callee = self.role(id, "callee")?;
+                for arg in self.source.group(id, "args") {
+                    let value = self.source.role(*arg, "value").unwrap_or(*arg);
+                    if let Some(hint) = self.contextual_hint(value) {
+                        overrides.insert(*arg, (Some(hint), constant));
+                    }
+                }
                 if let Some(signature) = self
                     .resolver
                     .signature(self.reference(callee))
@@ -1102,6 +1117,9 @@ impl<'a, 'r> Lower<'a, 'r> {
                 {
                     let params = self.resolver.fields(signature, "params");
                     for (i, arg) in self.source.group(id, "args").iter().enumerate() {
+                        if overrides.contains_key(arg) {
+                            continue;
+                        }
                         let index = if self.source.node(*arg).kind == "FieldValue" {
                             let name = self
                                 .source

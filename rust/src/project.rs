@@ -284,6 +284,7 @@ impl Project {
     pub fn lower(&mut self) -> Result<PathBuf> {
         self.discover_type_facts()?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        resolver.prepare_contexts();
         let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = crate::purity::Purity::analyze(&mut resolver);
         for (root, faults) in &privileges.pure_faults {

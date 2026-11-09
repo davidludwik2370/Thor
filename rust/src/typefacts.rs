@@ -64,15 +64,79 @@ impl Resolver<'_> {
                 }
             }
             Type::Soa(elem) => Type::Slice(Box::new(self.member_type(elem, name))),
-            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
-                .record_fields(typ)
-                .into_iter()
-                .find(|(field, _)| field == name)
-                .map(|(_, typ)| typ)
-                .unwrap_or(Type::Unknown),
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
+                let Some(path) = self.member_path(typ, name) else {
+                    return Type::Unknown;
+                };
+                let mut typ = typ.clone();
+                for component in path {
+                    typ = self
+                        .record_fields(&typ)
+                        .into_iter()
+                        .find(|(field, _)| field == &component)
+                        .map(|(_, typ)| typ)
+                        .unwrap_or(Type::Unknown);
+                }
+                typ
+            }
             Type::Enum(owner) => Type::Enum(*owner),
             _ => Type::Unknown,
         }
+    }
+    /// Retain the actual storage path through promoted `using` fields.
+    pub fn member_path(&mut self, typ: &Type, name: &str) -> Option<Vec<String>> {
+        self.member_path_seen(typ, name, &mut HashSet::new())
+    }
+    fn member_path_seen(
+        &mut self,
+        typ: &Type,
+        name: &str,
+        seen: &mut HashSet<Ref>,
+    ) -> Option<Vec<String>> {
+        let owner = match typ {
+            Type::Nominal(_, base) | Type::Pointer(base) => {
+                return self.member_path_seen(base, name, seen)
+            }
+            Type::Anonymous(fields) => {
+                return fields
+                    .iter()
+                    .any(|(field, _)| field == name)
+                    .then(|| vec![name.into()])
+            }
+            Type::Struct(owner) | Type::Record(owner, _) => *owner,
+            _ => return None,
+        };
+        if !seen.insert(owner) {
+            return None;
+        }
+        let fields = self.record_fields(typ);
+        if fields.iter().any(|(field, _)| field == name) {
+            return Some(vec![name.into()]);
+        }
+        let s = &self.sources[owner.file];
+        let block = s.role(owner.node, "fields")?;
+        let promoted = s
+            .node(block)
+            .children
+            .iter()
+            .filter(|field| s.node(**field).data["using_field"] == true)
+            .flat_map(|field| s.group(*field, "names"))
+            .map(|name| s.text(*name).to_string())
+            .collect::<HashSet<_>>();
+        let mut found = None;
+        for (field, typ) in fields {
+            if !promoted.contains(&field) {
+                continue;
+            }
+            if let Some(mut path) = self.member_path_seen(&typ, name, &mut seen.clone()) {
+                if found.is_some() {
+                    return None;
+                }
+                path.insert(0, field);
+                found = Some(path);
+            }
+        }
+        found
     }
     pub fn specialized_type(&mut self, r: Ref, bindings: &Substitutions) -> Type {
         self.specialize(r, bindings, &mut HashSet::new())
@@ -115,7 +179,8 @@ impl Resolver<'_> {
         match n.kind.as_str() {
             "Paren" => subtype("expr"),
             "WhenExpr" => {
-                if let Some(cond) = child("cond").and_then(|r| self.condition(r)) {
+                if let Some(cond) = child("cond").and_then(|r| self.context_condition(r, bindings))
+                {
                     return child(if cond { "x" } else { "y" })
                         .map(|r| self.specialize(r, bindings, &mut seen.clone()))
                         .unwrap_or(Type::Unknown);
@@ -208,7 +273,29 @@ impl Resolver<'_> {
                     .flat_map(|field| s.group(*field, "names"))
                     .map(|name| s.text(*name).trim_start_matches('$').to_string())
                     .collect::<Vec<_>>();
-                if names.is_empty() {
+                let captures = s
+                    .role(r.node, "fields")
+                    .into_iter()
+                    .flat_map(|fields| s.descendants(fields))
+                    .filter(|node| s.node(*node).kind == "Ident")
+                    .filter_map(|node| {
+                        let name = s.text(node);
+                        if names.iter().any(|parameter| parameter == name) {
+                            return None;
+                        }
+                        let typ = bindings.get(name)?;
+                        let symbol = &self.symbols[self.symbol(Ref { file: r.file, node })?];
+                        let owner = &self.sources[symbol.reference.file];
+                        (owner.node(symbol.name_node).kind == "PolyType"
+                            && (symbol.reference.file != r.file
+                                || !s
+                                    .node(r.node)
+                                    .span
+                                    .contains(owner.node(symbol.reference.node).span)))
+                        .then(|| (name.to_string(), typ.clone()))
+                    })
+                    .collect::<BTreeMap<_, _>>();
+                if names.is_empty() && captures.is_empty() {
                     Type::Struct(r)
                 } else {
                     Type::Record(
@@ -219,6 +306,7 @@ impl Resolver<'_> {
                                 let typ = bindings.get(&name).cloned().unwrap_or(Type::Generic);
                                 (name, typ)
                             })
+                            .chain(captures)
                             .collect(),
                     )
                 }
@@ -236,55 +324,88 @@ impl Resolver<'_> {
                     let params = self.fields(owner, "params");
                     if !params.is_empty() {
                         let args = s.group(r.node, "args");
-                        return Type::Record(
-                            owner,
-                            params
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, (name, annotation))| {
-                                    let argument = args
-                                        .iter()
-                                        .copied()
-                                        .find(|arg| {
-                                            s.node(*arg).kind == "FieldValue"
-                                                && s.role(*arg, "field")
-                                                    .is_some_and(|field| s.text(field) == name)
-                                        })
-                                        .or_else(|| args.get(i).copied());
-                                    let typ = argument
-                                        .map(|node| {
-                                            let node = s.role(node, "value").unwrap_or(node);
-                                            let r = Ref { file: r.file, node };
-                                            let type_param = annotation.is_some_and(|a| {
-                                                self.sources[a.file].node(a.node).kind
-                                                    == "TypeidType"
+                        let mut arguments: Vec<_> = params
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, (name, annotation))| {
+                                let argument = args
+                                    .iter()
+                                    .copied()
+                                    .find(|arg| {
+                                        s.node(*arg).kind == "FieldValue"
+                                            && s.role(*arg, "field")
+                                                .is_some_and(|field| s.text(field) == name)
+                                    })
+                                    .or_else(|| args.get(i).copied());
+                                let typ = argument
+                                    .map(|node| {
+                                        let node = s.role(node, "value").unwrap_or(node);
+                                        let r = Ref { file: r.file, node };
+                                        let type_param = annotation.is_some_and(|a| {
+                                            self.sources[a.file].node(a.node).kind == "TypeidType"
+                                        });
+                                        if type_param {
+                                            self.specialize(r, bindings, &mut seen.clone())
+                                        } else {
+                                            let expected = annotation.map(|a| {
+                                                self.specialize(a, bindings, &mut seen.clone())
                                             });
-                                            if type_param {
-                                                self.specialize(r, bindings, &mut seen.clone())
-                                            } else {
-                                                let expected = annotation.map(|a| {
-                                                    self.specialize(a, bindings, &mut seen.clone())
-                                                });
-                                                self.constant_value(r, bindings, expected.as_ref())
-                                                    .map(Type::Constant)
-                                                    .unwrap_or(Type::Unknown)
-                                            }
-                                        })
-                                        .unwrap_or(Type::Unknown);
-                                    (name, typ)
-                                })
-                                .collect(),
-                        );
+                                            self.constant_value(r, bindings, expected.as_ref())
+                                                .map(Type::Constant)
+                                                .unwrap_or(Type::Unknown)
+                                        }
+                                    })
+                                    .unwrap_or(Type::Unknown);
+                                (name, typ)
+                            })
+                            .collect();
+                        if let Type::Record(_, captured) = &base {
+                            for (name, typ) in captured {
+                                if !arguments.iter().any(|(parameter, _)| parameter == name) {
+                                    arguments.push((name.clone(), typ.clone()));
+                                }
+                            }
+                        }
+                        return self.record_instance(owner, arguments);
                     }
                 }
                 if !matches!(base, Type::Procedure(_) | Type::Unknown | Type::Generic) {
                     base
                 } else {
-                    self.type_of(r)
+                    let typ = self.specialized_result(r, 0, bindings);
+                    if typ.is_unknown() {
+                        self.type_of(r)
+                    } else {
+                        typ
+                    }
                 }
             }
             "Binary" if n.op == "/" => subtype("right"),
             _ => self.type_of(r),
+        }
+    }
+    fn record_instance(&self, owner: Ref, arguments: Vec<(String, Type)>) -> Type {
+        let s = &self.sources[owner.file];
+        let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("runtime/sets/sets.odin");
+        let genuine = matches!((std::fs::canonicalize(&s.path),std::fs::canonicalize(expected)),(Ok(actual),Ok(expected)) if actual==expected);
+        let named_set = s.node(owner.node).parent.is_some_and(|declaration| {
+            s.group(declaration, "names")
+                .iter()
+                .any(|name| s.text(*name) == "Set")
+        });
+        if genuine && named_set {
+            Type::Set(Box::new(
+                arguments
+                    .into_iter()
+                    .find(|(name, _)| name == "T")
+                    .map(|(_, typ)| typ)
+                    .unwrap_or(Type::Unknown),
+            ))
+        } else {
+            Type::Record(owner, arguments)
         }
     }
     pub fn parameter_bindings(&mut self, signature: Ref, args: &[Type]) -> Substitutions {
@@ -306,72 +427,175 @@ impl Resolver<'_> {
         actual: &Type,
         bindings: &Substitutions,
     ) -> bool {
-        if actual.is_unknown() {
-            return true;
-        }
+        self.shape_score(annotation, actual, bindings).is_some()
+    }
+    pub fn shape_score(
+        &mut self,
+        annotation: Ref,
+        actual: &Type,
+        bindings: &Substitutions,
+    ) -> Option<u32> {
         let s = &self.sources[annotation.file];
         let n = s.node(annotation.node);
-        let actual = if let Type::Nominal(_, base) = actual {
-            base.as_ref()
-        } else {
-            actual
+        if actual.is_unknown() {
+            return Some(0);
+        }
+        if n.kind == "PolyType" {
+            return if let Some(node) = s.role(annotation.node, "specialization") {
+                let actual = if let Type::Nominal(_, base) = actual {
+                    base.as_ref()
+                } else {
+                    actual
+                };
+                self.shape_score(
+                    Ref {
+                        file: annotation.file,
+                        node,
+                    },
+                    actual,
+                    bindings,
+                )
+            } else {
+                let bound = bindings.get(s.names.get(n.name));
+                if bound.is_some_and(|bound| Self::type_score(bound, actual).is_none()) {
+                    None
+                } else {
+                    Some(1)
+                }
+            };
+        }
+        let child = |name| {
+            s.role(annotation.node, name).map(|node| Ref {
+                file: annotation.file,
+                node,
+            })
         };
-        match n.kind.as_str() {
-            "PolyType" => s
-                .role(annotation.node, "specialization")
-                .is_none_or(|node| {
-                    self.shape_matches(
-                        Ref {
-                            file: annotation.file,
-                            node,
-                        },
-                        actual,
-                        bindings,
-                    )
-                }),
-            "ArrayType" => {
-                if s.role(annotation.node, "len").is_some() {
-                    matches!(actual, Type::Array { .. })
+        if matches!(
+            n.kind.as_str(),
+            "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis"
+        ) {
+            let expected_kind = n.kind.as_str();
+            let elem = match (expected_kind, actual) {
+                ("ArrayType", Type::Array { elem, length }) if child("len").is_some() => {
+                    let count = child("len").and_then(|r| self.context_integer(r, bindings));
+                    if count.is_some() && length.is_some() && count != *length {
+                        return None;
+                    }
+                    elem.as_ref()
+                }
+                ("ArrayType", Type::Slice(elem)) if child("len").is_none() && n.op != "soa" => {
+                    elem.as_ref()
+                }
+                ("ArrayType", Type::Soa(elem)) if n.op == "soa" => elem.as_ref(),
+                ("DynamicArrayType", Type::Dynamic(elem)) if child("capacity").is_none() => {
+                    elem.as_ref()
+                }
+                ("DynamicArrayType", Type::Fixed { elem, length })
+                    if child("capacity").is_some() =>
+                {
+                    let count = child("capacity").and_then(|r| self.context_integer(r, bindings));
+                    if count.is_some() && length.is_some() && count != *length {
+                        return None;
+                    }
+                    elem.as_ref()
+                }
+                ("PointerType" | "MultiPointerType", Type::Pointer(elem))
+                | ("Ellipsis", Type::Slice(elem)) => elem.as_ref(),
+                _ => return None,
+            };
+            return child(if expected_kind == "Ellipsis" {
+                "expr"
+            } else {
+                "elem"
+            })
+            .and_then(|r| self.shape_score(r, elem, bindings))
+            .map(|score| score + 3);
+        }
+        if n.kind == "Binary" && n.op == "/" {
+            return s.role(annotation.node, "right").and_then(|node| {
+                self.shape_score(
+                    Ref {
+                        file: annotation.file,
+                        node,
+                    },
+                    actual,
+                    bindings,
+                )
+            });
+        }
+        let expected = self.specialized_type(annotation, bindings);
+        Self::type_score(&expected, actual)
+    }
+    fn type_score(expected: &Type, actual: &Type) -> Option<u32> {
+        if expected.is_unknown() || actual.is_unknown() {
+            return Some(0);
+        }
+        let canonical = |name: &str| match name {
+            "byte" => "u8".to_string(),
+            "rune" => "i32".to_string(),
+            other => other.to_string(),
+        };
+        match (expected, actual) {
+            (Type::Scalar { name, .. }, _) if name == "any" => Some(0),
+            (
+                Type::Scalar { name, .. },
+                Type::Scalar {
+                    name: other,
+                    untyped,
+                },
+            ) => {
+                if canonical(name) == canonical(other) {
+                    Some(if *untyped { 2 } else { 5 })
+                } else if *untyped && expected.numeric() && actual.numeric() {
+                    Some(0)
                 } else {
-                    matches!(actual, Type::Slice(_) | Type::Soa(_))
+                    None
                 }
             }
-            "DynamicArrayType" => {
-                if s.role(annotation.node, "capacity").is_some() {
-                    matches!(actual, Type::Fixed { .. })
+            (
+                Type::String { name, .. },
+                Type::String {
+                    name: other,
+                    untyped,
+                },
+            ) => {
+                if name == other || *untyped {
+                    Some(if *untyped { 2 } else { 5 })
                 } else {
-                    matches!(actual, Type::Dynamic(_))
+                    None
                 }
             }
-            "PointerType" | "MultiPointerType" => matches!(actual, Type::Pointer(_)),
-            "MapType" => matches!(actual, Type::Map { .. }),
-            "Ellipsis" => true,
-            "ProcedureType" => matches!(actual, Type::Procedure(_)),
-            _ => {
-                let formal = self.specialized_type(annotation, bindings);
-                if formal.is_unknown() {
-                    return true;
+            (Type::Array { elem: a, length: n }, Type::Array { elem: b, length: m })
+            | (Type::Fixed { elem: a, length: n }, Type::Fixed { elem: b, length: m }) => {
+                if n.is_some() && m.is_some() && n != m {
+                    return None;
                 }
-                match (formal, actual) {
-                    (
-                        Type::Scalar { name, .. },
-                        Type::Scalar {
-                            name: other,
-                            untyped,
-                        },
-                    ) => name == *other || *untyped || name == "any",
-                    (
-                        Type::String { name, .. },
-                        Type::String {
-                            name: other,
-                            untyped,
-                        },
-                    ) => name == *other || *untyped,
-                    (Type::Struct(a), Type::Struct(b)) => a == *b,
-                    (Type::Record(a, _), Type::Record(b, _)) => a == *b,
-                    _ => true,
-                }
+                Self::type_score(a, b).map(|score| score + 3)
             }
+            (Type::Slice(a), Type::Slice(b))
+            | (Type::Dynamic(a), Type::Dynamic(b))
+            | (Type::Pointer(a), Type::Pointer(b))
+            | (Type::Set(a), Type::Set(b))
+            | (Type::Soa(a), Type::Soa(b)) => Self::type_score(a, b).map(|score| score + 3),
+            (Type::Map { key: a, value: b }, Type::Map { key: c, value: d }) => {
+                Some(Self::type_score(a, c)? + Self::type_score(b, d)? + 3)
+            }
+            (Type::Record(a, bindings), Type::Record(b, other)) if a == b => {
+                let mut score = 5;
+                for ((name, typ), (other_name, other_typ)) in bindings.iter().zip(other) {
+                    if name != other_name {
+                        return None;
+                    }
+                    score += Self::type_score(typ, other_typ)?;
+                }
+                Some(score)
+            }
+            (Type::Nominal(a, _), Type::Nominal(b, _)) if a == b => Some(5),
+            (Type::Nominal(_, base), value) if value.untyped() => Self::type_score(base, value),
+            (Type::Procedure(_), Type::Procedure(_)) => Some(1), // Odin checks complete calling signatures.
+            (Type::Union(_), _) => Some(0), // Native union injection is checked by Odin.
+            _ if expected == actual => Some(5),
+            _ => None,
         }
     }
     fn bind_shape(
@@ -394,7 +618,12 @@ impl Resolver<'_> {
         };
         match n.kind.as_str() {
             "PolyType" => {
-                bindings.insert(s.names.get(n.name).into(), actual.clone());
+                let binding = bindings
+                    .entry(s.names.get(n.name).into())
+                    .or_insert(Type::Unknown);
+                if binding.is_unknown() {
+                    *binding = actual.clone();
+                }
                 if let Some(specialization) = child("specialization") {
                     self.bind_shape(specialization, actual, bindings, seen);
                 }
@@ -436,6 +665,21 @@ impl Resolver<'_> {
                     self.bind_shape(elem, actual, bindings, seen);
                 }
             }
+            "Ident" => {
+                let name = s.text(annotation.node);
+                let generic = self.symbol(annotation).is_some_and(|index| {
+                    self.sources[self.symbols[index].reference.file]
+                        .node(self.symbols[index].reference.node)
+                        .kind
+                        == "PolyType"
+                });
+                if generic || bindings.contains_key(name) {
+                    let binding = bindings.entry(name.into()).or_insert(Type::Unknown);
+                    if binding.is_unknown() {
+                        *binding = actual.clone();
+                    }
+                }
+            }
             "MapType" => {
                 if let Type::Map { key, value } = actual {
                     if let Some(k) = child("key") {
@@ -447,6 +691,19 @@ impl Resolver<'_> {
                 }
             }
             "Call" => {
+                if let Type::Set(elem) = actual {
+                    if let Some(arg) = s.group(annotation.node, "args").first() {
+                        self.bind_shape(
+                            Ref {
+                                file: annotation.file,
+                                node: *arg,
+                            },
+                            elem,
+                            bindings,
+                            &mut seen.clone(),
+                        );
+                    }
+                }
                 if let Type::Record(_, arguments) = actual {
                     for (arg, (_, typ)) in s.group(annotation.node, "args").iter().zip(arguments) {
                         self.bind_shape(

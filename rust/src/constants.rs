@@ -47,7 +47,7 @@ impl Resolver<'_> {
         let s = &self.sources[r.file];
         let n = s.node(r.node);
         let role = |name| s.role(r.node, name).map(|node| Ref { file: r.file, node });
-        if matches!(n.kind.as_str(), "Ident" | "PolyType") {
+        if matches!(n.kind.as_str(), "Ident" | "PolyType" | "Selector") {
             let name = if n.kind == "PolyType" {
                 s.names.get(n.name)
             } else {
@@ -77,6 +77,44 @@ impl Resolver<'_> {
             return Some(Constant::Integer(value));
         }
         match n.kind.as_str() {
+            "Call"
+                if role("callee").is_some_and(|callee| {
+                    s.node(callee.node).kind == "Directive" && s.text(callee.node) == "#config"
+                }) =>
+            {
+                let args = s.group(r.node, "args");
+                if args.len() != 2 {
+                    return None;
+                }
+                let key = s.text(args[0]).trim_matches('"');
+                let prefix = format!("-define:{key}=");
+                if let Some(value) = self
+                    .flags
+                    .iter()
+                    .rev()
+                    .find_map(|flag| flag.strip_prefix(&prefix))
+                {
+                    return match value {
+                        "true" => Some(Constant::Boolean(true)),
+                        "false" => Some(Constant::Boolean(false)),
+                        _ => value
+                            .replace('_', "")
+                            .parse::<i128>()
+                            .ok()
+                            .map(Constant::Integer)
+                            .or_else(|| crate::lower::unquote(value).ok().map(Constant::Text)),
+                    };
+                }
+                self.constant_value_seen(
+                    Ref {
+                        file: r.file,
+                        node: args[1],
+                    },
+                    bindings,
+                    expected,
+                    seen,
+                )
+            }
             "Call"
                 if role("callee").is_some_and(|callee| self.native_builtin(callee, "size_of")) =>
             {
@@ -110,14 +148,31 @@ impl Resolver<'_> {
                 }
             }
             "Binary" => {
-                let left =
-                    self.constant_value_seen(role("left")?, bindings, expected, &mut seen.clone())?;
+                let left_site = role("left")?;
+                let right_site = role("right")?;
+                let mut left =
+                    self.constant_value_seen(left_site, bindings, expected, &mut seen.clone());
+                let context = match &left {
+                    Some(Constant::Enum(owner, _)) => Some(Type::Enum(*owner)),
+                    _ => None,
+                };
                 let right = self.constant_value_seen(
-                    role("right")?,
+                    right_site,
                     bindings,
-                    expected,
+                    context.as_ref().or(expected),
                     &mut seen.clone(),
                 )?;
+                if left.is_none() {
+                    if let Constant::Enum(owner, _) = &right {
+                        left = self.constant_value_seen(
+                            left_site,
+                            bindings,
+                            Some(&Type::Enum(*owner)),
+                            &mut seen.clone(),
+                        );
+                    }
+                }
+                let left = left?;
                 match (left, right) {
                     (Constant::Integer(a), Constant::Integer(b)) => {
                         let result = match n.op.as_str() {
@@ -126,6 +181,15 @@ impl Resolver<'_> {
                             "*" => a.checked_mul(b),
                             "/" => a.checked_div(b),
                             "%" => a.checked_rem(b),
+                            "&" => Some(a & b),
+                            "|" => Some(a | b),
+                            "~" => Some(a ^ b),
+                            "&~" => Some(a & !b),
+                            "<<" => u32::try_from(b).ok().and_then(|shift| {
+                                a.checked_shl(shift)
+                                    .filter(|value| value.checked_shr(shift) == Some(a))
+                            }),
+                            ">>" => u32::try_from(b).ok().and_then(|shift| a.checked_shr(shift)),
                             _ => None,
                         };
                         if let Some(value) = result {
@@ -245,7 +309,7 @@ impl Resolver<'_> {
         None
     }
     pub fn constant_parameter_bindings(
-        &self,
+        &mut self,
         sig: Ref,
         args: &[Ref],
         context: &Substitutions,
@@ -263,7 +327,7 @@ impl Resolver<'_> {
             if source.node(name).kind != "PolyType" {
                 continue;
             }
-            let key = source.text(name).trim_start_matches('$');
+            let key = source.text(name).trim_start_matches('$').to_string();
             let Some(field) = source.node(name).parent else {
                 continue;
             };
@@ -281,9 +345,18 @@ impl Resolver<'_> {
                     node,
                 })
                 .unwrap_or(*arg);
+            let expected = source.role(field, "type").map(|node| {
+                self.specialized_type(
+                    Ref {
+                        file: sig.file,
+                        node,
+                    },
+                    context,
+                )
+            });
             bindings.insert(
-                key.into(),
-                self.constant_value(value, context, None)
+                key,
+                self.constant_value(value, context, expected.as_ref())
                     .map(Type::Constant)
                     .unwrap_or(Type::Unknown),
             );

@@ -516,8 +516,9 @@ class Resolver:
         if node is None or node in seen:return Type()
         seen.add(node)
         key=binding_name(node)
-        if key in substitutions and isinstance(substitutions[key],(int,bool,str)):
-            return substitutions[key]
+        if key in substitutions:
+            value=substitutions[key]
+            if isinstance(value,(int,bool,str)) or isinstance(value,tuple) and value and value[0]=='enum':return value
         if node.kind=='Paren':return self.record_constant(node.role('expr'),substitutions,seen,expected)
         if node.text in {'true','false'}:return node.text=='true'
         value=self.constant_int(node)
@@ -575,7 +576,9 @@ class Resolver:
             if index==1 and self.native_builtin(n.role('callee'),'make'):return Type('enum','Allocator_Error')
             plan = self.resolve_call(n)
             results = self.fields(plan.signature.role('results')) if plan else []
-            if index < len(results): return self.type_node(results[index][1], plan.substitutions)
+            if index < len(results):
+                typ=self.type_node(results[index][1], plan.substitutions)
+                return replace(typ,witness=n) if len(results)==1 else typ
         return self.type_of(n, seen) if index == 0 else Type(node=n)
 
     def type_of(self, n, seen=None):
@@ -700,7 +703,8 @@ class Resolver:
             if plan:
                 results = self.fields(plan.signature.role("results"))
                 if results:
-                    return self.type_node(results[0][1], plan.substitutions)
+                    typ=self.type_node(results[0][1], plan.substitutions)
+                    return replace(typ,witness=n) if len(results)==1 else typ
         if kind in {"Cast","TypeAssertion"}:
             return self.type_node(n.role("type"))
         if kind in {'AutoCast','OrReturn','OrBranch','OrPanic'}:return self.type_of(n.role('expr'),seen)
@@ -897,6 +901,24 @@ class Resolver:
                         return found
         return None
 
+    def field_path(self, typ, name, seen=None):
+        """Resolve promoted fields through the storage that actually contains them."""
+        seen=set() if seen is None else seen
+        if typ.kind=='pointer':return self.field_path(typ.elem,name,seen)
+        if typ.members:return (name,) if name in typ.members else None
+        if typ.kind!='struct' or typ.node is None or typ.node in seen:return None
+        seen.add(typ.node)
+        fields=typ.node.role('fields')
+        fields=[field for field in fields.children if field.kind=='Field'] if fields else []
+        if any(any(binding_name(n)==name for n in field.group('names')) for field in fields):return (name,)
+        found=[]
+        for field in fields:
+            if not field.data.get('using_field'):continue
+            path=self.field_path(self.type_node(field.role('type'),typ.substitutions),name,seen.copy())
+            if path:
+                found.extend((binding_name(n),*path) for n in field.group('names'))
+        return found[0] if len(found)==1 else None
+
     def procedure_candidates(self, n, seen=None):
         seen = set() if seen is None else seen
         symbol = self.symbol(n)
@@ -952,6 +974,26 @@ class Resolver:
         if formal.kind=='PointerType' and actual.kind=='pointer':
             score=self.unify(formal.role('elem'),actual.elem or Type(),substitutions)
             return score+3 if score>=0 else score
+        if formal.kind=='Call' and actual.kind=='struct' and actual.node is expected.node:
+            parameters=self.fields(actual.node.role('params'))
+            arguments=formal.group('args');score=0
+            for index,(name,annotation) in enumerate(parameters):
+                argument=next((arg.role('value') for arg in arguments if arg.kind=='FieldValue' and arg.role('field').text==name),
+                              arguments[index] if index<len(arguments) else None)
+                if argument is None:continue
+                value=actual.substitutions.get(name)
+                if value is None:continue
+                if argument.kind=='PolyType':
+                    substitutions.setdefault(argument.data['name'],value)
+                    score+=1
+                elif isinstance(value,Type):
+                    amount=self.unify(argument,value,substitutions)
+                    if amount<0:return amount
+                    score+=amount
+                else:
+                    wanted=self.record_constant(argument,substitutions,expected=self.type_node(annotation,substitutions) if annotation else None)
+                    if not isinstance(wanted,Type) and wanted!=value:return -1000
+            return score+3
         if actual.kind == "unknown" or expected.kind in {"unknown", "generic"}:
             return 0
         if expected.kind != actual.kind:

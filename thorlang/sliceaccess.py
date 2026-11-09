@@ -333,6 +333,10 @@ class SliceAccess:
 
     def member(self,value,name):
         if value.typ.kind=='pointer':return self.member(self.deref(value),name)
+        path=self.r.field_path(value.typ,name)
+        if path and len(path)>1:
+            for component in path:value=self.member(value,component)
+            return value
         selection=self.r.array_selector_type(value.typ,name)
         if selection is not None:
             element=self.item(value)
@@ -924,6 +928,11 @@ class SliceAccess:
             if annotation and annotation.kind=='Ellipsis':self.r.unify(annotation.role('expr'),value.typ.elem or Type(),substitutions)
             elif annotation:self.r.unify(annotation,value.typ,substitutions)
             if annotation and annotation.kind=='PolyType':substitutions[annotation.data['name']]=value.typ
+        for site,(name,field) in zip(sites,params):
+            annotation=field.role('type')
+            if name.kind=='PolyType' and annotation and annotation.kind!='TypeidType':
+                constant=self.r.record_constant(site,context.substitutions,expected=self.parameter_type(field,substitutions))
+                if not isinstance(constant,Type):substitutions[name.data['name']]=constant
         summary=self.summary(target,substitutions,context)
         for origin,(operation,reason,chain) in list(summary.effects.items()):
             origins=self.resolve(origin,bindings)
@@ -1204,6 +1213,12 @@ class SliceAccess:
                         if typ.kind not in {'generic','unknown'}:return typ
                     return n.source.constant_int(n)
                 a,b=value(left),value(right)
+                if isinstance(a,tuple) and a and a[0]=='enum':
+                    b=self.r.record_constant(right,context.substitutions,expected=Type('enum',node=a[1]))
+                    if isinstance(b,Type):return None
+                elif isinstance(b,tuple) and b and b[0]=='enum':
+                    a=self.r.record_constant(left,context.substitutions,expected=Type('enum',node=b[1]))
+                    if isinstance(a,Type):return None
                 if op not in {'==','!='}:
                     if isinstance(a,(int,float)) and isinstance(b,(int,float)):
                         return {'<':a<b,'<=':a<=b,'>':a>b,'>=':a>=b}[op]

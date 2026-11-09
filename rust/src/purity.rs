@@ -200,7 +200,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         let source = &self.r.sources[node.file];
         if kind == "When" || kind == "WhenExpr" {
             if let Some(cond) = self.role(node, "cond") {
-                match self.r.condition(cond) {
+                match self.r.context_condition(cond, bindings) {
                     Some(value) => {
                         let target = self
                             .role(node, if value { "body" } else { "else" })
@@ -389,7 +389,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 }
             }
         } else {
-            let candidates = self.r.candidates(callee);
+            let plans = self.r.call_plans(call, bindings);
             let indirect = self.r.symbol(callee).is_some_and(|i| {
                 let sym = &self.r.symbols[i];
                 sym.parameter || sym.result || !sym.constant
@@ -401,18 +401,12 @@ impl<'a, 'r> Purity<'a, 'r> {
                     via,
                     "Pure code cannot invoke an indirect procedure value.",
                 );
-            } else if candidates.is_empty() {
+            } else if plans.is_empty() {
                 self.gap(root, call);
             } else {
-                let types = args
-                    .iter()
-                    .map(|r| {
-                        self.r
-                            .specialized_type(self.role(*r, "value").unwrap_or(*r), bindings)
-                    })
-                    .collect::<Vec<_>>();
                 let mut selected = 0;
-                for candidate in candidates {
+                for plan in plans {
+                    let candidate = plan.procedure;
                     if self.kind(candidate) != "Procedure" || self.role(candidate, "body").is_none()
                     {
                         self.fault(
@@ -447,15 +441,8 @@ impl<'a, 'r> Purity<'a, 'r> {
                         selected += 1;
                         continue;
                     }
-                    let sig = self.role(candidate, "type").unwrap_or(candidate);
-                    let mut contextual = bindings.clone();
-                    contextual.extend(self.r.parameter_bindings(sig, &types));
-                    let fields = self.r.fields(sig, "params");
-                    if fields.iter().zip(&types).any(|((_, annotation), typ)| {
-                        annotation.is_some_and(|a| !self.r.shape_matches(a, typ, &contextual))
-                    }) {
-                        continue;
-                    }
+                    let sig = plan.signature;
+                    let contextual = plan.bindings;
                     selected += 1;
                     let mut chain = via.to_vec();
                     chain.push(call);
