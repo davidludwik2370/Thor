@@ -49,6 +49,10 @@ class FStringLifetimes:
             if ancestor.kind=='Call':
                 callee=ancestor.role('callee')
                 if callee.text in self.queries and self.s.resolver.symbol(callee) is None:return False
+                # Native conversions preserve their operand's storage. They
+                # are not borrowing procedure calls. Continue to a surrounding
+                # real call, or leave an assigned/returned string owned.
+                if self.s.denotes_type(callee) and not self.s.big.constructor(ancestor):continue
                 if any(arg.start<=node.start<node.end<=arg.end for arg in ancestor.group('args')):return ancestor
             if ancestor.kind in {'Interpolation','Procedure','Declaration','Return','Assignment','Field'}:return False
         return False

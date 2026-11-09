@@ -9,6 +9,18 @@ class FStringLifetimeTests(unittest.TestCase):
     program=base.ThorTests.program
     memory=hardening.HardeningTests.memory
 
+    def test_type_conversions_preserve_owned_strings_and_enclosing_call_cleanup(self):
+        self.memory('''
+named:=string(f"owned {7}");defer delete(named)
+returned:=plain(9);defer delete(returned)
+casted:=cast(string)f"cast {10}";defer delete(casted)
+consume(string(f"borrowed {8}"))
+testing.expect(t,named=="owned 7"&&returned=="returned 9"&&casted=="cast 10")
+''','''
+consume::proc(text:string){if text!="borrowed 8"{panic("converted temporary")}}
+plain::proc(n:int)->string{return string(f"returned {n}")}
+''')
+
     def test_fibonacci_print_and_named_numeric_owners_do_not_leak(self):
         self.memory('''
 a,b:Integer=0,1

@@ -445,9 +445,9 @@ impl Project {
                     source.path.parent() == Some(self.options.entry.as_path())
                 },
             );
+            let (emitted, errors) = lower.finish()?;
             self.type_sites
                 .extend(std::mem::take(&mut lower.type_sites));
-            let (emitted, errors) = lower.finish()?;
             self.errors.extend(errors);
             planned.push((self.destination.join(relative), (file, emitted)));
         }

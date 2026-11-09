@@ -19,6 +19,13 @@ snapshot :: fn(input: []int) -> Snapshot {
 
 independent :: fn(value: $T) -> T { return value }
 explicit :: fn($T: typeid, value: T) -> T { return value }
+captured :: proc($T: typeid, value: int) -> int {
+    calculate :: fn(n: int) -> int {
+        OFFSET :: T(2)
+        return int(T(n)) + int(OFFSET)
+    }
+    return calculate(value)
+}
 square :: fn(value: $T) -> T { return value * value }
 square_root :: fn(value: f64) -> f64 { return intrinsics.sqrt(value) }
 seconds :: fn(value: time.Duration) -> f64 { return time.duration_seconds(value) }
@@ -52,6 +59,7 @@ main :: proc() {
     if explicit(f64, number) != number { panic("explicit type parameter") }
     duration := time.Second
     seed := 3
+    if captured(f64, seed) != 5 { panic("captured type parameter") }
     if seconds(duration) != 1 || reversed_end(seed) != 4 { panic("checked SDK calls") }
 
     calls := 0

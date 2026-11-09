@@ -1,9 +1,15 @@
 //! Verified call scratch lifetimes and independently owned results.
-//! Public generic bodies and native SDK specialization remain explicit gaps.
+//! Unresolved effect/ownership specializations remain explicit migration gaps.
 use super::*;
 impl Lower<'_, '_> {
     pub fn apply_purity(&mut self, facts: &crate::purity::Facts) -> Result<()> {
         let file = self.file;
+        self.pure_defaults = facts
+            .defaults
+            .iter()
+            .filter(|field| field.file == file)
+            .map(|field| field.node)
+            .collect();
         for root in facts.checked.iter().copied().filter(|r| r.file == file) {
             if self.source.node(root.node).data["pure"] != true {
                 continue;

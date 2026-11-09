@@ -239,6 +239,8 @@ class Purity:
         self.storage_reads={}
         self.storage_writes={}
         self.pointer_checks={}
+        self.conversion_checks=set()
+        self.local_type_checks=set()
         self.entry_roots=set()
         self.borrowing=Borrowing(self)
         from .purecalls import PureCalls
@@ -474,6 +476,7 @@ class Purity:
         names=sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
                       for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
+        builtin=s.expressions.module('builtin','base:builtin')
         parts=[f'when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}}']
         if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
             parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
@@ -491,12 +494,20 @@ class Purity:
             if len(fields)==1:return f'(1 when {direct_field(fields[0])} else 0)'
             middle=len(fields)//2
             return '('+count_fields(fields[:middle])+'+'+count_fields(fields[middle:])+')'
+        def overlapping_fields(fields):
+            if not fields:return '0'
+            if len(fields)==1:
+                field=fields[0];quoted=json.dumps(field)
+                return f'((1 when {builtin}.offset_of(T,{field})==0 && {builtin}.size_of({meta}.type_field_type(T,{quoted}))>0 else 0) when {direct_field(field)} else 0)'
+            middle=len(fields)//2
+            return '('+overlapping_fields(fields[:middle])+'+'+overlapping_fields(fields[middle:])+')'
+        overlapping=overlapping_fields(names)
+        parts.append(f'when {overlapping}>1 {{#panic("Raw-union storage cannot be proved pure: overlapping fields in a raw-union"+Site)}} else {{')
         # Keep checker recursion logarithmic even when SDK access inference has
         # inspected many record schemas. A left-associated sum can exhaust the
         # native compiler's stack before it can report any useful diagnostic.
         count=count_fields(names)
         parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
-        raw_shapes=set()
         from .imports import file_private
         for unit in self.r.sources:
             for record in unit.nodes:
@@ -508,17 +519,11 @@ class Purity:
                 reference=self.r.access(s,unit,raw_name) if accessible else None
                 if reference and (unit.path.parent==s.path.parent or reference!=raw_name):
                     parts.append(f'when T=={reference} {{#panic("Raw-union storage cannot be proved pure"+Site)}}')
-                else:
-                    raw_shapes.add(tuple(n.text for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')))
-        for shape in sorted(raw_shapes):
-            matches=' && '.join([f'{meta}.type_struct_field_count(T)=={len(shape)}']+
-                                [direct_field(name) for name in shape])
-            parts.append(f'when {matches} {{#panic("Raw-union storage cannot be proved pure: an inaccessible raw-union schema has this field layout"+Site)}}')
         for field in names:
             predicate=direct_field(field)
             field=json.dumps(field)
             parts.append(f'when {predicate} {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
-        parts.extend(['}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
+        parts.extend(['}','}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
                       f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}}',
                       f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}','}',
                       f'else when {meta}.type_is_union(T) {{',
@@ -729,6 +734,18 @@ class Purity:
         if node.kind=='Slice':return self.flow(node.role('expr'),env).borrowed
         return self.flow(node,env).location
 
+    @staticmethod
+    def schema_key(typ,active=None):
+        # The same record declaration can occur with different actual type
+        # arguments. Its node alone cannot identify an inspected schema.
+        if not hasattr(typ,'kind'):return typ
+        active=set() if active is None else active
+        head=typ.kind,typ.name,typ.node,typ.nominal,typ.length,typ.soa
+        if id(typ) in active:return head
+        active=active|{id(typ)}
+        return (*head,Purity.schema_key(typ.elem,active) if typ.elem else None,
+                tuple((name,Purity.schema_key(value,active)) for name,value in sorted(typ.substitutions.items())))
+
     def unsafe_storage(self,typ,seen=None):
         """Local annotations must not introduce raw pointers or any boxing.
 
@@ -737,7 +754,7 @@ class Purity:
         representations cannot provide a back door around the call whitelist.
         """
         seen=set() if seen is None else seen
-        key=typ.kind,typ.node
+        key=self.schema_key(typ)
         if key in seen:return False
         seen.add(key)
         if typ.kind in {'procedure','map','set'} or typ.name in {'any','typeid','rawptr','cstring'}:return True
@@ -748,12 +765,26 @@ class Purity:
                 if field.kind=='Field' and self.unsafe_storage(self.r.type_node(field.role('type'),typ.substitutions),seen):return True
         if typ.kind=='union' and typ.node:
             return any(self.unsafe_storage(self.r.type_node(v,typ.substitutions),seen) for v in typ.node.group('variants'))
+
+    def unresolved_storage(self,typ,seen=None):
+        seen=set() if seen is None else seen
+        key=self.schema_key(typ)
+        if key in seen:return False
+        seen.add(key)
+        if typ.kind in {'generic','unknown'}:return True
+        if typ.elem and self.unresolved_storage(typ.elem,seen):return True
+        if typ.kind=='struct' and typ.node:
+            return any(self.unresolved_storage(self.r.type_node(field.role('type'),typ.substitutions),seen)
+                       for field in typ.node.role('fields').children if field.kind=='Field')
+        if typ.kind=='union' and typ.node:
+            return any(self.unresolved_storage(self.r.type_node(value,typ.substitutions),seen) for value in typ.node.group('variants'))
+        return False
         return False
 
     def pointer_comparison(self,typ,seen=None):
         """Whether a value comparison can inspect a pointer representation."""
         seen=set() if seen is None else seen
-        key=typ.kind,typ.node
+        key=self.schema_key(typ)
         if key in seen:return None
         seen.add(key)
         if typ.kind=='pointer' or typ.name in {'rawptr','cstring'}:return True
@@ -823,6 +854,9 @@ class Purity:
                 local_types=[typ] if typ else [self.r.type_of(value) for value in n.group('values')]
                 if any(t and self.unsafe_storage(t) for t in local_types):
                     self.problem(n,'Pure local storage cannot contain raw pointers, any, procedure values, maps, sets or raw unions.')
+                annotation=n.role('type')
+                if annotation and self.unresolved_storage(self.r.type_node(annotation)):
+                    self.local_type_checks.add(annotation)
             if n.kind=='Using' or n.kind=='Declaration' and n.data.get('using_field'):
                 owners=n.group('values' if n.kind=='Using' else 'names')
                 if any(self.r.type_of(owner).kind in {'generic','unknown'} for owner in owners):
@@ -955,6 +989,8 @@ class Purity:
                 typ=self.r.type_node(target)
                 if typ.kind in {'pointer','procedure'} or typ.name in {'rawptr','cstring','any','typeid'}:
                     self.problem(n,'Pure code cannot convert values to pointers, procedure values, any or runtime type identities.')
+                elif typ.kind in {'generic','unknown'} and not (n.kind=='Cast' and n.data['op']=='transmute'):
+                    self.conversion_checks.add(n)
         # Keep defaults syntactically valid. Replacing an effectful default
         # with an error expression corrupts inference and reports missing
         # parameters before the actual purity violation. Fail lazily in the
@@ -1042,20 +1078,50 @@ class Purity:
         if checked_params is not None:return checked_params
         queried_type=self.calls.query(n)
         if queried_type is not None:return queried_type
-        if n in self.pointer_checks:
+        if n in self.local_type_checks and not self.calls.queried(n) and self.calls.default_evaluated(n):
+            self.rendering.add(n)
+            try:
+                source=n.source
+                name=source.prefix+'pure_local_type';key=source.root,name
+                if key not in source.expressions.helpers:
+                    validator=self.validator(source)
+                    code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Site:string)->T{{{validator}(T,true,true,true,0,Site);return {{}}}}\n'
+                    source.expressions.helpers[key]=source.mapping.wrap(code,source.path,0,0,'pure-local-type')
+                token,_,_=self.type_site(source,n,'local storage type')
+                return f'type_of({name}({source._render(n,expected,constant)},{json.dumps(token)}))'
+            finally:self.rendering.remove(n)
+        if n in self.conversion_checks and not self.calls.queried(n) and self.calls.default_evaluated(n):
+            self.rendering.add(n)
+            try:
+                source=n.source
+                token,_,_=self.type_site(source,n,'conversion target')
+                native=self.module(source)
+                value=source._render(n,expected,constant)
+                return f'(type_of({native}.conversion_type(type_of({value}),{json.dumps(token)})))({value})'
+            finally:self.rendering.remove(n)
+        if n in self.pointer_checks and self.calls.default_evaluated(n):
             self.rendering.add(n)
             try:
                 source=n.source;source.needs_default=True
-                def body(_):
-                    checks=[]
-                    for value in self.pointer_checks[n]:
-                        token,_,_=self.type_site(source,value,'pointer-free comparison/conversion operand')
-                        checks.append(f'{self.validator(source)}(type_of({source.prefix}default_value({value.source.render(value)})),false,true,false,0,{json.dumps(token)})')
-                    return '\n'.join([*checks,'return '+source._render(n,expected,constant)])
-                result='bool' if n.kind=='Binary' and n.data['op'] in {'==','!=','<','<=','>','>=','in','not_in'} else None
-                name,args=source.expressions.closed(n,body,result=result,flavor='pure_pointer_identity')
-                if result is None:args.append(source.expressions.ownership.native_type(n))
-                return name+'('+', '.join(args)+')'
+                values=self.pointer_checks[n]
+                name=source.prefix+'pure_pointer_free_type_'+str(len(values))
+                key=source.root,name
+                if key not in source.expressions.helpers:
+                    validator=self.validator(source)
+                    params=','.join(f'$T{i}:typeid,$Site{i}:string' for i in range(len(values)))
+                    checks=';'.join(f'{validator}(T{i},true,true,false,0,Site{i})' for i in range(len(values)))
+                    code=f'\n@(private="file")\n{name}::proc "contextless"($R:typeid,{params})->R{{{checks};return {{}}}}\n'
+                    source.expressions.helpers[key]=source.mapping.wrap(code,source.path,0,0,'pure-pointer-free-type')
+                arguments=[]
+                for value in values:
+                    token,_,_=self.type_site(source,value,'pointer-free comparison/conversion operand')
+                    original=value.source.render(value)
+                    arguments.extend([f'type_of({source.prefix}default_value({original}))',json.dumps(token)])
+                # Unevaluated type proofs preserve constant expressions and the
+                # original evaluation count; a runtime wrapper would not.
+                expression=source._render(n,expected,constant)
+                result_type='bool' if n.kind=='Binary' and n.data['op'] in {'==','!=','<','<=','>','>=','in','not_in'} else f'type_of({source.prefix}default_value({expression}))'
+                return f'(type_of({name}({result_type},{",".join(arguments)})))({expression})'
             finally:self.rendering.remove(n)
         if n in self.storage_reads:
             self.rendering.add(n)

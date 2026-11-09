@@ -23,6 +23,28 @@ fn field_count(names: &[String], meta: &str) -> String {
     }
 }
 
+fn overlap_count(names: &[String], meta: &str, builtin: &str) -> String {
+    // Ordinary struct fields with positive size cannot share byte offset zero.
+    // A raw union can. Field-name equality alone would also reject unrelated
+    // ordinary records; zero-sized fields carry no overlapping bytes.
+    match names.len() {
+        0 => "0".into(),
+        1 => {
+            let name = &names[0];
+            let quoted = json!(name);
+            format!("((1 when {builtin}.offset_of(T,{name})==0 && {builtin}.size_of({meta}.type_field_type(T,{quoted}))>0 else 0) when {} else 0)",direct_field(name,meta))
+        }
+        _ => {
+            let middle = names.len() / 2;
+            format!(
+                "({}+{})",
+                overlap_count(&names[..middle], meta, builtin),
+                overlap_count(&names[middle..], meta, builtin)
+            )
+        }
+    }
+}
+
 impl Lower<'_, '_> {
     pub(super) fn pure_type_site(&mut self, site: NodeId, proc: NodeId, role: &str) -> String {
         let token = format!(
@@ -66,6 +88,8 @@ impl Lower<'_, '_> {
         self.meta = true;
         let meta = format!("{}meta", self.prefix);
         let module = self.module("pure");
+        self.builtin = true;
+        let builtin = format!("{}builtin", self.prefix);
         let mut parts=vec![
             format!("when Depth>24{{#panic(\"Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels\"+Site)}}"),
             format!("else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}"),
@@ -73,12 +97,68 @@ impl Lower<'_, '_> {
             format!("else when {meta}.type_is_dynamic_array(T){{when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc\"+Site)}}else when Result || Allow_Refs{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}else{{{module}.validate(T,false,Depth,Site)}}}}"),
             format!("else when {meta}.type_is_struct(T){{\nwhen {meta}.type_struct_field_count(T)!=({}){{#panic(\"Pure record fields could not be fully resolved\"+Site)}}",field_count(&names,&meta)),
         ];
+        parts.push(format!("when {}>1{{#panic(\"Raw-union storage cannot be proved pure: overlapping fields in a raw-union\"+Site)}}else{{",overlap_count(&names,&meta,&builtin)));
+        for (file, owner) in self.resolver.sources.iter().enumerate() {
+            if owner.path.parent() != self.source.path.parent() {
+                continue;
+            }
+            for (index, record) in owner
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(_, node)| node.kind == "StructType" && node.op == "raw_union")
+            {
+                if owner.role(NodeId(index), "params").is_some() {
+                    continue;
+                }
+                let Some(declaration) = record.parent.filter(|decl| {
+                    owner.node(*decl).kind == "Declaration"
+                        && owner.node(*decl).parent == Some(NodeId(0))
+                }) else {
+                    continue;
+                };
+                let raw_names = owner.group(declaration, "names");
+                if raw_names.len() != 1 {
+                    continue;
+                }
+                let field_private = self
+                    .resolver
+                    .attributes(Ref {
+                        file,
+                        node: declaration,
+                    })
+                    .iter()
+                    .any(|(name, value)| {
+                        name == "private"
+                            && value.is_some_and(|value| {
+                                self.resolver.sources[value.file].text(value.node) == "\"file\""
+                            })
+                    })
+                    || owner.info["file_tags"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|tag| tag.as_str())
+                        .any(|tag| {
+                            tag.contains("private")
+                                && tag.split_whitespace().any(|word| word == "file")
+                        });
+                if field_private && owner.path != self.source.path {
+                    continue;
+                }
+                parts.push(format!(
+                    "when T=={}{{#panic(\"Raw-union storage cannot be proved pure\"+Site)}}",
+                    owner.text(raw_names[0])
+                ));
+            }
+        }
         for field in names {
             let predicate = direct_field(&field, &meta);
             let field = json!(field);
             parts.push(format!("when {predicate}{{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}"));
         }
         parts.extend([
+            "}".into(),
             "}".into(),
             format!("else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T){{when Result && !Allow_Owned && {meta}.type_is_slice(T){{#panic(\"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc\"+Site)}}else{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}}}"),
             format!("else when {meta}.type_is_union(T){{{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site)}}"),

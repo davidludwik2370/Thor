@@ -86,6 +86,19 @@ validate_union :: proc "contextless"($T:typeid,$Result:bool,$Depth:int,$Index:in
     }
 }
 
+// Used only beneath type_of by the compiler. Checking the concrete target here
+// also covers type parameters captured from an enclosing ordinary procedure.
+// The real conversion remains a native expression, evaluated exactly once.
+conversion_type :: proc "contextless"($T:typeid,$Site:string)->T {
+    when intrinsics.type_is_pointer(T)||intrinsics.type_is_multi_pointer(T)||
+         intrinsics.type_is_proc(T)||intrinsics.type_is_map(T)||
+         intrinsics.type_is_cstring(T)||intrinsics.type_is_cstring16(T)||
+         intrinsics.type_is_string16(T)||T==rawptr||T==any||T==typeid {
+        #panic("Pure code cannot convert values to pointers, procedure values, any or runtime type identities."+Site)
+    }
+    return {}
+}
+
 // Copying a slice creates fresh outer storage; its elements retain ordinary
 // shallow values. The frontend propagates borrowed nested elements separately.
 clone_slice :: proc(values:[]$T)->[]T {

@@ -1065,6 +1065,9 @@ or storing a reference to a default anonymous argument beyond its expression
 would leave a dangling reference. Named strings, literals and arbitrary
 string-returning procedures are not automatically deleted at call sites.
 Ordinary factory results still need the lifetime specified by their API.
+Native type conversions preserve ownership: `text := string(f"value {n}")`
+owns its string and needs deletion. In `print(string(f"value {n}"))`, the
+enclosing `print` call still controls temporary cleanup.
 See [the lifetime implementation and validation notes](docs/fstring-lifetimes.md).
 
 Expression switches require a default arm unless a runtime enum switch covers

@@ -2344,7 +2344,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .collect::<Vec<_>>();
                     self.values[id].data.extend(storage);
                 }
-                if matches!(base_type(&typ), Type::Pointer(_)) || opaque(&typ) {
+                // A checked generic conversion also receives an exact native
+                // target proof. Keep borrowed provenance until that proof and
+                // result promotion; do not treat a captured type as a callback.
+                let checked_generic =
+                    self.pure_depth > 0 && matches!(base_type(&typ), Type::Unknown | Type::Generic);
+                if matches!(base_type(&typ), Type::Pointer(_)) || opaque(&typ) && !checked_generic {
                     let refs = self.refs(v);
                     self.require(
                         refs,
@@ -2766,64 +2771,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         None
     }
     fn denotes_type(&mut self, r: Ref) -> bool {
-        if self.kind(r) == "Call" {
-            if let Some(callee) = self.role(r, "callee") {
-                let typ = self.r.specialized_type(callee, &Substitutions::new());
-                return matches!(typ, Type::Struct(_) | Type::Record(..));
-            }
-        }
-        if matches!(
-            self.kind(r),
-            "ArrayType" | "DynamicArrayType" | "PointerType" | "MapType" | "SetType" | "StructType"
-        ) {
-            return true;
-        }
-        if self.r.symbol(r).is_some_and(|symbol| {
-            self.r.symbols[symbol].constant
-                && self.r.symbols[symbol].value.is_some_and(|v| {
-                    matches!(
-                        self.r.sources[self.r.symbols[symbol].reference.file]
-                            .node(v)
-                            .kind
-                            .as_str(),
-                        "ArrayType"
-                            | "DynamicArrayType"
-                            | "PointerType"
-                            | "MapType"
-                            | "SetType"
-                            | "StructType"
-                            | "EnumType"
-                    )
-                })
-        }) {
-            return true;
-        }
-        self.r.symbol(r).is_none()
-            && matches!(
-                self.text(r).as_str(),
-                "int"
-                    | "uint"
-                    | "i8"
-                    | "i16"
-                    | "i32"
-                    | "i64"
-                    | "i128"
-                    | "u8"
-                    | "u16"
-                    | "u32"
-                    | "u64"
-                    | "u128"
-                    | "f16"
-                    | "f32"
-                    | "f64"
-                    | "bool"
-                    | "rune"
-                    | "byte"
-                    | "string"
-                    | "cstring"
-                    | "rawptr"
-                    | "any"
-            )
+        self.r.denotes_type(r)
     }
     fn verified_library(&self, reference: Ref, path: &str) -> bool {
         let Some((collection, suffix)) = path.split_once(':') else {

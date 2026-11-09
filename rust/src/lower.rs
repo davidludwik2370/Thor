@@ -20,6 +20,8 @@ mod defaults;
 mod extrema;
 #[path = "purelower.rs"]
 mod purelower;
+#[path = "pureproofs.rs"]
+mod pureproofs;
 #[path = "pureschema.rs"]
 mod pureschema;
 #[path = "purevariants.rs"]
@@ -72,6 +74,10 @@ pub struct Lower<'a, 'r> {
     verified_pure: HashSet<NodeId>,
     pure_owned: HashSet<NodeId>,
     pure_busy: HashSet<NodeId>,
+    pure_conversion_busy: HashSet<NodeId>,
+    pure_operand_busy: HashSet<NodeId>,
+    pure_defaults: HashSet<NodeId>,
+    pure_local_busy: HashSet<NodeId>,
     pure_ignored: HashMap<NodeId, String>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
@@ -112,6 +118,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             verified_pure: HashSet::new(),
             pure_owned: HashSet::new(),
             pure_busy: HashSet::new(),
+            pure_conversion_busy: HashSet::new(),
+            pure_operand_busy: HashSet::new(),
+            pure_defaults: HashSet::new(),
+            pure_local_busy: HashSet::new(),
             pure_ignored: HashMap::new(),
         };
         for edit in &source.edits {
@@ -315,11 +325,11 @@ impl<'a, 'r> Lower<'a, 'r> {
         self.errors.insert(token.clone(), message.into());
         self.g(token, id)
     }
-    pub fn finish(mut self) -> Result<(Emitted, HashMap<String, String>)> {
+    pub fn finish(&mut self) -> Result<(Emitted, HashMap<String, String>)> {
         if self.source.excluded {
             return Ok((
                 self.copy(Span::new(0, self.source.raw.len())).finish(),
-                self.errors,
+                std::mem::take(&mut self.errors),
             ));
         }
         if !self.source.thor {
@@ -370,7 +380,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                     "support",
                 ));
             }
-            return Ok((Code::concat(code).finish(), self.errors));
+            return Ok((
+                Code::concat(code).finish(),
+                std::mem::take(&mut self.errors),
+            ));
         }
         self.preflight()?;
         let mut code = vec![self.render(NodeId(0), None, false)?];
@@ -411,7 +424,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                 "support",
             ));
         }
-        Ok((Code::concat(code).finish(), self.errors))
+        Ok((
+            Code::concat(code).finish(),
+            std::mem::take(&mut self.errors),
+        ))
     }
     fn preflight(&mut self) -> Result<()> {
         let managed_composites = self
@@ -858,6 +874,21 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if self.checked_mode && !self.pure_local_busy.contains(&id) {
+            if let Some(code) = self.pure_local_type(id, expected.clone(), constant)? {
+                return Ok(code);
+            }
+        }
+        if self.checked_mode && self.querying == 0 && !self.pure_conversion_busy.contains(&id) {
+            if let Some(code) = self.pure_conversion(id, expected.clone(), constant)? {
+                return Ok(code);
+            }
+        }
+        if self.checked_mode && self.querying == 0 && !self.pure_operand_busy.contains(&id) {
+            if let Some(code) = self.pure_operands(id, expected.clone(), constant)? {
+                return Ok(code);
+            }
+        }
         if kind == "Directive" && self.source.names.get(node.name) == "procedure" {
             if let Some(proc) = self
                 .source
@@ -2408,6 +2439,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                     });
                     if query {
                         break;
+                    }
+                    if callee
+                        .is_some_and(|callee| self.resolver.denotes_type(self.reference(callee)))
+                    {
+                        continue;
                     }
                     if self
                         .source

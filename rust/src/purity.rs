@@ -21,6 +21,7 @@ pub struct Facts {
     pub faults: BTreeMap<Ref, Vec<Fault>>,
     pub gaps: BTreeMap<Ref, Ref>,
     pub targets: BTreeMap<Ref, BTreeSet<Ref>>,
+    pub defaults: BTreeSet<Ref>,
 }
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
@@ -319,7 +320,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                     else if !Self::scalar_transmute(&target) || !Self::scalar_transmute(&value) {
                         self.fault(root,node,via,"Pure transmute requires scalar numeric, boolean, enum or bit-set values; pointer and aggregate representations are not eligible.");
                     }
-                } else if matches!(&target,Type::Pointer(_)|Type::Procedure(_)) || matches!(&target,Type::Scalar{name,..}if ["rawptr","any","typeid"].contains(&name.as_str())) || matches!(&target,Type::String{name,..}if name!="string") {
+                } else if Self::forbidden_conversion(&target) {
                     self.fault(root,node,via,"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.");
                 }
             }
@@ -381,6 +382,18 @@ impl<'a, 'r> Purity<'a, 'r> {
                 node: *node,
             })
             .collect::<Vec<_>>();
+        if self.kind(callee) == "Directive"
+            && ["assert", "config"].contains(
+                &self.r.sources[callee.file]
+                    .names
+                    .get(self.r.sources[callee.file].node(callee.node).name),
+            )
+        {
+            for arg in args {
+                self.walk(root, proc, arg, bindings, via);
+            }
+            return;
+        }
         if let Some(name) = self.intrinsic_name(callee, &mut HashSet::new()) {
             if !Self::intrinsic_allowed(&name) {
                 self.fault(
@@ -403,12 +416,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                     self.fault(root,call,via,"Pure code cannot observe pointer identities or convert pointers to numeric values.");
                 }
             }
-            if matches!(
-                target_type,
-                Type::Pointer(_) | Type::Procedure(_) | Type::Map { .. }
-            ) || matches!(&target_type,Type::Scalar{name,..} if ["any","rawptr","typeid","cstring"].contains(&name.as_str()))
-                || matches!(&target_type,Type::String{name,..} if name!="string")
-            {
+            if Self::forbidden_conversion(&target_type) {
                 self.fault(root,call,via,"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.");
             }
         } else if let Some(name) = BUILTINS
@@ -535,6 +543,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                                 missing
                             });
                             if omitted {
+                                self.facts.defaults.insert(field);
                                 if let Some(default) = self.role(field, "default") {
                                     self.walk(root, candidate, default, bindings, &chain);
                                 }
@@ -549,6 +558,17 @@ impl<'a, 'r> Purity<'a, 'r> {
         }
         for arg in args {
             self.walk(root, proc, arg, bindings, via);
+        }
+    }
+    fn forbidden_conversion(typ: &Type) -> bool {
+        match typ {
+            Type::Nominal(_, base) => Self::forbidden_conversion(base),
+            Type::Pointer(_) | Type::Procedure(_) | Type::Map { .. } => true,
+            Type::Scalar { name, .. } => {
+                ["rawptr", "any", "typeid", "cstring"].contains(&name.as_str())
+            }
+            Type::String { name, .. } => name != "string",
+            _ => false,
         }
     }
     fn scalar_transmute(typ: &Type) -> bool {

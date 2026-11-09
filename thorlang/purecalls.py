@@ -36,6 +36,30 @@ class PureCalls:
         return any(parent.kind=='Call' and self.purity.builtin(parent) in self.purity.type_queries
                    and parent.role('callee') is not node for parent in node.ancestors())
 
+    def default_evaluated(self,node):
+        proc=self.purity.owner(node)
+        if not proc or self.purity.pure(proc):return True
+        params=proc.role('type').role('params')
+        field=next((field for field in params.children if field.role('default') and
+                    field.role('default').start<=node.start<field.role('default').end),None)
+        if field is None:return True
+        incoming=[call for call,targets in self.targets.items() if proc in targets]
+        if not incoming:return True
+        names=[name.text.lstrip('$') for parameter in params.children for name in parameter.group('names')]
+        wanted={name.text.lstrip('$') for name in field.group('names')}
+        for call in incoming:
+            callee=call.role('callee')
+            receiver=callee.kind=='Selector' and callee.data.get('op')=='->'
+            supplied=set(names[:1] if receiver else [])
+            position=int(receiver)
+            for argument in call.group('args'):
+                if argument.kind=='FieldValue':supplied.add(argument.role('field').text)
+                else:
+                    if position<len(names):supplied.add(names[position])
+                    position+=1
+            if not wanted<=supplied:return True
+        return False
+
     def chains(self,target):
         """Shortest source call chains from declared fn bodies to a checked proc.
 

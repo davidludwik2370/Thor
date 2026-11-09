@@ -535,3 +535,52 @@ assertion-hygiene checks, including 14 new type-parameter regressions. Eight
 Rust unit tests passed in both profiles, and Clippy passed with warnings denied.
 The expanded example matched Python in checked debug and unchecked release
 builds, with empty allocation reports.
+
+## Captured generic type proofs
+
+Both implementations now check conversions and local storage whose concrete
+type comes from an enclosing generic procedure. Such a type is not necessarily
+covered by a nested `fn`'s parameter/result checks. Previously, a captured pointer
+type or raw-union layout could bypass the ordinary purity checks and modify
+outside storage.
+
+The additional checks are native type proofs beneath `type_of`. They preserve
+constant expressions, evaluate the actual value once, and add no runtime calls.
+Pure comparisons/conversion operands use the same approach; the Python
+reference's previous runtime wrappers could invalidate generic constant `when`
+conditions. Unevaluated source type queries remain unevaluated. Local pointers
+derived from owned storage are still eligible.
+
+Record schemas distinguish generic instantiations during traversal. Native
+checks reject overlapping raw-union fields, retain exact checks for accessible
+raw-union types, and do not reject ordinary records merely because an inaccessible
+raw union has the same field names. Zero-sized fields do not count as overlapping
+storage. Unresolved local schemas use the existing native schema depth limit.
+
+The new proofs skip ordinary helper defaults when checked callers provide those
+arguments. Omitted defaults and declared `fn` defaults remain checked. Runtime,
+automatic compile-time and explicit `#run` reference cases cover these paths.
+Native diagnostic metadata is collected after rendering, so type-proof errors
+refer to the original conversion, operand or annotation. Unsaved TLS changes
+cover error appearance and recovery.
+
+The lifetime regressions also found a shared reference/native bug: native type
+conversions such as `string(f"...")` were treated as borrowing procedure calls.
+That could release the string before assignment or pure-result promotion.
+Conversions now retain the operand's ownership, while an enclosing real call
+still owns its normal temporary cleanup. Logical big-number constructors retain
+their separate parsing/argument contract in the Python implementation. Native
+borrowing uses the common type resolver for explicit type parameters and aliases;
+checked generic conversions retain provenance until their exact target proof.
+
+This is a correctness checkpoint within the type/purity port. Compile-time
+execution/caching and other migration gaps remain; Python stays the default.
+
+The clean acceptance runs passed 420 native/differential, memory-report,
+comparison and assertion-hygiene checks and 223 reference checks, including
+purity, defaults, compile-time execution and f-string lifetimes. The expanded
+example matched between engines in checked debug and unchecked release builds,
+with empty allocation reports. An earlier full run hit a stock Odin array-bounds
+assertion during a reference-only check; its isolated retry, neighboring checks
+and the clean full rerun passed. That diagnostic alone does not identify its
+cause as the previously recorded cached-name race.
