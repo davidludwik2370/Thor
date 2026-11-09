@@ -1,0 +1,41 @@
+{
+  "scope": "warm-cache transpile only; synthetic interpolation/power procedures; no Odin backend in timed runs",
+  "procedures": 200,
+  "source_bytes": 18760,
+  "source_sha256": "faefcdd351868dcf8ebc823999219bd179ea831759a861743e6dc5056be56bd4",
+  "engines": {
+    "python": "/Users/davidludwik/Thor/thor",
+    "rust": "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+    "initial-rust": "/private/tmp/thor-rust-initial-checkpoint/rust/target/release/thor-rust"
+  },
+  "runs_seconds": {
+    "python": [
+      0.6964165839999623,
+      0.7177099999989878,
+      0.7026771250002639,
+      0.7002482090010744,
+      0.7187256249999336
+    ],
+    "rust": [
+      0.08660554199923354,
+      0.08676329199988686,
+      0.08835483300026681,
+      0.08851516600043396,
+      0.08637474999886763
+    ],
+    "initial-rust": [
+      0.13052779200006626,
+      0.12997579100010626,
+      0.12869404100092652,
+      0.12567474999923434,
+      0.12924762500006182
+    ]
+  },
+  "median_seconds": {
+    "python": 0.7026771250002639,
+    "rust": 0.08676329199988686,
+    "initial-rust": 0.12924762500006182
+  },
+  "historical_commit": "6987b76",
+  "date": "2026-11-09"
+}

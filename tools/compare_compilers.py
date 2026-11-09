@@ -27,6 +27,27 @@ class Observation:
     seconds: float
     timeout: bool = False
     toolchain_failure: bool = False
+    stderr_residue: str | None = None
+
+
+def split_diagnostic_stream(text):
+    """Separate the compiler's JSON envelope from any program/backend stderr."""
+    leading = len(text)-len(text.lstrip())
+    try:
+        packet, end = json.JSONDecoder().raw_decode(text, leading)
+    except ValueError:
+        return {'errors': []}, text
+    if not (isinstance(packet, dict) and isinstance(packet.get('error_count'), int)
+            and isinstance(packet.get('errors'), list)
+            and all(isinstance(error, dict) and isinstance(error.get('msgs', []), list)
+                    for error in packet['errors'])):
+        return {'errors': []}, text
+    residue = text[end:]
+    if residue.startswith('\r\n'):
+        residue = residue[2:]
+    elif residue.startswith('\n'):
+        residue = residue[1:]
+    return packet, residue
 
 
 def canonical_diagnostics(packet):
@@ -61,16 +82,14 @@ def observe(compiler, entry, output, cache, *, timeout, command='check', flags=(
             return data.decode(errors='replace') if isinstance(data, bytes) else data or ''
         return Observation(None, decoded(error.stdout), [], decoded(error.stderr),
                            time.monotonic()-started, True)
-    try:
-        packet = json.loads(completed.stderr) if completed.stderr.strip() else {'errors': []}
-    except ValueError:
-        packet = {'errors': []}
+    packet, residue = split_diagnostic_stream(completed.stderr)
     toolchain_failure=any(error.get('stage')=='toolchain' or any(
         'Odin compiler terminated by' in message for message in error.get('msgs', []))
         for error in packet.get('errors', []))
     return Observation(completed.returncode, completed.stdout,
                        canonical_diagnostics(packet), completed.stderr,
-                       time.monotonic()-started,toolchain_failure=toolchain_failure)
+                       time.monotonic()-started,toolchain_failure=toolchain_failure,
+                       stderr_residue=residue)
 
 
 def classify(python, rust):
@@ -87,9 +106,11 @@ def classify(python, rust):
         return 'mismatch'
     if python.diagnostics != rust.diagnostics:
         return 'mismatch'
-    if python.status == 0 and python.stdout != rust.stdout:
+    if python.stdout != rust.stdout:
         return 'mismatch'
-    if not python.diagnostics and not rust.diagnostics and python.stderr != rust.stderr:
+    python_stderr = python.stderr if python.stderr_residue is None else python.stderr_residue
+    rust_stderr = rust.stderr if rust.stderr_residue is None else rust.stderr_residue
+    if python_stderr != rust_stderr:
         return 'mismatch'
     return 'match'
 
@@ -99,6 +120,13 @@ def source_snapshot(entry):
         path for path in entry.rglob('*') if path.suffix in {'.thor', '.odin'}
         and not any(part.startswith('.') for part in path.relative_to(entry).parts))
     return {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
+
+
+def comparison_flags(flags):
+    # Odin's parallel checker can repeat instantiation notes nondeterministically.
+    # Preserve every note and compare a deterministic native diagnostic stream.
+    return list(flags) if any(flag.startswith('-thread-count:') for flag in flags) else [
+        '-thread-count:1', *flags]
 
 
 def main(argv=None):
@@ -114,6 +142,7 @@ def main(argv=None):
     parser.add_argument('--report-only', action='store_true',
                         help='record migration gaps without returning a failing exit status')
     options = parser.parse_args(argv)
+    flags = comparison_flags(options.flag)
     entries = [entry.resolve() for entry in options.sources]
     if not entries:
         entries = sorted((ROOT/'tests/fixtures').glob('*/main.thor'))
@@ -126,10 +155,10 @@ def main(argv=None):
             before = source_snapshot(entry)
             python = observe(options.python.resolve(), entry, scratch/str(index)/'python',
                              scratch/str(index)/'cache', timeout=options.timeout,
-                             command=options.command, flags=options.flag)
+                             command=options.command, flags=flags)
             rust = observe(options.rust.resolve(), entry, scratch/str(index)/'rust',
                            scratch/str(index)/'cache', timeout=options.timeout,
-                           command=options.command, flags=options.flag)
+                           command=options.command, flags=flags)
             status = classify(python, rust)
             if source_snapshot(entry) != before:
                 raise RuntimeError(f'compiler changed original source: {entry}')
@@ -139,7 +168,7 @@ def main(argv=None):
             print(f'{status:9} {entry}', flush=True)
     counts = {kind: sum(row['comparison'] == kind for row in rows)
               for kind in ['match', 'mismatch', 'unported', 'timeout']}
-    report = {'schema_version': 1, 'complete': counts['match'] == len(rows),
+    report = {'schema_version': 1, 'complete': counts['match'] == len(rows), 'odin_flags':flags,
               'counts': counts, 'cases': rows}
     if options.report:
         options.report.parent.mkdir(parents=True, exist_ok=True)

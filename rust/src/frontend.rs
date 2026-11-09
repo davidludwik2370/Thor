@@ -161,15 +161,16 @@ impl Frontend {
         });
         if let Some(cache) = &cache {
             if let Ok(data) = fs::read(cache) {
-                if let Ok(packet) = serde_json::from_slice::<Value>(&data) {
+                if let Ok(mut packet) = serde_json::from_slice::<Value>(&data) {
                     let info = &packet["payload"];
                     let digest = sha256(&serde_json::to_vec(info)?);
                     if packet["version"] == 1
                         && packet["schema"] == "odin-frontend-raw-v1"
                         && packet["sha256"].as_str() == Some(digest.as_str())
                     {
+                        let info = std::mem::take(&mut packet["payload"]);
                         if let Ok(source) =
-                            Source::from_frontend(path.clone(), raw.clone(), info.clone(), thor)
+                            Source::from_frontend(path.clone(), raw.clone(), info, thor)
                         {
                             return Ok(source);
                         }

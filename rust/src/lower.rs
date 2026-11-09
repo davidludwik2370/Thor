@@ -8,6 +8,14 @@ use crate::{
 };
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
+#[path = "access.rs"]
+mod access;
+#[path = "sets.rs"]
+mod sets;
+#[path = "switches.rs"]
+mod switches;
+#[path = "typedloops.rs"]
+mod typedloops;
 
 #[derive(Clone, Debug)]
 pub struct Hint {
@@ -33,6 +41,11 @@ pub struct Lower<'a, 'r> {
     builtin: bool,
     pub errors: HashMap<String, String>,
     blocked: HashMap<NodeId, String>,
+    assigning: HashSet<NodeId>,
+    native_access: HashSet<NodeId>,
+    address_nodes: HashSet<NodeId>,
+    switch_owners: HashSet<NodeId>,
+    switch_replacements: HashMap<NodeId, Code>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -55,6 +68,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             builtin: false,
             errors: HashMap::new(),
             blocked: HashMap::new(),
+            assigning: HashSet::new(),
+            native_access: HashSet::new(),
+            address_nodes: HashSet::new(),
+            switch_owners: HashSet::new(),
+            switch_replacements: HashMap::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -128,12 +146,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         self.preflight()?;
         let mut code = vec![self.render(NodeId(0), None, false)?];
-        let helpers: Vec<_> = self
-            .helpers
-            .iter()
-            .filter(|((owner, _), _)| owner.0 == 0)
-            .map(|(_, code)| code.clone())
-            .collect();
+        let helpers = self.helper_declarations(NodeId(0));
         code.extend(helpers);
         if self.default {
             let name = format!("{}default_value", self.source.prefix);
@@ -163,8 +176,53 @@ impl<'a, 'r> Lower<'a, 'r> {
         Ok((Code::concat(code).finish(), self.errors))
     }
     fn preflight(&mut self) -> Result<()> {
+        let managed_composites = self
+            .fstring_plans
+            .values()
+            .flatten()
+            .flat_map(|target| self.source.ancestors(*target))
+            .collect::<HashSet<_>>();
         for (i, node) in self.source.nodes.iter().enumerate() {
             let id = NodeId(i);
+            let set_temporary = (node.kind == "Compound" && matches!(self.typ(id), Type::Set(_)))
+                || (node.kind == "Binary"
+                    && matches!(node.op.as_str(), "|" | "&" | "-" | "~")
+                    && matches!(self.typ(id), Type::Set(_)));
+            if set_temporary {
+                let mut root = id;
+                while let Some(parent) = self
+                    .source
+                    .node(root)
+                    .parent
+                    .filter(|parent| self.source.node(*parent).kind == "Paren")
+                {
+                    root = parent;
+                }
+                if let Some(parent) = self.source.node(root).parent {
+                    let kind = self.source.node(parent).kind.as_str();
+                    let delete = kind == "Call"
+                        && self.source.role(parent, "callee").is_some_and(|callee| {
+                            self.resolver
+                                .native_builtin(self.reference(callee), "delete")
+                        });
+                    if matches!(
+                        kind,
+                        "Call" | "Binary" | "Index" | "Slice" | "Selector" | "Interpolation"
+                    ) && !delete
+                    {
+                        return Err(self.unsupported(id, "anonymous Set temporary ownership"));
+                    }
+                    if kind == "Assignment"
+                        && self
+                            .source
+                            .group(parent, "lhs")
+                            .iter()
+                            .any(|lhs| self.source.text(*lhs) == "_")
+                    {
+                        return Err(self.unsupported(id, "discarded Set temporary cleanup"));
+                    }
+                }
+            }
             if self
                 .resolver
                 .conditional_immutables
@@ -189,16 +247,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 node.kind.as_str(),
                 "Binary" | "Ternary" | "WhenExpr" | "Index" | "Slice" | "Selector" | "Unary"
             ) {
-                let temporary = self.source.nodes.iter().enumerate().any(|(i, n)| {
-                    n.kind == "Interpolation"
-                        && n.data["manual_lifetime"] != true
-                        && self.source.is_descendant(NodeId(i), id)
+                let temporary = self.source.descendants(id).any(|child| {
+                    let n = self.source.node(child);
+                    n.kind == "Interpolation" && n.data["manual_lifetime"] != true
                 });
-                let managed = self.fstring_plans.values().any(|targets| {
-                    targets
-                        .iter()
-                        .any(|target| self.source.is_descendant(*target, id))
-                });
+                let managed = managed_composites.contains(&id);
                 if temporary && !managed {
                     return Err(
                         self.unsupported(id, "anonymous-string ownership in composite expressions")
@@ -219,15 +272,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             {
                 return Err(self.unsupported(id, "discarded anonymous-string cleanup"));
             }
-            if matches!(
-                node.kind.as_str(),
-                "Run"
-                    | "Comprehension"
-                    | "SwitchExpr"
-                    | "CompileSwitchExpr"
-                    | "CompileSwitch"
-                    | "SetType"
-            ) {
+            if matches!(node.kind.as_str(), "Run" | "Comprehension") {
                 return Err(self.unsupported(id, &node.kind));
             }
             if node.kind == "Ident"
@@ -235,12 +280,6 @@ impl<'a, 'r> Lower<'a, 'r> {
                 && self.resolver.symbol(self.reference(id)).is_none()
             {
                 return Err(self.unsupported(id, "arbitrary-precision numbers"));
-            }
-            if node.kind == "Range"
-                && (self.source.role(id, "value_type").is_some()
-                    || self.source.role(id, "index_type").is_some())
-            {
-                return Err(self.unsupported(id, "typed loop bindings"));
             }
             if node.kind == "Slice" {
                 let base = self.role(id, "expr")?;
@@ -412,7 +451,11 @@ impl<'a, 'r> Lower<'a, 'r> {
         let node = source.node(id);
         if let Some(symbol) = self.resolver.symbol(self.reference(id)) {
             let sym = &self.resolver.symbols[symbol];
-            if sym.immutable {
+            let source = &self.resolver.sources[sym.reference.file];
+            let typed_index = source.node(sym.reference.node).kind == "Range"
+                && sym.index == 1
+                && source.role(sym.reference.node, "index_type").is_some();
+            if sym.immutable || typed_index {
                 return Some(sym.name.clone());
             }
             return None;
@@ -592,8 +635,32 @@ impl<'a, 'r> Lower<'a, 'r> {
         if let Some(message) = self.blocked.get(&id).cloned() {
             return Ok(self.error_token(id, &message));
         }
+        if let Some(code) = self.switch_replacements.get(&id) {
+            return Ok(code.clone());
+        }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
+            if let Some(code) = self.switch_statement(id, constant)? {
+                return Ok(code);
+            }
+        }
+        if matches!(kind.as_str(), "SwitchExpr" | "CompileSwitchExpr") {
+            return self.switch_expression(id, vec![expected], constant);
+        }
+        if kind == "CompileSwitch" {
+            return self.compile_switch(id);
+        }
+        if kind == "Assignment" {
+            if let Some(code) = self.access_assignment(id, constant)? {
+                return Ok(code);
+            }
+        }
+        if kind == "Range" {
+            if let Some(code) = self.typed_loop(id)? {
+                return Ok(code);
+            }
+        }
         if kind == "Procedure" && !self.fstring_frames.is_empty() {
             let frames = std::mem::take(&mut self.fstring_frames);
             let code = self.render(id, expected, constant);
@@ -655,6 +722,9 @@ impl<'a, 'r> Lower<'a, 'r> {
                         .expansion(&self.source.path, node.span));
                 }
             }
+        }
+        if let Some(code) = self.set_expression(id, constant)? {
+            return Ok(code);
         }
         if kind == "Compound" && self.is_array(id) {
             return self.array(id, expected, None, constant);
@@ -965,21 +1035,43 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Block" {
-            let helpers: Vec<_> = self
-                .helpers
-                .iter()
-                .filter(|((owner, _), _)| *owner == id)
-                .map(|(_, code)| code.clone())
-                .collect();
+            let helpers = self.helper_declarations(id);
             if !helpers.is_empty() {
                 if self.source.raw.as_bytes()[node.span.start] == b'{' {
                     inserts.push((node.span.start + 1, Code::concat(helpers)));
                 } else {
-                    return Err(self.unsupported(id, "generated expression helpers in do bodies"));
+                    self.convert_do(id);
+                    let code = self.splice(id, replacements, inserts)?;
+                    return Ok(Code::concat([
+                        self.g("{\n", id),
+                        Code::concat(helpers),
+                        code,
+                        self.g("\n}", id),
+                    ]));
                 }
             }
         }
         self.splice(id, replacements, inserts)
+    }
+    fn convert_do(&mut self, id: NodeId) {
+        let mut cursor = self.source.node(id).span.start;
+        loop {
+            let previous = cursor;
+            while cursor > 0 && self.source.raw.as_bytes()[cursor - 1].is_ascii_whitespace() {
+                cursor -= 1;
+            }
+            if let Some(comment) = self.source.comments.iter().find(|span| span.end == cursor) {
+                cursor = comment.start;
+            }
+            if previous == cursor {
+                break;
+            }
+        }
+        if cursor >= 2 && &self.source.raw.as_bytes()[cursor - 2..cursor] == b"do" {
+            let token = Span::new(cursor - 2, cursor);
+            self.edits
+                .push((token, self.gen("", token, "expression-body")));
+        }
     }
     fn is_array(&self, id: NodeId) -> bool {
         self.source.node(id).kind == "Compound"
@@ -1157,6 +1249,21 @@ impl<'a, 'r> Lower<'a, 'r> {
             return Ok(Code::concat(parts).expansion(&self.source.path, self.source.node(id).span));
         }
         let typ = self.typ(right);
+        if matches!(typ, Type::Set(_)) {
+            let sets = self.module("sets");
+            let a = self.render(left, None, constant)?;
+            let b = self.render(right, None, constant)?;
+            return Ok(Code::concat([
+                self.g(
+                    format!("{}({sets}.contains(", if op == "not_in" { "!" } else { "" }),
+                    id,
+                ),
+                b,
+                self.g(", ", id),
+                a,
+                self.g("))", id),
+            ]));
+        }
         if matches!(typ, Type::Map { .. }) {
             let a = self.render(left, None, constant)?;
             let b = self.render(right, None, constant)?;
@@ -1429,59 +1536,6 @@ impl<'a, 'r> Lower<'a, 'r> {
         ])
         .expansion(&self.source.path, self.source.node(id).span))
     }
-    fn access(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
-        let base = self.role(id, "expr")?;
-        let typ = self.typ(base);
-        if matches!(typ, Type::Map { .. } | Type::Enum(_)) {
-            return Ok(None);
-        }
-        let bounds = if self.source.node(id).kind == "Index" {
-            vec![self.source.role(id, "index")]
-        } else {
-            vec![self.source.role(id, "low"), self.source.role(id, "high")]
-        };
-        let needs = bounds.iter().flatten().any(|bound| {
-            self.resolver
-                .constant_int(self.reference(*bound))
-                .map(|n| n < 0)
-                .unwrap_or(true)
-        });
-        if !needs {
-            return Ok(None);
-        }
-        if !typ.is_sequence() {
-            return Err(self.unsupported(id, "generic/indirect sequence access"));
-        }
-        if let Type::Array {
-            length: Some(length),
-            ..
-        } = typ
-        {
-            if bounds.len() == 1 {
-                if let Some(index) = self
-                    .resolver
-                    .constant_int(self.reference(bounds[0].unwrap()))
-                {
-                    let normalized = if index < 0 { length + index } else { index };
-                    if normalized < 0 {
-                        return Ok(Some(self.error_token(bounds[0].unwrap(),&format!("Negative sequence index {index} is out of bounds for length {length}."))));
-                    }
-                    let base = self.render(base, None, constant)?;
-                    return Ok(Some(
-                        Code::concat([
-                            self.g("(", id),
-                            base,
-                            self.g(format!(")[{normalized}]"), id),
-                        ])
-                        .expansion(&self.source.path, self.source.node(id).span),
-                    ));
-                }
-            }
-        }
-        // Full access helpers must preserve base/bound evaluation, addressability
-        // and temporary lifetimes. Do not emit a deceptively simpler duplicate.
-        Err(self.unsupported(id, "single-evaluation runtime sequence bounds"))
-    }
     fn has_context(&self, id: NodeId) -> bool {
         let owner = self
             .source
@@ -1496,6 +1550,35 @@ impl<'a, 'r> Lower<'a, 'r> {
             .and_then(|id| self.source.node(id).data["calling_convention"].as_str())
             .unwrap_or("");
         matches!(convention, "" | "odin")
+    }
+    fn source_location(&self, id: NodeId) -> String {
+        let owner = self
+            .source
+            .ancestors(id)
+            .find(|parent| self.source.node(*parent).kind == "Procedure");
+        let name = owner
+            .and_then(|owner| self.source.node(owner).parent)
+            .and_then(|declaration| self.source.group(declaration, "names").first())
+            .map(|name| self.source.text(*name))
+            .unwrap_or(if owner.is_some() {
+                "<anonymous>"
+            } else {
+                "<global>"
+            });
+        let offset = self.source.node(id).span.start;
+        let (line, _) = self.source.position(offset);
+        let column = self.source.raw[..offset]
+            .rsplit('\n')
+            .next()
+            .unwrap_or("")
+            .chars()
+            .count()
+            + 1;
+        format!(
+            "{{{},{line},{column},{}}}",
+            json!(self.source.path.to_string_lossy()),
+            json!(name)
+        )
     }
     fn or_panic(&mut self, id: NodeId) -> Result<Code> {
         let mut primary = self.role(id, "expr")?;
@@ -1633,9 +1716,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         let key = (owner, name.clone());
         let mut variables = vec![];
         let mut seen = HashSet::new();
-        for (index, node) in self.source.nodes.iter().enumerate() {
-            let child = NodeId(index);
-            if node.kind != "Ident" || !self.source.is_descendant(child, id) {
+        for child in self.source.descendants(id) {
+            let node = self.source.node(child);
+            if node.kind != "Ident" {
                 continue;
             }
             if let Some(parent) = node.parent {
@@ -1712,9 +1795,18 @@ impl<'a, 'r> Lower<'a, 'r> {
             args.push(self.g(pointer, id));
         }
         let returns = if let Some(result) = result {
-            if result.is_empty() {
+            if let Some(count) = result
+                .strip_prefix("tuple:")
+                .and_then(|n| n.parse::<usize>().ok())
+            {
+                let types = (0..count)
+                    .map(|i| format!("{}Result_{i}", self.source.prefix))
+                    .collect::<Vec<_>>();
+                params.extend(types.iter().map(|name| format!("${name}: typeid")));
+                format!(" -> ({})", types.join(", "))
+            } else if result.is_empty() || result == "^" {
                 params.push(format!("${}Result: typeid", self.source.prefix));
-                format!(" -> {}Result", self.source.prefix)
+                format!(" -> {result}{}Result", self.source.prefix)
             } else {
                 format!(" -> {result}")
             }
@@ -1729,11 +1821,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.helpers.insert(key.clone(), self.g("", id));
             self.captures.push(aliases);
             let mut cleanup = None;
-            for index in 0..self.source.nodes.len() {
-                let child = NodeId(index);
-                if self.source.node(child).kind != "Call"
-                    || child != id && !self.source.is_descendant(child, id)
-                {
+            for child in std::iter::once(id).chain(self.source.descendants(id)) {
+                if self.source.node(child).kind != "Call" {
                     continue;
                 }
                 if child != id
@@ -1805,7 +1894,13 @@ impl<'a, 'r> Lower<'a, 'r> {
             } else {
                 ""
             };
-            let convention = if self.has_context(id) {
+            let global_switch = (flavor.starts_with("switch")
+                || flavor.starts_with("compile_switch"))
+                && !self
+                    .source
+                    .ancestors(id)
+                    .any(|parent| self.source.node(parent).kind == "Procedure");
+            let convention = if self.has_context(id) && !global_switch {
                 "odin"
             } else {
                 "contextless"
@@ -2090,6 +2185,12 @@ impl<'a, 'r> Lower<'a, 'r> {
             args.push(query);
         }
         Ok(self.helper_call(id, &name, args))
+    }
+    fn helper_declarations(&self, owner: NodeId) -> Vec<Code> {
+        self.helpers
+            .range((owner, String::new())..(NodeId(owner.0 + 1), String::new()))
+            .map(|(_, code)| code.clone())
+            .collect()
     }
     fn helper_scope(&self, id: NodeId) -> NodeId {
         self.source

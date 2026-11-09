@@ -45,8 +45,8 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         println!(
             "{}",
             json!({"engine":"rust","complete":false,"python_fallback":false,"parallel_lowering":false,
-            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","constant fixed-array negative indices","automatic using feature","initial interpolation and f-string argument lifetimes","single-value or_panic"],
-            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","pure functions","compile-time execution","big numbers","full interpolation ownership","switch expressions","comprehensions","typed loops","complete optional-result arities","wildcard imports","TLS editor-info","debugger remapping","publishing","vet","project creation"]})
+            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","single-value or_panic"],
+            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","pure functions","compile-time execution","big numbers","full interpolation ownership","complete switch/using/callback interactions","comprehensions","full Set temporary ownership","complete optional-result arities","wildcard imports","TLS editor-info","debugger remapping","publishing","vet","project creation"]})
         );
         return Ok(0);
     }
@@ -107,7 +107,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         let sources: Vec<_> = project
             .sources
             .iter()
-            .map(|source| json!({"path":source.path,"frontend":source.info}))
+            .map(|source| json!({"path":source.path,"frontend":source.frontend_info()}))
             .collect();
         println!("{}", json!({"version":1,"sources":sources}));
         return Ok(0);

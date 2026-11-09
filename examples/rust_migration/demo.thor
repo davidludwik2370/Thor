@@ -27,7 +27,23 @@ main :: proc() {
     base, exponent: f64 = 2, -3
     if base ** exponent != probability { panic("numeric power") }
 
+    sum := 0
+    for item, (index: u8) in copied { sum += item + int(index) }
+    description := switch sum {
+        case 73: "typed loop and switch"
+        case: unreachable()
+    }
+    first, second := switch { case true: 1, 2; case: 0, 0 }
+    first, second = switch { case true: second, first; case: break }
+    if first != 2 || second != 1 { panic("multiple results") }
+
+    selected := set[int]{1, 2, 2}
+    defer delete(selected)
+    selected += 3
+    if len(selected) != 3 || 3 not_in selected { panic("set operations") }
+
     println(SEPARATOR)
     println(f"value {value:0{width}d}; chance {probability:.2%}")
     println(original, copied)
+    println(description, first, second)
 }

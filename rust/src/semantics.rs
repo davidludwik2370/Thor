@@ -504,21 +504,38 @@ impl<'a> Resolver<'a> {
                         });
                     }
                     if let Some(value) = sym.value {
-                        let typ = self.type_of(Ref {
+                        let source = &self.sources[sym.reference.file];
+                        let reference = Ref {
                             file: sym.reference.file,
                             node: value,
-                        });
+                        };
+                        let typ = if source.group(sym.reference.node, "values").len() == 1
+                            && source.group(sym.reference.node, "names").len() > 1
+                        {
+                            self.result_type(reference, sym.index, &mut HashSet::new())
+                        } else {
+                            self.type_of(reference)
+                        };
                         return if sym.constant { typ } else { typ.defaulted() };
                     }
                     if s.node(sym.reference.node).kind == "Range" {
-                        if sym.index == 1 {
-                            return Type::scalar("int");
-                        }
                         if let Some(expr) = s.role(sym.reference.node, "expr") {
-                            let t = self.type_of(Ref {
+                            let mut t = self.type_of(Ref {
                                 file: r.file,
                                 node: expr,
                             });
+                            while let Type::Pointer(elem) = t {
+                                t = *elem;
+                            }
+                            if let Type::Map { key, value } = t {
+                                return if sym.index == 0 { *key } else { *value };
+                            }
+                            if sym.index == 1 {
+                                return Type::scalar("int");
+                            }
+                            if matches!(t, Type::String { .. }) {
+                                return Type::scalar("rune");
+                            }
                             if let Some(elem) = t.element() {
                                 return elem.clone();
                             }
@@ -624,6 +641,13 @@ impl<'a> Resolver<'a> {
                         .unwrap_or(Type::Unknown),
                 ),
             },
+            "SetType" => Type::Set(Box::new(
+                s.group(r.node, "args")
+                    .first()
+                    .copied()
+                    .map(|node| self.type_of(Ref { file: r.file, node }))
+                    .unwrap_or(Type::Unknown),
+            )),
             "StructType" => Type::Struct(r),
             "UnionType" => Type::Union(r),
             "EnumType" => Type::Enum(r),
@@ -691,6 +715,9 @@ impl<'a> Resolver<'a> {
             "FieldValue" => child("value")
                 .map(|r| self.type_of(r))
                 .unwrap_or(Type::Unknown),
+            "SwitchExpr" | "CompileSwitchExpr" | "OrPanic" => {
+                self.result_type(r, 0, &mut HashSet::new())
+            }
             "Call" => {
                 let Some(callee) = child("callee") else {
                     return Type::Unknown;
@@ -785,6 +812,78 @@ impl<'a> Resolver<'a> {
                 }
             }
             _ => Type::Unknown,
+        }
+    }
+    fn result_type(&mut self, r: Ref, index: usize, seen: &mut HashSet<Ref>) -> Type {
+        if !seen.insert(r) {
+            return Type::Unknown;
+        }
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
+        match n.kind.as_str() {
+            "Paren" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
+                .map(|r| self.result_type(r, index, seen))
+                .unwrap_or(Type::Unknown),
+            "OrElse" => child("x")
+                .map(|r| self.result_type(r, index, seen))
+                .unwrap_or(Type::Unknown),
+            "SwitchResults" => s
+                .group(r.node, "args")
+                .get(index)
+                .copied()
+                .map(|node| self.type_of(Ref { file: r.file, node }))
+                .unwrap_or(Type::Unknown),
+            "SwitchExpr" | "CompileSwitchExpr" => {
+                let arms = n.data["cases"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|case| {
+                        crate::ast::Span::from_wire(&case["result"])
+                            .and_then(|span| s.at(span, r.node))
+                    })
+                    .collect::<Vec<_>>();
+                for arm in arms {
+                    let typ = self.result_type(
+                        Ref {
+                            file: r.file,
+                            node: arm,
+                        },
+                        index,
+                        &mut seen.clone(),
+                    );
+                    if !typ.is_unknown() {
+                        return typ;
+                    }
+                }
+                Type::Unknown
+            }
+            "Call" => {
+                if let Some(callee) = child("callee") {
+                    if let Some(signature) = self.signature(callee) {
+                        let fields = self.fields(signature, "results");
+                        return fields
+                            .get(index)
+                            .and_then(|(_, typ)| *typ)
+                            .map(|r| self.type_of(r))
+                            .unwrap_or(Type::Unknown);
+                    }
+                }
+                if index == 0 {
+                    self.type_of(r)
+                } else {
+                    Type::Unknown
+                }
+            }
+            "Index" | "TypeAssertion" if index == 1 => Type::scalar("bool"),
+            _ => {
+                if index == 0 {
+                    self.type_of(r)
+                } else {
+                    Type::Unknown
+                }
+            }
         }
     }
     pub fn constant_int(&self, r: Ref) -> Option<i128> {

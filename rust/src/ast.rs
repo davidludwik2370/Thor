@@ -110,6 +110,9 @@ pub struct Source {
     pub shared_native: bool,
     pub collection_roots: BTreeMap<String, PathBuf>,
     line_starts: Vec<usize>,
+    by_span: HashMap<Span, Vec<NodeId>>,
+    traversal: Vec<NodeId>,
+    subtree: Vec<(usize, usize)>,
 }
 impl Source {
     pub fn from_frontend(path: PathBuf, raw: String, mut info: Value, thor: bool) -> Result<Self> {
@@ -122,7 +125,7 @@ impl Source {
         let mut names = Names::default();
         let mut nodes = Vec::with_capacity(rows.len());
         let mut by_span: HashMap<Span, Vec<NodeId>> = HashMap::new();
-        for (i, row) in rows.iter().enumerate() {
+        for (i, row) in rows.iter_mut().enumerate() {
             let start = row["start"]
                 .as_u64()
                 .ok_or_else(|| Error::new("invalid AST start"))? as usize;
@@ -158,7 +161,7 @@ impl Source {
                 name: names.intern(row["name"].as_str().unwrap_or("")),
                 mutable: row["mutable"].as_bool().unwrap_or(false),
                 immutable: false,
-                data: row.clone(),
+                data: std::mem::take(row),
             });
         }
         for i in 1..nodes.len() {
@@ -340,7 +343,9 @@ impl Source {
                 .collect::<BTreeMap<_, _>>());
             nodes[loop_id.0].data["comprehension"] = serde_json::json!(id.0);
         }
-        info["nodes"] = Value::Array(nodes.iter().map(|node| node.data.clone()).collect());
+        // Keep one copy of node metadata during normal compilation. Rebuild the
+        // normalized protocol only when the explicit `ast` command requests it.
+        info["nodes"] = Value::Null;
         let mut edits = vec![];
         for value in info["edits"].as_array().into_iter().flatten() {
             let start = value["start"]
@@ -382,6 +387,24 @@ impl Source {
                 line_starts.push(i + 1);
             }
         }
+        // Euler intervals make descendant queries constant-time even when
+        // equal-span wrappers or a future frontend reorder sibling nodes.
+        let mut traversal = Vec::with_capacity(nodes.len());
+        let mut subtree = vec![(0, 0); nodes.len()];
+        let mut stack = vec![(NodeId(0), false)];
+        while let Some((id, leaving)) = stack.pop() {
+            if leaving {
+                subtree[id.0].1 = traversal.len();
+                continue;
+            }
+            subtree[id.0].0 = traversal.len();
+            traversal.push(id);
+            stack.push((id, true));
+            stack.extend(nodes[id.0].children.iter().rev().map(|id| (*id, false)));
+        }
+        if traversal.len() != nodes.len() {
+            return Err(Error::new("AST contains disconnected roots"));
+        }
         Ok(Self {
             path,
             raw,
@@ -397,10 +420,18 @@ impl Source {
             shared_native: false,
             collection_roots: BTreeMap::new(),
             line_starts,
+            by_span,
+            traversal,
+            subtree,
         })
     }
     pub fn node(&self, id: NodeId) -> &Node {
         &self.nodes[id.0]
+    }
+    pub fn frontend_info(&self) -> Value {
+        let mut info = self.info.clone();
+        info["nodes"] = Value::Array(self.nodes.iter().map(|node| node.data.clone()).collect());
+        info
     }
     pub fn text(&self, id: NodeId) -> &str {
         self.slice(self.node(id).span)
@@ -422,7 +453,13 @@ impl Source {
         std::iter::successors(self.node(id).parent, move |id| self.node(*id).parent)
     }
     pub fn is_descendant(&self, id: NodeId, parent: NodeId) -> bool {
-        is_descendant(&self.nodes, id, parent)
+        let (start, end) = self.subtree[parent.0];
+        let child = self.subtree[id.0].0;
+        start < child && child < end
+    }
+    pub fn descendants(&self, id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
+        let (start, end) = self.subtree[id.0];
+        self.traversal[start + 1..end].iter().copied()
     }
     pub fn position(&self, mut offset: usize) -> (usize, usize) {
         offset = offset.min(self.raw.len());
@@ -442,19 +479,12 @@ impl Source {
         )
     }
     pub fn at(&self, span: Span, relative: NodeId) -> Option<NodeId> {
-        self.nodes
+        let nodes = self.by_span.get(&span)?;
+        nodes
             .iter()
-            .enumerate()
-            .find(|(i, n)| {
-                n.span == span && *i != relative.0 && self.is_descendant(NodeId(*i), relative)
-            })
-            .or_else(|| {
-                self.nodes
-                    .iter()
-                    .enumerate()
-                    .find(|(i, n)| n.span == span && *i != relative.0)
-            })
-            .map(|(i, _)| NodeId(i))
+            .copied()
+            .find(|id| *id != relative && self.is_descendant(*id, relative))
+            .or_else(|| nodes.iter().copied().find(|id| *id != relative))
     }
 }
 fn is_descendant(nodes: &[Node], id: NodeId, ancestor: NodeId) -> bool {
@@ -508,6 +538,32 @@ mod tests {
         let child = source.role(NodeId(2), "expr");
         assert_eq!(child, Some(NodeId(3)));
         assert_eq!(source.nodes[3].parent, Some(NodeId(2)));
+    }
+    #[test]
+    fn descendant_intervals_handle_noncontiguous_ids_and_equal_spans() {
+        let source = parsed(
+            "abcd",
+            json!([
+                {"kind":"File","start":0,"end":4,"parent":-1},
+                {"kind":"Block","start":0,"end":2,"parent":0},
+                {"kind":"Block","start":2,"end":4,"parent":0},
+                {"kind":"Ident","start":0,"end":2,"parent":1,"name":"ab"},
+                {"kind":"Ident","start":2,"end":4,"parent":2,"name":"cd"}
+            ]),
+        )
+        .expect("valid ordered parents");
+        for parent in 0..source.nodes.len() {
+            for child in 0..source.nodes.len() {
+                let expected = is_descendant(&source.nodes, NodeId(child), NodeId(parent));
+                let indexed = source.is_descendant(NodeId(child), NodeId(parent));
+                assert_eq!(indexed, expected);
+            }
+        }
+        let children = source.descendants(NodeId(1)).collect::<Vec<_>>();
+        let resolved = source.at(Span::new(0, 2), NodeId(1));
+        let expected_children = vec![NodeId(3)];
+        assert_eq!(children, expected_children);
+        assert_eq!(resolved, Some(NodeId(3)));
     }
     #[test]
     fn malformed_spans_and_parent_cycles_are_rejected() {
