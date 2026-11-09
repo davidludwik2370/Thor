@@ -157,6 +157,64 @@ impl Resolver<'_> {
     pub fn specialized_type(&mut self, r: Ref, bindings: &Substitutions) -> Type {
         self.specialize(r, bindings, &mut HashSet::new())
     }
+    pub fn bound_type<'b>(&self, r: Ref, bindings: &'b Substitutions) -> Option<&'b Type> {
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        let name = if n.kind == "PolyType" {
+            s.names.get(n.name)
+        } else {
+            s.text(r.node).trim_start_matches('$')
+        };
+        if let Some(owner) = s
+            .ancestors(r.node)
+            .find(|node| s.node(*node).kind == "EnumType")
+        {
+            if let Some(typ) = bindings.get(&Self::enum_binding_key(
+                Ref {
+                    file: r.file,
+                    node: owner,
+                },
+                name,
+            )) {
+                return Some(typ);
+            }
+        }
+        let typ = bindings.get(name)?;
+        let Some(index) = self.symbol(r) else {
+            return (n.kind == "PolyType").then_some(typ);
+        };
+        let symbol = &self.symbols[index];
+        let owner = &self.sources[symbol.reference.file];
+        (owner.node(symbol.name_node).kind == "PolyType"
+            || symbol.parameter && owner.node(symbol.scope).kind == "StructType")
+            .then_some(typ)
+    }
+    pub(super) fn enum_binding_key(owner: Ref, name: &str) -> String {
+        format!("#enum:{}:{}:{name}", owner.file, owner.node.0)
+    }
+    pub fn compiled_type_parameter(&self, annotation: Ref, name: &str) -> bool {
+        let s = &self.sources[annotation.file];
+        s.node(annotation.node).kind == "TypeidType"
+            && s.node(annotation.node).parent.is_some_and(|field| {
+                let record = s
+                    .node(field)
+                    .parent
+                    .and_then(|fields| s.node(fields).parent)
+                    .is_some_and(|owner| {
+                        s.node(owner).kind == "StructType"
+                            && s.role(owner, "params") == s.node(field).parent
+                    });
+                s.group(field, "names").iter().any(|id| {
+                    let poly = s.node(*id).kind == "PolyType";
+                    (poly || record)
+                        && (if poly {
+                            s.names.get(s.node(*id).name)
+                        } else {
+                            s.text(*id)
+                        }) == name.trim_start_matches('$')
+                })
+            })
+    }
     fn specialize(&mut self, r: Ref, bindings: &Substitutions, seen: &mut HashSet<Ref>) -> Type {
         if !seen.insert(r) {
             return Type::Unknown;
@@ -164,13 +222,8 @@ impl Resolver<'_> {
         let s = &self.sources[r.file];
         let n = s.node(r.node);
         let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
-        let text = if n.kind == "PolyType" {
-            s.names.get(n.name)
-        } else {
-            s.text(r.node).trim_start_matches('$')
-        };
         if matches!(n.kind.as_str(), "Ident" | "PolyType") {
-            if let Some(typ) = bindings.get(text) {
+            if let Some(typ) = self.bound_type(r, bindings) {
                 return typ.clone();
             }
             if let Some(symbol) = self.symbol(r) {
@@ -179,6 +232,15 @@ impl Resolver<'_> {
                     .node(symbol.reference.node)
                     .kind
                     == "PolyType"
+                    || symbol.annotation.is_some_and(|annotation| {
+                        self.compiled_type_parameter(
+                            Ref {
+                                file: symbol.reference.file,
+                                node: annotation,
+                            },
+                            &symbol.name,
+                        )
+                    })
                 {
                     return Type::Generic;
                 }

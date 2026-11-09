@@ -154,11 +154,14 @@ impl<'a, 'r> Purity<'a, 'r> {
                 }
             }
         }
-        for (_, annotation) in self.r.fields(sig, "params") {
+        for (name, annotation) in self.r.fields(sig, "params") {
             if let Some(annotation) = annotation {
+                if self.r.compiled_type_parameter(annotation, &name) {
+                    continue;
+                }
                 let typ = self.r.specialized_type(annotation, &bindings);
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
-                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, any, maps, sets and procedure values are not pure inputs/results.");
+                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, typeid, any, maps, sets and procedure values are not pure inputs/results.");
                 }
                 if proc != root && self.unresolved_schema(&typ, &mut HashSet::new()) {
                     self.gap(root, annotation);
@@ -169,7 +172,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             if let Some(annotation) = annotation {
                 let typ = self.r.specialized_type(annotation, &bindings);
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
-                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, any, maps, sets, raw unions and procedure values are not pure inputs/results.");
+                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, typeid, any, maps, sets, raw unions and procedure values are not pure inputs/results.");
                 }
                 if proc != root && self.unresolved_schema(&typ, &mut HashSet::new()) {
                     self.gap(root, annotation);

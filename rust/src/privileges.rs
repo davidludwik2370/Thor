@@ -2312,12 +2312,13 @@ impl<'a, 'r> Privileges<'a, 'r> {
         } else {
             self.r.candidates(callee)
         };
-        if !indirect {
-            let plans = self.r.call_plans(r, &self.contexts[c].bindings.clone());
-            if !plans.is_empty() {
-                candidates
-                    .retain(|candidate| plans.iter().any(|plan| plan.procedure == *candidate));
-            }
+        let plans = if indirect {
+            vec![]
+        } else {
+            self.r.call_plans(r, &self.contexts[c].bindings.clone())
+        };
+        if !indirect && !plans.is_empty() {
+            candidates.retain(|candidate| plans.iter().any(|plan| plan.procedure == *candidate));
         }
         if candidates.is_empty() {
             // Conversions keep slice provenance. Opaque calls must promise
@@ -2426,13 +2427,36 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 &sites,
                 &self.contexts[c].bindings,
             ));
-            if params.iter().zip(&bound).any(|((_, field), v)| {
-                self.role(*field, "type").is_some_and(|annotation| {
-                    !self
-                        .r
-                        .shape_matches(annotation, &self.values[*v].typ.clone(), &substitutions)
+            if let Some(plan) = plans.iter().find(|plan| plan.procedure == candidate) {
+                // Value flow can know a constructed SOA row more precisely
+                // than syntax alone. Keep that information when a shared call
+                // plan has no concrete binding; resolved type/value arguments
+                // still come from the common planner.
+                for (name, typ) in &plan.bindings {
+                    if typ.resolved() || !substitutions.get(name).is_some_and(Type::resolved) {
+                        substitutions.insert(name.clone(), typ.clone());
+                    }
+                }
+            }
+            if params
+                .iter()
+                .zip(&bound)
+                .zip(&sites)
+                .any(|(((_, field), v), site)| {
+                    self.role(*field, "type").is_some_and(|annotation| {
+                        if self.kind(annotation) == "TypeidType" {
+                            return false;
+                        }
+                        let actual_site = self.role(*site, "value").unwrap_or(*site);
+                        let actual = if self.denotes_type(actual_site) {
+                            Type::scalar("typeid")
+                        } else {
+                            self.values[*v].typ.clone()
+                        };
+                        !self.r.shape_matches(annotation, &actual, &substitutions)
+                    })
                 })
-            }) {
+            {
                 continue;
             }
             for (index, (name, field)) in params.iter().enumerate() {

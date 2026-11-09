@@ -58,8 +58,8 @@ impl Resolver<'_> {
                     };
                 }
                 if (op == "==" || op == "!=")
-                    && (self.denotes_type(left) || bindings.contains_key(s.text(left.node)))
-                    && (self.denotes_type(right) || bindings.contains_key(s.text(right.node)))
+                    && (self.denotes_type(left) || self.bound_type(left, bindings).is_some())
+                    && (self.denotes_type(right) || self.bound_type(right, bindings).is_some())
                 {
                     let a = self.specialized_type(left, bindings);
                     let b = self.specialized_type(right, bindings);

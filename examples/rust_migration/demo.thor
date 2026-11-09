@@ -18,6 +18,7 @@ snapshot :: fn(input: []int) -> Snapshot {
 }
 
 independent :: fn(value: $T) -> T { return value }
+explicit :: fn($T: typeid, value: T) -> T { return value }
 square :: fn(value: $T) -> T { return value * value }
 square_root :: fn(value: f64) -> f64 { return intrinsics.sqrt(value) }
 seconds :: fn(value: time.Duration) -> f64 { return time.duration_seconds(value) }
@@ -48,6 +49,7 @@ main :: proc() {
     if saved.values[0] != 10 || saved.label != "stored 3 values" { panic("pure ownership") }
     number: f64 = 9
     if square_root(number) != 3 || square(number) != 81 { panic("pure intrinsics") }
+    if explicit(f64, number) != number { panic("explicit type parameter") }
     duration := time.Second
     seed := 3
     if seconds(duration) != 1 || reversed_end(seed) != 4 { panic("checked SDK calls") }

@@ -70,10 +70,24 @@ impl Resolver<'_> {
             let fields = self.fields(signature, "params");
             let types = arguments
                 .iter()
-                .map(|group| {
+                .zip(&fields)
+                .map(|(group, (_, annotation))| {
                     group
                         .first()
-                        .map(|arg| self.specialized_type(*arg, context))
+                        .map(|arg| {
+                            if !annotation.is_some_and(|annotation| {
+                                self.sources[annotation.file].node(annotation.node).kind
+                                    == "TypeidType"
+                            }) && self.denotes_type(*arg)
+                            {
+                                Type::Scalar {
+                                    name: "typeid".into(),
+                                    untyped: false,
+                                }
+                            } else {
+                                self.specialized_type(*arg, context)
+                            }
+                        })
                         .unwrap_or(Type::Unknown)
                 })
                 .collect::<Vec<_>>();
@@ -103,7 +117,20 @@ impl Resolver<'_> {
                             *annotation
                         };
                     for arg in group.iter().filter(|arg| supplied.contains(arg)) {
-                        let typ = self.specialized_type(*arg, context);
+                        let type_operand = self.denotes_type(*arg);
+                        if self.sources[annotation.file].node(annotation.node).kind == "TypeidType"
+                        {
+                            score += if type_operand { 5 } else { 0 };
+                            continue;
+                        }
+                        let typ = if type_operand {
+                            Type::Scalar {
+                                name: "typeid".into(),
+                                untyped: false,
+                            }
+                        } else {
+                            self.specialized_type(*arg, context)
+                        };
                         if let Some(amount) = self.shape_score(annotation, &typ, &bindings) {
                             score += amount;
                         } else {

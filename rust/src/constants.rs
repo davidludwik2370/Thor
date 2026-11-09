@@ -5,6 +5,7 @@ impl Type {
         match self {
             Self::Unknown | Self::Generic => false,
             Self::Record(_, args) => args.iter().all(|(_, typ)| typ.resolved()),
+            Self::Anonymous(fields) => fields.iter().all(|(_, typ)| typ.resolved()),
             Self::Array { elem, length } | Self::Fixed { elem, length } => {
                 length.is_some() && elem.resolved()
             }
@@ -48,12 +49,7 @@ impl Resolver<'_> {
         let n = s.node(r.node);
         let role = |name| s.role(r.node, name).map(|node| Ref { file: r.file, node });
         if matches!(n.kind.as_str(), "Ident" | "PolyType" | "Selector") {
-            let name = if n.kind == "PolyType" {
-                s.names.get(n.name)
-            } else {
-                s.text(r.node)
-            };
-            if let Some(Type::Constant(value)) = bindings.get(name.trim_start_matches('$')) {
+            if let Some(Type::Constant(value)) = self.bound_type(r, bindings) {
                 return Some(value.clone());
             }
             if let Some(index) = self.symbol(r) {
@@ -302,7 +298,10 @@ impl Resolver<'_> {
                 return value;
             }
             if let Some(value) = value {
-                bindings.insert(name.into(), Type::Constant(Constant::Integer(value)));
+                bindings.insert(
+                    Self::enum_binding_key(owner, name),
+                    Type::Constant(Constant::Integer(value)),
+                );
             }
             next = value.and_then(|value| value.checked_add(1));
         }

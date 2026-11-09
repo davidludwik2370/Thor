@@ -237,18 +237,24 @@ impl<'a> Resolver<'a> {
                                 "ProcedureType" | "StructType"
                             )
                         });
-                        let Some(signature) =
-                            signature.filter(|id| source.node(*id).kind == "ProcedureType")
-                        else {
+                        let Some(signature) = signature else {
                             continue;
                         };
-                        owner = source
-                            .node(signature)
-                            .parent
-                            .filter(|id| source.node(*id).kind == "Procedure")
-                            .unwrap_or(signature);
-                        parameter = source.node(id).parent == source.role(signature, "params");
-                        result = !parameter;
+                        if source.node(signature).kind == "StructType" {
+                            if source.node(id).parent != source.role(signature, "params") {
+                                continue;
+                            }
+                            owner = signature;
+                            parameter = true;
+                        } else {
+                            owner = source
+                                .node(signature)
+                                .parent
+                                .filter(|id| source.node(*id).kind == "Procedure")
+                                .unwrap_or(signature);
+                            parameter = source.node(id).parent == source.role(signature, "params");
+                            result = !parameter;
+                        }
                         source.group(id, "names").to_vec()
                     }
                     "Range" | "TypeSwitch" => {
@@ -256,10 +262,10 @@ impl<'a> Resolver<'a> {
                         source.group(id, "names").to_vec()
                     }
                     "PolyType" => {
-                        if let Some(prototype) = source
-                            .ancestors(id)
-                            .find(|id| source.node(*id).kind == "ProcedureType")
-                        {
+                        if let Some(prototype) = source.ancestors(id).find(|id| {
+                            ["ProcedureType", "StructType"]
+                                .contains(&source.node(*id).kind.as_str())
+                        }) {
                             owner = source
                                 .node(prototype)
                                 .parent
@@ -983,6 +989,15 @@ impl<'a> Resolver<'a> {
                 if let Some(id) = self.symbol(r) {
                     let sym = self.symbols[id].clone();
                     if let Some(annotation) = sym.annotation {
+                        if self.compiled_type_parameter(
+                            Ref {
+                                file: sym.reference.file,
+                                node: annotation,
+                            },
+                            &sym.name,
+                        ) {
+                            return Type::Generic;
+                        }
                         return self.type_of(Ref {
                             file: sym.reference.file,
                             node: annotation,
@@ -1151,6 +1166,10 @@ impl<'a> Resolver<'a> {
             "UnionType" => Type::Union(r),
             "EnumType" => Type::Enum(r),
             "PolyType" => Type::Generic,
+            "TypeidType" => Type::Scalar {
+                name: "typeid".into(),
+                untyped: false,
+            },
             "ProcedureType" => Type::Procedure(r),
             "Procedure" => child("type").map(Type::Procedure).unwrap_or(Type::Unknown),
             "Compound" => {

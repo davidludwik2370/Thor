@@ -505,3 +505,33 @@ matching output and empty allocation reports in checked debug and unchecked
 release configurations. The focused SDK suite also verifies that test mode runs
 exactly the project's own test, and that stale layouts never modify installed
 SDK files.
+
+## Explicit type parameters and scoped substitutions
+
+Runtime lowering now supports inspectable functions and helpers with explicit
+Odin type parameters, such as `identity :: fn($T: typeid, value: T) -> T`.
+Type arguments remain distinct from integer/value arguments during overload
+selection. Public generic results retain the existing independent ownership
+contract; the source procedure signatures receive no hidden permission arguments.
+Runtime `typeid` data is still ineligible as a pure input.
+
+Substitutions now follow the resolved parameter symbol rather than a matching
+name alone. Previously, an ordinary helper's local constant, or a global in an
+unrelated callee, could be mistaken for an outer compile-time parameter. That
+could make Rust skip an active impure `when` arm. The Python default already
+rejected those programs. Procedure and record parameter scopes are now indexed,
+and temporary enum-alias values use a separate scoped namespace.
+
+Borrowing uses the common call planner's concrete type/value bindings while
+retaining more precise value-flow information, including constructed SOA rows.
+Coverage includes scalar and owned results, multiple type/result slots, named
+value arguments, fixed-array contexts, local mutation and borrowed-input
+rejection, overloads, enum aliases and nested record parameters. Generic native
+branches and conditional ownership proofs remain incomplete; this checkpoint
+does not finish the migration.
+
+The clean gate passed all 400 native/differential, memory, comparison and
+assertion-hygiene checks, including 14 new type-parameter regressions. Eight
+Rust unit tests passed in both profiles, and Clippy passed with warnings denied.
+The expanded example matched Python in checked debug and unchecked release
+builds, with empty allocation reports.
