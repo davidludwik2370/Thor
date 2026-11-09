@@ -153,8 +153,8 @@ class Project:
                     dependency = path.parent / imported
                 dependency = dependency.resolve()
                 if not dependency.is_dir():
-                    node = next(n for n in source.nodes if n.kind == "Import" and imported == unquote(n.data["op"]))
-                    source.error(f"imported package does not exist: {dependency}", node.start, node.end)
+                    node = next((n for n in source.nodes if n.kind == "Import" and imported == unquote(n.data["op"])),None)
+                    source.error(f"imported package does not exist: {dependency}", node.start if node else 0, node.end if node else 0)
                 self.discover(dependency)
 
     def emit(self, destination, *, persist_maps=None, materialize=True):

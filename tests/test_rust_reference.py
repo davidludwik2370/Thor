@@ -101,8 +101,7 @@ def _install():
     # Every other slice fixture must pass against both engines.
     pending = {'test_compile_time_execution_does_not_bypass_readonly_locals',
                'test_compile_time_readers_accept_readonly_locals',
-               'test_previously_evaluated_dimensions_select_readonly_generic_paths',
-               'test_pure_result_cloning_restores_independent_writable_access'}
+               'test_previously_evaluated_dimensions_select_readonly_generic_paths'}
     for suite in (slices.SliceAccessTests,copies.SliceCopyHardeningTests):
         for name in unittest.defaultTestLoader.getTestCaseNames(suite):
             if name not in pending:

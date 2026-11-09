@@ -164,7 +164,7 @@ impl Resolver<'_> {
                 if let Some(len) = child("len") {
                     Type::Array {
                         elem,
-                        length: self.constant_int(len),
+                        length: self.context_integer(len, bindings),
                     }
                 } else if n.op == "soa" {
                     Type::Soa(elem)
@@ -177,7 +177,7 @@ impl Resolver<'_> {
                 if let Some(capacity) = child("capacity") {
                     Type::Fixed {
                         elem,
-                        length: self.constant_int(capacity),
+                        length: self.context_integer(capacity, bindings),
                     }
                 } else {
                     Type::Dynamic(elem)
@@ -233,14 +233,7 @@ impl Resolver<'_> {
                     _ => None,
                 };
                 if let Some(owner) = owner {
-                    let unit = &self.sources[owner.file];
-                    let params = unit
-                        .role(owner.node, "params")
-                        .into_iter()
-                        .flat_map(|params| unit.node(params).children.iter())
-                        .flat_map(|field| unit.group(*field, "names"))
-                        .map(|name| unit.text(*name).trim_start_matches('$').to_string())
-                        .collect::<Vec<_>>();
+                    let params = self.fields(owner, "params");
                     if !params.is_empty() {
                         let args = s.group(r.node, "args");
                         return Type::Record(
@@ -248,18 +241,34 @@ impl Resolver<'_> {
                             params
                                 .into_iter()
                                 .enumerate()
-                                .map(|(i, name)| {
-                                    let typ = args
-                                        .get(i)
+                                .map(|(i, (name, annotation))| {
+                                    let argument = args
+                                        .iter()
+                                        .copied()
+                                        .find(|arg| {
+                                            s.node(*arg).kind == "FieldValue"
+                                                && s.role(*arg, "field")
+                                                    .is_some_and(|field| s.text(field) == name)
+                                        })
+                                        .or_else(|| args.get(i).copied());
+                                    let typ = argument
                                         .map(|node| {
-                                            self.specialize(
-                                                Ref {
-                                                    file: r.file,
-                                                    node: *node,
-                                                },
-                                                bindings,
-                                                &mut seen.clone(),
-                                            )
+                                            let node = s.role(node, "value").unwrap_or(node);
+                                            let r = Ref { file: r.file, node };
+                                            let type_param = annotation.is_some_and(|a| {
+                                                self.sources[a.file].node(a.node).kind
+                                                    == "TypeidType"
+                                            });
+                                            if type_param {
+                                                self.specialize(r, bindings, &mut seen.clone())
+                                            } else {
+                                                let expected = annotation.map(|a| {
+                                                    self.specialize(a, bindings, &mut seen.clone())
+                                                });
+                                                self.constant_value(r, bindings, expected.as_ref())
+                                                    .map(Type::Constant)
+                                                    .unwrap_or(Type::Unknown)
+                                            }
                                         })
                                         .unwrap_or(Type::Unknown);
                                     (name, typ)
@@ -398,6 +407,28 @@ impl Resolver<'_> {
                 }
             }
             "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis" => {
+                if let Type::Array {
+                    length: Some(length),
+                    ..
+                }
+                | Type::Fixed {
+                    length: Some(length),
+                    ..
+                } = actual
+                {
+                    if let Some(count) = child(if n.kind == "ArrayType" {
+                        "len"
+                    } else {
+                        "capacity"
+                    }) {
+                        if s.node(count.node).kind == "PolyType" {
+                            bindings.insert(
+                                s.names.get(s.node(count.node).name).into(),
+                                Type::Constant(Constant::Integer(*length)),
+                            );
+                        }
+                    }
+                }
                 if let (Some(elem), Some(actual)) = (
                     child(if n.kind == "Ellipsis" { "expr" } else { "elem" }),
                     actual.element(),

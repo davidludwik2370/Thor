@@ -11,6 +11,7 @@ pub mod lower;
 pub mod memory;
 pub mod privileges;
 pub mod project;
+pub mod purity;
 pub mod semantics;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -73,10 +73,14 @@ pub struct Facts {
     pub mutating: BTreeSet<Ref>,
     pub readonly: BTreeSet<Ref>,
     pub invalid: HashMap<Ref, String>,
+    pub pure_faults: BTreeMap<Ref, Vec<Issue>>,
+    pub unresolved: BTreeMap<Ref, Ref>,
 }
 #[derive(Clone, PartialEq, Eq)]
 struct Effect {
     operation: Ref,
+    unresolved: Option<Ref>,
+    deleting: bool,
     reason: String,
     related: Vec<Ref>,
 }
@@ -100,6 +104,7 @@ struct GraphValue {
 }
 struct Context {
     proc: Option<Ref>,
+    checked: bool,
     bindings: Substitutions,
     env: HashMap<usize, V>,
     effects: BTreeMap<Origin, Effect>,
@@ -115,6 +120,7 @@ impl Context {
     fn new(proc: Option<Ref>, bindings: Substitutions) -> Self {
         Self {
             proc,
+            checked: false,
             bindings,
             env: HashMap::new(),
             effects: BTreeMap::new(),
@@ -132,7 +138,7 @@ pub struct Privileges<'a, 'r> {
     r: &'r mut Resolver<'a>,
     values: Vec<Value>,
     contexts: Vec<Context>,
-    summaries: HashMap<(Ref, Vec<(String, Type)>), C>,
+    summaries: HashMap<SummaryKey, C>,
     globals: HashMap<usize, V>,
     global_active: HashSet<usize>,
     explicit: HashSet<Ref>,
@@ -140,11 +146,22 @@ pub struct Privileges<'a, 'r> {
     changed: bool,
     depth: usize,
     flags: Vec<String>,
+    pure_depth: usize,
+    uncertain: Option<Ref>,
+    deleting: bool,
+}
+#[derive(PartialEq, Eq, Hash)]
+struct SummaryKey {
+    procedure: Ref,
+    bindings: Vec<(String, Type)>,
+    checked: bool,
 }
 impl<'a, 'r> Privileges<'a, 'r> {
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
         let enabled = r.sources.iter().any(|s| {
-            s.nodes.iter().any(|n| n.immutable)
+            s.nodes
+                .iter()
+                .any(|n| n.immutable || n.data["pure"] == true)
                 || s.info["mut_parameters"]
                     .as_array()
                     .is_some_and(|x| !x.is_empty())
@@ -164,6 +181,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             changed: false,
             depth: 0,
             flags: flags.to_vec(),
+            pure_depth: 0,
+            uncertain: None,
+            deleting: false,
         };
         this.annotations();
         let procedures = this
@@ -207,7 +227,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .any(|id| this.s(sig).node(id).kind == "PolyType")
             });
             if !generic {
+                this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
                 this.summary(proc, Substitutions::new());
+                this.pure_depth = 0;
             }
         }
         // Recursive summaries form a finite monotone effect graph. Revisit the
@@ -223,7 +245,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             for c in contexts {
                 let proc = this.contexts[c].proc.unwrap();
                 if let Some(body) = this.role(proc, "body") {
+                    this.pure_depth = usize::from(this.contexts[c].checked);
                     this.statement(body, c);
+                    this.pure_depth = 0;
                 }
             }
             let after = (0..this.contexts.len())
@@ -231,6 +255,38 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .collect::<Vec<_>>();
             if before == after {
                 break;
+            }
+        }
+        for c in 0..this.contexts.len() {
+            let Some(proc) = this.contexts[c].proc else {
+                continue;
+            };
+            if this.s(proc).node(proc.node).data["pure"] != true {
+                continue;
+            }
+            let sig = this.role(proc, "type").unwrap_or(proc);
+            let params = this.params(sig);
+            for (origin, effect) in this.contexts[c].effects.clone() {
+                if origin.seed.is_some()
+                    || effect.reason.starts_with("take a writable address")
+                    || effect.reason.starts_with("obtain a writable pointer")
+                {
+                    continue;
+                }
+                if let Some(conditional) = effect.unresolved {
+                    this.facts.unresolved.insert(effect.operation, conditional);
+                    continue;
+                }
+                if let Some((name, _)) = params.get(origin.path.index) {
+                    this.facts.pure_faults.entry(proc).or_default().push(Issue {
+                        operation: effect.operation,
+                        seed: *name,
+                        message:
+                            "Pure code cannot mutate or delete storage borrowed from an input."
+                                .into(),
+                        related: effect.related,
+                    });
+                }
             }
         }
         this.facts
@@ -350,7 +406,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.values[id].path = path.clone();
         if let Some(path) = path {
             self.values[id].locations.insert(path.clone());
-            if reference_data(&self.values[id].typ) {
+            if reference_data(&self.values[id].typ)
+                || self.pure_depth > 0
+                    && matches!(base_type(&self.values[id].typ), Type::String { .. })
+            {
                 self.values[id].data.insert(Origin {
                     path,
                     aspect: Aspect::Data,
@@ -584,7 +643,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let old = self.values[v].clone();
         let id = self.value(old.typ.clone());
         seen.insert(v, id);
-        if reference_data(&old.typ) {
+        if reference_data(&old.typ)
+            || self.pure_depth > 0 && matches!(base_type(&old.typ), Type::String { .. })
+        {
             self.values[id].data = old.data;
         }
         if references_type(&old.typ) {
@@ -748,9 +809,22 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn require(&mut self, origins: Origins, operation: Ref, c: C, reason: &str, related: Vec<Ref>) {
+        let unresolved = self.uncertain.or_else(|| {
+            self.contexts[c]
+                .controls
+                .iter()
+                .rev()
+                .copied()
+                .find(|control| self.kind(*control) == "When")
+                .and_then(|control| self.role(control, "cond"))
+        });
         for origin in origins {
             if let Some(seed) = origin.seed {
                 if origin.aspect == Aspect::Inline {
+                    continue;
+                }
+                if let Some(conditional) = unresolved {
+                    self.facts.unresolved.insert(operation, conditional);
                     continue;
                 }
                 let name = self.text(seed);
@@ -761,15 +835,23 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     message,
                     related: related.clone(),
                 });
-            } else if let std::collections::btree_map::Entry::Vacant(entry) =
-                self.contexts[c].effects.entry(origin)
-            {
-                entry.insert(Effect {
+            } else {
+                let incoming = Effect {
                     operation,
+                    unresolved,
+                    deleting: self.deleting,
                     reason: reason.into(),
                     related: related.clone(),
-                });
-                self.changed = true;
+                };
+                let effects = &mut self.contexts[c].effects;
+                if !effects.contains_key(&origin)
+                    || effects
+                        .get(&origin)
+                        .is_some_and(|old| old.deleting && !incoming.deleting)
+                {
+                    effects.insert(origin, incoming);
+                    self.changed = true;
+                }
             }
         }
     }
@@ -905,19 +987,21 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn summary(&mut self, proc: Ref, bindings: Substitutions) -> C {
-        let key = (
-            proc,
-            bindings
+        let key = SummaryKey {
+            procedure: proc,
+            bindings: bindings
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
-        );
+            checked: self.pure_depth > 0,
+        };
         if let Some(c) = self.summaries.get(&key) {
             return *c;
         }
         let c = self.contexts.len();
         self.contexts
             .push(Context::new(Some(proc), bindings.clone()));
+        self.contexts[c].checked = self.pure_depth > 0;
         self.summaries.insert(key, c);
         let sig = self.role(proc, "type").unwrap_or(proc);
         for (index, (name, field)) in self.params(sig).into_iter().enumerate() {
@@ -1824,6 +1908,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.builtin_name(callee, &mut HashSet::new())
                     .is_some_and(|name| matches!(name.as_str(), "make" | "new"))
                     || self.library(callee) == Some(("core:slice".into(), "clone".into()))
+                        && self.verified_library(callee, "core:slice")
             });
         fresh.then_some((lhs[0], rhs[0]))
     }
@@ -1896,10 +1981,26 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 );
             }
         }
+        if builtin && name == "delete" && self.pure_depth > 0 {
+            if let Some(value) = values.first() {
+                let origins = self
+                    .refs(*value)
+                    .into_iter()
+                    .filter(|origin| origin.seed.is_none())
+                    .collect();
+                let previous = self.deleting;
+                self.deleting = true;
+                self.require(origins, r, c, "delete borrowed storage", vec![]);
+                self.deleting = previous;
+            }
+        }
         if builtin && READERS.contains(&name.as_str())
             || library.as_ref().is_some_and(|(path, name)| {
-                path == "core:fmt" && FMT_READERS.contains(&name.as_str())
+                path == "core:fmt"
+                    && self.verified_library(callee, path)
+                    && FMT_READERS.contains(&name.as_str())
                     || path == "thor:basic"
+                        && self.verified_library(callee, path)
                         && ["print", "hash", "try_hash", "_string", "deepclone"]
                             .contains(&name.as_str())
             })
@@ -1908,6 +2009,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         if let Some((path, name)) = &library {
             if path == "core:fmt"
+                && self.verified_library(callee, path)
                 && ["bprint", "bprintln", "bprintf", "bprintfln"].contains(&name.as_str())
             {
                 let buffer = args
@@ -1943,6 +2045,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 });
             }
             if path == "core:slice"
+                && self.verified_library(callee, path)
                 && matches!(name.as_str(), "clone" | "clone_to_dynamic")
                 && !values.is_empty()
             {
@@ -2049,15 +2152,27 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     return self.record(r, c, results, false);
                 }
                 "copy" if values.len() > 1 => {
+                    let position = |name: &str, fallback| {
+                        args.iter()
+                            .position(|arg| {
+                                self.kind(*arg) == "FieldValue"
+                                    && self
+                                        .role(*arg, "field")
+                                        .is_some_and(|r| self.text(r) == name)
+                            })
+                            .unwrap_or(fallback)
+                    };
+                    let dst = values[position("dst", 0)];
+                    let src = values[position("src", 1)];
                     self.require(
-                        self.values[values[0]].data.clone(),
+                        self.values[dst].data.clone(),
                         r,
                         c,
                         "modify destination slice elements",
                         vec![],
                     );
-                    let dst = self.item(values[0]);
-                    let src = self.item(values[1]);
+                    let dst = self.item(dst);
+                    let src = self.item(src);
                     let src = self.copied(src);
                     self.write(dst, src, c, r, false);
                     return self.value(typ);
@@ -2163,7 +2278,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 return id;
             }
-            for (arg, v) in args.into_iter().zip(values) {
+            for (arg, v) in self.expanded_arguments(r, c, &args, &values) {
                 let refs = self.refs(v);
                 self.require(
                     refs,
@@ -2229,6 +2344,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .map(|v| self.values[*v].typ.clone())
                 .collect::<Vec<_>>();
             substitutions.extend(self.r.parameter_bindings(sig, &types));
+            substitutions.extend(self.r.constant_parameter_bindings(
+                sig,
+                &sites,
+                &self.contexts[c].bindings,
+            ));
             if params.iter().zip(&bound).any(|((_, field), v)| {
                 self.role(*field, "type").is_some_and(|annotation| {
                     !self
@@ -2319,7 +2439,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .s(candidate)
                 .descendants(candidate.node)
                 .any(|id| self.s(candidate).node(id).immutable);
-            if !has_references && !result_references && !local_checks {
+            if !has_references
+                && !result_references
+                && !local_checks
+                && self.pure_depth == 0
+                && self.s(candidate).node(candidate.node).data["pure"] != true
+            {
                 for (index, (_, annotation)) in result_fields.into_iter().enumerate() {
                     let typ = annotation
                         .map(|r| self.r.specialized_type(r, &substitutions))
@@ -2333,13 +2458,25 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 continue;
             }
+            let old_depth = self.pure_depth;
+            if self.s(candidate).node(candidate.node).data["pure"] == true {
+                self.pure_depth += 1;
+            }
             let summary = self.summary(candidate, substitutions);
+            self.pure_depth = old_depth;
             let effects = self.contexts[summary].effects.clone();
             for (origin, effect) in effects {
-                let origins = self.resolve(&origin, &bound);
+                let mut origins = self.resolve(&origin, &bound);
+                if effect.deleting {
+                    origins.retain(|origin| origin.seed.is_none());
+                }
                 let site = sites.get(origin.path.index).copied().unwrap_or(r);
                 let mut related = vec![effect.operation];
                 related.extend(effect.related);
+                let previous_uncertainty = self.uncertain;
+                self.uncertain = effect.unresolved.or(previous_uncertainty);
+                let previous_deleting = self.deleting;
+                self.deleting = effect.deleting;
                 self.require(
                     origins,
                     site,
@@ -2351,6 +2488,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     ),
                     related,
                 );
+                self.uncertain = previous_uncertainty;
+                self.deleting = previous_deleting;
             }
             let stores = self.contexts[summary].stores.clone();
 
@@ -2366,7 +2505,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
 
             let mut instances = HashMap::new();
             for (index, output) in outputs.into_iter().enumerate() {
-                let output = self.instantiate(output, &bound, &mut instances, 0);
+                let output = if self.s(candidate).node(candidate.node).data["pure"] == true {
+                    self.value(self.values[output].typ.clone())
+                } else {
+                    self.instantiate(output, &bound, &mut instances, 0)
+                };
                 if let Some(old) = results.get(index).copied() {
                     self.merge(old, output);
                 } else {
@@ -2578,6 +2721,33 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     | "any"
             )
     }
+    fn verified_library(&self, reference: Ref, path: &str) -> bool {
+        let Some((collection, suffix)) = path.split_once(':') else {
+            return false;
+        };
+        if collection == "thor" {
+            let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .join("runtime")
+                .join(suffix);
+            return self
+                .s(reference)
+                .collection_roots
+                .get(collection)
+                .map(|root| root.join(suffix))
+                .is_some_and(|actual| {
+                    match (
+                        std::fs::canonicalize(actual),
+                        std::fs::canonicalize(expected),
+                    ) {
+                        (Ok(actual), Ok(expected)) => actual == expected,
+                        _ => false,
+                    }
+                });
+        }
+        self.r.standard_library(reference, path)
+    }
     fn library(&self, callee: Ref) -> Option<(String, String)> {
         if self.kind(callee) == "Selector" {
             let owner = self.role(callee, "expr")?;
@@ -2645,6 +2815,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
         None
     }
     fn condition(&mut self, r: Ref, c: C) -> Option<bool> {
+        if let Some(crate::semantics::Constant::Boolean(value)) =
+            self.r.constant_value(r, &self.contexts[c].bindings, None)
+        {
+            return Some(value);
+        }
         match self.kind(r).to_string().as_str() {
             "Call" => {
                 let callee = self.role(r, "callee")?;
@@ -2736,16 +2911,16 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         let bindings = self.contexts[c].bindings.clone();
                         let a = self.r.specialized_type(left, &bindings);
                         let b = self.r.specialized_type(right, &bindings);
-                        if !a.is_unknown()
-                            && !b.is_unknown()
+                        if a.resolved()
+                            && b.resolved()
                             && (self.denotes_type(left) || bindings.contains_key(&self.text(left)))
                             && (self.denotes_type(right)
                                 || bindings.contains_key(&self.text(right)))
                         {
                             Some((a == b) == (self.op(r) == "=="))
                         } else {
-                            let a = self.r.constant_int(left)?;
-                            let b = self.r.constant_int(right)?;
+                            let a = self.r.context_integer(left, &bindings)?;
+                            let b = self.r.context_integer(right, &bindings)?;
                             Some((a == b) == (self.op(r) == "=="))
                         }
                     }

@@ -744,6 +744,48 @@ fmt.println(value)
         result = self.invoke('rust', command='check', env=environment)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_readonly_generic_record_value_arguments_preserve_values(self):
+        prefix='''Box::struct($N:int){items:[]int}
+write::proc(values:[]$T){when T==Box(1){_=values[0]}else{values[0].items[0]=9}}
+'''
+        self.compare(self.program('values :> []Box(1){{[]int{1}}};write(values)',prefix),command='check')
+        self.compare(self.program('values :> []Box(2){{[]int{1}}};write(values)',prefix),command='check',fail='read-only slice')
+        prefix='''Box::struct($Enabled:bool){items:[]int}
+write::proc(values:[]$T){when T==Box(true){_=values[0]}else{values[0].items[0]=9}}
+'''
+        self.compare(self.program('values :> []Box(true){{[]int{1}}};write(values)',prefix),command='check')
+        self.compare(self.program('values :> []Box(false){{[]int{1}}};write(values)',prefix),command='check',fail='read-only slice')
+
+    def test_readonly_enum_constant_record_arguments_use_values_including_aliases(self):
+        prefix='''Mode::enum u8{Read=1,Alias=Read,Write}
+Box::struct($Mode:Mode){items:[]int}
+read::proc(values:[]$T){when T==Box(.Read){_=values[0]}else{values[0].items[0]=9}}
+write::proc(values:[]$T){when T==Box(.Read){values[0].items[0]=9}else{_=values[0]}}
+'''
+        self.compare(self.program('values :> []Box(.Alias){{[]int{1}}};read(values)',prefix),command='check')
+        self.compare(self.program('values :> []Box(.Write){{[]int{1}}};read(values)',prefix),command='check',fail='read-only slice')
+        self.compare(self.program('values :> []Box(.Alias){{[]int{1}}};write(values)',prefix),command='check',fail='read-only slice')
+
+    def test_readonly_explicit_and_inferred_constant_parameters(self):
+        prefix='work::proc(values:[]int,$N:int){when N==1{_=values[0]}else{values[0]=9}}\n'
+        self.compare(self.program('values :> []int{1};work(values,1)',prefix),command='check')
+        self.compare(self.program('values :> []int{1};work(values,2)',prefix),command='check',fail='read-only slice')
+        prefix='work::proc(values:[][$N]int){when N==1{_=values[0]}else{values[0][0]=9}}\n'
+        self.compare(self.program('values :> [][1]int{{1}};work(values)',prefix),command='check')
+        self.compare(self.program('values :> [][2]int{{1,2}};work(values)',prefix),command='check',fail='read-only slice')
+
+    def test_method_receivers_and_overridden_library_readers_remain_checked(self):
+        prefix='''Record::struct{items:[]int,apply:proc(self:^Record)}
+change::proc(self:^Record){self.items[0]=9}
+'''
+        self.compare(self.program('values :> []int{1};record:=Record{values,change};record->apply()',prefix),command='check',fail='read-only slice')
+        self.compare(self.program('values:=[]int{1};record:=Record{values,change};record->apply();if values[0]!=9{panic("method")}',prefix))
+        library=self.root/'custom/basic';library.mkdir(parents=True)
+        (library/'basic.odin').write_text('package basic\nprint::proc(values:[]int){values[0]=9}\n')
+        for module in (ROOT/'runtime').iterdir():
+            if module.is_dir() and module.name!='basic':(library.parent/module.name).symlink_to(module,target_is_directory=True)
+        self.compare(self.program('values :> []int{1};basic.print(values)','import "thor:basic"\n'),command='check',flags=['-collection:thor='+str(library.parent)],fail='read-only slice')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -165,11 +165,16 @@ class Resolver:
             return None
         self.active.add(key)
         try:
+            own_field = next((field for field in context.ancestors() if field.kind=='Field'
+                              and any(part and (part is context or part in context.ancestors())
+                                      for part in [field.role('type'),field.role('default')])),None)
             for scope in self.lexical_scopes(context):
                 if scope.kind=='Range' and 'comprehension' in scope.data:
                     source=scope.role('expr')
                     if context is source or source in context.ancestors():continue
                 symbols = self.scopes.get(self.scope_key(scope), {}).get(name, [])
+                if own_field:
+                    symbols = [symbol for symbol in symbols if symbol.node not in own_field.group('names')]
                 if scope.kind != 'File':
                     # Runtime locals enter scope after their initializer. In
                     # `x := x`, the RHS still names the enclosing binding.
@@ -480,14 +485,61 @@ class Resolver:
             if len(values) == 1 and values[0].kind == "StructType":
                 record = values[0]
                 parameters = self.fields(record.role("params"))
-                mapping = dict(substitutions)
-                for (name, _), arg in zip(parameters, n.group("args")):
-                    mapping[name.lstrip("$")] = self.type_node(arg)
+                # A record's identity contains its own arguments and lexical
+                # captures, rather than unrelated type variables of its caller.
+                mapping = dict(self.type_node(record).substitutions)
+                for owner in record.ancestors():
+                    signature=owner.role('type') if owner.kind=='Procedure' else owner if owner.kind=='StructType' else None
+                    if signature:
+                        for captured in self.generic_parameters(signature):
+                            if captured in substitutions:mapping.setdefault(captured,substitutions[captured])
+                arguments = n.group("args")
+                for index, (name, annotation) in enumerate(parameters):
+                    key = name.lstrip("$")
+                    arg = next((a.role('value') for a in arguments if a.kind=='FieldValue'
+                                and a.role('field').text==key),
+                               arguments[index] if index<len(arguments) else None)
+                    if arg is None:continue
+                    if annotation and annotation.kind=='TypeidType':
+                        mapping[key] = self.type_node(arg, substitutions)
+                    else:
+                        mapping[key] = self.record_constant(arg, substitutions, expected=self.type_node(annotation, substitutions) if annotation else None)
                 if (record.source.path == Path(__file__).resolve().parents[1]/'runtime'/'sets'/'sets.odin'
                         and any(name.text=='Set' for name in declaration.group('names'))):
                     return Type('set',node=n,elem=mapping.get('T',Type()))
                 return Type("struct", node=record, substitutions=mapping)
         return Type(node=n)
+
+    def record_constant(self, node, substitutions, seen=None, expected=None):
+        """Preserve integer/boolean/text record arguments as values."""
+        seen=set() if seen is None else seen
+        if node is None or node in seen:return Type()
+        seen.add(node)
+        key=binding_name(node)
+        if key in substitutions and isinstance(substitutions[key],(int,bool,str)):
+            return substitutions[key]
+        if node.kind=='Paren':return self.record_constant(node.role('expr'),substitutions,seen,expected)
+        if node.text in {'true','false'}:return node.text=='true'
+        value=self.constant_int(node)
+        if value is not None:return value
+        symbol=self.symbol(node)
+        if symbol and not symbol.declaration.data.get('mutable',True) and not symbol.immutable and symbol.value:
+            return self.record_constant(symbol.value,substitutions,seen,expected)
+        if expected and expected.kind=='enum' and node.kind in {'ImplicitSelector','Selector'}:
+            if node.kind=='Selector' and not node.source.denotes_type(node.role('expr')):return Type(node=node)
+            field=node.role('field').text if node.role('field') else node.text.lstrip('.')
+            previous={};next_value=0
+            for member in expected.node.group('members'):
+                name=member.role('field').text if member.kind=='FieldValue' else member.text
+                value=self.record_constant(member.role('value'),{**substitutions,**previous},seen.copy()) if member.kind=='FieldValue' else next_value
+                if name==field:return ('enum',expected.node,value) if type(value) is int else Type(node=node)
+                if type(value) is int:previous[name]=value;next_value=value+1
+                else:next_value=None
+            return Type(node=node)
+        if node.kind=='Literal' and node.text.startswith(('"','`')):
+            from .compiler import unquote
+            return unquote(node.text)
+        return Type(node=node)
 
     @staticmethod
     def primitive_type(name, node):

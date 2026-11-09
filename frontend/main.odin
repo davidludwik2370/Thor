@@ -264,7 +264,10 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.lists["body"] = make([]Span,len(n.body))
         for statement,i in n.body {info.lists["body"][i]=span(statement)}
         info.roles["colon"] = {n.terminator.pos.offset,n.terminator.pos.offset+1}
-    case ^ast.Enum_Type: info.kind = "EnumType"
+    case ^ast.Enum_Type:
+        info.kind = "EnumType"
+        info.roles["base"] = span(n.base_type)
+        info.lists["members"] = spans(n.fields)
     case ^ast.Pointer_Type: info.kind = "PointerType"; info.roles["elem"] = span(n.elem)
     case ^ast.Multi_Pointer_Type: info.kind = "MultiPointerType"; info.roles["elem"] = span(n.elem)
     case ^ast.Typeid_Type: info.kind = "TypeidType"

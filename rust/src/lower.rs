@@ -16,6 +16,8 @@ mod comprehensions;
 mod defaults;
 #[path = "extrema.rs"]
 mod extrema;
+#[path = "purelower.rs"]
+mod purelower;
 #[path = "sets.rs"]
 mod sets;
 #[path = "switches.rs"]
@@ -55,6 +57,9 @@ pub struct Lower<'a, 'r> {
     body_prologues: BTreeMap<NodeId, Vec<Code>>,
     import_paths: BTreeMap<String, String>,
     declaration_helpers: BTreeMap<NodeId, Vec<Code>>,
+    verified_pure: HashSet<NodeId>,
+    pure_owned: HashSet<NodeId>,
+    pure_busy: HashSet<NodeId>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -85,6 +90,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             body_prologues: BTreeMap::new(),
             import_paths: BTreeMap::new(),
             declaration_helpers: BTreeMap::new(),
+            verified_pure: HashSet::new(),
+            pure_owned: HashSet::new(),
+            pure_busy: HashSet::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -416,7 +424,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             if node.immutable && node.data["using_field"] == true {
                 return Err(self.unsupported(id, "using-promoted immutable declarations"));
             }
-            if node.data["pure"] == true {
+            if node.data["pure"] == true && !self.verified_pure.contains(&id) {
                 return Err(self.unsupported(id, "pure-function verification and execution"));
             }
             if matches!(
@@ -779,6 +787,16 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if kind == "Block" {
+            if let Some(owner) = node
+                .parent
+                .filter(|owner| self.pure_owned.contains(owner) && !self.pure_busy.contains(owner))
+            {
+                if self.source.role(owner, "body") == Some(id) {
+                    return self.pure_body(owner, id);
+                }
+            }
+        }
         if matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
             if let Some(code) = self.switch_statement(id, constant)? {
                 return Ok(code);

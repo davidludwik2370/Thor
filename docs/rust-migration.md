@@ -212,10 +212,10 @@ tracking build from roughly 3 seconds to 70 seconds. The program itself retains
 its requested optimization level. Full debugger/DWARF and TLS editor-information
 parity remain outstanding.
 
-The persistent acceptance gate now reuses 113 runtime slice fixtures, seven
+The persistent acceptance gate now reuses 114 runtime slice fixtures, seven
 runtime comprehension fixtures, nine expanded-extrema fixtures and 13 standalone
 memory-debug fixtures in addition to the earlier native and comparison tests.
-The four slice fixtures requiring pure functions/compile-time evaluation remain
+The three slice fixtures requiring compile-time evaluation remain
 explicit migration gaps; they are not counted as passing native acceptance.
 
 This checkpoint passed all 267 tests in the combined native differential,
@@ -223,3 +223,42 @@ reference acceptance, memory-report, comparator and assertion-hygiene gate.
 All eight Rust unit tests also pass in debug and release profiles, and Clippy
 passes with warnings denied. This is expanded runtime coverage, not completion
 of migration stages 1–3.
+
+## Initial native purity contracts
+
+Runtime `fn` checking now follows local ordinary calls, rejects external storage,
+ambient context, source identity, I/O, pointer identity and unsupported local
+storage, and protects borrowed inputs. Rejection tests reuse the Python purity
+inventory, including reordered builtin arguments and transitive source locations.
+Scalar-returning functions release local allocations through the shared scratch
+runtime. String, slice and dynamic-array results receive independent storage;
+named/multiple returns retain user-defer ordering, and nested fn results use the
+enclosing allocation lifetime. Existing ordinary runtime call behavior is retained.
+
+This is still partial purity coverage. Generic/record schemas, ordinary checked
+callee variants with owned results, SDK specialization and all compile-time
+execution remain unfinished. Such detected gaps stay explicit migration failures.
+
+## Constant specialization and reference corrections
+
+Record specialization now distinguishes integer/boolean/text arguments by value.
+Enum arguments use their ordinal, including aliases. Array/fixed-capacity generic
+counts remain constants in contextual type facts. Unresolved native branch
+specializations fail explicitly instead of proving a branch from incomplete facts.
+The shared frontend exposes enum members without scanning source-text braces.
+
+The Python reference had a related false positive: it discarded record constant
+values and included unrelated caller type variables in record identity. Its
+constant record arguments now retain their values and relevant lexical captures.
+Both resolvers also leave a parameter name out of scope in its own annotation
+and default, preserving an enclosing type of the same name. Regression cases
+cover integer, boolean and aliased enum arguments, explicit/inferred counts,
+method receivers and substituted library bodies. A missing compiler-support
+package now reports a source diagnostic instead of raising `StopIteration`.
+
+The expanded native gate passed 285 checks. The subsequent purity storage/cast
+hardening passed its complete 13-test focused group (one new test, for 286 unique
+checks across the checkpoint). The Python reference compatibility run passed 284
+checks covering borrowing, defaults, basic, binding/TLS, pure calls and native
+execution. Rust unit tests pass in both profiles; Clippy denies warnings.
+This remains an incomplete migration; the pending list above still applies.

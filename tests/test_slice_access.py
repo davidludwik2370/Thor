@@ -606,5 +606,13 @@ apply::proc(values:[]int,callback:=proc(items:[]int){_=items[0]}){callback(value
         self.invoke(self.program('callback:=reader;result :> callback();copy:=slice.clone(result);defer delete(copy);copy[0]=9',
                     'import "core:slice"\n'+prefix))
 
+    def test_polymorphic_record_integer_and_boolean_values_choose_readonly_branch(self):
+        for annotation,reader,writer in [('int','1','2'),('bool','true','false')]:
+            prefix='Box::struct($N:'+annotation+'){items:[]int}\nwork::proc(values:[]$T){when T==Box('+reader+'){_=values[0]}else{values[0].items[0]=9}}\n'
+            with self.subTest(annotation=annotation):
+                self.invoke(self.program('values :> []Box('+reader+'){{[]int{1}}};work(values)',prefix),command='check')
+                self.invoke(self.program('values :> []Box('+writer+'){{[]int{1}}};work(values)',prefix),command='check',fail='read-only slice')
+
+
 
 if __name__=='__main__':unittest.main()

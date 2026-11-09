@@ -285,6 +285,30 @@ impl Project {
         self.discover_type_facts()?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
+        let purity = crate::purity::Purity::analyze(&mut resolver);
+        for (root, faults) in &privileges.pure_faults {
+            if let Some(fault) = faults.first() {
+                let source = &self.sources[fault.operation.file];
+                let mut error = Error::at(
+                    source,
+                    source.node(fault.operation.node).span,
+                    &fault.message,
+                );
+                error.diagnostics[0]["related"]=json!(fault.related.iter().chain(std::iter::once(root)).map(|r|{
+                    let s=&self.sources[r.file];let span=s.node(r.node).span;let (line,column)=s.position(span.start);
+                    json!({"pos":{"file":s.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},"msgs":["Required by this pure call."]})
+                }).collect::<Vec<_>>());
+                return Err(error);
+            }
+        }
+        if let Some((site, _)) = privileges.unresolved.iter().next() {
+            let source = &self.sources[site.file];
+            return Err(Error::unsupported(
+                source,
+                source.node(site.node).span,
+                "unresolved native generic slice branch specialization",
+            ));
+        }
         for (reference, issue) in &privileges.issues {
             let source = &self.sources[reference.file];
             let token = format!(
@@ -373,6 +397,7 @@ impl Project {
             }
             lower.remap_imports(import_paths);
             lower.apply_privileges(&privileges);
+            lower.apply_purity(&purity)?;
             lower.instrument_memory(
                 &self.memory,
                 &memory_collection,
@@ -505,7 +530,9 @@ impl Project {
     }
     fn discover_type_facts(&mut self) -> Result<()> {
         if !self.sources.iter().any(|s| {
-            s.nodes.iter().any(|n| n.immutable)
+            s.nodes
+                .iter()
+                .any(|n| n.immutable || n.data["pure"] == true)
                 || s.selections.iter().any(|selection| selection.wildcard)
                 || s.info["mut_parameters"]
                     .as_array()

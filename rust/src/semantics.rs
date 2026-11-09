@@ -3,6 +3,8 @@
 use crate::ast::{NodeId, Source};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+#[path = "constants.rs"]
+mod constants;
 #[path = "typefacts.rs"]
 mod typefacts;
 pub use typefacts::Substitutions;
@@ -13,7 +15,15 @@ pub struct Ref {
     pub node: NodeId,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+pub enum Constant {
+    Integer(i128),
+    Boolean(bool),
+    Text(String),
+    Enum(Ref, i128),
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub enum Type {
+    Constant(Constant),
     Unknown,
     Generic,
     Scalar {
@@ -363,8 +373,24 @@ impl<'a> Resolver<'a> {
                         && source.node(*id).mutable
                         && !source.group(*id, "names").contains(&reference.node)
                 });
+                let own_field = source.ancestors(reference.node).find(|id| {
+                    source.node(*id).kind == "Field"
+                        && ["type", "default"].iter().any(|role| {
+                            source.role(*id, role).is_some_and(|part| {
+                                source
+                                    .node(part)
+                                    .span
+                                    .contains(source.node(reference.node).span)
+                            })
+                        })
+                });
                 if let Some(id) = ids.iter().find(|id| {
                     Some(self.symbols[**id].reference.node) != own_decl
+                        && !own_field.is_some_and(|field| {
+                            source
+                                .group(field, "names")
+                                .contains(&self.symbols[**id].name_node)
+                        })
                         && self.active_definition(self.symbols[**id].reference)
                 }) {
                     return Some(*id);
@@ -440,10 +466,6 @@ impl<'a> Resolver<'a> {
             }
             "Selector" => {
                 let base = source.role(reference.node, "expr")?;
-                if source.node(reference.node).op == "->" {
-                    let field = source.role(reference.node, "field")?;
-                    return self.lookup(reference, source.text(field));
-                }
                 if source.node(base).kind != "Ident"
                     || self
                         .lookup(
@@ -736,19 +758,27 @@ impl<'a> Resolver<'a> {
         }
     }
     pub fn standard_library(&self, r: Ref, path: &str) -> bool {
-        let Some((collection, _)) = path.split_once(':') else {
+        let Some((collection, suffix)) = path.split_once(':') else {
             return false;
         };
         if !["base", "core", "vendor"].contains(&collection) {
             return false;
         }
         let source = &self.sources[r.file];
-        let Some(actual) = source.collection_roots.get(collection) else {
-            return true;
-        };
         source.info["odin_root"].as_str().is_some_and(|root| {
-            std::fs::canonicalize(actual).ok()
-                == std::fs::canonicalize(std::path::Path::new(root).join(collection)).ok()
+            let expected = std::path::Path::new(root).join(collection).join(suffix);
+            let actual = source
+                .collection_roots
+                .get(collection)
+                .map(|root| root.join(suffix))
+                .unwrap_or_else(|| expected.clone());
+            match (
+                std::fs::canonicalize(actual),
+                std::fs::canonicalize(expected),
+            ) {
+                (Ok(actual), Ok(expected)) => actual == expected,
+                _ => false,
+            }
         })
     }
     pub fn native_builtin(&self, reference: Ref, name: &str) -> bool {
