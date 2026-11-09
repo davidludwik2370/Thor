@@ -35,6 +35,11 @@ SIGSEGV stack/offsets with a null source pointer and length 30 (crash record
 `odin-2026-10-29-065118.ips`). That failing test passed on isolated retry. The
 independently reproducible finding is the data race below.
 
+A November 9 regression run encountered the same initial stack offsets with a
+null source pointer and length 29. Its isolated retry and clean full rerun
+passed. The extracted record is `evidence/recurrence-2026-11-09.txt`; it does not
+independently identify the particular concurrent write.
+
 ## Steps to reproduce
 
 1. In a separate Odin checkout at the commit above, build the compiler with C++

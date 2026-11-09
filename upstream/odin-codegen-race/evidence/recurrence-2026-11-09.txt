@@ -1,0 +1,50 @@
+Stock Odin compiler crash during independent Rust-migration regression testing.
+Personal filesystem paths are omitted. This is an extracted summary, not a raw dump.
+
+Report basename: odin-2026-11-09-143115.ips
+Capture time: 2026-11-09 14:31:15 -0500 (19:31:15 UTC)
+Compiler: dev-2026-10:8169255b9
+Process: odin (compiling generated Odin, not running the generated program)
+Signal: SIGSEGV
+Exception: EXC_BAD_ACCESS / KERN_INVALID_ADDRESS at address 0
+Faulting thread: 4
+Compiler threads in report: 11
+
+Faulting stack:
+  alloc_cstring(gbAllocator, String)                 +896
+  lb_type_internal(lbModule*, Type*)                +680
+  lb_type(lbModule*, Type*)                         +568
+  lb_type_internal(lbModule*, Type*)                +864
+  lb_type(lbModule*, Type*)                         +568
+  lb_type_internal(lbModule*, Type*)                +4704
+  lb_type(lbModule*, Type*)                         +568
+  lb_type_internal(lbModule*, Type*)                +752
+  lb_type(lbModule*, Type*)                         +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*)                      +636
+
+Saved source string registers, using the matching compiler disassembly described
+in original-crash.txt:
+  x20 = 0       (source pointer)
+  x19 = 29      (source length)
+  x0  != 0      (destination allocation)
+
+Failing acceptance fixture:
+  tests.test_rust_reference.RustReferenceTests.
+      test_borrowing_clone_is_writable_but_nested_clone_remains_shallow
+
+The failure was in the successful scalar-slice-copy case, which creates a
+read-only slice, calls core:slice.clone, changes the clone, and checks that the
+original has not changed. The Python reference succeeded; Odin crashed during
+the Rust compiler's backend invocation. The fixture uses no pure functions or
+newly enabled intrinsic calls. Generated files were in temporary storage and
+were not retained by the test's cleanup.
+
+The isolated acceptance fixture passed immediately on retry with the same stock
+compiler. A clean rerun of all 274 reference/compiler/comparison checks passed.
+
+The first three function offsets and the null-source/nonzero-length string
+match the earlier recorded failures. The cached-name publication race remains
+a strong explanation. This crash dump does not identify the particular Entity
+being accessed and does not independently prove which concurrent write caused
+this recurrence. No installed compiler, compiler source, or build defaults changed.

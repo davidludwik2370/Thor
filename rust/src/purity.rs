@@ -6,6 +6,8 @@ use crate::{
     semantics::{Ref, Resolver, Substitutions, Type},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+#[path = "pureintrinsics.rs"]
+mod pureintrinsics;
 
 #[derive(Clone, Debug)]
 pub struct Fault {
@@ -242,6 +244,9 @@ impl<'a, 'r> Purity<'a, 'r> {
                     let mut typ=self.r.specialized_type(value,bindings);
                     while let Type::Pointer(elem)=typ {typ = *elem;}
                     if matches!(typ,Type::Struct(_)|Type::Record(..)|Type::Anonymous(_)) {self.gap(root,value);}
+                    if typ.is_unknown() {
+                        self.fault(root,node,via,"Pure using requires a resolved record schema; unverified namespaces and unconstrained generic projections are not eligible.");
+                    }
                 }
             }
             "Return" if source.group(node.node,"values").is_empty()=> {
@@ -373,6 +378,20 @@ impl<'a, 'r> Purity<'a, 'r> {
                 node: *node,
             })
             .collect::<Vec<_>>();
+        if let Some(name) = self.intrinsic_name(callee, &mut HashSet::new()) {
+            if !Self::intrinsic_allowed(&name) {
+                self.fault(
+                    root,
+                    callee,
+                    via,
+                    format!("Pure code cannot call compiler intrinsic '{}': it is not an eligible pure operation.",self.text(callee)),
+                );
+            }
+            for arg in args {
+                self.walk(root, proc, arg, bindings, via);
+            }
+            return;
+        }
         let target_type = self.r.specialized_type(callee, bindings);
         if self.r.denotes_type(callee) {
             if let Some(arg) = args.first() {
@@ -445,6 +464,10 @@ impl<'a, 'r> Purity<'a, 'r> {
                 let mut selected = 0;
                 for plan in plans {
                     let candidate = plan.procedure;
+                    if self.llvm_primitive(candidate) {
+                        selected += 1;
+                        continue;
+                    }
                     if self.kind(candidate) != "Procedure" || self.role(candidate, "body").is_none()
                     {
                         self.fault(

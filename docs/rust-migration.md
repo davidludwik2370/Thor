@@ -421,3 +421,33 @@ The eight new generic checks passed, including debug and unchecked allocation
 tracking. All 70 purity/checked-call/record/resolution/hygiene interaction checks
 and all 195 reused reference fixtures passed. Eight Rust unit tests passed in
 both profiles, and Clippy passed with warnings denied.
+
+## Deterministic native intrinsics
+
+Checked calls can use the reference compiler's approved scalar and structural
+operations from the installed `base:intrinsics` package, including constant
+aliases and selective imports. Argument expressions still receive normal effect
+checking. Clock/memory operations and type-name identity queries remain
+ineligible. Canonical package identity is checked before names receive native
+intrinsic treatment; an overridden package cannot acquire that trust by name.
+
+The installed SDK's approved scalar LLVM declarations are recognized by their
+foreign calling convention and exact operation/float-width link names. Their
+ordinary library wrappers still require SDK adaptation. For example, a pure
+`math.sin` call reaches the explicit adaptation gap rather than being rejected
+as an invalid foreign call. User-defined foreign declarations retain normal
+inspection requirements. Namespace `using` retains the Python reference's
+purity restriction.
+
+The native-port example now exercises generic scalar/owned results, recursive
+record ownership, read-only inputs and a direct deterministic intrinsic. Both
+engines produced matching output with empty tracker reports in debug and
+unchecked release builds.
+
+All 88 intrinsic/generic/purity/record/resolution/hygiene interaction checks
+passed, as did a clean rerun of all 274 reference/compiler/comparison checks.
+Eight Rust unit tests passed in both profiles, and Clippy passed with warnings
+denied. The first reference run encountered one stock Odin compiler SIGSEGV;
+the isolated retry and full clean rerun passed. Its extracted null-source,
+nonzero-length stack signature is recorded in the existing
+[`upstream` evidence bundle](../upstream/odin-codegen-race/evidence/recurrence-2026-11-09.txt).

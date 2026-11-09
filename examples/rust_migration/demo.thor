@@ -1,10 +1,23 @@
-// Initial native-port acceptance example; the main language tour remains demo/.
+// Native-port acceptance example; the main language tour remains demo/.
 package main
 
 import "core:fmt" / println
+import "base:intrinsics"
 
 SEPARATOR :: "-" * 16
 VALUES :: [1, 2] ++ [3, 4]
+
+Snapshot :: struct { values: []int, label: string }
+
+snapshot :: fn(input: []int) -> Snapshot {
+    values := make([]int, len(input))
+    copy(values, input)
+    return {values, f"stored {len(input)} values"}
+}
+
+independent :: fn(value: $T) -> T { return value }
+square :: fn(value: $T) -> T { return value * value }
+square_root :: fn(value: f64) -> f64 { return intrinsics.sqrt(value) }
 
 checked_value :: proc(counter: ^int) -> (int, bool) {
     counter^ += 1
@@ -17,6 +30,16 @@ main :: proc() {
     copied[-1] = 40
     if original[-1] != 30 || copied[-1] != 40 { panic("inline copy") }
     if 2 not_in VALUES { panic("membership") }
+
+    saved := snapshot(original[:])
+    defer delete(saved.values)
+    defer delete(saved.label)
+    independent_values := independent(saved.values)
+    defer delete(independent_values)
+    independent_values[0] = 99
+    if saved.values[0] != 10 || saved.label != "stored 3 values" { panic("pure ownership") }
+    number: f64 = 9
+    if square_root(number) != 3 || square(number) != 81 { panic("pure intrinsics") }
 
     calls := 0
     value := checked_value(&calls) or_panic

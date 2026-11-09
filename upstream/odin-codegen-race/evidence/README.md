@@ -5,6 +5,10 @@
   raw crash dump. The exact SIGSEGV did not reproduce in that stress batch.
 - `recurrence-2026-10-29.txt`: a later stock-compiler crash with the same stack
   and offsets, a null source pointer and length 30; the isolated test retry passed.
+- `recurrence-2026-11-09.txt`: another stock-compiler crash with matching initial
+  offsets, a null source pointer and length 29. The isolated retry and the clean
+  full regression rerun passed. This is observational evidence, not a new TSan
+  experiment or independent proof of the precise racing access.
 - `type-name-race.txt`: selected original TSan access pair with source line
   numbers; personal temporary paths are replaced with `<temporary>`.
 - `summary.json`: aggregate results from the original investigation, including

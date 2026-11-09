@@ -8,6 +8,8 @@ The confirmed finding is a C++ data race in Odin's cached LLVM type names at
 commit `8169255b97b85d6a08691d99764f51fb01f92b5a`. It closely matches an
 intermittent compiler crash. A later regression run repeated the same SIGSEGV
 signature; see `evidence/recurrence-2026-10-29.txt`.
+A Rust-migration regression run repeated the null-source/nonzero-length string
+signature on November 9; see `evidence/recurrence-2026-11-09.txt`.
 
 ## Report material
 
