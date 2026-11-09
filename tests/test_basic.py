@@ -11,6 +11,35 @@ class BasicTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_native_runtime_parameter_witnesses_are_emitted_with_original_maps(self):
+        code=self.program('''
+values:=basic.to_set([3,1,3,2])
+defer delete(values)
+if len(values)!=3 || 2 not_in values {panic("native parameter witness")}
+''','import "thor:basic"\n')
+        for flags in [[], ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):
+                root,_=self.invoke(code,flags=flags)
+                manifest=json.loads((root/'output/thor-manifest.json').read_text())
+                generated=root/'output/.thor-runtime/sets/sets.odin'
+                self.assertTrue(generated.is_file())
+                generated_code=generated.read_text()
+                self.assertIn('parameter_',generated_code)
+                # Added type declarations must not rewrite native procedure bodies.
+                self.assertIn('return to_set_slice(values[:], allocator)',generated_code)
+                self.assertIn('.thor-runtime/sets/sets.odin',manifest['generated'])
+        root,_=self.invoke(code,command='transpile')
+        generated=root/'output/.thor-runtime/sets/sets.odin'
+        mapping=json.loads(generated.with_suffix('.odin.map.json').read_text())
+        original=base.ROOT/'runtime/sets/sets.odin'
+        self.assertIn(str(original),mapping['sources'])
+        raw=generated.read_bytes();copied=bytearray();cursor=0
+        for first,last,file,start,end,kind,exact in mapping['segments']:
+            if exact and file==str(original) and start==cursor:
+                copied.extend(raw[first:last]);cursor=end
+        expected=original.read_bytes()
+        self.assertEqual(copied,expected)
+
     def test_set_conversions_through_both_packages_and_all_sequence_inputs(self):
         self.invoke(self.program('''
 data := [3, 1, 3, 2]

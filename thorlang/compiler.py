@@ -1095,6 +1095,10 @@ class Source:
             # variants need lowering; leave the rest of this file verbatim.
             inserts=self.using_feature_insert()+[(declaration.end,self.purity.calls.helpers(declaration))
                      for declaration in self.purity.calls.declarations if declaration.source is self]
+            if self.resolver:
+                declarations={declaration for declaration,_ in self.resolver.wrappers if declaration.source is self}
+                inserts.extend((declaration.end,self.resolver.declaration_support(declaration))
+                               for declaration in sorted(declarations,key=lambda declaration:declaration.start))
             code=self.splice(self.root,[],inserts)
         else:
             code = self.render(self.root)

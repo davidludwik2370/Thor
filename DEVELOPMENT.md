@@ -1,5 +1,10 @@
 # Thor development process
 
+The [Rust migration](docs/rust-migration.md) keeps the Python compiler as its
+reference. Its current checkpoint is incomplete; native differential cases and
+migration gaps must stay distinct. Do not switch TLS/default builds or start
+parallelization before full semantic and diagnostic acceptance.
+
 Work through the numbered T tasks in coherent batches. Each batch includes its
 compiler behavior, editor support, diagnostic quality, tests, and evaluation demo.
 The [language specification](docs/language-spec.md) defines the numbered language contract.

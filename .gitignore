@@ -11,3 +11,5 @@ tls/bin/
 *.dSYM/
 /odin-playground/odin-playground
 /thor-playground/thor-playground
+/rust/target/
+.thor-rust-build/

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Build the separate native compiler, then hand all arguments to it unchanged.
+# No Python compiler fallback is permitted in this migration entry point.
+set -eu
+thor_rust_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cargo build --quiet --offline --release --locked --manifest-path "$thor_rust_root/rust/Cargo.toml"
+exec "$thor_rust_root/rust/target/release/thor-rust" "$@"

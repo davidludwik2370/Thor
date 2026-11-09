@@ -197,6 +197,7 @@ class Project:
                         for value in declaration.group('values'):source.big.constants.render(value,hint)
         from .shared import Runtime
         runtime=Runtime(self,ROOT) if self.use_shared and not self.purity.eval_mode else None
+        context_sources={declaration.source for declaration,_ in self.resolver.wrappers}
         runtime_base=ROOT/'runtime'
         if runtime and 'thor' in self.default_collections:
             runtime_base=runtime.prepare(with_basic=any(runtime.eligible(source) and not
@@ -205,7 +206,7 @@ class Project:
         adapted={path.parent for path,source in self.sources.items() if runtime and runtime.bundled(source)
                  and not (path==self.entry if self.file_entry else path.parent==self.entry)
                  and (not runtime.native(source) and not runtime.eligible(source) or path in self.overlays
-                      or any(d.source is source for d in self.purity.calls.declarations))}
+                      or source in context_sources or any(d.source is source for d in self.purity.calls.declarations))}
         regular=[]
         for path, source in self.sources.items():
             entry_source=path==self.entry if self.file_entry else path.parent==self.entry
@@ -249,11 +250,11 @@ class Project:
             if runtime:source.backend_import=import_path
             native_support=(path.suffix=='.odin' and path.is_relative_to(ROOT/'runtime') and not source.edits
                 and not source.run_values and not any(self.purity.checked(n) for n in source.nodes if n.kind=='Procedure'))
-            if native_support:
+            if native_support and source not in context_sources:
                 from .sourcemap import SourceMap
                 code=source.raw.decode()
                 source.source_map=SourceMap([[0,len(source.raw),str(path),0,len(source.raw),'source',True]])
-            else:code=source.transpile(preserve_native=bool(
+            else:code=source.transpile(preserve_native=bool(native_support or
                 getattr(source,'native_inspected',False) and not self.purity.eval_mode))
             generated[relative.as_posix()]=code
             self.maps[str(destination / relative)] = source.source_map
