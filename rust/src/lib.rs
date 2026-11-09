@@ -13,5 +13,6 @@ pub mod privileges;
 pub mod project;
 pub mod purity;
 pub mod semantics;
+pub mod values;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

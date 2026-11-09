@@ -651,3 +651,40 @@ change was needed for that fixture correction. All eight existing Rust unit test
 passed in debug and release, Clippy passed with warnings denied, and the updated
 example matched both engines in checked debug and unchecked release builds with
 empty allocation reports.
+
+## Native compile-time value reconstruction foundation
+
+`rust/src/values.rs` now implements the existing contents-only value packet and
+Odin reconstruction API for native scalar and aggregate values. It preserves
+integer bounds, float bit patterns and byte order, arbitrary string bytes, enum
+arrays, bit sets, records, unions, nil/zero-sized sequences and dynamic capacity.
+Runtime reconstruction allocates independent returned storage directly, using
+the shared pure runtime; it does not allocate temporary object templates.
+Unicode field identifiers use the already-locked `unicode-ident` crate. Packet
+versions must be integer `1`; Boolean/float lookalikes are rejected as malformed
+headers. Big-number static backing remains part of the separate big-number port.
+
+The specialization envelope now forwards ownership and dynamic-storage queries
+to its payload in both implementations. The reference evaluator normally unwraps
+that envelope before reconstruction, but the shared protocol API must remain
+correct when it receives one directly. Native tests cover wrapped and unwrapped
+actual Odin serializer output, including checked and unchecked release builds
+and allocation-map/bad-free checks. Differential tests compare scalar/aggregate
+packets, malformed input and 200 generated portable values with the reference.
+The Cargo example `value_protocol` is an internal differential-test harness.
+
+This component is not yet connected to native `#run`: dependency extraction,
+execution scheduling, result installation and result caching remain to be
+ported. Python remains the default, and native execution gaps remain explicit.
+The read-only reference regression check also passed all 19 projects currently
+under `/Users/davidludwik/Code/Thor`, with their source files unchanged.
+
+Validation passed 52 value/compile-time/big-number regressions, seven final native
+protocol integration tests, and seven assertion-hygiene checks. The integration
+suite includes the 200 generated packet comparisons and actual Odin round trips
+for plain and specialization-wrapped results in both checked and unchecked
+release builds, with no tracked allocations or bad frees left over. All 15 Rust
+unit tests passed in debug and release, and Clippy passed with warnings denied.
+The decoder transfers the decoded payload rather than cloning its JSON tree;
+byte-string reconstruction appends hex escapes directly without a heap
+allocation for each byte.

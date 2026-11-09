@@ -108,6 +108,7 @@ def expression(value,typ,meta,depth=0,big=None):
 
 def has_owned(value, *, slices_only=False):
     kind=value['kind']
+    if kind=='specialized':return has_owned(value['value'],slices_only=slices_only)
     if kind in {'string','big_integer','big_rational'}:return not slices_only
     if kind=='sequence':
         if value.get('storage') in {'slice','dynamic'} or value.get('nil'):return True
@@ -119,6 +120,7 @@ def has_owned(value, *, slices_only=False):
 
 def has_dynamic(value):
     kind=value['kind']
+    if kind=='specialized':return has_dynamic(value['value'])
     if kind=='sequence':return value.get('storage')=='dynamic' or any(has_dynamic(v) for v in value['values'])
     if kind in {'record','enum_array'}:return any(has_dynamic(v) for _,v in value['fields'])
     if kind=='union' and value['variant']>=0:return has_dynamic(value['value'])
@@ -133,6 +135,7 @@ def materialize(value,typ,meta,module,prefix,big=None):
         nonlocal serial
         if not has_owned(v):return expression(v,t,meta,big=big)
         kind=v['kind']
+        if kind=='specialized':return build(v['value'],t)
         if kind in {'big_integer','big_rational'}:return f'{module}.clone({expression(v,t,meta,big=big)})'
         if kind=='string':return f'{module}.clone({expression(v,t,meta,big=big)})'
         if kind=='sequence':
