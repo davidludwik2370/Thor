@@ -10,6 +10,28 @@ class PureMutationTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_sdk_reverse_recovers_between_local_and_borrowed_storage(self):
+        text='''// 😀 native generic branch and source coordinates
+package main
+import "core:slice"
+work::fn(values:[]int)->int{local:=[1,2];slice.reverse(local[:]);return local[0]}
+VALUE::#run work([]int{1,2})
+main::proc(){values:=[1,2];_=work(values[:])}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        broken=text.replace('slice.reverse(local[:])','slice.reverse(values)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='borrowed from an input')
+        self.assertTrue(any(error['range']['start']==self.position(broken,'slice.reverse(values)',0)
+                            for error in errors),errors)
+        self.assertNotIn('did not converge',json.dumps(errors))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_promoted_generic_record_writes_report_the_call_and_recover_unsaved(self):
         text='''// 😀 source coordinates
 package main

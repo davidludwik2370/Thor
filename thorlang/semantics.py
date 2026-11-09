@@ -683,6 +683,8 @@ class Resolver:
                 return Type("array", node=n, elem=self.type_of(elements[0], seen) if elements else Type(), length=len(elements), witness=n)
         if kind == "Call":
             callee = n.role("callee")
+            if any(self.native_builtin(callee,name) for name in {'size_of','align_of','offset_of','len','cap'}):
+                return Type('scalar','int',n,witness=n)
             if n.source.big.enabled:
                 numeric=n.source.big.integration.result(n)
                 if numeric is not None:return replace(numeric,witness=n)

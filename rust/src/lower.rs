@@ -340,6 +340,12 @@ impl<'a, 'r> Lower<'a, 'r> {
                 ));
             }
             let mut code = vec![self.splice(NodeId(0), vec![], inserts)?];
+            code.extend(
+                self.helpers
+                    .iter()
+                    .filter(|((owner, _, _), _)| *owner == NodeId(0))
+                    .map(|(_, code)| code.clone()),
+            );
             for (alias, path) in &self.modules {
                 code.push(self.gen(
                     format!(
@@ -355,6 +361,13 @@ impl<'a, 'r> Lower<'a, 'r> {
                     format!("\nimport {}meta \"base:intrinsics\"\n", self.prefix),
                     Span::new(0, 0),
                     "memory-debug",
+                ));
+            }
+            if self.builtin {
+                code.push(self.gen(
+                    format!("\nimport {}builtin \"base:builtin\"\n", self.prefix),
+                    Span::new(0, 0),
+                    "support",
                 ));
             }
             return Ok((Code::concat(code).finish(), self.errors));
@@ -884,7 +897,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
-        if kind == "Assignment" {
+        if self.source.thor && kind == "Assignment" {
             if let Some(code) = self.access_assignment(id, constant)? {
                 return Ok(code);
             }
@@ -1042,7 +1055,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
         }
-        if matches!(kind.as_str(), "Index" | "Slice") {
+        if self.source.thor && matches!(kind.as_str(), "Index" | "Slice") {
             if let Some(code) = self.access(id, constant)? {
                 return Ok(code);
             }

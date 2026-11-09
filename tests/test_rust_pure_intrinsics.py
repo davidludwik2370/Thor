@@ -1,5 +1,4 @@
 """Only installed deterministic native intrinsics bypass body inspection."""
-import json
 import unittest
 from tests import test_rust_checked_calls as checked
 
@@ -89,18 +88,11 @@ work::fn(n:f64)->f64{return intrinsics.sqrt(n)}
         self.assertIn('outside the function',result.stderr)
         self.assertNotIn('does not exist',result.stderr)
 
-    def test_sdk_math_reaches_the_adaptation_gap_without_rejecting_llvm_primitives(self):
-        self.source.write_text(self.program('n:=f64(0);_=work(n)', '''
+    def test_sdk_math_wrappers_keep_native_llvm_primitives(self):
+        self.tracked(self.program('n:=f64(0);if work(n)!=1{panic("math wrappers")}', '''
 import "core:math"
-work::fn(n:f64)->f64{return math.sin(n)}
+work::fn(n:f64)->f64{return math.sin(n)+math.cos(n)}
 '''))
-        reference=self.invoke('python',command='check')
-        self.assertEqual(reference.returncode,0,reference.stderr)
-        result=self.invoke('rust',command='check',flags=['-json-errors'])
-        self.assertEqual(result.returncode,3,result.stderr)
-        self.assertEqual(json.loads(result.stderr)['errors'][0]['stage'],'rust-migration')
-        self.assertIn('checked native SDK adaptation',result.stderr)
-        self.assertNotIn('foreign or bodyless',result.stderr)
 
     def test_user_foreign_link_names_do_not_acquire_sdk_trust(self):
         self.compare(self.program('n:=f64(0);_=work(n)', '''

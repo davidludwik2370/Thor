@@ -183,7 +183,11 @@ impl Memory {
         let prefix = format!("{}memory_", source.prefix);
         let memory = format!("{prefix}support");
         let runtime = format!("{prefix}runtime");
-        let mut footer=format!("\nimport {memory} \"{collection}:debug_memory\"\nimport {runtime} \"base:runtime\"\n@(private=\"file\")\n{prefix}files :: []{memory}.File{{\n");
+        // Native slice constants materialize their backing literals at each
+        // use. Keep mapping tables in global storage, as the reference does;
+        // large SDK maps otherwise create enormous stack stores and can crash
+        // LLVM's AArch64 instruction selector even with valid input IR.
+        let mut footer=format!("\nimport {memory} \"{collection}:debug_memory\"\nimport {runtime} \"base:runtime\"\n@(private=\"file\",rodata)\n{prefix}files := []{memory}.File{{\n");
         let files = data["files"].as_array().cloned().unwrap_or_default();
         for unit in data["units"].as_array().into_iter().flatten() {
             footer.push_str(&format!("{{{}, []{memory}.Span{{\n", unit["path"]));
@@ -198,7 +202,7 @@ impl Memory {
         }
         footer.push_str("}\n");
         footer.push_str(&format!(
-            "@(private=\"file\")\n{prefix}aliases :: []{memory}.Alias{{"
+            "@(private=\"file\",rodata)\n{prefix}aliases := []{memory}.Alias{{"
         ));
         for (path, original) in data["aliases"].as_object().into_iter().flatten() {
             footer.push_str(&format!("{{{},{original}}},", json!(path)));

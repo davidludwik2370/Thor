@@ -71,9 +71,6 @@ impl Lower<'_, '_> {
             .filter(|target| target.file == self.file)
             .collect::<std::collections::BTreeSet<_>>();
         for target in targets {
-            if self.source.shared_native {
-                return Err(self.unsupported(target.node, "checked native SDK adaptation"));
-            }
             let Some(declaration) = self
                 .source
                 .node(target.node)
@@ -160,11 +157,6 @@ impl Lower<'_, '_> {
             .any(|target| self.resolver.sources[target.file].node(target.node).data["pure"] != true)
         {
             return Ok(None);
-        }
-        for target in &targets {
-            if self.resolver.sources[target.file].shared_native {
-                return Err(self.unsupported(id, "checked native SDK adaptation"));
-            }
         }
         let callee = self.role(id, "callee")?;
         let original = self.render(callee, None, false)?;

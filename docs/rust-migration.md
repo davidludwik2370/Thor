@@ -451,3 +451,57 @@ denied. The first reference run encountered one stock Odin compiler SIGSEGV;
 the isolated retry and full clean rerun passed. Its extracted null-source,
 nonzero-length stack signature is recorded in the existing
 [`upstream` evidence bundle](../upstream/odin-codegen-race/evidence/recurrence-2026-11-09.txt).
+
+## Sparse native SDK checked calls
+
+Verified SDK wrappers now receive checked copies beside their original Odin
+declarations. The generated project contains a sparse mirror with a layout hash:
+only adapted files are generated, while untouched packages, files and resources
+link to their original locations. One native SDK root keeps ordinary and checked
+calls in the same nominal type universe. Ordinary declarations retain their
+shallow ownership; checked calls recursively promote owned results. Odin source
+keeps native indexing semantics inside the checked copies.
+
+Imports used only in reachable SDK bodies are inspected before effect analysis,
+including constant callee aliases and procedure groups. Missing body metadata
+must not become a false mutation effect. Unsaved native source replacements are
+inputs to the mirror; the installed SDK is not rewritten. Generated maps retain
+the original native file locations. Layout changes, obsolete-link cleanup and
+symlink-parent rejection have dedicated regressions.
+
+Compiler support libraries use an installation-owned native view under
+`lib/runtime-rust-<layout>`. It links editable sources while excluding their own
+unit-test files, as Python's shared runtime does. This prevents imported support
+tests from entering a project's test run or creating SDK dependency cycles.
+Project-specific checked SDK copies and execution artifacts remain local.
+
+The accepted subset covers scalar LLVM/math wrappers, native nominal durations,
+generic slice reversal on local buffers, native string result ownership and
+ordinary borrowed string views. Generic conditional ownership, promoted using
+scopes and unverified/indirect callbacks still have migration or purity limits;
+this does not complete chunks 1–3 or all SDK adaptation.
+
+The SDK regressions also found two Python-reference issues. Addressed compound
+literals now have stable abstract storage identities, preventing endlessly
+growing pointer alias sets during provenance analysis. Record literals also
+retain their local stack ownership, so their addresses cannot escape through
+an input. Native size/alignment/offset/length/capacity queries have their known
+integer result shape, avoiding runtime pointer guards in compile-time conditions.
+Runtime, explicit compile-time and unsaved TLS transitions cover these fixes.
+
+A separate repeatable LLVM AArch64 crash exposed a Rust-port mapping-table bug.
+The emitted IR passed LLVM verification, but standalone `llc` crashed selecting
+the generated memory-location mapper's huge aggregate stores. Slice constants
+had materialized thousands of mapping rows on each call. Mapping tables now use
+read-only global storage, retaining Python's storage lifetime, which removes that stack work and the crash
+trigger. No installed compiler, backend defaults or normal-build instrumentation
+changed. This is distinct from the earlier intermittent Odin cached-name race.
+
+The clean checkpoint passed all 386 native/differential, memory-report,
+comparison and assertion-hygiene checks; all 201 Python purity/borrowing/default
+checks; and 17 TLS checks. Eight Rust unit tests passed in debug and release
+profiles, and Clippy passed with warnings denied. The expanded example produced
+matching output and empty allocation reports in checked debug and unchecked
+release configurations. The focused SDK suite also verifies that test mode runs
+exactly the project's own test, and that stale layouts never modify installed
+SDK files.

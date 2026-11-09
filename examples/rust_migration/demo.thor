@@ -3,6 +3,8 @@ package main
 
 import "core:fmt" / println
 import "base:intrinsics"
+import "core:slice"
+import "core:time"
 
 SEPARATOR :: "-" * 16
 VALUES :: [1, 2] ++ [3, 4]
@@ -18,6 +20,12 @@ snapshot :: fn(input: []int) -> Snapshot {
 independent :: fn(value: $T) -> T { return value }
 square :: fn(value: $T) -> T { return value * value }
 square_root :: fn(value: f64) -> f64 { return intrinsics.sqrt(value) }
+seconds :: fn(value: time.Duration) -> f64 { return time.duration_seconds(value) }
+reversed_end :: fn(value: int) -> int {
+    local := [value, value + 1]
+    slice.reverse(local[:])
+    return local[0]
+}
 
 checked_value :: proc(counter: ^int) -> (int, bool) {
     counter^ += 1
@@ -40,6 +48,9 @@ main :: proc() {
     if saved.values[0] != 10 || saved.label != "stored 3 values" { panic("pure ownership") }
     number: f64 = 9
     if square_root(number) != 3 || square(number) != 81 { panic("pure intrinsics") }
+    duration := time.Second
+    seed := 3
+    if seconds(duration) != 1 || reversed_end(seed) != 4 { panic("checked SDK calls") }
 
     calls := 0
     value := checked_value(&calls) or_panic

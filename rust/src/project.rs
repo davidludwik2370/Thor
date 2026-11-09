@@ -15,6 +15,12 @@ use std::{
     path::{Component, Path, PathBuf},
     process::{Command, Stdio},
 };
+#[path = "nativefacts.rs"]
+mod nativefacts;
+#[path = "runtimeview.rs"]
+mod runtimeview;
+#[path = "sdkmirror.rs"]
+mod sdkmirror;
 
 pub struct Options {
     pub command: String,
@@ -45,6 +51,8 @@ pub struct Project {
     common: PathBuf,
     file_entry: bool,
     memory: crate::memory::Memory,
+    native_environment: BTreeMap<String, PathBuf>,
+    backend_runtime: PathBuf,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -191,6 +199,8 @@ impl Project {
             errors: HashMap::new(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
+            native_environment: BTreeMap::new(),
+            backend_runtime: PathBuf::new(),
             collections,
             common,
             file_entry,
@@ -232,7 +242,9 @@ impl Project {
                 )));
             }
         }
-        let files = package_files(&entry, self.frontend.test)?;
+        let support_library =
+            entry.starts_with(self.options.root.join("runtime")) && entry != self.options.entry;
+        let files = package_files(&entry, self.frontend.test && !support_library)?;
         let mut shared_frontend = self.frontend.clone();
         if shared_frontend.cache_dir.is_some() {
             shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
@@ -285,10 +297,22 @@ impl Project {
     }
     pub fn lower(&mut self) -> Result<PathBuf> {
         self.discover_type_facts()?;
+        self.discover_call_facts()?;
+        self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         resolver.prepare_contexts();
         let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = crate::purity::Purity::analyze(&mut resolver);
+        let sdk = sdkmirror::SdkMirror::plan(
+            &self.sources,
+            &purity,
+            &mut self.collections,
+            &self.destination,
+            &self.options.overlays,
+            &self.options.root.join("runtime"),
+            &self.backend_runtime,
+        )?;
+        self.native_environment = sdk.environment.clone();
         for (root, faults) in &privileges.pure_faults {
             if let Some(fault) = faults.first() {
                 let source = &self.sources[fault.operation.file];
@@ -353,14 +377,24 @@ impl Project {
         self.collections
             .insert(project_collection.clone(), self.destination.clone());
         for (file, source) in self.sources.iter().enumerate() {
-            if source.shared_native {
+            if source.shared_native && !sdk.adapts(&source.path) {
                 continue;
             }
-            let relative = source
-                .path
-                .strip_prefix(&self.common)
-                .map_err(|_| Error::new("source outside project root"))?
-                .with_extension("odin");
+            let relative = if source.shared_native {
+                sdk.output(&source.path)
+                    .and_then(|path| {
+                        path.strip_prefix(&self.destination)
+                            .ok()
+                            .map(Path::to_path_buf)
+                    })
+                    .ok_or_else(|| Error::new("adapted SDK file has no output path"))?
+            } else {
+                source
+                    .path
+                    .strip_prefix(&self.common)
+                    .map_err(|_| Error::new("source outside project root"))?
+                    .with_extension("odin")
+            };
             if !paths.insert(relative.clone()) {
                 return Err(Error::new(format!(
                     "generated filename collision: {}",
@@ -465,6 +499,7 @@ impl Project {
             })
             .collect();
         let mut files: BTreeMap<PathBuf, Vec<u8>> = BTreeMap::new();
+        files.extend(sdk.replacements);
         for (path, (_, emitted)) in &self.outputs {
             files.insert(path.clone(), emitted.text.as_bytes().to_vec());
             if self.options.maps
@@ -481,6 +516,7 @@ impl Project {
         }
         let generated: Vec<_> = files
             .keys()
+            .chain(sdk.links.keys())
             .map(|path| {
                 path.strip_prefix(&self.destination)
                     .unwrap()
@@ -489,19 +525,22 @@ impl Project {
             })
             .collect();
         let mut manifest = json!({"thor_version":VERSION,"engine":"rust","migration_complete":false,"entry":self.options.entry,"source_map_version":1,"debug_map_version":1,
-            "generated":generated,"odin_flags":self.native_flags(),"odin_environment":{},"debug_roots":[],"shared_maps":[]});
+            "generated":generated,"odin_flags":self.native_flags(),"odin_environment":self.native_environment,"debug_roots":[],"shared_maps":[]});
         if self.memory.enabled() {
             manifest["memory_debug"] = json!({"tracking":self.memory.tracking,"address_sanitizer":self.memory.address,"source_map_version":1,"llvm_symbolizer":self.memory.symbolizer});
         }
         // Lower every source before publishing any of them. Ownership is
         // recorded first so an interrupted first write stays recoverable.
         fs::create_dir_all(&self.destination)?;
-        for path in files.keys() {
+        for path in files.keys().chain(sdk.links.keys()) {
             self.validate_output(path)?;
         }
         atomic_write(&manifest_path, &serde_json::to_vec_pretty(&manifest)?)?;
         for (path, data) in &files {
             atomic_write(path, data)?;
+        }
+        for (path, target) in &sdk.links {
+            sdkmirror::write_link(path, target)?;
         }
         for relative in old["generated"]
             .as_array()
@@ -510,7 +549,10 @@ impl Project {
             .filter_map(|v| v.as_str())
         {
             let path = self.destination.join(relative);
-            if files.contains_key(&path) || self.validate_output(&path).is_err() {
+            if files.contains_key(&path)
+                || sdk.links.contains_key(&path)
+                || self.validate_output(&path).is_err()
+            {
                 continue;
             }
             if path.is_file() || path.is_symlink() {
@@ -534,6 +576,9 @@ impl Project {
         }
     }
     fn discover_type_facts(&mut self) -> Result<()> {
+        self.discover_type_facts_from(BTreeSet::new())
+    }
+    fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
         if !self.sources.iter().any(|s| {
             s.nodes
                 .iter()
@@ -563,7 +608,6 @@ impl Project {
                 .entry(name.into())
                 .or_insert_with(|| odin_root.join(name));
         }
-        let mut packages = BTreeSet::new();
         if let Some(base) = roots.get("base") {
             let runtime = base.join("runtime");
             if runtime.join("core.odin").is_file() {
@@ -605,7 +649,9 @@ impl Project {
             {
                 vec![package.join("core.odin")]
             } else {
-                package_files(&package, self.frontend.test)?
+                // The imported SDK is a library even when the project's entry
+                // package is being tested. Its own *_test files are not inputs.
+                package_files(&package, false)?
             };
             for path in files {
                 if self.sources.iter().any(|s| s.path == path) {
@@ -723,6 +769,11 @@ impl Project {
             }
         }
         for (name, base) in &self.collections {
+            let base = if *base == self.options.root.join("runtime") {
+                &self.backend_runtime
+            } else {
+                base
+            };
             result.push(format!("-collection:{name}={}", base.display()));
         }
         result
@@ -730,6 +781,7 @@ impl Project {
     pub fn compile(&self, target: &Path) -> Result<i32> {
         let action = self.options.command.as_str();
         let mut command = Command::new(&self.frontend.odin);
+        command.envs(&self.native_environment);
         command
             .arg(if matches!(action, "run" | "test") {
                 "build"

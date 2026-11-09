@@ -9,6 +9,24 @@ class PureMutationTests(unittest.TestCase):
     invoke=base.ThorTests.invoke
     program=base.ThorTests.program
 
+    def test_sdk_reverse_with_addressed_literals_in_inactive_generic_branches(self):
+        source=self.program('n:=3;if work(n)!=4||VALUE!=4{panic("SDK reverse")}', '''
+import "core:slice"
+work::fn(n:int)->int{values:=[]int{n,n+1};slice.reverse(values);return values[0]}
+VALUE::#run work(3)
+''')
+        for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']]:
+            with self.subTest(flags=flags):
+                _,result=self.invoke(source,flags=flags)
+                self.assertEqual(result.stderr,'')
+
+    def test_an_addressed_record_literal_cannot_escape_through_an_input(self):
+        self.invoke(self.program('n:=3;_=work(n)', '''
+Box::struct{value:int}
+helper::proc(out:^^Box){out^=&Box{3}}
+work::fn(n:int)->int{pointer:^Box;helper(&pointer);return n}
+'''),command='check',fail='local stack storage')
+
     def test_scalar_pointer_runtime_automatic_and_explicit(self):
         source=self.program('n:=3;if work(n)!=10||AUTO!=11||EXPLICIT!=12{panic("result")}', '''
 set_y::proc(y:^int){y^=7}

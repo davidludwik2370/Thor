@@ -586,7 +586,7 @@ class Purity:
         if n.kind=='Compound':
             result=Flow()
             typ=self.context_type(n)
-            if typ.kind in {'array','fixed'}:result.owner=self.owner(n)
+            if typ.kind in {'array','fixed','struct'}:result.owner=self.owner(n)
             if typ.kind=='slice' and n.group('elems') and self.owner(n):result.stack.add(self.owner(n))
             fields=[]
             if typ.kind=='struct' and typ.node:
@@ -598,7 +598,13 @@ class Purity:
                 else:
                     if result.element is None:result.element=Flow()
                     result.element.merge(self.flow(elem,env))
-            return result
+            # An addressed literal denotes one abstract storage site. Rebuilding
+            # its identity on each fixed-point pass grows pointer-alias sets
+            # forever, even in an inactive generic branch such as slice.swap.
+            # Preserve its identity while joining any evolving member provenance.
+            stable=env.setdefault((n,'<literal storage>'),result)
+            if stable is not result:stable.merge(result)
+            return stable
         if n.kind in {'Ternary','WhenExpr','OrElse'}:
             result=Flow();result.merge(self.flow(n.role('x'),env));result.merge(self.flow(n.role('y'),env));return result
         if n.kind == 'SwitchResults':
