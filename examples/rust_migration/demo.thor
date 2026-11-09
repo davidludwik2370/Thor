@@ -26,6 +26,11 @@ captured :: proc($T: typeid, value: int) -> int {
     }
     return calculate(value)
 }
+// Odin still selects the type-specific arm and contextual cast type.
+conditional :: fn(value: $T) -> T {
+    when T == int { return value + 1 } else { return value }
+}
+narrow :: fn(value: int) -> i16 { return auto_cast value }
 square :: fn(value: $T) -> T { return value * value }
 square_root :: fn(value: f64) -> f64 { return intrinsics.sqrt(value) }
 seconds :: fn(value: time.Duration) -> f64 { return time.duration_seconds(value) }
@@ -60,6 +65,9 @@ main :: proc() {
     duration := time.Second
     seed := 3
     if captured(f64, seed) != 5 { panic("captured type parameter") }
+    if conditional(seed) != 4 || conditional(number) != number || narrow(seed) != 3 {
+        panic("native generic condition and contextual cast")
+    }
     if seconds(duration) != 1 || reversed_end(seed) != 4 { panic("checked SDK calls") }
 
     calls := 0

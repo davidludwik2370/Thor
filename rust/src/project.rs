@@ -47,6 +47,10 @@ pub struct Project {
     pub errors: HashMap<String, String>,
     related: HashMap<String, Vec<Value>>,
     type_sites: HashMap<String, (crate::semantics::Ref, String)>,
+    pure_call_paths: BTreeMap<
+        crate::semantics::Ref,
+        BTreeSet<(crate::semantics::Ref, Vec<crate::semantics::Ref>)>,
+    >,
     collections: BTreeMap<String, PathBuf>,
     common: PathBuf,
     file_entry: bool,
@@ -199,6 +203,7 @@ impl Project {
             errors: HashMap::new(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
+            pure_call_paths: BTreeMap::new(),
             native_environment: BTreeMap::new(),
             backend_runtime: PathBuf::new(),
             collections,
@@ -303,6 +308,7 @@ impl Project {
         resolver.prepare_contexts();
         let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = crate::purity::Purity::analyze(&mut resolver);
+        self.pure_call_paths = purity.call_paths.clone();
         let sdk = sdkmirror::SdkMirror::plan(
             &self.sources,
             &purity,
@@ -912,9 +918,97 @@ impl Project {
                 error["pos"]=json!({"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column});
                 error["stage"]=json!("thor");
                 error["msgs"]=json!([primary,format!("While checking {description}")]);
+                self.pure_type_context(&mut error,*site);
             }
             error
         }).collect()
+    }
+    fn pure_type_context(&self, error: &mut Value, site: crate::semantics::Ref) {
+        use crate::semantics::Ref;
+        let source = &self.sources[site.file];
+        let Some(proc) = source
+            .ancestors(site.node)
+            .find(|node| source.node(*node).kind == "Procedure")
+        else {
+            return;
+        };
+        if source.node(proc).data["pure"] == true {
+            return;
+        }
+        let Some(paths) = self.pure_call_paths.get(&Ref {
+            file: site.file,
+            node: proc,
+        }) else {
+            return;
+        };
+        let paths = paths
+            .iter()
+            .filter(|(_, via)| !via.is_empty())
+            .collect::<Vec<_>>();
+        if paths.is_empty() {
+            return;
+        }
+        let position = |reference: Ref| {
+            let s = &self.sources[reference.file];
+            let span = s.node(reference.node).span;
+            let (line, column) = s.position(span.start);
+            let (end_line, end_column) = s.position(span.end);
+            json!({"file":s.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column})
+        };
+        let procedure_name = |reference: Ref| {
+            let s = &self.sources[reference.file];
+            s.node(reference.node)
+                .parent
+                .and_then(|decl| s.group(decl, "names").first().copied())
+                .map(|name| s.text(name).to_string())
+                .unwrap_or_else(|| "anonymous fn".into())
+        };
+        let mut notes = vec![
+            json!({"pos":position(site),"msgs":["Underlying purity violation in this checked implementation."]}),
+        ];
+        let mut chains = vec![];
+        for (root, via) in &paths {
+            let root_name = procedure_name(*root);
+            let mut names = vec![root_name.clone()];
+            for call in via {
+                let s = &self.sources[call.file];
+                if let Some(callee) = s.role(call.node, "callee") {
+                    names.push(s.text(callee).to_string());
+                }
+            }
+            chains.push(names.join(" -> "));
+            notes.push(json!({"pos":position(*root),"msgs":[format!("fn '{root_name}' requires its entire call chain to be pure; ordinary proc callers do not impose this requirement.")]}));
+            for call in via.iter().skip(usize::from(paths.len() == 1)) {
+                notes.push(json!({"pos":position(*call),"msgs":[format!("Checked call reached from fn '{root_name}'.")]}));
+            }
+        }
+        if paths.len() == 1 {
+            let (root, via) = paths[0];
+            let first = via[0];
+            let s = &self.sources[first.file];
+            let callee = s
+                .role(first.node, "callee")
+                .map(|node| s.text(node))
+                .unwrap_or("this procedure");
+            let primary = error["msgs"][0]
+                .as_str()
+                .unwrap_or("Invalid pure value type")
+                .trim_start_matches("Compile time panic: ")
+                .to_string();
+            error["pos"] = position(first);
+            error["msgs"][0] = json!(format!(
+                "Pure function '{}' cannot call '{callee}': {primary}",
+                procedure_name(*root)
+            ));
+        }
+        if let Some(messages) = error["msgs"].as_array_mut() {
+            messages.push(json!(format!(
+                "Pure call chain{}: {}.",
+                if chains.len() == 1 { "" } else { "s" },
+                chains.join("; ")
+            )));
+        }
+        error["related"] = json!(notes);
     }
     fn remap_references(&self, text: &str) -> String {
         let mut text = text.to_string();

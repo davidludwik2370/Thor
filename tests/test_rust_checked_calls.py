@@ -139,17 +139,11 @@ second::fn(n:int)->int{return helper(n)}
         for flags in (['-debug'],native.UNCHECKED):
             with self.subTest(flags=flags):self.compare(source,files=files,flags=flags,directory=True)
 
-    def test_unported_public_generic_branch_retains_migration_status(self):
-        import json
-        self.source.write_text(self.program('n:=3;_=work(n)', '''
+    def test_public_generic_branch_with_eligible_arms_is_checked(self):
+        self.tracked(self.program('n:=3;if work(n)!=3{panic("generic branch")}', '''
 identity::proc(value:$T)->T{return value}
 work::fn(value:$T)->T{when T==int{return identity(value)}else{return value}}
 '''))
-        reference=self.invoke('python',command='check')
-        self.assertEqual(reference.returncode,0,reference.stderr)
-        native=self.invoke('rust',command='check',flags=['-json-errors'])
-        self.assertEqual(native.returncode,3,native.stderr)
-        self.assertEqual(json.loads(native.stderr)['errors'][0]['stage'],'rust-migration')
 
     def test_checked_result_copy_restores_writable_access_from_readonly_inputs(self):
         self.tracked(self.program('values :> []int{3};if work(values)!=9||values[0]!=3{panic("checked result storage")}', '''

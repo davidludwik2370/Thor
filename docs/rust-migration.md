@@ -618,3 +618,36 @@ seven assertion-hygiene checks passed, as did the Rust unit tests in debug and
 release and Clippy with warnings denied. The earlier captured-type checkpoint
 also completed 30 TLS checks after its commit. The broader native acceptance
 suite is rerun at the next combined checkpoint.
+
+## Generic conditional branches and pure call context
+
+Unresolved generic `when` conditions can now remain native when every possible
+arm can be verified as eligible. This covers public generic functions and checked
+ordinary helpers, type and constant-value conditions, conditional expressions,
+type-specific inactive code and independent owned results. Type comparisons
+against pointer *types* do not observe runtime pointer identities. Native exact
+parameter/result proofs validate unresolved generic type slots.
+
+An unresolved condition with a potentially impure arm still produces an explicit
+migration gap. The compiler must first know which arm is selected before it can
+report that arm as a real source violation. Runtime state accessed by the
+condition itself remains an actual purity error. Conditional generic mutation
+and ownership cases that need more precise provenance also remain unported.
+
+Native type-proof diagnostics now retain the checked source call paths. With a
+single path into an ordinary helper, the primary error points at the requiring
+`fn` call, with the helper's underlying operation and pure declaration as related
+locations. Multiple callers/specializations retain the underlying primary
+location and identify the possible checked paths in notes, rather than assigning
+the error to a possibly unrelated specialization.
+
+The combined checkpoint passed all 224 reference checks and 21 TLS checks. The
+native/differential, memory-report, comparison and assertion-hygiene gate ran
+443 checks: 442 passed; one new diagnostic fixture incorrectly used an Odin-invalid
+`int`-to-pointer cast and therefore received two errors. Correcting its input to
+`uintptr` isolated the intended purity violation, and that test passed separately.
+The additional multiple-caller diagnostic test also passed. No production-code
+change was needed for that fixture correction. All eight existing Rust unit tests
+passed in debug and release, Clippy passed with warnings denied, and the updated
+example matched both engines in checked debug and unchecked release builds with
+empty allocation reports.

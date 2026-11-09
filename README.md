@@ -1302,6 +1302,11 @@ calculate :: fn(x: int) -> int {
 }
 ```
 
+Numeric casts, including `auto_cast`, keep Odin's type and overload inference.
+Pure code cannot use casts to manufacture pointers or expose pointer identities;
+that restriction also covers pointer elements inside converted arrays/slices.
+Native type queries may still inspect such types without executing a conversion.
+
 The permission follows the affected storage. A local record/header containing an
 input slice still borrows that slice; forwarding it through a pointer, field,
 subslicing, reference loop or another helper does not permit writing its elements.

@@ -22,12 +22,15 @@ pub struct Facts {
     pub gaps: BTreeMap<Ref, Ref>,
     pub targets: BTreeMap<Ref, BTreeSet<Ref>>,
     pub defaults: BTreeSet<Ref>,
+    /// Source call paths explain why an ordinary proc receives pure type proofs.
+    pub call_paths: BTreeMap<Ref, BTreeSet<(Ref, Vec<Ref>)>>,
 }
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
     facts: Facts,
     visiting: HashSet<(Ref, Vec<(String, Type)>)>,
     constants: HashSet<(Ref, Ref)>,
+    speculative: usize,
 }
 impl<'a, 'r> Purity<'a, 'r> {
     pub fn analyze(r: &'r mut Resolver<'a>) -> Facts {
@@ -52,6 +55,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             facts: Facts::default(),
             visiting: HashSet::new(),
             constants: HashSet::new(),
+            speculative: 0,
         };
         for root in roots {
             if this.r.active_definition(root) {
@@ -84,6 +88,12 @@ impl<'a, 'r> Purity<'a, 'r> {
         self.r.sources[r.file].node(r.node).kind.as_str()
     }
     fn fault(&mut self, root: Ref, origin: Ref, via: &[Ref], message: impl Into<String>) {
+        // A native-selected arm may be inactive. Until selection is ported, an
+        // unsafe possible arm is a migration gap, not a source-program error.
+        if self.speculative > 0 {
+            self.gap(root, origin);
+            return;
+        }
         let site = via.first().copied().unwrap_or(origin);
         let faults = self.facts.faults.entry(root).or_default();
         let message = message.into();
@@ -109,6 +119,13 @@ impl<'a, 'r> Purity<'a, 'r> {
         self.facts.gaps.entry(root).or_insert(origin);
     }
     fn visit(&mut self, root: Ref, proc: Ref, bindings: Substitutions, via: Vec<Ref>) {
+        if via.len() <= 40 {
+            self.facts
+                .call_paths
+                .entry(proc)
+                .or_default()
+                .insert((root, via.clone()));
+        }
         let key = (
             proc,
             bindings
@@ -235,7 +252,14 @@ impl<'a, 'r> Purity<'a, 'r> {
                         return;
                     }
                     None => {
-                        self.gap(root, cond);
+                        self.walk(root, proc, cond, bindings, via);
+                        self.speculative += 1;
+                        for role in ["body", "else", "x", "y"] {
+                            if let Some(branch) = self.role(node, role) {
+                                self.walk(root, proc, branch, bindings, via);
+                            }
+                        }
+                        self.speculative -= 1;
                         return;
                     }
                 }
@@ -343,7 +367,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if ["==","!=","<",">","<=",">=","in","not_in"].contains(&source.node(node.node).op.as_str()) {
                     let left=self.role(node,"left");let right=self.role(node,"right");
                     let null=left.into_iter().chain(right).any(|r|self.text(r)=="nil");
-                    if !null {
+                    if !null && !left.into_iter().chain(right).any(|value|self.r.denotes_type(value)) {
                         for value in left.into_iter().chain(right) {
                             let typ=self.r.specialized_type(value,bindings);
                             if self.pointers(&typ,&mut HashSet::new()) {
@@ -599,7 +623,9 @@ impl<'a, 'r> Purity<'a, 'r> {
             return false;
         }
         match typ {
-            Type::Unknown | Type::Generic | Type::Soa(_) => true,
+            Type::Unknown | Type::Soa(_) => true,
+            // Exact native parameter/result contracts validate bare type slots.
+            Type::Generic => false,
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .r
                 .record_fields(typ)
