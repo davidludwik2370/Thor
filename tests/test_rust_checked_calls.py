@@ -139,12 +139,11 @@ second::fn(n:int)->int{return helper(n)}
         for flags in (['-debug'],native.UNCHECKED):
             with self.subTest(flags=flags):self.compare(source,files=files,flags=flags,directory=True)
 
-    def test_unported_record_schema_retains_migration_status(self):
+    def test_unported_public_generic_schema_retains_migration_status(self):
         import json
         self.source.write_text(self.program('n:=3;_=work(n)', '''
-Row::struct{value:int}
 identity::proc(value:$T)->T{return value}
-work::fn(n:int)->int{row:=Row{n};return identity(row).value}
+work::fn(value:$T)->T{return identity(value)}
 '''))
         reference=self.invoke('python',command='check')
         self.assertEqual(reference.returncode,0,reference.stderr)
@@ -157,6 +156,18 @@ work::fn(n:int)->int{row:=Row{n};return identity(row).value}
 borrow::proc(values:[]int)->[]int{return values}
 work::fn(values:[]int)->int{copy:=borrow(values);copy[0]=9;return copy[0]}
 '''))
+
+    def test_alias_and_mut_permission_requests_are_not_themselves_purity_effects(self):
+        self.tracked(self.program('values:=[]int{3};if work(values)!=3{panic("read-only helper effects")}', '''
+read::proc(#mut values:[]int)->int{alias:=values;return alias[0]}
+work::fn(values:[]int)->int{return read(values)}
+'''))
+        for statement in ('alias[0]=9','delete(alias)'):
+            with self.subTest(statement=statement):
+                self.compare(self.program('values:=[]int{3};_=work(values)', '''
+change::proc(#mut values:[]int){alias:=values;'''+statement+'''}
+work::fn(values:[]int)->int{change(values);return 0}
+'''),command='check',fail='borrowed from an input')
 
     def test_imported_public_helper_keeps_private_implementation_access(self):
         self.tracked(self.program('n:=3;if work(n)!=3{panic("imported checked helper")}', '''

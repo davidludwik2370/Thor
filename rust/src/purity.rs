@@ -158,18 +158,26 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
                     self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, any, maps, sets and procedure values are not pure inputs/results.");
                 }
-                if proc != root && Self::pending_record_schema(&typ) {
+                if proc != root && self.unresolved_schema(&typ, &mut HashSet::new()) {
                     self.gap(root, annotation);
                 }
             }
         }
-        if proc != root {
-            for (_, annotation) in self.r.fields(sig, "results") {
-                if let Some(annotation) = annotation {
-                    let typ = self.r.specialized_type(annotation, &bindings);
-                    if Self::pending_record_schema(&typ) {
-                        self.gap(root, annotation);
-                    }
+        for (_, annotation) in self.r.fields(sig, "results") {
+            if let Some(annotation) = annotation {
+                let typ = self.r.specialized_type(annotation, &bindings);
+                if self.unsafe_storage(&typ, &mut HashSet::new()) {
+                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, any, maps, sets, raw unions and procedure values are not pure inputs/results.");
+                }
+                if proc != root && self.unresolved_schema(&typ, &mut HashSet::new()) {
+                    self.gap(root, annotation);
+                }
+            }
+        }
+        if let Some(params) = self.role(sig, "params") {
+            for field in self.children(params) {
+                if self.r.sources[field.file].node(field.node).data["using_field"] == true {
+                    self.gap(root, field);
                 }
             }
         }
@@ -228,6 +236,14 @@ impl<'a, 'r> Purity<'a, 'r> {
             }
         }
         match kind.as_str() {
+            "Using" => {
+                for value in source.group(node.node,"values").to_vec() {
+                    let value=Ref{file:node.file,node:value};
+                    let mut typ=self.r.specialized_type(value,bindings);
+                    while let Type::Pointer(elem)=typ {typ = *elem;}
+                    if matches!(typ,Type::Struct(_)|Type::Record(..)|Type::Anonymous(_)) {self.gap(root,value);}
+                }
+            }
             "Return" if source.group(node.node,"values").is_empty()=> {
                 if let Some(signature)=self.role(proc,"type") {
                     if self.r.fields(signature,"results").iter().any(|(name,_)|name.is_empty()||name=="_") {
@@ -285,6 +301,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if types.iter().any(|typ|self.unsafe_storage(typ,&mut HashSet::new())) {
                     self.fault(root,node,via,"Pure local storage cannot contain raw pointers, any, procedure values, maps, sets or raw unions.");
                 }
+                if source.node(node.node).data["using_field"]==true {self.gap(root,node);}
             }
             "Cast" => {
                 let target=self.role(node,"type").map(|r|if self.kind(r)=="TypeidType" {Type::scalar("typeid")}else{self.r.specialized_type(r,bindings)}).unwrap_or(Type::Unknown);
@@ -527,19 +544,28 @@ impl<'a, 'r> Purity<'a, 'r> {
             _ => false,
         }
     }
-    fn pending_record_schema(typ: &Type) -> bool {
+    fn unresolved_schema(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
+        if !seen.insert(typ.clone()) {
+            return false;
+        }
         match typ {
-            Type::Struct(_)
-            | Type::Record(..)
-            | Type::Anonymous(_)
-            | Type::Union(_)
-            | Type::Soa(_) => true,
+            Type::Unknown | Type::Generic | Type::Soa(_) => true,
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
+                .r
+                .record_fields(typ)
+                .iter()
+                .any(|(_, typ)| self.unresolved_schema(typ, seen)),
+            Type::Union(owner) => self
+                .r
+                .union_variants(*owner)
+                .iter()
+                .any(|typ| self.unresolved_schema(typ, seen)),
             Type::Nominal(_, base)
             | Type::Pointer(base)
             | Type::Slice(base)
             | Type::Dynamic(base)
             | Type::Array { elem: base, .. }
-            | Type::Fixed { elem: base, .. } => Self::pending_record_schema(base),
+            | Type::Fixed { elem: base, .. } => self.unresolved_schema(base, seen),
             _ => false,
         }
     }
@@ -569,6 +595,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .record_fields(t)
                 .iter()
                 .any(|(_, t)| self.unsafe_storage(t, seen)),
+            Type::Union(owner) => self
+                .r
+                .union_variants(*owner)
+                .iter()
+                .any(|typ| self.unsafe_storage(typ, seen)),
             _ => false,
         }
     }
@@ -589,6 +620,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .record_fields(t)
                 .iter()
                 .any(|(_, t)| self.pointers(t, seen)),
+            Type::Union(owner) => self
+                .r
+                .union_variants(*owner)
+                .iter()
+                .any(|typ| self.pointers(typ, seen)),
             _ => false,
         }
     }

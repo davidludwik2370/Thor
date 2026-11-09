@@ -10,6 +10,26 @@ class PureMutationTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_promoted_generic_record_writes_report_the_call_and_recover_unsaved(self):
+        text='''// 😀 source coordinates
+package main
+Inner::struct{values:[]int}
+Outer::struct{using inner:Inner}
+change::proc(input:$T)->int{alias:=input;alias.values[0]=9;return input.values[0]}
+work::fn(input:Outer)->int{return change(input)}
+main::proc(){values:=[]int{3};record:=Outer{Inner{values}};_=work(record)}
+'''
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains='borrowed from an input')
+        self.assertEqual(len(errors),1,errors)
+        self.assertEqual(errors[0]['range']['start'],self.position(text,'change(input)',0))
+        self.assertNotIn('pure_validate',json.dumps(errors))
+        fixed=text.replace('alias.values[0]=9;','')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':fixed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
     def test_owned_borrowed_and_corrected_unsaved_calls(self):
         text='''// 😀 source coordinates
 package main

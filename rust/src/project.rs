@@ -40,6 +40,7 @@ pub struct Project {
     pub outputs: BTreeMap<PathBuf, (usize, Emitted)>,
     pub errors: HashMap<String, String>,
     related: HashMap<String, Vec<Value>>,
+    type_sites: HashMap<String, (crate::semantics::Ref, String)>,
     collections: BTreeMap<String, PathBuf>,
     common: PathBuf,
     file_entry: bool,
@@ -189,6 +190,7 @@ impl Project {
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
             related: HashMap::new(),
+            type_sites: HashMap::new(),
             collections,
             common,
             file_entry,
@@ -409,6 +411,8 @@ impl Project {
                     source.path.parent() == Some(self.options.entry.as_path())
                 },
             );
+            self.type_sites
+                .extend(std::mem::take(&mut lower.type_sites));
             let (emitted, errors) = lower.finish()?;
             self.errors.extend(errors);
             planned.push((self.destination.join(relative), (file, emitted)));
@@ -848,6 +852,15 @@ impl Project {
             if let Some(messages)=error["msgs"].as_array_mut(){for message in messages{
                 if let Some(text)=message.as_str(){let mut text=self.remap_references(text);for (generated,original) in &expression_texts{if text.trim()==generated.trim(){let indent=&text[..text.len()-text.trim_start().len()];text=format!("{indent}{original}");break;}}for (token,replacement) in &self.errors{if text.contains(token){text=replacement.clone();break;}}*message=json!(text);}
             }}
+            if let Some((token,(site,description)))=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
+                .find_map(|message|self.type_sites.iter().find(|(token,_)|message.contains(token.as_str()))) {
+                let source=&self.sources[site.file];let span=source.node(site.node).span;
+                let (line,column)=source.position(span.start);let (end_line,end_column)=source.position(span.end);
+                let primary=error["msgs"][0].as_str().unwrap_or("Invalid pure value type").replace(token,"");
+                error["pos"]=json!({"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column});
+                error["stage"]=json!("thor");
+                error["msgs"]=json!([primary,format!("While checking {description}")]);
+            }
             error
         }).collect()
     }

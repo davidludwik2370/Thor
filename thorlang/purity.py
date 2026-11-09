@@ -28,6 +28,7 @@ class Flow:
     stack: set = field(default_factory=set)
     kind: str = 'unknown'
     copied_base: object = None
+    typ: object = None
 
     def __post_init__(self):
         self.borrowed=permission(self.borrowed)
@@ -61,8 +62,17 @@ class Flow:
         return changed
 
     def member(self,name):
-        if self.kind=='pointer':return self.deref().member(name)
+        if self.kind=='pointer' or self.typ and self.typ.kind=='pointer':return self.deref().member(name)
+        resolver=self.typ.node.source.resolver if self.typ and self.typ.node else None
+        path=resolver.field_path(self.typ,name) if resolver else None
+        if path and len(path)>1:
+            value=self
+            for component in path:value=value.member(component)
+            return value
         value=self.fields.setdefault(name,Flow(owner=self.owner))
+        member=resolver.field(self.typ,name) if resolver else None
+        if member:value.typ=member[0]
+        elif self.typ and name in self.typ.members:value.typ=self.typ.members[name]
         value.origins.update(origin.step(('field',name)) for origin in self.origins if len(origin.path)<24)
         if self.borrowed:
             value.borrowed|=self.borrowed.project(('field',name))
@@ -80,6 +90,7 @@ class Flow:
 
     def item(self):
         if self.element is None:self.element=Flow(owner=self.owner if self.kind in {'array','fixed','generic','unknown'} else None)
+        if self.typ and self.typ.elem:self.element.typ=self.typ.elem
         self.element.origins.update(origin.step(('item',)) for origin in self.origins if len(origin.path)<24)
         if self.borrowed:
             self.element.borrowed|=self.borrowed.project(('item',))
@@ -116,12 +127,13 @@ class Flow:
             if any(len(origin.path)>=24 for origin in self.origins):return Flow(READONLY,location=READONLY)
             self.target=Flow(self.borrowed.project(('deref',)),location=self.origin_location(('deref',)),
                              locations={origin.step(('deref',)) for origin in self.origins})
+        if self.typ and self.typ.kind=='pointer':self.target.typ=self.typ.elem
         return self.target
 
     def header_copy(self,typ,node=None,seen=None,owner=None):
         seen={} if seen is None else seen
         if id(self) in seen:return seen[id(self)]
-        result=Flow(self.borrowed,numeric_copy=self.numeric_copy,target=self.target,copied_from=node,owner=owner,stack=set(self.stack),kind=typ.kind)
+        result=Flow(self.borrowed,numeric_copy=self.numeric_copy,target=self.target,copied_from=node,owner=owner,stack=set(self.stack),kind=typ.kind,typ=typ)
         if typ.kind in {'pointer','generic','unknown'}:result.copied_base=self
         result.origins=set(self.origins)
         seen[id(self)]=result
@@ -469,9 +481,14 @@ class Purity:
         parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
         parts.append(f'else when {meta}.type_is_struct(T) {{')
+        def direct_field(field):
+            # type_has_field includes promoted `using` members. A one-field
+            # structural probe checks physical fields without counting aliases.
+            quoted=json.dumps(field)
+            return f'({meta}.type_has_shared_fields(T,struct{{{field}:{meta}.type_field_type(T,{quoted})}}) when {meta}.type_has_field(T,{quoted}) else false)'
         def count_fields(fields):
             if not fields:return '0'
-            if len(fields)==1:return f'(1 when {meta}.type_has_field(T,{json.dumps(fields[0])}) else 0)'
+            if len(fields)==1:return f'(1 when {direct_field(fields[0])} else 0)'
             middle=len(fields)//2
             return '('+count_fields(fields[:middle])+'+'+count_fields(fields[middle:])+')'
         # Keep checker recursion logarithmic even when SDK access inference has
@@ -495,11 +512,12 @@ class Purity:
                     raw_shapes.add(tuple(n.text for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')))
         for shape in sorted(raw_shapes):
             matches=' && '.join([f'{meta}.type_struct_field_count(T)=={len(shape)}']+
-                                [f'{meta}.type_has_field(T,{json.dumps(name)})' for name in shape])
+                                [direct_field(name) for name in shape])
             parts.append(f'when {matches} {{#panic("Raw-union storage cannot be proved pure: an inaccessible raw-union schema has this field layout"+Site)}}')
         for field in names:
+            predicate=direct_field(field)
             field=json.dumps(field)
-            parts.append(f'when {meta}.type_has_field(T,{field}) {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
+            parts.append(f'when {predicate} {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}')
         parts.extend(['}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
                       f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}}',
                       f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site)}}','}',
@@ -550,6 +568,7 @@ class Purity:
         if n.kind=='Deref':return self.flow(n.role('expr'),env).deref()
         if n.kind=='Selector':
             base=n.role('expr');value=self.flow(base,env)
+            if value.typ is None:value.typ=self.r.type_of(base)
             if self.r.type_of(base).kind=='pointer':value=value.deref()
             return value.member(n.role('field').text)
         if n.kind=='Index':return self.flow(n.role('expr'),env).item()

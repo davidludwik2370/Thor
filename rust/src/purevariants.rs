@@ -212,15 +212,4 @@ impl Lower<'_, '_> {
         }
         Ok(Some(self.splice(id, replacements, vec![])?))
     }
-    pub(super) fn pure_internal_validator(&mut self, site: NodeId) -> String {
-        let name = format!("{}pure_internal_validate", self.prefix);
-        let module = self.module("pure");
-        self.meta = true;
-        let meta = format!("{}meta", self.prefix);
-        let code=self.g(format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid,$Result:bool,$Depth:int,$Site:string){{when Depth>24{{#panic(\"Pure input nesting limit exceeded\"+Site)}}else when {meta}.type_is_pointer(T)||{meta}.type_is_dynamic_array(T)||{meta}.type_is_fixed_capacity_dynamic_array(T){{{name}({meta}.type_elem_type(T),Result,Depth+1,Site)}}else{{{module}.validate(T,Result,Depth,Site)}}}}\n"),site);
-        self.helpers
-            .entry((NodeId(0), self.prefix.clone(), name.clone()))
-            .or_insert(code);
-        name
-    }
 }

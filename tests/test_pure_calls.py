@@ -40,6 +40,29 @@ work::fn(n:int)->([]int,string){return middle(n)}
     def test_unnamed_owned_results_still_require_explicit_return_values(self):
         self.invoke(self.program('_=work(3)','work::fn(n:int)->[]int{_=n;return}\n'),command='check',fail='return values explicitly')
 
+    def test_promoted_fields_are_validated_as_physical_record_fields(self):
+        for input_type in ('Outer','$T'):
+            with self.subTest(input_type=input_type):
+                prefix='''Inner::struct{values:[]int}
+Outer::struct{using inner:Inner}
+leaf::proc(input:'''+input_type+''')->int{return input.values[0]}
+work::fn(input:Outer)->int{return leaf(input)}
+'''
+                for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']):
+                    with self.subTest(flags=flags):
+                        _,result=self.invoke(self.program('source:=[]int{3};view :> Outer{Inner{source}};if work(view)!=3{panic("promoted record")}',prefix),flags=flags)
+                        self.assertEqual(result.stderr,'')
+                self.invoke(self.program('if AUTO!=3||EXPLICIT!=3{panic("promoted compile-time reader")}',prefix+'''
+AUTO::work(Outer{Inner{[]int{3}}})
+EXPLICIT::#run work(Outer{Inner{[]int{3}}})
+'''))
+                for mutation in ('input.values[0]=9;return input.values[0]',
+                                 'alias:=input;alias.values[0]=9;return input.values[0]'):
+                    with self.subTest(mutation=mutation):
+                        self.invoke(self.program('source:=[]int{3};value:=Outer{Inner{source}};_=work(value)',
+                                                 prefix.replace('return input.values[0]',mutation)),
+                                    command='check',fail='borrowed from an input')
+
     def test_runtime_automatic_and_explicit_transitive_calls(self):
         self.invoke(self.program('value:=4;assert(calculate(value)==17&&AUTO==10&&EXPLICIT==26)', '''
 square::proc(x:int)->int{return x*x}

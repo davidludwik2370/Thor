@@ -153,9 +153,10 @@ class Borrowing:
                     if symbol:
                         access=Access(proc,index)
                         value=Permission('access',(access,)) if self.internal(proc) else READONLY
+                        typ=self.r.type_node(field.role('type'))
                         self.envs[proc][symbol.declaration,symbol.name]=Flow(value,location=READONLY,
                             locations={access} if self.internal(proc) else set(),owner=proc,
-                            kind=self.r.type_node(field.role('type')).kind)
+                            kind=typ.kind,typ=typ)
                 for node in self.nodes[proc]:
                     if node.kind!='Call' or self.p.calls.queried(node):continue
                     if self.p.builtin(node) or self.p.approved(node) or node.source.denotes_type(node.role('callee')) or self.p.io_call(node):continue

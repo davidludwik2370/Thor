@@ -4,6 +4,22 @@ use super::*;
 use std::collections::BTreeMap;
 pub type Substitutions = BTreeMap<String, Type>;
 impl Resolver<'_> {
+    pub fn union_variants(&mut self, owner: Ref) -> Vec<Type> {
+        self.sources[owner.file]
+            .group(owner.node, "variants")
+            .to_vec()
+            .into_iter()
+            .map(|node| {
+                self.specialized_type(
+                    Ref {
+                        file: owner.file,
+                        node,
+                    },
+                    &Substitutions::new(),
+                )
+            })
+            .collect()
+    }
     pub fn record_fields(&mut self, typ: &Type) -> Vec<(String, Type)> {
         let (owner, bindings) = match typ {
             Type::Anonymous(fields) => return fields.clone(),

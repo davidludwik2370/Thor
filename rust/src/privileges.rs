@@ -83,6 +83,7 @@ struct Effect {
     deleting: bool,
     reason: String,
     related: Vec<Ref>,
+    changes_storage: bool,
 }
 #[derive(PartialEq, Eq)]
 struct GraphState {
@@ -267,10 +268,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let sig = this.role(proc, "type").unwrap_or(proc);
             let params = this.params(sig);
             for (origin, effect) in this.contexts[c].effects.clone() {
-                if origin.seed.is_some()
-                    || effect.reason.starts_with("take a writable address")
-                    || effect.reason.starts_with("obtain a writable pointer")
-                {
+                if origin.seed.is_some() || !effect.changes_storage {
                     continue;
                 }
                 if let Some(conditional) = effect.unresolved {
@@ -818,6 +816,27 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn require(&mut self, origins: Origins, operation: Ref, c: C, reason: &str, related: Vec<Ref>) {
+        let changes_storage = ![
+            "create a writable slice alias",
+            "assign a writable slice alias",
+            "take a writable address",
+            "obtain a writable pointer",
+            "satisfy explicit #mut",
+            "pass a read-only slice to #mut parameter",
+        ]
+        .iter()
+        .any(|prefix| reason.starts_with(prefix));
+        self.require_effect(origins, operation, c, reason, related, changes_storage);
+    }
+    fn require_effect(
+        &mut self,
+        origins: Origins,
+        operation: Ref,
+        c: C,
+        reason: &str,
+        related: Vec<Ref>,
+        changes_storage: bool,
+    ) {
         let unresolved = self.uncertain.or_else(|| {
             self.contexts[c]
                 .controls
@@ -851,12 +870,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     deleting: self.deleting,
                     reason: reason.into(),
                     related: related.clone(),
+                    changes_storage,
                 };
                 let effects = &mut self.contexts[c].effects;
                 if !effects.contains_key(&origin)
-                    || effects
-                        .get(&origin)
-                        .is_some_and(|old| old.deleting && !incoming.deleting)
+                    || effects.get(&origin).is_some_and(|old| {
+                        (!old.changes_storage && incoming.changes_storage)
+                            || (old.deleting && !incoming.deleting && incoming.changes_storage)
+                    })
                 {
                     effects.insert(origin, incoming);
                     self.changed = true;
@@ -2493,7 +2514,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.uncertain = effect.unresolved.or(previous_uncertainty);
                 let previous_deleting = self.deleting;
                 self.deleting = effect.deleting;
-                self.require(
+                self.require_effect(
                     origins,
                     site,
                     c,
@@ -2503,6 +2524,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         effect.reason
                     ),
                     related,
+                    effect.changes_storage,
                 );
                 self.uncertain = previous_uncertainty;
                 self.deleting = previous_deleting;

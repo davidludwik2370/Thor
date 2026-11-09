@@ -20,6 +20,8 @@ mod defaults;
 mod extrema;
 #[path = "purelower.rs"]
 mod purelower;
+#[path = "pureschema.rs"]
+mod pureschema;
 #[path = "purevariants.rs"]
 mod purevariants;
 #[path = "sets.rs"]
@@ -58,6 +60,7 @@ pub struct Lower<'a, 'r> {
     meta: bool,
     builtin: bool,
     pub errors: HashMap<String, String>,
+    pub type_sites: HashMap<String, (Ref, String)>,
     blocked: HashMap<NodeId, String>,
     assigning: HashSet<NodeId>,
     native_access: HashSet<NodeId>,
@@ -98,6 +101,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             meta: false,
             builtin: false,
             errors: HashMap::new(),
+            type_sites: HashMap::new(),
             blocked: HashMap::new(),
             assigning: HashSet::new(),
             native_access: HashSet::new(),

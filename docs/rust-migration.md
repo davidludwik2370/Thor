@@ -361,3 +361,39 @@ assertion-hygiene checks, plus seven reused acceptance fixtures and two addition
 multiple-result/ignored-parameter regressions. All 112 Python purity, mutation,
 call-context, dynamic-result and I/O checks passed. Rust unit tests pass in debug
 and release profiles, and Clippy passes with warnings denied.
+
+## Record contracts and checked storage provenance
+
+Native pure-call contracts now validate inspected record and union layouts,
+including generic record dimensions. Results recursively own each occurrence of
+a string, slice or dynamic buffer, including repeated aliases inside records and
+union variants. Contextless helpers retain the scalar-only result contract.
+Pointer-containing records remain unavailable as public pure values; internal
+helpers may operate on locally created pointer graphs.
+
+Permission requirements and actual storage changes are tracked separately through
+ordinary call chains. Creating an alias or requesting `#mut` alone does not make
+a procedure impure. A subsequent write or deletion takes priority over that
+permission request, and explicit immutable-slice restrictions remain enforced.
+
+Record validation now uses Odin's physical shared-field metadata to distinguish
+real fields from promoted `using` names. The earlier schema-counting algorithm
+could falsely reject valid promoted records in both engines. Fixing it exposed a
+Python purity-provenance gap: promoted fields inside copied/generic arguments
+could lose their original storage path. Typed flow projections now retain that
+path, including through aliases and pointer-containing internal helper arguments.
+These are reference corrections; the port must not reproduce those bugs.
+
+Native generic type-contract failures carry a source-site token through Odin's
+checker and are retargeted to the original Thor parameter/result annotation.
+The user-facing messages identify the original procedure and rejected type,
+without exposing the generated validator's location or instantiation names.
+Public generic branches, promoted `using` parameter scopes, native SDK checked
+adaptation and compile-time execution still require later migration work.
+
+This checkpoint passed 357 native/differential, memory, comparison and
+assertion-hygiene checks; 325 Python purity, borrowing, binding and default checks;
+44 base purity/evaluation checks; and 13 TLS checks. Focused regressions also
+exercise promoted fields through copied aliases and both automatic and explicit
+compile-time readers. Eight Rust unit tests passed in debug and release profiles;
+Clippy passed with warnings denied.
