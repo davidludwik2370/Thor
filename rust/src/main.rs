@@ -45,8 +45,8 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         println!(
             "{}",
             json!({"engine":"rust","complete":false,"python_fallback":false,"parallel_lowering":false,
-            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","single-value or_panic"],
-            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","pure functions","compile-time execution","big numbers","full interpolation ownership","complete switch/using/callback interactions","comprehensions","full Set temporary ownership","complete optional-result arities","wildcard imports","TLS editor-info","debugger remapping","publishing","vet","project creation"]})
+            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","multiple-value or_panic","runtime collection comprehensions","runtime expanded extrema","slice privileges and contextual mutation summaries","generic inline defaults","macOS allocation tracking and ASan source locations","editor source overlays"],
+            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","pure functions","compile-time execution","big numbers","full interpolation ownership","complete switch/using/callback interactions","compile-time comprehensions","full Set temporary ownership","complete optional-result arities","wildcard imports","TLS editor-info","debugger remapping","publishing","vet","project creation"]})
         );
         return Ok(0);
     }
@@ -82,24 +82,82 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             .unwrap()
             .to_path_buf(),
         maps: false,
+        tracking: "auto".into(),
+        no_sanitize: false,
+        overlays: Default::default(),
     };
     if let Some(root) = env::var_os("THOR_ROOT") {
         options.root = absolute(&PathBuf::from(root))?;
     }
     let mut args = args.into_iter();
     while let Some(argument) = args.next() {
-        match argument.as_str(){
-            "--"=>{options.args=args.collect();break;},
-            "--output-dir"=>options.output=Some(PathBuf::from(args.next().ok_or_else(||Error::new("--output-dir requires a path"))?)),
-            "--cache-dir"=>options.cache=Some(PathBuf::from(args.next().ok_or_else(||Error::new("--cache-dir requires a path"))?)),
-            "--odin"=>options.odin=args.next().ok_or_else(||Error::new("--odin requires a path"))?,
-            "--no-cache"=>options.no_cache=true,
-            "--diagnostic-format"=>{let format=args.next().ok_or_else(||Error::new("--diagnostic-format requires text or json"))?;if format!="text"&&format!="json"{return Err(Error::new("invalid diagnostic format"));}options.json=format=="json";},
-            "--diagnostic-format=json"|"-json-errors"=>options.json=true,
-            "--source-maps"=>options.maps=true,
-            "-debug"=>return Err(Error::new("Rust migration: debug allocation tracking and original-source debugger mapping have not been ported yet; use `thor` for debug builds")),
-            _ if argument.starts_with("--")=>return Err(Error::new(format!("Rust migration: option '{argument}' has not been ported yet"))),
-            _=>options.flags.push(argument),
+        match argument.as_str() {
+            "--" => {
+                options.args = args.collect();
+                break;
+            }
+            "--output-dir" => {
+                options.output = Some(PathBuf::from(
+                    args.next()
+                        .ok_or_else(|| Error::new("--output-dir requires a path"))?,
+                ))
+            }
+            "--cache-dir" => {
+                options.cache = Some(PathBuf::from(
+                    args.next()
+                        .ok_or_else(|| Error::new("--cache-dir requires a path"))?,
+                ))
+            }
+            "--odin" => {
+                options.odin = args
+                    .next()
+                    .ok_or_else(|| Error::new("--odin requires a path"))?
+            }
+            "--no-cache" => options.no_cache = true,
+            "--diagnostic-format" => {
+                let format = args
+                    .next()
+                    .ok_or_else(|| Error::new("--diagnostic-format requires text or json"))?;
+                if format != "text" && format != "json" {
+                    return Err(Error::new("invalid diagnostic format"));
+                }
+                options.json = format == "json";
+            }
+            "--diagnostic-format=json" | "-json-errors" => options.json = true,
+            "--source-maps" => options.maps = true,
+            "--track-allocations" => {
+                options.tracking = args
+                    .next()
+                    .ok_or_else(|| Error::new("--track-allocations requires a mode"))?
+            }
+            "--no-sanitize" => options.no_sanitize = true,
+            "--overlay" => {
+                let path = args
+                    .next()
+                    .ok_or_else(|| Error::new("--overlay requires a file"))?;
+                let packet: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+                let entries = packet["Replace"]
+                    .as_object()
+                    .ok_or_else(|| Error::new("overlay requires a Replace object"))?;
+                for (original, replacement) in entries {
+                    let replacement = replacement
+                        .as_str()
+                        .ok_or_else(|| Error::new("overlay replacement must be a path"))?;
+                    let original = absolute(std::path::Path::new(original))?;
+                    options
+                        .overlays
+                        .insert(original, std::fs::read_to_string(replacement)?);
+                }
+            }
+            _ if argument.starts_with("--track-allocations=") => {
+                options.tracking = argument[20..].into()
+            }
+            _ if argument.starts_with("--") => {
+                return Err(Error::new(format!(
+                    "Rust migration: option '{argument}' has not been ported yet"
+                )))
+            }
+            _ => options.flags.push(argument),
         }
     }
     let mut project = Project::new(options)?;

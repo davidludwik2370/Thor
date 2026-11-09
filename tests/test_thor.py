@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-THOR = ROOT / "thor"
+THOR = Path(os.environ.get("THOR_TEST_COMPILER", ROOT / "thor"))
 
 
 class ThorTests(unittest.TestCase):

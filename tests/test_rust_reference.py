@@ -10,11 +10,16 @@ from tests import test_thor as base
 from tests import test_rust_compiler as rust
 from tests import test_t13_t17 as expressions
 from tests import test_typed_loops as loops
+from tests import test_slice_access as slices
+from tests import test_slice_copy_hardening as copies
+from tests import test_comprehensions as comprehensions
+from tests import test_extrema as extrema
 
 
 class RustReferenceTests(unittest.TestCase):
     setUpClass = classmethod(rust.RustCompilerTests.setUpClass.__func__)
     program = base.ThorTests.program
+    check = copies.SliceCopyHardeningTests.check
 
     def invoke(self, source, *, files=None, command='run', fail=None, flags=(),
                args=(), expected=None, directory=False):
@@ -92,6 +97,30 @@ def _install():
     for suite, names in [(expressions.ExpressionTests, EXPRESSIONS), (loops.TypedLoopTests, LOOPS)]:
         for name in names:
             setattr(RustReferenceTests, 'test_'+name, getattr(suite, 'test_'+name))
+    # These exclusions are explicit migration gaps, not skip-on-unsupported.
+    # Every other slice fixture must pass against both engines.
+    pending = {'test_compile_time_execution_does_not_bypass_readonly_locals',
+               'test_compile_time_readers_accept_readonly_locals',
+               'test_previously_evaluated_dimensions_select_readonly_generic_paths',
+               'test_pure_result_cloning_restores_independent_writable_access'}
+    for suite in (slices.SliceAccessTests,copies.SliceCopyHardeningTests):
+        for name in unittest.defaultTestLoader.getTestCaseNames(suite):
+            if name not in pending:
+                setattr(RustReferenceTests,'test_borrowing_'+name[5:],getattr(suite,name))
+    for name in ('explicit_collections_and_duplicates','flatten_all_destinations_and_map_last_wins',
+                 'fstring_elements_keep_owned_storage_and_shallow_slice_elements',
+                 'package_runtime_initializers_and_anonymous_owned_arguments',
+                 'or_else_unwraps_output_once_with_lazy_fallback',
+                 'distinct_containers_and_mixed_untyped_range_bounds',
+                 'or_else_map_lookup_and_optional_fallback_call'):
+        setattr(RustReferenceTests,'test_comprehension_'+name,getattr(comprehensions.ComprehensionTests,'test_'+name))
+    for name in ('slice_results_empty_singleton_and_ignored_status',
+                 'arrays_one_element_multiple_expansions_and_native_forms',
+                 'calls_once_in_source_order_with_array_snapshots',
+                 'generic_and_contextless_code','aliases_shadowing_and_native_odin_passthrough',
+                 'nonempty_allocation_free_reductions','rejected_shapes_types_and_empty_arrays',
+                 'optional_status_fallback_and_multiple_rhs_values','float_special_values_match_native_left_fold'):
+        setattr(RustReferenceTests,'test_extrema_'+name,getattr(extrema.ExtremaTests,'test_'+name))
 
 
 _install()

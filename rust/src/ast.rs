@@ -478,6 +478,16 @@ impl Source {
                 + 1,
         )
     }
+    pub fn rune_position(&self, offset: usize) -> (usize, usize) {
+        let line = self
+            .line_starts
+            .partition_point(|start| *start <= offset)
+            .saturating_sub(1);
+        (
+            line + 1,
+            self.raw[self.line_starts[line]..offset].chars().count() + 1,
+        )
+    }
     pub fn at(&self, span: Span, relative: NodeId) -> Option<NodeId> {
         let nodes = self.by_span.get(&span)?;
         nodes

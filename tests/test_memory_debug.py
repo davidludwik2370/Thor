@@ -15,6 +15,7 @@ from thorlang.memorymap import Locations, decode, encode, read_binary
 from thorlang.symbolizer import Symbolizer
 
 ROOT = Path(__file__).resolve().parents[1]
+THOR = Path(os.environ.get("THOR_TEST_COMPILER", ROOT / "thor"))
 
 
 class MemoryPolicyTests(unittest.TestCase):
@@ -88,7 +89,7 @@ class MemoryDebugTests(unittest.TestCase):
             path = self.root/name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
-        result = subprocess.run([str(ROOT/'thor'), 'build', str(self.source), *flags,
+        result = subprocess.run([str(THOR), 'build', str(self.source), *flags,
             '--output-dir', str(self.output), '-out:'+str(self.exe)], cwd=self.root,
             capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
@@ -286,7 +287,7 @@ main::proc(){p:=new(int);free(rawptr(p));assert(p^==1)}
 
     def test_debug_compiler_errors_and_compile_time_cache_are_unchanged(self):
         self.source.write_text('package main\nmain :: proc() {\n    value: int = "wrong"\n    _ = value\n}\n')
-        result = subprocess.run([str(ROOT/'thor'), 'build', str(self.source), '-debug',
+        result = subprocess.run([str(THOR), 'build', str(self.source), '-debug',
             '--output-dir', str(self.output), '-out:'+str(self.exe)], cwd=self.root,
             capture_output=True, text=True, timeout=90)
         self.assertNotEqual(result.returncode, 0)
@@ -386,7 +387,7 @@ import "core:testing"
     testing.expect(t, text == "test 1")
 }
 ''')
-        result = subprocess.run([str(ROOT/'thor'), 'test', str(self.source), '-debug',
+        result = subprocess.run([str(THOR), 'test', str(self.source), '-debug',
             '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true', '--output-dir', str(self.output)],
             capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)

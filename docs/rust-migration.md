@@ -1,4 +1,4 @@
-# Rust migration: initial native checkpoint
+# Rust migration: independent native compiler
 
 The Python compiler is still the supported default. The Rust port is **incomplete**;
 this checkpoint does not complete stages 1–3 or establish whole-language parity.
@@ -106,17 +106,18 @@ rather than behavior the native port should reproduce.
 
 - Complete symbol/type/overload resolution, imported/native type facts, generic
   specialization and conditional declarations; the initial resolver is a subset.
-- Full immutable-slice borrowing and mutation inference, recursive propagation,
-  aliases, aggregates, copy boundaries and `#mut` contracts.
+- Complete immutable-slice integration with pure calls, evaluated generic dimensions
+  and all remaining native type/overload specialization paths. The runtime slice
+  acceptance suites are now included in the differential gate.
 - Purity, local mutation provenance, checked callees, scratch/result ownership,
   dependency extraction, automatic evaluation, `#run`, and evaluation caching.
-- Integer/Rational lowering and compile-time values; comprehensions, reductions,
+- Integer/Rational lowering and compile-time values; compile-time comprehensions and reductions,
   full temporary ownership, wildcard exports and complete optional-result arities.
 - Complete switch/generic-callback and promoted-field context handling, Set
   temporaries, and native access interactions beyond the selected reference cases.
 - Remaining diagnostic cleanup/related notes, frontend-warning policy, the
   unused-inner-scope warning behavior, and source/resource path rewriting.
-- Debug source regions, sanitizer/tracker integration, editor overlays and TLS
+- Full debug source regions, remaining sanitizer/tracker interactions and TLS
   `--editor-info`; publishing, project creation and vet commands.
 - Full existing-suite and real-project differential acceptance. Only then should
   phase-level speed comparisons, default-engine changes, or parallelization begin.
@@ -185,3 +186,40 @@ The [raw measurements](benchmarks/rust-migration-checkpoint.json) retain all
 samples and the generated source hash. These describe one supported synthetic
 case. They do not estimate real-project performance or establish whole-language
 parity; the remaining semantic work must precede those comparisons.
+
+## Runtime borrowing and construction checkpoint
+
+The native engine now has procedure summaries for parameter-relative writes,
+returned aliases and out-parameter stores. They preserve nested record/array
+copy boundaries, shallow slice copies, named/default/variadic arguments,
+conditional type specializations, union narrowing and SoA columns. Ordinary
+inline scalar/record/array copies stay writable; retaining a reference to a
+read-only element keeps its access restriction. Native SDK type inspection uses
+shared parser entries rather than copying SDK sources into each project.
+
+Runtime one-clause comprehensions support slices, dynamic arrays, sets and maps,
+filters, flattening, optional fallback outputs and distinct container types.
+Expanded `min`/`max` calls preserve evaluation order and optional status for
+possibly empty slices. Generic inline callback defaults are lifted to named
+native generic helpers. These are independent Rust implementations.
+
+macOS native builds support the debug allocation tracker and ASan defaults,
+tracking overrides and original Thor report locations, including standalone
+executables moved away from their generated sources. Ordinary builds emit no
+tracking support. The source-map lookup deliberately disables optimization for
+that diagnostic helper: optimizing its constant tables increased one unchecked
+tracking build from roughly 3 seconds to 70 seconds. The program itself retains
+its requested optimization level. Full debugger/DWARF and TLS editor-information
+parity remain outstanding.
+
+The persistent acceptance gate now reuses 113 runtime slice fixtures, seven
+runtime comprehension fixtures, nine expanded-extrema fixtures and 13 standalone
+memory-debug fixtures in addition to the earlier native and comparison tests.
+The four slice fixtures requiring pure functions/compile-time evaluation remain
+explicit migration gaps; they are not counted as passing native acceptance.
+
+This checkpoint passed all 267 tests in the combined native differential,
+reference acceptance, memory-report, comparator and assertion-hygiene gate.
+All eight Rust unit tests also pass in debug and release profiles, and Clippy
+passes with warnings denied. This is expanded runtime coverage, not completion
+of migration stages 1–3.

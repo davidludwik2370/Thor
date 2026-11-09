@@ -8,6 +8,8 @@ pub mod formatting;
 pub mod frontend;
 pub mod kind;
 pub mod lower;
+pub mod memory;
+pub mod privileges;
 pub mod project;
 pub mod semantics;
 

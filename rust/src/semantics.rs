@@ -3,8 +3,11 @@
 use crate::ast::{NodeId, Source};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+#[path = "typefacts.rs"]
+mod typefacts;
+pub use typefacts::Substitutions;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct Ref {
     pub file: usize,
     pub node: NodeId,
@@ -34,6 +37,14 @@ pub enum Type {
     },
     Set(Box<Type>),
     Struct(Ref),
+    Anonymous(Vec<(String, Type)>),
+    Soa(Box<Type>),
+    Record(Ref, Vec<(String, Type)>),
+    Nominal(Ref, Box<Type>),
+    Fixed {
+        elem: Box<Type>,
+        length: Option<i128>,
+    },
     Enum(Ref),
     Union(Ref),
     Procedure(Ref),
@@ -55,14 +66,24 @@ impl Type {
             | Self::Dynamic(elem)
             | Self::Pointer(elem)
             | Self::Set(elem) => Some(elem),
+            Self::Soa(elem) => Some(elem),
+            Self::Nominal(_, base) => base.element(),
+            Self::Fixed { elem, .. } => Some(elem),
             Self::Map { value, .. } => Some(value),
             _ => None,
         }
     }
     pub fn is_sequence(&self) -> bool {
+        if let Self::Nominal(_, base) = self {
+            return base.is_sequence();
+        }
         matches!(
             self,
-            Self::Array { .. } | Self::Slice(_) | Self::Dynamic(_) | Self::String { .. }
+            Self::Array { .. }
+                | Self::Slice(_)
+                | Self::Dynamic(_)
+                | Self::Fixed { .. }
+                | Self::String { .. }
         )
     }
     pub fn defaulted(self) -> Self {
@@ -85,6 +106,9 @@ impl Type {
         )
     }
     pub fn numeric(&self) -> bool {
+        if let Self::Nominal(_, base) = self {
+            return base.numeric();
+        }
         match self {
             Self::Scalar { name, .. } => {
                 name == "int"
@@ -119,6 +143,7 @@ pub struct Resolver<'a> {
     types: HashMap<Ref, Type>,
     active: HashSet<Ref>,
     pub conditional_immutables: HashSet<Ref>,
+    pub flags: Vec<String>,
 }
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
     let node = source.node(id);
@@ -155,6 +180,9 @@ pub fn scope(source: &Source, id: NodeId) -> NodeId {
 }
 impl<'a> Resolver<'a> {
     pub fn new(sources: &'a [Source]) -> Self {
+        Self::with_flags(sources, &[])
+    }
+    pub fn with_flags(sources: &'a [Source], flags: &[String]) -> Self {
         let mut this = Self {
             sources,
             symbols: vec![],
@@ -162,6 +190,7 @@ impl<'a> Resolver<'a> {
             types: HashMap::new(),
             active: HashSet::new(),
             conditional_immutables: HashSet::new(),
+            flags: flags.to_vec(),
         };
         for (file, source) in sources.iter().enumerate() {
             if source.excluded {
@@ -216,10 +245,14 @@ impl<'a> Resolver<'a> {
                 };
                 let values = source.group(id, "values");
                 for (index, name_node) in names.into_iter().enumerate() {
-                    let name = source
-                        .text(name_node)
-                        .trim_start_matches(['&', '$'])
-                        .to_string();
+                    let name = if source.node(name_node).kind == "PolyType" {
+                        source.names.get(source.node(name_node).name).to_string()
+                    } else {
+                        source
+                            .text(name_node)
+                            .trim_start_matches(['&', '$'])
+                            .to_string()
+                    };
                     if name == "_" {
                         continue;
                     }
@@ -288,7 +321,15 @@ impl<'a> Resolver<'a> {
                             matches!(
                                 sources[s.reference.file].node(a).kind.as_str(),
                                 "When" | "CompileSwitch"
-                            )
+                            ) && sources[s.reference.file]
+                                .role(a, "cond")
+                                .is_none_or(|node| {
+                                    this.condition(Ref {
+                                        file: s.reference.file,
+                                        node,
+                                    })
+                                    .is_none()
+                                })
                         })
                 })
             {
@@ -304,16 +345,28 @@ impl<'a> Resolver<'a> {
             .chain(source.ancestors(reference.node))
             .filter(|id| is_scope(source, *id))
         {
+            if source.node(owner).kind == "Range"
+                && ["expr", "init"].iter().any(|role| {
+                    source.role(owner, role).is_some_and(|expr| {
+                        source
+                            .node(expr)
+                            .span
+                            .contains(source.node(reference.node).span)
+                    })
+                })
+            {
+                continue;
+            }
             if let Some(ids) = self.scopes.get(&(reference.file, owner, name.to_string())) {
                 let own_decl = source.ancestors(reference.node).find(|id| {
                     source.node(*id).kind == "Declaration"
                         && source.node(*id).mutable
                         && !source.group(*id, "names").contains(&reference.node)
                 });
-                if let Some(id) = ids
-                    .iter()
-                    .find(|id| Some(self.symbols[**id].reference.node) != own_decl)
-                {
+                if let Some(id) = ids.iter().find(|id| {
+                    Some(self.symbols[**id].reference.node) != own_decl
+                        && self.active_definition(self.symbols[**id].reference)
+                }) {
                     return Some(*id);
                 }
             }
@@ -323,7 +376,46 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             if let Some(ids) = self.scopes.get(&(file, NodeId(0), name.to_string())) {
-                return ids.first().copied();
+                return ids
+                    .iter()
+                    .find(|id| self.active_definition(self.symbols[**id].reference))
+                    .copied();
+            }
+        }
+        for (index, node) in source.nodes.iter().enumerate() {
+            if node.kind != "Using" || node.span.start >= source.node(reference.node).span.start {
+                continue;
+            }
+            let owner = scope(source, NodeId(index));
+            if owner != NodeId(0)
+                && !source
+                    .node(owner)
+                    .span
+                    .contains(source.node(reference.node).span)
+            {
+                continue;
+            }
+            for value in source.group(NodeId(index), "values") {
+                let alias = source.text(*value);
+                for import in &source.nodes {
+                    if import.kind != "Import" {
+                        continue;
+                    }
+                    let Ok(path) = crate::lower::unquote(&import.op) else {
+                        continue;
+                    };
+                    let explicit = source.names.get(import.name);
+                    let namespace = if explicit.is_empty() {
+                        path.rsplit(['/', ':']).next().unwrap_or("")
+                    } else {
+                        explicit
+                    };
+                    if namespace == alias {
+                        if let Some(symbol) = self.package_symbol(source, &path, name) {
+                            return Some(symbol);
+                        }
+                    }
+                }
             }
         }
         None
@@ -332,18 +424,26 @@ impl<'a> Resolver<'a> {
         let source = &self.sources[reference.file];
         match source.node(reference.node).kind.as_str() {
             "Ident" | "PolyType" => {
-                let name = source.text(reference.node).trim_start_matches('$');
+                let name = if source.node(reference.node).kind == "PolyType" {
+                    source.names.get(source.node(reference.node).name)
+                } else {
+                    source.text(reference.node).trim_start_matches('$')
+                };
                 self.lookup(reference, name).or_else(|| {
                     source
                         .selections
                         .iter()
-                        .find(|s| s.names.iter().any(|item| item == name))
+                        .find(|s| s.wildcard || s.names.iter().any(|item| item == name))
                         .and_then(|selection| crate::lower::unquote(&selection.path).ok())
                         .and_then(|path| self.package_symbol(source, &path, name))
                 })
             }
             "Selector" => {
                 let base = source.role(reference.node, "expr")?;
+                if source.node(reference.node).op == "->" {
+                    let field = source.role(reference.node, "field")?;
+                    return self.lookup(reference, source.text(field));
+                }
                 if source.node(base).kind != "Ident"
                     || self
                         .lookup(
@@ -397,15 +497,259 @@ impl<'a> Resolver<'a> {
             }
             self.scopes
                 .get(&(file, NodeId(0), name.to_string()))
-                .and_then(|symbols| symbols.first())
+                .and_then(|symbols| {
+                    symbols
+                        .iter()
+                        .find(|id| self.active_definition(self.symbols[**id].reference))
+                })
                 .copied()
         })
+    }
+    pub fn active_definition(&self, r: Ref) -> bool {
+        let source = &self.sources[r.file];
+        let span = source.node(r.node).span;
+        for ancestor in source.ancestors(r.node) {
+            if source.node(ancestor).kind != "When" {
+                continue;
+            }
+            let Some(cond) = source.role(ancestor, "cond") else {
+                continue;
+            };
+            if let Some(selected) = self.condition(Ref {
+                file: r.file,
+                node: cond,
+            }) {
+                let arm = source.role(ancestor, if selected { "body" } else { "else" });
+                if !arm.is_some_and(|arm| source.node(arm).span.contains(span)) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+    pub fn condition(&self, r: Ref) -> Option<bool> {
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        let role = |name| s.role(r.node, name).map(|node| Ref { file: r.file, node });
+        match n.kind.as_str() {
+            "Paren" => self.condition(role("expr")?),
+            "Ident" => match s.text(r.node) {
+                "true" => Some(true),
+                "false" => Some(false),
+                "ODIN_DEBUG" => Some(self.flags.iter().any(|f| f == "-debug")),
+                _ => None,
+            },
+            "Unary" if n.op == "!" => self.condition(role("expr")?).map(|x| !x),
+            "Call" => {
+                let callee = role("callee")?;
+                let args = s.group(r.node, "args");
+                if s.text(callee.node) == "#config" && args.len() == 2 {
+                    let key = s.text(args[0]).trim_matches('"');
+                    let prefix = format!("-define:{key}=");
+                    if let Some(value) = self
+                        .flags
+                        .iter()
+                        .find_map(|flag| flag.strip_prefix(&prefix))
+                    {
+                        return match value {
+                            "true" => Some(true),
+                            "false" => Some(false),
+                            _ => None,
+                        };
+                    }
+                    return self.condition(Ref {
+                        file: r.file,
+                        node: args[1],
+                    });
+                }
+                None
+            }
+            "Binary" => {
+                let a = role("left")?;
+                let b = role("right")?;
+                if matches!(n.op.as_str(), "==" | "!=")
+                    && s.node(a.node).kind == "Ident"
+                    && s.node(b.node).kind == "ImplicitSelector"
+                {
+                    let target = self
+                        .flags
+                        .iter()
+                        .find_map(|flag| flag.strip_prefix("-target:"))
+                        .and_then(|target| target.split_once('_'));
+                    let actual = match s.text(a.node) {
+                        "ODIN_OS" => {
+                            target
+                                .map(|(os, _)| os)
+                                .unwrap_or(if cfg!(target_os = "macos") {
+                                    "darwin"
+                                } else {
+                                    std::env::consts::OS
+                                })
+                        }
+                        "ODIN_ARCH" => {
+                            target
+                                .map(|(_, arch)| arch)
+                                .unwrap_or(match std::env::consts::ARCH {
+                                    "aarch64" => "arm64",
+                                    "x86_64" => "amd64",
+                                    other => other,
+                                })
+                        }
+                        _ => "",
+                    };
+                    if !actual.is_empty() {
+                        return Some(
+                            actual.eq_ignore_ascii_case(s.text(b.node).trim_start_matches('.'))
+                                == (n.op == "=="),
+                        );
+                    }
+                }
+                if matches!(n.op.as_str(), "&&" | "||") {
+                    let a = self.condition(a);
+                    let b = self.condition(b);
+                    return if n.op == "&&" {
+                        if a == Some(false) || b == Some(false) {
+                            Some(false)
+                        } else if a == Some(true) && b == Some(true) {
+                            Some(true)
+                        } else {
+                            None
+                        }
+                    } else if a == Some(true) || b == Some(true) {
+                        Some(true)
+                    } else if a == Some(false) && b == Some(false) {
+                        Some(false)
+                    } else {
+                        None
+                    };
+                }
+                let a = self.constant_int(a)?;
+                let b = self.constant_int(b)?;
+                match n.op.as_str() {
+                    "==" => Some(a == b),
+                    "!=" => Some(a != b),
+                    "<" => Some(a < b),
+                    "<=" => Some(a <= b),
+                    ">" => Some(a > b),
+                    ">=" => Some(a >= b),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
     }
     pub fn signature(&mut self, reference: Ref) -> Option<Ref> {
         match self.type_of(reference) {
             Type::Procedure(signature) => Some(signature),
             _ => None,
         }
+    }
+    pub fn primitive(&self, r: Ref) -> Option<Type> {
+        let source = &self.sources[r.file];
+        let name = if source.node(r.node).kind == "Ident" {
+            if self.symbol(r).is_some() {
+                return None;
+            }
+            source.text(r.node)
+        } else if source.node(r.node).kind == "Selector" {
+            let owner = source.role(r.node, "expr")?;
+            let field = source.role(r.node, "field")?;
+            if source.node(owner).kind != "Ident"
+                || self
+                    .lookup(
+                        Ref {
+                            file: r.file,
+                            node: owner,
+                        },
+                        source.text(owner),
+                    )
+                    .is_some()
+            {
+                return None;
+            }
+            let native = source.nodes.iter().any(|node| {
+                node.kind == "Import"
+                    && crate::lower::unquote(&node.op).is_ok_and(|path| {
+                        path == "base:builtin" && {
+                            let alias = source.names.get(node.name);
+                            source.text(owner) == if alias.is_empty() { "builtin" } else { alias }
+                        }
+                    })
+            });
+            if !native {
+                return None;
+            }
+            if source.collection_roots.get("base").is_some_and(|root| {
+                source.info["odin_root"]
+                    .as_str()
+                    .is_none_or(|odin| root != &std::path::Path::new(odin).join("base"))
+            }) {
+                return None;
+            }
+            source.text(field)
+        } else {
+            return None;
+        };
+        if matches!(name, "string" | "cstring" | "string16" | "cstring16") {
+            return Some(Type::String {
+                name: name.into(),
+                untyped: false,
+            });
+        }
+        if matches!(
+            name,
+            "bool"
+                | "b8"
+                | "b16"
+                | "b32"
+                | "b64"
+                | "int"
+                | "uint"
+                | "uintptr"
+                | "rawptr"
+                | "any"
+                | "rune"
+                | "byte"
+                | "i8"
+                | "i16"
+                | "i32"
+                | "i64"
+                | "i128"
+                | "u8"
+                | "u16"
+                | "u32"
+                | "u64"
+                | "u128"
+                | "f16"
+                | "f32"
+                | "f64"
+                | "complex32"
+                | "complex64"
+                | "complex128"
+                | "quaternion64"
+                | "quaternion128"
+                | "quaternion256"
+        ) {
+            Some(Type::scalar(name))
+        } else {
+            None
+        }
+    }
+    pub fn standard_library(&self, r: Ref, path: &str) -> bool {
+        let Some((collection, _)) = path.split_once(':') else {
+            return false;
+        };
+        if !["base", "core", "vendor"].contains(&collection) {
+            return false;
+        }
+        let source = &self.sources[r.file];
+        let Some(actual) = source.collection_roots.get(collection) else {
+            return true;
+        };
+        source.info["odin_root"].as_str().is_some_and(|root| {
+            std::fs::canonicalize(actual).ok()
+                == std::fs::canonicalize(std::path::Path::new(root).join(collection)).ok()
+        })
     }
     pub fn native_builtin(&self, reference: Ref, name: &str) -> bool {
         let source = &self.sources[reference.file];
@@ -641,6 +985,20 @@ impl<'a> Resolver<'a> {
                         .unwrap_or(Type::Unknown),
                 ),
             },
+            "Comprehension" => {
+                if let Some(annotation) = child("type") {
+                    return self.type_of(annotation);
+                }
+                let output = child("output")
+                    .map(|r| self.type_of(r))
+                    .unwrap_or(Type::Unknown);
+                let output = if n.data["spread"] == true {
+                    output.element().cloned().unwrap_or(Type::Unknown)
+                } else {
+                    output.defaulted()
+                };
+                Type::Slice(Box::new(output))
+            }
             "SetType" => Type::Set(Box::new(
                 s.group(r.node, "args")
                     .first()
@@ -747,6 +1105,43 @@ impl<'a> Resolver<'a> {
                 }
                 if builtin && matches!(name, "len" | "cap" | "size_of" | "align_of" | "offset_of") {
                     return Type::scalar("int");
+                }
+                if builtin && matches!(name, "min" | "max") {
+                    let args = s.group(r.node, "args");
+                    let ellipsis = n.spans.get("ellipsis");
+                    for arg in args {
+                        let mut value = *arg;
+                        while s.node(value).kind == "Paren" {
+                            let Some(inner) = s.role(value, "expr") else {
+                                break;
+                            };
+                            value = inner;
+                        }
+                        let spread =
+                            ellipsis.is_some_and(|span| s.node(value).span.start >= span.end);
+                        let array = s.node(value).kind == "Unary" && s.node(value).op == "**";
+                        if spread || array {
+                            let value = if array {
+                                s.role(value, "expr").unwrap_or(value)
+                            } else {
+                                value
+                            };
+                            return self
+                                .type_of(Ref {
+                                    file: r.file,
+                                    node: value,
+                                })
+                                .element()
+                                .cloned()
+                                .unwrap_or(Type::Unknown);
+                        }
+                    }
+                    if let Some(arg) = args.first() {
+                        return self.type_of(Ref {
+                            file: r.file,
+                            node: *arg,
+                        });
+                    }
                 }
                 let callee_type = self.type_of(callee);
                 match callee_type {
@@ -907,6 +1302,48 @@ impl<'a> Resolver<'a> {
                 text.parse().ok()
             }
             "Paren" => self.integer(child("expr")?, seen),
+            "Call" => {
+                let callee = child("callee")?;
+                let args = s.group(r.node, "args");
+                if self.native_builtin(callee, "size_of") && args.len() == 1 {
+                    let arg = Ref {
+                        file: r.file,
+                        node: args[0],
+                    };
+                    let typ = self.primitive(arg)?;
+                    let pointer = self
+                        .flags
+                        .iter()
+                        .find_map(|flag| flag.strip_prefix("-target:"))
+                        .and_then(|target| target.split_once('_'))
+                        .map(|(_, arch)| {
+                            if matches!(arch, "i386" | "arm32" | "wasm32") {
+                                4
+                            } else {
+                                8
+                            }
+                        })
+                        .unwrap_or(std::mem::size_of::<usize>());
+                    return match typ {
+                        Type::Scalar { name, .. } => match name.as_str() {
+                            "rawptr" | "int" | "uint" | "uintptr" => Some(pointer as i128),
+                            "any" => Some((2 * pointer) as i128),
+                            "rune" => Some(4),
+                            "byte" | "bool" => Some(1),
+                            other => other
+                                .trim_start_matches(['i', 'u', 'f', 'b'])
+                                .parse::<i128>()
+                                .ok()
+                                .map(|bits| bits / 8),
+                        },
+                        Type::String { name, .. } => {
+                            Some((pointer * if name.starts_with('c') { 1 } else { 2 }) as i128)
+                        }
+                        _ => None,
+                    };
+                }
+                None
+            }
             "Unary" => {
                 let value = self.integer(child("expr")?, seen)?;
                 match n.op.as_str() {
@@ -952,6 +1389,9 @@ impl<'a> Resolver<'a> {
         if !seen.insert(r) {
             return false;
         }
+        if self.primitive(r).is_some() {
+            return true;
+        }
         let source = &self.sources[r.file];
         let node = source.node(r.node);
         if node.kind.ends_with("Type") {
@@ -961,6 +1401,21 @@ impl<'a> Resolver<'a> {
             return source
                 .role(r.node, "expr")
                 .is_some_and(|node| self.type_operand(Ref { file: r.file, node }, seen));
+        }
+        if node.kind == "WhenExpr" {
+            if let Some(selected) = source
+                .role(r.node, "cond")
+                .and_then(|node| self.condition(Ref { file: r.file, node }))
+            {
+                return source
+                    .role(r.node, if selected { "x" } else { "y" })
+                    .is_some_and(|node| self.type_operand(Ref { file: r.file, node }, seen));
+            }
+            return ["x", "y"].iter().all(|role| {
+                source.role(r.node, role).is_some_and(|node| {
+                    self.type_operand(Ref { file: r.file, node }, &mut seen.clone())
+                })
+            });
         }
         if let Some(symbol) = self.symbol(r) {
             let symbol = &self.symbols[symbol];

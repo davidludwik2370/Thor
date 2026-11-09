@@ -13,6 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[derive(Clone)]
 pub struct Frontend {
     pub executable: PathBuf,
     pub fingerprint: String,
@@ -131,8 +132,20 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 impl Frontend {
     pub fn parse(&self, path: &Path, package: bool) -> Result<Source> {
+        self.parse_overlay(path, package, None)
+    }
+    pub fn parse_overlay(
+        &self,
+        path: &Path,
+        package: bool,
+        overlay: Option<&str>,
+    ) -> Result<Source> {
         let path = fs::canonicalize(path)?;
-        let bytes = fs::read(&path)?;
+        let bytes = if let Some(raw) = overlay {
+            raw.as_bytes().to_vec()
+        } else {
+            fs::read(&path)?
+        };
         let raw = String::from_utf8(bytes.clone())
             .map_err(|_| Error::new(format!("source is not UTF-8: {}", path.display())))?;
         let thor = path.extension().is_some_and(|ext| ext == "thor");

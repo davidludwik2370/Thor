@@ -10,6 +10,12 @@ use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
 #[path = "access.rs"]
 mod access;
+#[path = "comprehensions.rs"]
+mod comprehensions;
+#[path = "defaults.rs"]
+mod defaults;
+#[path = "extrema.rs"]
+mod extrema;
 #[path = "sets.rs"]
 mod sets;
 #[path = "switches.rs"]
@@ -46,6 +52,9 @@ pub struct Lower<'a, 'r> {
     address_nodes: HashSet<NodeId>,
     switch_owners: HashSet<NodeId>,
     switch_replacements: HashMap<NodeId, Code>,
+    body_prologues: BTreeMap<NodeId, Vec<Code>>,
+    import_paths: BTreeMap<String, String>,
+    declaration_helpers: BTreeMap<NodeId, Vec<Code>>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -73,6 +82,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             address_nodes: HashSet::new(),
             switch_owners: HashSet::new(),
             switch_replacements: HashMap::new(),
+            body_prologues: BTreeMap::new(),
+            import_paths: BTreeMap::new(),
+            declaration_helpers: BTreeMap::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -82,7 +94,143 @@ impl<'a, 'r> Lower<'a, 'r> {
         this.resources()?;
         this.storage()?;
         this.discover_fstrings();
+        if this.source.thor {
+            this.prepare_defaults()?;
+        }
         Ok(this)
+    }
+    pub fn instrument_memory(
+        &mut self,
+        memory: &crate::memory::Memory,
+        collection: &str,
+        map: &str,
+        entry: bool,
+    ) {
+        if !memory.enabled() {
+            return;
+        }
+        for (i, node) in self.source.nodes.iter().enumerate() {
+            let id = NodeId(i);
+            if node.kind != "Procedure" {
+                continue;
+            }
+            let Some(body) = self.source.role(id, "body").filter(|body| {
+                self.source.raw.as_bytes()[self.source.node(*body).span.start] == b'{'
+            }) else {
+                continue;
+            };
+            let declaration = node
+                .parent
+                .filter(|decl| self.source.node(*decl).kind == "Declaration");
+            let attributes = declaration
+                .into_iter()
+                .flat_map(|decl| self.source.group(decl, "attributes"))
+                .map(|attr| self.source.text(*attr))
+                .collect::<Vec<_>>();
+            if attributes.iter().any(|attr| attr.contains("naked")) {
+                continue;
+            }
+            let main = entry
+                && !self
+                    .source
+                    .ancestors(id)
+                    .any(|parent| self.source.node(parent).kind == "Procedure")
+                && declaration.is_some_and(|decl| {
+                    self.source.group(decl, "names").len() == 1
+                        && self.source.text(self.source.group(decl, "names")[0]) == "main"
+                });
+            if main && memory.tracking != "off" {
+                let alias = format!("{}memory_start", self.source.prefix);
+                self.modules.insert(
+                    alias.clone(),
+                    format!(
+                        "{collection}:{}",
+                        if memory.tracking == "trace" {
+                            "debug_memory_trace"
+                        } else {
+                            "debug_memory"
+                        }
+                    ),
+                );
+                let prologue = self.gen(
+                    format!("\ncontext.allocator={alias}.begin({map})\n"),
+                    self.source.node(body).span,
+                    "memory-debug",
+                );
+                self.body_prologues.entry(body).or_default().push(prologue);
+            }
+            if memory.address
+                && !attributes
+                    .iter()
+                    .any(|attr| attr.contains("no_sanitize_address"))
+            {
+                self.meta = true;
+                let prologue = self.gen(
+                    format!(
+                        "\n{{_debug_entry:u64=0;_={}meta.volatile_load(&_debug_entry)}}\n",
+                        self.source.prefix
+                    ),
+                    self.source.node(body).span,
+                    "memory-debug",
+                );
+                self.body_prologues.entry(body).or_default().push(prologue);
+            }
+        }
+    }
+    pub fn apply_privileges(&mut self, facts: &crate::privileges::Facts) {
+        for (reference, issue) in &facts.issues {
+            if reference.file == self.file {
+                self.permission_error(reference.node, &issue.message);
+            }
+        }
+        for (reference, message) in &facts.invalid {
+            if reference.file == self.file {
+                self.permission_error(reference.node, message);
+            }
+        }
+    }
+    pub fn remap_imports(&mut self, paths: BTreeMap<String, String>) {
+        for (i, node) in self.source.nodes.iter().enumerate() {
+            if node.kind != "Import" {
+                continue;
+            }
+            let Ok(path) = unquote(&node.op) else {
+                continue;
+            };
+            if let (Some(mapped), Some(span)) = (paths.get(&path), node.spans.get("path")) {
+                self.edits
+                    .push((*span, self.gen(json!(mapped).to_string(), *span, "import")));
+            }
+            let _ = i;
+        }
+        self.import_paths = paths;
+    }
+    fn permission_error(&mut self, origin: NodeId, message: &str) {
+        let mut target = origin;
+        if self.source.node(target).kind == "FieldValue" {
+            target = self.source.role(target, "value").unwrap_or(target);
+        }
+        if let Some(parent) = self.source.node(origin).parent {
+            if self.source.group(parent, "names").contains(&origin) {
+                if self.source.node(parent).kind == "Declaration" {
+                    target = self
+                        .source
+                        .group(parent, "values")
+                        .first()
+                        .copied()
+                        .unwrap_or(origin);
+                } else if self.source.node(parent).kind == "Field" {
+                    target = self.source.role(parent, "type").unwrap_or(origin);
+                }
+            }
+        }
+        let code = self.error_token(origin, message);
+        self.blocked.remove(&target);
+        if self.source.thor {
+            self.switch_replacements.insert(target, code);
+        } else {
+            self.edits.push((self.source.node(target).span, code));
+        }
     }
     fn gen(&self, text: impl Into<String>, span: Span, kind: &str) -> Code {
         Code::generated(text, &self.source.path, span, kind)
@@ -139,10 +287,35 @@ impl<'a, 'r> Lower<'a, 'r> {
             ));
         }
         if !self.source.thor {
-            return Ok((
-                self.splice(NodeId(0), vec![], vec![])?.finish(),
-                self.errors,
-            ));
+            let inserts = self
+                .body_prologues
+                .iter()
+                .map(|(body, parts)| {
+                    (
+                        self.source.node(*body).span.start + 1,
+                        Code::concat(parts.iter().cloned()),
+                    )
+                })
+                .collect();
+            let mut code = vec![self.splice(NodeId(0), vec![], inserts)?];
+            for (alias, path) in &self.modules {
+                code.push(self.gen(
+                    format!(
+                        "\nimport {alias} {}\n",
+                        json!(self.import_paths.get(path).unwrap_or(path))
+                    ),
+                    Span::new(0, 0),
+                    "memory-debug",
+                ));
+            }
+            if self.meta {
+                code.push(self.gen(
+                    format!("\nimport {}meta \"base:intrinsics\"\n", self.source.prefix),
+                    Span::new(0, 0),
+                    "memory-debug",
+                ));
+            }
+            return Ok((Code::concat(code).finish(), self.errors));
         }
         self.preflight()?;
         let mut code = vec![self.render(NodeId(0), None, false)?];
@@ -168,7 +341,10 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         for (alias, path) in &self.modules {
             code.push(self.gen(
-                format!("\nimport {alias} {}\n", json!(path)),
+                format!(
+                    "\nimport {alias} {}\n",
+                    json!(self.import_paths.get(path).unwrap_or(path))
+                ),
                 Span::new(0, 0),
                 "support",
             ));
@@ -272,110 +448,73 @@ impl<'a, 'r> Lower<'a, 'r> {
             {
                 return Err(self.unsupported(id, "discarded anonymous-string cleanup"));
             }
-            if matches!(node.kind.as_str(), "Run" | "Comprehension") {
+            if node.kind == "Run" {
                 return Err(self.unsupported(id, &node.kind));
             }
             if node.kind == "Ident"
                 && matches!(self.source.text(id), "Integer" | "Rational")
                 && self.resolver.symbol(self.reference(id)).is_none()
             {
-                return Err(self.unsupported(id, "arbitrary-precision numbers"));
-            }
-            if node.kind == "Slice" {
-                let base = self.role(id, "expr")?;
-                if matches!(self.typ(base), Type::Array { .. }) && self.protected(base).is_some() {
-                    return Err(
-                        self.unsupported(id, "read-only array views and slice borrowing analysis")
-                    );
+                let toolchain = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .unwrap();
+                if self.source.path.parent() != Some(toolchain.join("runtime/basic").as_path()) {
+                    return Err(self.unsupported(id, "arbitrary-precision numbers"));
                 }
+                let big = self.module("big");
+                self.switch_replacements
+                    .insert(id, self.g(format!("{big}.{}", self.source.text(id)), id));
             }
-            if node.kind == "Cast"
-                && self
-                    .source
-                    .role(id, "type")
-                    .is_some_and(|target| matches!(self.typ(target), Type::Slice(_)))
-            {
-                let base = self.role(id, "expr")?;
-                if self.protected(base).is_some() {
-                    return Err(self.unsupported(id, "read-only array casts to slices"));
-                }
-            }
-            if node.kind == "Call" && self.source.group(id, "args").len() == 1 {
-                let callee = self.role(id, "callee")?;
-                let argument = self.source.group(id, "args")[0];
-                if matches!(self.typ(callee), Type::Slice(_)) && self.protected(argument).is_some()
-                {
-                    return Err(self.unsupported(id, "read-only array conversions to slices"));
-                }
-            }
-            if node.immutable {
-                for symbol in self
-                    .resolver
-                    .symbols
-                    .iter()
-                    .filter(|sym| sym.reference == self.reference(id))
-                    .cloned()
-                    .collect::<Vec<_>>()
-                {
-                    let typ = self.resolver.type_of(Ref {
-                        file: self.file,
-                        node: symbol.name_node,
-                    });
-                    if !self.inline_type(&typ, &mut HashSet::new()) {
-                        return Err(
-                            self.unsupported(id, "immutable slice/aggregate borrowing analysis")
-                        );
-                    }
-                }
-            }
-        }
-        if self.source.info["mut_parameters"]
-            .as_array()
-            .is_some_and(|rows| !rows.is_empty())
-        {
-            return Err(self.unsupported(NodeId(0), "#mut slice contracts"));
         }
         Ok(())
-    }
-    fn inline_type(&mut self, typ: &Type, seen: &mut HashSet<Ref>) -> bool {
-        match typ {
-            Type::Scalar { name, .. } => name != "any",
-            Type::String { .. } | Type::Enum(_) => true,
-            Type::Array { elem, .. } => self.inline_type(elem, seen),
-            Type::Struct(owner) => {
-                if !seen.insert(*owner) {
-                    return true;
-                }
-                let source = &self.resolver.sources[owner.file];
-                if let Some(fields) = source.role(owner.node, "fields") {
-                    for field in &source.node(fields).children {
-                        if let Some(node) = source.role(*field, "type") {
-                            let field_type = self.resolver.type_of(Ref {
-                                file: owner.file,
-                                node,
-                            });
-                            if !self.inline_type(&field_type, seen) {
-                                return false;
-                            }
-                        }
-                    }
-                }
-                true
-            }
-            _ => false,
-        }
     }
     fn imports(&mut self) -> Result<()> {
         let s = self.source;
         for selection in &s.selections {
-            if selection.wildcard {
-                return Err(Error::unsupported(
-                    s,
-                    Span::new(selection.start, selection.end),
-                    "wildcard export discovery",
-                ));
-            }
             let path = unquote(&selection.path)?;
+            let names = if selection.wildcard {
+                let directory = if let Some((collection, suffix)) = path.split_once(':') {
+                    s.collection_roots
+                        .get(collection)
+                        .map(|root| root.join(suffix))
+                } else {
+                    s.path.parent().map(|parent| parent.join(&path))
+                };
+                let directory = directory.and_then(|path| std::fs::canonicalize(path).ok());
+                let mut names = std::collections::BTreeSet::new();
+                for symbol in &self.resolver.symbols {
+                    if symbol.scope != NodeId(0) {
+                        continue;
+                    }
+                    let source = &self.resolver.sources[symbol.reference.file];
+                    if source.path.parent() != directory.as_deref()
+                        || source.info["private"] == true
+                    {
+                        continue;
+                    }
+                    let decl = symbol.reference.node;
+                    if source
+                        .group(decl, "attributes")
+                        .iter()
+                        .any(|attribute| source.text(*attribute).contains("private"))
+                    {
+                        continue;
+                    }
+                    if source.ancestors(decl).any(|ancestor| {
+                        source.node(ancestor).kind == "ForeignBlock"
+                            && source
+                                .group(ancestor, "attributes")
+                                .iter()
+                                .any(|attr| source.text(*attr).contains("private"))
+                    }) {
+                        continue;
+                    }
+                    names.insert(symbol.name.clone());
+                }
+                names.into_iter().collect::<Vec<_>>()
+            } else {
+                selection.names.clone()
+            };
             let mut namespace = if selection.package_name.is_empty() {
                 path.rsplit(['/', ':']).next().unwrap_or("").to_string()
             } else {
@@ -395,7 +534,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             let alias = format!("{}import_{}", s.prefix, self.modules.len());
             self.modules.insert(alias.clone(), path);
-            for (i, name) in selection.names.iter().enumerate() {
+            for (i, name) in names.iter().enumerate() {
                 let start = selection
                     .positions
                     .get(i)
@@ -651,6 +790,14 @@ impl<'a, 'r> Lower<'a, 'r> {
         if kind == "CompileSwitch" {
             return self.compile_switch(id);
         }
+        if kind == "Comprehension" {
+            return self.comprehension(id, expected, constant);
+        }
+        if kind == "Call" {
+            if let Some(code) = self.extrema(id, constant)? {
+                return Ok(code);
+            }
+        }
         if kind == "Assignment" {
             if let Some(code) = self.access_assignment(id, constant)? {
                 return Ok(code);
@@ -691,6 +838,38 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
             return Ok(code);
+        }
+        if kind == "OrElse" {
+            if let Some(fallback) = self.source.role(id, "y") {
+                let operand = self.unparen(fallback);
+                if self.source.node(operand).kind == "Call" && !self.diverging(operand) {
+                    if let Some(callee) = self.source.role(operand, "callee") {
+                        if let Some(signature) = self.resolver.signature(self.reference(callee)) {
+                            let source = &self.resolver.sources[signature.file];
+                            let data = &source.node(signature.node).data;
+                            if self.resolver.fields(signature, "results").len() == 2
+                                && (data["optional_ok"] == true
+                                    || data["optional_allocator_error"] == true)
+                            {
+                                let left =
+                                    self.render(self.role(id, "x")?, expected.clone(), constant)?;
+                                let right = self.render(fallback, expected, constant)?;
+                                self.default = true;
+                                return Ok(Code::concat([
+                                    self.g("(", id),
+                                    left,
+                                    self.g(
+                                        format!(" or_else {}default_value(", self.source.prefix),
+                                        id,
+                                    ),
+                                    right,
+                                    self.g("))", id),
+                                ]));
+                            }
+                        }
+                    }
+                }
+            }
         }
         if kind == "Ident" {
             if let Some(symbol) = self.resolver.symbol(self.reference(id)) {
@@ -898,7 +1077,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             "Call" => {
                 let callee = self.role(id, "callee")?;
-                if let Some(signature) = self.resolver.signature(self.reference(callee)) {
+                if let Some(signature) = self
+                    .resolver
+                    .signature(self.reference(callee))
+                    .filter(|_| self.source.node(callee).op != "->")
+                {
                     let params = self.resolver.fields(signature, "params");
                     for (i, arg) in self.source.group(id, "args").iter().enumerate() {
                         let index = if self.source.node(*arg).kind == "FieldValue" {
@@ -911,9 +1094,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                         } else {
                             i
                         };
-                        if let Some((_, Some(annotation))) = params.get(index) {
-                            if annotation.file == self.file
-                                && self.source.text(annotation.node).contains('$')
+                        if let Some((_, Some(_annotation))) = params.get(index) {
+                            let unit = &self.resolver.sources[signature.file];
+                            if unit
+                                .descendants(signature.node)
+                                .any(|node| unit.node(node).kind == "PolyType")
                             {
                                 continue;
                             }
@@ -1035,6 +1220,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Block" {
+            if let Some(prologue) = self.body_prologues.get(&id) {
+                inserts.push((node.span.start + 1, Code::concat(prologue.iter().cloned())));
+            }
             let helpers = self.helper_declarations(id);
             if !helpers.is_empty() {
                 if self.source.raw.as_bytes()[node.span.start] == b'{' {
@@ -1051,7 +1239,14 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
         }
-        self.splice(id, replacements, inserts)
+        let code = self.splice(id, replacements, inserts)?;
+        if let Some(helpers) = self.declaration_helpers.get(&id) {
+            Ok(Code::concat(
+                std::iter::once(code).chain(helpers.iter().cloned()),
+            ))
+        } else {
+            Ok(code)
+        }
     }
     fn convert_do(&mut self, id: NodeId) {
         let mut cursor = self.source.node(id).span.start;
@@ -1641,52 +1836,77 @@ impl<'a, 'r> Lower<'a, 'r> {
                     ),
                 ]));
             }
-            let Some(signature) = self.resolver.signature(self.reference(callee)) else {
+            if let Some(signature) = self.resolver.signature(self.reference(callee)) {
+                count = self
+                    .resolver
+                    .fields(signature, "results")
+                    .len()
+                    .saturating_sub(1);
+            } else if self.extrema_name(callee, &mut HashSet::new()).is_none()
+                && !matches!(self.source.text(callee), "make" | "new" | "new_clone")
+            {
                 return Err(self.unsupported(
                     id,
                     "optional-result signatures from imported/overloaded procedures",
                 ));
-            };
-            count = self
-                .resolver
-                .fields(signature, "results")
-                .len()
-                .saturating_sub(1);
+            }
         }
+        let mut queries = vec![];
         if count > 1 {
-            return Err(self.unsupported(id, "multi-value or_panic results"));
-        }
-        let query = if count == 1 {
+            self.meta = true;
+            self.querying += 1;
+            let rendered = self.render(primary, None, false);
+            self.querying -= 1;
+            let rendered = rendered?;
+            let type_of = self.native("type_of");
+            for index in 0..count {
+                queries.push(Code::concat([
+                    self.g(
+                        format!(
+                            "{}meta.type_proc_return_type({type_of}({}meta.procedure_of(",
+                            self.source.prefix, self.source.prefix
+                        ),
+                        id,
+                    ),
+                    rendered.clone(),
+                    self.g(format!(")),{index})"), id),
+                ]));
+            }
+        } else if count == 1 {
             self.querying += 1;
             let code = self.render(primary, None, false);
             self.querying -= 1;
             let code = code?;
             let typeof_ = self.native("type_of");
-            Some(Code::concat([
+            queries.push(Code::concat([
                 self.g(format!("{typeof_}("), id),
                 code,
                 self.g(
                     format!(" or_else {module}.failure_contextless(false,\"\",{{}}))"),
                     id,
                 ),
-            ]))
-        } else {
-            None
-        };
+            ]));
+        }
         let prefix = format!(
             "{}optional_{}_",
             self.source.prefix,
             self.source.node(id).span.start
         );
-        let (name,mut args)=self.closed(id,"or_panic",if count==0{None}else{Some("")},|this|{
+        let result = if count == 0 {
+            None
+        } else if count == 1 {
+            Some(String::new())
+        } else {
+            Some(format!("tuple:{count}"))
+        };
+        let (name,mut args)=self.closed(id,"or_panic",result.as_deref(),|this|{
             let expression=this.render(primary,None,false)?;
-            let value=if count==0{String::new()}else{format!("{prefix}value, ")};
-            let mut code=vec![this.g(format!("{value}{prefix}status := "),id),expression,this.g(format!("\nif !{module}.succeeded({prefix}status) {{ {module}.{fail}({prefix}status,{summary},{location}{extra}) }}\n"),id)];
-            if count==1{code.push(this.g(format!("return {prefix}value"),id));}Ok(Code::concat(code))
+            let names=(0..count).map(|index|format!("{prefix}value_{index}")).collect::<Vec<_>>();
+            let values=if names.is_empty(){String::new()}else{format!("{}, ",names.join(", "))};
+            let mut code=vec![this.g(format!("{values}{prefix}status := "),id),expression,this.g(format!("\nif !{module}.succeeded({prefix}status) {{ {module}.{fail}({prefix}status,{summary},{location}{extra}) }}\n"),id)];
+            if !names.is_empty(){code.push(this.g(format!("return {}",names.join(", ")),id));}Ok(Code::concat(code))
         })?;
-        if let Some(query) = query {
-            args.push(query);
-        }
+        args.extend(queries);
         Ok(self.helper_call(id, &name, args))
     }
     fn closed<F>(
@@ -1895,7 +2115,8 @@ impl<'a, 'r> Lower<'a, 'r> {
                 ""
             };
             let global_switch = (flavor.starts_with("switch")
-                || flavor.starts_with("compile_switch"))
+                || flavor.starts_with("compile_switch")
+                || flavor.starts_with("comprehension"))
                 && !self
                     .source
                     .ancestors(id)
@@ -1907,8 +2128,13 @@ impl<'a, 'r> Lower<'a, 'r> {
             };
             let header = self.g(
                 format!(
-                    "\n{private}{name} :: proc \"{convention}\"({}){returns} {{\n",
-                    params.join(", ")
+                    "\n{private}{name} :: proc \"{convention}\"({}){returns} {}{{\n",
+                    params.join(", "),
+                    if flavor == "extrema_optional" {
+                        "#optional_ok "
+                    } else {
+                        ""
+                    }
                 ),
                 id,
             );
@@ -2197,6 +2423,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             .ancestors(id)
             .find(|id| {
                 self.source.node(*id).kind == "Block"
+                    && !self
+                        .source
+                        .ancestors(*id)
+                        .any(|parent| self.source.node(parent).kind == "Comprehension")
                     && self.source.node(*id).parent.is_none_or(|p| {
                         !matches!(self.source.node(p).kind.as_str(), "Switch" | "TypeSwitch")
                     })

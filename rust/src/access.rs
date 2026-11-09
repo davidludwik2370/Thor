@@ -23,7 +23,7 @@ impl Lower<'_, '_> {
             _ => true,
         }
     }
-    fn query_value(&mut self, id: NodeId) -> Result<Code> {
+    pub(super) fn query_value(&mut self, id: NodeId) -> Result<Code> {
         self.querying += 1;
         let code = self.render(id, None, false);
         self.querying -= 1;

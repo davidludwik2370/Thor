@@ -660,12 +660,12 @@ release::proc(text:string){}
             self.assertTrue(all('immutable' not in node for node in packet['payload']['nodes']))
 
     def test_unported_features_fail_closed_without_python(self):
-        for code in ['values :> []int{1,2}; _=values', 'values :> [1,2]; alias:=values[:];_=alias',
-                     'values :> any([]int{1,2});_=values', 'value:=f"hello {2}"=="hello 2";_=value',
-                     'when true {value:=1} else {value :> 1};value=2;_=value',
+        for code in ['value:=f"hello {2}"=="hello 2";_=value',
+                     'T::int;when T==int {value:=1} else {value :> 1};value=2;_=value',
                      'value :> struct{x:int}{1};using value;x=2',
                      'value:=#run calculate();_=value', 'value:Integer=2;_=value',
-                     'value:=[x for x in 0..<3];_=value']:
+                     'VALUE::[x for x in 0..<3];_=VALUE',
+                     'value:=len(set[int]{1,2});_=value']:
             with self.subTest(code=code):
                 self.source.write_text(self.program(code, 'calculate::proc()->int{return 2}\n'))
                 result = self.invoke('rust', command='check', flags=['-json-errors'])
@@ -678,6 +678,7 @@ release::proc(text:string){}
         self.assertEqual(result.returncode, 0, result.stderr)
         packet = json.loads(result.stdout)
         self.assertFalse(packet['complete'])
+
         self.assertFalse(packet['python_fallback'])
         self.assertFalse(packet['parallel_lowering'])
 

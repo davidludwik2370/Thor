@@ -28,6 +28,9 @@ pub struct Options {
     pub json: bool,
     pub root: PathBuf,
     pub maps: bool,
+    pub tracking: String,
+    pub no_sanitize: bool,
+    pub overlays: BTreeMap<PathBuf, String>,
 }
 pub struct Project {
     pub options: Options,
@@ -36,9 +39,11 @@ pub struct Project {
     pub destination: PathBuf,
     pub outputs: BTreeMap<PathBuf, (usize, Emitted)>,
     pub errors: HashMap<String, String>,
+    related: HashMap<String, Vec<Value>>,
     collections: BTreeMap<String, PathBuf>,
     common: PathBuf,
     file_entry: bool,
+    memory: crate::memory::Memory,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -171,12 +176,19 @@ impl Project {
                 .join(&frontend.project_name)
         }))?;
         let mut project = Self {
+            memory: crate::memory::Memory::select(
+                &options.command,
+                &options.flags,
+                &options.tracking,
+                options.no_sanitize,
+            )?,
             options,
             frontend,
             sources: vec![],
             destination,
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
+            related: HashMap::new(),
             collections,
             common,
             file_entry,
@@ -219,12 +231,27 @@ impl Project {
             }
         }
         let files = package_files(&entry, self.frontend.test)?;
+        let mut shared_frontend = self.frontend.clone();
+        if shared_frontend.cache_dir.is_some() {
+            shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
+        }
         let mut imports = vec![];
         for path in files {
             if self.sources.iter().any(|s| s.path == path) {
                 continue;
             }
-            let mut source = self.frontend.parse(&path, entry.is_dir())?;
+            let frontend = if path.starts_with(self.options.root.join("runtime"))
+                && path.extension().is_some_and(|ext| ext == "odin")
+            {
+                &shared_frontend
+            } else {
+                &self.frontend
+            };
+            let mut source = frontend.parse_overlay(
+                &path,
+                entry.is_dir(),
+                self.options.overlays.get(&path).map(String::as_str),
+            )?;
             source.shared_native = path.extension().is_some_and(|ext| ext == "odin")
                 && path.starts_with(self.options.root.join("runtime"))
                 && path != self.options.entry
@@ -255,9 +282,49 @@ impl Project {
         Ok(())
     }
     pub fn lower(&mut self) -> Result<PathBuf> {
-        let mut resolver = Resolver::new(&self.sources);
+        self.discover_type_facts()?;
+        let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
+        for (reference, issue) in &privileges.issues {
+            let source = &self.sources[reference.file];
+            let token = format!(
+                "{}expression_error_{}",
+                source.prefix,
+                source.node(reference.node).span.start
+            );
+            let notes=std::iter::once((issue.seed,"Read-only view declared here."))
+                .chain(issue.related.iter().map(|r|(*r,"Slice effect occurs here.")))
+                .map(|(r,message)|{let source=&self.sources[r.file];let span=source.node(r.node).span;let (line,column)=source.position(span.start);json!({"pos":{"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},"msgs":[message]})}).collect();
+            self.related.insert(token, notes);
+        }
+        let first = self
+            .sources
+            .iter()
+            .position(|source| {
+                if self.file_entry {
+                    source.path == self.options.entry
+                } else {
+                    source.path.parent() == Some(self.options.entry.as_path())
+                }
+            })
+            .unwrap_or(0);
+        let memory_map = format!("{}memory_map", self.sources[first].prefix);
+        let mut memory_collection = "__thor_memory".to_string();
+        while self.collections.contains_key(&memory_collection) {
+            memory_collection.push('_');
+        }
+        if self.memory.enabled() {
+            self.collections
+                .insert(memory_collection.clone(), self.options.root.join("runtime"));
+        }
         let mut paths = BTreeSet::new();
         let mut planned = vec![];
+        let mut project_collection = "__thor_project".to_string();
+        while self.collections.contains_key(&project_collection) {
+            project_collection.push('_');
+        }
+        self.collections
+            .insert(project_collection.clone(), self.destination.clone());
         for (file, source) in self.sources.iter().enumerate() {
             if source.shared_native {
                 continue;
@@ -273,7 +340,50 @@ impl Project {
                     relative.display()
                 )));
             }
-            let (emitted, errors) = Lower::new(file, &mut resolver)?.finish()?;
+            let mut lower = Lower::new(file, &mut resolver)?;
+            let mut import_paths = BTreeMap::new();
+            for node in &source.nodes {
+                if node.kind != "Import" {
+                    continue;
+                }
+                let path = unquote(&node.op)?;
+                let directory = if let Some((collection, suffix)) = path.split_once(':') {
+                    source
+                        .collection_roots
+                        .get(collection)
+                        .map(|root| root.join(suffix))
+                } else {
+                    source.path.parent().map(|parent| parent.join(&path))
+                };
+                if let Some(directory) = directory.and_then(|dir| fs::canonicalize(dir).ok()) {
+                    if self.sources.iter().any(|unit| {
+                        !unit.shared_native && unit.path.parent() == Some(directory.as_path())
+                    }) {
+                        let relative = directory
+                            .strip_prefix(&self.common)
+                            .map_err(|_| Error::new("adapted import outside project root"))?;
+                        let suffix = if relative.as_os_str().is_empty() {
+                            ".".to_string()
+                        } else {
+                            relative.to_string_lossy().into_owned()
+                        };
+                        import_paths.insert(path, format!("{project_collection}:{suffix}"));
+                    }
+                }
+            }
+            lower.remap_imports(import_paths);
+            lower.apply_privileges(&privileges);
+            lower.instrument_memory(
+                &self.memory,
+                &memory_collection,
+                &memory_map,
+                if self.file_entry {
+                    source.path == self.options.entry
+                } else {
+                    source.path.parent() == Some(self.options.entry.as_path())
+                },
+            );
+            let (emitted, errors) = lower.finish()?;
             self.errors.extend(errors);
             planned.push((self.destination.join(relative), (file, emitted)));
         }
@@ -306,6 +416,14 @@ impl Project {
             json!({})
         };
         self.outputs = planned.into_iter().collect();
+        self.memory.finish(
+            &mut self.outputs,
+            &self.sources,
+            first,
+            &memory_collection,
+            &self.options.root,
+            &memory_map,
+        )?;
         let raw_sources: Vec<_> = self
             .sources
             .iter()
@@ -319,7 +437,10 @@ impl Project {
         let mut files: BTreeMap<PathBuf, Vec<u8>> = BTreeMap::new();
         for (path, (_, emitted)) in &self.outputs {
             files.insert(path.clone(), emitted.text.as_bytes().to_vec());
-            if self.options.maps || self.options.command == "transpile" {
+            if self.options.maps
+                || self.options.command == "transpile"
+                || self.options.flags.iter().any(|flag| flag == "-debug")
+            {
                 let mut map = emitted.map_json(path, &raw_sources);
                 map["generated_sha256"] = json!(sha256(emitted.text.as_bytes()));
                 files.insert(
@@ -337,8 +458,11 @@ impl Project {
                     .into_owned()
             })
             .collect();
-        let manifest = json!({"thor_version":VERSION,"engine":"rust","migration_complete":false,"entry":self.options.entry,"source_map_version":1,"debug_map_version":1,
+        let mut manifest = json!({"thor_version":VERSION,"engine":"rust","migration_complete":false,"entry":self.options.entry,"source_map_version":1,"debug_map_version":1,
             "generated":generated,"odin_flags":self.native_flags(),"odin_environment":{},"debug_roots":[],"shared_maps":[]});
+        if self.memory.enabled() {
+            manifest["memory_debug"] = json!({"tracking":self.memory.tracking,"address_sanitizer":self.memory.address,"source_map_version":1,"llvm_symbolizer":self.memory.symbolizer});
+        }
         // Lower every source before publishing any of them. Ownership is
         // recorded first so an interrupted first write stays recoverable.
         fs::create_dir_all(&self.destination)?;
@@ -379,6 +503,161 @@ impl Project {
                 .ok_or_else(|| Error::new("entry package excluded by target"))
         }
     }
+    fn discover_type_facts(&mut self) -> Result<()> {
+        if !self.sources.iter().any(|s| {
+            s.nodes.iter().any(|n| n.immutable)
+                || s.selections.iter().any(|selection| selection.wildcard)
+                || s.info["mut_parameters"]
+                    .as_array()
+                    .is_some_and(|rows| !rows.is_empty())
+        }) {
+            return Ok(());
+        }
+        let Some(odin_root) = self
+            .sources
+            .iter()
+            .find_map(|s| s.info["odin_root"].as_str())
+            .map(PathBuf::from)
+        else {
+            return Ok(());
+        };
+        let mut roots = self.collections.clone();
+        let mut frontend = self.frontend.clone();
+        if frontend.cache_dir.is_some() {
+            frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
+        }
+        for name in ["base", "core", "vendor"] {
+            roots
+                .entry(name.into())
+                .or_insert_with(|| odin_root.join(name));
+        }
+        let mut packages = BTreeSet::new();
+        if let Some(base) = roots.get("base") {
+            let runtime = base.join("runtime");
+            if runtime.join("core.odin").is_file() {
+                packages.insert(runtime);
+            }
+        }
+        for source in &self.sources {
+            if source.shared_native || source.path.starts_with(self.options.root.join("runtime")) {
+                continue;
+            }
+            for node in &source.nodes {
+                if node.kind != "Import" {
+                    continue;
+                }
+                let import = unquote(&node.op)?;
+                if ["base:builtin", "base:intrinsics"].contains(&import.as_str()) {
+                    continue;
+                }
+                if let Some((collection, suffix)) = import.split_once(':') {
+                    if ["base", "core", "vendor"].contains(&collection) {
+                        if let Some(root) = roots.get(collection) {
+                            packages.insert(root.join(suffix));
+                        }
+                    }
+                }
+            }
+        }
+        let mut inspected = HashSet::new();
+        while let Some(package) = packages.pop_first() {
+            if !inspected.insert(package.clone()) {
+                continue;
+            }
+            if !package.is_dir() {
+                continue;
+            }
+            let files = if roots
+                .get("base")
+                .is_some_and(|base| package == base.join("runtime"))
+            {
+                vec![package.join("core.odin")]
+            } else {
+                package_files(&package, self.frontend.test)?
+            };
+            for path in files {
+                if self.sources.iter().any(|s| s.path == path) {
+                    continue;
+                }
+                let mut source = frontend.parse_overlay(
+                    &path,
+                    true,
+                    self.options.overlays.get(&path).map(String::as_str),
+                )?;
+                if source.excluded {
+                    continue;
+                }
+                for (index, node) in source.nodes.iter().enumerate() {
+                    if node.kind != "Selector" {
+                        continue;
+                    }
+                    let typed = source.ancestors(crate::ast::NodeId(index)).any(|ancestor| {
+                        let owner = source.node(ancestor);
+                        owner.kind.as_str().ends_with("Type")
+                            || owner.kind == "Field"
+                                && source
+                                    .role(ancestor, "type")
+                                    .is_some_and(|typ| source.node(typ).span.contains(node.span))
+                            || owner.kind == "Declaration"
+                                && !owner.mutable
+                                && !source
+                                    .group(ancestor, "values")
+                                    .iter()
+                                    .any(|value| source.node(*value).kind == "Procedure")
+                                && source
+                                    .ancestors(ancestor)
+                                    .all(|parent| source.node(parent).kind != "Procedure")
+                    });
+                    if !typed {
+                        continue;
+                    }
+                    let Some(base) = source
+                        .role(crate::ast::NodeId(index), "expr")
+                        .filter(|base| source.node(*base).kind == "Ident")
+                    else {
+                        continue;
+                    };
+                    for import in &source.nodes {
+                        if import.kind != "Import" {
+                            continue;
+                        }
+                        let path = unquote(&import.op)?;
+                        if ["base:builtin", "base:intrinsics"].contains(&path.as_str()) {
+                            continue;
+                        }
+                        let alias = source.names.get(import.name);
+                        let alias = if alias.is_empty() {
+                            path.rsplit(['/', ':']).next().unwrap_or("")
+                        } else {
+                            alias
+                        };
+                        if alias != source.text(base) {
+                            continue;
+                        }
+                        let directory = if let Some((collection, suffix)) = path.split_once(':') {
+                            roots.get(collection).map(|root| root.join(suffix))
+                        } else {
+                            source.path.parent().map(|parent| parent.join(&path))
+                        };
+                        if let Some(directory) =
+                            directory.and_then(|dir| fs::canonicalize(dir).ok())
+                        {
+                            if !inspected.contains(&directory) {
+                                packages.insert(directory);
+                            }
+                        }
+                    }
+                }
+                source.shared_native = true;
+                source.collection_roots = roots.clone();
+                self.sources.push(source);
+            }
+        }
+        for source in &mut self.sources {
+            source.collection_roots = roots.clone();
+        }
+        Ok(())
+    }
     fn validate_output(&self, path: &Path) -> Result<()> {
         let relative = path
             .strip_prefix(&self.destination)
@@ -403,6 +682,7 @@ impl Project {
     }
     fn native_flags(&self) -> Vec<String> {
         let mut result = vec![];
+        result.extend(self.memory.extra.iter().cloned());
         for flag in &self.options.flags {
             if !flag.starts_with("-collection:")
                 && !matches!(flag.as_str(), "-json-errors" | "-keep-executable")
@@ -411,18 +691,7 @@ impl Project {
             }
         }
         for (name, base) in &self.collections {
-            let mapped = if base.starts_with(&self.common)
-                && self
-                    .sources
-                    .iter()
-                    .any(|s| !s.shared_native && s.path.starts_with(base))
-            {
-                self.destination
-                    .join(base.strip_prefix(&self.common).unwrap())
-            } else {
-                base.clone()
-            };
-            result.push(format!("-collection:{name}={}", mapped.display()));
+            result.push(format!("-collection:{name}={}", base.display()));
         }
         result
     }
@@ -528,6 +797,9 @@ impl Project {
     pub fn translate(&self, errors: &[Value]) -> Vec<Value> {
         errors.iter().map(|error|{
             let mut error=error.clone();
+            let related=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
+                .find_map(|message|self.related.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,notes)|notes.clone()));
+            if let Some(notes)=related {error["related"]=json!(notes);}
             let mut expression_texts=vec![];
             let file=error["pos"]["file"].as_str().map(PathBuf::from);
             if let Some((index,emitted))=file.as_ref().and_then(|file|self.outputs.get(file)){

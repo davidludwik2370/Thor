@@ -8,7 +8,7 @@ struct Case {
     result: NodeId,
 }
 impl Lower<'_, '_> {
-    fn unparen(&self, mut id: NodeId) -> NodeId {
+    pub(super) fn unparen(&self, mut id: NodeId) -> NodeId {
         while self.source.node(id).kind == "Paren" {
             let Some(child) = self.source.role(id, "expr") else {
                 break;
@@ -44,7 +44,7 @@ impl Lower<'_, '_> {
             })
             .collect()
     }
-    fn diverging(&mut self, id: NodeId) -> bool {
+    pub(super) fn diverging(&mut self, id: NodeId) -> bool {
         let id = self.unparen(id);
         if self.source.node(id).kind != "Call" {
             return false;
