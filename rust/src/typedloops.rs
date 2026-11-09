@@ -66,10 +66,10 @@ impl Lower<'_, '_> {
             }
         }
         self.meta = true;
-        let meta = format!("{}meta", s.prefix);
+        let meta = format!("{}meta", self.prefix);
         let target = self.render(annotation, None, false)?;
         let target_text = target.clone().finish().text;
-        let native_index = format!("{}loop_index_{}", s.prefix, s.node(id).span.start);
+        let native_index = format!("{}loop_index_{}", self.prefix, s.node(id).span.start);
         let mut replacements = vec![];
         let init = s.role(id, "init");
         if let Some(init) = init {
@@ -112,9 +112,9 @@ impl Lower<'_, '_> {
                 format!("#assert({condition}, {})\n", json!(token)),
                 value_type,
             ));
-            let helper = format!("{}loop_bound_{}", s.prefix, s.node(id).span.start);
+            let helper = format!("{}loop_bound_{}", self.prefix, s.node(id).span.start);
             self.helpers.insert(
-                (self.helper_scope(id), helper.clone()),
+                (self.helper_scope(id), self.prefix.clone(), helper.clone()),
                 self.g(
                     format!(
                 "\n{helper} :: proc \"contextless\"($T: typeid, value: T) -> T {{return value}}\n"),
@@ -146,7 +146,7 @@ impl Lower<'_, '_> {
             let type_of = self.native("type_of");
             self.default = true;
             let typ = Code::concat([
-                self.g(format!("{type_of}({}default_value(", s.prefix), expr),
+                self.g(format!("{type_of}({}default_value(", self.prefix), expr),
                 rendered,
                 self.g("))", expr),
             ]);

@@ -74,7 +74,7 @@ impl Lower<'_, '_> {
                 self.switch_replacements.insert(procedure, code);
                 continue;
             }
-            let name = format!("{}default_{}", s.prefix, s.node(procedure).span.start);
+            let name = format!("{}default_{}", self.prefix, s.node(procedure).span.start);
             let mut field_code = vec![];
             let names = s.group(field, "names");
             if let Some(last) = names.last() {

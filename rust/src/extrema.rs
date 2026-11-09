@@ -227,14 +227,10 @@ impl Lower<'_, '_> {
             ])));
         }
         let optional = ellipsis.is_some();
-        let result_type = format!(
-            "{}Result{}",
-            self.source.prefix,
-            if optional { "_0" } else { "" }
-        );
+        let result_type = format!("{}Result{}", self.prefix, if optional { "_0" } else { "" });
         let prefix = format!(
             "{}extrema_{}_",
-            self.source.prefix,
+            self.prefix,
             self.source.node(id).span.start
         );
         let (helper,mut args)=self.closed(id,if optional{"extrema_optional"}else{"extrema"},Some(if optional{"tuple:2"}else{""}),|this|{

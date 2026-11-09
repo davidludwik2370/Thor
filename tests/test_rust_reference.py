@@ -15,12 +15,14 @@ from tests import test_slice_copy_hardening as copies
 from tests import test_comprehensions as comprehensions
 from tests import test_extrema as extrema
 from tests import test_t07_t12 as bindings
+from tests import test_pure_calls as checked
 
 
 class RustReferenceTests(unittest.TestCase):
     setUpClass = classmethod(rust.RustCompilerTests.setUpClass.__func__)
     program = base.ThorTests.program
     check = copies.SliceCopyHardeningTests.check
+    memory = checked.PureCallTests.memory
 
     def invoke(self, source, *, files=None, command='run', fail=None, flags=(),
                args=(), expected=None, directory=False):
@@ -136,6 +138,14 @@ def _install():
                  'nonempty_allocation_free_reductions','rejected_shapes_types_and_empty_arrays',
                  'optional_status_fallback_and_multiple_rhs_values','float_special_values_match_native_left_fold'):
         setattr(RustReferenceTests,'test_extrema_'+name,getattr(extrema.ExtremaTests,'test_'+name))
+    for name in ('borrowed_views_are_owned_only_on_the_checked_path',
+                 'owned_variadic_results_forward_named_only_parameters',
+                 'private_procedures_cannot_be_exposed_through_checked_versions',
+                 'same_named_file_private_helpers_keep_their_own_bodies',
+                 'void_multiple_results_and_variadic_helpers',
+                 'inspectable_contextless_and_c_helpers',
+                 'type_queries_do_not_execute_or_check_ordinary_effects'):
+        setattr(RustReferenceTests,'test_checked_'+name,getattr(checked.PureCallTests,'test_'+name))
 
 
 _install()

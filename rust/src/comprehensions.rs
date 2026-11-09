@@ -38,7 +38,10 @@ impl Lower<'_, '_> {
                 let low = self.comp_query(self.role(range, "left")?)?;
                 let high = self.comp_query(self.role(range, "right")?)?;
                 types.push(Code::concat([
-                    self.g(format!("{type_of}({}default_value(true ? (", s.prefix), id),
+                    self.g(
+                        format!("{type_of}({}default_value(true ? (", self.prefix),
+                        id,
+                    ),
                     low,
                     self.g(") : (", id),
                     high,
@@ -62,7 +65,7 @@ impl Lower<'_, '_> {
                 self.g(
                     format!(
                         ") when {}meta.type_is_enumerated_array({type_of}(",
-                        s.prefix
+                        self.prefix
                     ),
                     id,
                 ),
@@ -124,7 +127,7 @@ impl Lower<'_, '_> {
                         let count = self.resolver.fields(signature, "results").len();
                         let rendered = self.comp_query(call)?;
                         let query = |i| {
-                            Code::concat([self.g(format!("({}meta.type_proc_return_type({type_of}({}meta.procedure_of(",s.prefix,s.prefix),call),rendered.clone(),self.g(format!(")),{i})){{}}"),call)])
+                            Code::concat([self.g(format!("({}meta.type_proc_return_type({type_of}({}meta.procedure_of(",self.prefix,self.prefix),call),rendered.clone(),self.g(format!(")),{i})){{}}"),call)])
                         };
                         let mut parent = call;
                         while let Some(p) =
@@ -175,7 +178,7 @@ impl Lower<'_, '_> {
                 ])
             } else {
                 Code::concat([
-                    self.g(format!("[]{type_of}({}default_value(", s.prefix), id),
+                    self.g(format!("[]{type_of}({}default_value(", self.prefix), id),
                     rendered,
                     self.g("))", id),
                 ])
@@ -262,16 +265,16 @@ impl Lower<'_, '_> {
         let module = self.module("comprehension");
         self.meta = true;
         self.default = true;
-        let meta = format!("{}meta", s.prefix);
+        let meta = format!("{}meta", self.prefix);
         let type_of = self.native("type_of");
-        let builder = format!("{}comprehension_{}", s.prefix, s.node(id).span.start);
+        let builder = format!("{}comprehension_{}", self.prefix, s.node(id).span.start);
         let global = !s
             .ancestors(id)
             .any(|parent| s.node(parent).kind == "Procedure");
         let (name,mut args)=self.closed(id,"comprehension",Some(""),|this|{
-            let result=format!("{}Result",s.prefix);let element=format!("{meta}.type_elem_type({result})");
+            let result=format!("{}Result",this.prefix);let element=format!("{meta}.type_elem_type({result})");
             let mut code=vec![];
-            if global{let runtime=format!("{}comprehension_runtime",s.prefix);this.modules.insert(runtime.clone(),"base:runtime".into());code.push(this.g(format!("context = {runtime}.default_context()\n"),id));}
+            if global{let runtime=format!("{}comprehension_runtime",this.prefix);this.modules.insert(runtime.clone(),"base:runtime".into());code.push(this.g(format!("context = {runtime}.default_context()\n"),id));}
             code.push(this.g(if matches!(kind,"slice"|"dynamic"){format!("{builder}: [dynamic]{element}\n")}else{format!("{builder}: {result}\n")},id));
             let insert=|this:&Self,value:Code,key:Option<Code>|->Code{
                 let name=match kind{"slice"|"dynamic"=>"append_one","set"=>"set_insert",_=>"map_insert"};
@@ -306,7 +309,7 @@ impl Lower<'_, '_> {
             if let Some(interval)=interval{
                 let low=format!("{builder}_low");let high=format!("{builder}_high");
                 let lo=this.render(this.role(interval,"left")?,None,false)?;let hi=this.render(this.role(interval,"right")?,None,false)?;
-                let typ=if let Some(annotation)=value_type{this.render(annotation,None,true)?}else{Code::concat([this.g(format!("{type_of}({}default_value(true ? (",s.prefix),id),lo.clone(),this.g(") : (",id),hi.clone(),this.g(")))",id)])};
+                let typ=if let Some(annotation)=value_type{this.render(annotation,None,true)?}else{Code::concat([this.g(format!("{type_of}({}default_value(true ? (",this.prefix),id),lo.clone(),this.g(") : (",id),hi.clone(),this.g(")))",id)])};
                 code.extend([this.g(format!("{low}: "),source),typ.clone(),this.g(" = ",source),lo,this.g(format!("\n{high}: "),source),typ,this.g(" = ",source),hi,this.g("\n",source)]);
                 iterable=this.g(format!("{low}{}{high}",s.node(interval).op),source);
             }else if !this.resolver.denotes_type(this.reference(source))&&!names.iter().any(|name|s.node(*name).kind=="Unary"){

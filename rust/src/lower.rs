@@ -20,6 +20,8 @@ mod defaults;
 mod extrema;
 #[path = "purelower.rs"]
 mod purelower;
+#[path = "purevariants.rs"]
+mod purevariants;
 #[path = "sets.rs"]
 mod sets;
 #[path = "switches.rs"]
@@ -40,7 +42,13 @@ pub struct Lower<'a, 'r> {
     edits: Vec<(Span, Code)>,
     selected: HashMap<String, String>,
     modules: BTreeMap<String, String>,
-    helpers: BTreeMap<(NodeId, String), Code>,
+    helpers: BTreeMap<(NodeId, String, String), Code>,
+    prefix: String,
+    variant_mode: bool,
+    checked_mode: bool,
+    checked_targets: BTreeMap<NodeId, Vec<Ref>>,
+    emitting_variants: HashSet<NodeId>,
+    mutating_params: HashSet<NodeId>,
     captures: Vec<HashMap<usize, Code>>,
     fstring_plans: HashMap<NodeId, HashSet<NodeId>>,
     fstring_frames: Vec<(String, HashSet<NodeId>)>,
@@ -62,6 +70,7 @@ pub struct Lower<'a, 'r> {
     verified_pure: HashSet<NodeId>,
     pure_owned: HashSet<NodeId>,
     pure_busy: HashSet<NodeId>,
+    pure_ignored: HashMap<NodeId, String>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -74,6 +83,12 @@ impl<'a, 'r> Lower<'a, 'r> {
             selected: HashMap::new(),
             modules: BTreeMap::new(),
             helpers: BTreeMap::new(),
+            prefix: source.prefix.clone(),
+            variant_mode: false,
+            checked_mode: false,
+            checked_targets: BTreeMap::new(),
+            emitting_variants: HashSet::new(),
+            mutating_params: HashSet::new(),
             captures: vec![],
             fstring_plans: HashMap::new(),
             fstring_frames: vec![],
@@ -95,6 +110,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             verified_pure: HashSet::new(),
             pure_owned: HashSet::new(),
             pure_busy: HashSet::new(),
+            pure_ignored: HashMap::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -151,7 +167,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         && self.source.text(self.source.group(decl, "names")[0]) == "main"
                 });
             if main && memory.tracking != "off" {
-                let alias = format!("{}memory_start", self.source.prefix);
+                let alias = format!("{}memory_start", self.prefix);
                 self.modules.insert(
                     alias.clone(),
                     format!(
@@ -179,7 +195,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 let prologue = self.gen(
                     format!(
                         "\n{{_debug_entry:u64=0;_={}meta.volatile_load(&_debug_entry)}}\n",
-                        self.source.prefix
+                        self.prefix
                     ),
                     self.source.node(body).span,
                     "memory-debug",
@@ -189,6 +205,13 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
     }
     pub fn apply_privileges(&mut self, facts: &crate::privileges::Facts) {
+        self.mutating_params.extend(
+            facts
+                .mutating
+                .iter()
+                .filter(|r| r.file == self.file)
+                .map(|r| r.node),
+        );
         for (reference, issue) in &facts.issues {
             if reference.file == self.file {
                 self.permission_error(reference.node, &issue.message);
@@ -270,13 +293,13 @@ impl<'a, 'r> Lower<'a, 'r> {
         })
     }
     fn module(&mut self, name: &str) -> String {
-        let alias = format!("{}{name}", self.source.prefix);
+        let alias = format!("{}{name}", self.prefix);
         self.modules.insert(alias.clone(), format!("thor:{name}"));
         alias
     }
     fn native(&mut self, name: &str) -> String {
         self.builtin = true;
-        format!("{}builtin.{name}", self.source.prefix)
+        format!("{}builtin.{name}", self.prefix)
     }
     fn unsupported(&self, id: NodeId, name: &str) -> Error {
         Error::unsupported(self.source, self.source.node(id).span, name)
@@ -327,7 +350,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             if self.meta {
                 code.push(self.gen(
-                    format!("\nimport {}meta \"base:intrinsics\"\n", self.source.prefix),
+                    format!("\nimport {}meta \"base:intrinsics\"\n", self.prefix),
                     Span::new(0, 0),
                     "memory-debug",
                 ));
@@ -336,22 +359,29 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         self.preflight()?;
         let mut code = vec![self.render(NodeId(0), None, false)?];
-        let helpers = self.helper_declarations(NodeId(0));
+        let helpers = self
+            .helpers
+            .range(
+                (NodeId(0), String::new(), String::new())
+                    ..(NodeId(1), String::new(), String::new()),
+            )
+            .map(|(_, code)| code.clone())
+            .collect::<Vec<_>>();
         code.extend(helpers);
         if self.default {
-            let name = format!("{}default_value", self.source.prefix);
+            let name = format!("{}default_value", self.prefix);
             code.push(self.gen(format!("\n@(private=\"file\")\n{name} :: proc \"contextless\" (value: $T) -> T {{ return value }}\n"),Span::new(0,0),"support"));
         }
         if self.meta {
             code.push(self.gen(
-                format!("\nimport {}meta \"base:intrinsics\"\n", self.source.prefix),
+                format!("\nimport {}meta \"base:intrinsics\"\n", self.prefix),
                 Span::new(0, 0),
                 "support",
             ));
         }
         if self.builtin {
             code.push(self.gen(
-                format!("\nimport {}builtin \"base:builtin\"\n", self.source.prefix),
+                format!("\nimport {}builtin \"base:builtin\"\n", self.prefix),
                 Span::new(0, 0),
                 "support",
             ));
@@ -538,7 +568,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 selection.package_name.clone()
             };
             if namespace == "_" {
-                namespace = format!("{}import_{}", s.prefix, selection.start);
+                namespace = format!("{}import_{}", self.prefix, selection.start);
                 let import = s.nodes.iter().enumerate().rev().find(|(_, n)| {
                     n.kind == "Import" && n.span.end <= selection.start && n.op == selection.path
                 });
@@ -549,7 +579,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     }
                 }
             }
-            let alias = format!("{}import_{}", s.prefix, self.modules.len());
+            let alias = format!("{}import_{}", self.prefix, self.modules.len());
             self.modules.insert(alias.clone(), path);
             for (i, name) in names.iter().enumerate() {
                 let start = selection
@@ -569,9 +599,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 // exports. The init-local aliases retain native privacy checks.
                 let owner = NodeId(0);
                 let name_key = format!("validate_import_{start}");
-                let body=format!("\n@(private=\"file\", init)\n{}{name_key} :: proc \"contextless\" () {{ checked :: {alias}.{name} }}\n",s.prefix);
-                self.helpers
-                    .insert((owner, name_key), self.gen(body, span, "import"));
+                let body=format!("\n@(private=\"file\", init)\n{}{name_key} :: proc \"contextless\" () {{ checked :: {alias}.{name} }}\n",self.prefix);
+                self.helpers.insert(
+                    (owner, self.prefix.clone(), name_key),
+                    self.gen(body, span, "import"),
+                );
                 if let Some(symbol) = self.resolver.lookup(
                     Ref {
                         file: self.file,
@@ -788,14 +820,39 @@ impl<'a, 'r> Lower<'a, 'r> {
         Ok(Code::concat(parts))
     }
     pub fn render(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
+        let old = self.checked_mode;
+        if self.source.node(id).kind == "Procedure" {
+            self.checked_mode =
+                self.source.node(id).data["pure"] == true || self.emitting_variants.contains(&id);
+        }
+        let result = self.render_inner(id, expected, constant);
+        self.checked_mode = old;
+        result
+    }
+    fn render_inner(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
         if let Some(message) = self.blocked.get(&id).cloned() {
             return Ok(self.error_token(id, &message));
         }
         if let Some(code) = self.switch_replacements.get(&id) {
             return Ok(code.clone());
         }
+        if self.checked_mode {
+            if let Some(name) = self.pure_ignored.get(&id) {
+                return Ok(self.g(name, id));
+            }
+        }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if kind == "Directive" && self.source.names.get(node.name) == "procedure" {
+            if let Some(proc) = self
+                .source
+                .ancestors(id)
+                .find(|node| self.source.node(*node).kind == "Procedure")
+                .filter(|node| self.emitting_variants.contains(node))
+            {
+                return Ok(self.g(self.checked_procedure_literal(proc), id));
+            }
+        }
         if kind == "Block" {
             if let Some(owner) = node
                 .parent
@@ -846,6 +903,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return self.fstring_expression(id, expected, targets);
             }
         }
+        if kind == "Call" && self.checked_mode && self.querying == 0 {
+            if let Some(code) = self.checked_call(id, constant)? {
+                return Ok(code);
+            }
+        }
         if kind == "Interpolation" {
             let code = self.interpolation(id)?;
             if self.querying == 0 {
@@ -885,10 +947,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                                 return Ok(Code::concat([
                                     self.g("(", id),
                                     left,
-                                    self.g(
-                                        format!(" or_else {}default_value(", self.source.prefix),
-                                        id,
-                                    ),
+                                    self.g(format!(" or_else {}default_value(", self.prefix), id),
                                     right,
                                     self.g("))", id),
                                 ]));
@@ -1145,7 +1204,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                                 self.g(
                                     format!(
                                         "#type {}meta.type_proc_parameter_type({type_of}(",
-                                        self.source.prefix
+                                        self.prefix
                                     ),
                                     id,
                                 ),
@@ -1330,7 +1389,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 self.meta = true;
                 target = Some(hint.code.clone());
                 Code::concat([
-                    self.g(format!("{}meta.type_elem_type(", self.source.prefix), id),
+                    self.g(format!("{}meta.type_elem_type(", self.prefix), id),
                     hint.code.clone(),
                     self.g(")", id),
                 ])
@@ -1348,10 +1407,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 self.default = true;
                 let type_of = self.native("type_of");
                 Code::concat([
-                    self.g(
-                        format!("{type_of}({}default_value(", self.source.prefix),
-                        id,
-                    ),
+                    self.g(format!("{type_of}({}default_value(", self.prefix), id),
                     code,
                     self.g("))", id),
                 ])
@@ -1503,8 +1559,8 @@ impl<'a, 'r> Lower<'a, 'r> {
         if !typ.is_sequence() && !self.is_array(sequence) {
             return Err(self.unsupported(id, "generic/bit-set/set membership dispatch"));
         }
-        let helper = format!("{}contains", self.source.prefix);
-        let key = (NodeId(0), helper.clone());
+        let helper = format!("{}contains", self.prefix);
+        let key = (NodeId(0), self.prefix.clone(), helper.clone());
         if !self.helpers.contains_key(&key) {
             let mut parts = String::new();
             let mut names = vec![];
@@ -1581,10 +1637,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             kind = Some(current);
         }
         self.meta = true;
-        let mut parts = vec![self.g(format!("{}meta.concatenate(", self.source.prefix), id)];
+        let mut parts = vec![self.g(format!("{}meta.concatenate(", self.prefix), id)];
         let mut hint = expected.map(|hint| Hint {
             code: Code::concat([
-                self.g(format!("{}meta.type_elem_type(", self.source.prefix), id),
+                self.g(format!("{}meta.type_elem_type(", self.prefix), id),
                 hint.code,
                 self.g(")", id),
             ]),
@@ -1611,19 +1667,13 @@ impl<'a, 'r> Lower<'a, 'r> {
                     let typeof_ = self.native("type_of");
                     let code = if self.is_array(*anchor) {
                         Code::concat([
-                            self.g(
-                                format!("{typeof_}({}default_value(", self.source.prefix),
-                                id,
-                            ),
+                            self.g(format!("{typeof_}({}default_value(", self.prefix), id),
                             code,
                             self.g("))", id),
                         ])
                     } else {
                         Code::concat([
-                            self.g(
-                                format!("{}meta.type_elem_type({typeof_}(", self.source.prefix),
-                                id,
-                            ),
+                            self.g(format!("{}meta.type_elem_type({typeof_}(", self.prefix), id),
                             code,
                             self.g("))", id),
                         ])
@@ -1678,12 +1728,12 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let name = format!(
             "{}repeat_{}_{}",
-            self.source.prefix,
+            self.prefix,
             self.source.node(id).span.start,
             self.source.node(id).span.end
         );
         let scope = self.helper_scope(id);
-        let key = (scope, name.clone());
+        let key = (scope, self.prefix.clone(), name.clone());
         if !self.helpers.contains_key(&key) {
             let value = self.render(text, None, true)?;
             let mut parts = vec![
@@ -1746,7 +1796,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         self.default = true;
         let typ = Code::concat([
             self.g(
-                format!("{typeof_}({}default_value(true ? (", self.source.prefix),
+                format!("{typeof_}({}default_value(true ? (", self.prefix),
                 id,
             ),
             a.clone(),
@@ -1900,7 +1950,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     self.g(
                         format!(
                             "{}meta.type_proc_return_type({type_of}({}meta.procedure_of(",
-                            self.source.prefix, self.source.prefix
+                            self.prefix, self.prefix
                         ),
                         id,
                     ),
@@ -1925,7 +1975,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let prefix = format!(
             "{}optional_{}_",
-            self.source.prefix,
+            self.prefix,
             self.source.node(id).span.start
         );
         let result = if count == 0 {
@@ -1967,9 +2017,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         };
         let name = format!(
             "{}{flavor}_{}_{}{variant}",
-            self.source.prefix, span.start, span.end
+            self.prefix, span.start, span.end
         );
-        let key = (owner, name.clone());
+        let key = (owner, self.prefix.clone(), name.clone());
         let mut variables = vec![];
         let mut seen = HashSet::new();
         for child in self.source.descendants(id) {
@@ -2024,11 +2074,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             } else {
                 true
             };
-            let parameter = format!("{}capture_{i}", self.source.prefix);
+            let parameter = format!("{}capture_{i}", self.prefix);
             params.push(format!(
                 "{parameter}: {}${}Capture_{i}",
                 if byref { "^" } else { "" },
-                self.source.prefix
+                self.prefix
             ));
             let argument = self.render(*child, None, false)?;
             args.push(if byref {
@@ -2056,13 +2106,13 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .and_then(|n| n.parse::<usize>().ok())
             {
                 let types = (0..count)
-                    .map(|i| format!("{}Result_{i}", self.source.prefix))
+                    .map(|i| format!("{}Result_{i}", self.prefix))
                     .collect::<Vec<_>>();
                 params.extend(types.iter().map(|name| format!("${name}: typeid")));
                 format!(" -> ({})", types.join(", "))
             } else if result.is_empty() || result == "^" {
-                params.push(format!("${}Result: typeid", self.source.prefix));
-                format!(" -> {result}{}Result", self.source.prefix)
+                params.push(format!("${}Result: typeid", self.prefix));
+                format!(" -> {result}{}Result", self.prefix)
             } else {
                 format!(" -> {result}")
             }
@@ -2070,7 +2120,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             String::new()
         };
         if params.is_empty() {
-            params.push(format!("${}Site: bool", self.source.prefix));
+            params.push(format!("${}Site: bool", self.prefix));
             args.push(self.g("true", id));
         }
         if !self.helpers.contains_key(&key) {
@@ -2259,11 +2309,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             parsed.push((Some(field), None, Some(spec), widths));
         }
         let formatting = self.module("format");
-        let prefix = format!(
-            "{}format_{}_",
-            self.source.prefix,
-            self.source.node(id).span.start
-        );
+        let prefix = format!("{}format_{}_", self.prefix, self.source.node(id).span.start);
         let (name,args)=self.closed(id,"format",Some("string"),|this|{
             let builder=format!("{prefix}builder");
             let mut code=vec![this.g(format!("{builder}: {formatting}.Buffer = ---\n{formatting}.buffer_init(&{builder})\ndefer {formatting}.buffer_destroy(&{builder})\n"),id)];
@@ -2413,10 +2459,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             let typeof_ = self.native("type_of");
             self.render(id, None, false).map(|code| {
                 Some(Code::concat([
-                    self.g(
-                        format!("{typeof_}({}default_value(", self.source.prefix),
-                        id,
-                    ),
+                    self.g(format!("{typeof_}({}default_value(", self.prefix), id),
                     code,
                     self.g("))", id),
                 ]))
@@ -2433,10 +2476,10 @@ impl<'a, 'r> Lower<'a, 'r> {
         let module = self.module("temporaries");
         let prefix = format!(
             "{}fstrings_{}_",
-            self.source.prefix,
+            self.prefix,
             self.source.node(id).span.start
         );
-        let pointer = format!("{}fstring_scope", self.source.prefix);
+        let pointer = format!("{}fstring_scope", self.prefix);
         let (name,mut args)=self.closed(id,"fstring_expression",if statement{None}else{Some("")},|this|{
             let code=this.g(format!("{prefix}entries:[{}]{module}.Entry\n{prefix}scope: {module}.Scope = {{entries={prefix}entries[:]}}\n{pointer} := &{prefix}scope\ndefer {module}.destroy({pointer})\n",targets.len()),id);
             this.fstring_frames.push((pointer.clone(),targets));let expression=this.render(id,None,false);this.fstring_frames.pop();
@@ -2450,10 +2493,14 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
     fn helper_declarations(&self, owner: NodeId) -> Vec<Code> {
         self.helpers
-            .range((owner, String::new())..(NodeId(owner.0 + 1), String::new()))
+            .range(
+                (owner, self.prefix.clone(), String::new())
+                    ..(owner, format!("{}\0", self.prefix), String::new()),
+            )
             .map(|(_, code)| code.clone())
             .collect()
     }
+
     fn helper_scope(&self, id: NodeId) -> NodeId {
         self.source
             .ancestors(id)

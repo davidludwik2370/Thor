@@ -12,6 +12,34 @@ class PureCallTests(unittest.TestCase):
     program=base.ThorTests.program
     memory=pure.PureTests.memory
 
+    def test_checked_result_copy_is_writable_from_readonly_input_and_ordinary_aliases_remain_shallow(self):
+        code=self.program('''values:=make([]int,1);defer delete(values);values[0]=3
+frozen :> values
+if work(frozen)!=9||values[0]!=3{panic("checked result copy")}
+alias:=borrow(values);values[0]=7
+if alias[0]!=7{panic("ordinary shallow result")}
+''','''borrow::proc(values:[]int)->[]int{return values}
+work::fn(values:[]int)->int{copy:=borrow(values);copy[0]=9;return copy[0]}
+''')
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']):
+            with self.subTest(flags=flags):
+                _,result=self.invoke(code,flags=flags)
+                self.assertEqual(result.stderr,'')
+
+    def test_unnamed_owned_tuple_results_and_deferred_updates(self):
+        code=self.program('n:=3;values,text:=work(n);defer delete(values);defer delete(text);if values[0]!=9||text!="number 3"{panic("owned tuple")}', '''
+leaf::proc(n:int)->(values:[]int,text:string){values=make([]int,1);values[0]=n;text=f"number {n}";defer values[0]=9;return}
+middle::proc(n:int)->([]int,string){return leaf(n)}
+work::fn(n:int)->([]int,string){return middle(n)}
+''')
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']):
+            with self.subTest(flags=flags):
+                _,result=self.invoke(code,flags=flags)
+                self.assertEqual(result.stderr,'')
+
+    def test_unnamed_owned_results_still_require_explicit_return_values(self):
+        self.invoke(self.program('_=work(3)','work::fn(n:int)->[]int{_=n;return}\n'),command='check',fail='return values explicitly')
+
     def test_runtime_automatic_and_explicit_transitive_calls(self):
         self.invoke(self.program('value:=4;assert(calculate(value)==17&&AUTO==10&&EXPLICIT==26)', '''
 square::proc(x:int)->int{return x*x}

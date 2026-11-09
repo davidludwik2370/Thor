@@ -252,7 +252,9 @@ enclosing allocation lifetime. Existing ordinary runtime call behavior is retain
 
 This is still partial purity coverage. Generic/record schemas, ordinary checked
 callee variants with owned results, SDK specialization and all compile-time
-execution remain unfinished. Such detected gaps stay explicit migration failures.
+execution were unfinished at this initial checkpoint. The checked-callee
+checkpoint below extends that runtime coverage; detected unported cases remain
+explicit migration failures.
 
 ## Constant specialization and reference corrections
 
@@ -325,3 +327,37 @@ checks passed in the final reference run. Eight Rust unit tests passed in both
 debug and release profiles; Clippy passed with warnings denied. An earlier
 reference run hit an Odin backend SIGSEGV compiling the native format tests;
 the targeted retry and the final complete reference run both passed.
+
+## Checked ordinary-call runtime checkpoint
+
+Calls from verified functions now use separately emitted checked ordinary bodies.
+Ordinary calls retain their shallow aliasing behavior. Checked helpers use scratch
+storage and recursively promote owned results into the enclosing allocation
+lifetime. Helpers that mutate local out parameters retain that enclosing scratch
+allocator, so returned allocations do not disappear at the helper's return.
+
+Generated helpers and imports have separate namespaces for ordinary and checked
+bodies, including nested procedures. Checked calls retain overload selection,
+named/default/variadic arguments, anonymous f-string cleanup, original
+`#procedure` names and required-result attributes. Redirecting a call cannot
+bypass the original procedure's package/file privacy.
+
+Both implementations had two reference inconsistencies that this work corrects:
+checked helper results own independent storage and must therefore be writable
+even when their inputs are read-only; and the parser's synthetic `_` names for
+unnamed result slots must not be read as the first character of their type.
+Unnamed results still require explicit return values. The native resolver also
+tracks each slot of a multiple result with its own concrete/generic type, and
+generated contracts handle ignored input parameters without reading `_`.
+
+The permanent comparison suite now reuses existing borrowed-view, variadic,
+privacy, contextless-call and type-query fixtures. Allocation-tracked native
+fixtures exercise both debug and assertion/bounds/type-assert-disabled release
+builds. This checkpoint does not complete chunk 2: generic public-function and
+record schemas, native SDK adaptation and compile-time execution remain pending.
+
+The checkpoint passed 336 broad native/differential, memory, comparator and
+assertion-hygiene checks, plus seven reused acceptance fixtures and two additional
+multiple-result/ignored-parameter regressions. All 112 Python purity, mutation,
+call-context, dynamic-result and I/O checks passed. Rust unit tests pass in debug
+and release profiles, and Clippy passes with warnings denied.

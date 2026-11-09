@@ -72,6 +72,7 @@ class Summary:
     strong_updates: bool = False
     controls: list = field(default_factory=list)
     callers: set = field(default_factory=set)
+    checked: bool = False
 
 
 class SliceAccess:
@@ -601,7 +602,8 @@ class SliceAccess:
                 tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.members.items())))
 
     def summary(self,proc,substitutions,caller=None,*,contract=True):
-        key=proc,tuple(sorted((name,self.type_key(typ)) for name,typ in substitutions.items())),contract
+        checked=bool(caller and caller.checked) or self.project.purity.pure(proc) or self.project.purity.eval_mode and proc in self.project.purity.active
+        key=proc,tuple(sorted((name,self.type_key(typ)) for name,typ in substitutions.items())),contract,checked
         if key in self.summaries:
             context=self.summaries[key]
             if caller and caller.proc:context.callers.add(caller)
@@ -609,7 +611,7 @@ class SliceAccess:
                 self.recursive=True
                 if caller and caller.proc:self.recursive_pending.add(caller)
             return context
-        context=Summary(proc,substitutions);self.summaries[key]=context
+        context=Summary(proc,substitutions,checked=checked);self.summaries[key]=context
         if caller and caller.proc:context.callers.add(caller)
         params=self.parameters(proc)
         for index,(name,field) in enumerate(params):
@@ -954,7 +956,8 @@ class SliceAccess:
             # owned result storage is independent even when the source body
             # returned an input view. Ordinary proc results remain shallow.
             seen={}
-            results=[Value(value.typ) if self.project.purity.pure(target) else self.instantiate(value,bindings,seen)
+            independent=self.project.purity.pure(target) or context.checked and self.project.purity.wraps(target)
+            results=[Value(value.typ) if independent else self.instantiate(value,bindings,seen)
                      for value in summary.results]
             context.expressions[node,'results']=results
             result=results[0]

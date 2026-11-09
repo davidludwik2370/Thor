@@ -272,7 +272,9 @@ impl<'a> Resolver<'a> {
                 };
                 let values = source.group(id, "values");
                 for (index, name_node) in names.into_iter().enumerate() {
-                    let name = if source.node(name_node).kind == "PolyType" {
+                    let name = if source.names.get(source.node(name_node).name) == "_" {
+                        "_".to_string()
+                    } else if source.node(name_node).kind == "PolyType" {
                         source.names.get(source.node(name_node).name).to_string()
                     } else {
                         source
@@ -865,13 +867,76 @@ impl<'a> Resolver<'a> {
                 result.push((String::new(), annotation));
             }
             for name in names {
-                result.push((
-                    source.text(*name).trim_start_matches('$').into(),
-                    annotation,
-                ));
+                let name = if source.names.get(source.node(*name).name) == "_" {
+                    "_"
+                } else {
+                    source.text(*name).trim_start_matches('$')
+                };
+                result.push((name.into(), annotation));
             }
         }
         result
+    }
+    pub fn attributes(&self, declaration: Ref) -> Vec<(String, Option<Ref>)> {
+        let s = &self.sources[declaration.file];
+        let mut result = vec![];
+        for attribute in s.group(declaration.node, "attributes") {
+            let items = s.group(*attribute, "elems");
+            for item in items {
+                let name = s.role(*item, "field").unwrap_or(*item);
+                let value = s.role(*item, "value").map(|node| Ref {
+                    file: declaration.file,
+                    node,
+                });
+                result.push((s.text(name).into(), value));
+            }
+        }
+        result
+    }
+    pub fn private_call_reason(&self, callee: Ref) -> Option<String> {
+        let symbol = &self.symbols[self.symbol(callee)?];
+        let owner = &self.sources[symbol.reference.file];
+        let caller = &self.sources[callee.file];
+        let mut visibility = None;
+        for (name, value) in self.attributes(symbol.reference) {
+            if name == "private" {
+                visibility = Some(
+                    value
+                        .and_then(|r| crate::lower::unquote(self.sources[r.file].text(r.node)).ok())
+                        .unwrap_or("package".into()),
+                );
+            }
+        }
+        if visibility.is_none() {
+            for tag in owner.info["file_tags"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|tag| tag.as_str())
+            {
+                if tag.contains("private") {
+                    visibility = Some(
+                        if tag.split_whitespace().any(|word| word == "file") {
+                            "file"
+                        } else {
+                            "package"
+                        }
+                        .into(),
+                    );
+                }
+            }
+        }
+        match visibility.as_deref() {
+            Some("file") if caller.path != owner.path => Some(format!(
+                "Procedure '{}' is private to its file.",
+                symbol.name
+            )),
+            Some("package") if caller.path.parent() != owner.path.parent() => Some(format!(
+                "Procedure '{}' is private to its package.",
+                symbol.name
+            )),
+            _ => None,
+        }
     }
     pub fn type_of(&mut self, reference: Ref) -> Type {
         if let Some(typ) = self.types.get(&reference) {
@@ -1264,80 +1329,7 @@ impl<'a> Resolver<'a> {
         }
     }
     fn result_type(&mut self, r: Ref, index: usize, seen: &mut HashSet<Ref>) -> Type {
-        if !seen.insert(r) {
-            return Type::Unknown;
-        }
-        let s = &self.sources[r.file];
-        let n = s.node(r.node);
-        let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
-        match n.kind.as_str() {
-            "Paren" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
-                .map(|r| self.result_type(r, index, seen))
-                .unwrap_or(Type::Unknown),
-            "OrElse" => child("x")
-                .map(|r| self.result_type(r, index, seen))
-                .unwrap_or(Type::Unknown),
-            "SwitchResults" => s
-                .group(r.node, "args")
-                .get(index)
-                .copied()
-                .map(|node| self.type_of(Ref { file: r.file, node }))
-                .unwrap_or(Type::Unknown),
-            "SwitchExpr" | "CompileSwitchExpr" => {
-                let arms = n.data["cases"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|case| {
-                        crate::ast::Span::from_wire(&case["result"])
-                            .and_then(|span| s.at(span, r.node))
-                    })
-                    .collect::<Vec<_>>();
-                for arm in arms {
-                    let typ = self.result_type(
-                        Ref {
-                            file: r.file,
-                            node: arm,
-                        },
-                        index,
-                        &mut seen.clone(),
-                    );
-                    if !typ.is_unknown() {
-                        return typ;
-                    }
-                }
-                Type::Unknown
-            }
-            "Call" => {
-                if let Some(callee) = child("callee") {
-                    let typ = self.specialized_result(r, index, &Substitutions::new());
-                    if !typ.is_unknown() {
-                        return typ;
-                    }
-                    if let Some(signature) = self.signature(callee) {
-                        let fields = self.fields(signature, "results");
-                        return fields
-                            .get(index)
-                            .and_then(|(_, typ)| *typ)
-                            .map(|r| self.type_of(r))
-                            .unwrap_or(Type::Unknown);
-                    }
-                }
-                if index == 0 {
-                    self.type_of(r)
-                } else {
-                    Type::Unknown
-                }
-            }
-            "Index" | "TypeAssertion" if index == 1 => Type::scalar("bool"),
-            _ => {
-                if index == 0 {
-                    self.type_of(r)
-                } else {
-                    Type::Unknown
-                }
-            }
-        }
+        self.specialized_value_result(r, index, &Substitutions::new(), seen)
     }
     pub fn constant_int(&self, r: Ref) -> Option<i128> {
         self.integer(r, &mut HashSet::new())

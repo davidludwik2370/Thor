@@ -18,6 +18,7 @@ pub struct Facts {
     pub checked: BTreeSet<Ref>,
     pub faults: BTreeMap<Ref, Vec<Fault>>,
     pub gaps: BTreeMap<Ref, Ref>,
+    pub targets: BTreeMap<Ref, BTreeSet<Ref>>,
 }
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
@@ -142,11 +143,12 @@ impl<'a, 'r> Purity<'a, 'r> {
             );
         }
         if let Some(decl) = self.r.sources[proc.file].node(proc.node).parent {
-            let attrs = self.r.sources[proc.file].group(decl, "attributes").to_vec();
-            for attr in attrs {
-                let text = self.r.sources[proc.file].text(attr);
-                if text.contains("deferred_") || text.contains("init") || text.contains("fini") {
-                    self.fault(root,Ref{file:proc.file,node:attr},&via,"Pure calls cannot use package initialization/finalization or implicit deferred callbacks.");
+            for (name, value) in self.r.attributes(Ref {
+                file: proc.file,
+                node: decl,
+            }) {
+                if name.starts_with("deferred_") || ["init", "fini"].contains(&name.as_str()) {
+                    self.fault(root,value.unwrap_or(Ref{file:proc.file,node:decl}),&via,"Pure calls cannot use package initialization/finalization or implicit deferred callbacks.");
                 }
             }
         }
@@ -156,19 +158,27 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
                     self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, any, maps, sets and procedure values are not pure inputs/results.");
                 }
-                if proc != root
-                    && matches!(&typ,Type::Pointer(elem) if !matches!(elem.as_ref(),Type::Scalar{..}|Type::Array{..}))
-                {
+                if proc != root && Self::pending_record_schema(&typ) {
                     self.gap(root, annotation);
                 }
             }
         }
-        if proc != root && self.r.sources[proc.file].node(proc.node).data["pure"] != true {
+        if proc != root {
             for (_, annotation) in self.r.fields(sig, "results") {
                 if let Some(annotation) = annotation {
                     let typ = self.r.specialized_type(annotation, &bindings);
-                    if Self::reference_result(&typ) {
+                    if Self::pending_record_schema(&typ) {
                         self.gap(root, annotation);
+                    }
+                }
+            }
+        }
+        if !["", "odin"].contains(&convention) {
+            for (_, annotation) in self.r.fields(sig, "results") {
+                if let Some(annotation) = annotation {
+                    let typ = self.r.specialized_type(annotation, &bindings);
+                    if Self::owned_sequence(&typ) {
+                        self.fault(root,annotation,&via,"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc.");
                     }
                 }
             }
@@ -218,6 +228,13 @@ impl<'a, 'r> Purity<'a, 'r> {
             }
         }
         match kind.as_str() {
+            "Return" if source.group(node.node,"values").is_empty()=> {
+                if let Some(signature)=self.role(proc,"type") {
+                    if self.r.fields(signature,"results").iter().any(|(name,_)|name.is_empty()||name=="_") {
+                        self.fault(root,node,via,"Pure procedure results are unnamed; return values explicitly.");
+                    }
+                }
+            }
             "Implicit" => self.fault(root,node,via,"Pure code cannot access the ambient context or implicit runtime state."),
             "Unsafe" => self.fault(root,node,via,"Assembly, uninitialized storage and unsafe operations are not permitted in pure code."),
             "Directive" => {
@@ -327,6 +344,10 @@ impl<'a, 'r> Purity<'a, 'r> {
             self.gap(root, call);
             return;
         };
+        if let Some(message) = self.r.private_call_reason(callee) {
+            self.fault(root, callee, via, message);
+            return;
+        }
         let args = self.r.sources[call.file]
             .group(call.node, "args")
             .iter()
@@ -443,6 +464,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                     }
                     let sig = plan.signature;
                     let contextual = plan.bindings;
+                    self.facts
+                        .targets
+                        .entry(call)
+                        .or_default()
+                        .insert(candidate);
                     selected += 1;
                     let mut chain = via.to_vec();
                     chain.push(call);
@@ -492,14 +518,29 @@ impl<'a, 'r> Purity<'a, 'r> {
             _ => false,
         }
     }
-    fn reference_result(typ: &Type) -> bool {
+    fn owned_sequence(typ: &Type) -> bool {
         match typ {
+            Type::String { .. } | Type::Slice(_) | Type::Dynamic(_) => true,
             Type::Nominal(_, base)
             | Type::Array { elem: base, .. }
-            | Type::Fixed { elem: base, .. } => Self::reference_result(base),
-            Type::Scalar { name, .. } => ["rawptr", "any", "typeid"].contains(&name.as_str()),
-            Type::Enum(_) => false,
-            _ => true,
+            | Type::Fixed { elem: base, .. } => Self::owned_sequence(base),
+            _ => false,
+        }
+    }
+    fn pending_record_schema(typ: &Type) -> bool {
+        match typ {
+            Type::Struct(_)
+            | Type::Record(..)
+            | Type::Anonymous(_)
+            | Type::Union(_)
+            | Type::Soa(_) => true,
+            Type::Nominal(_, base)
+            | Type::Pointer(base)
+            | Type::Slice(base)
+            | Type::Dynamic(base)
+            | Type::Array { elem: base, .. }
+            | Type::Fixed { elem: base, .. } => Self::pending_record_schema(base),
+            _ => false,
         }
     }
     fn unsafe_storage(&mut self, t: &Type, seen: &mut HashSet<Type>) -> bool {

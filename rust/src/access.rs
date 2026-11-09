@@ -34,10 +34,7 @@ impl Lower<'_, '_> {
         let type_of = self.native("type_of");
         self.default = true;
         Ok(Code::concat([
-            self.g(
-                format!("{type_of}({}default_value(", self.source.prefix),
-                id,
-            ),
+            self.g(format!("{type_of}({}default_value(", self.prefix), id),
             value,
             self.g("))", id),
         ]))
@@ -45,7 +42,7 @@ impl Lower<'_, '_> {
     fn sequence_trait(&mut self, id: NodeId) -> Result<String> {
         let typ = self.native_type(id)?.finish().text;
         self.meta = true;
-        let m = format!("{}meta", self.source.prefix);
+        let m = format!("{}meta", self.prefix);
         Ok(format!("(({m}.type_is_array({typ}) && !{m}.type_is_enumerated_array({typ})) || {m}.type_is_slice({typ}) || {m}.type_is_dynamic_array({typ}) || {m}.type_is_fixed_capacity_dynamic_array({typ}) || {m}.type_is_string({typ}))"))
     }
     fn write_access(&self, id: NodeId) -> bool {
@@ -127,7 +124,7 @@ impl Lower<'_, '_> {
         }
         let t = self.native_type(base)?.finish().text;
         self.meta = true;
-        let m = format!("{}meta", self.source.prefix);
+        let m = format!("{}meta", self.prefix);
         if node.kind == "Selector" {
             return Ok(format!("({m}.type_is_pointer({t}) || ({inherited}))"));
         }
@@ -255,19 +252,12 @@ impl Lower<'_, '_> {
         } else {
             self.default = true;
             Code::concat([
-                self.g(
-                    format!("{type_of}({}default_value((", self.source.prefix),
-                    id,
-                ),
+                self.g(format!("{type_of}({}default_value((", self.prefix), id),
                 original,
                 self.g(")[:]))", id),
             ])
         };
-        let p = format!(
-            "{}access_{}_",
-            self.source.prefix,
-            self.source.node(id).span.start
-        );
+        let p = format!("{}access_{}_", self.prefix, self.source.node(id).span.start);
         let (name, mut args) = self.closed(
             id,
             if pointer { "address" } else { "access" },

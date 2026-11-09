@@ -159,6 +159,29 @@ impl Resolver<'_> {
             }
             if let Some(symbol) = self.symbol(r) {
                 let symbol = self.symbols[symbol].clone();
+                if symbol.annotation.is_none() {
+                    let source = &self.sources[symbol.reference.file];
+                    if source.group(symbol.reference.node, "names").len() > 1
+                        && source.group(symbol.reference.node, "values").len() == 1
+                    {
+                        if let Some(node) = symbol.value {
+                            let typ = self.specialized_value_result(
+                                Ref {
+                                    file: symbol.reference.file,
+                                    node,
+                                },
+                                symbol.index,
+                                bindings,
+                                seen,
+                            );
+                            return if symbol.constant {
+                                typ
+                            } else {
+                                typ.defaulted()
+                            };
+                        }
+                    }
+                }
                 if let Some(node) = symbol.annotation.or(symbol.value) {
                     return self.specialize(
                         Ref {
@@ -382,6 +405,80 @@ impl Resolver<'_> {
             }
             "Binary" if n.op == "/" => subtype("right"),
             _ => self.type_of(r),
+        }
+    }
+    /// Select a value from a multi-result expression without losing generic
+    /// substitutions. Assignment slots are not all the first result's type.
+    pub(super) fn specialized_value_result(
+        &mut self,
+        r: Ref,
+        index: usize,
+        bindings: &Substitutions,
+        seen: &mut HashSet<Ref>,
+    ) -> Type {
+        if !seen.insert(r) {
+            return Type::Unknown;
+        }
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
+        match n.kind.as_str() {
+            "Paren" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
+                .map(|r| self.specialized_value_result(r, index, bindings, seen))
+                .unwrap_or(Type::Unknown),
+            "OrElse" => child("x")
+                .map(|r| self.specialized_value_result(r, index, bindings, seen))
+                .unwrap_or(Type::Unknown),
+            "SwitchResults" => s
+                .group(r.node, "args")
+                .get(index)
+                .copied()
+                .map(|node| self.specialized_type(Ref { file: r.file, node }, bindings))
+                .unwrap_or(Type::Unknown),
+            "SwitchExpr" | "CompileSwitchExpr" => {
+                let arms = n.data["cases"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|case| {
+                        crate::ast::Span::from_wire(&case["result"])
+                            .and_then(|span| s.at(span, r.node))
+                    })
+                    .collect::<Vec<_>>();
+                for node in arms {
+                    let typ = self.specialized_value_result(
+                        Ref { file: r.file, node },
+                        index,
+                        bindings,
+                        &mut seen.clone(),
+                    );
+                    if !typ.is_unknown() {
+                        return typ;
+                    }
+                }
+                Type::Unknown
+            }
+            "Call" => {
+                let typ = self.specialized_result(r, index, bindings);
+                if !typ.is_unknown() {
+                    return typ;
+                }
+                if let Some(signature) = child("callee").and_then(|r| self.signature(r)) {
+                    if let Some((_, Some(annotation))) =
+                        self.fields(signature, "results").get(index)
+                    {
+                        return self.specialized_type(*annotation, bindings);
+                    }
+                }
+                if index == 0 {
+                    self.type_of(r)
+                } else {
+                    Type::Unknown
+                }
+            }
+            "Index" | "TypeAssertion" if index == 1 => Type::scalar("bool"),
+            _ if index == 0 => self.specialized_type(r, bindings),
+            _ => Type::Unknown,
         }
     }
     fn record_instance(&self, owner: Ref, arguments: Vec<(String, Type)>) -> Type {

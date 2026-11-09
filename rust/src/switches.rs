@@ -268,12 +268,12 @@ impl Lower<'_, '_> {
         }
         let name = format!(
             "{}validate_switch_{}",
-            self.source.prefix,
+            self.prefix,
             self.source.node(id).span.start
         );
-        let selector = format!("{}selector", self.source.prefix);
+        let selector = format!("{}selector", self.prefix);
         let owner = self.helper_scope(id);
-        let mut declaration=vec![self.g(format!("\n{}{name} :: proc \"contextless\" (${selector}: ${}Selector) -> bool {{\nswitch {selector} {{\n",if owner.0==0{"@(private=\"file\")\n"}else{""},self.source.prefix),id)];
+        let mut declaration=vec![self.g(format!("\n{}{name} :: proc \"contextless\" (${selector}: ${}Selector) -> bool {{\nswitch {selector} {{\n",if owner.0==0{"@(private=\"file\")\n"}else{""},self.prefix),id)];
         for operand in operands {
             declaration.extend([
                 self.g("case ", operand),
@@ -282,8 +282,10 @@ impl Lower<'_, '_> {
             ]);
         }
         declaration.push(self.g("case:\n}\nreturn true\n}\n", id));
-        self.helpers
-            .insert((owner, name.clone()), Code::concat(declaration));
+        self.helpers.insert(
+            (owner, self.prefix.clone(), name.clone()),
+            Code::concat(declaration),
+        );
         let value = if let Some(selector) = self.source.role(id, "selector") {
             self.render(selector, None, true)?
         } else {
@@ -422,7 +424,7 @@ impl Lower<'_, '_> {
                 self.g(
                     format!(
                         "({}meta.type_proc_return_type({type_of}({}meta.procedure_of(",
-                        self.source.prefix, self.source.prefix
+                        self.prefix, self.prefix
                     ),
                     arm,
                 ),
@@ -496,10 +498,7 @@ impl Lower<'_, '_> {
             self.default = true;
             let type_of = self.native("type_of");
             types.push(Code::concat([
-                self.g(
-                    format!("{type_of}({}default_value(", self.source.prefix),
-                    id,
-                ),
+                self.g(format!("{type_of}({}default_value(", self.prefix), id),
                 query,
                 self.g("))", id),
             ]));
@@ -618,7 +617,7 @@ impl Lower<'_, '_> {
         let mut results = vec![];
         if cleanup {
             for (i, value) in values.iter().enumerate() {
-                let name = format!("{}switch_value_{i}", s.prefix);
+                let name = format!("{}switch_value_{i}", self.prefix);
                 let expression = self.render(*value, hints[i].clone(), false)?;
                 code.push(self.g(name.clone(), *value));
                 if let Some(hint) = &hints[i] {
@@ -687,14 +686,14 @@ impl Lower<'_, '_> {
             let type_of = self.native("type_of");
             code.extend([
                 self.g(
-                    format!("when {}meta.type_is_enum({type_of}(", self.source.prefix),
+                    format!("when {}meta.type_is_enum({type_of}(", self.prefix),
                     id,
                 ),
                 selector_code.clone(),
                 self.g(")) {\n", id),
             ]);
             if targets.is_some() {
-                code.push(self.g(format!("{}matched := false\n", self.source.prefix), id));
+                code.push(self.g(format!("{}matched := false\n", self.prefix), id));
             }
         }
         code.push(self.g(
@@ -716,7 +715,7 @@ impl Lower<'_, '_> {
             }
             code.push(self.g(": ", case.result));
             if missing && targets.is_some() {
-                code.push(self.g(format!("{}matched=true; ", self.source.prefix), case.result));
+                code.push(self.g(format!("{}matched=true; ", self.prefix), case.result));
             }
             if self.source.node(case.result).kind == "SwitchBreak" {
                 continue;
@@ -736,7 +735,7 @@ impl Lower<'_, '_> {
                 "panic_contextless"
             });
             if targets.is_some() {
-                code.push(self.g(format!("if !{}matched {{", self.source.prefix), id));
+                code.push(self.g(format!("if !{}matched {{", self.prefix), id));
             }
             code.push(self.g(
                 format!("{panic}(\"Unmatched enum value in switch expression\")"),
@@ -775,7 +774,7 @@ impl Lower<'_, '_> {
                 let generic = (0..hints.len())
                     .map(|i| {
                         Some(Hint {
-                            code: self.g(format!("{}Result_{i}", self.source.prefix), id),
+                            code: self.g(format!("{}Result_{i}", self.prefix), id),
                             element_only: false,
                             plain_array: false,
                         })
@@ -826,7 +825,7 @@ impl Lower<'_, '_> {
         let generic = (0..hints.len())
             .map(|i| {
                 Some(Hint {
-                    code: self.g(format!("{}Result_{i}", self.source.prefix), id),
+                    code: self.g(format!("{}Result_{i}", self.prefix), id),
                     element_only: false,
                     plain_array: false,
                 })
@@ -1032,7 +1031,7 @@ impl Lower<'_, '_> {
         let call = self.helper_call(owner, &name, args);
         let temporary = format!(
             "{}global_switch_{}",
-            self.source.prefix,
+            self.prefix,
             self.source.node(owner).span.start
         );
         let mut replacement = vec![];
@@ -1043,7 +1042,7 @@ impl Lower<'_, '_> {
             replacement.push(self.g(format!("{temporary}.value_{i}"), id));
         }
         self.helpers.insert(
-            (NodeId(0), temporary.clone()),
+            (NodeId(0), self.prefix.clone(), temporary.clone()),
             Code::concat([
                 self.g(format!("\n@(private=\"file\")\n{temporary} := "), id),
                 call,
@@ -1149,7 +1148,7 @@ impl Lower<'_, '_> {
                         local_hints.push(None);
                         continue;
                     }
-                    let name = format!("{}switch_lhs_{i}", s.prefix);
+                    let name = format!("{}switch_lhs_{i}", this.prefix);
                     let target = this.unparen(*lhs);
                     let value = if s.node(target).kind == "Index"
                         && matches!(this.typ(this.role(target, "expr")?), Type::Map { .. })

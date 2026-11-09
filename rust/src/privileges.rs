@@ -2521,7 +2521,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
 
             let mut instances = HashMap::new();
             for (index, output) in outputs.into_iter().enumerate() {
-                let output = if self.s(candidate).node(candidate.node).data["pure"] == true {
+                let output = if self.s(candidate).node(candidate.node).data["pure"] == true
+                    || old_depth > 0
+                {
                     self.value(self.values[output].typ.clone())
                 } else {
                     self.instantiate(output, &bound, &mut instances, 0)

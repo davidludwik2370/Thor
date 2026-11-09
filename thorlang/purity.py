@@ -1169,6 +1169,10 @@ class Purity:
         name=s.prefix+'body_'+str(proc.start)
         hidden=s.prefix+'procedure_name_'+str(proc.start)
         results=self.r.fields(signature.role('results'))
+        if any(not name or name=='_' for name,_ in results):
+            for node in self.walk(proc):
+                if node.kind=='Return' and not node.group('values'):
+                    self.problem(node,'Pure procedure results are unnamed; return values explicitly.')
         outputs=[s.prefix+'output_'+str(proc.start)+'_'+str(i) for i in range(len(results))]
         extra=','.join(f'{slot}:^${slot}_T' for slot in outputs)+','+hidden+':string,'+prefix+'_caller:$'+prefix+'_Allocator'
         parameter_code=s.splice(params,[(c.start,c.end,s.render(c)) for c in params.children],

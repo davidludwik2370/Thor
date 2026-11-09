@@ -1,5 +1,5 @@
 //! Verified call scratch lifetimes and independent scalar/sequence results.
-//! Record schemas and ordinary owned-result variants remain explicit gaps.
+//! Record schemas and native SDK specialization remain explicit gaps.
 use super::*;
 impl Lower<'_, '_> {
     pub fn apply_purity(&mut self, facts: &crate::purity::Facts) -> Result<()> {
@@ -9,23 +9,39 @@ impl Lower<'_, '_> {
                 continue;
             }
             facts.validate(self.resolver, root)?;
-            let signature = self.role(root.node, "type")?;
-            let params = self.resolver.fields(self.reference(signature), "params");
-            let results = self.resolver.fields(self.reference(signature), "results");
-            for (_, annotation) in params.iter().chain(&results) {
-                if let Some(annotation) = annotation {
-                    let typ = self
-                        .resolver
-                        .specialized_type(*annotation, &crate::semantics::Substitutions::new());
-                    if Self::pure_schema_gap(&typ) {
-                        return Err(self.unsupported(
-                            annotation.node,
-                            "pure generic/record schema validation",
-                        ));
-                    }
+            self.prepare_pure(root, false)?;
+        }
+        self.prepare_checked_variants(facts)?;
+        Ok(())
+    }
+    pub(super) fn prepare_pure(&mut self, root: Ref, internal: bool) -> Result<()> {
+        let signature = self.role(root.node, "type")?;
+        let params = self.resolver.fields(self.reference(signature), "params");
+        let results = self.resolver.fields(self.reference(signature), "results");
+        for (_, annotation) in params.iter().chain(&results) {
+            if let Some(annotation) = annotation {
+                let typ = self
+                    .resolver
+                    .specialized_type(*annotation, &crate::semantics::Substitutions::new());
+                let gap = if internal {
+                    Self::pure_internal_schema_gap(&typ)
+                } else {
+                    Self::pure_schema_gap(&typ)
+                };
+                if gap {
+                    return Err(
+                        self.unsupported(annotation.node, "pure generic/record schema validation")
+                    );
                 }
             }
-            let owned = results
+        }
+        let contextual = ["", "odin"].contains(
+            &self.source.node(signature).data["calling_convention"]
+                .as_str()
+                .unwrap_or(""),
+        );
+        let owned = contextual
+            && results
                 .iter()
                 .filter_map(|(_, annotation)| *annotation)
                 .any(|annotation| {
@@ -34,65 +50,90 @@ impl Lower<'_, '_> {
                         .specialized_type(annotation, &crate::semantics::Substitutions::new());
                     Self::pure_owns(&typ)
                 });
-            let Some(body) = self.source.role(root.node, "body") else {
-                continue;
-            };
-            let module = self.module("pure");
-            let mut checks = vec![];
-            if let Some(fields) = self.source.role(signature, "params") {
-                for field in self.source.node(fields).children.clone() {
-                    if self.source.node(field).kind != "Field" {
-                        continue;
-                    }
-                    for name in self.source.group(field, "names").to_vec() {
-                        let site = self.source.role(field, "type").unwrap_or(name);
-                        let value = self.source.text(name).trim_start_matches('$');
-                        checks.push(self.g(
-                            format!("\n{module}.validate(type_of({value}),false,0,\"\")\n"),
-                            site,
-                        ));
-                    }
+        let Some(body) = self.source.role(root.node, "body") else {
+            return Ok(());
+        };
+        let module = self.module("pure");
+        let mut checks = vec![];
+        if let Some(fields) = self.source.role(signature, "params") {
+            for field in self.source.node(fields).children.clone() {
+                if self.source.node(field).kind != "Field" {
+                    continue;
+                }
+                for name in self.source.group(field, "names").to_vec() {
+                    let site = self.source.role(field, "type").unwrap_or(name);
+                    let value = if self.source.names.get(self.source.node(name).name) == "_"
+                        || self.source.text(name) == "_"
+                    {
+                        self.pure_ignored
+                            .entry(name)
+                            .or_insert_with(|| {
+                                format!("{}pure_ignored_{}", self.source.prefix, name.0)
+                            })
+                            .clone()
+                    } else {
+                        self.source.text(name).trim_start_matches('$').to_string()
+                    };
+                    let type_of = self.native("type_of");
+                    let query = if self.source.node(name).kind == "PolyType"
+                        && self
+                            .source
+                            .role(field, "type")
+                            .is_some_and(|r| self.source.node(r).kind == "TypeidType")
+                    {
+                        value
+                    } else {
+                        format!("{type_of}({value})")
+                    };
+                    let validator = if internal {
+                        self.pure_internal_validator(root.node)
+                    } else {
+                        format!("{module}.validate")
+                    };
+                    checks.push(self.g(format!("\n{validator}({query},false,0,\"\")\n"), site));
                 }
             }
-            for (_, annotation) in results {
-                if let Some(annotation) = annotation {
-                    let typ = self.render(annotation.node, None, true)?;
-                    let validator = self.pure_result_validator(root.node);
-                    checks.push(Code::concat([
-                        self.g(format!("\n{validator}("), annotation.node),
-                        typ,
-                        self.g(",0)\n", annotation.node),
-                    ]));
-                }
-            }
-            let contextual = self.source.node(signature).data["calling_convention"]
-                .as_str()
-                .unwrap_or("")
-                != "contextless";
-            if contextual {
-                let scratch = format!(
-                    "{}pure_scratch_{}",
-                    self.source.prefix,
-                    self.source.node(root.node).span.start
-                );
-                checks.push(self.g(format!("\n{scratch}:{module}.Scratch\n{module}.scratch_init(&{scratch})\ndefer {module}.scratch_destroy(&{scratch})\ncontext.allocator={module}.scratch_allocator(&{scratch})\ncontext.temp_allocator=context.allocator\n"),root.node));
-            }
-            if owned {
-                self.pure_owned.insert(root.node);
-            }
-            self.body_prologues.entry(body).or_default().extend(checks);
-            self.verified_pure.insert(root.node);
         }
+        for (_, annotation) in results {
+            if let Some(annotation) = annotation {
+                let typ = self.render(annotation.node, None, true)?;
+                let validator = self.pure_result_validator(root.node);
+                checks.push(Code::concat([
+                    self.g(format!("\n{validator}("), annotation.node),
+                    typ,
+                    self.g(",0)\n", annotation.node),
+                ]));
+            }
+        }
+        let mutates = internal
+            && self.source.role(signature, "params").is_some_and(|params| {
+                self.source
+                    .descendants(params)
+                    .any(|name| self.mutating_params.contains(&name))
+            });
+        if contextual && !mutates {
+            let scratch = format!(
+                "{}pure_scratch_{}",
+                self.prefix,
+                self.source.node(root.node).span.start
+            );
+            checks.push(self.g(format!("\n{scratch}:{module}.Scratch\n{module}.scratch_init(&{scratch})\ndefer {module}.scratch_destroy(&{scratch})\ncontext.allocator={module}.scratch_allocator(&{scratch})\ncontext.temp_allocator=context.allocator\n"),root.node));
+        }
+        if owned {
+            self.pure_owned.insert(root.node);
+        }
+        self.body_prologues.entry(body).or_default().extend(checks);
+        self.verified_pure.insert(root.node);
         Ok(())
     }
     fn pure_result_validator(&mut self, site: NodeId) -> String {
-        let name = format!("{}pure_result_validate", self.source.prefix);
+        let name = format!("{}pure_result_validate", self.prefix);
         let module = self.module("pure");
         self.meta = true;
-        let meta = format!("{}meta", self.source.prefix);
+        let meta = format!("{}meta", self.prefix);
         let code=self.g(format!("\n@(private=\"file\")\n{name}::proc \"contextless\"($T:typeid,$Depth:int){{when Depth>24{{#panic(\"Pure result nesting limit exceeded\")}} else when {meta}.type_is_slice(T)||{meta}.type_is_dynamic_array(T)||{meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T){{{name}({meta}.type_elem_type(T),Depth+1)}}else{{{module}.validate(T,false,Depth,\"\")}}}}\n"),site);
         self.helpers
-            .entry((NodeId(0), name.clone()))
+            .entry((NodeId(0), self.prefix.clone(), name.clone()))
             .or_insert(code);
         name
     }
@@ -101,7 +142,7 @@ impl Lower<'_, '_> {
         let sig = self.role(proc, "type")?;
         let params = self.role(sig, "params")?;
         let results = self.resolver.fields(self.reference(sig), "results");
-        let prefix = format!("{}pure_{}", s.prefix, s.node(proc).span.start);
+        let prefix = format!("{}pure_{}", self.prefix, s.node(proc).span.start);
         let module = self.module("pure");
         let inner = format!("{prefix}_body");
         let allocator = format!("{prefix}_allocator");
@@ -137,7 +178,12 @@ impl Lower<'_, '_> {
         );
         let mut substitutions = vec![];
         for id in s.descendants(body) {
-            if s.node(id).kind == "Directive" && s.names.get(s.node(id).name) == "procedure" {
+            if s.node(id).kind == "Directive"
+                && s.names.get(s.node(id).name) == "procedure"
+                && s.ancestors(id)
+                    .find(|node| s.node(*node).kind == "Procedure")
+                    == Some(proc)
+            {
                 self.switch_replacements.insert(id, self.g(&procedure, id));
                 substitutions.push(id);
             }
@@ -203,7 +249,14 @@ impl Lower<'_, '_> {
         let mut args = locals
             .iter()
             .map(|local| format!("&{local}"))
-            .chain(["#procedure".into(), allocator.clone()])
+            .chain([
+                if self.emitting_variants.contains(&proc) {
+                    self.checked_procedure_literal(proc)
+                } else {
+                    "#procedure".into()
+                },
+                allocator.clone(),
+            ])
             .collect::<Vec<_>>();
         let mut after_variadic = false;
         for field in s
@@ -213,7 +266,11 @@ impl Lower<'_, '_> {
             .filter(|id| s.node(**id).kind == "Field")
         {
             for name in s.group(*field, "names") {
-                let name = s.text(*name).trim_start_matches('$');
+                let name = self
+                    .pure_ignored
+                    .get(name)
+                    .map(String::as_str)
+                    .unwrap_or_else(|| s.text(*name).trim_start_matches('$'));
                 args.push(if s.node(*field).data["variadic"] == true {
                     after_variadic = true;
                     format!("..{name}")
@@ -234,6 +291,18 @@ impl Lower<'_, '_> {
         ));
         Ok(Code::concat(code))
     }
+    fn pure_internal_schema_gap(typ: &Type) -> bool {
+        match typ {
+            Type::Unknown | Type::Generic => false,
+            Type::Nominal(_, base)
+            | Type::Pointer(base)
+            | Type::Slice(base)
+            | Type::Dynamic(base)
+            | Type::Array { elem: base, .. }
+            | Type::Fixed { elem: base, .. } => Self::pure_internal_schema_gap(base),
+            _ => Self::pure_schema_gap(typ),
+        }
+    }
     fn pure_schema_gap(typ: &Type) -> bool {
         match typ {
             Type::Nominal(_, base)
@@ -251,12 +320,16 @@ impl Lower<'_, '_> {
             _ => false,
         }
     }
-    fn pure_owns(typ: &Type) -> bool {
+    pub(super) fn pure_owns(typ: &Type) -> bool {
         match typ {
             Type::Nominal(_, base)
             | Type::Array { elem: base, .. }
             | Type::Fixed { elem: base, .. } => Self::pure_owns(base),
-            Type::Slice(_) | Type::Dynamic(_) | Type::String { .. } => true,
+            Type::Slice(_)
+            | Type::Dynamic(_)
+            | Type::String { .. }
+            | Type::Unknown
+            | Type::Generic => true,
             _ => false,
         }
     }

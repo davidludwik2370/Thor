@@ -12,8 +12,8 @@ impl Lower<'_, '_> {
         self.meta = true;
         let type_of = self.native("type_of");
         let sets = self.module("sets");
-        let m = format!("{}meta", self.source.prefix);
-        let t = format!("{type_of}({}default_value({rendered}))", self.source.prefix);
+        let m = format!("{}meta", self.prefix);
+        let t = format!("{type_of}({}default_value({rendered}))", self.prefix);
         Ok(self.g(format!("((({t}=={sets}.Set({type_of}({sets}.key_witness(({rendered}).table)))) when {m}.type_is_map({type_of}(({rendered}).table)) else false) when {m}.type_has_field({t},\"table\") else false)"),id))
     }
     pub(super) fn set_expression(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {

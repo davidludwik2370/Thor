@@ -86,7 +86,7 @@ impl Lower<'_, '_> {
                 continue;
             }
             // A separate alias also works for blank imports and local shadowing.
-            let alias = format!("{}context_package_{}", self.source.prefix, owner.file);
+            let alias = format!("{}context_package_{}", self.prefix, owner.file);
             self.modules.insert(alias.clone(), path);
             return Some(format!("{alias}."));
         }
@@ -152,7 +152,7 @@ impl Lower<'_, '_> {
                 }
                 for _ in 0..*depth {
                     code = Code::concat([
-                        self.g(format!("{}meta.type_elem_type(", self.source.prefix), id),
+                        self.g(format!("{}meta.type_elem_type(", self.prefix), id),
                         code,
                         self.g(")", id),
                     ]);
