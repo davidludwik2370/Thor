@@ -27,26 +27,21 @@ impl Lower<'_, '_> {
         Ok(())
     }
     pub(super) fn prepare_pure(&mut self, root: Ref, internal: bool) -> Result<()> {
-        let signature = self.role(root.node, "type")?;
-        let params = self.resolver.fields(self.reference(signature), "params");
-        let results = self.resolver.fields(self.reference(signature), "results");
-        for (_, annotation) in params.iter().chain(&results) {
-            if let Some(annotation) = annotation {
-                let typ = self
-                    .resolver
-                    .specialized_type(*annotation, &crate::semantics::Substitutions::new());
-                let gap = if internal {
-                    Self::pure_internal_schema_gap(&typ)
-                } else {
-                    Self::pure_schema_gap(&typ)
-                };
-                if gap {
-                    return Err(
-                        self.unsupported(annotation.node, "pure generic/record schema validation")
-                    );
-                }
+        if let Some(body) = self.source.role(root.node, "body") {
+            if self.source.raw.as_bytes()[self.source.node(body).span.start] != b'{' {
+                return Err(Error::at(
+                    self.source,
+                    self.source.node(body).span,
+                    "'do' for procedure bodies is not allowed, prefer {}",
+                ));
             }
         }
+        if self.borrowing.contracts.contains_key(&root) {
+            self.verified_pure.insert(root.node);
+            return Ok(());
+        }
+        let signature = self.role(root.node, "type")?;
+        let results = self.resolver.fields(self.reference(signature), "results");
         let contextual = ["", "odin"].contains(
             &self.source.node(signature).data["calling_convention"]
                 .as_str()
@@ -188,7 +183,11 @@ impl Lower<'_, '_> {
             types.push(self.render(annotation.node, None, true)?);
         }
         if self.source.raw.as_bytes()[self.source.node(body).span.start] != b'{' {
-            return Err(self.unsupported(body, "pure single-statement owned body"));
+            return Err(Error::at(
+                self.source,
+                self.source.node(body).span,
+                "'do' for procedure bodies is not allowed, prefer {}",
+            ));
         }
         let prologues = self.body_prologues.remove(&body).unwrap_or_default();
         let promotion = slots
@@ -315,29 +314,6 @@ impl Lower<'_, '_> {
             proc,
         ));
         Ok(Code::concat(code))
-    }
-    fn pure_internal_schema_gap(typ: &Type) -> bool {
-        match typ {
-            Type::Unknown | Type::Generic => false,
-            Type::Nominal(_, base)
-            | Type::Pointer(base)
-            | Type::Slice(base)
-            | Type::Dynamic(base)
-            | Type::Array { elem: base, .. }
-            | Type::Fixed { elem: base, .. } => Self::pure_internal_schema_gap(base),
-            _ => Self::pure_schema_gap(typ),
-        }
-    }
-    fn pure_schema_gap(typ: &Type) -> bool {
-        match typ {
-            Type::Nominal(_, base)
-            | Type::Slice(base)
-            | Type::Dynamic(base)
-            | Type::Array { elem: base, .. }
-            | Type::Fixed { elem: base, .. } => Self::pure_schema_gap(base),
-            Type::Unknown | Type::Soa(_) => true,
-            _ => false,
-        }
     }
     pub(super) fn pure_owns(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
         if !seen.insert(typ.clone()) {

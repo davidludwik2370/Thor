@@ -223,6 +223,35 @@ All 24 Rust units pass in both profiles. A fresh broad native run is still in
 progress, so this is not recorded as whole-suite acceptance. Checkpoint 3 continues
 with nonconvergence handling and remaining eligibility gaps; execution is unported.
 
+### Native eligibility and graph-failure contracts
+
+Nonconverging provenance now installs the reference's failing checked-body
+contract. Unused generic functions remain lazy and ordinary proc calls remain
+unchanged. Generic overload groups retain native candidate selection; effects
+from an unselected implementation do not invalidate the selected implementation.
+Generic formatting and transmute predicates are checked inside the selected
+native helper. Definite invalid overload arguments keep native candidate errors.
+Unknown signature types and unsupported SoA schemas reach the reference's native
+type checks rather than an unrelated migration error.
+
+Checked helpers can reach bodies through transitive public re-exports without
+requiring a direct user import. Valid single-statement scopes such as
+`if flag do return value` retain owned-result promotion. Checked-variant edits
+are isolated from original proc bodies; invalid whole-procedure `do` syntax
+remains an Odin syntax error. Unresolved `auto_cast` targets use the reference
+source-contract message.
+
+The broad native comparison run passed 576 tests. A subsequent 127-test focused
+gate passes for checked calls, conditional effects, ownership, conversions,
+auto-casts, source errors and real-AST helper models. The corrected transitive
+re-export test and two final procedure-syntax/result-lifetime tests pass separately.
+Rust's 24 units pass in debug and release, Clippy passes with warnings denied,
+and the seven assertion-hygiene tests pass. The broad run predates the final
+eligibility changes; these results do not replace checkpoint 8 acceptance.
+Evaluation-mode signatures and specialization scheduling are the next porting
+work. Big-number integration and complete diagnostic/editor parity retain their
+later checkpoints.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

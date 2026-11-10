@@ -35,6 +35,7 @@ pub struct Emission {
     pub profiles: BTreeMap<Ref, Vec<(Access, Permission)>>,
     pub mutates: BTreeSet<Ref>,
     pub escapes: BTreeMap<Ref, String>,
+    pub contracts: BTreeMap<Ref, String>,
 }
 impl Emission {
     pub fn covers(&self, resolver: &Resolver<'_>, site: Ref) -> bool {
@@ -117,7 +118,16 @@ impl Model {
     /// Other paths retain their prior explicit migration checks.
     pub fn emission(&mut self, resolver: &mut Resolver<'_>, purity: &purity::Facts) -> Emission {
         if !self.converged {
-            return Emission::default();
+            // Python installs a contract on every procedure prepared in this
+            // graph. Keep it inside the native checked body: unused generic
+            // helpers and ordinary proc calls must remain lazy/unchanged.
+            return Emission {
+                procedures: self.nodes.keys().copied().collect(),
+                contracts: self.nodes.keys().copied().map(|proc| (proc,
+                    "Pure storage provenance did not converge; simplify the reference graph.".into())).collect(),
+                profiles: purity.targets.keys().copied().map(|call| (call, vec![])).collect(),
+                ..Emission::default()
+            };
         }
         let mut result = Emission::default();
         for (proc, nodes) in &self.nodes {
@@ -126,6 +136,9 @@ impl Model {
                 arena: &mut self.arena,
             };
             let supported = nodes.iter().all(|node| {
+                if purity.conditional.contains_key(node) {
+                    return true;
+                }
                 if eval.queried(*node) {
                     return true;
                 }
@@ -252,7 +265,11 @@ impl Model {
                 }
             }
             let mut nodes = vec![];
-            walk(eval.resolver, body, &mut nodes);
+            if purity.conditional.contains_key(&body) {
+                nodes.push(body);
+            } else {
+                walk(eval.resolver, body, &mut nodes);
+            }
             for (_, field) in eval.parameters(*proc) {
                 if let Some(default) = eval.role(field, "default") {
                     if !nodes.contains(&default) {

@@ -17,6 +17,22 @@ class RustHelperOwnershipTests(unittest.TestCase):
                 result=self.compare(source,flags=flags)
                 self.assertEqual(result.stderr,'')
 
+    def test_nonconverging_alias_graph_has_a_source_contract_error(self):
+        self.compare(self.program('values:=[1,2];_=work(values[:])','''
+write::proc(values:[]int,n:int){values[0]=n}
+forward::proc(n:int,values:..[]int){write(n=n,values=values[0])}
+work::fn(input:[]int)->int{forward(2,input);return input[0]}
+'''),command='check',fail='Pure storage provenance did not converge')
+
+    def test_nonconverging_generic_contract_remains_lazy_for_ordinary_calls(self):
+        self.run_profiles(self.program('''
+values:=[1,2];forward(7,values[:]);if values[0]!=7{panic("ordinary call")}
+''','''
+write::proc(values:[]int,n:int){values[0]=n}
+forward::proc(n:int,values:..[]int){write(n=n,values=values[0])}
+work::fn(input:$T)->int{forward(2,input);return input[0]}
+'''))
+
     def test_transitive_scalar_setters_can_modify_only_local_storage(self):
         self.run_profiles(self.program('if work(3)!=9{panic("local setter")}', '''
 set::proc(value:^int){value^=9}

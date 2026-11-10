@@ -49,7 +49,57 @@ impl Lower<'_, '_> {
                 return Ok(self.g(format!("{alias}.{name}"), site));
             }
         }
-        Err(self.unsupported(site, "checked transitive package access"))
+        // A public procedure alias can resolve to a body in a package not
+        // directly imported by this file. Mirror PureCalls.access: retain the
+        // original alias as the native access witness, and add a compiler-only
+        // import for its checked implementation.
+        let target_dir = owner
+            .path
+            .parent()
+            .ok_or_else(|| Error::new("checked target has no package"))?;
+        let path = self
+            .source
+            .collection_roots
+            .iter()
+            .filter_map(|(collection, root)| {
+                target_dir.strip_prefix(root).ok().map(|suffix| {
+                    (
+                        root.components().count(),
+                        format!(
+                            "{collection}:{}",
+                            suffix.to_string_lossy().replace('\\', "/")
+                        ),
+                    )
+                })
+            })
+            .max_by_key(|(depth, _)| *depth)
+            .map(|(_, path)| path)
+            .unwrap_or_else(|| {
+                let caller = self
+                    .source
+                    .path
+                    .parent()
+                    .unwrap()
+                    .components()
+                    .collect::<Vec<_>>();
+                let target = target_dir.components().collect::<Vec<_>>();
+                let common = caller
+                    .iter()
+                    .zip(&target)
+                    .take_while(|(a, b)| a == b)
+                    .count();
+                let mut relative = std::path::PathBuf::new();
+                for _ in common..caller.len() {
+                    relative.push("..");
+                }
+                for part in &target[common..] {
+                    relative.push(part.as_os_str());
+                }
+                relative.to_string_lossy().replace('\\', "/")
+            });
+        let alias = format!("{}checked_package_{}", self.prefix, target.file);
+        self.modules.insert(alias.clone(), path);
+        Ok(self.g(format!("{alias}.{name}"), site))
     }
     pub(super) fn prepare_checked_variants(&mut self, facts: &crate::purity::Facts) -> Result<()> {
         self.checked_targets = facts
@@ -85,6 +135,7 @@ impl Lower<'_, '_> {
             let saved_prefix = std::mem::replace(&mut self.prefix, prefix);
             let old_prologue = self.body_prologues.remove(&body);
             let old_owned = self.pure_owned.contains(&target.node);
+            let edit_count = self.edits.len();
             self.emitting_variants.insert(target.node);
             let result: Result<Code> = (|| {
                 self.prepare_pure(target, true)?;
@@ -133,6 +184,9 @@ impl Lower<'_, '_> {
                     .or_insert(code);
             }
             self.emitting_variants.remove(&target.node);
+            // A checked body can convert a `do` block into braces. Its source
+            // edits belong to the rendered variant, never the original proc.
+            self.edits.truncate(edit_count);
             self.body_prologues.remove(&body);
             if let Some(prologue) = old_prologue {
                 self.body_prologues.insert(body, prologue);

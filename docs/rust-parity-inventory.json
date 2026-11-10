@@ -78,7 +78,7 @@
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 24,
-      "remaining": "Reference symbolic helper profiles cover regular/variadic helpers, SDK helper graphs, comprehensions, iterators, type switches and stored aliases. Complete nonconvergence contract diagnostics and remaining eligibility gates."
+      "remaining": "Symbolic helper profiles, SDK/comprehension graphs, nonconvergence contracts and lazy checked emission are connected. Evaluation-mode signatures remain with checkpoint 4 and logical-number traits with checkpoint 6."
     },
     {
       "python": "thorlang/purecalls.py",
@@ -90,7 +90,7 @@
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 16,
-      "remaining": "Zero-sized ownership profiles, lazy checked variants, named wrapped procedures, SDK adaptation and surrounding mutator lifetimes are connected. Evaluation-mode checked-call behavior belongs to execution integration."
+      "remaining": "Checked ownership profiles, lazy native overloads, named wrapped procedures, transitive re-export access, SDK adaptation and surrounding mutator lifetimes are connected. Complete evaluation-mode behavior with execution integration."
     },
     {
       "python": "thorlang/purediagnostics.py",
@@ -114,7 +114,7 @@
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 77,
-      "remaining": "Complete callable/default/effect eligibility with the reference decisions."
+      "remaining": "Runtime source eligibility includes native generic overload/effect selection, formatting/transmute predicates and native type errors. Complete explicit compile-time entry eligibility during checkpoint 4; logical numbers follow in checkpoint 6."
     },
     {
       "python": "thorlang/sliceaccess.py",

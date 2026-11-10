@@ -9,6 +9,29 @@ class RustPureCallErrorTests(unittest.TestCase):
     compare=native.RustCompilerTests.compare
     program=native.RustCompilerTests.program
 
+    def test_unresolved_signature_types_keep_the_native_type_error(self):
+        for definition in ('work::fn(value:Missing)->int{return 0}',
+                           'helper::proc(value:Missing)->int{return 0}\nwork::fn(value:int)->int{return helper(value)}'):
+            with self.subTest(definition=definition):
+                self.compare(self.program('',definition+'\n'),command='check',fail='Undeclared name: Missing')
+
+    def test_soa_schemas_keep_the_reference_native_rejection(self):
+        for schema in ('#soa []Row','#soa [2]Row'):
+            with self.subTest(schema=schema):
+                self.compare(self.program('', 'Row::struct{x,y:int}\nwork::fn(value:'+schema+')->int{return len(value)}\n'),
+                             command='check',fail="Expected a struct type for 'type_has_shared_fields'")
+
+    def test_unresolved_auto_cast_is_a_source_contract_error(self):
+        self.compare(self.program('n:=3;_=work(n)',
+            'work::fn(n:int)->int{_=auto_cast n;return n}\n'),
+            command='check',fail='Pure auto_cast requires a resolved target type')
+
+    def test_checked_variant_does_not_make_invalid_proc_do_syntax_valid(self):
+        self.compare(self.program('n:=3;_=work(n)','''
+leaf::proc(n:int)->int do return n+1
+work::fn(n:int)->int{return leaf(n)}
+'''),command='check',fail="'do' for procedure bodies is not allowed")
+
     def test_missing_callee_keeps_the_native_undeclared_name_error(self):
         self.compare(self.program('n:=3;_=work(n)',
             'work::fn(n:int)->int{return missing(n)}\n'),command='check',fail='Undeclared name: missing')
@@ -27,6 +50,15 @@ class RustPureCallErrorTests(unittest.TestCase):
                 if expression=='helper(1,2)':
                     self.assertIn('Too many arguments',result.stderr)
                     self.assertNotIn('Thor expression',result.stderr)
+
+    def test_bad_arguments_to_an_overload_group_keep_native_candidates(self):
+        for expression in ('pick("bad")','pick()','pick(wrong=1)'):
+            with self.subTest(expression=expression):
+                self.compare(self.program('n:=3;_=work(n)','''
+integer::proc(value:int)->int{return value}
+real::proc(value:f64)->int{return int(value)}
+pick::proc{integer,real}
+work::fn(n:int)->int{return '''+expression+'}\n'),command='check',fail='pick')
 
     def test_inline_proc_is_a_purity_error_instead_of_an_unported_named_body(self):
         self.compare(self.program('n:=3;_=work(n)',

@@ -285,7 +285,7 @@ impl Lower<'_, '_> {
             }
         }
         if expected.is_none() && !forced {
-            return Err(self.unsupported(id, "pure auto_cast target inference"));
+            return Ok(self.error_token(id, "Pure auto_cast requires a resolved target type; use an explicit numeric conversion in this context."));
         }
         let expression = self.render(value, None, constant)?;
         let proof = if let Some(hint) = expected {
@@ -442,6 +442,46 @@ impl Lower<'_, '_> {
             expression,
             self.g(")", id),
         ])))
+    }
+    pub(super) fn pure_transmute(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
+        if self.queried_pure_expression(id) {
+            return Ok(None);
+        }
+        let target = self.role(id, "type")?;
+        let value = self.role(id, "expr")?;
+        let target_type = self.typ(target);
+        let value_type = self.typ(value);
+        if [target_type, value_type]
+            .iter()
+            .all(|typ| crate::purity::Purity::scalar_transmute(typ).is_some())
+        {
+            return Ok(None);
+        }
+        self.pure_conversion_busy.insert(id);
+        let result = (|| {
+            let (name, mut args) = self.closed(id, "pure_transmute", Some(""), |this| {
+                this.meta = true;
+                let meta = format!("{}meta", this.prefix);
+                let target = this.render(target, None, true)?;
+                let query = this.native("type_of");
+                let source = this.query_value(value)?;
+                let scalar = |typ: &str| ["numeric", "boolean", "enum", "bit_set"].iter()
+                    .map(|kind| format!("{meta}.type_is_{kind}({typ})")).collect::<Vec<_>>().join(" || ");
+                let condition = format!("({}) && ({})", scalar(&target.finish().text), scalar(&format!("{query}({})", source.finish().text)));
+                let expression = this.render(id, None, constant)?;
+                let token = this.error_token(id, "Pure transmute requires scalar values; pointer and aggregate representations are not eligible.").finish().text;
+                this.pure_error_sites.insert(token.clone(), this.reference(id));
+                Ok(Code::concat([
+                    this.g(format!("when {condition} {{return "), id),
+                    expression,
+                    this.g(format!("}} else {{#panic({})}}", json!(token)), id),
+                ]))
+            })?;
+            args.push(self.render(target, None, true)?);
+            Ok(Some(self.helper_call(id, &name, args)))
+        })();
+        self.pure_conversion_busy.remove(&id);
+        result
     }
     fn pure_conversion_shape(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> Option<bool> {
         if !seen.insert(typ.clone()) {

@@ -118,7 +118,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             let site = if inside(origin) {
                 origin
             } else {
-                self.conditional_reference().unwrap_or(origin)
+                self.conditional_reference().unwrap_or(owner)
             };
             let mut related = via
                 .iter()
@@ -229,9 +229,6 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
                     self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, typeid, any, maps, sets and procedure values are not pure inputs/results.");
                 }
-                if proc != root && self.unresolved_schema(&typ, &mut HashSet::new()) {
-                    self.gap(root, annotation);
-                }
             }
         }
         for (_, annotation) in self.r.fields(sig, "results") {
@@ -239,9 +236,6 @@ impl<'a, 'r> Purity<'a, 'r> {
                 let typ = self.r.specialized_type(annotation, &bindings);
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
                     self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, typeid, any, maps, sets, raw unions and procedure values are not pure inputs/results.");
-                }
-                if proc != root && self.unresolved_schema(&typ, &mut HashSet::new()) {
-                    self.gap(root, annotation);
                 }
             }
         }
@@ -381,11 +375,15 @@ impl<'a, 'r> Purity<'a, 'r> {
                 }
             }
             "Interpolation" => {
-                let args=self.r.sources[node.file].group(node.node,"args").to_vec();
-                for arg in args {
-                    let arg=Ref{file:node.file,node:arg};let typ=self.r.specialized_type(arg,bindings);
-                    if typ.is_unknown() { self.gap(root,arg); }
-                    else if !matches!(typ,Type::Scalar{..}|Type::String{..}|Type::Enum(_)) {self.fault(root,arg,via,"Pure formatting supports deterministic scalar/string values only; custom record formatters are not eligible.");}
+                // Concrete invalid values can be reported before lowering;
+                // generic values are checked by validate_pure_value in the
+                // selected native formatting helper.
+                for id in self.r.sources[node.file].group(node.node,"args").to_vec() {
+                    let arg=Ref{file:node.file,node:id};
+                    let typ=self.r.specialized_type(arg,bindings);
+                    if !typ.is_unknown() && !matches!(typ,Type::Scalar{..}|Type::String{..}|Type::Enum(_)) {
+                        self.fault(root,arg,via,"Pure formatting supports deterministic scalar/string values only; custom record formatters are not eligible.");
+                    }
                 }
             }
             "Call" => { self.call(root,proc,node,bindings,via); return; }
@@ -405,8 +403,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 let target=self.role(node,"type").map(|r|if self.kind(r)=="TypeidType" {Type::scalar("typeid")}else{self.r.specialized_type(r,bindings)}).unwrap_or(Type::Unknown);
                 if source.node(node.node).op=="transmute" {
                     let value=self.role(node,"expr").map(|r|self.r.specialized_type(r,bindings)).unwrap_or(Type::Unknown);
-                    if target.is_unknown() || value.is_unknown() {self.gap(root,node);}
-                    else if !Self::scalar_transmute(&target) || !Self::scalar_transmute(&value) {
+                    if Self::scalar_transmute(&target)==Some(false) || Self::scalar_transmute(&value)==Some(false) {
                         self.fault(root,node,via,"Pure transmute requires scalar numeric, boolean, enum or bit-set values; pointer and aggregate representations are not eligible.");
                     }
                 } else if self.role(node,"expr").is_some_and(|value| {
@@ -593,6 +590,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 }
             } else {
                 let mut selected = 0;
+                let native_selection = plans.len() > 1;
                 for plan in plans {
                     let candidate = plan.procedure;
                     if self.llvm_primitive(candidate) {
@@ -653,6 +651,9 @@ impl<'a, 'r> Purity<'a, 'r> {
                     selected += 1;
                     let mut chain = via.to_vec();
                     chain.push(call);
+                    if native_selection {
+                        self.speculative.push(self.role(candidate, "body").unwrap());
+                    }
                     self.visit(root, candidate, contextual, chain.clone());
                     if let Some(params) = self.role(sig, "params") {
                         let mut position = 0;
@@ -680,8 +681,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                             }
                         }
                     }
+                    if native_selection {
+                        self.speculative.pop();
+                    }
                 }
-                if selected != 1 {
+                if selected == 0 {
                     self.gap(root, call);
                 }
             }
@@ -694,12 +698,9 @@ impl<'a, 'r> Purity<'a, 'r> {
     /// Unknown generic shapes/spreads still require an inspectable checked plan.
     fn native_argument_error(&mut self, call: Ref, callee: Ref, bindings: &Substitutions) -> bool {
         let candidates = self.r.candidates(callee);
-        let [target] = candidates.as_slice() else {
+        if candidates.is_empty() {
             return false;
-        };
-        let Some(signature) = self.role(*target, "type") else {
-            return false;
-        };
+        }
         let args = self.r.sources[call.file]
             .group(call.node, "args")
             .iter()
@@ -715,7 +716,20 @@ impl<'a, 'r> Purity<'a, 'r> {
         {
             return false;
         }
-        let Some(groups) = self.r.arrange_arguments(signature, &args) else {
+        candidates
+            .into_iter()
+            .all(|target| self.native_target_argument_error(target, &args, bindings))
+    }
+    fn native_target_argument_error(
+        &mut self,
+        target: Ref,
+        args: &[Ref],
+        bindings: &Substitutions,
+    ) -> bool {
+        let Some(signature) = self.role(target, "type") else {
+            return false;
+        };
+        let Some(groups) = self.r.arrange_arguments(signature, args) else {
             return true;
         };
         for ((_, annotation), group) in self.r.fields(signature, "params").into_iter().zip(groups) {
@@ -728,12 +742,9 @@ impl<'a, 'r> Purity<'a, 'r> {
                     continue;
                 }
                 let actual = self.r.specialized_type(arg, bindings);
-                if matches!(expected, Type::String { .. }) && actual.numeric()
-                    || expected.numeric() && matches!(actual, Type::String { .. })
-                    || matches!(
-                        (&expected, &actual),
-                        (Type::Scalar { .. }, Type::Scalar { .. })
-                    )
+                if matches!(expected, Type::Scalar { .. } | Type::String { .. })
+                    && matches!(actual, Type::Scalar { .. } | Type::String { .. })
+                    && self.r.shape_score(annotation, &actual, bindings).is_none()
                 {
                     return true;
                 }
@@ -752,14 +763,15 @@ impl<'a, 'r> Purity<'a, 'r> {
             _ => false,
         }
     }
-    fn scalar_transmute(typ: &Type) -> bool {
+    pub(crate) fn scalar_transmute(typ: &Type) -> Option<bool> {
         match typ {
             Type::Nominal(_, base) => Self::scalar_transmute(base),
             Type::Scalar { name, .. } => {
-                !["rawptr", "any", "typeid", "cstring", "cstring16"].contains(&name.as_str())
+                Some(!["rawptr", "any", "typeid", "cstring", "cstring16"].contains(&name.as_str()))
             }
-            Type::Enum(_) => true,
-            _ => false,
+            Type::Enum(_) => Some(true),
+            Type::Unknown | Type::Generic => None,
+            _ => Some(false),
         }
     }
     fn owned_sequence(typ: &Type) -> bool {
@@ -768,33 +780,6 @@ impl<'a, 'r> Purity<'a, 'r> {
             Type::Nominal(_, base)
             | Type::Array { elem: base, .. }
             | Type::Fixed { elem: base, .. } => Self::owned_sequence(base),
-            _ => false,
-        }
-    }
-    fn unresolved_schema(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
-        if !seen.insert(typ.clone()) {
-            return false;
-        }
-        match typ {
-            Type::Unknown | Type::Soa(_) => true,
-            // Exact native parameter/result contracts validate bare type slots.
-            Type::Generic => false,
-            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
-                .r
-                .record_fields(typ)
-                .iter()
-                .any(|(_, typ)| self.unresolved_schema(typ, seen)),
-            Type::Union(owner) => self
-                .r
-                .union_variants(*owner)
-                .iter()
-                .any(|typ| self.unresolved_schema(typ, seen)),
-            Type::Nominal(_, base)
-            | Type::Pointer(base)
-            | Type::Slice(base)
-            | Type::Dynamic(base)
-            | Type::Array { elem: base, .. }
-            | Type::Fixed { elem: base, .. } => self.unresolved_schema(base, seen),
             _ => false,
         }
     }

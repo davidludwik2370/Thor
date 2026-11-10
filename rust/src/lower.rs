@@ -836,6 +836,11 @@ impl<'a, 'r> Lower<'a, 'r> {
         let node = self.source.node(id);
         let kind = node.kind.clone();
         if self.checked_mode && self.querying == 0 {
+            if kind == "Block" && self.pure_conditional.contains_key(&id) {
+                if let Some(code) = self.ownership_body(id)? {
+                    return Ok(code);
+                }
+            }
             if let Some(message) = self.pure_conditional.remove(&id) {
                 let token = format!(
                     "{}conditional_pure_error_{}_end",
@@ -846,6 +851,8 @@ impl<'a, 'r> Lower<'a, 'r> {
                     self.render_inner(id, expected, constant).map(|code| {
                         Code::concat([code, self.g(format!("\n#panic({})\n", json!(token)), id)])
                     })
+                } else if kind == "Block" {
+                    Ok(self.g(format!("{{#panic({})}}", json!(token)), id))
                 } else {
                     Ok(self.g(token, id))
                 };
@@ -863,6 +870,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if self.checked_mode && self.querying == 0 && !self.pure_conversion_busy.contains(&id) {
+            if kind == "Cast" && node.op == "transmute" {
+                if let Some(code) = self.pure_transmute(id, constant)? {
+                    return Ok(code);
+                }
+            }
             if let Some(code) = self.pure_conversion(id, expected.clone(), constant)? {
                 return Ok(code);
             }
@@ -885,6 +897,23 @@ impl<'a, 'r> Lower<'a, 'r> {
         if kind == "Block" {
             if let Some(code) = self.ownership_body(id)? {
                 return Ok(code);
+            }
+            if self.checked_mode {
+                if let Some((proc, message)) = node.parent.and_then(|proc| {
+                    self.borrowing
+                        .contracts
+                        .get(&self.reference(proc))
+                        .map(|message| (proc, message.clone()))
+                }) {
+                    let token = format!("{}pure_contract_{}_end", self.source.prefix, proc.0);
+                    self.errors.insert(token.clone(), message);
+                    self.pure_error_sites
+                        .insert(token.clone(), self.reference(proc));
+                    if self.source.raw.as_bytes()[node.span.start] != b'{' {
+                        self.convert_do(id);
+                    }
+                    return Ok(self.g(format!("{{#panic({})}}", json!(token)), proc));
+                }
             }
             if let Some(owner) = node
                 .parent
@@ -1352,17 +1381,16 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Block" {
-            if let Some(prologue) = self.body_prologues.get(&id) {
-                inserts.push((node.span.start + 1, Code::concat(prologue.iter().cloned())));
-            }
-            let mut helpers = self
-                .storage_block_guards
-                .get(&id)
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|guard| self.render_storage_guard(guard))
-                .collect::<Result<Vec<_>>>()?;
+            let mut helpers = self.body_prologues.get(&id).cloned().unwrap_or_default();
+            helpers.extend(
+                self.storage_block_guards
+                    .get(&id)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|guard| self.render_storage_guard(guard))
+                    .collect::<Result<Vec<_>>>()?,
+            );
             helpers.extend(self.helper_declarations(id));
             if !helpers.is_empty() {
                 if self.source.raw.as_bytes()[node.span.start] == b'{' {
@@ -2371,6 +2399,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                     code.extend([this.g(format!("{width_name} := {formatting}.normalize_width("),*width),rendered,this.g(")\n",*width)]);
                 }
                 let options=spec.as_ref().ok_or_else(||Error::new("missing interpolation format"))?.options(&width_name);
+                if this.checked_mode && this.querying==0 {
+                    let query=this.native("type_of");
+                    code.push(this.g(format!("{formatting}.validate_pure_value({query}({value}))\n"),field));
+                }
                 code.push(this.g(format!("{formatting}.write_spec(&{builder}.builder,{value},{options})\n"),field));
                 if owned&&!captured{let delete=this.native("delete");code.push(this.g(format!("{delete}({value})\n"),field));}
             }

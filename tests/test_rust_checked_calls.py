@@ -16,6 +16,70 @@ class RustCheckedCallTests(unittest.TestCase):
                 result=self.compare(source,flags=flags,files=files)
                 self.assertEqual(result.stderr,'')
 
+    def test_single_statement_returns_keep_owned_promotions_and_original_bodies(self):
+        self.tracked(self.program('''
+for flag in [false,true]{text:=work(flag);if text!=(flag ? "yes" : "no"){panic("checked do return")};delete(text)}
+text:=leaf(true);defer delete(text);if text!="yes"{panic("ordinary do return")}
+''','''
+leaf::proc(flag:bool)->string{if flag do return f"yes";return "no"}
+work::fn(flag:bool)->string{return leaf(flag)}
+'''))
+
+    def test_generic_interpolation_uses_selected_native_format_contracts(self):
+        self.tracked(self.program('''
+n:=3;value:=f64(1.5);text:=work(n);defer delete(text)
+other:=work(value);defer delete(other)
+if text!="value 3"||other!="value 1.5"{panic("generic format")}
+''','''
+leaf::proc(value:$T)->string{return f"value {value}"}
+work::fn(value:$T)->string{return leaf(value)}
+'''))
+        self.compare(self.program('row:=Row{3};_=work(row)','''
+Row::struct{value:int}
+leaf::proc(value:$T)->string{return f"value {value}"}
+work::fn(value:$T)->string{return leaf(value)}
+'''),command='check',fail='Pure formatting supports deterministic scalar/string values only')
+
+    def test_generic_scalar_transmute_checks_the_selected_types(self):
+        self.tracked(self.program('n:=u64(0x3ff0000000000000);if work(f64,n)!=1{panic("generic transmute")}','''
+leaf::proc($T:typeid,value:$S)->T{return transmute(T)value}
+work::fn($T:typeid,value:$S)->T{return leaf(T,value)}
+'''))
+        self.compare(self.program('value:=Row{0,0};_=work(u64,value)','''
+Row::struct{low,high:u32}
+leaf::proc($T:typeid,value:$S)->T{return transmute(T)value}
+work::fn($T:typeid,value:$S)->T{return leaf(T,value)}
+'''),command='check',fail='Pure transmute requires scalar')
+
+    def test_generic_overloads_defer_native_candidate_selection(self):
+        self.tracked(self.program('n:=3;v:=f64(4);if work(n)!=3||work(v)!=4{panic("generic overloads")}','''
+integer::proc(value:int)->int{return value}
+real::proc(value:f64)->f64{return value}
+pick::proc{integer,real}
+work::fn(value:$T)->T{return pick(value)}
+'''))
+
+    def test_generic_overloads_check_only_the_selected_effects(self):
+        prefix='''
+state:int
+integer::proc(value:int)->int{return value}
+real::proc(value:f64)->f64{return value+f64(state)}
+pick::proc{integer,real}
+work::fn(value:$T)->T{return pick(value)}
+'''
+        self.tracked(self.program('n:=3;if work(n)!=3{panic("inactive overload")}',prefix))
+        self.compare(self.program('n:=f64(3);_=work(n)',prefix),command='check',fail='outside the function')
+
+    def test_reexported_helpers_keep_transitive_package_access(self):
+        for extension in ('thor','odin'):
+            with self.subTest(extension=extension):
+                self.tracked(self.program('n:=3;if work(n)!=4{panic("transitive alias")}','''
+import "bridge"
+work::fn(n:int)->int{return bridge.value(n)}
+'''),files={
+                    'bridge/main.thor':'package bridge\nimport leaf "../leaf_'+extension+'"\nvalue::leaf.value\n',
+                    'leaf_'+extension+'/main.'+extension:'package leaf\nvalue::proc(n:int)->int{return n+1}\n'})
+
     def test_owned_checked_results_and_ordinary_shallow_aliases(self):
         self.tracked(self.program('''n:=3
 if work(n)!=3{panic("checked helper result must be independent")}
