@@ -105,15 +105,126 @@ impl Lower<'_, '_> {
         let Some(callee) = self.source.role(id, "callee") else {
             return false;
         };
-        if let Some(signature) = self.resolver.signature(self.reference(callee)) {
+        if let Some(signature) = self.resolver.call_signature(self.reference(id)) {
             return self.resolver.sources[signature.file]
                 .node(signature.node)
                 .data["diverging"]
                 == true;
         }
-        ["panic", "panic_contextless", "unreachable"]
+        self.diverging_builtin(self.reference(callee), &mut HashSet::new())
+    }
+    fn diverging_builtin(&self, mut callee: Ref, seen: &mut HashSet<Ref>) -> bool {
+        let source = &self.resolver.sources[callee.file];
+        while source.node(callee.node).kind == "Paren" {
+            let Some(expr) = source.role(callee.node, "expr") else {
+                return false;
+            };
+            callee.node = expr;
+        }
+        if !seen.insert(callee) {
+            return false;
+        }
+        if let Some(index) = self.resolver.symbol(callee) {
+            let symbol = &self.resolver.symbols[index];
+            if symbol.constant && symbol.annotation.is_none() {
+                if let Some(node) = symbol.value {
+                    return self.diverging_builtin(
+                        Ref {
+                            file: symbol.reference.file,
+                            node,
+                        },
+                        seen,
+                    );
+                }
+            }
+        }
+        let names = ["panic", "panic_contextless", "unreachable"];
+        names
             .iter()
-            .any(|name| self.resolver.native_builtin(self.reference(callee), name))
+            .any(|name| self.resolver.native_builtin(callee, name))
+            || crate::evaluation::library_member(self.resolver, callee, "base:builtin")
+                .is_some_and(|name| names.contains(&name.as_str()))
+            || crate::evaluation::library_member(self.resolver, callee, "base:runtime")
+                .is_some_and(|name| names[..2].contains(&name.as_str()))
+    }
+    fn deferred_switch_call(&mut self, arm: NodeId) -> bool {
+        let arm = self.unparen(arm);
+        if self.source.node(arm).kind != "Call" {
+            return false;
+        }
+        let Some(callee) = self.source.role(arm, "callee") else {
+            return false;
+        };
+        if self.diverging(arm)
+            || self.resolver.call_signature(self.reference(arm)).is_some()
+            || self.resolver.denotes_type(self.reference(callee))
+            || crate::purity::builtin_call(self.resolver, self.reference(arm)).is_some()
+        {
+            return false;
+        }
+        crate::evaluation::library_origin(self.resolver, self.reference(callee)).is_some()
+            || self
+                .source
+                .ancestors(arm)
+                .find(|id| self.source.node(*id).kind == "Procedure")
+                .and_then(|proc| self.source.role(proc, "type"))
+                .is_some_and(|sig| {
+                    self.source
+                        .descendants(sig)
+                        .any(|id| self.source.node(id).kind == "PolyType")
+                })
+    }
+    fn switch_result_condition(&mut self, arm: NodeId, index: usize) -> Result<Code> {
+        let arm = self.unparen(arm);
+        let code = self.query_value_switch(arm)?;
+        self.meta = true;
+        let type_of = self.native("type_of");
+        Ok(Code::concat([
+            self.g(
+                format!(
+                    "{}meta.type_proc_return_count({type_of}({}meta.procedure_of(",
+                    self.prefix, self.prefix
+                ),
+                arm,
+            ),
+            code,
+            self.g(format!(")))>{index}"), arm),
+        ]))
+    }
+    fn switch_result_choice(
+        &self,
+        arm: NodeId,
+        value: Code,
+        condition: Code,
+        fallback: Code,
+    ) -> Code {
+        Code::concat([
+            self.g("(", arm),
+            value,
+            self.g(" when ", arm),
+            condition,
+            self.g(" else ", arm),
+            fallback,
+            self.g(")", arm),
+        ])
+    }
+    fn switch_checked_branch(&mut self, arm: NodeId, value: Code) -> Result<Code> {
+        let condition = self.switch_result_condition(arm, 0)?;
+        // Odin proves that a zero-result arm really cannot return. A void
+        // callback cannot silently stand in for a value.
+        let (helper, args) = self.closed(arm, "switch_nonreturning", Some("!"), |this| {
+            this.render(arm, None, false)
+        })?;
+        let terminal = self.helper_call(arm, &helper, args);
+        Ok(Code::concat([
+            self.g("when ", arm),
+            condition,
+            self.g(" {\n", arm),
+            value,
+            self.g("\n} else {\n", arm),
+            terminal,
+            self.g("\n}", arm),
+        ]))
     }
     fn arm_count(&mut self, id: NodeId) -> Result<usize> {
         let id = self.unparen(id);
@@ -125,9 +236,8 @@ impl Lower<'_, '_> {
                 if self.diverging(id) {
                     0
                 } else {
-                    let callee = self.role(id, "callee")?;
                     self.resolver
-                        .signature(self.reference(callee))
+                        .call_signature(self.reference(id))
                         .map(|sig| self.resolver.fields(sig, "results").len())
                         .unwrap_or(1)
                 }
@@ -141,6 +251,71 @@ impl Lower<'_, '_> {
             count = count.max(self.arm_count(case.result)?);
         }
         Ok(count)
+    }
+    pub(super) fn switch_argument(
+        &mut self,
+        call: NodeId,
+        constant: bool,
+    ) -> Result<Option<(NodeId, Code)>> {
+        let [arg] = self.source.group(call, "args") else {
+            return Ok(None);
+        };
+        let root = self.unparen(*arg);
+        if !matches!(
+            self.source.node(root).kind.as_str(),
+            "SwitchExpr" | "CompileSwitchExpr"
+        ) {
+            return Ok(None);
+        }
+        let count = self.switch_count(root)?;
+        if count < 2 {
+            return Ok(None);
+        }
+        let callee = self.role(call, "callee")?;
+        let Some(signature) = self.resolver.signature(self.reference(callee)) else {
+            return Ok(None);
+        };
+        let unit = &self.resolver.sources[signature.file];
+        let params = self.resolver.fields(signature, "params");
+        if params.len() < count
+            || self.source.node(callee).op == "->"
+            || unit
+                .descendants(signature.node)
+                .any(|id| unit.node(id).kind == "PolyType")
+        {
+            return Ok(None);
+        }
+        self.meta = true;
+        let type_of = self.native("type_of");
+        let target = self.render(callee, None, false)?;
+        let hints = params
+            .into_iter()
+            .take(count)
+            .enumerate()
+            .map(|(index, (_, annotation))| {
+                Some(Hint {
+                    constant_literal: false,
+                    semantic: annotation.map(|annotation| {
+                        self.resolver
+                            .specialized_type(annotation, &Default::default())
+                    }),
+                    code: Code::concat([
+                        self.g(
+                            format!(
+                                "#type {}meta.type_proc_parameter_type({type_of}(",
+                                self.prefix
+                            ),
+                            call,
+                        ),
+                        target.clone(),
+                        self.g(format!("),{index})"), call),
+                    ]),
+                    element_only: false,
+                    plain_array: false,
+                })
+            })
+            .collect();
+        Ok(Some((*arg, self.switch_expression(root, hints, constant)?)))
     }
     fn switch_problem(&mut self, id: NodeId, count: usize) -> Result<Option<Code>> {
         let cases = self.cases(id)?;
@@ -178,11 +353,10 @@ impl Lower<'_, '_> {
                     continue;
                 }
                 let arm = self.unparen(case.result);
-                if self.source.node(arm).kind == "Call" {
-                    let callee = self.role(arm, "callee")?;
-                    if self.resolver.signature(self.reference(callee)).is_none() {
-                        continue;
-                    }
+                if self.source.node(arm).kind == "Call"
+                    && self.resolver.call_signature(self.reference(arm)).is_none()
+                {
+                    continue;
                 }
                 let actual = self.arm_count(case.result)?;
                 if actual != count {
@@ -542,11 +716,26 @@ impl Lower<'_, '_> {
             let mut values = vec![];
             for case in &cases {
                 if let Some(code) = self.switch_witness(case.result, index)? {
-                    values.push((case, code));
+                    let condition = self
+                        .deferred_switch_call(case.result)
+                        .then(|| self.switch_result_condition(case.result, index))
+                        .transpose()?;
+                    values.push((case, code, condition));
+                } else if compile {
+                    let invalid = self.error_token(
+                        case.result,
+                        "A selected nonreturning arm requires expected result types.",
+                    );
+                    values.push((case, invalid, None));
                 }
             }
+            let need_type = if hints.len() == 1 {
+                "A switch expression with only nonreturning arms requires an expected result type."
+            } else {
+                "A switch expression with only nonreturning/break arms requires expected result types."
+            };
             if values.is_empty() {
-                types.push(self.error_token(id,"A switch expression with only nonreturning/break arms requires expected result types."));
+                types.push(self.error_token(id, need_type));
                 continue;
             }
             let first = self.unparen(values[0].0.result);
@@ -559,15 +748,32 @@ impl Lower<'_, '_> {
             } else {
                 first
             };
-            let mut query = values.last().unwrap().1.clone();
+            let mut query;
             if compile {
-                if let Some((_, code)) = values.iter().find(|(case, _)| case.matches.is_empty()) {
-                    query = code.clone();
+                for (case, value, condition) in &mut values {
+                    if let Some(condition) = condition.take() {
+                        let invalid = self.error_token(
+                            case.result,
+                            "A selected nonreturning arm requires expected result types.",
+                        );
+                        *value = self.switch_result_choice(
+                            case.result,
+                            value.clone(),
+                            condition,
+                            invalid,
+                        );
+                    }
                 }
-                for (case, code) in values
+                query = values
+                    .iter()
+                    .find(|(case, _, _)| case.matches.is_empty())
+                    .unwrap_or_else(|| values.last().unwrap())
+                    .1
+                    .clone();
+                for (case, code, _) in values
                     .into_iter()
                     .rev()
-                    .filter(|(case, _)| !case.matches.is_empty())
+                    .filter(|(case, _, _)| !case.matches.is_empty())
                 {
                     let cond = self.case_condition(id, case)?;
                     query = Code::concat([
@@ -581,10 +787,41 @@ impl Lower<'_, '_> {
                     ]);
                 }
             } else {
-                for (_, code) in values[..values.len() - 1].iter().rev() {
+                let fallback = if let Some((_, value, _)) = values
+                    .iter()
+                    .rev()
+                    .find(|(_, _, condition)| condition.is_none())
+                {
+                    value.clone()
+                } else {
+                    let mut fallback = self.error_token(id, need_type);
+                    for (case, value, condition) in values.iter().rev() {
+                        fallback = self.switch_result_choice(
+                            case.result,
+                            value.clone(),
+                            condition.clone().unwrap(),
+                            fallback,
+                        );
+                    }
+                    fallback
+                };
+                let mut values = values
+                    .into_iter()
+                    .map(|(case, code, condition)| match condition {
+                        Some(condition) => self.switch_result_choice(
+                            case.result,
+                            code,
+                            condition,
+                            fallback.clone(),
+                        ),
+                        None => code,
+                    })
+                    .rev();
+                query = values.next().unwrap();
+                for code in values {
                     query = Code::concat([
                         self.g("(false ? (", origin),
-                        code.clone(),
+                        code,
                         self.g(") : (", origin),
                         query,
                         self.g("))", origin),
@@ -626,10 +863,12 @@ impl Lower<'_, '_> {
     fn compile_arm(&mut self, arm: NodeId, hints: &[Option<Hint>], constant: bool) -> Result<Code> {
         if self.diverging(arm) {
             if hints.iter().any(Option::is_none) {
-                return Ok(self.error_token(
-                    arm,
-                    "A selected nonreturning arm requires expected result types.",
-                ));
+                let message = if hints.len() == 1 {
+                    "A selected nonreturning arm requires an expected result type."
+                } else {
+                    "A selected nonreturning arm requires expected result types."
+                };
+                return Ok(self.error_token(arm, message));
             }
             let result = format!("tuple:{}", hints.len());
             let (name, mut args) = self.closed(arm, "switch_panic", Some(&result), |this| {
@@ -638,12 +877,49 @@ impl Lower<'_, '_> {
             args.extend(hints.iter().flatten().map(|hint| hint.code.clone()));
             return Ok(self.helper_call(arm, &name, args));
         }
+        if self.deferred_switch_call(arm) {
+            let mut types = vec![];
+            let mut generic = vec![];
+            for (index, hint) in hints.iter().enumerate() {
+                let typ = if let Some(hint) = hint {
+                    hint.code.clone()
+                } else {
+                    let condition = self.switch_result_condition(arm, index)?;
+                    let invalid = self.error_token(
+                        arm,
+                        "A selected nonreturning arm requires an expected result type.",
+                    );
+                    let value = self
+                        .switch_witness(arm, index)?
+                        .unwrap_or_else(|| invalid.clone());
+                    let choice = self.switch_result_choice(arm, value, condition, invalid);
+                    let type_of = self.native("type_of");
+                    Code::concat([self.g(format!("{type_of}("), arm), choice, self.g(")", arm)])
+                };
+                types.push(typ);
+                generic.push(Some(Hint {
+                    constant_literal: false,
+                    semantic: hint.as_ref().and_then(|hint| hint.semantic.clone()),
+                    code: self.g(format!("{}Result_{index}", self.prefix), arm),
+                    element_only: false,
+                    plain_array: false,
+                }));
+            }
+            let result = format!("tuple:{}", hints.len());
+            let (name, mut args) =
+                self.closed(arm, "switch_selected_call", Some(&result), |this| {
+                    let value = this.switch_consume(arm, arm, &generic, None)?;
+                    this.switch_checked_branch(arm, value)
+                })?;
+            args.extend(types);
+            return Ok(self.helper_call(arm, &name, args));
+        }
         let actual = self.arm_count(arm)?;
         let known = self.source.node(self.unparen(arm)).kind != "Call"
             || self
-                .source
-                .role(self.unparen(arm), "callee")
-                .is_some_and(|callee| self.resolver.signature(self.reference(callee)).is_some());
+                .resolver
+                .call_signature(self.reference(self.unparen(arm)))
+                .is_some();
         if known && actual != hints.len() {
             let error = self.error_token(
                 arm,
@@ -663,13 +939,7 @@ impl Lower<'_, '_> {
         }
         self.switch_arm(arm, hints, constant)
     }
-    fn switch_consume(
-        &mut self,
-        id: NodeId,
-        arm: NodeId,
-        hints: &[Option<Hint>],
-        targets: Option<&[Code]>,
-    ) -> Result<Code> {
+    fn switch_blanks(&self, id: NodeId) -> Vec<bool> {
         let s = self.source;
         let mut root = id;
         while let Some(parent) = s
@@ -679,12 +949,7 @@ impl Lower<'_, '_> {
         {
             root = parent;
         }
-        let blanks = if let Some(targets) = targets {
-            targets
-                .iter()
-                .map(|code| code.clone().finish().text == "_")
-                .collect::<Vec<_>>()
-        } else if let Some(parent) = s.node(root).parent {
+        if let Some(parent) = s.node(root).parent {
             let names = if s.node(parent).kind == "Declaration" {
                 s.group(parent, "names")
             } else if s.node(parent).kind == "Assignment" {
@@ -692,12 +957,31 @@ impl Lower<'_, '_> {
             } else {
                 &[]
             };
-            names
-                .iter()
-                .map(|name| s.text(*name) == "_")
-                .collect::<Vec<_>>()
+            names.iter().map(|name| s.text(*name) == "_").collect()
         } else {
             vec![]
+        }
+    }
+    fn switch_discarded_temporaries(&mut self, blanks: &[bool], values: &[NodeId]) -> bool {
+        blanks.iter().zip(values).any(|(blank, &value)| {
+            *blank && (self.temporary_producer(value) || self.temporary_view(value))
+        })
+    }
+    fn switch_consume(
+        &mut self,
+        id: NodeId,
+        arm: NodeId,
+        hints: &[Option<Hint>],
+        targets: Option<&[Code]>,
+    ) -> Result<Code> {
+        let s = self.source;
+        let blanks = if let Some(targets) = targets {
+            targets
+                .iter()
+                .map(|code| code.clone().finish().text == "_")
+                .collect::<Vec<_>>()
+        } else {
+            self.switch_blanks(id)
         };
         let values = if s.node(arm).kind == "SwitchResults" {
             s.group(arm, "args").to_vec()
@@ -753,38 +1037,23 @@ impl Lower<'_, '_> {
             }
             return Ok(Code::concat(code));
         }
-        let cleanup = values.len() == hints.len()
-            && values
-                .iter()
-                .enumerate()
-                .any(|(i, value)| blanks.get(i) == Some(&true) && self.anonymous_string(*value));
+        let cleanup =
+            values.len() == hints.len() && self.switch_discarded_temporaries(&blanks, &values);
         let mut code = vec![];
         let mut results = vec![];
         if cleanup {
-            for (i, value) in values.iter().enumerate() {
-                let name = format!("{}switch_value_{i}", self.prefix);
-                let expression = self.render(*value, hints[i].clone(), false)?;
-                code.push(self.g(name.clone(), *value));
-                if let Some(hint) = &hints[i] {
-                    code.extend([
-                        self.g(": ", *value),
-                        hint.code.clone(),
-                        self.g(" = ", *value),
-                    ]);
-                } else {
-                    code.push(self.g(" := ", *value));
-                }
-                code.extend([expression, self.g("\n", *value)]);
-                results.push(self.g(name, *value));
+            let mut temporaries = vec![];
+            for (&value, hint) in values.iter().zip(hints) {
+                temporaries.push(self.temporary_evaluate(value, &mut code, hint.clone())?);
             }
-            for (i, value) in values.iter().enumerate() {
-                if blanks.get(i) == Some(&true) && self.anonymous_string(*value) {
-                    let delete = self.native("delete");
-                    code.extend([
-                        self.g(format!("{delete}("), *value),
-                        results[i].clone(),
-                        self.g(")\n", *value),
-                    ]);
+            for (i, temporary) in temporaries.iter().enumerate() {
+                let value = values[i];
+                if blanks.get(i) == Some(&true) {
+                    self.temporary_release(temporary, &mut code, false)?;
+                    let type_of = self.native("type_of");
+                    results.push(self.g(format!("{type_of}({}){{}}", temporary.value), value));
+                } else {
+                    results.push(self.g(&temporary.value, value));
                 }
             }
         }
@@ -941,7 +1210,12 @@ impl Lower<'_, '_> {
             } else if self.diverging(case.result) {
                 code.push(self.render(case.result, None, false)?);
             } else {
-                code.push(self.switch_consume(id, case.result, hints, targets)?);
+                let value = self.switch_consume(id, case.result, hints, targets)?;
+                code.push(if self.deferred_switch_call(case.result) {
+                    self.switch_checked_branch(case.result, value)?
+                } else {
+                    value
+                });
             }
             code.push(self.g("\n", case.result));
         }
@@ -1131,13 +1405,56 @@ impl Lower<'_, '_> {
                     {
                         code.push(self.render(case.result, None, false)?);
                     } else {
-                        let value = self.compile_arm(
-                            case.result,
-                            hints,
-                            constant
-                                || self.source.node(owner).kind == "Declaration"
-                                    && !self.source.node(owner).mutable,
-                        )?;
+                        let declaration = self.source.node(owner).kind == "Declaration";
+                        let constant = constant || declaration && !self.source.node(owner).mutable;
+                        let arm = case.result;
+                        let discarded = !constant
+                            && self.source.node(arm).kind == "SwitchResults"
+                            && self.switch_discarded_temporaries(
+                                &self.switch_blanks(id),
+                                self.source.group(arm, "args"),
+                            );
+                        let value = if discarded {
+                            let types = self.switch_types(id, hints)?;
+                            let generic = (0..hints.len())
+                                .map(|index| {
+                                    Some(Hint {
+                                        constant_literal: false,
+                                        semantic: self.switch_hint_semantic(id, index, hints),
+                                        code: self.g(format!("{}Result_{index}", self.prefix), arm),
+                                        element_only: false,
+                                        plain_array: false,
+                                    })
+                                })
+                                .collect::<Vec<_>>();
+                            let result = format!("tuple:{}", hints.len());
+                            let (name, mut args) = self.closed(
+                                arm,
+                                "switch_selected_discard",
+                                Some(&result),
+                                |this| this.switch_consume(id, arm, &generic, None),
+                            )?;
+                            args.extend(types);
+                            self.helper_call(arm, &name, args)
+                        } else if declaration && self.diverging(arm) {
+                            // Odin parses global declarations before selecting
+                            // the native when arm and requires one expression
+                            // per name even for an inactive declaration.
+                            let mut values = vec![];
+                            for hint in hints {
+                                if !values.is_empty() {
+                                    values.push(self.g(",", case.result));
+                                }
+                                values.push(self.compile_arm(
+                                    case.result,
+                                    std::slice::from_ref(hint),
+                                    constant,
+                                )?);
+                            }
+                            Code::concat(values)
+                        } else {
+                            self.compile_arm(case.result, hints, constant)?
+                        };
                         self.switch_replacements.insert(root, value);
                         let declaration = self.render(owner, None, constant);
                         self.switch_replacements.remove(&root);
@@ -1347,6 +1664,11 @@ impl Lower<'_, '_> {
         if skip && (s.node(owner).kind != "Assignment" || s.node(owner).op != "=") {
             return Ok(Some(self.error_token(id,"break in a switch expression requires an ordinary = assignment to existing destinations.")));
         }
+        if skip {
+            if let Some(code) = self.access_assignment(owner, constant)? {
+                return Ok(Some(code));
+            }
+        }
         if let Some(problem) = self.switch_problem(id, hints.len())? {
             let global = s.node(owner).kind == "Declaration"
                 && !s
@@ -1400,9 +1722,17 @@ impl Lower<'_, '_> {
             s.node(parent).kind == "For" && s.role(parent, "post") == Some(owner)
         });
         let lhs = s.group(owner, "lhs").to_vec();
+        let native = lhs
+            .iter()
+            .flat_map(|id| std::iter::once(*id).chain(s.descendants(*id)))
+            .filter(|id| self.native_access.contains(id))
+            .map(|id| id.0.to_string())
+            .collect::<Vec<_>>()
+            .join("_");
+        let flavor = format!("switch_assignment_{native}");
         let (name, args) = self.closed(
             owner,
-            "switch_assignment",
+            &flavor,
             if post { Some("bool") } else { None },
             |this| {
                 let mut code = vec![];
@@ -1417,21 +1747,41 @@ impl Lower<'_, '_> {
                     let name = format!("{}switch_lhs_{i}", this.prefix);
                     let target = this.unparen(*lhs);
                     let value = if s.node(target).kind == "Index"
-                        && matches!(this.typ(this.role(target, "expr")?), Type::Map { .. })
+                        && (this.native_access.contains(&target)
+                            || matches!(this.typ(this.role(target, "expr")?), Type::Map { .. }))
                     {
-                        let base = this.render(this.role(target, "expr")?, None, false)?;
-                        let key = this.render(this.role(target, "index")?, None, false)?;
+                        let base = this.role(target, "expr")?;
+                        let key = this.role(target, "index")?;
+                        let addressable = this.addressable(base)? == "true";
+                        let base_code = if addressable {
+                            this.render_address(base)?
+                        } else {
+                            this.render(base, None, false)?
+                        };
+                        let access = if addressable {
+                            format!("{name}^")
+                        } else {
+                            name.clone()
+                        };
+                        let key_code = this.render(key, None, false)?;
+                        let sets = this.module("sets");
+                        let type_of = this.native("type_of");
                         code.extend([
-                            this.g(format!("{name} := &("), *lhs),
-                            base,
-                            this.g(")\n", *lhs),
-                            this.g(format!("{name}_key := "), *lhs),
-                            key,
+                            this.g(
+                                format!("{name} := {}(", if addressable { "&" } else { "" }),
+                                *lhs,
+                            ),
+                            base_code,
+                            this.g(
+                                format!(")\n{name}_key:{type_of}({sets}.key_witness({access}))="),
+                                *lhs,
+                            ),
+                            key_code,
                             this.g("\n", *lhs),
                         ]);
-                        this.g(format!("{name}^[{name}_key]"), *lhs)
+                        this.g(format!("{access}[{name}_key]"), *lhs)
                     } else {
-                        let value = this.render(*lhs, None, false)?;
+                        let value = this.render_address(*lhs)?;
                         code.extend([
                             this.g(format!("{name} := &("), *lhs),
                             value,

@@ -293,6 +293,14 @@ pub(crate) fn clean(
     for (mut error, origin, purity_cause) in errors {
         let mut msgs = messages(&error);
         let original = msgs.clone();
+        if msgs.first().is_some_and(|message| {
+            message.starts_with("Missing diverging call at the end of the procedure")
+                && project.sources.iter().any(|source| {
+                    message.contains(&source.prefix) && message.contains("switch_nonreturning_")
+                })
+        }) {
+            msgs = vec!["This switch arm does not return a value. A valueless arm must call a nonreturning (-> !) procedure.".into()];
+        }
         let mut invalid_target = None;
         let mut concat_operand_failure = false;
         let mut concat_declaration_failure = false;

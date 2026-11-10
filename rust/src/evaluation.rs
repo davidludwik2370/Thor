@@ -20,8 +20,8 @@ pub use schedule::Scheduler;
 mod bridge;
 #[path = "evaluationeligibility.rs"]
 mod eligibility;
-pub(crate) use eligibility::{approved_library, explicit_allocator, library_member, primitive};
-use eligibility::{library_origin, source_location_dependent};
+pub(crate) use eligibility::{approved_library, explicit_allocator, library_member, library_origin, primitive};
+use eligibility::source_location_dependent;
 /// Borrowed evaluator state used by one isolated helper. Native helper creation
 /// snapshots the selected inputs; the scheduler retains its own registries.
 pub struct Context<'a> {

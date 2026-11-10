@@ -173,6 +173,20 @@ impl Lower<'_, '_> {
                 self.source.group(parent, "lhs").len() > 1
                     && self.source.group(parent, "rhs").len() == 1
             }
+            "Return" => {
+                self.source.group(parent, "values").len() == 1
+                    && self
+                        .source
+                        .ancestors(parent)
+                        .find(|owner| self.source.node(*owner).kind == "Procedure")
+                        .and_then(|owner| self.source.role(owner, "type"))
+                        .is_some_and(|signature| {
+                            self.resolver
+                                .fields(self.reference(signature), "results")
+                                .len()
+                                > 1
+                        })
+            }
             _ => false,
         }
     }

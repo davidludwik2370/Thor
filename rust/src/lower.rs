@@ -1509,11 +1509,23 @@ impl<'a, 'r> Lower<'a, 'r> {
             .expansion(&self.source.path, node.span));
         }
         let mut replacements = vec![];
+        let switch_arg = if kind == "Call" {
+            self.switch_argument(id, constant)?
+        } else {
+            None
+        };
         for child in &node.children {
             let (hint, con) = overrides.get(child).cloned().unwrap_or((None, constant));
+            let code = if let Some((_, code)) = switch_arg.as_ref().filter(|(arg, _)| arg == child) {
+                code.clone()
+            } else if self.big_owning_child(id, *child) {
+                self.big_owned(*child, hint, con)?
+            } else {
+                self.render(*child, hint, con)?
+            };
             replacements.push((
                 self.source.node(*child).span,
-                if self.big_owning_child(id,*child) {self.big_owned(*child,hint,con)?} else {self.render(*child, hint, con)?},
+                code,
             ));
         }
         let mut inserts = if kind=="Call" {self.default_arguments(id)?}else{vec![]};
@@ -2451,17 +2463,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             code.push(this.g(format!("return {formatting}.buffer_owned_text(&{builder})"),id));Ok(Code::concat(code))
         })?;
         Ok(self.helper_call(id, &name, args))
-    }
-    fn anonymous_string(&self, mut id: NodeId) -> bool {
-        while self.source.node(id).kind == "Paren" {
-            if let Some(expr) = self.source.role(id, "expr") {
-                id = expr;
-            } else {
-                break;
-            }
-        }
-        self.source.node(id).kind == "Interpolation"
-            && self.source.node(id).data["manual_lifetime"] != true
     }
     fn discover_fstrings(&mut self) {
         const EXPRESSIONS: &[&str] = &[

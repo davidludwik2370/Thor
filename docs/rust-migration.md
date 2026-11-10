@@ -138,7 +138,29 @@ of an established operand, including a distinct array used as an element.
 Odin still evaluates a single concatenation intrinsic. Native errors map to
 the original operand and preserve independent literal diagnostics. All 25
 original concatenation fixtures passed, including checked debug and unchecked
-release tests that verify the operation does not allocate.
+release tests that verify the operation does not allocate. The follow-up
+diagnostic gate passed all 123 checks. The combined purity, compile-time result
+and assertion-hygiene gate passed all 131 checks on the release compiler.
+
+### Switch results and collection permissions
+
+Switches use the selected call's signature to distinguish `-> !` from an
+ordinary void result. Imported and generic call shapes that require Odin
+resolution are checked without executing a candidate arm. A switch supplying
+multiple call arguments receives each parameter's expected type. Assignment
+captures map headers and keys in the generic map case, and discarded results
+release anonymous f-strings and Sets while retaining named storage. Inactive
+`#switch` arms retain valid Odin syntax even for multi-name declarations.
+
+Permission checking now includes map and Set comprehension keys and keeps the
+scalar status results of verified collection and allocation calls independent
+of their owned results. A generic map lookup returned directly from a two-result
+procedure keeps Odin's optional lookup status and key semantics.
+
+All 83 original switch, enum and cross-feature permission fixtures passed.
+The discarded-result allocation test passed on both engines in checked and
+unchecked configurations. The original generic map result test passed with
+the Rust compiler.
 
 ### Anonymous producer ownership
 

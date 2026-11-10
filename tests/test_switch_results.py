@@ -171,17 +171,28 @@ assert(count==4)
 '''))
 
     def test_blank_results_release_only_anonymous_allocations(self):
-        _,result=self.invoke(self.program('''
+        source=self.program('''
 a,_:=switch{case true:1,f"hello {2}";case:2,f"bye {3}"}
-assert(a==1)
-_,a=switch{case true:set[int]{1,2},3;case:set[int]{3},4};assert(a==3)
-_,a=switch{case true:f"other {4}",5;case:break};assert(a==5)
+if a!=1{panic("wrong string arm")}
+_,a=switch{case true:set[int]{1,2},3;case:set[int]{3},4}
+if a!=3{panic("wrong set arm")}
+_,a=switch{case true:f"other {4}",5;case:break}
+if a!=5{panic("wrong optional arm")}
 named:=f"named {6}";defer delete(named)
-_,a=switch{case true:named,7;case:"",8};assert(named=="named 6"&&a==7)
-x,_:=#switch{case true:9,f"compile choice {3}";case:undefined,undefined};assert(x==9)
-_,x=#switch{case true:set[int]{7},10;case:undefined,undefined};assert(x==10)
-'''),flags=['-debug'],expected='')
-        self.assertEqual(result.stderr,'')
+_,a=switch{case true:named,7;case:f"unselected {a}",8}
+if named!="named 6"||a!=7{panic("named owner was released")}
+x,_:=#switch{case true:9,f"compile choice {3}";case:undefined,undefined}
+if x!=9{panic("wrong compile-time string arm")}
+_,x=#switch{case true:set[int]{7},10;case:undefined,undefined}
+if x!=10{panic("wrong compile-time set arm")}
+_,x=switch{case true:named[1:],11;case:f"unselected {x}",12}
+if named!="named 6"||x!=11{panic("borrowed view was released")}
+''')
+        for flags in (['-debug'], ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert',
+                                   '--track-allocations=basic']):
+            with self.subTest(flags=flags):
+                _,result=self.invoke(source,flags=flags,expected='')
+                self.assertEqual(result.stderr,'')
 
     def test_pure_borrowed_second_result_is_still_protected(self):
         self.invoke(self.program('a:=[1,2];_=bad(a[:])', '''

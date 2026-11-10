@@ -1757,12 +1757,23 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.bind_loop(loop_, c);
                 }
                 self.eval_role(r, "cond", c);
+                if let Some(key) = self.role(r, "key") {
+                    let key_value = self.eval(key, c);
+                    let refs = self.refs(key_value);
+                    self.require(refs, key, c, "preserve read-only slice references in a map key", vec![]);
+                }
                 let output = self.eval_role(r, "output", c);
                 let output = if self.s(r).node(r.node).data["spread"] == true {
                     self.item(output)
                 } else {
                     output
                 };
+                if matches!(base_type(&typ), Type::Set(_)) {
+                    if let Some(site) = self.role(r, "output") {
+                        let refs = self.refs(output);
+                        self.require(refs, site, c, "preserve read-only slice references in a Set key", vec![]);
+                    }
+                }
                 let result = self.value(typ);
                 let output = self.copied(output);
                 self.values[result].element = Some(output);
@@ -2250,20 +2261,44 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.deleting = previous;
             }
         }
-        if builtin && READERS.contains(&name.as_str())
-            || library.as_ref().is_some_and(|(path, name)| {
-                path == "core:fmt"
-                    && self.verified_library(callee, path)
-                    && FMT_READERS.contains(&name.as_str())
-                    || path == "thor:basic"
-                        && self.verified_library(callee, path)
-                        && ["print", "hash", "try_hash", "_string", "deepclone"]
-                            .contains(&name.as_str())
-            })
-        {
-            return self.value(typ);
+        if builtin && READERS.contains(&name.as_str()) {
+            let first = self.value(typ);
+            let status = match name.as_str() {
+                "make" | "new" => Some(Type::scalar("Allocator_Error")),
+                "min" | "max" if crate::extremaplan::plan(self.r, r)
+                    .is_some_and(|plan| plan.optional) => Some(Type::scalar("bool")),
+                _ => None,
+            };
+            if let Some(status) = status {
+                let status = self.value(status);
+                return self.record(r, c, vec![first, status], true);
+            }
+            return first;
         }
         if let Some((path, name)) = &library {
+            if path == "core:fmt" && FMT_READERS.contains(&name.as_str())
+                && self.verified_library(callee, path)
+            {
+                return self.value(typ);
+            }
+            let reviewed_basic = path == "thor:basic" && self.verified_library(callee, path);
+            let graph_clone = name == "deepclone" && (reviewed_basic
+                || path == "thor:graph" && self.verified_library(callee, path));
+            if graph_clone || reviewed_basic && ["try_hash", "_string"].contains(&name.as_str()) {
+                let first = self.value(typ);
+                let result = self.r.result_type(r, 1, &mut HashSet::new());
+                // The verified status types are reference-free. Preserve the
+                // resolved enum identity when available.
+                let status = self.value(if result.is_unknown() {
+                    Type::scalar(if name == "_string" { "Allocator_Error" } else { "Error" })
+                } else {
+                    result
+                });
+                return self.record(r, c, vec![first, status], name == "_string");
+            }
+            if reviewed_basic && ["print", "hash"].contains(&name.as_str()) {
+                return self.value(typ);
+            }
             if path == "core:fmt"
                 && self.verified_library(callee, path)
                 && ["bprint", "bprintln", "bprintf", "bprintfln"].contains(&name.as_str())

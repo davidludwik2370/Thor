@@ -2,7 +2,7 @@
 //! A collection override or same-named local never inherits an SDK contract.
 use super::*;
 
-pub(super) fn library_origin(r: &Resolver<'_>, callee: Ref) -> Option<(String, String)> {
+pub(crate) fn library_origin(r: &Resolver<'_>, callee: Ref) -> Option<(String, String)> {
     fn visit(r: &Resolver<'_>, callee: Ref, seen: &mut HashSet<Ref>) -> Option<(String, String)> {
         if !seen.insert(callee) {
             return None;
