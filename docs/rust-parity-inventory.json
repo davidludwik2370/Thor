@@ -145,7 +145,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Helper-relative identity refresh, inactive local-type cases and retained-case filtering are connected. Exact untyped integer power results and wide constant-value parameters retain native literal coercion. Reviewed call identities, allocator selection, entry diagnostics and source-work gates follow the reference. Complete automatic expanded extrema/native-protocol cases, command integration and cache policy."
+      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Helper-relative identity refresh, inactive local-type cases and retained-case filtering are connected. Exact untyped integer power results and wide constant-value parameters retain native literal coercion. Reviewed call identities, allocator selection, entry diagnostics and source-work gates follow the reference. Automatic expanded extrema share the runtime reduction plan and native element-type witness. Complete command integration and contents-cache policy before execution acceptance."
     },
     {
       "python": "thorlang/native.py",
@@ -289,12 +289,13 @@
     {
       "python": "thorlang/extrema.py",
       "rust": [
-        "rust/src/extrema.rs"
+        "rust/src/extrema.rs",
+        "rust/src/extremaplan.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 8,
-      "remaining": "Finish constant execution and arities."
+      "remaining": "Shared runtime/evaluation plans and automatic constant reductions are connected. Finish command adoption and broad acceptance of optional arities."
     },
     {
       "python": "thorlang/formatting.py",

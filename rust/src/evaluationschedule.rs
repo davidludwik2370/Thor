@@ -74,7 +74,10 @@ impl<'p> Scheduler<'p> {
                 };
                 let request = ast.kind == "Run"
                     || ast.kind == "Binary" && ast.op == "**"
-                    || ast.kind == "Comprehension" && self.constant_context(node);
+                    || ast.kind == "Comprehension" && self.constant_context(node)
+                    || ast.kind == "Call"
+                        && crate::extremaplan::plan(&self.resolver, node).is_some()
+                        && self.constant_context(node);
                 if !request {
                     continue;
                 }
@@ -392,6 +395,17 @@ impl<'p> Scheduler<'p> {
             || self.queried(node)
         {
             return false;
+        }
+        if crate::extremaplan::plan(&self.resolver, node).is_some() {
+            return self.constant_context(node)
+                && !self
+                    .source(node)
+                    .node(node.node)
+                    .parent
+                    .is_some_and(|parent| {
+                        self.source(node).node(parent).kind == "Declaration"
+                            && self.source(node).group(parent, "names").len() > 1
+                    });
         }
         if self
             .project

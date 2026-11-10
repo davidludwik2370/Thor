@@ -525,6 +525,28 @@ The final five-case indirection/primitive gate also passes, including two added
 tests that distinguish a mutable primitive alias and an indirect nested argument
 from their eligible direct-call counterparts.
 
+### Expanded extrema constants
+
+Expanded `min`/`max` calls now use one spread plan and builtin-identity classifier
+in runtime lowering, purity checking and automatic evaluation. A required
+constant is evaluated with the existing native reduction and reconstructed with
+its sequence element type. Mixed scalar/array/slice reductions use that direct
+element-type witness, avoiding a contextful generated call in a global type
+query. Ordinary scalar builtins and runtime optional-status calls stay native.
+
+The focused regressions compare fixed arrays, optional slice primary values,
+empty slices, literal coercion, string/float elements, qualified imports and
+aliases, nested `#run`, generic constants, unevaluated type queries and invalid
+spreads. Checked and unchecked builds also verify source-order evaluation and
+array snapshots through runtime output. The same-named procedure in a user
+namespace remains an ordinary procedure.
+
+The combined extrema/numeric/entry-eligibility/intrinsic gate passes all 58 tests.
+All 27 Rust units pass in debug and release, Clippy passes with warnings denied,
+and assertion hygiene passes seven checks. The independent execution harness is
+ready for the contents-cache port and normal command adoption; Python remains
+the default, and this does not declare whole-language acceptance.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

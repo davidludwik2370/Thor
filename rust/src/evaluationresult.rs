@@ -217,6 +217,22 @@ impl Lower<'_, '_> {
         if self.source.node(call).kind == "Comprehension" {
             return self.comp_target(call, None);
         }
+        if let Some(plan) = crate::extremaplan::plan(self.resolver, self.reference(call)) {
+            if let Some((_, witness)) = plan
+                .parts
+                .iter()
+                .find(|(kind, _)| *kind != crate::extremaplan::Part::Scalar)
+            {
+                let sequence = self.module("sequence");
+                let query = self.query_value(*witness)?;
+                let type_of = self.native("type_of");
+                return Ok(Code::concat([
+                    self.g(format!("{type_of}({sequence}.element("), *witness),
+                    query,
+                    self.g("))", *witness),
+                ]));
+            }
+        }
         let owner = self
             .source
             .ancestors(call)

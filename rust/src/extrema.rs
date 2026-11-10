@@ -1,169 +1,18 @@
 //! Ordered, once-only builtin extrema expansion. Ordinary scalar calls remain
 //! Odin calls; borrowed slice expansion retains an optional success result.
 use super::*;
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Part {
-    Scalar,
-    Array,
-    Slice,
-}
+use crate::extremaplan::Part;
 impl Lower<'_, '_> {
     pub(super) fn extrema_name(&self, id: NodeId, seen: &mut HashSet<Ref>) -> Option<String> {
-        self.extrema_reference(self.reference(id), seen)
-    }
-    fn extrema_reference(&self, r: Ref, seen: &mut HashSet<Ref>) -> Option<String> {
-        if !seen.insert(r) {
-            return None;
-        }
-        let source = &self.resolver.sources[r.file];
-        if source.node(r.node).kind == "Ident"
-            && self.resolver.lookup(r, source.text(r.node)).is_none()
-        {
-            for selection in &source.selections {
-                let Ok(path) = unquote(&selection.path) else {
-                    continue;
-                };
-                if selection
-                    .names
-                    .iter()
-                    .any(|name| name == source.text(r.node))
-                    && matches!(path.as_str(), "core:math" | "base:builtin")
-                    && self.resolver.standard_library(r, &path)
-                    && matches!(source.text(r.node), "min" | "max")
-                {
-                    return Some(source.text(r.node).into());
-                }
-            }
-        }
-        if source.node(r.node).kind == "Selector" {
-            if let (Some(base), Some(field)) =
-                (source.role(r.node, "expr"), source.role(r.node, "field"))
-            {
-                let name = source.text(field);
-                if matches!(name, "min" | "max")
-                    && self
-                        .resolver
-                        .lookup(
-                            Ref {
-                                file: r.file,
-                                node: base,
-                            },
-                            source.text(base),
-                        )
-                        .is_none()
-                {
-                    for import in &source.nodes {
-                        if import.kind != "Import" {
-                            continue;
-                        }
-                        let Ok(path) = unquote(&import.op) else {
-                            continue;
-                        };
-                        let alias = source.names.get(import.name);
-                        let alias = if alias.is_empty() {
-                            path.rsplit(['/', ':']).next().unwrap_or("")
-                        } else {
-                            alias
-                        };
-                        if alias == source.text(base)
-                            && matches!(path.as_str(), "core:math" | "base:builtin")
-                            && self.resolver.standard_library(r, &path)
-                        {
-                            return Some(name.into());
-                        }
-                    }
-                }
-            }
-        }
-        if source.node(r.node).kind == "Paren" {
-            return source
-                .role(r.node, "expr")
-                .and_then(|node| self.extrema_reference(Ref { file: r.file, node }, seen));
-        }
-        if let Some(symbol) = self.resolver.symbol(r) {
-            let symbol = &self.resolver.symbols[symbol];
-            if symbol.constant && !symbol.immutable {
-                if let Some(node) = symbol.value {
-                    return self.extrema_reference(
-                        Ref {
-                            file: symbol.reference.file,
-                            node,
-                        },
-                        seen,
-                    );
-                }
-            }
-            return None;
-        }
-        if source.node(r.node).kind == "Ident"
-            && matches!(source.text(r.node), "min" | "max")
-            && self.resolver.native_builtin(r, source.text(r.node))
-        {
-            return Some(source.text(r.node).into());
-        }
-        if source.node(r.node).kind == "Selector" {
-            let base = source.role(r.node, "expr")?;
-            let field = source.role(r.node, "field")?;
-            let name = source.text(field);
-            if !matches!(name, "min" | "max")
-                || self
-                    .resolver
-                    .lookup(
-                        Ref {
-                            file: r.file,
-                            node: base,
-                        },
-                        source.text(base),
-                    )
-                    .is_some()
-            {
-                return None;
-            }
-            for import in &source.nodes {
-                if import.kind != "Import" {
-                    continue;
-                }
-                let path = unquote(&import.op).ok()?;
-                let alias = source.names.get(import.name);
-                let alias = if alias.is_empty() {
-                    path.rsplit(['/', ':']).next().unwrap_or("")
-                } else {
-                    alias
-                };
-                if alias == source.text(base)
-                    && matches!(path.as_str(), "core:math" | "base:builtin")
-                {
-                    return Some(name.into());
-                }
-            }
-        }
-        None
+        crate::extremaplan::name(self.resolver, self.reference(id), seen)
     }
     pub(super) fn extrema(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
-        let Some(callee) = self.source.role(id, "callee") else {
+        let Some(plan) = crate::extremaplan::plan(self.resolver, self.reference(id)) else {
             return Ok(None);
         };
-        let Some(name) = self.extrema_name(callee, &mut HashSet::new()) else {
-            return Ok(None);
-        };
-        let ellipsis = self.source.node(id).spans.get("ellipsis").copied();
-        let mut parts = vec![];
-        for argument in self.source.group(id, "args") {
-            let value = self.unparen(*argument);
-            if ellipsis
-                .is_some_and(|span| self.source.node(argument.to_owned()).span.start >= span.end)
-            {
-                parts.push((Part::Slice, *argument));
-            } else if self.source.node(value).kind == "Unary" && self.source.node(value).op == "**"
-            {
-                parts.push((Part::Array, self.role(value, "expr")?));
-            } else {
-                parts.push((Part::Scalar, *argument));
-            }
-        }
-        if parts.iter().all(|(kind, _)| *kind == Part::Scalar) {
-            return Ok(None);
-        }
+        let name = plan.name;
+        let parts = plan.parts;
+        let optional = plan.optional;
         for (kind, value) in &parts {
             if self.source.node(*value).kind == "FieldValue" {
                 return Ok(Some(self.error_token(
@@ -226,7 +75,6 @@ impl Lower<'_, '_> {
                 self.g(")", id),
             ])));
         }
-        let optional = ellipsis.is_some();
         let result_type = format!("{}Result{}", self.prefix, if optional { "_0" } else { "" });
         let prefix = format!(
             "{}extrema_{}_",

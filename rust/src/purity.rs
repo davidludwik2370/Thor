@@ -42,6 +42,18 @@ pub struct Purity<'a, 'r> {
 }
 type VisitKey = (Ref, Vec<(String, Type)>, Option<Ref>);
 pub(crate) fn builtin_call(r: &mut Resolver<'_>, call: Ref) -> Option<String> {
+    if let Some(callee) = r.sources[call.file].role(call.node, "callee") {
+        if let Some(name) = crate::extremaplan::name(
+            r,
+            Ref {
+                file: call.file,
+                node: callee,
+            },
+            &mut HashSet::new(),
+        ) {
+            return Some(name);
+        }
+    }
     crate::borroweval::Evaluator {
         resolver: r,
         arena: &mut crate::borrowflow::Arena::default(),
