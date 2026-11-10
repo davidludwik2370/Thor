@@ -433,6 +433,23 @@ passed, plus the additional Unicode TLS diagnostic-location check. All 34 Rust
 unit tests passed in debug and release; Clippy passed with warnings denied.
 Remaining migration guards and project acceptance continue before optimization.
 
+### Native intervals and membership
+
+Numeric loop intervals bypass generic Set dispatch, including parenthesized
+intervals and defaulted/generic bounds. Native Odin retains its bound evaluation
+frequency and loop control behavior. Range membership now follows the reference's
+constant predicate and runtime ownership algorithm: operands are checked in one
+common native type, evaluated once in source order, and temporary owners are
+released after comparison. `not_in`, inclusive/exclusive bounds, enum contexts,
+formatting and fn/#run calls retain their existing behavior.
+
+All 110 interval/compiler/conditional-binding/typed-loop/assertion-hygiene tests
+passed. A corrected case-sensitive diagnostic expectation also passed separately;
+no compiler fix was needed for that fixture. All 34 Rust unit tests passed in
+both debug and release, and Clippy passed with warnings denied. These changes
+address the interval mismatches found in project-copy acceptance; helper capture
+addressability and fixed-capacity storage cases are the next work.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

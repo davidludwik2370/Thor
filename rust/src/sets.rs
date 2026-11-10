@@ -239,6 +239,10 @@ impl Lower<'_, '_> {
         }
         if node.kind == "Range" {
             let expr = self.role(id, "expr")?;
+            let mut operand=expr;
+            while s.node(operand).kind=="Paren"{operand=self.role(operand,"expr")?;}
+            // A native interval is range syntax, never a Set value expression.
+            if s.node(operand).kind=="Binary"&&matches!(s.node(operand).op.as_str(),".."|"..<"|"..="|"..."){return Ok(None);}
             let typ = self.typ(expr);
             let generic = typ.is_unknown()
                 && !self.resolver.denotes_type(self.reference(expr))

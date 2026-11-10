@@ -49,6 +49,8 @@ mod purevariants;
 mod repetition;
 #[path = "sets.rs"]
 mod sets;
+#[path = "intervals.rs"]
+mod intervals;
 #[path = "storage.rs"]
 mod storage;
 #[path = "switches.rs"]
@@ -919,6 +921,13 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if kind=="Binary"&&matches!(node.op.as_str(),"in"|"not_in"){
+            let mut interval=self.role(id,"right")?;
+            while self.source.node(interval).kind=="Paren"{interval=self.role(interval,"expr")?;}
+            if self.source.node(interval).kind=="Binary"&&matches!(self.source.node(interval).op.as_str(),".."|"..<"|"..="){
+                return self.interval_membership(id,interval,constant);
+            }
+        }
         if let Some(code)=self.pure_big_storage(id,expected.clone(),constant)?{return Ok(code);}
         if self.checked_mode
             && kind == "ExpressionStatement"
@@ -1739,7 +1748,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         if self.source.node(sequence).kind == "Binary"
             && matches!(self.source.node(sequence).op.as_str(), ".." | "..<" | "..=")
         {
-            return Err(self.unsupported(id, "range membership"));
+            return self.interval_membership(id,sequence,constant);
         }
         let type_membership =
             self.resolver.denotes_type(self.reference(left)) && self.is_array(sequence);
