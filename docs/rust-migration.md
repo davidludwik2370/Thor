@@ -459,6 +459,13 @@ warnings denied, and all seven assertion-hygiene checks pass. Execution-eligibil
 and native-protocol details remain before scheduler/command adoption; this is
 still a partial checkpoint 4, rather than whole-language acceptance.
 
+The scope-offset remapper also preserves quoted constant-parameter contents.
+Odin marks these string values with `$$`; text such as `"::$12"` inside a value
+is not a scope address. Direct native metadata probes confirmed that spelling.
+The regression covers escaped quotes, raw values, Unicode and quotes in filenames.
+All 25 Rust units pass in debug and release, the three neighboring native scope
+regressions pass, and assertion hygiene passes seven checks.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

@@ -47,18 +47,33 @@ fn offset(project: &Project, at: Ref) -> Option<usize> {
 fn scopes(name: &str, offsets: &BTreeMap<String, String>) -> String {
     let mut result = String::new();
     let mut rest = name;
-    while let Some(start) = rest.find("::$") {
-        let end = start + 3;
-        result.push_str(&rest[..end]);
-        rest = &rest[end..];
-        let count = rest.bytes().take_while(u8::is_ascii_digit).count();
-        let number = &rest[..count];
-        result.push_str(offsets.get(number).map(String::as_str).unwrap_or(number));
-        rest = &rest[count..];
+    let mut quote = None;
+    let mut escaped = false;
+    while let Some(character) = rest.chars().next() {
+        if let Some(delimiter) = quote {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' && delimiter != '`' {
+                escaped = true;
+            } else if character == delimiter {
+                quote = None;
+            }
+        } else if ['"', '`'].contains(&character) && result.ends_with("$$") {
+            quote = Some(character);
+        } else if let Some(tail) = rest.strip_prefix("::$") {
+            result.push_str("::$");
+            let count = tail.bytes().take_while(u8::is_ascii_digit).count();
+            let number = &tail[..count];
+            result.push_str(offsets.get(number).map(String::as_str).unwrap_or(number));
+            rest = &tail[count..];
+            continue;
+        }
+        result.push(character);
+        rest = &rest[character.len_utf8()..];
     }
-    result.push_str(rest);
     result
 }
+
 impl Project {
     fn evaluation_snapshot(
         &self,
@@ -287,5 +302,47 @@ impl Project {
             }
         }
         Err(fail("Local type identity scheduling did not converge."))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn scope_offsets_preserve_constant_parameter_contents() {
+        let offsets = BTreeMap::from([("12".into(), "123".into()), ("61".into(), "75".into())]);
+        for (name, expected) in [
+            (
+                "main::outer::$12::Local::$61",
+                "main::outer::$123::Local::$75",
+            ),
+            (
+                r#"main::outer(S:$$"::$12")::Local::$61"#,
+                r#"main::outer(S:$$"::$12")::Local::$75"#,
+            ),
+            (
+                r#"main::outer(S:$$"a\"::$61")::Local::$61"#,
+                r#"main::outer(S:$$"a\"::$61")::Local::$75"#,
+            ),
+            (
+                "main::outer(S:$$`::$61`)::Local::$61",
+                "main::outer(S:$$`::$61`)::Local::$75",
+            ),
+            (
+                "main::someone's_file.odin::Local::$61",
+                "main::someone's_file.odin::Local::$75",
+            ),
+            (
+                "main::quoted\"file.odin::Local::$61",
+                "main::quoted\"file.odin::Local::$75",
+            ),
+            (
+                "主::outer(S:$$\"é🙂::$61\")::型::$61",
+                "主::outer(S:$$\"é🙂::$61\")::型::$75",
+            ),
+        ] {
+            let actual = scopes(name, &offsets);
+            assert_eq!(actual, expected);
+        }
     }
 }
