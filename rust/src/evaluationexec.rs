@@ -485,10 +485,8 @@ impl Project {
                 })
                 .unwrap_or("");
             let detail = helper.remap_references(detail);
-            let detail = detail
-                .find(") ")
-                .map(|end| &detail[end + 2..])
-                .unwrap_or(&detail);
+            let detail = detail.find("panic:").or_else(||detail.find("assertion failure:"))
+                .map(|start| &detail[start..]).unwrap_or(&detail);
             let mut error = fail(format!(
                 "{label} execution failed ({}). {}",
                 result.status,
@@ -498,7 +496,19 @@ impl Project {
                     detail.chars().take(300).collect::<String>()
                 }
             ));
-            if let Some(origin) = helper.evaluation_failure_origin(&stderr) {
+            if detail.contains("panic: unexpected failure") && stderr.lines().any(|line|line.starts_with("  expression: ")) {
+                if let Some(messages)=error.diagnostics[0]["msgs"].as_array_mut() {
+                    messages.extend(stderr.lines().filter(|line|["  expression: ","  procedure: ","  error: "].iter().any(|prefix|line.starts_with(prefix)))
+                        .map(|line|json!(line.trim().chars().take(2000).collect::<String>())));
+                }
+                if let Some(origin)=self.original_optional_failure_origin(&stderr) {
+                    let unit=self.sources.iter().find(|unit|unit.path==Path::new(&origin.file)).unwrap();
+                    let (line,column)=unit.position(origin.span.start);
+                    error.diagnostics[0]["related"]=json!([{"pos":{"file":origin.file,"offset":origin.span.start,"end_offset":origin.span.end,"line":line,"column":column},"message":"or_panic failed here."}]);
+                }
+            }
+            let origin=error.diagnostics[0]["related"].is_null().then(||helper.evaluation_failure_origin(&stderr)).flatten();
+            if let Some(origin) = origin {
                 let unit = helper
                     .sources
                     .iter()
@@ -537,6 +547,27 @@ impl Project {
             cache.put(key.as_deref(), &value);
         }
         Ok(Executed { value, target: key })
+    }
+    fn original_optional_failure_origin(&self, stderr: &str) -> Option<crate::emit::Origin> {
+        for line in stderr.lines().filter(|line|line.contains("panic: unexpected failure")) {
+            for source in &self.sources {
+                let path=source.path.to_string_lossy();
+                let Some(start)=line.find(path.as_ref()) else {continue;};
+                let tail=&line[start+path.len()..];
+                let coordinates=tail.strip_prefix('(').and_then(|tail|tail.split(')').next())
+                    .or_else(||tail.strip_prefix(':').map(|tail|tail.split(": ").next().unwrap_or(tail)));
+                let Some((row,column))=coordinates.and_then(|pair|pair.split_once(':')) else {continue;};
+                let (Ok(row),Ok(column))=(row.parse::<usize>(),column.parse::<usize>()) else {continue;};
+                if row==0||column==0 {continue;}
+                let Some(line)=source.raw.split_inclusive('\n').nth(row-1) else {continue;};
+                let base=source.raw.split_inclusive('\n').take(row-1).map(str::len).sum::<usize>();
+                let offset=base+line.chars().take(column-1).map(char::len_utf8).sum::<usize>();
+                let end=source.nodes.iter().find(|node|node.kind=="OrPanic"&&node.span.start==offset)
+                    .map(|node|node.span.end).unwrap_or((offset+1).min(source.raw.len()));
+                return Some(crate::emit::Origin{file:path.into_owned(),span:Span::new(offset,end),kind:"or-panic".into(),exact:false});
+            }
+        }
+        None
     }
     fn evaluation_failure_origin(&self, stderr: &str) -> Option<crate::emit::Origin> {
         for line in stderr.lines() {

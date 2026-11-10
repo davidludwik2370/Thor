@@ -2,7 +2,7 @@ use serde_json::json;
 use std::{env, path::PathBuf, process::ExitCode};
 use thor_compiler::{
     diagnostic::{Error, Result},
-    project::{absolute, print_diagnostic, Options, Project},
+    project::{absolute, Options, Project},
     VERSION,
 };
 
@@ -43,7 +43,10 @@ fn main() -> ExitCode {
                 );
             } else {
                 for error in errors {
-                    print_diagnostic(&error);
+                    let overlay=compiler_args.iter().find_map(|arg|arg.strip_prefix("--overlay="))
+                        .or_else(||compiler_args.windows(2).find(|args|args[0]=="--overlay").map(|args|args[1].as_str()));
+                    let raw=overlay.and_then(|path|thor_compiler::diagnostic::overlay_source(&error,std::path::Path::new(path)));
+                    eprintln!("{}",thor_compiler::diagnostic::text(&error,raw.as_deref(),compiler_args.iter().any(|arg|arg=="-terse-errors"),compiler_args.iter().any(|arg|arg=="-error-pos-style:unix")));
                 }
             }
             ExitCode::from(exit_status)

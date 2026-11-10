@@ -1,5 +1,5 @@
 use crate::{
-    ast::Source,
+    ast::{Source, Span},
     diagnostic::{Error, Result},
     digest::sha256,
     emit::Emitted,
@@ -845,7 +845,7 @@ impl Project {
             s.nodes.iter().any(|n| {
                 n.immutable
                     || n.data["pure"] == true
-                    || matches!(n.kind.as_str(), "Run" | "Interpolation")
+                    || matches!(n.kind.as_str(), "Run" | "Interpolation" | "OrPanic")
             }) || s.selections.iter().any(|selection| selection.wildcard)
                 || s.info["mut_parameters"]
                     .as_array()
@@ -1286,8 +1286,49 @@ impl Project {
                 self.pure_type_context(&mut error,*site,false);
             }
             if let Some(site)=pure_site { self.pure_type_context(&mut error,site,true); }
+            self.optional_diagnostic(&mut error);
+            if let Some(messages)=error["msgs"].as_array_mut() {
+                for message in messages {
+                    if let Some(text)=message.as_str() { *message=json!(self.hide_generated_names(text)); }
+                }
+            }
             error
         }).collect()
+    }
+    fn optional_diagnostic(&self,error:&mut Value) {
+        if error["pos"]["file"].as_str().is_some_and(|file|Path::new(file)==self.options.root.join("runtime/optional/optional.odin")) {
+            if let Some((file,offset))=self.instantiation_locations(error).into_iter().find(|(file,_)|!self.sources[*file].path.starts_with(self.options.root.join("runtime"))) {
+                let source=&self.sources[file];
+                let span=source.nodes.iter().filter(|node|node.kind=="OrPanic"&&node.span.start<=offset&&offset<node.span.end)
+                    .min_by_key(|node|node.span.len()).map(|node|node.span).unwrap_or(Span::new(offset,offset));
+                let pos=Error::at(source,span,"");error["pos"]=pos.diagnostics[0]["pos"].clone();
+            }
+        }
+        let source=error["pos"]["file"].as_str().and_then(|file|self.sources.iter().find(|source|source.path==Path::new(file)));
+        if let Some(source)=source {
+            let start=error["pos"]["offset"].as_u64().unwrap_or(0) as usize;
+            let end=error["pos"]["end_offset"].as_u64().unwrap_or(start as u64) as usize;
+            let inside=|kind:&str|source.nodes.iter().any(|node|node.kind==kind&&node.span.start<=start&&end<=node.span.end);
+            if inside("OrPanic")&&!inside("OrElse") {
+                if let Some(messages)=error["msgs"].as_array_mut() {
+                    for message in messages {
+                        if let Some(text)=message.as_str() {*message=json!(text.replace("'or_else'","'or_panic'"));}
+                    }
+                }
+            }
+        }
+    }
+    fn hide_generated_names(&self,text:&str)->String {
+        let mut text=text.to_string();
+        for source in &self.sources {
+            let mut cursor=0;
+            while let Some(found)=text[cursor..].find(&source.prefix) {
+                let start=cursor+found;
+                let end=start+text[start..].bytes().take_while(|ch|ch.is_ascii_alphanumeric()||*ch==b'_').count();
+                text.replace_range(start..end,"Thor expression");cursor=start+"Thor expression".len();
+            }
+        }
+        text
     }
     fn pure_type_context(
         &self,
@@ -1583,32 +1624,13 @@ impl Project {
             eprintln!("{packet}");
         } else {
             for error in errors {
-                print_diagnostic(&error);
+                let raw=error["pos"]["file"].as_str().and_then(|file|self.sources.iter().find(|source|source.path==Path::new(file))).map(|source|source.raw.as_str());
+                eprintln!("{}",crate::diagnostic::text(&error,raw,self.options.flags.iter().any(|flag|flag=="-terse-errors"),self.options.flags.iter().any(|flag|flag=="-error-pos-style:unix")));
             }
         }
         failed
     }
 }
 pub fn print_diagnostic(error: &Value) {
-    if let Some(file) = error["pos"]["file"].as_str() {
-        eprint!(
-            "{}({}:{}): ",
-            file, error["pos"]["line"], error["pos"]["column"]
-        );
-    } else {
-        eprint!("thor-rust ");
-    }
-    eprint!(
-        "{}: ",
-        if error["type"] == "warning" {
-            "Warning"
-        } else {
-            "Error"
-        }
-    );
-    if let Some(messages) = error["msgs"].as_array() {
-        for message in messages {
-            eprintln!("{}", message.as_str().unwrap_or("invalid diagnostic"));
-        }
-    }
+    eprintln!("{}",crate::diagnostic::text(error,None,false,false));
 }

@@ -51,6 +51,40 @@ staging directory. Application names `package.zip`, `package.tar.gz` and
 archives or the replacement backup. All 41 publishing checks and seven assertion
 hygiene checks passed; the frozen comparison tag remains unchanged.
 
+### Library call and permission parity corrections
+
+Expanded original-fixture comparisons exposed gaps hidden by the earlier
+feature-focused gates. The native compiler now resolves imported/overloaded
+optional-result signatures, retains complete `or_panic` failure locations, and
+preserves lexical context in default callbacks, field names and named arguments.
+Explicitly initialized foreign-callback contexts can allocate as in Python.
+Contextual array literals boxed as `any` retain their inferred array type;
+nominal sequences work in extrema, and package-level switch initializers retain
+contextless nested helpers. Wide native constants receive fixed-operand context
+without relaxing logical/native numeric type matching.
+
+Slice analysis now follows the reference's demand-driven parameter contracts and
+recursive-caller stabilization. Scalar-only callees no longer force SDK body
+inspection merely because their caller is pure. The separate storage-provenance
+analysis respects approved-library boundaries. Native purity checking recognizes
+I/O aliases, defers overload selection to Odin, and leaves inactive `fn` bodies
+unchecked. These corrections address real timeouts; they are parity work rather
+than a new optimization architecture.
+
+The new original-fixture gates cover optional results, callback defaults, basic
+helpers, hashing, pure I/O and terminal diagnostics. The initial 104-test library
+gate passed 101 tests and exposed three I/O underline/stage mismatches; all ten
+pure-I/O fixtures passed after that correction. Rust's 34 unit tests pass in debug
+and release, and all-target Clippy passes with warnings denied. The clean
+permission/editor/generic/assertion-hygiene gate passed all 232 tests, including
+checked and unchecked slice-copy paths. Whole-language diagnostic comparisons
+remain in progress. None of these results establishes full migration acceptance.
+
+A uniform copied-project sweep built all 19 example projects with both compilers
+and verified that their original Thor sources were unchanged. The editor Node
+suite passed 141 tests. These project and editor checks complement, rather than
+replace, the remaining original-language fixture comparisons.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

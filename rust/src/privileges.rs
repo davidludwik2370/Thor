@@ -107,6 +107,7 @@ struct GraphValue {
 struct Context {
     proc: Option<Ref>,
     checked: bool,
+    callers: BTreeSet<C>,
     bindings: Substitutions,
     env: HashMap<usize, V>,
     effects: BTreeMap<Origin, Effect>,
@@ -123,6 +124,7 @@ impl Context {
         Self {
             proc,
             checked: false,
+            callers: BTreeSet::new(),
             bindings,
             env: HashMap::new(),
             effects: BTreeMap::new(),
@@ -141,6 +143,7 @@ pub struct Privileges<'a, 'r> {
     values: Vec<Value>,
     contexts: Vec<Context>,
     summaries: HashMap<SummaryKey, C>,
+    recursive_pending: BTreeSet<C>,
     globals: HashMap<usize, V>,
     global_active: HashSet<usize>,
     explicit: HashSet<Ref>,
@@ -156,6 +159,7 @@ pub struct Privileges<'a, 'r> {
 struct SummaryKey {
     procedure: Ref,
     bindings: Vec<(String, Type)>,
+    contract: bool,
     checked: bool,
 }
 impl<'a, 'r> Privileges<'a, 'r> {
@@ -180,6 +184,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             values: vec![],
             contexts: vec![],
             summaries: HashMap::new(),
+            recursive_pending: BTreeSet::new(),
             globals: HashMap::new(),
             global_active: HashSet::new(),
             explicit: HashSet::new(),
@@ -234,39 +239,52 @@ impl<'a, 'r> Privileges<'a, 'r> {
             });
             if editor || !generic || this.s(proc).node(proc.node).data["pure"] == true {
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
-                this.summary(proc, Substitutions::new());
+                this.summary(proc, Substitutions::new(), None, editor);
                 this.pure_depth = 0;
             }
         }
-        // Recursive summaries form a finite monotone effect graph. Revisit the
-        // actual roots after callees acquire effects on the first traversal.
-        for _ in 0..24 {
-            this.changed = false;
-            let before = (0..this.contexts.len())
-                .map(|c| this.state(c))
-                .collect::<Vec<_>>();
-            let contexts = (0..this.contexts.len())
-                .filter(|c| this.contexts[*c].proc.is_some())
-                .collect::<Vec<_>>();
-            for c in contexts {
-                let proc = this.contexts[c].proc.unwrap();
-                if let Some(body) = this.role(proc, "body") {
-                    this.pure_depth = usize::from(this.contexts[c].checked);
-                    this.statement(body, c);
-                    this.pure_depth = 0;
-                }
+        // Only incomplete recursive callees can invalidate an already
+        // completed caller. Match the reference work queue instead of
+        // repeatedly walking every unrelated SDK body.
+        let mut visits = HashMap::<C, usize>::new();
+        while let Some(c) = this.recursive_pending.pop_first() {
+            let count = visits.entry(c).or_default();
+            if *count >= 24 {
+                continue;
             }
-            let after = (0..this.contexts.len())
-                .map(|c| this.state(c))
-                .collect::<Vec<_>>();
-            if before == after {
-                break;
+            *count += 1;
+            let Some(proc) = this.contexts[c].proc else {
+                continue;
+            };
+            let Some(body) = this.role(proc, "body") else {
+                continue;
+            };
+            let before = this.state(c);
+            this.pure_depth = usize::from(this.contexts[c].checked);
+            this.statement(body, c);
+            this.pure_depth = 0;
+            if before != this.state(c) {
+                if visits[&c] == 24 {
+                    this.conservative_summary(
+                        c,
+                        "verify a complex recursive slice reference graph",
+                    );
+                }
+                this.recursive_pending.insert(c);
+                this.recursive_pending
+                    .extend(this.contexts[c].callers.iter().copied());
             }
         }
         for c in 0..this.contexts.len() {
             let Some(proc) = this.contexts[c].proc else {
                 continue;
             };
+            let sig = this.role(proc, "type").unwrap_or(proc);
+            for origin in this.contexts[c].effects.keys() {
+                if let Some((name, _)) = this.params(sig).get(origin.path.index) {
+                    this.facts.mutating.insert(*name);
+                }
+            }
             if this.s(proc).node(proc.node).data["pure"] != true {
                 continue;
             }
@@ -1166,22 +1184,38 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
     }
-    fn summary(&mut self, proc: Ref, bindings: Substitutions) -> C {
+    fn summary(
+        &mut self,
+        proc: Ref,
+        bindings: Substitutions,
+        caller: Option<C>,
+        contract: bool,
+    ) -> C {
         let key = SummaryKey {
             procedure: proc,
+            contract,
             bindings: bindings
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             checked: self.pure_depth > 0,
         };
-        if let Some(c) = self.summaries.get(&key) {
-            return *c;
+        if let Some(c) = self.summaries.get(&key).copied() {
+            if let Some(caller) = caller {
+                self.contexts[c].callers.insert(caller);
+                if self.contexts[c].active {
+                    self.recursive_pending.insert(caller);
+                }
+            }
+            return c;
         }
         let c = self.contexts.len();
         self.contexts
             .push(Context::new(Some(proc), bindings.clone()));
         self.contexts[c].checked = self.pure_depth > 0;
+        if let Some(caller) = caller {
+            self.contexts[c].callers.insert(caller);
+        }
         self.summaries.insert(key, c);
         let sig = self.role(proc, "type").unwrap_or(proc);
         for (index, (name, field)) in self.params(sig).into_iter().enumerate() {
@@ -1195,7 +1229,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 });
             let v = self.fresh(
                 typ,
-                Some(Path {
+                contract.then_some(Path {
                     index,
                     steps: vec![],
                 }),
@@ -1250,7 +1284,16 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.depth += 1;
         if self.depth < 40 {
             if let Some(body) = self.role(proc, "body") {
-                self.statement(body, c);
+                for pass in 0..24 {
+                    let before = self.state(c);
+                    self.statement(body, c);
+                    if before == self.state(c) {
+                        break;
+                    }
+                    if pass == 23 {
+                        self.conservative_summary(c, "verify a complex slice reference graph");
+                    }
+                }
             }
         } else {
             for (index, (name, _)) in self.params(sig).into_iter().enumerate() {
@@ -1280,6 +1323,29 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
         c
+    }
+    fn conservative_summary(&mut self, c: C, reason: &str) {
+        let Some(proc) = self.contexts[c].proc else {
+            return;
+        };
+        let sig = self.role(proc, "type").unwrap_or(proc);
+        for (index, (name, _)) in self.params(sig).into_iter().enumerate() {
+            self.require(
+                [Origin {
+                    path: Path {
+                        index,
+                        steps: vec![],
+                    },
+                    aspect: Aspect::All,
+                    seed: None,
+                }]
+                .into(),
+                name,
+                c,
+                reason,
+                vec![],
+            );
+        }
     }
     fn typ(&mut self, r: Ref, c: C) -> Type {
         if let Some(symbol) = self.r.symbol(r) {
@@ -2661,16 +2727,20 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.contains_slice(&typ, &mut HashSet::new())
                 })
             });
+            // As in the reference analyzer, body inspection is needed only
+            // when provenance can cross this call, or a generic body has
+            // immutable declarations whose permissions need specialization.
+            // Purity is checked separately; it must not force this permission
+            // pass to traverse scalar-only standard-library implementations.
             let local_checks = self
-                .s(candidate)
-                .descendants(candidate.node)
-                .any(|id| self.s(candidate).node(id).immutable);
-            if !has_references
-                && !result_references
-                && !local_checks
-                && self.pure_depth == 0
-                && self.s(candidate).node(candidate.node).data["pure"] != true
-            {
+                .s(sig)
+                .descendants(sig.node)
+                .any(|id| self.s(sig).node(id).kind == "PolyType")
+                && self
+                    .s(candidate)
+                    .descendants(candidate.node)
+                    .any(|id| self.s(candidate).node(id).immutable);
+            if !has_references && !result_references && !local_checks {
                 for (index, (_, annotation)) in result_fields.into_iter().enumerate() {
                     let typ = annotation
                         .map(|r| self.r.specialized_type(r, &substitutions))
@@ -2688,7 +2758,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if self.s(candidate).node(candidate.node).data["pure"] == true {
                 self.pure_depth += 1;
             }
-            let summary = self.summary(candidate, substitutions);
+            let summary = self.summary(candidate, substitutions, Some(c), true);
             self.pure_depth = old_depth;
             let effects = self.contexts[summary].effects.clone();
             for (origin, effect) in effects {
@@ -2921,6 +2991,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.r.standard_library(reference, path)
     }
     fn library(&self, callee: Ref) -> Option<(String, String)> {
+        for path in ["core:fmt", "thor:basic", "thor:graph", "core:slice"] {
+            if let Some(name) = crate::evaluation::library_member(self.r, callee, path) {
+                return Some((path.into(), name));
+            }
+        }
         if self.kind(callee) == "Selector" {
             let owner = self.role(callee, "expr")?;
             let field = self.role(callee, "field")?;
@@ -3113,8 +3188,11 @@ fn base_type(typ: &Type) -> &Type {
 }
 // Union payload provenance survives copies, but copying a union value is not
 // itself a writable slice alias. Narrowing checks the selected payload later.
-fn writable_alias(typ:&Type)->bool{
-    matches!(base_type(typ),Type::Slice(_)|Type::Soa(_)|Type::Unknown|Type::Generic)
+fn writable_alias(typ: &Type) -> bool {
+    matches!(
+        base_type(typ),
+        Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic
+    )
 }
 fn reference_data(typ: &Type) -> bool {
     matches!(

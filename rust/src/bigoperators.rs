@@ -20,16 +20,23 @@ impl Lower<'_, '_> {
             return Ok(hint.code.clone());
         }
         let values = self.big_operands(id);
-        for logical in [true, false] {
-            for value in &values {
-                let typ = self.typ(*value);
-                if if logical {
-                    typ.big_name().is_some()
-                } else {
-                    typ.is_unknown()
-                } {
-                    return self.native_type(*value);
-                }
+        for value in &values {
+            let typ = self.typ(*value);
+            if typ.big_name().is_some() {
+                return self.native_type(*value);
+            }
+        }
+        // A fixed native operand supplies context for an unresolved operand.
+        // Do not default a wide untyped native constant to int first.
+        for value in &values {
+            let typ = self.typ(*value);
+            if !typ.is_unknown() && !typ.untyped() {
+                return self.native_type(*value);
+            }
+        }
+        for value in &values {
+            if self.typ(*value).is_unknown() {
+                return self.native_type(*value);
             }
         }
         self.native_type(values[0])
@@ -100,7 +107,8 @@ impl Lower<'_, '_> {
                         this.source.node(id).span.start,
                         index
                     );
-                    let expected = Hint {constant_literal:false,
+                    let expected = Hint {
+                        constant_literal: false,
                         code: typ.clone(),
                         semantic: Some(Type::Generic),
                         element_only: false,

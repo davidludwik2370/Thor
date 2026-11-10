@@ -77,7 +77,7 @@ pub(super) fn library_origin(r: &Resolver<'_>, callee: Ref) -> Option<(String, S
     visit(r, callee, &mut HashSet::new())
 }
 
-pub(super) fn library_member(r: &Resolver<'_>, callee: Ref, path: &str) -> Option<String> {
+pub(crate) fn library_member(r: &Resolver<'_>, callee: Ref, path: &str) -> Option<String> {
     if !path.starts_with("thor:") {
         return r.library_alias_member(callee, path);
     }
@@ -218,7 +218,7 @@ pub(crate) fn approved_library(r: &Resolver<'_>, callee: Ref) -> Option<(String,
     }
     None
 }
-pub(super) fn primitive(r: &mut Resolver<'_>, callee: Ref) -> bool {
+pub(crate) fn primitive(r: &mut Resolver<'_>, callee: Ref) -> bool {
     if r.symbol(callee).is_some_and(|index| {
         let symbol = &r.symbols[index];
         !symbol.constant || symbol.immutable || symbol.parameter || symbol.result

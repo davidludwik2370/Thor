@@ -83,3 +83,114 @@ impl From<serde_json::Error> for Error {
         Self::io("invalid parser protocol", error)
     }
 }
+
+/// Render source diagnostics with the reference's source excerpts and related
+/// notes. Source-map coordinates remain UTF-8 offsets and UTF-16 LSP columns;
+/// the terminal excerpt uses Unicode scalars and four-column tab stops.
+pub fn text(error: &Value, raw: Option<&str>, terse: bool, unix: bool) -> String {
+    let pos = &error["pos"];
+    let file = pos["file"].as_str();
+    let location = if let Some(file) = file {
+        if unix {
+            format!("{}:{}:{}:", file, pos["line"], pos["column"])
+        } else {
+            format!("{}({}:{}):", file, pos["line"], pos["column"])
+        }
+    } else {
+        "thor".into()
+    };
+    let severity = match error["type"].as_str().unwrap_or("error") {
+        "warning" => "Warning",
+        "note" => "Note",
+        _ => "Error",
+    };
+    let messages = error["msgs"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut output = format!("{location} {severity}: {messages}");
+    let read = if raw.is_none() {
+        file.and_then(|file| std::fs::read_to_string(file).ok())
+    } else {
+        None
+    };
+    if let Some(raw) = raw.or(read.as_deref()).filter(|_| !terse) {
+        let row = pos["line"].as_u64().unwrap_or(0) as usize;
+        if let Some(line) = row.checked_sub(1).and_then(|row| raw.lines().nth(row)) {
+            let offset = pos["offset"].as_u64().unwrap_or(0) as usize;
+            let end = pos["end_offset"].as_u64().unwrap_or(offset as u64) as usize;
+            let prefix = raw
+                .get(..offset)
+                .unwrap_or("")
+                .rsplit('\n')
+                .next()
+                .unwrap_or("");
+            let selected = raw
+                .get(offset..end)
+                .unwrap_or("")
+                .split('\n')
+                .next()
+                .unwrap_or("");
+            output.push_str(&format!(
+                "\n    {}\n    {}{}",
+                tabs(line),
+                " ".repeat(tabs(prefix).chars().count()),
+                "^".repeat(tabs(selected).chars().count().max(1))
+            ));
+        }
+    }
+    for note in error["related"].as_array().into_iter().flatten() {
+        let messages = note["message"]
+            .as_str()
+            .map(|message| vec![json!(message)])
+            .unwrap_or_else(|| note["msgs"].as_array().cloned().unwrap_or_default());
+        let same = file.is_some() && note["pos"]["file"].as_str() == file;
+        output.push('\n');
+        output.push_str(&text(
+            &json!({"type":"note","pos":note["pos"],"msgs":messages}),
+            raw.filter(|_| same),
+            terse,
+            unix,
+        ));
+    }
+    output
+}
+fn tabs(text: &str) -> String {
+    let mut out = String::new();
+    let mut column = 0;
+    for ch in text.chars() {
+        if ch == '\t' {
+            let count = 4 - column % 4;
+            out.extend(std::iter::repeat_n(' ', count));
+            column += count;
+        } else {
+            out.push(ch);
+            column = if ch == '\n' || ch == '\r' {
+                0
+            } else {
+                column + 1
+            };
+        }
+    }
+    out
+}
+
+/// An early parser error can precede Project construction. Retain the unsaved
+/// source excerpt rather than reading the older on-disk document at this point.
+pub fn overlay_source(error: &Value, path: &std::path::Path) -> Option<String> {
+    let file = std::path::Path::new(error["pos"]["file"].as_str()?);
+    let packet: Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+    for (original, replacement) in packet["Replace"].as_object()? {
+        if crate::project::absolute(std::path::Path::new(original))
+            .ok()
+            .as_deref()
+            == Some(file)
+        {
+            return std::fs::read_to_string(replacement.as_str()?).ok();
+        }
+    }
+    None
+}

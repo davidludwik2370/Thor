@@ -526,6 +526,16 @@ impl<'a, 'r> Purity<'a, 'r> {
             || ["Selector", "FieldValue"].contains(&s.node(parent).kind.as_str())
                 && s.role(parent, "field") == Some(r.node))
     }
+    fn io_call(&self,callee:Ref)->bool {
+        crate::evaluation::library_member(self.r,callee,"core:fmt").is_some_and(|name|IO.contains(&name.as_str()))
+            ||crate::evaluation::library_member(self.r,callee,"thor:basic").is_some_and(|name|["print","input","read","write"].contains(&name.as_str()))
+    }
+    fn io_message(&self,proc:Ref,callee:Ref)->String {
+        let source=&self.r.sources[proc.file];
+        let name=source.node(proc.node).parent.and_then(|declaration|source.group(declaration,"names").first()).map(|name|source.text(*name));
+        let subject=if source.node(proc.node).data["pure"]==true {name.map(|name|format!("Pure function '{name}'")).unwrap_or("Pure code".into())}else{"Pure code".into()};
+        format!("{subject} cannot call '{}' because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.",self.text(callee))
+    }
     fn call(&mut self, root: Ref, proc: Ref, call: Ref, bindings: &Substitutions, via: &[Ref]) {
         let Some(callee) = self.role(call, "callee") else {
             self.gap(root, call);
@@ -533,6 +543,10 @@ impl<'a, 'r> Purity<'a, 'r> {
         };
         if let Some(message) = self.r.private_call_reason(callee) {
             self.fault(root, callee, via, message);
+            return;
+        }
+        if self.io_call(callee) {
+            self.fault(root,call,via,self.io_message(proc,callee));
             return;
         }
         let args = self.r.sources[call.file]
@@ -630,7 +644,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                     root,
                     call,
                     via,
-                    "Pure code cannot invoke an indirect procedure value.",
+                    format!("Pure code requires a resolved direct call to an eligible procedure; An indirect call through runtime procedure value '{}' is not eligible.",self.text(callee)),
                 );
             } else if plans.is_empty() {
                 let source = &self.r.sources[callee.file];
@@ -693,7 +707,17 @@ impl<'a, 'r> Purity<'a, 'r> {
                     if native_fmt && IO.contains(&name)
                         || basic && ["print", "input", "read", "write"].contains(&name)
                     {
-                        self.fault(root,callee,via,"Pure code cannot call this library procedure because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.");
+                        if native_selection {
+                            let body=self.role(candidate,"body").unwrap();
+                            self.facts.checked.insert(candidate);
+                            self.facts.targets.entry(call).or_default().insert(candidate);
+                            self.speculative.push(body);
+                            let mut chain=via.to_vec();chain.push(call);
+                            self.fault(root,body,&chain,self.io_message(proc,callee));
+                            self.speculative.pop();
+                        } else {
+                            self.fault(root,call,via,self.io_message(proc,callee));
+                        }
                         selected += 1;
                         continue;
                     }
@@ -916,6 +940,7 @@ pub(crate) const IO: &[&str] = &[
     "wprintln",
     "wprintf",
     "wprintfln",
+    "fprint_type", "fprint_typeid", "wprint_type", "wprint_typeid",
 ];
 pub(crate) const BUILTINS: &[&str] = &[
     "len",
@@ -956,10 +981,25 @@ impl Facts {
             let mut error = Error::new(&faults[0].message);
             for fault in faults {
                 let source = &r.sources[fault.site.file];
+                let io=fault.message.contains("because it performs I/O.");
+                let site=if io {source.role(fault.site.node,"callee").unwrap_or(fault.site.node)}else{fault.site.node};
                 let mut diagnostic =
-                    Error::at(source, source.node(fault.site.node).span, &fault.message)
+                    Error::at(source, source.node(site).span, &fault.message)
                         .diagnostics
                         .remove(0);
+                if io {diagnostic["stage"]=serde_json::json!("checker");}
+                if fault.message.contains("An indirect call through runtime procedure value") {
+                    for call in std::iter::once(fault.site).chain(fault.related.iter().copied()) {
+                        let source=&r.sources[call.file];
+                        let Some(callee)=source.role(call.node,"callee") else {continue;};
+                        let Some(symbol)=r.symbol(Ref{file:call.file,node:callee}).map(|index|&r.symbols[index]) else {continue;};
+                        if !symbol.parameter {continue;}
+                        let owner=&r.sources[symbol.reference.file];
+                        let name=owner.node(symbol.scope).parent.and_then(|decl|owner.group(decl,"names").first()).map(|name|owner.text(*name)).unwrap_or("anonymous fn");
+                        diagnostic["msgs"].as_array_mut().unwrap().push(serde_json::json!(format!("While checking parameter '{}' in pure call '{name}'.",symbol.name)));
+                        break;
+                    }
+                }
                 if !fault.related.is_empty() {
                     diagnostic["related"]=serde_json::json!(fault.related.iter().map(|reference|{
                         let s=&r.sources[reference.file];let span=s.node(reference.node).span;let (line,column)=s.position(span.start);

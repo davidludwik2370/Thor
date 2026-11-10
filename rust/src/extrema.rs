@@ -21,8 +21,12 @@ impl Lower<'_, '_> {
                 )));
             }
             let typ = self.typ(*value);
+            let mut shape = &typ;
+            while let Type::Nominal(_, base) = shape {
+                shape = base;
+            }
             if *kind == Part::Slice
-                && !matches!(typ, Type::Slice(_) | Type::Unknown | Type::Generic)
+                && !matches!(shape, Type::Slice(_) | Type::Unknown | Type::Generic)
             {
                 return Ok(Some(self.error_token(
                     *value,
@@ -30,7 +34,7 @@ impl Lower<'_, '_> {
                 )));
             }
             if *kind == Part::Array
-                && !matches!(typ, Type::Array { .. } | Type::Unknown | Type::Generic)
+                && !matches!(shape, Type::Array { .. } | Type::Unknown | Type::Generic)
             {
                 return Ok(Some(self.error_token(
                     *value,
@@ -39,7 +43,7 @@ impl Lower<'_, '_> {
             }
             if *kind == Part::Array
                 && matches!(
-                    typ,
+                    shape,
                     Type::Array {
                         length: Some(0),
                         ..

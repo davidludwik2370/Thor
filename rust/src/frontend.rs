@@ -140,7 +140,11 @@ impl Frontend {
         package: bool,
         overlay: Option<&str>,
     ) -> Result<Source> {
-        let path = fs::canonicalize(path)?;
+        let path = if overlay.is_some() {
+            crate::project::absolute(path)?
+        } else {
+            fs::canonicalize(path)?
+        };
         let bytes = if let Some(raw) = overlay {
             raw.as_bytes().to_vec()
         } else {
@@ -200,7 +204,50 @@ impl Frontend {
             ))
         })?;
         if !status.success() {
-            let errors = info["errors"].as_array().cloned().unwrap_or_default();
+            let mut errors = info["errors"].as_array().cloned().unwrap_or_default();
+            for error in &mut errors {
+                if error["pos"]["file"].as_str() != path.to_str() {
+                    continue;
+                }
+                let Some(offset) = error["pos"]["offset"].as_u64().map(|n| n as usize) else {
+                    continue;
+                };
+                let mut offset = offset.min(raw.len());
+                while !raw.is_char_boundary(offset) {
+                    offset -= 1;
+                }
+                let rest = &raw[offset..];
+                let word = rest
+                    .chars()
+                    .next()
+                    .is_some_and(|ch| ch.is_alphanumeric() || ch == '_');
+                let length = if word {
+                    rest.chars()
+                        .take_while(|ch| ch.is_alphanumeric() || *ch == '_')
+                        .map(char::len_utf8)
+                        .sum()
+                } else {
+                    rest.chars().next().map_or(0, char::len_utf8)
+                };
+                let end = error["pos"]["end_offset"]
+                    .as_u64()
+                    .map(|n| n as usize)
+                    .unwrap_or(offset + length)
+                    .min(raw.len());
+                let before = &raw[..offset];
+                error["pos"]["line"] =
+                    serde_json::json!(before.bytes().filter(|ch| *ch == b'\n').count() + 1);
+                error["pos"]["column"] = serde_json::json!(
+                    before
+                        .rsplit('\n')
+                        .next()
+                        .unwrap_or("")
+                        .encode_utf16()
+                        .count()
+                        + 1
+                );
+                error["pos"]["end_offset"] = serde_json::json!(end);
+            }
             return Err(Error {
                 message: String::from_utf8_lossy(&stderr).trim().to_string(),
                 diagnostics: errors,

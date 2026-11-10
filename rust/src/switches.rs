@@ -14,26 +14,49 @@ impl Lower<'_, '_> {
         index: usize,
         hints: &[Option<Hint>],
     ) -> Option<Type> {
-        hints.get(index).and_then(|hint|hint.as_ref()).and_then(|hint|hint.semantic.clone())
-            .or_else(||Some(self.resolver.result_type(self.reference(id),index,&mut HashSet::new())))
+        hints
+            .get(index)
+            .and_then(|hint| hint.as_ref())
+            .and_then(|hint| hint.semantic.clone())
+            .or_else(|| {
+                Some(
+                    self.resolver
+                        .result_type(self.reference(id), index, &mut HashSet::new()),
+                )
+            })
     }
     pub(super) fn temporary_switch<F>(&mut self, id: NodeId, mut arm: F) -> Result<Code>
-    where F: FnMut(&mut Self, NodeId) -> Result<Code> {
-        if let Some(problem) = self.switch_problem(id, 1)? { return Ok(problem); }
+    where
+        F: FnMut(&mut Self, NodeId) -> Result<Code>,
+    {
+        if let Some(problem) = self.switch_problem(id, 1)? {
+            return Ok(problem);
+        }
         let cases = self.cases(id)?;
         if self.source.node(id).kind == "SwitchExpr" {
             let mut branches = HashMap::new();
-            for case in cases { branches.insert(case.result, arm(self, case.result)?); }
+            for case in cases {
+                branches.insert(case.result, arm(self, case.result)?);
+            }
             return self.native_switch(id, &[None], Some(&[]), Some(&branches));
         }
         let validation = self.switch_validation(id)?;
         let mut code = vec![self.g("when ", id), validation, self.g(" {\n", id)];
-        for (index, case) in cases.iter().filter(|case|!case.matches.is_empty())
-            .chain(cases.iter().filter(|case|case.matches.is_empty())).enumerate() {
+        for (index, case) in cases
+            .iter()
+            .filter(|case| !case.matches.is_empty())
+            .chain(cases.iter().filter(|case| case.matches.is_empty()))
+            .enumerate()
+        {
             let condition = self.case_condition(id, case)?;
             let branch = arm(self, case.result)?;
-            code.extend([self.g(if index==0 {"when "} else {"else when "},id), condition,
-                self.g(" {\n", id), branch, self.g("}\n", id)]);
+            code.extend([
+                self.g(if index == 0 { "when " } else { "else when " }, id),
+                condition,
+                self.g(" {\n", id),
+                branch,
+                self.g("}\n", id),
+            ]);
         }
         code.push(self.g("}\n", id));
         Ok(Code::concat(code))
@@ -172,7 +195,9 @@ impl Lower<'_, '_> {
         Ok(None)
     }
     fn compile_case_problem(&mut self, id: NodeId) -> Result<Option<String>> {
-        if let Some(problem)=self.big_compile_case_problem(id){return Ok(Some(problem));}
+        if let Some(problem) = self.big_compile_case_problem(id) {
+            return Ok(Some(problem));
+        }
         let mut keys = HashSet::new();
         let mut intervals: Vec<(i128, i128)> = vec![];
         for case in self.cases(id)? {
@@ -286,7 +311,13 @@ impl Lower<'_, '_> {
         }
     }
     fn switch_validation(&mut self, id: NodeId) -> Result<Code> {
-        if self.source.role(id,"selector").is_some_and(|selector|self.typ(selector).big_name().is_some()){return Ok(self.g("true",id));}
+        if self
+            .source
+            .role(id, "selector")
+            .is_some_and(|selector| self.typ(selector).big_name().is_some())
+        {
+            return Ok(self.g("true", id));
+        }
         let mut operands = vec![];
         for case in self.cases(id)? {
             for operand in case.matches {
@@ -376,7 +407,9 @@ impl Lower<'_, '_> {
         Ok(Code::concat(code))
     }
     fn case_condition(&mut self, id: NodeId, case: &Case) -> Result<Code> {
-        if let Some(selected)=self.big_compile_case(id,&case.matches){return Ok(self.g(if selected{"true"}else{"false"},id));}
+        if let Some(selected) = self.big_compile_case(id, &case.matches) {
+            return Ok(self.g(if selected { "true" } else { "false" }, id));
+        }
         if case.matches.is_empty() {
             return Ok(self.g("true", id));
         }
@@ -650,24 +683,52 @@ impl Lower<'_, '_> {
         } else {
             vec![arm]
         };
-        if self.big_enabled() && (self.big_numeric_results(arm,hints.len()) || hints.iter().flatten().any(|hint|hint.semantic.as_ref().is_some_and(|typ|typ.big_name().is_some()||matches!(typ,Type::Generic)))) {
-            let mut code=vec![];
-            let names=(0..hints.len()).map(|_|self.temporary_name("big_switch")).collect::<Vec<_>>();
-            if values.len()==hints.len(){
-                for((name,value),hint)in names.iter().zip(&values).zip(hints){
-                    code.push(self.g(name,*value));
-                    code.push(self.g(if hint.is_some(){":"}else{":="},*value));
-                    if let Some(hint)=hint{code.extend([hint.code.clone(),self.g("=",*value)]);}
-                    code.extend([self.big_owned(*value,hint.clone(),false)?,self.g("\n",*value)]);
+        if self.big_enabled()
+            && (self.big_numeric_results(arm, hints.len())
+                || hints.iter().flatten().any(|hint| {
+                    hint.semantic
+                        .as_ref()
+                        .is_some_and(|typ| typ.big_name().is_some() || matches!(typ, Type::Generic))
+                }))
+        {
+            let mut code = vec![];
+            let names = (0..hints.len())
+                .map(|_| self.temporary_name("big_switch"))
+                .collect::<Vec<_>>();
+            if values.len() == hints.len() {
+                for ((name, value), hint) in names.iter().zip(&values).zip(hints) {
+                    code.push(self.g(name, *value));
+                    code.push(self.g(if hint.is_some() { ":" } else { ":=" }, *value));
+                    if let Some(hint) = hint {
+                        code.extend([hint.code.clone(), self.g("=", *value)]);
+                    }
+                    code.extend([
+                        self.big_owned(*value, hint.clone(), false)?,
+                        self.g("\n", *value),
+                    ]);
                 }
-            }else{code.extend([self.g(format!("{}:=",names.join(",")),arm),self.render(arm,None,false)?,self.g("\n",arm)]);}
-            if let Some(targets)=targets{
-                let targets=targets.iter().cloned().map(|code|code.finish().text).collect::<Vec<_>>();
-                self.big_commit(id,&targets,&names,&mut code);
-            }else{
-                let module=self.module("big");
-                for(blank,name)in blanks.iter().zip(&names){if *blank{code.push(self.g(format!("{module}.compiler_destroy(&{name})\n"),arm));}}
-                code.push(self.g(format!("return {}",names.join(",")),arm));
+            } else {
+                code.extend([
+                    self.g(format!("{}:=", names.join(",")), arm),
+                    self.render(arm, None, false)?,
+                    self.g("\n", arm),
+                ]);
+            }
+            if let Some(targets) = targets {
+                let targets = targets
+                    .iter()
+                    .cloned()
+                    .map(|code| code.finish().text)
+                    .collect::<Vec<_>>();
+                self.big_commit(id, &targets, &names, &mut code);
+            } else {
+                let module = self.module("big");
+                for (blank, name) in blanks.iter().zip(&names) {
+                    if *blank {
+                        code.push(self.g(format!("{module}.compiler_destroy(&{name})\n"), arm));
+                    }
+                }
+                code.push(self.g(format!("return {}", names.join(",")), arm));
             }
             return Ok(Code::concat(code));
         }
@@ -740,13 +801,29 @@ impl Lower<'_, '_> {
         let selector = self.source.role(id, "selector");
         let missing = !cases.iter().any(|case| case.matches.is_empty());
         let mut code = vec![];
-        let logical_selector=selector.map(|node|self.typ(node)).filter(|typ|typ.big_name().is_some());
-        let selector_code = if let (Some(selector),Some(_))=(selector,logical_selector.as_ref()) {
-            if let Some(problem)=self.big_compile_case_problem(id){return Ok(self.error_token(id,&problem));}
-            let module=self.module("big");
-            let name=format!("{}switch_selector_{}",self.prefix,self.source.node(id).span.start);
-            code.extend([self.g(format!("{name}:="),selector),self.big_owned(selector,None,false)?,self.g(format!("\ndefer {module}.compiler_destroy(&{name})\n"),selector)]);
-            self.g(name,selector)
+        let logical_selector = selector
+            .map(|node| self.typ(node))
+            .filter(|typ| typ.big_name().is_some());
+        let selector_code = if let (Some(selector), Some(_)) = (selector, logical_selector.as_ref())
+        {
+            if let Some(problem) = self.big_compile_case_problem(id) {
+                return Ok(self.error_token(id, &problem));
+            }
+            let module = self.module("big");
+            let name = format!(
+                "{}switch_selector_{}",
+                self.prefix,
+                self.source.node(id).span.start
+            );
+            code.extend([
+                self.g(format!("{name}:="), selector),
+                self.big_owned(selector, None, false)?,
+                self.g(
+                    format!("\ndefer {module}.compiler_destroy(&{name})\n"),
+                    selector,
+                ),
+            ]);
+            self.g(name, selector)
         } else if let Some(selector) = selector {
             self.render(selector, None, false)?
         } else {
@@ -775,23 +852,61 @@ impl Lower<'_, '_> {
             },
             id,
         ));
-        code.extend([if logical_selector.is_some(){self.g("",id)}else{selector_code.clone()}, self.g(" {\n", id)]);
+        code.extend([
+            if logical_selector.is_some() {
+                self.g("", id)
+            } else {
+                selector_code.clone()
+            },
+            self.g(" {\n", id),
+        ]);
         for case in cases {
             code.push(self.g("case ", case.result));
             for (i, operand) in case.matches.iter().enumerate() {
                 if i > 0 {
                     code.push(self.g(", ", *operand));
                 }
-                if let Some(typ)=logical_selector.as_ref(){
-                    let module=self.module("big");
-                    let hint=Hint{constant_literal:false,code:self.g(format!("{module}.{}",typ.big_name().unwrap()),*operand),semantic:Some(typ.clone()),element_only:false,plain_array:false};
-                    let node=self.source.node(*operand);
-                    let value=if node.kind=="Binary"&&matches!(node.op.as_str(),".."|"..<"|"..="){
-                        let low=self.role(*operand,"left")?;let high=self.role(*operand,"right")?;
-                        Code::concat([self.g(format!("{module}.compiler_switch_range("),*operand),selector_code.clone(),self.g(",",*operand),self.big_owned(low,Some(hint.clone()),false)?,self.g(",",*operand),self.big_owned(high,Some(hint),false)?,self.g(format!(",{})",node.op=="..="),*operand)])
-                    }else{Code::concat([self.g(format!("{module}.compiler_switch_case("),*operand),selector_code.clone(),self.g(",",*operand),self.big_owned(*operand,Some(hint),false)?,self.g(")",*operand)])};
-                    code.push(self.gen(value.finish().text,self.source.node(*operand).span,"debug-capture"));
-                }else{code.push(self.render(*operand, None, false)?);}
+                if let Some(typ) = logical_selector.as_ref() {
+                    let module = self.module("big");
+                    let hint = Hint {
+                        constant_literal: false,
+                        code: self.g(format!("{module}.{}", typ.big_name().unwrap()), *operand),
+                        semantic: Some(typ.clone()),
+                        element_only: false,
+                        plain_array: false,
+                    };
+                    let node = self.source.node(*operand);
+                    let value = if node.kind == "Binary"
+                        && matches!(node.op.as_str(), ".." | "..<" | "..=")
+                    {
+                        let low = self.role(*operand, "left")?;
+                        let high = self.role(*operand, "right")?;
+                        Code::concat([
+                            self.g(format!("{module}.compiler_switch_range("), *operand),
+                            selector_code.clone(),
+                            self.g(",", *operand),
+                            self.big_owned(low, Some(hint.clone()), false)?,
+                            self.g(",", *operand),
+                            self.big_owned(high, Some(hint), false)?,
+                            self.g(format!(",{})", node.op == "..="), *operand),
+                        ])
+                    } else {
+                        Code::concat([
+                            self.g(format!("{module}.compiler_switch_case("), *operand),
+                            selector_code.clone(),
+                            self.g(",", *operand),
+                            self.big_owned(*operand, Some(hint), false)?,
+                            self.g(")", *operand),
+                        ])
+                    };
+                    code.push(self.gen(
+                        value.finish().text,
+                        self.source.node(*operand).span,
+                        "debug-capture",
+                    ));
+                } else {
+                    code.push(self.render(*operand, None, false)?);
+                }
             }
             code.push(self.g(": ", case.result));
             if missing && targets.is_some() {
@@ -833,6 +948,22 @@ impl Lower<'_, '_> {
     pub(super) fn switch_expression(
         &mut self,
         id: NodeId,
+        hints: Vec<Option<Hint>>,
+        constant: bool,
+    ) -> Result<Code> {
+        let global = !self.evaluation_mode
+            && !self
+                .source
+                .ancestors(id)
+                .any(|node| self.source.node(node).kind == "Procedure");
+        self.switch_global_context += usize::from(global);
+        let result = self.switch_expression_inner(id, hints, constant);
+        self.switch_global_context -= usize::from(global);
+        result
+    }
+    fn switch_expression_inner(
+        &mut self,
+        id: NodeId,
         mut hints: Vec<Option<Hint>>,
         constant: bool,
     ) -> Result<Code> {
@@ -855,8 +986,9 @@ impl Lower<'_, '_> {
                 let types = self.switch_types(id, &hints)?;
                 let generic = (0..hints.len())
                     .map(|i| {
-                        Some(Hint {constant_literal:false,
-                            semantic: self.switch_hint_semantic(id,i,&hints),
+                        Some(Hint {
+                            constant_literal: false,
+                            semantic: self.switch_hint_semantic(id, i, &hints),
                             code: self.g(format!("{}Result_{i}", self.prefix), id),
                             element_only: false,
                             plain_array: false,
@@ -907,8 +1039,9 @@ impl Lower<'_, '_> {
         let types = self.switch_types(id, &hints)?;
         let generic = (0..hints.len())
             .map(|i| {
-                Some(Hint {constant_literal:false,
-                    semantic: self.switch_hint_semantic(id,i,&hints),
+                Some(Hint {
+                    constant_literal: false,
+                    semantic: self.switch_hint_semantic(id, i, &hints),
                     code: self.g(format!("{}Result_{i}", self.prefix), id),
                     element_only: false,
                     plain_array: false,
@@ -1003,7 +1136,8 @@ impl Lower<'_, '_> {
         let hints = match s.node(id).kind.as_str() {
             "Declaration" => {
                 let hint = if let Some(annotation) = s.role(id, "type") {
-                    Some(Hint {constant_literal:false,
+                    Some(Hint {
+                        constant_literal: false,
                         semantic: Some(self.typ(annotation)),
                         code: self.render(annotation, None, false)?,
                         element_only: false,
@@ -1022,7 +1156,8 @@ impl Lower<'_, '_> {
                     } else {
                         let type_of = self.native("type_of");
                         let value = self.query_value_switch(*lhs)?;
-                        hints.push(Some(Hint {constant_literal:false,
+                        hints.push(Some(Hint {
+                            constant_literal: false,
                             semantic: Some(self.typ(*lhs)),
                             code: Code::concat([
                                 self.g(format!("{type_of}("), *lhs),
@@ -1048,7 +1183,8 @@ impl Lower<'_, '_> {
                         let hint = if let Some(annotation) =
                             annotation.filter(|annotation| annotation.file == self.file)
                         {
-                            Some(Hint {constant_literal:false,
+                            Some(Hint {
+                                constant_literal: false,
                                 semantic: Some(self.typ(annotation.node)),
                                 code: self.render(annotation.node, None, false)?,
                                 element_only: false,
@@ -1073,6 +1209,18 @@ impl Lower<'_, '_> {
         id: NodeId,
         hints: &[Option<Hint>],
     ) -> Result<Code> {
+        self.switch_global_context += 1;
+        let result = self.global_switch_binding_inner(owner, root, id, hints);
+        self.switch_global_context -= 1;
+        result
+    }
+    fn global_switch_binding_inner(
+        &mut self,
+        owner: NodeId,
+        root: NodeId,
+        id: NodeId,
+        hints: &[Option<Hint>],
+    ) -> Result<Code> {
         let count = hints.len();
         let types = self.switch_types(id, hints)?;
         let mut record = vec![self.g("struct{", id)];
@@ -1087,8 +1235,9 @@ impl Lower<'_, '_> {
             let type_of = this.native("type_of");
             let hints = (0..hints.len())
                 .map(|i| {
-                    Some(Hint {constant_literal:false,
-                        semantic: this.switch_hint_semantic(id,i,hints),
+                    Some(Hint {
+                        constant_literal: false,
+                        semantic: this.switch_hint_semantic(id, i, hints),
                         code: this.g(
                             format!("{type_of}({}Result{{}}.value_{i})", this.source.prefix),
                             id,
@@ -1178,8 +1327,15 @@ impl Lower<'_, '_> {
             return Ok(Some(self.error_token(id,"break in a switch expression requires an ordinary = assignment to existing destinations.")));
         }
         if let Some(problem) = self.switch_problem(id, hints.len())? {
-            let global=s.node(owner).kind=="Declaration"&&!s.ancestors(owner).any(|ancestor|s.node(ancestor).kind=="Procedure");
-            return Ok(Some(if global{self.g(format!("#panic({})",json!(problem.finish().text)),id)}else{problem}));
+            let global = s.node(owner).kind == "Declaration"
+                && !s
+                    .ancestors(owner)
+                    .any(|ancestor| s.node(ancestor).kind == "Procedure");
+            return Ok(Some(if global {
+                self.g(format!("#panic({})", json!(problem.finish().text)), id)
+            } else {
+                problem
+            }));
         }
         if s.node(id).kind == "CompileSwitchExpr" && (hints.len() > 1 || skip) {
             let header = s.node(owner).parent.is_some_and(|parent| {
@@ -1263,7 +1419,8 @@ impl Lower<'_, '_> {
                         this.g(format!("{name}^"), *lhs)
                     };
                     let type_of = this.native("type_of");
-                    local_hints.push(Some(Hint {constant_literal:false,
+                    local_hints.push(Some(Hint {
+                        constant_literal: false,
                         semantic: Some(this.typ(*lhs)),
                         code: Code::concat([
                             this.g(format!("{type_of}("), *lhs),

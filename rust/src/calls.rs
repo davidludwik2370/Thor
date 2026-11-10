@@ -77,6 +77,20 @@ impl Resolver<'_> {
         plans
     }
 
+    /// Follow call-site overload selection before falling back to a declared
+    /// procedure value. Ambiguous native calls retain Odin's own diagnostics.
+    pub fn call_signature(&mut self, call: Ref) -> Option<Ref> {
+        let plans = self.call_plans(call, &Substitutions::new());
+        if plans.len() == 1 {
+            return Some(plans[0].signature);
+        }
+        let callee = self.sources[call.file].role(call.node, "callee")?;
+        self.signature(Ref {
+            file: call.file,
+            node: callee,
+        })
+    }
+
     fn plan_calls(&mut self, call: Ref, context: &Substitutions) -> Vec<CallPlan> {
         let source = &self.sources[call.file];
         let Some(callee) = source.role(call.node, "callee") else {

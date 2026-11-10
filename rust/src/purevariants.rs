@@ -20,6 +20,9 @@ impl Lower<'_, '_> {
     }
     fn checked_access(&mut self, target: Ref, site: NodeId) -> Result<Code> {
         let name = self.checked_name(target);
+        self.compiler_access(target,&name,site)
+    }
+    pub(super) fn compiler_access(&mut self,target:Ref,name:&str,site:NodeId)->Result<Code> {
         let owner = &self.resolver.sources[target.file];
         if owner.path.parent() == self.source.path.parent() {
             return Ok(self.g(name, site));

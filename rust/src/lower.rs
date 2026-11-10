@@ -102,6 +102,7 @@ pub struct Lower<'a, 'r> {
     native_access: HashSet<NodeId>,
     address_nodes: HashSet<NodeId>,
     switch_owners: HashSet<NodeId>,
+    switch_global_context: usize,
     switch_replacements: HashMap<NodeId, Code>,
     body_prologues: BTreeMap<NodeId, Vec<Code>>,
     import_paths: BTreeMap<String, String>,
@@ -173,6 +174,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             native_access: HashSet::new(),
             address_nodes: HashSet::new(),
             switch_owners: HashSet::new(),
+            switch_global_context: 0,
             switch_replacements: HashMap::new(),
             body_prologues: BTreeMap::new(),
             import_paths: BTreeMap::new(),
@@ -489,6 +491,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                 })
                 .collect();
             inserts.extend(storage.inserts);
+            for index in 0..self.source.nodes.len() {
+                let call=NodeId(index);
+                if self.source.node(call).kind=="Call" {inserts.extend(self.default_arguments(call)?);}
+            }
             for (declaration, parts) in &self.declaration_helpers {
                 inserts.push((
                     self.source.node(*declaration).span.end,
@@ -587,7 +593,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             {
                 continue;
             }
-            if node.data["pure"] == true && !self.verified_pure.contains(&id) {
+            if node.data["pure"] == true && !self.verified_pure.contains(&id)
+                && self.resolver.active_definition(self.reference(id)) {
                 return Err(self.unsupported(id, "pure-function verification and execution"));
             }
             let evaluated = self.evaluated.contains_key(&id)
@@ -1150,7 +1157,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Ident" {
-            if let Some(symbol) = self.resolver.symbol(self.reference(id)) {
+            if let Some(symbol) = self.capture_variable(id) {
                 for captures in self.captures.iter().rev() {
                     if let Some(code) = captures.get(&symbol) {
                         return Ok(code.clone());
@@ -1485,7 +1492,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 if self.big_owning_child(id,*child) {self.big_owned(*child,hint,con)?} else {self.render(*child, hint, con)?},
             ));
         }
-        let mut inserts = vec![];
+        let mut inserts = if kind=="Call" {self.default_arguments(id)?}else{vec![]};
         if id.0 == 0 {
             let has_flag = self.source.info["file_tags"]
                 .as_array()
@@ -1605,6 +1612,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         needle: Option<NodeId>,
         constant: bool,
     ) -> Result<Code> {
+        let expected=expected.filter(|hint|hint.element_only||!matches!(&hint.semantic,Some(Type::Scalar{name,..}) if name=="any"));
         let elems = self.source.group(id, "elems").to_vec();
         let mut first_rendered = None;
         let mut target = None;
@@ -2023,6 +2031,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         .expansion(&self.source.path, self.source.node(id).span))
     }
     fn has_context(&self, id: NodeId) -> bool {
+        if self.switch_global_context>0{return false;}
         if self.logical.globalizing>0{return true;}
         let owner = self
             .source
@@ -2036,7 +2045,15 @@ impl<'a, 'r> Lower<'a, 'r> {
             .role(owner, "type")
             .and_then(|id| self.source.node(id).data["calling_convention"].as_str())
             .unwrap_or("");
-        matches!(convention, "" | "odin")
+        let convention=if convention=="foreign" {
+            self.source.ancestors(owner).find(|node|self.source.node(*node).kind=="ForeignBlock")
+                .and_then(|block|self.source.node(block).data["calling_convention"].as_str()).unwrap_or("c")
+        } else {convention};
+        if matches!(convention, "" | "odin") {return true;}
+        let scopes=self.source.ancestors(id).filter(|parent|matches!(self.source.node(*parent).kind.as_str(),"Block"|"Case"|"Procedure")).collect::<HashSet<_>>();
+        self.source.nodes.iter().enumerate().any(|(index,node)|node.kind=="Assignment"&&node.span.start<self.source.node(id).span.start
+            &&self.source.group(NodeId(index),"lhs").iter().any(|lhs|self.source.text(*lhs)=="context")
+            &&self.source.ancestors(NodeId(index)).find(|parent|matches!(self.source.node(*parent).kind.as_str(),"Block"|"Case"|"Procedure")).is_some_and(|scope|scopes.contains(&scope)))
     }
     fn source_location(&self, id: NodeId) -> String {
         let owner = self
@@ -2108,16 +2125,14 @@ impl<'a, 'r> Lower<'a, 'r> {
         ))
         .to_string();
         let context = self.has_context(id);
-        let fail = if context {
-            "failure"
-        } else {
-            "failure_contextless"
-        };
-        let extra = if context { ",false" } else { "" };
+        let fail = if context {"failure"} else {"failure_contextless"};
+        let extra = if context {",false"} else {""};
         let mut count = 1;
         if self.source.node(primary).kind == "Call" {
             let callee = self.role(primary, "callee")?;
             if self.source.text(callee) == "#load" {
+                let fail = if owner.is_some() && context { "failure" } else { "failure_contextless" };
+                let extra = if owner.is_some() && context { ",false" } else { "" };
                 let query = self.render(primary, None, false)?;
                 return Ok(Code::concat([
                     self.g("(", id),
@@ -2128,19 +2143,15 @@ impl<'a, 'r> Lower<'a, 'r> {
                     ),
                 ]));
             }
-            if let Some(signature) = self.resolver.signature(self.reference(callee)) {
-                count = self
-                    .resolver
-                    .fields(signature, "results")
-                    .len()
-                    .saturating_sub(1);
-            } else if self.big_constructor_type(primary).is_none() && self.extrema_name(callee, &mut HashSet::new()).is_none()
-                && !matches!(self.source.text(callee), "make" | "new" | "new_clone")
-            {
-                return Err(self.unsupported(
-                    id,
-                    "optional-result signatures from imported/overloaded procedures",
-                ));
+            if let Some(signature) = self.resolver.call_signature(self.reference(primary)) {
+                count = self.resolver.fields(signature, "results").len().saturating_sub(1);
+            }
+            if self.extrema_name(callee, &mut HashSet::new()).is_some() ||
+                self.big_constructor_type(primary).is_some() && self.source.group(primary,"args").iter().any(|arg| {
+                    let value=self.source.role(*arg,"value").unwrap_or(*arg);
+                    self.resolver.type_of(self.reference(value)).is_string()
+                }) {
+                count = 1;
             }
         }
         let mut queries = vec![];
@@ -2201,6 +2212,22 @@ impl<'a, 'r> Lower<'a, 'r> {
         args.extend(queries);
         Ok(self.helper_call(id, &name, args))
     }
+    fn capture_variable(&self,id:NodeId)->Option<usize> {
+        let source=self.source;let node=source.node(id);
+        if node.kind!="Ident" {return None;}
+        if let Some(parent)=node.parent {
+            let p=source.node(parent);
+            if matches!(p.kind.as_str(),"Selector"|"FieldValue")&&source.role(parent,"field")==Some(id)
+                || matches!(p.kind.as_str(),"Declaration"|"Field"|"Range")&&source.group(parent,"names").contains(&id)
+                || matches!(p.kind.as_str(),"PolyType"|"ImplicitSelector") {return None;}
+        }
+        let symbol=self.resolver.symbol(self.reference(id))?;
+        let sym=&self.resolver.symbols[symbol];let owner=&self.resolver.sources[sym.reference.file];
+        if sym.scope.0==0||sym.constant||owner.node(sym.reference.node).kind=="PolyType"
+            ||sym.annotation.is_some_and(|annotation|owner.node(annotation).kind=="TypeidType")
+            ||sym.parameter&&owner.group(sym.reference.node,"names").iter().any(|name|owner.node(*name).kind=="PolyType") {return None;}
+        Some(symbol)
+    }
     fn closed<F>(
         &mut self,
         id: NodeId,
@@ -2229,41 +2256,10 @@ impl<'a, 'r> Lower<'a, 'r> {
         let mut variables = vec![];
         let mut seen = HashSet::new();
         for child in std::iter::once(id).chain(self.source.descendants(id)) {
-            let node = self.source.node(child);
-            if node.kind != "Ident" {
-                continue;
-            }
-            if let Some(parent) = node.parent {
-                let parent_node = self.source.node(parent);
-                if matches!(parent_node.kind.as_str(), "Declaration" | "Field" | "Range")
-                    && self.source.group(parent, "names").contains(&child)
-                    || matches!(parent_node.kind.as_str(), "Selector" | "FieldValue")
-                        && self.source.role(parent, "field") == Some(child)
-                {
-                    continue;
-                }
-            }
-            let Some(symbol) = self.resolver.symbol(self.reference(child)) else {
-                continue;
-            };
-            let sym = &self.resolver.symbols[symbol];
-            let source = &self.resolver.sources[sym.reference.file];
-            if sym.scope.0 == 0
-                || sym.constant
-                || source.node(sym.reference.node).kind == "PolyType"
-                || span.contains(source.node(sym.reference.node).span)
-            {
-                continue;
-            }
-            if sym.annotation.is_some_and(|annotation|source.node(annotation).kind=="TypeidType"){continue;}
-            if sym.parameter
-                && source
-                    .group(sym.reference.node, "names")
-                    .iter()
-                    .any(|name| source.node(*name).kind == "PolyType")
-            {
-                continue;
-            }
+            let Some(symbol)=self.capture_variable(child) else {continue;};
+            let sym=&self.resolver.symbols[symbol];
+            let source=&self.resolver.sources[sym.reference.file];
+            if span.contains(source.node(sym.reference.node).span) {continue;}
             if seen.insert(symbol) {
                 variables.push((symbol, child));
             }

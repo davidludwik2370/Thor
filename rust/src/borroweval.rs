@@ -91,6 +91,12 @@ impl Evaluator<'_, '_, '_> {
         }
         self.builtin_inner(callee, &mut HashSet::new())
     }
+    pub fn approved(&mut self, call: Ref) -> bool {
+        self.role(call, "callee").is_some_and(|callee| {
+            crate::evaluation::approved_library(self.resolver, callee).is_some()
+                || crate::evaluation::primitive(self.resolver, callee)
+        })
+    }
     pub fn clone_library(&self, call: Ref) -> Option<&'static str> {
         let callee = self.role(call, "callee")?;
         ["core:slice", "core:strings"].into_iter().find(|path| {
@@ -516,11 +522,20 @@ impl Evaluator<'_, '_, '_> {
     }
     pub fn copied(&mut self, value: Id, node: Ref) -> Id {
         let typ = self.resolver.type_of(node);
-        if self.resolver.logical_enabled(node.file){
-            if typ.big_name().is_some(){return self.empty();}
-            if typ.is_unknown()&&(self.resolver.logical_fresh(node)||self.resolver.logical_generic_reference(node,&mut HashSet::new())){
-                let copy=self.arena.header_copy(value,typ,Some(node),None,self.resolver);
-                self.arena.values[copy].numeric_copy=true;
+        if self.resolver.logical_enabled(node.file) {
+            if typ.big_name().is_some() {
+                return self.empty();
+            }
+            if typ.is_unknown()
+                && (self.resolver.logical_fresh(node)
+                    || self
+                        .resolver
+                        .logical_generic_reference(node, &mut HashSet::new()))
+            {
+                let copy = self
+                    .arena
+                    .header_copy(value, typ, Some(node), None, self.resolver);
+                self.arena.values[copy].numeric_copy = true;
                 return copy;
             }
         }
@@ -543,20 +558,34 @@ impl Evaluator<'_, '_, '_> {
             _ => value,
         }
     }
-    pub fn borrowed_write(&mut self,node:Ref,env:&mut Environment)->Permission{
-        let mut condition=self.storage(node,env);
-        if self.resolver.logical_enabled(node.file)&&matches!(self.kind(node),"Selector"|"Index"|"Deref"){
-            let value=self.flow(node,env);let borrowed=self.arena.values[value].borrowed.clone();
-            if !borrowed.is_owned(){let typ=self.resolver.type_of(node);
-                if typ.big_name().is_some(){condition=condition.join(&borrowed);}
-                else if typ.is_unknown(){condition=condition.join(&borrowed.meet(&Permission::Type(Trait::Big,node)));}
+    pub fn borrowed_write(&mut self, node: Ref, env: &mut Environment) -> Permission {
+        let mut condition = self.storage(node, env);
+        if self.resolver.logical_enabled(node.file)
+            && matches!(self.kind(node), "Selector" | "Index" | "Deref")
+        {
+            let value = self.flow(node, env);
+            let borrowed = self.arena.values[value].borrowed.clone();
+            if !borrowed.is_owned() {
+                let typ = self.resolver.type_of(node);
+                if typ.big_name().is_some() {
+                    condition = condition.join(&borrowed);
+                } else if typ.is_unknown() {
+                    condition = condition.join(&borrowed.meet(&Permission::Type(Trait::Big, node)));
+                }
             }
         }
         condition
     }
-    pub fn borrowed_consumption(&mut self,node:Ref,env:&mut Environment)->Permission{
-        let value=self.flow(node,env);let provenance=&self.arena.values[value];
-        if provenance.numeric_copy{provenance.borrowed.meet(&Permission::Type(Trait::NotBig,node))}else{provenance.borrowed.clone()}
+    pub fn borrowed_consumption(&mut self, node: Ref, env: &mut Environment) -> Permission {
+        let value = self.flow(node, env);
+        let provenance = &self.arena.values[value];
+        if provenance.numeric_copy {
+            provenance
+                .borrowed
+                .meet(&Permission::Type(Trait::NotBig, node))
+        } else {
+            provenance.borrowed.clone()
+        }
     }
     pub fn storage(&mut self, node: Ref, env: &mut Environment) -> Permission {
         if self.kind(node) == "Paren" {

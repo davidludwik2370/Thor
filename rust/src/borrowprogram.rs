@@ -136,7 +136,7 @@ impl Model {
             ..Emission::default()
         };
         for (proc, nodes) in &self.nodes {
-            let eval = Evaluator {
+            let mut eval = Evaluator {
                 resolver,
                 arena: &mut self.arena,
             };
@@ -151,7 +151,7 @@ impl Model {
                     return true;
                 }
                 eval.builtin(*node).is_some()
-                    || eval.clone_library(*node).is_some()
+                    || eval.approved(*node)
                     || eval
                         .role(*node, "callee")
                         .is_some_and(|callee| eval.resolver.denotes_type(callee))
@@ -225,7 +225,7 @@ impl Model {
             if model.nodes.contains_key(&proc) {
                 continue;
             }
-            let eval = Evaluator {
+            let mut eval = Evaluator {
                 resolver,
                 arena: &mut model.arena,
             };
@@ -288,7 +288,7 @@ impl Model {
                 if eval.kind(*node) != "Call"
                     || eval.queried(*node)
                     || eval.builtin(*node).is_some()
-                    || eval.clone_library(*node).is_some()
+                    || eval.approved(*node)
                     || eval.io_call(*node)
                     || eval
                         .role(*node, "callee")
@@ -726,7 +726,7 @@ impl Model {
                             .or_else(|| eval.argument(*node, "m", 0))
                     };
                     if let Some(target) = target {
-                        permission=permission.join(&eval.borrowed_consumption(target,env));
+                        permission = permission.join(&eval.borrowed_consumption(target, env));
                     }
                 }
                 if !permission.is_owned() {
