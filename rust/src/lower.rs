@@ -48,6 +48,7 @@ mod temporaries;
 #[derive(Clone, Debug)]
 pub struct Hint {
     pub code: Code,
+    pub semantic: Option<Type>,
     pub element_only: bool,
     pub plain_array: bool,
 }
@@ -1209,6 +1210,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             "Declaration" => {
                 let hint = if let Some(annotation) = self.source.role(id, "type") {
                     Some(Hint {
+                        semantic: Some(self.typ(annotation)),
                         code: self.render(annotation, None, false)?,
                         element_only: false,
                         plain_array: self.source.node(annotation).kind == "ArrayType",
@@ -1233,6 +1235,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         None
                     } else {
                         Some(Hint {
+                            semantic: Some(self.typ(*lhs)),
                             code: Code::concat([
                                 self.g(format!("{type_of}("), id),
                                 left,
@@ -1255,6 +1258,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         value,
                         (
                             Some(Hint {
+                                semantic: Some(self.typ(annotation)),
                                 code,
                                 element_only: false,
                                 plain_array: self.source.node(annotation).kind == "ArrayType",
@@ -1307,6 +1311,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                                     *value,
                                     (
                                         Some(Hint {
+                                            semantic: Some(self.typ(annotation.node)),
                                             code,
                                             element_only: false,
                                             plain_array: self.source.node(annotation.node).kind
@@ -1348,7 +1353,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         } else {
                             i
                         };
-                        if let Some((_, Some(_annotation))) = params.get(index) {
+                        if let Some((_, Some(annotation))) = params.get(index) {
                             let unit = &self.resolver.sources[signature.file];
                             if unit
                                 .descendants(signature.node)
@@ -1374,6 +1379,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                                 *arg,
                                 (
                                     Some(Hint {
+                                        semantic: Some(self.resolver.specialized_type(*annotation, &Default::default())),
                                         code,
                                         element_only: false,
                                         plain_array: false,
@@ -1584,7 +1590,15 @@ impl<'a, 'r> Lower<'a, 'r> {
                 ));
             }
         };
+        let semantic = expected.as_ref().and_then(|hint| {
+            if hint.element_only { hint.semantic.clone() }
+            else { hint.semantic.as_ref().and_then(|typ|typ.element().cloned()) }
+        }).or_else(|| {
+            needle.filter(|needle| !self.typ(*needle).untyped())
+                .or_else(||elems.first().copied()).or(needle).map(|anchor|self.typ(anchor).defaulted())
+        });
         let hint = Hint {
+            semantic,
             code: element.clone(),
             element_only: false,
             plain_array: false,
@@ -1822,6 +1836,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         self.meta = true;
         let mut parts = vec![self.g(format!("{}meta.concatenate(", self.prefix), id)];
         let mut hint = expected.map(|hint| Hint {
+            semantic: hint.semantic.as_ref().and_then(|typ|typ.element().cloned()),
             code: Code::concat([
                 self.g(format!("{}meta.type_elem_type(", self.prefix), id),
                 hint.code,
@@ -1883,6 +1898,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         ])
                     };
                     hint = Some(Hint {
+                        semantic: None,
                         code,
                         element_only: true,
                         plain_array: false,

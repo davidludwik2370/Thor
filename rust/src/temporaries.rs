@@ -81,6 +81,7 @@ impl Lower<'_, '_> {
     }
     fn temporary_hint(&self, code: Code) -> Hint {
         Hint {
+            semantic: None,
             code,
             element_only: false,
             plain_array: false,
@@ -208,12 +209,13 @@ impl Lower<'_, '_> {
         code: &mut Vec<Code>,
         hint: Option<Hint>,
     ) -> Result<Temporary> {
-        let hint = if let Some(hint) = hint {
+        let mut hint = if let Some(hint) = hint {
             hint
         } else {
             let typ = self.native_type(id)?;
             self.temporary_hint(typ)
         };
+        if hint.semantic.is_none() { hint.semantic=Some(self.typ(id)); }
         let value = self.temporary_name("selected");
         let owned = self.temporary_name("selected_flag");
         code.extend([

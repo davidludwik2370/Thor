@@ -261,6 +261,7 @@ impl Lower<'_, '_> {
                 &format!("Duplicate comprehension binding: {}", s.text(names[1])),
             ));
         }
+        let semantic = expected.as_ref().and_then(|hint|hint.semantic.clone()).unwrap_or_else(||self.typ(id));
         let target = self.comp_target(id, expected)?;
         let module = self.module("comprehension");
         self.meta = true;
@@ -297,12 +298,12 @@ impl Lower<'_, '_> {
             }else if kind=="map"{
                 let key=key.ok_or_else(||Error::new("map key omitted"))?;let key_name=format!("{builder}_key");let value_name=format!("{builder}_value");
                 let kt=this.g(format!("{type_of}({module}.first({builder}))"),key);let vt=this.g(format!("{type_of}({module}.second({builder}))"),output);
-                let k=this.render(key,Some(Hint{code:kt.clone(),element_only:false,plain_array:false}),false)?;
-                let v=this.render(output,Some(Hint{code:vt.clone(),element_only:false,plain_array:false}),false)?;
+                let k=this.render(key,Some(Hint{semantic:match &semantic{Type::Map{key,..}=>Some(*key.clone()),_=>Some(Type::Generic)},code:kt.clone(),element_only:false,plain_array:false}),false)?;
+                let v=this.render(output,Some(Hint{semantic:match &semantic{Type::Map{value,..}=>Some(*value.clone()),_=>Some(Type::Generic)},code:vt.clone(),element_only:false,plain_array:false}),false)?;
                 emitted.extend([this.g(format!("{key_name}: "),key),kt,this.g(" = ",key),k,this.g(format!("\n{value_name}: "),output),vt,this.g(" = ",output),v,this.g("\n",output),insert(this,this.g(value_name,output),Some(this.g(key_name,key)))]);
             }else{
                 let element=if kind=="set"{let sets=this.module("sets");this.g(format!("{type_of}({sets}.element_witness({builder}))"),output)}else{this.g(element,output)};
-                let value=this.render(output,Some(Hint{code:element,element_only:false,plain_array:false}),false)?;emitted.push(insert(this,value,None));
+                let value=this.render(output,Some(Hint{semantic:semantic.element().cloned().or(Some(Type::Generic)),code:element,element_only:false,plain_array:false}),false)?;emitted.push(insert(this,value,None));
             }
             let mut emitted=Code::concat(emitted);
             if let Some(condition)=s.role(id,"cond"){let condition=this.render(condition,None,false)?;emitted=Code::concat([this.g("if ",id),condition,this.g(" {\n",id),emitted,this.g("\n}",id)]);}

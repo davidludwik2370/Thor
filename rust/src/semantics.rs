@@ -1510,7 +1510,7 @@ impl<'a> Resolver<'a> {
             _ => Type::Unknown,
         }
     }
-    fn result_type(&mut self, r: Ref, index: usize, seen: &mut HashSet<Ref>) -> Type {
+    pub(crate) fn result_type(&mut self, r: Ref, index: usize, seen: &mut HashSet<Ref>) -> Type {
         self.specialized_value_result(r, index, &Substitutions::new(), seen)
     }
     pub fn constant_int(&self, r: Ref) -> Option<i128> {

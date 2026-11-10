@@ -117,6 +117,21 @@ comparisons. All 29 Rust unit tests passed in debug and release, and Clippy
 passed with warnings denied. Python remains the supported default; this is a
 checkpoint within the remaining logical-number port.
 
+### Semantic context for owned literals
+
+Lowering hints now carry the semantic expected type alongside the native Odin
+type expression. Explicit declarations, assignments, results, parameter witnesses,
+array/concatenation elements, set literals, comprehension builders and switch
+result slots preserve that context. This metadata lets the numeric lowerer
+recognize explicit logical/generic contexts without treating ordinary native
+literals as allocating logical numbers. Runtime constructors and ownership
+lowering are still being ported.
+
+All 113 compiler/generic/concatenation/native-execution/assertion-hygiene checks
+passed after this change. All 29 Rust unit tests passed in debug and release;
+Clippy passed with warnings denied. These changes do not enable the unfinished
+numeric lowerer or change the supported-default Python engine.
+
 ### Parity-first resolution work
 
 The resolver now follows the reference's `using` lookup and storage-protection

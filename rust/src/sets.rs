@@ -48,6 +48,7 @@ impl Lower<'_, '_> {
                         self.g("){}))", id),
                     ]);
                     let hint = Hint {
+                        semantic: self.typ(annotation).element().cloned(),
                         code: element.clone(),
                         element_only: false,
                         plain_array: false,

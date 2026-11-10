@@ -178,7 +178,12 @@ impl Lower<'_, '_> {
             code.push(self.g(")", id));
         }
         code.push(self.g("{}.value)", id));
+        let bindings = self.resolver.parameter_witnesses.get(&hint.annotation)
+            .map(|witness|witness.used.iter().map(|(name,_)|name.clone()).zip(hint.values.clone()).collect())
+            .unwrap_or_default();
+        let semantic = Some(self.resolver.specialized_type(hint.annotation,&bindings));
         Some(Hint {
+            semantic,
             code: Code::concat(code),
             element_only: false,
             plain_array: hint.plain_array,

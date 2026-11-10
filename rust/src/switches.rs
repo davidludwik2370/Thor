@@ -8,6 +8,15 @@ struct Case {
     result: NodeId,
 }
 impl Lower<'_, '_> {
+    fn switch_hint_semantic(
+        &mut self,
+        id: NodeId,
+        index: usize,
+        hints: &[Option<Hint>],
+    ) -> Option<Type> {
+        hints.get(index).and_then(|hint|hint.as_ref()).and_then(|hint|hint.semantic.clone())
+            .or_else(||Some(self.resolver.result_type(self.reference(id),index,&mut HashSet::new())))
+    }
     pub(super) fn temporary_switch<F>(&mut self, id: NodeId, mut arm: F) -> Result<Code>
     where F: FnMut(&mut Self, NodeId) -> Result<Code> {
         if let Some(problem) = self.switch_problem(id, 1)? { return Ok(problem); }
@@ -807,6 +816,7 @@ impl Lower<'_, '_> {
                 let generic = (0..hints.len())
                     .map(|i| {
                         Some(Hint {
+                            semantic: self.switch_hint_semantic(id,i,&hints),
                             code: self.g(format!("{}Result_{i}", self.prefix), id),
                             element_only: false,
                             plain_array: false,
@@ -858,6 +868,7 @@ impl Lower<'_, '_> {
         let generic = (0..hints.len())
             .map(|i| {
                 Some(Hint {
+                    semantic: self.switch_hint_semantic(id,i,&hints),
                     code: self.g(format!("{}Result_{i}", self.prefix), id),
                     element_only: false,
                     plain_array: false,
@@ -953,6 +964,7 @@ impl Lower<'_, '_> {
             "Declaration" => {
                 let hint = if let Some(annotation) = s.role(id, "type") {
                     Some(Hint {
+                        semantic: Some(self.typ(annotation)),
                         code: self.render(annotation, None, false)?,
                         element_only: false,
                         plain_array: s.node(annotation).kind == "ArrayType",
@@ -971,6 +983,7 @@ impl Lower<'_, '_> {
                         let type_of = self.native("type_of");
                         let value = self.query_value_switch(*lhs)?;
                         hints.push(Some(Hint {
+                            semantic: Some(self.typ(*lhs)),
                             code: Code::concat([
                                 self.g(format!("{type_of}("), *lhs),
                                 value,
@@ -996,6 +1009,7 @@ impl Lower<'_, '_> {
                             annotation.filter(|annotation| annotation.file == self.file)
                         {
                             Some(Hint {
+                                semantic: Some(self.typ(annotation.node)),
                                 code: self.render(annotation.node, None, false)?,
                                 element_only: false,
                                 plain_array: false,
@@ -1034,6 +1048,7 @@ impl Lower<'_, '_> {
             let hints = (0..hints.len())
                 .map(|i| {
                     Some(Hint {
+                        semantic: this.switch_hint_semantic(id,i,hints),
                         code: this.g(
                             format!("{type_of}({}Result{{}}.value_{i})", this.source.prefix),
                             id,
@@ -1208,6 +1223,7 @@ impl Lower<'_, '_> {
                     };
                     let type_of = this.native("type_of");
                     local_hints.push(Some(Hint {
+                        semantic: Some(this.typ(*lhs)),
                         code: Code::concat([
                             this.g(format!("{type_of}("), *lhs),
                             value.clone(),

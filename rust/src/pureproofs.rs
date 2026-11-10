@@ -140,6 +140,7 @@ impl Lower<'_, '_> {
                         ]);
                     }
                     expected = Some(Hint {
+                        semantic: None,
                         code,
                         element_only: false,
                         plain_array: false,
@@ -169,6 +170,7 @@ impl Lower<'_, '_> {
                         let expression = self.render(other, None, constant)?;
                         let query = self.native("type_of");
                         expected = Some(Hint {
+                            semantic: None,
                             code: Code::concat([
                                 self.g(format!("{query}("), id),
                                 expression,
@@ -198,6 +200,7 @@ impl Lower<'_, '_> {
                     })
                 {
                     expected = Some(Hint {
+                        semantic: None,
                         code: self.g("bool", id),
                         element_only: false,
                         plain_array: false,
@@ -229,6 +232,7 @@ impl Lower<'_, '_> {
                             self.meta = true;
                             if let Some(field) = field {
                                 expected = Some(Hint {
+                                    semantic: None,
                                     code: Code::concat([
                                         self.g(format!("{}meta.type_field_type(", self.prefix), id),
                                         typ_code,
@@ -245,6 +249,7 @@ impl Lower<'_, '_> {
                                     | Type::Fixed { .. }
                             ) {
                                 expected = Some(Hint {
+                                    semantic: None,
                                     code: Code::concat([
                                         self.g(format!("{}meta.type_elem_type(", self.prefix), id),
                                         typ_code,
@@ -273,6 +278,7 @@ impl Lower<'_, '_> {
                     let query = self.native("type_of");
                     self.meta = true;
                     expected = Some(Hint {
+                        semantic: None,
                         code: Code::concat([
                             self.g(format!("{}meta.type_elem_type({query}((", self.prefix), id),
                             expression,
