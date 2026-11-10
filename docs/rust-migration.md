@@ -134,6 +134,14 @@ numeric lowerer or change the supported-default Python engine.
 
 ### Parity-first resolution work
 
+The expression-coercion predicate now follows the reference's syntax-sensitive
+rules, including untyped comparison results, shift counts, both arithmetic
+operands, conditional arms and constant container lengths. Array membership
+uses that predicate when selecting its element type. The focused resolution,
+compiler, numeric, membership and assertion-hygiene gate passed all 117 tests;
+debug and release unit tests and Clippy also passed. This supplies the same
+coercion decisions to the remaining logical-number lowerer.
+
 The resolver now follows the reference's `using` lookup and storage-protection
 decisions. Promoted names retain their containing record's type and storage
 origin, including nested `using`, parameter projections, local initializer

@@ -8,7 +8,7 @@ from tests import test_rust_big_values as numeric
 class RustBigResolutionTests(unittest.TestCase):
     setUpClass=classmethod(numeric.RustBigValueTests.setUpClass.__func__)
 
-    def compare(self,body,prefix='',files=None):
+    def compare(self,body,prefix='',files=None,untyped_only=False):
         with tempfile.TemporaryDirectory(prefix='thor-big-resolution-') as directory:
             source=Path(directory).resolve()/'main.thor'
             source.write_text('package main\n'+prefix+'\ninspect::proc(){\n'+body+'\n}\n')
@@ -28,11 +28,16 @@ class RustBigResolutionTests(unittest.TestCase):
                 label,arg=node.group('args')
                 is_type=arg.source.denotes_type(arg)
                 typ=resolver.type_node(arg) if is_type else resolver.type_of(arg)
-                expected[json.loads(label.text)]=dict(shape=shape(typ),type_operand=is_type)
+                expected[json.loads(label.text)]=dict(shape=shape(typ),type_operand=is_type,untyped_operand=resolver.membership_untyped(arg))
             result=subprocess.run([numeric.BINARY],input=json.dumps(dict(operation='resolve',file=str(source)))+'\n',capture_output=True,text=True,timeout=60)
             self.assertEqual(result.returncode,0,result.stderr)
             packet=json.loads(result.stdout)
-            self.assertEqual(packet,dict(ok=expected))
+            if untyped_only:
+                expected={name:value['untyped_operand'] for name,value in expected.items()}
+                self.assertIn('ok',packet,packet)
+                self.assertEqual({name:value['untyped_operand'] for name,value in packet['ok'].items()},expected)
+            else:
+                self.assertEqual(packet,dict(ok=expected))
             return expected
 
     def test_predefined_aliases_arrays_values_and_rational_properties(self):
@@ -102,6 +107,21 @@ import "thor:big"
 integer::proc()->big.Integer{return {}}
 rational::proc()->big.Rational{return {}}
 '''})
+
+    def test_operand_coercion_checks_syntax_and_both_arithmetic_operands(self):
+        result=self.compare('''typed:=1;count:=uint(2);text:="text";pair:Pair
+N::1
+query("comparison",typed==1);query("left_typed",typed+1);query("right_typed",1+typed)
+query("constant",N+1);query("shift",1<<count);query("typed_shift",u8(1)<<count)
+query("min",min(N,2));query("clamp",clamp(N,0,2))
+query("array_len",len([1,2]));query("literal_len",len("text"));query("runtime_len",len(text))
+query("conditional",(typed==1)?1:2);query("nil",nil)
+query("nominal_len",len(pair))
+''',prefix='Pair::distinct [2]int\n',untyped_only=True)
+        for name in ['comparison','constant','shift','min','clamp','array_len','literal_len','conditional','nil','nominal_len']:
+            self.assertTrue(result[name])
+        for name in ['left_typed','right_typed','typed_shift','runtime_len']:
+            self.assertFalse(result[name])
 
 
 if __name__=='__main__':unittest.main()

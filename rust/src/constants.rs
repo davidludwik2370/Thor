@@ -1,5 +1,112 @@
 //! Compile-time arguments carry values, rather than just their scalar types.
 use super::*;
+impl Resolver<'_> {
+    pub fn untyped_operand(&mut self, r: Ref) -> bool {
+        self.untyped_operand_at(r, &mut HashSet::new())
+    }
+    fn untyped_operand_at(&mut self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
+        if !seen.insert(r) {
+            return false;
+        }
+        let source = &self.sources[r.file];
+        let node = source.node(r.node);
+        let child = |role: &str| {
+            source
+                .role(r.node, role)
+                .map(|node| Ref { file: r.file, node })
+        };
+        if node.kind == "Paren" {
+            return child("expr").is_none_or(|child| self.untyped_operand_at(child, seen));
+        }
+        if node.kind == "ImplicitSelector" || source.text(r.node) == "nil" {
+            return true;
+        }
+        if let Some(symbol) = self.symbol(r).map(|index| self.symbols[index].clone()) {
+            if self.sources[symbol.reference.file]
+                .node(symbol.reference.node)
+                .kind
+                == "Declaration"
+            {
+                if symbol.annotation.is_some() || !symbol.constant {
+                    return false;
+                }
+                return symbol.value.is_none_or(|node| {
+                    self.untyped_operand_at(
+                        Ref {
+                            file: symbol.reference.file,
+                            node,
+                        },
+                        seen,
+                    )
+                });
+            }
+        }
+        if node.kind == "Binary" {
+            if matches!(node.op.as_str(), "==" | "!=" | "<" | ">" | "<=" | ">=") {
+                return true;
+            }
+            if !matches!(node.op.as_str(), "in" | "not_in") {
+                let roles = if matches!(node.op.as_str(), "<<" | ">>") {
+                    ["left"].as_slice()
+                } else {
+                    ["left", "right"].as_slice()
+                };
+                return roles.iter().all(|role| {
+                    child(role)
+                        .is_none_or(|child| self.untyped_operand_at(child, &mut seen.clone()))
+                });
+            }
+        }
+        if node.kind == "Unary" && matches!(node.op.as_str(), "+" | "-" | "~" | "!") {
+            return child("expr").is_none_or(|child| self.untyped_operand_at(child, seen));
+        }
+        if matches!(node.kind.as_str(), "Ternary" | "WhenExpr") {
+            return ["x", "y"].iter().all(|role| {
+                child(role).is_none_or(|child| self.untyped_operand_at(child, &mut seen.clone()))
+            });
+        }
+        if node.kind == "Call" {
+            let builtin = crate::purity::builtin_call(self, r);
+            let args = source.group(r.node, "args");
+            match builtin.as_deref() {
+                Some("size_of" | "align_of" | "offset_of") => return true,
+                Some(
+                    "min" | "max" | "abs" | "clamp" | "complex" | "quaternion" | "real" | "imag"
+                    | "jmag" | "kmag" | "conj",
+                ) => {
+                    return args.iter().all(|node| {
+                        self.untyped_operand_at(
+                            Ref {
+                                file: r.file,
+                                node: *node,
+                            },
+                            &mut seen.clone(),
+                        )
+                    })
+                }
+                Some("len" | "cap") if !args.is_empty() => {
+                    let arg = Ref {
+                        file: r.file,
+                        node: args[0],
+                    };
+                    let typ = self.type_of(arg);
+                    let mut base = &typ;
+                    while let Type::Nominal(_, inner) = base {
+                        base = inner;
+                    }
+                    if matches!(base, Type::Array { .. }) {
+                        return true;
+                    }
+                    if typ.is_string() {
+                        return !self.runtime_operand(arg);
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.type_of(r).untyped()
+    }
+}
 impl Type {
     /// Floating/complex constant coercion is authoritative in Odin. In
     /// particular, an integer source packet is not its rounded formal value.

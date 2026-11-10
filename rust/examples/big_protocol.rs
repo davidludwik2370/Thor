@@ -79,7 +79,7 @@ fn resolve(request: &Value) -> bigvalues::Result<Value> {
             let typ = resolver.specialized_type(at, &Default::default());
             out.insert(
                 label,
-                json!({"shape":shape(&typ),"type_operand":resolver.denotes_type(at)}),
+                json!({"shape":shape(&typ),"type_operand":resolver.denotes_type(at),"untyped_operand":resolver.untyped_operand(at)}),
             );
         }
     }

@@ -1568,7 +1568,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         } else {
             let anchor = needle
-                .filter(|needle| !self.typ(*needle).untyped())
+                .filter(|needle| !self.resolver.untyped_operand(self.reference(*needle)))
                 .or_else(|| elems.first().copied())
                 .or(needle);
             if let Some(anchor) = anchor {
@@ -1594,7 +1594,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             if hint.element_only { hint.semantic.clone() }
             else { hint.semantic.as_ref().and_then(|typ|typ.element().cloned()) }
         }).or_else(|| {
-            needle.filter(|needle| !self.typ(*needle).untyped())
+            needle.filter(|needle| !self.resolver.untyped_operand(self.reference(*needle)))
                 .or_else(||elems.first().copied()).or(needle).map(|anchor|self.typ(anchor).defaulted())
         });
         let hint = Hint {

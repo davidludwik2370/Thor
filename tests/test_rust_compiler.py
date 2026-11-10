@@ -469,6 +469,15 @@ fmt.println("clean")
     def test_set_temporary_query_matches_reference(self):
         self.compare(self.program('if len(set[int]{1,2})!=2{panic("temporary query")}'))
 
+    def test_comparison_shift_and_nil_needles_use_the_container_element_type(self):
+        source=self.program('''n:=2;truth:=b8(true);count:=uint(2);value:=u8(4);pointer:^int
+if !((n==2) in [truth]){panic("comparison context")}
+if !((1<<count) in [value]){panic("shift context")}
+if nil not_in [pointer]{panic("nil context")}
+''')
+        for flags in [[],UNCHECKED]:
+            with self.subTest(flags=flags):self.compare(source,flags=flags)
+
     def test_immutable_inline_storage_rejected(self):
         self.compare(self.program('values :> [1,2]; values[0]=3'), command='check',
                      fail="Cannot write immutable storage 'values'")
