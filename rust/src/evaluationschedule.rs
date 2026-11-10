@@ -5,6 +5,8 @@ use crate::specialization::{Binding, Bindings, Cases, EvaluatedCase, Specializat
 use crate::{project::Project, semantics::Substitutions};
 use serde_json::Value;
 use std::time::Duration;
+#[path = "evaluationcall.rs"]
+mod call;
 #[path = "evaluationinteger.rs"]
 mod integer;
 #[path = "evaluationspecialize.rs"]
@@ -25,13 +27,15 @@ pub struct Scheduler<'p> {
     guard_busy: BTreeSet<(Ref, String)>,
     explicit_arguments: usize,
     has_pure: bool,
+    schedule_generics: bool,
+    work_sources: Option<BTreeSet<usize>>,
     timeout: Duration,
 }
 impl<'p> Scheduler<'p> {
     pub fn new(project: &'p Project, timeout: Duration) -> Self {
         let mut resolver = Resolver::with_flags(&project.sources, &project.options.flags);
         resolver.prepare_contexts();
-        Self {
+        let mut this = Self {
             project,
             resolver,
             results: BTreeMap::new(),
@@ -49,7 +53,51 @@ impl<'p> Scheduler<'p> {
                 .sources
                 .iter()
                 .any(|source| source.nodes.iter().any(|node| node.data["pure"] == true)),
+            schedule_generics: false,
+            work_sources: None,
             timeout,
+        };
+        this.prepare_work_sources();
+        this
+    }
+    fn prepare_work_sources(&mut self) {
+        self.schedule_generics = self.has_pure;
+        if self.has_pure {
+            return;
+        }
+        let mut sources = BTreeSet::new();
+        for (file, source) in self.project.sources.iter().enumerate() {
+            for (index, ast) in source.nodes.iter().enumerate() {
+                let node = Ref {
+                    file,
+                    node: NodeId(index),
+                };
+                let request = ast.kind == "Run"
+                    || ast.kind == "Binary" && ast.op == "**"
+                    || ast.kind == "Comprehension" && self.constant_context(node);
+                if !request {
+                    continue;
+                }
+                sources.insert(file);
+                if source.ancestors(node.node).any(|owner| {
+                    let kind = source.node(owner).kind.as_str();
+                    kind == "Procedure"
+                        && !crate::specialization::parameters(
+                            Ref { file, node: owner },
+                            &self.resolver,
+                        )
+                        .is_empty()
+                        || kind == "StructType"
+                            && source
+                                .role(owner, "params")
+                                .is_some_and(|params| !source.node(params).children.is_empty())
+                }) {
+                    self.schedule_generics = true;
+                }
+            }
+        }
+        if !self.schedule_generics {
+            self.work_sources = Some(sources);
         }
     }
     fn source(&self, node: Ref) -> &'p crate::ast::Source {
@@ -474,6 +522,29 @@ impl<'p> Scheduler<'p> {
                 let callee = self.role(node, "callee").unwrap_or(node);
                 let mut args = self.group(node, "args");
                 let builtin = self.builtin(node);
+                if self.explicit_allocator(node) {
+                    return Ok(false);
+                }
+                let library = approved_library(&self.resolver, callee);
+                if library
+                    .as_ref()
+                    .is_some_and(|(path, _)| path == "thor:format")
+                {
+                    if let Some(arg) = args.first().copied() {
+                        let arg = if self.kind(arg) == "FieldValue" {
+                            self.role(arg, "value").unwrap_or(arg)
+                        } else {
+                            arg
+                        };
+                        let typ = self.resolver.type_of(arg);
+                        if !matches!(
+                            typ,
+                            Type::Scalar { .. } | Type::Enum(_) | Type::String { .. }
+                        ) {
+                            return Ok(false);
+                        }
+                    }
+                }
                 if builtin.as_deref() == Some("make") {
                     let typ = args
                         .first()
@@ -488,12 +559,7 @@ impl<'p> Scheduler<'p> {
                         return Ok(false);
                     }
                 }
-                let clone = ["core:slice", "core:strings"].iter().any(|path| {
-                    self.resolver.library_alias_member(callee, path).as_deref() == Some("clone")
-                });
-                if clone && args.len() > 1 {
-                    return Ok(false);
-                }
+                let approved = library.is_some() || primitive(&mut self.resolver, callee);
                 if self.resolver.denotes_type(callee) {
                     let typ = self
                         .resolver
@@ -508,10 +574,20 @@ impl<'p> Scheduler<'p> {
                     args.remove(0);
                 }
                 let targets = self.resolver.call_plans(node, &Substitutions::new());
+                let direct = self.resolver.symbol(callee).is_none_or(|index| {
+                    let symbol = &self.resolver.symbols[index];
+                    symbol.constant && !symbol.immutable && !symbol.parameter && !symbol.result
+                });
+                let eligible = direct
+                    && !targets.is_empty()
+                    && targets.iter().all(|plan| {
+                        self.kind(plan.procedure) == "Procedure"
+                            && self.role(plan.procedure, "body").is_some()
+                    });
                 if builtin.is_none()
-                    && !clone
+                    && !approved
                     && !self.resolver.denotes_type(callee)
-                    && targets.is_empty()
+                    && !eligible
                 {
                     return Ok(false);
                 }
@@ -540,6 +616,13 @@ impl<'p> Scheduler<'p> {
                     .unwrap_or(Ok(false))
             }
             "Compound" | "Interpolation" | "SwitchResults" => {
+                if ast.kind == "Compound"
+                    && self.role(node, "type").is_some_and(|typ| {
+                        source_location_dependent(&self.resolver, typ, &mut HashSet::new())
+                    })
+                {
+                    return Ok(false);
+                }
                 let group = if ast.kind == "Compound" {
                     "elems"
                 } else {
@@ -956,17 +1039,40 @@ impl<'p> Scheduler<'p> {
         }
         if self.kind(call) == "Call" {
             let callee = self.role(call, "callee").unwrap_or(call);
+            let io = FlowEvaluator {
+                resolver: &mut self.resolver,
+                arena: &mut Arena::default(),
+            }
+            .io_call(call);
+            if io {
+                return Err(self.fail(node, self.io_message(call)));
+            }
             let plans = self.resolver.call_plans(call, &Substitutions::new());
             let builtin = self.builtin(call);
-            let approved = ["core:slice", "core:strings"].iter().any(|path| {
-                self.resolver.library_alias_member(callee, path).as_deref() == Some("clone")
+            let approved = approved_library(&self.resolver, callee).is_some()
+                || primitive(&mut self.resolver, callee);
+            let direct = self.resolver.symbol(callee).is_none_or(|index| {
+                let symbol = &self.resolver.symbols[index];
+                symbol.constant && !symbol.immutable && !symbol.parameter && !symbol.result
             });
-            if plans.is_empty()
-                && builtin.is_none()
-                && !approved
-                && !self.resolver.denotes_type(callee)
-            {
+            let targets = direct
+                && plans.iter().any(|plan| {
+                    self.kind(plan.procedure) == "Procedure"
+                        && self.role(plan.procedure, "body").is_some()
+                });
+            if !targets && builtin.is_none() && !approved {
+                if library_origin(&self.resolver, callee)
+                    .is_some_and(|(path, _)| path == "base:intrinsics")
+                {
+                    return Err(self.fail(node,format!("#run cannot evaluate compiler intrinsic '{}': it is not an eligible pure operation.",self.source(callee).text(callee.node))));
+                }
+                if library_origin(&self.resolver, callee).is_some() {
+                    return Err(self.fail(node,format!("#run cannot verify '{}': no eligible procedure body is available; foreign and unresolved implementations are not eligible.",self.source(callee).text(callee.node))));
+                }
                 return Err(self.fail(node,"#run requires a resolved direct call; indirect and foreign calls are not eligible."));
+            }
+            if self.explicit_allocator(call) {
+                return Err(self.fail(call,"Compile-time calls cannot select an allocator; use the evaluation scratch allocator."));
             }
             if self.kind(node) == "Run" {
                 if let [plan] = plans.as_slice() {
@@ -1038,7 +1144,13 @@ impl<'p> Scheduler<'p> {
     }
     pub fn evaluate_all(&mut self) -> Result<()> {
         for (file, source) in self.project.sources.iter().enumerate() {
-            if source.shared_native || source.excluded {
+            if source.shared_native
+                || source.excluded
+                || self
+                    .work_sources
+                    .as_ref()
+                    .is_some_and(|sources| !sources.contains(&file))
+            {
                 continue;
             }
             for index in 0..source.nodes.len() {

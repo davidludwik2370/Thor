@@ -18,6 +18,10 @@ mod schedule;
 pub use schedule::Scheduler;
 #[path = "evaluationbridge.rs"]
 mod bridge;
+#[path = "evaluationeligibility.rs"]
+mod eligibility;
+pub(crate) use eligibility::{approved_library, explicit_allocator};
+use eligibility::{library_origin, primitive, source_location_dependent};
 /// Borrowed evaluator state used by one isolated helper. Native helper creation
 /// snapshots the selected inputs; the scheduler retains its own registries.
 pub struct Context<'a> {
@@ -535,51 +539,6 @@ impl<'a, 'r> Extraction<'a, 'r> {
         }
         .io_call(node)
     }
-    fn approved(&self, callee: Ref) -> Option<(String, String)> {
-        for (path, names) in [
-            ("core:slice", &["clone"][..]),
-            ("core:strings", &["clone"][..]),
-            (
-                "thor:format",
-                &[
-                    "format",
-                    "format_plain",
-                    "format_options",
-                    "format_spec",
-                    "group_integer",
-                ][..],
-            ),
-            (
-                "thor:big",
-                &[
-                    "from_integer",
-                    "rational_from_integer",
-                    "fraction",
-                    "parse_integer",
-                    "parse_rational",
-                    "parse_fraction",
-                    "clone",
-                    "numerator",
-                    "denominator",
-                    "to_string",
-                    "equal",
-                    "is_zero",
-                    "sum",
-                    "ascending",
-                    "descending",
-                ][..],
-            ),
-        ] {
-            if let Some(name) = self
-                .r
-                .library_alias_member(callee, path)
-                .filter(|name| names.contains(&name.as_str()))
-            {
-                return Some((path.into(), name));
-            }
-        }
-        None
-    }
     fn import_alias(&self, import: Ref) -> Option<String> {
         let source = &self.r.sources[import.file];
         let node = source.node(import.node);
@@ -859,7 +818,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
                 }
                 return Ok(());
             }
-            if let Some(library) = self.approved(callee) {
+            if let Some(library) = approved_library(self.r, callee) {
                 self.graph.external.insert(callee, library);
                 for arg in self.group(node, "args") {
                     self.visit(arg)?;

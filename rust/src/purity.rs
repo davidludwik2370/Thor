@@ -8,6 +8,10 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 #[path = "pureintrinsics.rs"]
 mod pureintrinsics;
+pub(crate) use pureintrinsics::llvm_primitive;
+pub(crate) fn intrinsic_allowed(name: &str) -> bool {
+    Purity::intrinsic_allowed(name)
+}
 
 #[derive(Clone, Debug)]
 pub struct Fault {
@@ -593,21 +597,8 @@ impl<'a, 'r> Purity<'a, 'r> {
                     );
                 }
             }
-        } else if ["core:slice", "core:strings"]
-            .iter()
-            .any(|path| self.r.library_alias_member(callee, path).as_deref() == Some("clone"))
-        {
-            let allocator = args.iter().any(|arg| {
-                self.kind(*arg) == "FieldValue"
-                    && self
-                        .role(*arg, "field")
-                        .is_some_and(|field| self.text(field) == "allocator")
-            }) || args
-                .iter()
-                .filter(|arg| self.kind(**arg) != "FieldValue")
-                .count()
-                > 1;
-            if allocator {
+        } else if crate::evaluation::approved_library(self.r, callee).is_some() {
+            if crate::evaluation::explicit_allocator(self.r, call) {
                 self.fault(root, call, via, "Pure code cannot select an allocator.");
             }
         } else {

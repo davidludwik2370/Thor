@@ -492,6 +492,39 @@ is recorded as a backend failure, not a clean combined gate. All 27 Rust units
 pass in debug and release, Clippy passes with warnings denied, and all seven
 assertion-hygiene checks pass.
 
+### Compile-time call eligibility
+
+Extraction, argument readiness and checked calls now share reviewed library
+identities and allocator-selection rules. The shared Thor formatter and big-number
+library identities are tied to their installed source directories; native
+libraries remain tied to their genuine SDK collection. Constant aliases preserve
+that identity, while collection overrides and local look-alikes do not acquire a
+reviewed contract. LLVM primitive recognition is shared with purity checking.
+
+Explicit `#run` entries reject I/O before result-count or argument-readiness
+errors, identify disallowed compiler intrinsics and imported bodyless calls, and
+reject indirect runtime procedure values. Ordinary scalar/enum parameters named
+`allocator` remain ordinary parameters. Real allocator selection retains the
+reference scratch-allocator diagnostic. Nested known arguments and source-location
+dependent compound types follow the same readiness rules as the reference.
+
+The scheduler also follows Python's source-work and generic-traversal gates.
+Projects without automatic pure-function work visit only sources containing
+evaluation requests, unless a request requires traversing user generic bodies.
+An isolated formatter test exposed the omitted gate in debug Rust; the same case
+now completes in checked debug and release harnesses. This is the existing
+reference scheduling policy, not a new evaluation or ownership rule.
+
+The combined eligibility/scheduling/execution/extraction gate passed 109 of 110
+tests. One new collection-override fixture omitted required support packages;
+the corrected fixture and the clean 22-test eligibility group passed separately.
+All 36 neighboring purity/ownership checks pass. All 27 Rust units pass in debug
+and release, Clippy passes with warnings denied, and assertion hygiene passes
+seven checks.
+The final five-case indirection/primitive gate also passes, including two added
+tests that distinguish a mutable primitive alias and an indirect nested argument
+from their eligible direct-call counterparts.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

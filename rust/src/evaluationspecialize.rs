@@ -85,7 +85,7 @@ impl Scheduler<'_> {
         }
     }
     pub(super) fn process_specialization(&mut self, call: Ref) -> Result<()> {
-        if self.unbound_generic(call) {
+        if !self.schedule_generics || self.unbound_generic(call) {
             return Ok(());
         }
         let plans = self.resolver.call_plans(call, &Substitutions::new());

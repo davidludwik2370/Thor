@@ -4,75 +4,7 @@ use super::*;
 
 impl Purity<'_, '_> {
     pub(super) fn llvm_primitive(&self, candidate: Ref) -> bool {
-        let source = &self.r.sources[candidate.file];
-        let Some(root) = source.info["odin_root"].as_str() else {
-            return false;
-        };
-        let root = std::path::Path::new(root);
-        if !["base", "core", "vendor"]
-            .iter()
-            .any(|dir| source.path.starts_with(root.join(dir)))
-        {
-            return false;
-        }
-        let Some(foreign) = source
-            .ancestors(candidate.node)
-            .find(|id| source.node(*id).kind == "ForeignBlock")
-        else {
-            return false;
-        };
-        if source.node(foreign).data["calling_convention"] != "none" {
-            return false;
-        }
-        let Some(declaration) = source
-            .node(candidate.node)
-            .parent
-            .filter(|id| source.node(*id).kind == "Declaration")
-        else {
-            return false;
-        };
-        self.r
-            .attributes(Ref {
-                file: candidate.file,
-                node: declaration,
-            })
-            .iter()
-            .any(|(name, value)| {
-                if name != "link_name" {
-                    return false;
-                }
-                let Some(link) =
-                    value.and_then(|value| crate::lower::unquote(self.text(value)).ok())
-                else {
-                    return false;
-                };
-                let Some((operation, float)) = link
-                    .strip_prefix("llvm.")
-                    .and_then(|name| name.rsplit_once('.'))
-                else {
-                    return false;
-                };
-                [
-                    "sin",
-                    "cos",
-                    "pow",
-                    "exp",
-                    "exp2",
-                    "log",
-                    "log2",
-                    "log10",
-                    "fmuladd",
-                    "fma",
-                    "sqrt",
-                    "floor",
-                    "ceil",
-                    "trunc",
-                    "round",
-                    "roundeven",
-                ]
-                .contains(&operation)
-                    && ["f16", "f32", "f64"].contains(&float)
-            })
+        llvm_primitive(self.r, candidate)
     }
     pub(super) fn intrinsic_name(&self, callee: Ref, seen: &mut HashSet<Ref>) -> Option<String> {
         if !seen.insert(callee) {
@@ -104,6 +36,77 @@ impl Purity<'_, '_> {
             || name.starts_with("type_is_")
             || name.starts_with("type_has_")
     }
+}
+
+pub(crate) fn llvm_primitive(r: &Resolver<'_>, candidate: Ref) -> bool {
+    let source = &r.sources[candidate.file];
+    let Some(root) = source.info["odin_root"].as_str() else {
+        return false;
+    };
+    let root = std::path::Path::new(root);
+    if !["base", "core", "vendor"]
+        .iter()
+        .any(|dir| source.path.starts_with(root.join(dir)))
+    {
+        return false;
+    }
+    let Some(foreign) = source
+        .ancestors(candidate.node)
+        .find(|id| source.node(*id).kind == "ForeignBlock")
+    else {
+        return false;
+    };
+    if source.node(foreign).data["calling_convention"] != "none" {
+        return false;
+    }
+    let Some(declaration) = source
+        .node(candidate.node)
+        .parent
+        .filter(|id| source.node(*id).kind == "Declaration")
+    else {
+        return false;
+    };
+    r.attributes(Ref {
+        file: candidate.file,
+        node: declaration,
+    })
+    .iter()
+    .any(|(name, value)| {
+        if name != "link_name" {
+            return false;
+        }
+        let Some(link) = value
+            .and_then(|value| crate::lower::unquote(r.sources[value.file].text(value.node)).ok())
+        else {
+            return false;
+        };
+        let Some((operation, float)) = link
+            .strip_prefix("llvm.")
+            .and_then(|name| name.rsplit_once('.'))
+        else {
+            return false;
+        };
+        [
+            "sin",
+            "cos",
+            "pow",
+            "exp",
+            "exp2",
+            "log",
+            "log2",
+            "log10",
+            "fmuladd",
+            "fma",
+            "sqrt",
+            "floor",
+            "ceil",
+            "trunc",
+            "round",
+            "roundeven",
+        ]
+        .contains(&operation)
+            && ["f16", "f32", "f64"].contains(&float)
+    })
 }
 
 const SCALAR: &[&str] = &[
