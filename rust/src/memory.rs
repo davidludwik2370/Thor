@@ -42,7 +42,7 @@ impl Memory {
             .iter()
             .find_map(|flag| flag.strip_prefix("-build-mode:"))
             .unwrap_or("exe");
-        let executable = matches!(command, "build" | "run" | "test")
+        let executable = matches!(command, "build" | "run" | "test" | "publish")
             && matches!(mode, "exe" | "test")
             && !flags.iter().any(|flag| flag == "-no-entry-point");
         let tracking = if requested == "auto" {

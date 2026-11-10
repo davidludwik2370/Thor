@@ -386,6 +386,36 @@ in debug and release; Clippy passed with warnings denied. Transaction tests cove
 replacement failure, rollback, concurrent changes, permissions and cleanup.
 Publishing, remaining migration guards and whole-language acceptance continue.
 
+### Native application publishing
+
+Rust now implements publishing policy, TOML configuration, additive project
+resources, PNG/ICO normalization, platform icon containers and native dependency
+relocation. macOS packages preserve framework links and sign copied dependencies;
+Windows packages inspect regular/delayed PE imports; Linux packages retain their
+relocatable launcher, library paths and explicit desktop installer. Managed
+replacement uses an isolated payload directory and preserves prior output on
+compilation/package failures. Console launching remains an explicit app choice.
+
+Publishing shares native lowering, compile-time helpers, source diagnostics,
+tracking and debug-symbol packaging. Diagnostic warnings and later errors produce
+one JSON packet. The normal build path does not read publishing configuration.
+`thor:app` uses the source directory in development and the packaged layout when
+published. Foreign import assets use per-source collection aliases, matching the
+reference and preserving library paths containing spaces without editing inputs.
+
+The combined publishing/reference/compiler/CLI/TLS-metadata/debug-map/scaffolding/
+vet/assertion-hygiene gate passed 197 tests with two existing opt-in Finder-launch
+checks skipped. Portable comparisons cover 36 policy/flag cases, twelve icon
+pixel/container cases, eighteen dependency cases and sixteen package/replacement
+cases. Real macOS tests move applications away from sources, preserve arguments,
+load libraries/plugins/frameworks and run tracked debug and unchecked release
+builds. All 34 Rust unit tests passed in debug and release; Clippy with warnings
+denied passed. Windows/Linux host execution and live DAP acceptance remain outstanding; format
+and controlled-tool comparisons do not substitute for those platform checks.
+Three final CLI checks also passed for toolchain-first validation, publishing
+TLS metadata, combined warning/error packets and relocated #run applications.
+The native path never invokes Python; the Python engine remains the default.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

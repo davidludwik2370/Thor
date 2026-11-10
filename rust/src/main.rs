@@ -74,9 +74,9 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         println!(
             "{}",
             json!({"engine":"rust","complete":false,"python_fallback":false,"parallel_lowering":false,
-            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","multiple-value or_panic","runtime collection comprehensions","runtime expanded extrema","slice privileges and contextual mutation summaries","generic inline defaults","macOS allocation tracking and ASan source locations","editor source overlays","TLS slice metadata","native project creation","verified vet findings and source corrections","runtime pure contracts, checked ordinary callees and scalar/sequence/record/union result ownership"],
+            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","multiple-value or_panic","runtime collection comprehensions","runtime expanded extrema","slice privileges and contextual mutation summaries","generic inline defaults","macOS allocation tracking and ASan source locations","editor source overlays","TLS slice metadata","native project creation","verified vet findings and source corrections","application publishing, icons and native dependency relocation","runtime pure contracts, checked ordinary callees and scalar/sequence/record/union result ownership"],
             "evaluation":{"isolated_native_helpers":true,"generic_frames":true,"scalar_and_aggregate_results":true,"contents_cache":true,"prepared_scalar_cache":true,"verified_scalar_sites":true,"compile_time_comprehensions":true,"big_number_results":true},
-            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","remaining pure function and SDK interactions","full interpolation ownership","complete switch/using/callback interactions","full Set temporary ownership","complete optional-result arities","wildcard imports","full live debugger acceptance","publishing","whole-language acceptance"]})
+            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","remaining pure function and SDK interactions","full interpolation ownership","complete switch/using/callback interactions","full Set temporary ownership","complete optional-result arities","wildcard imports","full live debugger acceptance","whole-language acceptance"]})
         );
         return Ok(0);
     }
@@ -86,13 +86,13 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             .take_while(|arg| arg.as_str() != "--")
             .any(|arg| arg == "--help" || arg == "-h")
     {
-        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|vet|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --clear-cache        Clear managed parser/evaluation cache entries\n  --cache-report       Print compile-time cache counters\n  --run-timeout SEC    Native compile-time execution limit (default 5)\n  --raw-diagnostics    Show original Odin diagnostics\n  --vet[=CHECKS]       Check immutable,pure conventions\n  --apply | --ask      Apply or confirm verified vet corrections\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
+        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|vet|publish|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --clear-cache        Clear managed parser/evaluation cache entries\n  --cache-report       Print compile-time cache counters\n  --run-timeout SEC    Native compile-time execution limit (default 5)\n  --raw-diagnostics    Show original Odin diagnostics\n  --vet[=CHECKS]       Check immutable,pure conventions\n  --apply | --ask      Apply or confirm verified vet corrections\n  --app-name NAME      Published application name\n  --app-type TYPE      gui (default) or console\n  --app-icon PATH      Project PNG/ICO icon\n  --app-resource PATH  Include another project resource (repeatable)\n  --app-library PATH   Bundle a native plugin/library (repeatable)\n  --app-id ID          Reverse-domain application identifier\n  --app-version VER    Published version (default 0.1.0)\n  --publish-dir PATH   Published package destination\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
         return Ok(0);
     }
     let command = args.remove(0);
     if !matches!(
         command.as_str(),
-        "transpile" | "check" | "build" | "run" | "test" | "vet" | "ast"
+        "transpile" | "check" | "build" | "run" | "test" | "vet" | "publish" | "ast"
     ) {
         return Err(Error::new(format!(
             "Rust migration: command '{command}' has not been ported yet"
@@ -120,6 +120,14 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                 | "--overlay"
                 | "--run-timeout"
                 | "--track-allocations"
+                | "--app-name"
+                | "--app-id"
+                | "--app-version"
+                | "--app-icon"
+                | "--app-type"
+                | "--app-resource"
+                | "--app-library"
+                | "--publish-dir"
         ) {
             skip = true;
             continue;
@@ -162,6 +170,8 @@ fn run(mut args: Vec<String>) -> Result<i32> {
     if let Some(root) = env::var_os("THOR_ROOT") {
         options.root = absolute(&PathBuf::from(root))?;
     }
+    let mut publishing = thor_compiler::publishing::Options::default();
+    let mut packaging_options = false;
     let mut expanded = vec![];
     for argument in args {
         if let Some((flag, value)) = argument.split_once('=') {
@@ -174,6 +184,14 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                     | "--overlay"
                     | "--run-timeout"
                     | "--track-allocations"
+                    | "--app-name"
+                    | "--app-id"
+                    | "--app-version"
+                    | "--app-icon"
+                    | "--app-type"
+                    | "--app-resource"
+                    | "--app-library"
+                    | "--publish-dir"
             ) {
                 expanded.extend([flag.to_string(), value.to_string()]);
                 continue;
@@ -184,6 +202,29 @@ fn run(mut args: Vec<String>) -> Result<i32> {
     let mut args = expanded.into_iter();
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--app-name" | "--app-id" | "--app-version" | "--app-icon" | "--app-type"
+            | "--app-resource" | "--app-library" | "--publish-dir" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| Error::usage(format!("{argument} requires a value")))?;
+                packaging_options = true;
+                match argument.as_str() {
+                    "--app-name" => publishing.name = Some(value),
+                    "--app-id" => publishing.identifier = Some(value),
+                    "--app-version" => publishing.version = Some(value),
+                    "--app-icon" => publishing.icon = Some(value),
+                    "--app-type" => {
+                        if !matches!(value.as_str(), "gui" | "console") {
+                            return Err(Error::usage("--app-type: choose gui or console"));
+                        }
+                        publishing.app_type = Some(value);
+                    }
+                    "--app-resource" => publishing.resources.push(value),
+                    "--app-library" => publishing.libraries.push(value),
+                    "--publish-dir" => publishing.directory = Some(PathBuf::from(value)),
+                    _ => unreachable!(),
+                }
+            }
             "--" => {
                 options.args = args.collect();
                 break;
@@ -328,6 +369,14 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         return Err(Error::usage(
             "Thor vet requires mapped diagnostics without --raw-diagnostics",
         ));
+    }
+    if packaging_options && options.command != "publish" {
+        return Err(Error::usage(
+            "application packaging options are only supported by thor publish",
+        ));
+    }
+    if options.command == "publish" {
+        return thor_compiler::publishing::run(options, publishing);
     }
     let mut project = Project::new(options)?;
     if project.options.command == "ast" {

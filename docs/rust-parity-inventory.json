@@ -462,7 +462,7 @@
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Project creation, ordinary compilation, verified vetting/corrections, cache/time-limit controls, raw/mapped diagnostics and runtime argument separation are connected. Finish publishing command orchestration and whole-language acceptance."
+      "remaining": "Command orchestration includes native publishing, project creation, verified vetting/corrections, cache/time-limit controls, raw/mapped diagnostics and runtime argument separation. Complete whole-language/platform acceptance."
     },
     {
       "python": "thorlang/hygiene.py",
@@ -507,19 +507,26 @@
     },
     {
       "python": "thorlang/publish_deps.py",
-      "rust": [],
+      "rust": [
+        "rust/src/publishing/deps.rs"
+      ],
       "checkpoint": 7,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 14,
-      "remaining": "Port published dependency handling."
+      "remaining": "Native Mach-O closure/framework signing and portable PE/DLL/Linux controlled comparisons are implemented. Windows/Linux host acceptance remains."
     },
     {
       "python": "thorlang/publishing.py",
-      "rust": [],
+      "rust": [
+        "rust/src/publishing.rs",
+        "rust/src/publishing/package.rs",
+        "rust/src/publishing/policy.rs",
+        "rust/src/publishing/icons.rs"
+      ],
       "checkpoint": 7,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 15,
-      "remaining": "Port publishing command."
+      "remaining": "Native policy, image normalization, package assembly, atomic managed replacement and CLI diagnostics are connected. Complete integration gate and whole-language/platform acceptance."
     },
     {
       "python": "thorlang/sourcemap.py",

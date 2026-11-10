@@ -229,6 +229,9 @@ impl Project {
             }
         }
         Ok(Self {
+            publish_layout: None,
+            native_override: None,
+            collected_diagnostics: None,
             options: Options {
                 command: "build".into(),
                 entry,
@@ -389,9 +392,17 @@ impl Project {
             .args(&flags)
             .arg(format!("-out:{}", executable.display()))
             .arg("-json-errors");
-        if !flags.iter().any(|flag|flag.starts_with("-max-error-count:")) { command.arg("-max-error-count:1000"); }
-        let built =
-            helper.run_backend(&mut command, |command|capture(command, timeout.max(Duration::from_secs(30)))).map_err(|error| {
+        if !flags
+            .iter()
+            .any(|flag| flag.starts_with("-max-error-count:"))
+        {
+            command.arg("-max-error-count:1000");
+        }
+        let built = helper
+            .run_backend(&mut command, |command| {
+                capture(command, timeout.max(Duration::from_secs(30)))
+            })
+            .map_err(|error| {
                 fail(format!(
                     "{label} could not start the helper compiler: {error}"
                 ))
@@ -505,8 +516,7 @@ impl Project {
         }
         let value =
             crate::values::decode(&result.stdout).map_err(|error| fail(error.to_string()))?;
-        crate::values::validate(&value)
-            .map_err(|error| fail(error.to_string()))?;
+        crate::values::validate(&value).map_err(|error| fail(error.to_string()))?;
         if let Some(cache) = &mut cache {
             if key.is_some() {
                 let current = cache.key(

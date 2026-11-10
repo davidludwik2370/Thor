@@ -32,3 +32,5 @@ pub mod values;
 pub mod vet;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub mod publishing;

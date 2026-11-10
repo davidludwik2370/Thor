@@ -728,6 +728,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         Ok(())
     }
     fn resources(&mut self) -> Result<()> {
+        let (_,foreign_paths)=foreign_assets(self.source);
         for (i, node) in self.source.nodes.iter().enumerate() {
             let id = NodeId(i);
             let paths = if node.kind == "ForeignImport" {
@@ -754,6 +755,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                     continue;
                 }
                 let path = unquote(self.source.text(literal))?;
+                if node.kind=="ForeignImport" {
+                    if let Some(path)=foreign_paths.get(&literal){let span=self.source.node(literal).span;self.edits.push((span,self.gen(json!(path).to_string(),span,"resource")));}
+                    continue;
+                }
                 let path = if let Some((collection, suffix)) = path.split_once(':') {
                     self.source
                         .collection_roots
@@ -2812,4 +2817,25 @@ pub fn unquote(text: &str) -> Result<String> {
         return Ok(text[1..text.len() - 1].into());
     }
     serde_json::from_str(text).map_err(|_| Error::new(format!("unsupported path literal: {text}")))
+}
+
+/// Preserve native foreign path syntax through per-source collection aliases.
+/// Absolute paths and unknown collections (system:/framework:) stay native.
+pub(crate) fn foreign_assets(source:&Source)->(BTreeMap<String,std::path::PathBuf>,BTreeMap<NodeId,String>){
+    let mut collections:BTreeMap<String,std::path::PathBuf>=BTreeMap::new();let mut paths=BTreeMap::new();
+    for (index,node) in source.nodes.iter().enumerate(){if node.kind!="ForeignImport"{continue;}
+        for literal in source.group(NodeId(index),"paths"){
+            let Ok(mut path)=unquote(source.text(*literal))else{continue;};
+            let mut base=source.path.parent().unwrap().to_path_buf();
+            if let Some((collection,relative))=path.split_once(':'){
+                let Some(root)=source.collection_roots.get(collection)else{continue;};base=root.clone();path=relative.into();
+            }
+            if std::path::Path::new(&path).is_absolute(){continue;}
+            let alias=collections.iter().find(|(_,directory)|**directory==base).map(|(name,_)|name.clone()).unwrap_or_else(||{
+                let alias=format!("{}assets_{}",source.prefix,collections.len());collections.insert(alias.clone(),base);alias
+            });
+            paths.insert(*literal,format!("{alias}:{path}"));
+        }
+    }
+    (collections,paths)
 }

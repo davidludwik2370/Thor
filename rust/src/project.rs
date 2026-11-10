@@ -55,6 +55,9 @@ pub struct Options {
     pub vet_ask: bool,
 }
 pub struct Project {
+    pub publish_layout: Option<String>,
+    pub native_override: Option<Vec<String>>,
+    pub collected_diagnostics: Option<std::cell::RefCell<Vec<Value>>>,
     pub options: Options,
     pub frontend: Frontend,
     pub sources: Vec<Source>,
@@ -172,12 +175,24 @@ impl Project {
             });
         if options.clear_cache {
             crate::evaluationcache::EvaluationCache::new(&cache, true).clear();
-            if let Ok(entries)=fs::read_dir(cache.join("rust-parse-v1")) {
+            if let Ok(entries) = fs::read_dir(cache.join("rust-parse-v1")) {
                 for entry in entries.flatten() {
-                    let path=entry.path();
-                    if entry.file_type().is_ok_and(|kind|kind.is_file()) && path.extension().is_some_and(|extension|extension=="json")
-                        && path.file_stem().and_then(|name|name.to_str()).is_some_and(|name|name.len()==64 && name.bytes().all(|c|c.is_ascii_hexdigit() && !c.is_ascii_uppercase())) {
-                        let _=fs::remove_file(path);
+                    let path = entry.path();
+                    if entry.file_type().is_ok_and(|kind| kind.is_file())
+                        && path
+                            .extension()
+                            .is_some_and(|extension| extension == "json")
+                        && path
+                            .file_stem()
+                            .and_then(|name| name.to_str())
+                            .is_some_and(|name| {
+                                name.len() == 64
+                                    && name
+                                        .bytes()
+                                        .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+                            })
+                    {
+                        let _ = fs::remove_file(path);
                     }
                 }
             }
@@ -227,6 +242,9 @@ impl Project {
                 .join(&frontend.project_name)
         }))?;
         let mut project = Self {
+            publish_layout: None,
+            native_override: None,
+            collected_diagnostics: None,
             memory: crate::memory::Memory::select(
                 &options.command,
                 &options.flags,
@@ -265,6 +283,16 @@ impl Project {
                 "no .thor or .odin sources found: {}",
                 entry.display()
             )));
+        }
+        if project.sources.iter().any(|source| {
+            source.path.parent() == Some(project.options.root.join("runtime/app").as_path())
+        }) && project.options.flags.iter().any(|flag| {
+            flag.starts_with("-define:THOR_APP_SOURCE_ROOT=")
+                || flag.starts_with("-define:THOR_APP_LAYOUT=")
+        }) {
+            return Err(Error::new(
+                "THOR_APP_SOURCE_ROOT and THOR_APP_LAYOUT are reserved for thor:app.",
+            ));
         }
         for source in &project.sources {
             if source.shared_native {
@@ -366,8 +394,11 @@ impl Project {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
         }
         crate::lower::prime_logical_constants(&mut resolver);
-        let mut privileges =
-            crate::privileges::Privileges::analyze_editor(&mut resolver, &self.options.flags, self.options.editor_info);
+        let mut privileges = crate::privileges::Privileges::analyze_editor(
+            &mut resolver,
+            &self.options.flags,
+            self.options.editor_info,
+        );
         self.editor_info = privileges.editor_info.clone();
         let purity = if let Some(plan) = &self.evaluation {
             if plan.requests.is_empty() {
@@ -743,10 +774,14 @@ impl Project {
             .collect();
         let mut manifest = json!({"thor_version":VERSION,"engine":"rust","migration_complete":false,"entry":self.options.entry,"source_map_version":1,"debug_map_version":1,
             "generated":generated,"odin_flags":self.native_flags(),"odin_environment":self.native_environment,"debug_roots":[],"shared_maps":[]});
-        if self.options.flags.iter().any(|flag|flag=="-debug") {
+        if self.options.flags.iter().any(|flag| flag == "-debug") {
             let mut roots = vec![self.options.root.join("runtime")];
-            if let Some(root) = self.sources.iter().find_map(|source| source.info["odin_root"].as_str()) {
-                roots.extend(["base","core","vendor"].map(|name|Path::new(root).join(name)));
+            if let Some(root) = self
+                .sources
+                .iter()
+                .find_map(|source| source.info["odin_root"].as_str())
+            {
+                roots.extend(["base", "core", "vendor"].map(|name| Path::new(root).join(name)));
             }
             manifest["debug_roots"] = json!(roots);
         }
@@ -986,7 +1021,7 @@ impl Project {
         }
         Ok(())
     }
-    fn native_flags(&self) -> Vec<String> {
+    pub(crate) fn native_flags(&self) -> Vec<String> {
         let mut result = vec![];
         result.extend(self.memory.extra.iter().cloned());
         for flag in &self.options.flags {
@@ -1004,6 +1039,21 @@ impl Project {
             };
             result.push(format!("-collection:{name}={}", base.display()));
         }
+        for source in &self.sources{for (name,directory) in crate::lower::foreign_assets(source).0 {result.push(format!("-collection:{name}={}",directory.display()));}}
+        if self.sources.iter().any(|source| {
+            source.path.parent() == Some(self.options.root.join("runtime/app").as_path())
+        }) {
+            if let Some(layout) = &self.publish_layout {
+                result.push(format!("-define:THOR_APP_LAYOUT={layout}"));
+            } else {
+                let root = if self.file_entry {
+                    self.options.entry.parent().unwrap()
+                } else {
+                    &self.options.entry
+                };
+                result.push(format!("-define:THOR_APP_SOURCE_ROOT={}", root.display()));
+            }
+        }
         result
     }
     pub fn compile(&mut self, target: &Path) -> Result<i32> {
@@ -1012,7 +1062,9 @@ impl Project {
         let mut command = Command::new(&self.frontend.odin);
         command.envs(&self.native_environment);
         command
-            .arg(if action=="vet" { "check" } else if matches!(action, "run" | "test") {
+            .arg(if action == "vet" {
+                "check"
+            } else if matches!(action, "run" | "test" | "publish") {
                 "build"
             } else {
                 action
@@ -1021,11 +1073,15 @@ impl Project {
         if self.file_entry {
             command.arg("-file");
         }
-        command.args(self.native_flags());
-        if !self.options.raw_diagnostics { command.arg("-json-errors"); }
-        let explicit = self
-            .options
-            .flags
+        let effective_flags = self
+            .native_override
+            .clone()
+            .unwrap_or_else(|| self.native_flags());
+        command.args(&effective_flags);
+        if !self.options.raw_diagnostics {
+            command.arg("-json-errors");
+        }
+        let explicit = effective_flags
             .iter()
             .find_map(|flag| flag.strip_prefix("-out:"));
         let binary = if let Some(path) = explicit {
@@ -1054,34 +1110,69 @@ impl Project {
         if action == "test" {
             command.arg("-build-mode:test");
         }
-        if !self.options.raw_diagnostics && !self.options.flags.iter().any(|flag|flag.starts_with("-max-error-count:")) { command.arg("-max-error-count:1000"); }
+        if !self.options.raw_diagnostics
+            && !self
+                .options
+                .flags
+                .iter()
+                .any(|flag| flag.starts_with("-max-error-count:"))
+        {
+            command.arg("-max-error-count:1000");
+        }
         let output = if self.options.raw_diagnostics {
-            let status=command.stdout(Stdio::inherit()).stderr(Stdio::inherit()).status()?;
-            evaluationexec::Captured{status,stdout:vec![],stderr:vec![],timed_out:false,oversized:false}
-        } else { self.run_backend(&mut command, |command| {
-            let output=command.output()?;
-            Ok(evaluationexec::Captured{status:output.status,stdout:output.stdout,stderr:output.stderr,timed_out:false,oversized:false})
-        })? };
-        let mut backend_status=output.status.code().unwrap_or(1);
+            let status = command
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()?;
+            evaluationexec::Captured {
+                status,
+                stdout: vec![],
+                stderr: vec![],
+                timed_out: false,
+                oversized: false,
+            }
+        } else {
+            self.run_backend(&mut command, |command| {
+                let output = command.output()?;
+                Ok(evaluationexec::Captured {
+                    status: output.status,
+                    stdout: output.stdout,
+                    stderr: output.stderr,
+                    timed_out: false,
+                    oversized: false,
+                })
+            })?
+        };
+        let mut backend_status = output.status.code().unwrap_or(1);
         let mut errors = if output.status.code().is_none() {
             #[cfg(unix)]
-            let number={use std::os::unix::process::ExitStatusExt;output.status.signal().unwrap_or(0)};
+            let number = {
+                use std::os::unix::process::ExitStatusExt;
+                output.status.signal().unwrap_or(0)
+            };
             #[cfg(not(unix))]
-            let number=0;
-            backend_status=128+number;
-            let display=output.status.to_string();
-            let fallback=number.to_string();
-            let name=display.rsplit_once('(').and_then(|(_,suffix)|suffix.strip_suffix(')')).unwrap_or(&fallback);
+            let number = 0;
+            backend_status = 128 + number;
+            let display = output.status.to_string();
+            let fallback = number.to_string();
+            let name = display
+                .rsplit_once('(')
+                .and_then(|(_, suffix)| suffix.strip_suffix(')'))
+                .unwrap_or(&fallback);
             let mut messages=vec![format!("Odin compiler terminated by {name} (signal {number}). This is a backend compiler failure; no source location was provided.")];
-            if !output.stderr.is_empty(){messages.push(String::from_utf8_lossy(&output.stderr).trim().to_string());}
+            if !output.stderr.is_empty() {
+                messages.push(String::from_utf8_lossy(&output.stderr).trim().to_string());
+            }
             vec![json!({"type":"error","stage":"toolchain","pos":null,"msgs":messages})]
         } else if output.stderr.is_empty() {
             vec![]
-        } else if let Ok(packet)=serde_json::from_slice::<Value>(&output.stderr) {
+        } else if let Ok(packet) = serde_json::from_slice::<Value>(&output.stderr) {
             packet["errors"].as_array().cloned().unwrap_or_default()
         } else {
-            vec![json!({"type":if output.status.success(){"warning"}else{"error"},"stage":"toolchain","pos":null,
-                "msgs":[String::from_utf8_lossy(&output.stderr).trim()]})]
+            vec![
+                json!({"type":if output.status.success(){"warning"}else{"error"},"stage":"toolchain","pos":null,
+                "msgs":[String::from_utf8_lossy(&output.stderr).trim()]}),
+            ]
         };
         for source in &self.sources {
             errors.extend(
@@ -1092,16 +1183,35 @@ impl Project {
                     .cloned(),
             );
         }
-        if output.status.success() && (action=="vet" || self.options.vet.is_some()) {
-            let checks=self.options.vet.clone().unwrap_or_else(||vec!["immutable".into(),"pure".into()]);
-            errors.extend(crate::vet::run(self,&checks,self.options.vet_apply,self.options.vet_ask)?);
+        if output.status.success() && (action == "vet" || self.options.vet.is_some()) {
+            let checks = self
+                .options
+                .vet
+                .clone()
+                .unwrap_or_else(|| vec!["immutable".into(), "pure".into()]);
+            errors.extend(crate::vet::run(
+                self,
+                &checks,
+                self.options.vet_apply,
+                self.options.vet_ask,
+            )?);
         }
-        let reported_errors=if self.options.raw_diagnostics && errors.is_empty(){false}else{self.report(&errors)};
+        let reported_errors = if self.options.raw_diagnostics && errors.is_empty() {
+            false
+        } else {
+            self.report(&errors)
+        };
         if !output.status.success() || reported_errors {
-            return Ok(if backend_status==0 {1}else{backend_status});
+            return Ok(if backend_status == 0 {
+                1
+            } else {
+                backend_status
+            });
         }
         if matches!(action, "build" | "run" | "test")
-            && self.options.flags.iter().any(|flag|flag=="-debug") && binary.is_file() {
+            && self.options.flags.iter().any(|flag| flag == "-debug")
+            && binary.is_file()
+        {
             let path = self.destination.join("thor-manifest.json");
             let mut manifest: Value = serde_json::from_slice(&fs::read(&path)?)?;
             manifest["debug_program"] = json!({"path":binary,"sha256":sha256(&fs::read(&binary)?)});
@@ -1419,20 +1529,57 @@ impl Project {
         text
     }
     fn report(&self, errors: &[Value]) -> bool {
-        let mut seen=BTreeSet::new();
-        let errors=self.translate(errors).into_iter().filter_map(|mut error| {
-            if error["type"]=="warning" && self.options.flags.iter().any(|flag|flag=="-ignore-warnings") { return None; }
-            if let Some(messages)=error["msgs"].as_array_mut() { for message in messages {
-                if let Some(text)=message.as_str().and_then(|text|text.strip_prefix("Syntax Warning: ")) { *message=json!(text); }
-            }}
-            if error["type"]=="warning" && self.options.flags.iter().any(|flag|flag=="-warnings-as-errors") { error["type"]=json!("error"); }
-            let key=json!([error["type"],error["pos"]["file"],error["pos"]["offset"],error["msgs"]]).to_string();
-            seen.insert(key).then_some(error)
-        }).collect::<Vec<_>>();
-        let failed=errors.iter().any(|error|error["type"]=="error");
-        if self.options.json {
+        let mut seen = BTreeSet::new();
+        let errors = self
+            .translate(errors)
+            .into_iter()
+            .filter_map(|mut error| {
+                if error["type"] == "warning"
+                    && self
+                        .options
+                        .flags
+                        .iter()
+                        .any(|flag| flag == "-ignore-warnings")
+                {
+                    return None;
+                }
+                if let Some(messages) = error["msgs"].as_array_mut() {
+                    for message in messages {
+                        if let Some(text) = message
+                            .as_str()
+                            .and_then(|text| text.strip_prefix("Syntax Warning: "))
+                        {
+                            *message = json!(text);
+                        }
+                    }
+                }
+                if error["type"] == "warning"
+                    && self
+                        .options
+                        .flags
+                        .iter()
+                        .any(|flag| flag == "-warnings-as-errors")
+                {
+                    error["type"] = json!("error");
+                }
+                let key = json!([
+                    error["type"],
+                    error["pos"]["file"],
+                    error["pos"]["offset"],
+                    error["msgs"]
+                ])
+                .to_string();
+                seen.insert(key).then_some(error)
+            })
+            .collect::<Vec<_>>();
+        let failed = errors.iter().any(|error| error["type"] == "error");
+        if let Some(collected) = &self.collected_diagnostics {
+            collected.borrow_mut().extend(errors);
+        } else if self.options.json {
             let mut packet = json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors});
-            if self.options.editor_info { packet["slice_access"] = json!(self.editor_info); }
+            if self.options.editor_info {
+                packet["slice_access"] = json!(self.editor_info);
+            }
             eprintln!("{packet}");
         } else {
             for error in errors {

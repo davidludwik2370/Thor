@@ -88,6 +88,9 @@ impl Project {
             .flags
             .retain(|flag| !flag.starts_with("-out:") && flag != "-keep-executable");
         Ok(Self {
+            publish_layout: None,
+            native_override: None,
+            collected_diagnostics: None,
             options,
             frontend: self.frontend.clone(),
             sources: self.sources.clone(),
