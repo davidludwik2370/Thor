@@ -51,6 +51,12 @@ staging directory. Application names `package.zip`, `package.tar.gz` and
 archives or the replacement backup. All 41 publishing checks and seven assertion
 hygiene checks passed; the frozen comparison tag remains unchanged.
 
+A separate Python correction reuses the builtin namespace import when the
+purity validator and generated-name hygiene both need it. The duplicate import
+previously prevented otherwise valid shadowing of builtin names inside `fn`
+and `#run` from compiling. All 128 reference diagnostic and assertion-hygiene
+checks passed, including the cold and cached execution cases.
+
 ### Library call and permission parity corrections
 
 Expanded original-fixture comparisons exposed gaps hidden by the earlier

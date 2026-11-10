@@ -71,6 +71,12 @@ def qualify(source, code, mapping):
         cursor = start
     chunks.append(raw[cursor:])
     raw = b''.join(chunks)
+    # The purity validator can already have emitted this namespace in the
+    # same file. Reuse it for hygiene-qualified operations.
+    namespace = (b'import', alias.encode(), b'"base:builtin"')
+    spellings = [token for _, _, token in scanned]
+    if any(tuple(spellings[i:i+3]) == namespace for i in range(len(spellings)-2)):
+        return raw.decode(), mapping
     imported = f'\nimport {alias} "base:builtin"\n'.encode()
     mapping.segments.append([len(raw), len(raw)+len(imported), str(source.path), 0, 0, 'support', False])
     mapping.starts.append(len(raw))
