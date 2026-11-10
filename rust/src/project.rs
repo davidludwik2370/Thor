@@ -47,6 +47,8 @@ pub struct Project {
     pub destination: PathBuf,
     pub outputs: BTreeMap<PathBuf, (usize, Emitted)>,
     pub errors: HashMap<String, String>,
+    pub evaluated: BTreeMap<crate::semantics::Ref, Value>,
+    pub evaluation_skips: BTreeMap<crate::semantics::Ref, bool>,
     related: HashMap<String, Vec<Value>>,
     type_sites: HashMap<String, (crate::semantics::Ref, String)>,
     pure_error_sites: HashMap<String, crate::semantics::Ref>,
@@ -205,6 +207,8 @@ impl Project {
             destination,
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
+            evaluated: BTreeMap::new(),
+            evaluation_skips: BTreeMap::new(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
@@ -317,6 +321,7 @@ impl Project {
         self.inspect_sources()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        resolver.evaluated = self.evaluated.clone();
         resolver.prepare_contexts();
         let mut privileges =
             crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
@@ -557,6 +562,20 @@ impl Project {
                 }
             }
             lower.remap_imports(import_paths);
+            lower.apply_evaluation_results(
+                self.evaluated
+                    .iter()
+                    .filter(|(node, _)| node.file == file)
+                    .map(|(node, value)| (node.node, value.clone()))
+                    .collect(),
+            );
+            lower.apply_evaluation_skips(
+                self.evaluation_skips
+                    .iter()
+                    .filter(|(node, _)| node.file == file)
+                    .map(|(node, unchecked)| (node.node, *unchecked))
+                    .collect(),
+            );
             lower.apply_privileges(&privileges);
             lower.apply_local_borrowing(&local_borrowing);
             lower.apply_borrowing(&borrowing);

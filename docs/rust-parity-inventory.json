@@ -132,12 +132,14 @@
       "rust": [
         "rust/src/evaluation.rs",
         "rust/src/evaluationlower.rs",
-        "rust/src/evaluationexec.rs"
+        "rust/src/evaluationexec.rs",
+        "rust/src/evaluationschedule.rs",
+        "rust/src/evaluationresult.rs"
       ],
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Dependency extraction and isolated native helper rendering/execution are connected through an independent harness. Complete known/active and generic scheduling, command integration and result installation/cache policy."
+      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Complete generic caller frames and nominal identity probes, remaining eligibility cases, command integration and cache policy."
     },
     {
       "python": "thorlang/native.py",

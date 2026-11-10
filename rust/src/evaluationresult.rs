@@ -1,0 +1,214 @@
+//! Contents-only reconstruction retains native result-type checking. Runtime
+//! owned values are materialized independently; constants never own buffers.
+use super::*;
+impl Lower<'_, '_> {
+    pub fn apply_evaluation_skips(&mut self, skips: BTreeMap<NodeId, bool>) {
+        self.evaluation_skips.extend(skips);
+    }
+    pub(super) fn evaluation_skipped(&mut self, id: NodeId, unchecked: bool) -> Result<Code> {
+        if unchecked {
+            return Ok(self.g("0", id));
+        }
+        let call = if self.source.node(id).kind == "Run" {
+            self.role(id, "expr")?
+        } else {
+            id
+        };
+        let typ = self.evaluation_result_type(call)?;
+        Ok(Code::concat([self.g("(", id), typ, self.g("{})", id)]))
+    }
+    pub fn apply_evaluation_results(&mut self, results: BTreeMap<NodeId, serde_json::Value>) {
+        self.evaluated.extend(results);
+    }
+    pub(super) fn evaluation_result(
+        &mut self,
+        id: NodeId,
+        value: &serde_json::Value,
+        constant: bool,
+    ) -> Result<Code> {
+        let call = if self.source.node(id).kind == "Run" {
+            self.role(id, "expr")?
+        } else {
+            id
+        };
+        let mut typ = self.evaluation_result_type(call)?;
+        self.meta = true;
+        let meta = format!("{}meta", self.prefix);
+        let mut value = value.clone();
+        if self.source.node(id).kind == "Comprehension" {
+            let count = value["values"]
+                .as_array()
+                .ok_or_else(|| {
+                    Error::at(
+                        self.source,
+                        self.source.node(id).span,
+                        "Compile-time comprehension did not produce a sequence.",
+                    )
+                })?
+                .len();
+            if crate::values::has_owned(&value, true)
+                && value["values"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| crate::values::has_owned(value, true))
+            {
+                return Err(Error::at(self.source,self.source.node(id).span,"A compile-time comprehension constant cannot contain owned slices or dynamic arrays; flatten them or use a runtime binding."));
+            }
+            typ = Code::concat([
+                self.g(format!("[{count}]{meta}.type_elem_type("), id),
+                typ,
+                self.g(")", id),
+            ]);
+            value["storage"] = json!("array");
+            value["nil"] = json!(false);
+        }
+        let value = &value;
+        let literal =
+            crate::values::expression(value, &typ.finish().text, &meta).map_err(|error| {
+                Error::at(
+                    self.source,
+                    self.source.node(id).span,
+                    format!("Invalid compile-time result: {error}"),
+                )
+            })?;
+        if !crate::values::has_owned(value, false) || constant {
+            if constant
+                && (crate::values::has_owned(value, true) || crate::values::has_dynamic(value))
+            {
+                return Ok(self.error_token(id,if crate::values::has_dynamic(value) {
+                    "A dynamic-array-containing #run/fn result needs a runtime binding (:=); use a pure consumer to compute a scalar constant."
+                } else {"A slice-containing #run/fn result needs a runtime binding (:=); use a pure consumer to compute a scalar constant."}));
+            }
+            return Ok(self.g(literal, id));
+        }
+        let module = self.module("pure");
+        let prefix = format!(
+            "{}materialized_{}_",
+            self.prefix,
+            self.source.node(id).span.start
+        );
+        let result = format!("{}Result", self.prefix);
+        let body = crate::values::materialize(value, &result, &meta, &module, &prefix).map_err(
+            |error| Error::at(self.source, self.source.node(id).span, error.to_string()),
+        )?;
+        let (name, mut arguments) =
+            self.closed(id, "run_value", Some(""), |this| Ok(this.g(body, id)))?;
+        arguments.push(typ);
+        Ok(self.helper_call(id, &name, arguments))
+    }
+    fn evaluation_result_type(&mut self, call: NodeId) -> Result<Code> {
+        if self.source.node(call).kind == "Comprehension" {
+            return self.comp_target(call, None);
+        }
+        let owner = self
+            .source
+            .ancestors(call)
+            .take_while(|id| self.source.node(*id).kind != "Procedure")
+            .find(|id| {
+                self.source.node(*id).kind == "Declaration"
+                    && !self.source.node(*id).mutable
+                    && !self.source.node(*id).immutable
+            })
+            .filter(|id| {
+                self.source.node(*id).parent.is_some_and(|parent| {
+                    ["Block", "Case"].contains(&self.source.node(parent).kind.as_str())
+                })
+            });
+        let mut saved = vec![];
+        if let Some(owner) = owner.filter(|_| !self.evaluation_mode) {
+            let graph = crate::evaluation::Extraction::build(
+                self.resolver,
+                &[Ref {
+                    file: self.file,
+                    node: call,
+                }],
+            )?;
+            for ((file, alias), directory) in graph.helper_imports {
+                if file == self.file {
+                    self.modules.insert(
+                        alias,
+                        crate::evaluation::dependency_path(self.source, &directory),
+                    );
+                }
+            }
+            for (query, code) in graph.queries {
+                if query.file != self.file || !self.source.is_descendant(query.node, call) {
+                    continue;
+                }
+                let local = self.source.descendants(query.node).any(|node| {
+                    self.resolver
+                        .symbol(Ref {
+                            file: self.file,
+                            node,
+                        })
+                        .is_some_and(|index| self.resolver.symbols[index].scope != NodeId(0))
+                });
+                if !local {
+                    continue;
+                }
+                if self.evaluation_queries.insert(query.node) {
+                    self.querying += 1;
+                    let original = self.render(query.node, None, false);
+                    self.querying -= 1;
+                    let type_of = self.native("type_of");
+                    self.default = true;
+                    let check = Code::concat([
+                        self.g(
+                            format!("\n_ = {type_of}({}default_value(", self.prefix),
+                            query.node,
+                        ),
+                        original?,
+                        self.g("))\n", query.node),
+                    ]);
+                    self.declaration_helpers
+                        .entry(owner)
+                        .or_default()
+                        .push(check);
+                }
+                let previous = self
+                    .switch_replacements
+                    .insert(query.node, self.g(code, query.node));
+                saved.push((query.node, previous));
+            }
+        }
+        self.querying += 1;
+        let expression = self.render(call, None, false);
+        self.querying -= 1;
+        for (query, previous) in saved {
+            if let Some(previous) = previous {
+                self.switch_replacements.insert(query, previous);
+            } else {
+                self.switch_replacements.remove(&query);
+            }
+        }
+        let expression = expression?;
+        let type_of = self.native("type_of");
+        let plan = if self.source.node(call).kind == "Call" {
+            self.resolver
+                .call_plans(self.reference(call), &Default::default())
+        } else {
+            vec![]
+        };
+        if plan.len() == 1 {
+            self.meta = true;
+            Ok(Code::concat([
+                self.g(
+                    format!(
+                        "{}meta.type_proc_return_type({type_of}({}meta.procedure_of(",
+                        self.prefix, self.prefix
+                    ),
+                    call,
+                ),
+                expression,
+                self.g(")),0)", call),
+            ]))
+        } else {
+            Ok(Code::concat([
+                self.g(format!("{type_of}("), call),
+                expression,
+                self.g(")", call),
+            ]))
+        }
+    }
+}

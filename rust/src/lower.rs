@@ -18,6 +18,8 @@ mod contextlower;
 mod defaults;
 #[path = "evaluationlower.rs"]
 mod evaluationlower;
+#[path = "evaluationresult.rs"]
+mod evaluationresult;
 #[path = "extrema.rs"]
 mod extrema;
 #[path = "ownershiplower.rs"]
@@ -94,6 +96,11 @@ pub struct Lower<'a, 'r> {
     borrow_marker: String,
     ownership_wrapping: HashSet<NodeId>,
     evaluation: Option<crate::evaluation::FileView>,
+    evaluation_mode: bool,
+    evaluated: BTreeMap<NodeId, serde_json::Value>,
+    evaluated_busy: HashSet<NodeId>,
+    evaluation_skips: BTreeMap<NodeId, bool>,
+    evaluation_queries: HashSet<NodeId>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -157,7 +164,12 @@ impl<'a, 'r> Lower<'a, 'r> {
             borrowing: crate::borrowprogram::Emission::default(),
             borrow_marker,
             ownership_wrapping: HashSet::new(),
+            evaluation_mode: evaluation.is_some(),
             evaluation,
+            evaluated: BTreeMap::new(),
+            evaluated_busy: HashSet::new(),
+            evaluation_skips: BTreeMap::new(),
+            evaluation_queries: HashSet::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -620,7 +632,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             {
                 return Err(self.unsupported(id, "discarded anonymous-string cleanup"));
             }
-            if node.kind == "Run" {
+            if node.kind == "Run"
+                && !self.evaluated.contains_key(&id)
+                && !self.evaluation_skips.contains_key(&id)
+            {
                 return Err(self.unsupported(id, &node.kind));
             }
             if node.kind == "Ident"
@@ -905,6 +920,20 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         if let Some(code) = self.switch_replacements.get(&id) {
             return Ok(code.clone());
+        }
+        if !self.evaluated_busy.contains(&id) {
+            if let Some(unchecked) = self.evaluation_skips.get(&id).copied() {
+                self.evaluated_busy.insert(id);
+                let result = self.evaluation_skipped(id, unchecked);
+                self.evaluated_busy.remove(&id);
+                return result;
+            }
+            if let Some(value) = self.evaluated.get(&id).cloned() {
+                self.evaluated_busy.insert(id);
+                let result = self.evaluation_result(id, &value, constant);
+                self.evaluated_busy.remove(&id);
+                return result;
+            }
         }
         if self.checked_mode {
             if let Some(name) = self.pure_ignored.get(&id) {
@@ -2378,9 +2407,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             } else {
                 ""
             };
-            let global_switch = (flavor.starts_with("switch")
-                || flavor.starts_with("compile_switch")
-                || flavor.starts_with("comprehension"))
+            let global_switch = !self.evaluation_mode
+                && (flavor.starts_with("switch")
+                    || flavor.starts_with("compile_switch")
+                    || flavor.starts_with("comprehension"))
                 && !self
                     .source
                     .ancestors(id)

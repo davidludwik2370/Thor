@@ -114,9 +114,27 @@ impl Project {
     /// Construct a helper from the already selected source snapshot. In
     /// particular, a file-entry request never rediscovers unrelated files.
     pub fn evaluation_helper(&self, expression: Ref, destination: PathBuf) -> Result<Self> {
+        self.evaluation_helper_with_results(
+            expression,
+            destination,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            crate::evaluation::Mode::Value,
+        )
+    }
+    pub(crate) fn evaluation_helper_with_results(
+        &self,
+        expression: Ref,
+        destination: PathBuf,
+        results: &BTreeMap<Ref, Value>,
+        skips: &BTreeMap<Ref, bool>,
+        mode: crate::evaluation::Mode,
+    ) -> Result<Self> {
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        resolver.evaluated = results.clone();
         resolver.prepare_contexts();
-        let mut plan = crate::evaluation::Plan::build(&mut resolver, expression)?;
+        let mut plan =
+            crate::evaluation::Plan::with_mode(&mut resolver, expression, results, skips, mode)?;
         let entry = self.sources[expression.file]
             .path
             .parent()
@@ -227,6 +245,8 @@ impl Project {
             destination,
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
+            evaluated: results.clone(),
+            evaluation_skips: skips.clone(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
@@ -241,6 +261,22 @@ impl Project {
         })
     }
     pub fn execute_evaluation(&self, expression: Ref, timeout: Duration) -> Result<Value> {
+        self.execute_evaluation_with_results(
+            expression,
+            timeout,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            crate::evaluation::Mode::Value,
+        )
+    }
+    pub(crate) fn execute_evaluation_with_results(
+        &self,
+        expression: Ref,
+        timeout: Duration,
+        results: &BTreeMap<Ref, Value>,
+        skips: &BTreeMap<Ref, bool>,
+        mode: crate::evaluation::Mode,
+    ) -> Result<Value> {
         let source = &self.sources[expression.file];
         let site = source
             .node(expression.node)
@@ -269,7 +305,13 @@ impl Project {
             }
         }
         let work = Temporary::new()?;
-        let mut helper = self.evaluation_helper(expression, work.0.join("source"))?;
+        let mut helper = self.evaluation_helper_with_results(
+            expression,
+            work.0.join("source"),
+            results,
+            skips,
+            mode,
+        )?;
         let target = helper.lower()?;
         let executable = work.0.join(format!("helper{}", env::consts::EXE_SUFFIX));
         let mut command = Command::new(&helper.frontend.odin);

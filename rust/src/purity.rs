@@ -106,9 +106,15 @@ impl<'a, 'r> Purity<'a, 'r> {
             walk_stack: vec![],
         };
         for call in calls.iter().copied() {
-            this.call(call, call, call, &Substitutions::new(), &[]);
-            if let Some(targets) = this.facts.targets.get(&call) {
-                this.facts.entry_roots.extend(targets.iter().copied());
+            this.walk(call, call, call, &Substitutions::new(), &[]);
+            let source = &this.r.sources[call.file];
+            for node in std::iter::once(call.node).chain(source.descendants(call.node)) {
+                if let Some(targets) = this.facts.targets.get(&Ref {
+                    file: call.file,
+                    node,
+                }) {
+                    this.facts.entry_roots.extend(targets.iter().copied());
+                }
             }
         }
         this.facts

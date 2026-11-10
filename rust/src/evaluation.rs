@@ -13,6 +13,9 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     path::PathBuf,
 };
+#[path = "evaluationschedule.rs"]
+mod schedule;
+pub use schedule::Scheduler;
 
 #[derive(Clone, Default)]
 pub struct FileView {
@@ -34,6 +37,14 @@ pub struct Bridge {
 pub struct Request {
     pub expression: NodeId,
     pub locals: BTreeMap<NodeId, Vec<NodeId>>,
+    pub mode: Mode,
+}
+#[derive(Clone, Copy, Default)]
+pub enum Mode {
+    #[default]
+    Value,
+    Condition,
+    Case(usize),
 }
 impl FileView {
     pub fn retains(&self, source: &crate::ast::Source, node: NodeId) -> bool {
@@ -57,8 +68,29 @@ impl Plan {
     /// Isolate one request using original node identities. Local declarations
     /// from the surrounding runtime body are reintroduced by the helper main.
     pub fn build(r: &mut Resolver<'_>, expression: Ref) -> Result<Self> {
-        let graph = Extraction::build(r, &[expression])?;
-        if let Some(nested) = graph.nested_runs.iter().next() {
+        Self::with_results(r, expression, &BTreeMap::new())
+    }
+    pub fn with_results(
+        r: &mut Resolver<'_>,
+        expression: Ref,
+        results: &BTreeMap<Ref, serde_json::Value>,
+    ) -> Result<Self> {
+        Self::with_mode(r, expression, results, &BTreeMap::new(), Mode::Value)
+    }
+    pub(crate) fn with_mode(
+        r: &mut Resolver<'_>,
+        expression: Ref,
+        results: &BTreeMap<Ref, serde_json::Value>,
+        skips: &BTreeMap<Ref, bool>,
+        mode: Mode,
+    ) -> Result<Self> {
+        let roots = request_roots(&r.sources[expression.file], expression, mode);
+        let graph = Extraction::build(r, &roots)?;
+        if let Some(nested) = graph
+            .nested_runs
+            .iter()
+            .find(|node| !results.contains_key(node) && !skips.contains_key(node))
+        {
             let source = &r.sources[nested.file];
             return Err(Error::unsupported(
                 source,
@@ -206,27 +238,33 @@ impl Plan {
         plan.files.get_mut(&source.path).unwrap().request = Some(Request {
             expression: expression.node,
             locals,
+            mode,
         });
-        plan.requests = std::iter::once(expression.node)
-            .chain(source.descendants(expression.node))
-            .filter(|node| source.node(*node).kind == "Call")
-            .filter(|node| {
-                !source
-                    .ancestors(*node)
-                    .take_while(|parent| *parent != expression.node)
-                    .any(|parent| {
-                        graph.queries.contains_key(&Ref {
-                            file: expression.file,
-                            node: parent,
-                        })
-                    })
-            })
+        plan.requests = roots;
+        Ok(plan)
+    }
+}
+pub(crate) fn request_roots(source: &crate::ast::Source, expression: Ref, mode: Mode) -> Vec<Ref> {
+    if let Mode::Case(index) = mode {
+        let case = &source.node(expression.node).data["cases"][index];
+        let mut roots = case["matches"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Span::from_wire)
+            .filter_map(|span| source.at(span, expression.node))
             .map(|node| Ref {
                 file: expression.file,
                 node,
             })
-            .collect();
-        Ok(plan)
+            .collect::<Vec<_>>();
+        roots.extend(source.role(expression.node, "selector").map(|node| Ref {
+            file: expression.file,
+            node,
+        }));
+        roots
+    } else {
+        vec![expression]
     }
 }
 pub(crate) fn dependency_path(source: &crate::ast::Source, directory: &std::path::Path) -> String {

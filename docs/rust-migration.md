@@ -309,6 +309,42 @@ harness is not command integration: known/active and generic scheduling, nested
 requests, result installation and cache policy remain. Normal Rust commands
 still explicitly reject unported `#run` rather than invoking Python.
 
+### Concrete scheduling and result reconstruction
+
+`evaluationschedule.rs` follows the reference's known-input and active-branch
+decisions for concrete requests. It distinguishes constants from runtime and
+immutable storage, leaves optional debug calls native, executes required calls,
+handles nested requests and preserves lazy boolean, conditional and switch
+selection. An inactive request inside a retained dependency is also carried to
+the helper. Compile-time comprehensions check their complete bodies and become
+fixed native arrays, including filtered, flattened and empty results.
+
+`evaluationresult.rs` installs contents using the original native result-type
+witness. Runtime strings/slices/dynamic arrays receive independent storage;
+constant results do not own allocated buffers. Local runtime storage used only
+by a type query stays out of the constant witness, while a separate unevaluated
+check retains the original query's validation. Evaluated array lengths are
+available to subsequent inference. These paths are exercised by compiling and
+running the installed output in checked and unchecked release configurations.
+
+One additional frozen-reference exception is recorded by
+`test_dependency_constant_request_is_evaluated_first`: Python adds a helper-only
+generic parameter to `leaf` while reusing an already evaluated `VALUE::#run
+leaf()`. That invalidates the original signature witness in the next helper.
+Rust retains the original signature and produces both expected results. The
+Python source remains unchanged.
+
+The clean combined scheduling, execution, extraction and specialization gate
+passes all 80 tests. It includes compiled checked/unchecked scalar and slice
+results, constant comprehensions, downstream generic array-length inference,
+local type-query validation and inactive nested requests. All 24 Rust units
+pass in debug and release, and Clippy passes with warnings denied.
+
+Generic caller frames, per-specialization substitutions and original nominal
+identity probes are still pending. The scheduling/reconstruction harness does
+not enable evaluation in the normal Rust command. Contents caching, logical
+numbers and final command/editor integration retain their later checkpoints.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

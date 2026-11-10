@@ -15,7 +15,7 @@ impl Lower<'_, '_> {
         self.querying -= 1;
         code
     }
-    fn comp_target(&mut self, id: NodeId, expected: Option<Hint>) -> Result<Code> {
+    pub(super) fn comp_target(&mut self, id: NodeId, expected: Option<Hint>) -> Result<Code> {
         let s = self.source;
         if let Some(annotation) = s.role(id, "type") {
             return self.render(annotation, None, true);
@@ -268,9 +268,10 @@ impl Lower<'_, '_> {
         let meta = format!("{}meta", self.prefix);
         let type_of = self.native("type_of");
         let builder = format!("{}comprehension_{}", self.prefix, s.node(id).span.start);
-        let global = !s
-            .ancestors(id)
-            .any(|parent| s.node(parent).kind == "Procedure");
+        let global = !self.evaluation_mode
+            && !s
+                .ancestors(id)
+                .any(|parent| s.node(parent).kind == "Procedure");
         let (name,mut args)=self.closed(id,"comprehension",Some(""),|this|{
             let result=format!("{}Result",this.prefix);let element=format!("{meta}.type_elem_type({result})");
             let mut code=vec![];

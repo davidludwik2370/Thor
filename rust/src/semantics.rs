@@ -171,6 +171,7 @@ pub struct Resolver<'a> {
     pub parameter_witnesses: BTreeMap<Ref, ParameterWitness>,
     pub conditional_immutables: HashSet<Ref>,
     pub flags: Vec<String>,
+    pub evaluated: BTreeMap<Ref, serde_json::Value>,
     using_symbols: HashMap<Ref, usize>,
 }
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
@@ -207,6 +208,10 @@ pub fn scope(source: &Source, id: NodeId) -> NodeId {
         .unwrap_or(NodeId(0))
 }
 impl<'a> Resolver<'a> {
+    pub fn remember_evaluation(&mut self, node: Ref, value: serde_json::Value) {
+        self.evaluated.insert(node, value);
+        self.types.clear();
+    }
     pub fn new(sources: &'a [Source]) -> Self {
         Self::with_flags(sources, &[])
     }
@@ -223,6 +228,7 @@ impl<'a> Resolver<'a> {
             parameter_witnesses: BTreeMap::new(),
             conditional_immutables: HashSet::new(),
             flags: flags.to_vec(),
+            evaluated: BTreeMap::new(),
             using_symbols: HashMap::new(),
         };
         for (file, source) in sources.iter().enumerate() {
@@ -1105,7 +1111,7 @@ impl<'a> Resolver<'a> {
                 }
                 Type::Unknown
             }
-            "Paren" | "AutoCast" | "Unary" => {
+            "Paren" | "AutoCast" | "Unary" | "Run" => {
                 let typ = child("expr")
                     .map(|r| self.type_of(r))
                     .unwrap_or(Type::Unknown);
@@ -1190,7 +1196,18 @@ impl<'a> Resolver<'a> {
                 } else {
                     output.defaulted()
                 };
-                Type::Slice(Box::new(output))
+                if let Some(values) = self
+                    .evaluated
+                    .get(&r)
+                    .and_then(|value| value["values"].as_array())
+                {
+                    Type::Array {
+                        elem: Box::new(output),
+                        length: Some(values.len() as i128),
+                    }
+                } else {
+                    Type::Slice(Box::new(output))
+                }
             }
             "SetType" => Type::Set(Box::new(
                 s.group(r.node, "args")
@@ -1393,6 +1410,13 @@ impl<'a> Resolver<'a> {
         self.integer(r, &mut HashSet::new())
     }
     fn integer(&self, r: Ref, seen: &mut HashSet<Ref>) -> Option<i128> {
+        if let Some(value) = self
+            .evaluated
+            .get(&r)
+            .filter(|value| value["kind"] == "integer")
+        {
+            return value["value"].as_str()?.parse().ok();
+        }
         if !seen.insert(r) {
             return None;
         }

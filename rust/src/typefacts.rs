@@ -293,7 +293,7 @@ impl Resolver<'_> {
                 .unwrap_or(Type::Unknown)
         };
         match n.kind.as_str() {
-            "Paren" => subtype("expr"),
+            "Paren" | "Run" => subtype("expr"),
             "WhenExpr" => {
                 if let Some(cond) = child("cond").and_then(|r| self.context_condition(r, bindings))
                 {
@@ -516,7 +516,7 @@ impl Resolver<'_> {
         let n = s.node(r.node);
         let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
         match n.kind.as_str() {
-            "Paren" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
+            "Paren" | "Run" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
                 .map(|r| self.specialized_value_result(r, index, bindings, seen))
                 .unwrap_or(Type::Unknown),
             "OrElse" => child("x")

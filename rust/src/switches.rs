@@ -394,6 +394,15 @@ impl Lower<'_, '_> {
         }
         Ok(result)
     }
+    pub(super) fn evaluation_case_condition(&mut self, id: NodeId, index: usize) -> Result<Code> {
+        let cases = self.cases(id)?;
+        self.case_condition(
+            id,
+            cases
+                .get(index)
+                .ok_or_else(|| Error::new("invalid evaluation switch case"))?,
+        )
+    }
     fn switch_witness(&mut self, arm: NodeId, index: usize) -> Result<Option<Code>> {
         if self.source.node(arm).kind == "SwitchBreak" || self.diverging(arm) {
             return Ok(None);

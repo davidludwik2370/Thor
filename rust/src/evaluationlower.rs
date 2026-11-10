@@ -7,14 +7,26 @@ impl Lower<'_, '_> {
         let checked = std::mem::replace(&mut self.checked_mode, true);
         let result = (|| {
             let id = request.expression;
-            let expression = self.render(id, None, false)?;
+            let expression = if let crate::evaluation::Mode::Case(index) = request.mode {
+                self.evaluation_case_condition(id, index)?
+            } else {
+                self.render(id, None, false)?
+            };
             let eval = self.module("eval");
             let pure = self.module("pure");
             let value = format!("{}evaluation_result", self.prefix);
             let scratch = format!("{}evaluation_scratch", self.prefix);
             let mut inner = Code::concat([
                 self.g(format!("\n{value} := "), id),
-                expression,
+                if matches!(request.mode, crate::evaluation::Mode::Condition) {
+                    Code::concat([
+                        self.g("true when (", id),
+                        expression,
+                        self.g(") else false", id),
+                    ])
+                } else {
+                    expression
+                },
                 self.g(format!("\n{eval}.emit({value})\n"), id),
             ]);
             for scope in self

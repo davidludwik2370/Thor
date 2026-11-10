@@ -42,6 +42,13 @@ impl Resolver<'_> {
         expected: Option<&Type>,
         seen: &mut HashSet<Ref>,
     ) -> Option<Constant> {
+        if let Some(value) = self.evaluated.get(&r) {
+            match value["kind"].as_str()? {
+                "integer" => return value["value"].as_str()?.parse().ok().map(Constant::Integer),
+                "bool" => return value["value"].as_bool().map(Constant::Boolean),
+                _ => {}
+            }
+        }
         if !seen.insert(r) || seen.len() > 64 {
             return None;
         }
