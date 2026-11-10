@@ -1,5 +1,6 @@
 """Prepared scalar reuse keeps reference invalidation boundaries intact."""
 import unittest
+import shutil
 from tests import test_rust_cached_execution as cached
 from tests import test_rust_compiler as native
 
@@ -9,7 +10,11 @@ class RustPreparedExecutionTests(unittest.TestCase):
     setUpClass=classmethod(cached.RustCachedExecutionTests.setUpClass.__func__)
     setUp=cached.RustCachedExecutionTests.setUp
     write=cached.RustCachedExecutionTests.write
-    invoke=cached.RustCachedExecutionTests.invoke
+    def invoke(self,**kwargs):
+        # Exercise the intermediate prepared-key policy independently of the
+        # still earlier verified-site lookup.
+        shutil.rmtree(self.cache/'scalar-v1',ignore_errors=True)
+        return cached.RustCachedExecutionTests.invoke(self,**kwargs)
 
     def test_scalar_reuse_survives_unrelated_runtime_body_edits(self):
         for flags in (['-debug'],native.UNCHECKED):
@@ -64,6 +69,7 @@ class RustPreparedExecutionTests(unittest.TestCase):
         warm=self.invoke(output='6\n')
         self.assertEqual(warm['cache']['prepared_hits'],0)
         self.assertGreater(warm['cache']['stats']['writes'],0)
+        self.assertEqual(warm['cache']['stats']['misses'],1)
 
     def test_imported_helper_body_edit_invalidates_result(self):
         directory=self.root/'lib';directory.mkdir()

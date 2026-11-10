@@ -362,7 +362,12 @@ impl Project {
                 &self.options.root,
             )
         });
-        if let Some(value) = cache.as_mut().and_then(|cache| cache.get(key.as_deref())) {
+        if let Some(value) = cache.as_mut().and_then(|cache| {
+            cache.get(
+                key.as_deref()
+                    .filter(|key| !context.cache_misses.contains(*key)),
+            )
+        }) {
             return Ok(Executed { value, target: key });
         }
         let executable = work.0.join(format!("helper{}", env::consts::EXE_SUFFIX));

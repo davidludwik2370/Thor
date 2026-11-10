@@ -31,11 +31,13 @@ pub struct Context<'a> {
     pub bindings: &'a crate::specialization::Bindings,
     pub frames: &'a [(Ref, crate::specialization::Bindings)],
     pub cache: Option<&'a std::cell::RefCell<crate::evaluationcache::EvaluationCache>>,
+    pub cache_misses: &'a BTreeSet<String>,
 }
 static EMPTY_RESULTS: BTreeMap<Ref, serde_json::Value> = BTreeMap::new();
 static EMPTY_SKIPS: BTreeMap<Ref, bool> = BTreeMap::new();
 static EMPTY_CASES: crate::specialization::Cases = BTreeMap::new();
 static EMPTY_BINDINGS: crate::specialization::Bindings = BTreeMap::new();
+static EMPTY_CACHE_MISSES: BTreeSet<String> = BTreeSet::new();
 impl Default for Context<'_> {
     fn default() -> Self {
         Self {
@@ -45,6 +47,7 @@ impl Default for Context<'_> {
             bindings: &EMPTY_BINDINGS,
             frames: &[],
             cache: None,
+            cache_misses: &EMPTY_CACHE_MISSES,
         }
     }
 }

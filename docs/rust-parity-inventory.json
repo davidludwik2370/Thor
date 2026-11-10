@@ -178,7 +178,7 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links and selective clearing are independently compared with Python. Toolchain identities, resource hashes, normalized emitted-result keys and prepared scalar keys are ported and connected through the independent scheduler. Complete scalar-site reuse and normal command adoption."
+      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links, selective clearing, toolchain identities, resource hashes and prepared/scalar-site reuse are connected through the independent scheduler. Complete normal command adoption and acceptance."
     },
     {
       "python": "thorlang/dependencies.py",
@@ -188,15 +188,15 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 9,
-      "remaining": "File/stat/raw-content observations, directory/tree/package membership, resource inputs and symlink bindings are compared with Python. Connect the snapshots to toolchain identities and scalar/prepared result reuse."
+      "remaining": "File/stat/raw-content observations, directory/tree/package membership, resource inputs and symlink bindings are compared with Python and connected to toolchain identities and scalar-site reuse. Complete command adoption and acceptance."
     },
     {
       "python": "thorlang/scalarcache.py",
-      "rust": [],
+      "rust": ["rust/src/evaluationscalar.rs", "rust/src/evaluationprepared.rs"],
       "checkpoint": 5,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 9,
-      "remaining": "Port scalar-site reuse and invalidation."
+      "remaining": "Straight-line scalar eligibility, binding/body/header validation, dependency snapshots, witness metadata and target reuse are connected to the independent scheduler. Native discovery retains selected files, so snapshots also observe unparsed package members. Complete pre-discovery command adoption and witness integration."
     },
     {
       "python": "thorlang/values.py",

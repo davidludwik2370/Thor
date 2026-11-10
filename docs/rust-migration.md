@@ -681,6 +681,27 @@ fixture tests conservative resource invalidation without changing those rules.
 Debug units, assertion hygiene and Clippy pass. Scalar-site reuse and normal
 command adoption are still pending; Python remains the supported default.
 
+### Verified scalar sites
+
+`evaluationscalar.rs` ports straight-line scalar-site eligibility and replay.
+Records validate source interfaces, lexical bindings, selected procedure bodies,
+resource observations, native package files and raw collection-path bindings
+before loading their contents target. Runtime shadowing, changed transitive
+bodies and new impurity invalidate replay. Generic, conditional, `using` and
+owned results keep the established verified paths. Missing targets flow through
+the prepared and final lookups without repeatedly probing the same failed key.
+
+Rust retains selected platform ASTs rather than every native file. Its scalar
+snapshot therefore observes the full native package membership and contents of
+unparsed members as well, avoiding immediately invalid partial snapshots.
+The 16-test scalar-site group passes; the neighboring 12 prepared and 11 contents
+checks pass. Two initial collection fixtures tried to override Odin's reserved
+`core` collection, which Odin rejects; the corrected custom-collection tests
+pass. Debug/release units, assertion hygiene and Clippy pass. Reuse is currently
+connected through the independent scheduler after source discovery. Normal
+command adoption, early SDK discovery avoidance and result-type witness
+integration remain outstanding.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

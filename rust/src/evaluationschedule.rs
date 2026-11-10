@@ -11,6 +11,8 @@ mod call;
 mod integer;
 #[path = "evaluationprepared.rs"]
 mod prepared;
+#[path = "evaluationscalar.rs"]
+mod scalar;
 #[path = "evaluationspecialize.rs"]
 mod specialize;
 
@@ -33,7 +35,9 @@ pub struct Scheduler<'p> {
     work_sources: Option<BTreeSet<usize>>,
     timeout: Duration,
     cache: std::cell::RefCell<crate::evaluationcache::EvaluationCache>,
-    evaluation_targets: BTreeMap<Ref, String>,
+    execution_records: BTreeMap<Ref, scalar::ExecutionRecord>,
+    failed_scalar_targets: BTreeMap<Ref, String>,
+    pub scalar_witnesses: BTreeMap<Ref, String>,
 }
 impl<'p> Scheduler<'p> {
     pub fn new(project: &'p Project, timeout: Duration) -> Self {
@@ -77,14 +81,16 @@ impl<'p> Scheduler<'p> {
                 &cache_directory,
                 !project.options.no_cache,
             )),
-            evaluation_targets: BTreeMap::new(),
+            execution_records: BTreeMap::new(),
+            failed_scalar_targets: BTreeMap::new(),
+            scalar_witnesses: BTreeMap::new(),
         };
         this.prepare_work_sources();
         this
     }
     pub fn cache_report(&self) -> Value {
         let cache = self.cache.borrow();
-        serde_json::json!({"stats":cache.stats,"prepared_hits":cache.prepared_hits})
+        serde_json::json!({"stats":cache.stats,"prepared_hits":cache.prepared_hits,"scalar_reused":self.scalar_witnesses.len()})
     }
     fn prepare_work_sources(&mut self) {
         self.schedule_generics = self.has_pure;
@@ -804,14 +810,29 @@ impl<'p> Scheduler<'p> {
             }
         }
         let prepared = self.prepared_key(node, &roots, &graph, mode);
+        let mut cache_misses = self
+            .failed_scalar_targets
+            .get(&node)
+            .cloned()
+            .into_iter()
+            .collect::<BTreeSet<_>>();
         if let Some(key) = &prepared {
-            let (value, target) = self.cache.borrow_mut().prepared(Some(key), None);
+            let (value, target) = self.cache.borrow_mut().prepared(
+                Some(key),
+                self.failed_scalar_targets.get(&node).map(String::as_str),
+            );
             if let Some(value) = value {
-                if let Some(target) = target {
-                    self.evaluation_targets.insert(node, target);
-                }
+                self.execution_records.insert(
+                    node,
+                    scalar::ExecutionRecord {
+                        target,
+                        keep: graph.keep,
+                        procedures: graph.procedures,
+                    },
+                );
                 return Ok(value);
             }
+            cache_misses.extend(target);
         }
         let skips = self
             .inactive
@@ -828,6 +849,7 @@ impl<'p> Scheduler<'p> {
                 bindings: &self.specializations.bindings,
                 frames: &self.specializations.frames,
                 cache: Some(&self.cache),
+                cache_misses: &cache_misses,
             },
             mode,
         )?;
@@ -835,9 +857,14 @@ impl<'p> Scheduler<'p> {
             self.cache
                 .borrow()
                 .remember(prepared.as_deref(), executed.target.as_deref());
-            if let Some(target) = executed.target {
-                self.evaluation_targets.insert(node, target);
-            }
+            self.execution_records.insert(
+                node,
+                scalar::ExecutionRecord {
+                    target: executed.target,
+                    keep: graph.keep,
+                    procedures: graph.procedures,
+                },
+            );
         }
         let mut value = executed.value;
         if value["kind"] == "specialized" {
@@ -1107,6 +1134,13 @@ impl<'p> Scheduler<'p> {
             if io {
                 return Err(self.fail(node, self.io_message(call)));
             }
+            if self.kind(node) == "Run" {
+                if let Some(value) = self.load_scalar(node) {
+                    self.results.insert(node, value.clone());
+                    self.resolver.remember_evaluation(node, value.clone());
+                    return Ok(Some(value));
+                }
+            }
             let plans = self.resolver.call_plans(call, &Substitutions::new());
             let builtin = self.builtin(call);
             let approved = approved_library(&self.resolver, callee).is_some()
@@ -1200,6 +1234,9 @@ impl<'p> Scheduler<'p> {
             );
         }
         self.resolver.remember_evaluation(node, value.clone());
+        if self.kind(node) == "Run" {
+            self.save_scalar(node);
+        }
         Ok(Some(value))
     }
     pub fn evaluate_all(&mut self) -> Result<()> {
