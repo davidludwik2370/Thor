@@ -145,7 +145,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Helper-relative identity refresh, inactive local-type cases and retained-case filtering are connected. Exact untyped integer power results and wide constant-value parameters retain native literal coercion. Reviewed call identities, allocator selection, entry diagnostics and source-work gates follow the reference. Automatic expanded extrema share the runtime reduction plan and native element-type witness. Complete command integration and contents-cache policy before execution acceptance."
+      "remaining": "Concrete known/active scheduling, nested requests, helper execution, generic caller frames, nominal identities and scalar/owned/comprehension reconstruction are connected to normal Rust commands. Exact integer constants, native floating parameter coercion, reviewed call identities, entry diagnostics, automatic extrema and contents/prepared/scalar-site caches are integrated. Complete remaining logical-number paths in checkpoint 6 and broad execution/editor acceptance in checkpoints 7-8."
     },
     {
       "python": "thorlang/native.py",
@@ -178,7 +178,7 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links, selective clearing, toolchain identities, resource hashes and prepared/scalar-site reuse are connected through the independent scheduler. Complete normal command adoption and acceptance."
+      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links, selective clearing, toolchain identities, resource hashes and prepared/scalar-site reuse are connected to normal Rust commands. Complete broad acceptance."
     },
     {
       "python": "thorlang/dependencies.py",
@@ -196,7 +196,7 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 9,
-      "remaining": "Straight-line scalar eligibility, binding/body/header validation, dependency snapshots, witness metadata and target reuse are connected to the independent scheduler. Native discovery retains selected files, so snapshots also observe unparsed package members. Complete pre-discovery command adoption and witness integration."
+      "remaining": "Straight-line scalar eligibility, binding/body/header validation, dependency snapshots, native witness metadata and target reuse are connected to normal Rust commands. Native discovery retains selected files, so snapshots also observe unparsed package members. Complete early SDK discovery avoidance and broad acceptance."
     },
     {
       "python": "thorlang/values.py",
@@ -206,7 +206,7 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 9,
-      "remaining": "Reuse reconstruction; finish evaluator integration and big-number backing in checkpoint 6."
+      "remaining": "Native scalar and aggregate reconstruction is installed through normal command evaluation. Complete logical big-number backing and reconstruction in checkpoint 6."
     },
     {
       "python": "thorlang/bigconstants.py",

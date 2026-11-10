@@ -103,6 +103,7 @@ pub struct Lower<'a, 'r> {
     evaluated_busy: HashSet<NodeId>,
     evaluation_skips: BTreeMap<NodeId, bool>,
     evaluation_queries: HashSet<NodeId>,
+    evaluation_witnesses: BTreeMap<NodeId, String>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -174,6 +175,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             evaluated_busy: HashSet::new(),
             evaluation_skips: BTreeMap::new(),
             evaluation_queries: HashSet::new(),
+            evaluation_witnesses: BTreeMap::new(),
         };
         for edit in &source.edits {
             this.edits

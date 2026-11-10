@@ -17,6 +17,8 @@ use std::{
 };
 #[path = "evaluationexec.rs"]
 mod evaluationexec;
+#[path = "evaluationinstall.rs"]
+mod evaluationinstall;
 pub(crate) use evaluationexec::capture as capture_command;
 #[path = "nativefacts.rs"]
 mod nativefacts;
@@ -53,6 +55,7 @@ pub struct Project {
     pub specialized: crate::specialization::Cases,
     pub evaluation_scheduled: bool,
     pub evaluation_skips: BTreeMap<crate::semantics::Ref, bool>,
+    pub evaluation_witnesses: BTreeMap<crate::semantics::Ref, String>,
     related: HashMap<String, Vec<Value>>,
     type_sites: HashMap<String, (crate::semantics::Ref, String)>,
     pure_error_sites: HashMap<String, crate::semantics::Ref>,
@@ -217,6 +220,7 @@ impl Project {
             specialized: BTreeMap::new(),
             evaluation_scheduled: false,
             evaluation_skips: BTreeMap::new(),
+            evaluation_witnesses: BTreeMap::new(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
@@ -329,6 +333,7 @@ impl Project {
     }
     pub fn lower(&mut self) -> Result<PathBuf> {
         self.inspect_sources()?;
+        self.schedule_evaluations()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         resolver.evaluated = self.evaluated.clone();
@@ -591,6 +596,13 @@ impl Project {
                     .iter()
                     .filter(|(node, _)| node.file == file)
                     .map(|(node, value)| (node.node, value.clone()))
+                    .collect(),
+            );
+            lower.apply_evaluation_witnesses(
+                self.evaluation_witnesses
+                    .iter()
+                    .filter(|(node, _)| node.file == file)
+                    .map(|(node, witness)| (node.node, witness.clone()))
                     .collect(),
             );
             lower.apply_specialized_results(

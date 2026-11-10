@@ -254,6 +254,7 @@ impl Project {
             specialized: context.cases.clone(),
             evaluation_scheduled: true,
             evaluation_skips: context.skips.clone(),
+            evaluation_witnesses: self.evaluation_witnesses.clone(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),

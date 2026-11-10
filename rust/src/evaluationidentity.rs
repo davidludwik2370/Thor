@@ -96,6 +96,7 @@ impl Project {
             errors: HashMap::new(),
             evaluated: results.clone(),
             evaluation_skips: skips.clone(),
+            evaluation_witnesses: self.evaluation_witnesses.clone(),
             specialized: cases.clone(),
             evaluation_scheduled: true,
             related: HashMap::new(),

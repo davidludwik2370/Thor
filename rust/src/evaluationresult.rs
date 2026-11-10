@@ -102,6 +102,9 @@ impl Lower<'_, '_> {
     pub fn apply_evaluation_results(&mut self, results: BTreeMap<NodeId, serde_json::Value>) {
         self.evaluated.extend(results);
     }
+    pub fn apply_evaluation_witnesses(&mut self, witnesses: BTreeMap<NodeId, String>) {
+        self.evaluation_witnesses.extend(witnesses);
+    }
     pub(super) fn evaluation_result(
         &mut self,
         id: NodeId,
@@ -214,6 +217,7 @@ impl Lower<'_, '_> {
         Ok(self.helper_call(id, &name, arguments))
     }
     fn evaluation_result_type(&mut self, call: NodeId) -> Result<Code> {
+        let witness = self.evaluation_witnesses.get(&call).cloned();
         if self.source.node(call).kind == "Comprehension" {
             return self.comp_target(call, None);
         }
@@ -248,7 +252,7 @@ impl Lower<'_, '_> {
                 })
             });
         let mut saved = vec![];
-        if let Some(owner) = owner.filter(|_| !self.evaluation_mode) {
+        if let Some(owner) = owner.filter(|_| !self.evaluation_mode && witness.is_none()) {
             let graph = crate::evaluation::Extraction::build(
                 self.resolver,
                 &[Ref {
@@ -322,7 +326,7 @@ impl Lower<'_, '_> {
         } else {
             vec![]
         };
-        if plan.len() == 1 {
+        if witness.as_deref() == Some("procedure") || witness.is_none() && plan.len() == 1 {
             self.meta = true;
             Ok(Code::concat([
                 self.g(

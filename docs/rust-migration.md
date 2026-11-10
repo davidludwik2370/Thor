@@ -717,6 +717,28 @@ is valid native code but the frozen reference fails its helper compilation;
 the differential test records that reference gap explicitly. The Rust output
 matches the ordinary Odin program. No Python or Odin compiler source changed.
 
+### Normal command evaluation pipeline
+
+Ordinary Rust `check`, `transpile`, `build`, `run` and `test` now schedule native
+compile-time requests after source inspection and install scalar/aggregate
+results, generic cases, inactive-branch markers and verified scalar witnesses.
+Helper/identity snapshots are marked scheduled and cannot recursively start
+another scheduler. Restored scalar witnesses retain native result-type queries
+without re-extracting their dependencies. Python remains the supported default;
+there is no Python fallback in the Rust pipeline.
+
+The 67 existing compiler regression tests and all 11 dedicated command checks
+pass after adoption. The command checks cover explicit/automatic/nested requests, generic frames, SDK
+calls, fixed-array comprehensions, owned reconstruction and original Thor error
+locations. A first owned-result fixture returned stack-backed slice storage;
+both compilers correctly rejected it. Its allocated-buffer replacement passes.
+The capability report exposes the connected evaluator and cache components while
+retaining `complete: false` and the remaining migration gaps. Source inspection
+still precedes verified-site reuse; avoiding redundant SDK discovery is a
+separate remaining integration/performance task, not a claimed speedup here.
+All 29 Rust units pass in debug and release, Clippy passes with warnings denied,
+and all seven assertion-hygiene checks pass.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
