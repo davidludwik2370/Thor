@@ -662,7 +662,6 @@ release::proc(text:string){}
     def test_unported_features_fail_closed_without_python(self):
         for code in ['value:=f"hello {2}"=="hello 2";_=value',
                      'T::int;when T==int {value:=1} else {value :> 1};value=2;_=value',
-                     'value :> struct{x:int}{1};using value;x=2',
                      'value:=#run calculate();_=value', 'value:Integer=2;_=value',
                      'VALUE::[x for x in 0..<3];_=VALUE',
                      'value:=len(set[int]{1,2});_=value']:

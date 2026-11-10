@@ -82,6 +82,32 @@ pure-projection, generic-branch, record, storage and resolution gate passed all
 83 tests, including checked and unchecked tracked runtime cases. Clippy passes
 with warnings denied.
 
+### Conditional pure effects
+
+Generic `when` statements and expressions retain conditional purity failures in
+the native checked body. Inactive branches do not reject an otherwise valid
+instantiation. A transitive failure is attached to the call or constant reference
+inside that branch, with original Thor locations and related pure call paths.
+Ordinary procedure bodies keep their original behavior. Call-analysis memoization
+includes the conditional use so a first visit in one branch cannot suppress a
+failure in a later branch or an unconditional call.
+
+The remaining generic ownership gap is separate: unresolved storage provenance
+still rejects cases such as a generic fixed-array copy followed by an element
+write. Completing the reference's symbolic permission propagation is the next
+part of checkpoint 3. Compile-time helper execution has not begun.
+
+One explicit reference exception is preserved by
+`test_unused_default_branch_records_a_reference_false_positive`: Python combines
+the default-use requirements of `helper(value)` and an inactive `helper()` call
+inside the same generic function. It then incorrectly rejects the supplied-value
+call if the unused default reads runtime state. Rust accepts that supplied-value
+path and rejects the selected omitted-default path. The frozen Python snapshot
+has not been edited to hide this discrepancy.
+
+The conditional/branch/native-compiler regression gate passed 87 tests, followed
+by 15 transitive-call and explicit-type checks. Clippy passes with warnings denied.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

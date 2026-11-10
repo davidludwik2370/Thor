@@ -4,6 +4,12 @@ use super::*;
 impl Lower<'_, '_> {
     pub fn apply_purity(&mut self, facts: &crate::purity::Facts) -> Result<()> {
         let file = self.file;
+        self.pure_conditional = facts
+            .conditional
+            .iter()
+            .filter(|(site, _)| site.file == file)
+            .map(|(site, fault)| (site.node, fault.message.clone()))
+            .collect();
         self.pure_defaults = facts
             .defaults
             .iter()

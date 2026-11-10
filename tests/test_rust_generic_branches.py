@@ -1,5 +1,4 @@
 """Generic native conditions whose arms can all be verified safely."""
-import json
 import unittest
 from tests import test_rust_checked_calls as checked
 
@@ -66,16 +65,13 @@ state:int
 work::fn(value:$T)->T{when state==0{return value}else{return value}}
 '''),command='check',fail='outside the function')
 
-    def test_a_potentially_impure_arm_remains_an_explicit_migration_gap(self):
-        self.source.write_text(self.program('n:=3;_=work(n)', '''
+    def test_native_selection_defers_inactive_purity_violations(self):
+        prefix='''
 state:int
 work::fn(value:$T)->T{when T==int{return value}else{return T(state)}}
-'''))
-        reference=self.invoke('python',command='check')
-        self.assertEqual(reference.returncode,0,reference.stderr)
-        native=self.invoke('rust',command='check',flags=['-json-errors'])
-        self.assertEqual(native.returncode,3,native.stderr)
-        self.assertEqual(json.loads(native.stderr)['errors'][0]['stage'],'rust-migration')
+'''
+        self.compare(self.program('n:=3;_=work(n)',prefix),command='check')
+        self.compare(self.program('n:=f64(3);_=work(n)',prefix),command='check',fail='outside the function')
 
 
 if __name__=='__main__':unittest.main()

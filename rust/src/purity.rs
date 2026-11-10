@@ -24,14 +24,18 @@ pub struct Facts {
     pub defaults: BTreeSet<Ref>,
     /// Source call paths explain why an ordinary proc receives pure type proofs.
     pub call_paths: BTreeMap<Ref, BTreeSet<(Ref, Vec<Ref>)>>,
+    /// Native `when` selection decides whether these body checks are reached.
+    pub conditional: BTreeMap<Ref, Fault>,
 }
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
     facts: Facts,
-    visiting: HashSet<(Ref, Vec<(String, Type)>)>,
+    visiting: HashSet<VisitKey>,
     constants: HashSet<(Ref, Ref)>,
-    speculative: usize,
+    speculative: Vec<Ref>,
+    walk_stack: Vec<Ref>,
 }
+type VisitKey = (Ref, Vec<(String, Type)>, Option<Ref>);
 impl<'a, 'r> Purity<'a, 'r> {
     pub fn analyze(r: &'r mut Resolver<'a>) -> Facts {
         let roots = r
@@ -55,7 +59,8 @@ impl<'a, 'r> Purity<'a, 'r> {
             facts: Facts::default(),
             visiting: HashSet::new(),
             constants: HashSet::new(),
-            speculative: 0,
+            speculative: vec![],
+            walk_stack: vec![],
         };
         for root in roots {
             if this.r.active_definition(root) {
@@ -87,16 +92,58 @@ impl<'a, 'r> Purity<'a, 'r> {
     fn kind(&self, r: Ref) -> &str {
         self.r.sources[r.file].node(r.node).kind.as_str()
     }
+    fn conditional_reference(&self) -> Option<Ref> {
+        let owner = self.speculative.last()?;
+        self.walk_stack.iter().rev().copied().find(|site| {
+            site.file == owner.file
+                && self.r.sources[owner.file]
+                    .node(owner.node)
+                    .span
+                    .contains(self.r.sources[site.file].node(site.node).span)
+        })
+    }
     fn fault(&mut self, root: Ref, origin: Ref, via: &[Ref], message: impl Into<String>) {
-        // A native-selected arm may be inactive. Until selection is ported, an
-        // unsafe possible arm is a migration gap, not a source-program error.
-        if self.speculative > 0 {
-            self.gap(root, origin);
+        let message = message.into();
+        // Like the reference's checked bodies, leave conditional violations
+        // inside their native branch. Relocate transitive failures to the call
+        // or constant reference within that branch, never to an eager helper.
+        if let Some(owner) = self.speculative.last().copied() {
+            let inside = |site: Ref| {
+                site.file == owner.file
+                    && self.r.sources[owner.file]
+                        .node(owner.node)
+                        .span
+                        .contains(self.r.sources[site.file].node(site.node).span)
+            };
+            let site = if inside(origin) {
+                origin
+            } else {
+                self.conditional_reference().unwrap_or(origin)
+            };
+            let mut related = via
+                .iter()
+                .copied()
+                .chain([origin, root])
+                .filter(|reference| *reference != site)
+                .collect::<Vec<_>>();
+            related.sort();
+            related.dedup();
+            let entry = self.facts.conditional.entry(site).or_insert_with(|| Fault {
+                site,
+                message: message.clone(),
+                related: vec![],
+            });
+            if !entry.message.lines().any(|line| line == message) {
+                entry.message.push('\n');
+                entry.message.push_str(&message);
+            }
+            entry.related.extend(related);
+            entry.related.sort();
+            entry.related.dedup();
             return;
         }
         let site = via.first().copied().unwrap_or(origin);
         let faults = self.facts.faults.entry(root).or_default();
-        let message = message.into();
         if !faults.iter().any(|f| {
             f.site == site
                 && f.message == message
@@ -132,6 +179,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
+            self.conditional_reference(),
         );
         if !self.visiting.insert(key) {
             return;
@@ -232,6 +280,18 @@ impl<'a, 'r> Purity<'a, 'r> {
         }
     }
     fn walk(&mut self, root: Ref, proc: Ref, node: Ref, bindings: &Substitutions, via: &[Ref]) {
+        self.walk_stack.push(node);
+        self.walk_inner(root, proc, node, bindings, via);
+        self.walk_stack.pop();
+    }
+    fn walk_inner(
+        &mut self,
+        root: Ref,
+        proc: Ref,
+        node: Ref,
+        bindings: &Substitutions,
+        via: &[Ref],
+    ) {
         let kind = self.kind(node).to_owned();
         if kind == "Procedure" {
             return;
@@ -257,13 +317,13 @@ impl<'a, 'r> Purity<'a, 'r> {
                     }
                     None => {
                         self.walk(root, proc, cond, bindings, via);
-                        self.speculative += 1;
+                        self.speculative.push(proc);
                         for role in ["body", "else", "x", "y"] {
                             if let Some(branch) = self.role(node, role) {
                                 self.walk(root, proc, branch, bindings, via);
                             }
                         }
-                        self.speculative -= 1;
+                        self.speculative.pop();
                         return;
                     }
                 }

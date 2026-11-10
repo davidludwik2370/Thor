@@ -83,6 +83,7 @@ pub struct Lower<'a, 'r> {
     pure_defaults: HashSet<NodeId>,
     pure_local_busy: HashSet<NodeId>,
     pure_ignored: HashMap<NodeId, String>,
+    pure_conditional: HashMap<NodeId, String>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
@@ -129,6 +130,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             pure_defaults: HashSet::new(),
             pure_local_busy: HashSet::new(),
             pure_ignored: HashMap::new(),
+            pure_conditional: HashMap::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -819,6 +821,24 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if self.checked_mode && self.querying == 0 {
+            if let Some(message) = self.pure_conditional.remove(&id) {
+                let token = format!(
+                    "{}conditional_pure_error_{}_end",
+                    self.source.prefix, node.span.start
+                );
+                self.errors.insert(token.clone(), message.clone());
+                let result = if kind == "Declaration" {
+                    self.render_inner(id, expected, constant).map(|code| {
+                        Code::concat([code, self.g(format!("\n#panic({})\n", json!(token)), id)])
+                    })
+                } else {
+                    Ok(self.g(token, id))
+                };
+                self.pure_conditional.insert(id, message);
+                return result;
+            }
+        }
         if kind == "AutoCast" && self.checked_mode && self.querying == 0 {
             return self.pure_auto_cast(id, expected, constant);
         }

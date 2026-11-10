@@ -309,6 +309,21 @@ impl Project {
         let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = crate::purity::Purity::analyze(&mut resolver);
         self.pure_call_paths = purity.call_paths.clone();
+        for (site, fault) in &purity.conditional {
+            let source = &self.sources[site.file];
+            let token = format!(
+                "{}conditional_pure_error_{}_end",
+                source.prefix,
+                source.node(site.node).span.start
+            );
+            let notes=fault.related.iter().map(|reference|{
+                let source=&self.sources[reference.file];let span=source.node(reference.node).span;
+                let (line,column)=source.position(span.start);
+                json!({"pos":{"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},
+                    "msgs":["Required by this pure call; the selected implementation must obey pure function rules."]})
+            }).collect();
+            self.related.insert(token, notes);
+        }
         let sdk = sdkmirror::SdkMirror::plan(
             &self.sources,
             &purity,
