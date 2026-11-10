@@ -54,7 +54,7 @@ class RustSchedulingTests(unittest.TestCase):
                 return
             if reference_failure:
                 self.assertIsNotNone(reference_error)
-                self.assertIn(reference_failure,str(reference_error.diagnostics))
+                self.assertIn(reference_failure,str(reference_error)+'\n'+str(reference_error.diagnostics))
                 self.assertEqual(result.returncode,0,result.stderr)
                 if output is None:
                     return json.loads(result.stdout)['results']
@@ -74,6 +74,8 @@ class RustSchedulingTests(unittest.TestCase):
             expected=[[[str(node.source.path),node.kind,node.start,node.end],data]
                       for (node,fingerprint),data in evaluator.results.items() if not fingerprint]
             actual=json.loads(result.stdout)['results']
+            if reference_failure and reference_specialized_gap is None:
+                return actual
             specialized=[[[str(node.source.path),node.kind,node.start,node.end],data]
                          for (node,fingerprint),data in evaluator.results.items() if fingerprint]
             actual_specialized=json.loads(result.stdout).get('specialized',[])

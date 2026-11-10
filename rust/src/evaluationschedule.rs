@@ -194,13 +194,29 @@ impl<'p> Scheduler<'p> {
         } else {
             self.specialized_skips.insert(key.clone());
             if inactive {
-                let bindings = self.specializations.relevant(node, &self.resolver);
+                let unchecked = self.specialized_unchecked.contains(&key);
+                if unchecked {
+                    return;
+                }
+                let mut bindings = self.specializations.relevant(node, &self.resolver);
+                for binding in bindings
+                    .values_mut()
+                    .filter(|binding| binding.value.is_none() && binding.canonical.is_empty())
+                {
+                    let mut names = TypeCode::new(node.file, Some(node));
+                    if names.render(&binding.typ, &self.resolver).is_err() {
+                        // An inactive runtime branch still needs its native
+                        // result type. Probe its local type even though no
+                        // helper execution supplied an initial identity.
+                        binding.canonical = "__thor_unresolved_native_type__".into();
+                    }
+                }
                 self.cases.entry(node).or_default().insert(
                     key.1.clone(),
                     EvaluatedCase {
                         bindings,
                         value: Value::Null,
-                        skipped: Some(self.specialized_unchecked.contains(&key)),
+                        skipped: Some(false),
                     },
                 );
             }

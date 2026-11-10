@@ -34,10 +34,12 @@ fn offset(project: &Project, at: Ref) -> Option<usize> {
                 .segments
                 .iter()
                 .find(|segment| {
-                    segment.origin.exact
-                        && segment.origin.file == source.path.to_string_lossy()
-                        && segment.origin.span.start <= position
-                        && position < segment.origin.span.end
+                    segment.origin.file == source.path.to_string_lossy()
+                        && (segment.origin.exact
+                            && segment.origin.span.start <= position
+                            && position < segment.origin.span.end
+                            || segment.origin.kind == "evaluation-scope"
+                                && segment.origin.span.start == position)
                 })
                 .map(|segment| segment.start + position - segment.origin.span.start + 1)
         })
@@ -67,11 +69,9 @@ impl Project {
     ) -> Result<Self> {
         let mut options = self.options.clone();
         options.output = None;
-        options.flags.retain(|flag| {
-            !flag.starts_with("-out:")
-                && !flag.starts_with("-build-mode:")
-                && flag != "-keep-executable"
-        });
+        options
+            .flags
+            .retain(|flag| !flag.starts_with("-out:") && flag != "-keep-executable");
         Ok(Self {
             options,
             frontend: self.frontend.clone(),
@@ -93,7 +93,7 @@ impl Project {
             memory: self.memory.clone(),
             native_environment: BTreeMap::new(),
             backend_runtime: PathBuf::new(),
-            evaluation: None,
+            evaluation: self.evaluation.clone(),
             type_probes: BTreeMap::new(),
             type_probe_imports: BTreeMap::new(),
         })
@@ -189,12 +189,6 @@ impl Project {
             .arg("build")
             .arg(target)
             .args(probe.native_flags())
-            .args(
-                self.options
-                    .flags
-                    .iter()
-                    .filter(|flag| flag.starts_with("-build-mode:")),
-            )
             .arg(format!("-out:{}", work.0.join("type-probe").display()))
             .arg("-json-errors")
             .arg("-max-error-count:10000");

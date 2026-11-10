@@ -142,7 +142,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Complete helper-relative identity refresh for nested evaluation, remaining eligibility cases, command integration and cache policy."
+      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Helper-relative identity refresh, inactive local-type cases and retained-case filtering are connected. Complete remaining execution eligibility/native-protocol cases, command integration and cache policy."
     },
     {
       "python": "thorlang/native.py",

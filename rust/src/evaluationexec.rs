@@ -310,6 +310,28 @@ impl Project {
         let work = Temporary::new()?;
         let mut helper =
             self.evaluation_helper_with_context(expression, work.0.join("source"), context, mode)?;
+        if let Some(plan) = &helper.evaluation {
+            helper.specialized.retain(|node, cases| {
+                if !plan.emits(&helper.sources[node.file], node.node) {
+                    return false;
+                }
+                cases.retain(|_, case| {
+                    case.bindings
+                        .values()
+                        .all(|binding| plan.emits_type(&binding.typ, &helper.sources))
+                });
+                !cases.is_empty()
+            });
+        }
+        // Nominal scope positions belong to this generated helper, rather
+        // than an earlier helper or the eventual user executable.
+        let mut cases = std::mem::take(&mut helper.specialized);
+        helper.resolve_evaluation_identities(
+            &helper.evaluated,
+            &helper.evaluation_skips,
+            &mut cases,
+        )?;
+        helper.specialized = cases;
         let target = helper.lower()?;
         let executable = work.0.join(format!("helper{}", env::consts::EXE_SUFFIX));
         let mut command = Command::new(&helper.frontend.odin);

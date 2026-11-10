@@ -63,7 +63,7 @@ impl Lower<'_, '_> {
                 }
                 declarations.extend(self.helper_declarations(scope));
                 inner = Code::concat([
-                    self.g("{\n", scope),
+                    self.gen("{\n", self.source.node(scope).span, "evaluation-scope"),
                     Code::concat(declarations),
                     inner,
                     self.g("\n}\n", scope),
@@ -109,7 +109,7 @@ impl Lower<'_, '_> {
                 }
                 declarations.extend(self.helper_declarations(scope));
                 inner = Code::concat([
-                    self.g("{\n", scope),
+                    self.gen("{\n", self.source.node(scope).span, "evaluation-scope"),
                     Code::concat(declarations),
                     inner,
                     self.g("\n}\n", scope),

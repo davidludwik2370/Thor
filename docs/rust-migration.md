@@ -425,11 +425,39 @@ class. The harness import has been corrected: the local module now discovers
 its nine tests once. All 24 Rust units pass in debug and release, Clippy passes
 with warnings denied, and the seven assertion-hygiene checks pass.
 
-A caller-local specialization composed into a second compile-time helper still
-needs its result predicates refreshed for that helper's generated scopes. This
-is the next checkpoint-4 item, followed by remaining eligibility details and
-command adoption. Contents-cache policy remains checkpoint 5. Normal Rust commands do
-not enable the scheduler yet.
+At this checkpoint, composing caller-local results into another helper still
+needed helper-relative identities. That work is recorded below. Contents-cache
+policy remains checkpoint 5, and normal Rust commands do not enable the scheduler.
+
+### Replaying results inside nested helpers
+
+Each helper now installs only result cases whose declarations and bound types
+are present in its extracted program. This prevents unused materializers or
+specializations from requiring pruned definitions. Retained caller-local cases
+receive identities from that helper's own scopes, independently of earlier
+helpers and the final program. Synthetic lexical wrappers carry scope origins
+so scope-position changes, including changes in digit width, settle correctly.
+Compiler-owned base types remain available through their original SDK sources.
+
+Inactive native `when` branches keep the reference's lazy source-error fallback
+without creating a specialization result. Inactive runtime branches retain their
+ordinary result type; a local type can be probed even when execution never
+supplied an initial identity. Probe snapshots preserve the original build mode.
+Tests cover nested scalar and owned-record results, independent materialized
+buffers, unevaluated runtime type queries, unused global-type specializations,
+large source positions, active/inactive conditions and object-build context.
+
+Two more reference discrepancies are explicit: Python can reuse a local identity
+from the wrong generated helper, and a condition helper with a local type
+parameter can leak NUL mapping markers into its emitted Odin. The regression
+fixtures require those reference failures and independently verify the Rust
+packets and native runtime output. Python production code remains unchanged.
+
+The combined helper-replay/local-type/scheduling/execution/extraction gate passes
+all 106 tests. All 24 Rust units pass in debug and release, Clippy passes with
+warnings denied, and all seven assertion-hygiene checks pass. Execution-eligibility
+and native-protocol details remain before scheduler/command adoption; this is
+still a partial checkpoint 4, rather than whole-language acceptance.
 
 ## Build and compare
 

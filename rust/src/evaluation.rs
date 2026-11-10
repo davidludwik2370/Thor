@@ -109,6 +109,56 @@ pub struct Plan {
     pub entry_file: usize,
 }
 impl Plan {
+    pub(crate) fn emits(&self, source: &crate::ast::Source, node: NodeId) -> bool {
+        let Some(view) = self.files.get(&source.path) else {
+            return false;
+        };
+        view.retains(source, node)
+            || view
+                .request
+                .as_ref()
+                .map(|request| &request.locals)
+                .into_iter()
+                .chain(view.entry.as_ref().map(|entry| &entry.locals))
+                .flat_map(|scopes| scopes.values())
+                .flatten()
+                .any(|declaration| {
+                    source
+                        .node(*declaration)
+                        .span
+                        .contains(source.node(node).span)
+                })
+    }
+    pub(crate) fn emits_type(&self, typ: &Type, sources: &[crate::ast::Source]) -> bool {
+        let present = |owner: Ref| {
+            let source = &sources[owner.file];
+            if compiler_support(source) {
+                return true;
+            }
+            let node = source
+                .node(owner.node)
+                .parent
+                .filter(|node| source.node(*node).kind == "Declaration")
+                .unwrap_or(owner.node);
+            self.emits(source, node)
+        };
+        match typ {
+            Type::Nominal(owner, inner) => present(*owner) && self.emits_type(inner, sources),
+            Type::Struct(owner) | Type::Enum(owner) | Type::Union(owner) => present(*owner),
+            Type::Record(owner, bindings) => {
+                present(*owner)
+                    && bindings
+                        .iter()
+                        .all(|(_, typ)| self.emits_type(typ, sources))
+            }
+            Type::Array { elem, .. }
+            | Type::Fixed { elem, .. }
+            | Type::Pointer(elem)
+            | Type::Slice(elem)
+            | Type::Dynamic(elem) => self.emits_type(elem, sources),
+            _ => true,
+        }
+    }
     /// Isolate one request using original node identities. Local declarations
     /// from the surrounding runtime body are reintroduced by the helper main.
     pub fn build(r: &mut Resolver<'_>, expression: Ref) -> Result<Self> {
