@@ -412,11 +412,14 @@ impl<'a, 'r> Lower<'a, 'r> {
             .evaluation
             .as_ref()
             .and_then(|view| view.request.clone());
-        let main = if let Some(request) = request {
-            Some(self.evaluation_main(request)?)
-        } else {
-            None
-        };
+        let entry = self.evaluation.as_ref().and_then(|view| view.entry.clone());
+        let mut main = vec![];
+        if let Some(request) = request {
+            main.push(self.evaluation_main(request)?);
+        }
+        if let Some(entry) = entry {
+            main.push(self.evaluation_entry(entry)?);
+        }
         if self.source.excluded {
             return Ok((
                 self.copy(Span::new(0, self.source.raw.len())).finish(),

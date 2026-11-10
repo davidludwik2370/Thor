@@ -36,7 +36,7 @@ fn kind(value: &Value) -> Result<&str> {
     Ok(object.get("kind").and_then(Value::as_str).unwrap_or(""))
 }
 
-fn bytes(value: &Value) -> Result<Vec<u8>> {
+pub(crate) fn bytes(value: &Value) -> Result<Vec<u8>> {
     let text = value
         .get("bytes")
         .and_then(Value::as_str)

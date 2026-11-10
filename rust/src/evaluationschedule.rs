@@ -667,7 +667,7 @@ impl<'p> Scheduler<'p> {
             .iter()
             .map(|node| (*node, self.unchecked.contains(node)))
             .collect();
-        self.project.execute_evaluation_with_context(
+        let mut value = self.project.execute_evaluation_with_context(
             node,
             self.timeout,
             &Context {
@@ -678,7 +678,52 @@ impl<'p> Scheduler<'p> {
                 frames: &self.specializations.frames,
             },
             mode,
-        )
+        )?;
+        if value["kind"] == "specialized" {
+            let names = value["types"]
+                .as_array()
+                .ok_or_else(|| self.fail(node, "Invalid specialization metadata."))?;
+            let mut names = names.iter();
+            for binding in self
+                .specializations
+                .bindings
+                .values_mut()
+                .filter(|binding| binding.value.is_none())
+            {
+                let packet = names
+                    .next()
+                    .ok_or_else(|| Error::new("Invalid specialization metadata."))?;
+                let bytes =
+                    crate::values::bytes(packet).map_err(|error| Error::new(error.to_string()))?;
+                let mut canonical = String::from_utf8(bytes)
+                    .map_err(|_| Error::new("Invalid specialization type name."))?;
+                for source in self
+                    .project
+                    .sources
+                    .iter()
+                    .filter(|source| source.shared_native)
+                {
+                    if let Some(span) = source.node(NodeId(0)).spans.get("package") {
+                        let internal = format!(
+                            "thor_eval_{}",
+                            &crate::digest::sha256(
+                                source.path.parent().unwrap().to_string_lossy().as_bytes()
+                            )[..12]
+                        );
+                        canonical = canonical.replace(
+                            &(internal + "."),
+                            &(source.raw[span.start..span.end].to_string() + "."),
+                        );
+                    }
+                }
+                binding.canonical = canonical;
+            }
+            if names.next().is_some() {
+                return Err(self.fail(node, "Invalid specialization metadata."));
+            }
+            return Ok(value["value"].take());
+        }
+        Ok(value)
     }
     fn ensure_runs(&mut self, node: Ref) -> Result<()> {
         for child in self.children(node) {
@@ -990,6 +1035,12 @@ impl<'p> Scheduler<'p> {
                 }
             }
         }
-        Ok(())
+        let skips = self
+            .inactive
+            .iter()
+            .map(|node| (*node, self.unchecked.contains(node)))
+            .collect();
+        self.project
+            .resolve_evaluation_identities(&self.results, &skips, &mut self.cases)
     }
 }

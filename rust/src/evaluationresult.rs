@@ -2,6 +2,24 @@
 //! owned values are materialized independently; constants never own buffers.
 use super::*;
 impl Lower<'_, '_> {
+    pub(crate) fn apply_type_probes(
+        &mut self,
+        probes: BTreeMap<NodeId, Vec<String>>,
+        imports: BTreeMap<String, String>,
+    ) {
+        self.modules.extend(imports);
+        for (scope, codes) in probes {
+            self.meta = true;
+            for (index, code) in codes.into_iter().enumerate() {
+                let name = format!("{}type_probe_{index}", self.prefix);
+                self.helpers.insert(
+                    (scope, self.prefix.clone(), name),
+                    self.g(format!("\n{code}\n"), scope),
+                );
+            }
+        }
+    }
+
     pub fn apply_specialized_results(
         &mut self,
         cases: BTreeMap<NodeId, BTreeMap<String, crate::specialization::EvaluatedCase>>,

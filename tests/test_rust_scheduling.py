@@ -56,8 +56,10 @@ class RustSchedulingTests(unittest.TestCase):
                 self.assertIsNotNone(reference_error)
                 self.assertIn(reference_failure,str(reference_error.diagnostics))
                 self.assertEqual(result.returncode,0,result.stderr)
-                return json.loads(result.stdout)['results']
-            self.assertIsNone(reference_error,str(reference_error))
+                if output is None:
+                    return json.loads(result.stdout)['results']
+            else:
+                self.assertIsNone(reference_error,str(reference_error))
             self.assertEqual(result.returncode,0,result.stderr)
             if output is not None:
                 packet=json.loads(result.stdout)
@@ -76,11 +78,16 @@ class RustSchedulingTests(unittest.TestCase):
                          for (node,fingerprint),data in evaluator.results.items() if fingerprint]
             actual_specialized=json.loads(result.stdout).get('specialized',[])
             if reference_specialized_gap is not None:
-                self.assertEqual(specialized,[])
+                expected_reference=[]
+                native_values=reference_specialized_gap
+                if isinstance(reference_specialized_gap,dict):
+                    expected_reference=reference_specialized_gap['reference']
+                    native_values=reference_specialized_gap['rust']
+                self.assertEqual(sorted([item[1] for item in specialized],key=str),sorted(expected_reference,key=str))
                 runs=[node for source in project.sources.values() for node in source.nodes if node.kind=='Run']
                 self.assertEqual(len(runs),1)
                 node=runs[0]
-                specialized=[[[str(node.source.path),node.kind,node.start,node.end],value] for value in reference_specialized_gap]
+                specialized=[[[str(node.source.path),node.kind,node.start,node.end],value] for value in native_values]
             self.assertEqual(sorted(actual_specialized,key=str),sorted(specialized,key=str))
             self.assertEqual(sorted(actual,key=str),sorted(expected,key=str))
             return actual

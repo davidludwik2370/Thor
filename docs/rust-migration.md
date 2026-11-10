@@ -394,6 +394,43 @@ identity probes. Remaining eligibility details, command adoption and the content
 cache are also pending. Python remains the default and frozen reference, and
 normal Rust build commands still reject unported evaluation requests explicitly.
 
+### Caller-local native type identities
+
+Isolated evaluation can now use a caller-local nominal type even when the
+request belongs to a different package. The helper reintroduces the original
+local declarations at a concrete caller, invokes a generated generic bridge,
+and serializes the result with native type-name metadata. Reverse imports exist
+only inside the helper. The original program retains its package dependencies
+and procedure signatures.
+
+The scheduler probes named type identities in their original defining scopes.
+It maps the native scope positions through exact source-map segments and settles
+result-predicate widths before final emission. Local records that capture an
+outer generic constant carry the matching condition into their probe. Equal
+shapes do not merge distinct nominal types. Probe builds consume only tagged
+compile-time diagnostics and never execute the program; using the build command
+also preserves support for build-only flags such as `-o:speed`.
+
+Three additional frozen-reference gaps are explicit in the local-type tests.
+Python's helper fails to name a caller-local `distinct` type; it reuses the first
+result for a local record that depends on different enclosing constant values;
+and its identity probe forwards `-o:speed` to Odin's `check` command, which rejects
+that flag. The tests pin those reference failures/partial registries and verify
+the Rust packets, compiled runtime output and unchecked builds independently.
+Python production code remains unchanged.
+
+The integrated execution/extraction/scheduling/local-type run passed 139 test
+runs, including a repeated scheduling group discovered through an imported test
+class. The harness import has been corrected: the local module now discovers
+its nine tests once. All 24 Rust units pass in debug and release, Clippy passes
+with warnings denied, and the seven assertion-hygiene checks pass.
+
+A caller-local specialization composed into a second compile-time helper still
+needs its result predicates refreshed for that helper's generated scopes. This
+is the next checkpoint-4 item, followed by remaining eligibility details and
+command adoption. Contents-cache policy remains checkpoint 5. Normal Rust commands do
+not enable the scheduler yet.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

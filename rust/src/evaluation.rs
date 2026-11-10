@@ -16,6 +16,8 @@ use std::{
 #[path = "evaluationschedule.rs"]
 mod schedule;
 pub use schedule::Scheduler;
+#[path = "evaluationbridge.rs"]
+mod bridge;
 /// Borrowed evaluator state used by one isolated helper. Native helper creation
 /// snapshots the selected inputs; the scheduler retains its own registries.
 pub struct Context<'a> {
@@ -49,6 +51,7 @@ pub struct FileView {
     pub imports: BTreeMap<String, String>,
     pub bridges: Vec<Bridge>,
     pub request: Option<Request>,
+    pub entry: Option<EntryRequest>,
 }
 #[derive(Clone)]
 pub struct Bridge {
@@ -63,6 +66,20 @@ pub struct Request {
     pub locals: BTreeMap<NodeId, Vec<NodeId>>,
     pub mode: Mode,
     pub prelude: String,
+    pub bridge: Option<RequestBridge>,
+}
+#[derive(Clone)]
+pub struct RequestBridge {
+    pub name: String,
+    pub parameters: String,
+    pub type_names: Vec<String>,
+}
+#[derive(Clone)]
+pub struct EntryRequest {
+    pub origin: NodeId,
+    pub locals: BTreeMap<NodeId, Vec<NodeId>>,
+    pub prelude: String,
+    pub call: String,
 }
 #[derive(Clone, Copy, Default)]
 pub enum Mode {
@@ -89,6 +106,7 @@ pub struct Plan {
     pub entries: BTreeSet<Ref>,
     pub requests: Vec<Ref>,
     pub bindings: crate::specialization::Bindings,
+    pub entry_file: usize,
 }
 impl Plan {
     /// Isolate one request using original node identities. Local declarations
@@ -167,7 +185,7 @@ impl Plan {
         for source in r.sources {
             plan.files.insert(source.path.clone(), FileView::default());
         }
-        let mut locals: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
+        let mut locals: BTreeMap<usize, BTreeMap<NodeId, Vec<NodeId>>> = BTreeMap::new();
         for kept in &graph.keep {
             let source = &r.sources[kept.file];
             let owner = source
@@ -183,15 +201,19 @@ impl Plan {
                     .unwrap()
                     .keep
                     .insert(kept.node);
-            } else if kept.file == expression.file && source.node(kept.node).kind == "Declaration" {
+            } else if source.node(kept.node).kind == "Declaration" {
                 locals
+                    .entry(kept.file)
+                    .or_default()
                     .entry(scope(source, kept.node))
                     .or_default()
                     .push(kept.node);
             }
         }
-        for declarations in locals.values_mut() {
-            declarations.sort_by_key(|id| r.sources[expression.file].node(*id).span.start);
+        for (file, scopes) in &mut locals {
+            for declarations in scopes.values_mut() {
+                declarations.sort_by_key(|id| r.sources[*file].node(*id).span.start);
+            }
         }
         for import in &graph.imports {
             plan.files
@@ -299,27 +321,7 @@ impl Plan {
             view.imports.insert(alias.clone(), path.clone());
             view.values.insert(callee.node, format!("{alias}.{name}"));
         }
-        let source = &r.sources[expression.file];
-        let mut types = TypeCode::new(expression.file, Some(expression));
-        types.allow_imports = true;
-        let prelude =
-            crate::specialization::Specializations::declarations(context.bindings, &mut types, r)
-                .map_err(|error| {
-                Error::at(source, source.node(expression.node).span, error.to_string())
-            })?;
-        for (alias, directory) in types.imports {
-            plan.files
-                .get_mut(&source.path)
-                .unwrap()
-                .imports
-                .insert(alias, dependency_path(source, &directory));
-        }
-        plan.files.get_mut(&source.path).unwrap().request = Some(Request {
-            expression: expression.node,
-            locals,
-            mode,
-            prelude,
-        });
+        plan.configure_request(r, expression, context, mode, locals)?;
         plan.requests = roots;
         Ok(plan)
     }

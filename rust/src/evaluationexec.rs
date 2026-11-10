@@ -1,6 +1,8 @@
 //! Isolated native helpers. No Python process, user callbacks or project entry
 //! points are used to evaluate a request.
 use super::*;
+#[path = "evaluationidentity.rs"]
+mod identity;
 use crate::{
     ast::{Edit, NodeId, Span},
     semantics::Ref,
@@ -134,7 +136,7 @@ impl Project {
         crate::specialization::Specializations::apply_bindings(context.bindings, &mut resolver);
         let mut plan =
             crate::evaluation::Plan::with_context(&mut resolver, expression, context, mode)?;
-        let entry = self.sources[expression.file]
+        let entry = self.sources[plan.entry_file]
             .path
             .parent()
             .ok_or_else(|| Error::new("evaluation source has no package"))?
@@ -259,6 +261,8 @@ impl Project {
             native_environment: BTreeMap::new(),
             backend_runtime: PathBuf::new(),
             evaluation: Some(plan),
+            type_probes: BTreeMap::new(),
+            type_probe_imports: BTreeMap::new(),
         })
     }
     pub fn execute_evaluation(&self, expression: Ref, timeout: Duration) -> Result<Value> {

@@ -24,6 +24,7 @@ mod runtimeview;
 #[path = "sdkmirror.rs"]
 mod sdkmirror;
 
+#[derive(Clone)]
 pub struct Options {
     pub command: String,
     pub entry: PathBuf,
@@ -65,6 +66,8 @@ pub struct Project {
     native_environment: BTreeMap<String, PathBuf>,
     backend_runtime: PathBuf,
     evaluation: Option<crate::evaluation::Plan>,
+    type_probes: BTreeMap<crate::semantics::Ref, Vec<String>>,
+    type_probe_imports: BTreeMap<usize, BTreeMap<String, String>>,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -220,6 +223,8 @@ impl Project {
             native_environment: BTreeMap::new(),
             backend_runtime: PathBuf::new(),
             evaluation: None,
+            type_probes: BTreeMap::new(),
+            type_probe_imports: BTreeMap::new(),
             collections,
             common,
             file_entry,
@@ -569,6 +574,17 @@ impl Project {
                 }
             }
             lower.remap_imports(import_paths);
+            lower.apply_type_probes(
+                self.type_probes
+                    .iter()
+                    .filter(|(scope, _)| scope.file == file)
+                    .map(|(scope, codes)| (scope.node, codes.clone()))
+                    .collect(),
+                self.type_probe_imports
+                    .get(&file)
+                    .cloned()
+                    .unwrap_or_default(),
+            );
             lower.apply_evaluation_results(
                 self.evaluated
                     .iter()

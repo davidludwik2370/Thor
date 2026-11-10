@@ -133,6 +133,8 @@
         "rust/src/evaluation.rs",
         "rust/src/evaluationlower.rs",
         "rust/src/evaluationexec.rs",
+        "rust/src/evaluationbridge.rs",
+        "rust/src/evaluationidentity.rs",
         "rust/src/evaluationschedule.rs",
         "rust/src/evaluationspecialize.rs",
         "rust/src/evaluationresult.rs"
@@ -140,7 +142,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Complete caller-local nominal bridges and identity probes, remaining eligibility cases, command integration and cache policy."
+      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Complete helper-relative identity refresh for nested evaluation, remaining eligibility cases, command integration and cache policy."
     },
     {
       "python": "thorlang/native.py",
@@ -151,7 +153,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 7,
-      "remaining": "Explicit #run roots and transitive SDK bodies participate in helper extraction, with private bridges and isolated renamed native packages. Complete generic specialization attachment and canonical type-name remapping."
+      "remaining": "Explicit #run roots and transitive SDK bodies participate in helper extraction, with private bridges and isolated renamed native packages. Generic specialization attachment and isolated canonical package-name remapping are connected. Complete command/editor adoption and full SDK acceptance."
     },
     {
       "python": "thorlang/specialization.py",
@@ -162,7 +164,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 11,
-      "remaining": "Bindings, lexical relevance, fingerprints, caller-frame save/restore, type spelling, declarations and predicates are ported. User generic process scheduling and lazy result predicates are connected. Complete native local-type/caller bridges and original-scope nominal identity probes."
+      "remaining": "Bindings, lexical relevance, fingerprints, caller-frame save/restore, type spelling, declarations and predicates are ported. User generic process scheduling and lazy result predicates are connected. Caller-local bridges and original-scope nominal identity probes are connected. Complete eligibility and command integration comparisons."
     },
     {
       "python": "thorlang/cache.py",

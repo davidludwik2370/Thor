@@ -3,6 +3,77 @@
 use super::*;
 use serde_json::json;
 impl Scheduler<'_> {
+    fn binding_condition(&mut self, typ: &Type) -> Result<String> {
+        let at = match typ {
+            Type::Nominal(at, _)
+            | Type::Struct(at)
+            | Type::Record(at, _)
+            | Type::Enum(at)
+            | Type::Union(at) => *at,
+            _ => return Ok(String::new()),
+        };
+        let mut bindings = self.specializations.relevant(at, &self.resolver);
+        if let Type::Record(_, captures) = typ {
+            let context = captures.iter().cloned().collect();
+            for (name, typ) in captures {
+                let Some(index) = self.resolver.lookup(at, name) else {
+                    continue;
+                };
+                let symbol = self.resolver.symbols[index].clone();
+                if symbol.scope == at.node {
+                    continue;
+                }
+                let (typ, value) = if let Type::Constant(value) = typ {
+                    let typ = symbol
+                        .annotation
+                        .map(|node| {
+                            self.resolver.specialized_type(
+                                Ref {
+                                    file: symbol.reference.file,
+                                    node,
+                                },
+                                &context,
+                            )
+                        })
+                        .unwrap_or(Type::scalar("int"));
+                    let data = match value {
+                        crate::semantics::Constant::Integer(value)
+                        | crate::semantics::Constant::Enum(_, value) => {
+                            json!({"kind":"integer","value":value.to_string()})
+                        }
+                        crate::semantics::Constant::Boolean(value) => {
+                            json!({"kind":"bool","value":value})
+                        }
+                        crate::semantics::Constant::Text(value) => {
+                            json!({"kind":"string","bytes":value.as_bytes().iter().map(|byte|format!("{byte:02x}")).collect::<String>()})
+                        }
+                    };
+                    (typ, Some(data))
+                } else {
+                    (typ.clone(), None)
+                };
+                bindings.insert(
+                    (symbol.reference, name.clone()),
+                    Binding {
+                        symbol: index,
+                        typ,
+                        value,
+                        canonical: String::new(),
+                        condition: String::new(),
+                    },
+                );
+            }
+        }
+        if bindings.is_empty() {
+            return Ok(String::new());
+        }
+        Specializations::predicate(
+            &bindings,
+            &mut TypeCode::new(at.file, Some(at)),
+            &self.resolver,
+        )
+        .map_err(|error| self.fail(at, error.to_string()))
+    }
     fn refresh_bindings(&mut self) {
         self.resolver.evaluated = self.results.clone();
         self.specializations.apply(&mut self.resolver);
@@ -106,6 +177,11 @@ impl Scheduler<'_> {
                 };
                 (typ, Some(data))
             };
+            let condition = if value.is_none() {
+                self.binding_condition(&typ)?
+            } else {
+                String::new()
+            };
             bindings.insert(
                 (symbol.reference, name),
                 Binding {
@@ -113,7 +189,7 @@ impl Scheduler<'_> {
                     typ,
                     value,
                     canonical: String::new(),
-                    condition: String::new(),
+                    condition,
                 },
             );
         }
