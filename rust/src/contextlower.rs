@@ -7,7 +7,12 @@ impl Lower<'_, '_> {
             .resolver
             .parameter_witnesses
             .values()
-            .filter(|w| w.annotation.file == self.file)
+            .filter(|w| {
+                w.annotation.file == self.file
+                    && self.evaluation.as_ref().is_none_or(|view| {
+                        view.retains(self.source, w.declaration.node)
+                    })
+            })
             .cloned()
             .collect::<Vec<_>>();
         for witness in witnesses {
@@ -90,7 +95,14 @@ impl Lower<'_, '_> {
             self.modules.insert(alias.clone(), path);
             return Some(format!("{alias}."));
         }
-        None
+        // A re-export such as basic.to_set can resolve to a declaration in
+        // another Thor runtime package without a direct source import.
+        let runtime = self.source.collection_roots.get("thor")?;
+        let directory = target.path.parent()?.strip_prefix(runtime).ok()?;
+        let path = format!("thor:{}", directory.to_str()?.replace('\\', "/"));
+        let alias = format!("{}context_package_{}", self.prefix, owner.file);
+        self.modules.insert(alias.clone(), path);
+        Some(format!("{alias}."))
     }
     fn context_type(&mut self, typ: &Type) -> Option<String> {
         Some(match typ {

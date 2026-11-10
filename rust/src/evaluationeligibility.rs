@@ -175,20 +175,20 @@ fn library_seen(
     .then(|| library_seen(r, value, path, seen))
     .flatten()
 }
+const PURE_FORMAT_PROCEDURES: &[&str] = &[
+    "format", "format_plain", "format_options", "format_spec", "group_integer",
+];
+
+pub(crate) fn approved_format(r: &Resolver<'_>, callee: Ref) -> bool {
+    library_member(r, callee, "thor:format")
+        .is_some_and(|name| PURE_FORMAT_PROCEDURES.contains(&name.as_str()))
+}
+
 pub(crate) fn approved_library(r: &Resolver<'_>, callee: Ref) -> Option<(String, String)> {
     for (path, names) in [
         ("core:slice", &["clone"][..]),
         ("core:strings", &["clone"][..]),
-        (
-            "thor:format",
-            &[
-                "format",
-                "format_plain",
-                "format_options",
-                "format_spec",
-                "group_integer",
-            ][..],
-        ),
+        ("thor:format", PURE_FORMAT_PROCEDURES),
         (
             "thor:big",
             &[

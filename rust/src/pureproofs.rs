@@ -678,6 +678,32 @@ impl Lower<'_, '_> {
             return Ok(None);
         }
         let node = self.source.node(id);
+        if node.kind == "Call" {
+            let callee = self.role(id, "callee")?;
+            if crate::evaluation::approved_format(self.resolver, self.reference(callee)) {
+                let args = self.source.group(id, "args");
+                let value = args.iter().find_map(|arg| {
+                    let field = self.source.role(*arg, "field")?;
+                    (self.source.text(field) == "value").then(|| self.source.role(*arg, "value")).flatten()
+                }).or_else(|| args.first().copied().filter(|arg| self.source.node(*arg).kind != "FieldValue"));
+                if let Some(value) = value {
+                    self.pure_operand_busy.insert(id);
+                    let result = self.closed(id, "pure_format", Some("string"), |this| {
+                        let module = this.module("format");
+                        let witness = this.native_type(value)?;
+                        Ok(Code::concat([
+                            this.g(format!("{module}.validate_pure_value("), value),
+                            witness,
+                            this.g(")\nreturn ", id),
+                            this.render(id, expected, constant)?,
+                        ]))
+                    });
+                    self.pure_operand_busy.remove(&id);
+                    let (name, args) = result?;
+                    return Ok(Some(self.helper_call(id, &name, args)));
+                }
+            }
+        }
         let mut operands = vec![];
         let mut boolean = false;
         match node.kind.as_str() {

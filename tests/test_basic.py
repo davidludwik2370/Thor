@@ -21,15 +21,19 @@ if len(values)!=3 || 2 not_in values {panic("native parameter witness")}
             with self.subTest(flags=flags):
                 root,_=self.invoke(code,flags=flags)
                 manifest=json.loads((root/'output/thor-manifest.json').read_text())
-                generated=root/'output/.thor-runtime/sets/sets.odin'
+                sources=[name for name in manifest['generated'] if name.endswith('/sets/sets.odin')]
+                self.assertEqual(len(sources),1,sources)
+                generated=root/'output'/sources[0]
                 self.assertTrue(generated.is_file())
                 generated_code=generated.read_text()
                 self.assertIn('parameter_',generated_code)
                 # Added type declarations must not rewrite native procedure bodies.
                 self.assertIn('return to_set_slice(values[:], allocator)',generated_code)
-                self.assertIn('.thor-runtime/sets/sets.odin',manifest['generated'])
         root,_=self.invoke(code,command='transpile')
-        generated=root/'output/.thor-runtime/sets/sets.odin'
+        manifest=json.loads((root/'output/thor-manifest.json').read_text())
+        sources=[name for name in manifest['generated'] if name.endswith('/sets/sets.odin')]
+        self.assertEqual(len(sources),1,sources)
+        generated=root/'output'/sources[0]
         mapping=json.loads(generated.with_suffix('.odin.map.json').read_text())
         original=base.ROOT/'runtime/sets/sets.odin'
         self.assertIn(str(original),mapping['sources'])

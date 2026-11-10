@@ -52,7 +52,9 @@ impl Resolver<'_> {
             }
             let plan = &plans[0];
             let owner = &self.sources[plan.procedure.file];
-            if owner.shared_native {
+            if owner.shared_native && !owner.collection_roots.get("thor")
+                .is_some_and(|runtime| owner.path.starts_with(runtime))
+            {
                 continue;
             }
             let Some(declaration) = owner

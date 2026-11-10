@@ -647,7 +647,9 @@ impl<'a, 'r> Purity<'a, 'r> {
             return;
         }
         if let Some(name) = self.intrinsic_name(callee, &mut HashSet::new()) {
-            if !Self::intrinsic_allowed(&name) {
+            if matches!(name.as_str(), "type_canonical_name" | "type_name_of") {
+                self.fault(root, callee, via, "Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.");
+            } else if !Self::intrinsic_allowed(&name) {
                 self.fault(
                     root,
                     callee,

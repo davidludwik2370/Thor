@@ -156,8 +156,8 @@ choose::proc(values:[2]$T,other:T)->T{_=other;return values[1]}
             with self.subTest(flags=flags):self.compare(code,flags=flags)
 
     def test_native_local_package_can_supply_private_contextual_type(self):
-        self.compare(self.program('if library.choose([.Red,.Blue])!=1{panic("native context")}',
-                                  'import "library"\n'),files={'library/main.odin':'''package library
+        self.compare(self.program('if library.choose([.Red,.Blue])!=1||ANSWER!=9{panic("native context")}',
+                                  'import "library"\nsquare::proc(n:int)->int{return n*n}\nANSWER::#run square(3)\n'),files={'library/main.odin':'''package library
 @(private="file") Color::enum{Red,Blue}
 choose::proc(values:[2]Color)->int{return int(values[1])}
 '''})

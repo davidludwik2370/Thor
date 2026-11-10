@@ -189,6 +189,26 @@ All 116 checks in the combined expression, power and import gate passed.
 The expanded membership and unevaluated-power regressions passed on both
 engines, including debug and unchecked power builds.
 
+### Native parameter type witnesses and checked formatting
+
+Isolated helpers emit parameter type witnesses only for retained declarations.
+Ordinary calls through `thor:basic` can use witnesses from the native runtime
+package that defines the procedure. The manifest identifies the adapted file
+and its source map, which retains the original Odin procedure bytes. The
+build-output check allows each compiler's generated directory while verifying
+the same executable location and name.
+
+Compile-time context substitution preserves lexical bindings and record field
+names. Type-name intrinsics report their source-identity restriction through
+constant aliases. Checked formatting validates the resolved operand type with
+the runtime's scalar and logical-number rules, including untyped scalar
+arguments and records that would invoke custom formatting.
+
+The native witness and original-byte mapping checks passed in checked and
+unchecked builds. The private contextual type and unrelated `#run` regression
+passed with both compilers. The native formatting, source identity and context
+macro fixtures also passed.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

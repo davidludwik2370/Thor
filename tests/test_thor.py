@@ -85,7 +85,9 @@ class ThorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         executable = directory / (directory.name + ('.exe' if os.name == 'nt' else ''))
         self.assertTrue(executable.is_file())
-        self.assertTrue((directory / '.thor-build' / 'input' / 'thor-manifest.json').is_file())
+        manifests=list(directory.glob('.thor*-build/input/thor-manifest.json'))
+        self.assertEqual(len(manifests),1,manifests)
+        self.assertEqual(json.loads(manifests[0].read_text())['entry'],str(directory.resolve()))
         self.assertEqual(subprocess.run([str(executable)], capture_output=True).returncode, 0)
 
     def test_cli_build_directory_name_with_spaces_and_dots(self):

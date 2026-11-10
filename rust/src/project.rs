@@ -480,7 +480,7 @@ impl Project {
             self.related.insert(token, notes);
         }
         let sdk = sdkmirror::SdkMirror::plan(
-            &self.sources,
+            &resolver,
             &purity,
             &mut self.collections,
             &self.destination,

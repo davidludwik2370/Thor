@@ -14,7 +14,7 @@ pub(super) struct SdkMirror {
 }
 impl SdkMirror {
     pub fn plan(
-        sources: &[Source],
+        resolver: &Resolver<'_>,
         facts: &crate::purity::Facts,
         collections: &mut BTreeMap<String, PathBuf>,
         destination: &Path,
@@ -22,6 +22,7 @@ impl SdkMirror {
         runtime_paths: (&Path, &Path),
         evaluation: Option<&crate::evaluation::Plan>,
     ) -> Result<Self> {
+        let sources = resolver.sources;
         let (runtime, backend_runtime) = runtime_paths;
         let mut changed = facts
             .targets
@@ -32,6 +33,12 @@ impl SdkMirror {
                 source.shared_native.then(|| source.path.clone())
             })
             .collect::<BTreeSet<_>>();
+        changed.extend(resolver.parameter_witnesses.values().filter_map(|witness| {
+            let source = &sources[witness.declaration.file];
+            (source.shared_native && evaluation.is_none_or(|plan| {
+                plan.emits(source, witness.declaration.node)
+            })).then(|| source.path.clone())
+        }));
         if let Some(plan) = evaluation {
             changed.extend(
                 sources

@@ -269,7 +269,26 @@ impl Project {
                     node: NodeId(index),
                 };
                 let name = if node.kind == "Ident" {
-                    Some(source.text(NodeId(index)).to_string())
+                    let name = source.text(id.node);
+                    if !matches!(name, "ODIN_TEST" | "ODIN_BUILD_MODE") {
+                        continue;
+                    }
+                    let binding = node.parent.is_some_and(|parent| {
+                        let kind = source.node(parent).kind.as_str();
+                        matches!(kind, "PolyType" | "EnumType" | "ImplicitSelector")
+                            || matches!(kind, "Declaration" | "Field" | "Range" | "TypeSwitch")
+                                && source.group(parent, "names").contains(&id.node)
+                            || matches!(kind, "Selector" | "FieldValue")
+                                && source.role(parent, "field") == Some(id.node)
+                    });
+                    (!binding && resolver.native_builtin(id, name)).then(|| name.to_owned())
+                } else if node.kind == "Selector" {
+                    if !source.role(id.node, "field").is_some_and(|field| {
+                        matches!(source.text(field), "ODIN_TEST" | "ODIN_BUILD_MODE")
+                    }) {
+                        continue;
+                    }
+                    crate::evaluation::library_member(&resolver, id, "base:builtin")
                 } else {
                     None
                 };
@@ -280,9 +299,7 @@ impl Project {
                     _ => None,
                 };
                 if let Some(value) = value {
-                    if resolver.symbol(id).is_none() {
-                        view.values.insert(NodeId(index), value);
-                    }
+                    view.values.insert(id.node, value);
                 }
             }
         }
