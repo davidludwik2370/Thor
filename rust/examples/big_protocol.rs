@@ -54,6 +54,9 @@ fn resolve(request: &Value) -> bigvalues::Result<Value> {
         clear_cache: false,
         cache_report: false,
         raw_diagnostics: false,
+        vet: None,
+        vet_apply: false,
+        vet_ask: false,
     })
     .map_err(|error| error.to_string())?;
     project

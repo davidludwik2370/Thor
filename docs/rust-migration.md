@@ -356,6 +356,30 @@ keeps the final executable identity and generated-source hashes consistent.
 All 32 Rust unit tests passed in debug and release; Clippy passed with warnings
 denied. Native `vet` and publishing ports and whole-language acceptance remain.
 
+### Native convention vetting and verified corrections
+
+The Rust CLI now supports `vet`, `--vet[=immutable,pure]`, `--apply` and `--ask`.
+Findings use the existing warning codes, UTF-8 byte edits and snapshot hashes.
+Candidate filtering retains explicit ownership/aliasing decisions, excludes
+generic/attributed/inactive declarations and rejects known purity violations.
+The complete native compiler validates batches and bisects rejected batches
+before a correction is reported. Validation invokes only the independent Rust
+compiler and reuses the project cache; Python is not a fallback.
+
+Corrections preserve comments, CRLF, Unicode and file modes. Application stages
+updates and backups, checks the original bytes again before replacement, rolls
+back partial replacements when possible and preserves concurrent edits. Dry
+vetting never prompts or edits. `--ask` defaults to no, and corrections reject
+unsaved overlays. Vet options before the source path and large valid batches
+retain their reference behavior. Build-time findings obey ordinary warning flags.
+
+All 17 focused native vet tests passed, including exact reference fix-payload
+comparison and an 80-correction batch. The combined vet/CLI/TLS/unused-local/
+debug-map/assertion-hygiene gate passed all 54 tests. All 34 Rust unit tests passed
+in debug and release; Clippy passed with warnings denied. Transaction tests cover
+replacement failure, rollback, concurrent changes, permissions and cleanup.
+Publishing, remaining migration guards and whole-language acceptance continue.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

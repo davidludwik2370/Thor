@@ -50,6 +50,9 @@ pub struct Options {
     pub clear_cache: bool,
     pub cache_report: bool,
     pub raw_diagnostics: bool,
+    pub vet: Option<Vec<String>>,
+    pub vet_apply: bool,
+    pub vet_ask: bool,
 }
 pub struct Project {
     pub options: Options,
@@ -1009,7 +1012,7 @@ impl Project {
         let mut command = Command::new(&self.frontend.odin);
         command.envs(&self.native_environment);
         command
-            .arg(if matches!(action, "run" | "test") {
+            .arg(if action=="vet" { "check" } else if matches!(action, "run" | "test") {
                 "build"
             } else {
                 action
@@ -1088,6 +1091,10 @@ impl Project {
                     .flatten()
                     .cloned(),
             );
+        }
+        if output.status.success() && (action=="vet" || self.options.vet.is_some()) {
+            let checks=self.options.vet.clone().unwrap_or_else(||vec!["immutable".into(),"pure".into()]);
+            errors.extend(crate::vet::run(self,&checks,self.options.vet_apply,self.options.vet_ask)?);
         }
         let reported_errors=if self.options.raw_diagnostics && errors.is_empty(){false}else{self.report(&errors)};
         if !output.status.success() || reported_errors {

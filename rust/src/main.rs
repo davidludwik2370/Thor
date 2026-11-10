@@ -74,9 +74,9 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         println!(
             "{}",
             json!({"engine":"rust","complete":false,"python_fallback":false,"parallel_lowering":false,
-            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","multiple-value or_panic","runtime collection comprehensions","runtime expanded extrema","slice privileges and contextual mutation summaries","generic inline defaults","macOS allocation tracking and ASan source locations","editor source overlays","runtime pure contracts, checked ordinary callees and scalar/sequence/record/union result ownership"],
-            "evaluation":{"isolated_native_helpers":true,"generic_frames":true,"scalar_and_aggregate_results":true,"contents_cache":true,"prepared_scalar_cache":true,"verified_scalar_sites":true,"compile_time_comprehensions":true,"big_number_results":false},
-            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","remaining pure function and SDK interactions","big numbers","full interpolation ownership","complete switch/using/callback interactions","full Set temporary ownership","complete optional-result arities","wildcard imports","TLS editor-info","debugger remapping","publishing","vet","project creation"]})
+            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","multiple-value or_panic","runtime collection comprehensions","runtime expanded extrema","slice privileges and contextual mutation summaries","generic inline defaults","macOS allocation tracking and ASan source locations","editor source overlays","TLS slice metadata","native project creation","verified vet findings and source corrections","runtime pure contracts, checked ordinary callees and scalar/sequence/record/union result ownership"],
+            "evaluation":{"isolated_native_helpers":true,"generic_frames":true,"scalar_and_aggregate_results":true,"contents_cache":true,"prepared_scalar_cache":true,"verified_scalar_sites":true,"compile_time_comprehensions":true,"big_number_results":true},
+            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","remaining pure function and SDK interactions","full interpolation ownership","complete switch/using/callback interactions","full Set temporary ownership","complete optional-result arities","wildcard imports","full live debugger acceptance","publishing","whole-language acceptance"]})
         );
         return Ok(0);
     }
@@ -86,13 +86,13 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             .take_while(|arg| arg.as_str() != "--")
             .any(|arg| arg == "--help" || arg == "-h")
     {
-        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
+        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|vet|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --clear-cache        Clear managed parser/evaluation cache entries\n  --cache-report       Print compile-time cache counters\n  --run-timeout SEC    Native compile-time execution limit (default 5)\n  --raw-diagnostics    Show original Odin diagnostics\n  --vet[=CHECKS]       Check immutable,pure conventions\n  --apply | --ask      Apply or confirm verified vet corrections\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
         return Ok(0);
     }
     let command = args.remove(0);
     if !matches!(
         command.as_str(),
-        "transpile" | "check" | "build" | "run" | "test" | "ast"
+        "transpile" | "check" | "build" | "run" | "test" | "vet" | "ast"
     ) {
         return Err(Error::new(format!(
             "Rust migration: command '{command}' has not been ported yet"
@@ -101,7 +101,37 @@ fn run(mut args: Vec<String>) -> Result<i32> {
     if args.is_empty() {
         return Err(Error::usage("expected a source file or package directory"));
     }
-    let entry = PathBuf::from(args.remove(0));
+    let mut skip = false;
+    let mut source = None;
+    for (index, argument) in args.iter().enumerate() {
+        if skip {
+            skip = false;
+            continue;
+        }
+        if argument == "--" {
+            break;
+        }
+        if matches!(
+            argument.as_str(),
+            "--output-dir"
+                | "--cache-dir"
+                | "--odin"
+                | "--diagnostic-format"
+                | "--overlay"
+                | "--run-timeout"
+                | "--track-allocations"
+        ) {
+            skip = true;
+            continue;
+        }
+        if !argument.starts_with('-') {
+            source = Some(index);
+            break;
+        }
+    }
+    let entry = PathBuf::from(args.remove(
+        source.ok_or_else(|| Error::usage("expected a source file or package directory"))?,
+    ));
     let mut options = Options {
         command,
         entry,
@@ -125,6 +155,9 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         clear_cache: false,
         cache_report: false,
         raw_diagnostics: false,
+        vet: None,
+        vet_apply: false,
+        vet_ask: false,
     };
     if let Some(root) = env::var_os("THOR_ROOT") {
         options.root = absolute(&PathBuf::from(root))?;
@@ -196,6 +229,9 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             "--clear-cache" => options.clear_cache = true,
             "--cache-report" => options.cache_report = true,
             "--raw-diagnostics" => options.raw_diagnostics = true,
+            "--vet" => options.vet = Some(vec!["immutable".into(), "pure".into()]),
+            "--apply" => options.vet_apply = true,
+            "--ask" => options.vet_ask = true,
             "--source-maps" => options.maps = true,
             "--editor-info" => options.editor_info = true,
             "--track-allocations" => {
@@ -221,6 +257,9 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                         .overlays
                         .insert(original, std::fs::read_to_string(replacement)?);
                 }
+            }
+            _ if argument.starts_with("--vet=") => {
+                options.vet = Some(argument[6..].split(',').map(str::to_string).collect())
             }
             _ if argument.starts_with("--run-timeout=") => {
                 let seconds = argument[14..]
@@ -254,6 +293,40 @@ fn run(mut args: Vec<String>) -> Result<i32> {
     if !options.args.is_empty() && !matches!(options.command.as_str(), "run" | "test") {
         return Err(Error::usage(
             "arguments after -- are only supported by run and test",
+        ));
+    }
+    if options.vet_apply && options.vet_ask {
+        return Err(Error::usage("--apply and --ask are mutually exclusive"));
+    }
+    if (options.vet_apply || options.vet_ask) && options.command != "vet" {
+        return Err(Error::usage(
+            "--apply and --ask are only supported by thor vet",
+        ));
+    }
+    if (options.vet_apply || options.vet_ask) && !options.overlays.is_empty() {
+        return Err(Error::usage(
+            "vet corrections require saved files without --overlay",
+        ));
+    }
+    if let Some(checks) = &options.vet {
+        if checks.is_empty()
+            || checks
+                .iter()
+                .any(|check| !matches!(check.as_str(), "immutable" | "pure"))
+        {
+            return Err(Error::usage(
+                "Thor vet checks must be selected from immutable,pure",
+            ));
+        }
+        if options.command == "transpile" {
+            return Err(Error::usage(
+                "--vet requires native checking. Run thor vet.",
+            ));
+        }
+    }
+    if options.raw_diagnostics && (options.command == "vet" || options.vet.is_some()) {
+        return Err(Error::usage(
+            "Thor vet requires mapped diagnostics without --raw-diagnostics",
         ));
     }
     let mut project = Project::new(options)?;

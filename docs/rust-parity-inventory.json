@@ -462,7 +462,7 @@
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Project creation, ordinary compilation, cache/time-limit controls, raw/mapped diagnostics and runtime argument separation are connected. Finish vet/publishing command orchestration and whole-language acceptance."
+      "remaining": "Project creation, ordinary compilation, verified vetting/corrections, cache/time-limit controls, raw/mapped diagnostics and runtime argument separation are connected. Finish publishing command orchestration and whole-language acceptance."
     },
     {
       "python": "thorlang/hygiene.py",
@@ -543,11 +543,15 @@
     },
     {
       "python": "thorlang/vet.py",
-      "rust": [],
+      "rust": [
+        "rust/src/vet.rs",
+        "rust/src/main.rs",
+        "rust/src/project.rs"
+      ],
       "checkpoint": 7,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 11,
-      "remaining": "Port vet commands and edits."
+      "remaining": "Native convention candidates, complete-compiler batch validation, fix payloads, explicit apply/ask and transactional source updates pass reference CLI cases and focused interaction tests. Complete whole-language acceptance and performance comparison."
     }
   ]
 }

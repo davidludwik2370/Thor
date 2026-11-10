@@ -34,6 +34,9 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         clear_cache: false,
         cache_report: false,
         raw_diagnostics: false,
+        vet: None,
+        vet_apply: false,
+        vet_ask: false,
     })?;
     project.inspect_sources()?;
     let request = project

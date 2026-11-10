@@ -29,5 +29,6 @@ pub mod purity;
 pub mod semantics;
 pub mod specialization;
 pub mod values;
+pub mod vet;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
