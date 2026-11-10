@@ -1,0 +1,389 @@
+//! Reference Resolver.protection/prepare_storage_checks, retaining native type
+//! predicates when a generic reference path has not been instantiated yet.
+use super::*;
+
+#[derive(Clone)]
+enum Predicate {
+    NotPointer(NodeId),
+    InlineIndex(NodeId),
+    Set(NodeId),
+    Arrow(NodeId, String),
+    Array(NodeId),
+}
+#[derive(Clone)]
+pub(super) struct Guard {
+    predicates: Vec<Predicate>,
+    origin: NodeId,
+    message: String,
+}
+struct Protection {
+    name: String,
+    predicates: Vec<Predicate>,
+}
+pub(super) struct NativeStorage {
+    pub replacements: Vec<(Span, Code)>,
+    pub inserts: Vec<(usize, Code)>,
+}
+fn storage_type(mut typ: Type) -> Type {
+    while let Type::Nominal(_, inner) = typ {
+        typ = *inner;
+    }
+    typ
+}
+impl Lower<'_, '_> {
+    fn value_iteration_slice(&self, mut id: NodeId) -> bool {
+        while let Some(parent) = self.source.node(id).parent {
+            if self.source.node(parent).kind != "Paren" {
+                return self.source.node(parent).kind == "Range"
+                    && self.source.role(parent, "expr") == Some(id)
+                    && !self.source.group(parent, "names").iter().any(|name| {
+                        self.source.node(*name).kind == "Unary" && self.source.node(*name).op == "&"
+                    });
+            }
+            id = parent;
+        }
+        false
+    }
+    pub(super) fn native_storage(&mut self) -> Result<NativeStorage> {
+        let mut replacements = vec![];
+        let mut inserts = vec![];
+        for (id, message) in self.blocked.clone() {
+            let span = self.source.node(id).span;
+            if self
+                .edits
+                .iter()
+                .any(|(edit, _)| edit.start < span.end && span.start < edit.end)
+            {
+                continue;
+            }
+            let code = self.error_token(id, &message);
+            replacements.push((span, code));
+        }
+        for (statement, guards) in self.storage_guards.clone() {
+            let code = guards
+                .into_iter()
+                .map(|guard| self.render_storage_guard(guard))
+                .collect::<Result<Vec<_>>>()?;
+            let start = self.source.node(statement).span.start;
+            inserts.push((start, Code::concat(code)));
+        }
+        for (block, guards) in self.storage_block_guards.clone() {
+            let code = guards
+                .into_iter()
+                .map(|guard| self.render_storage_guard(guard))
+                .collect::<Result<Vec<_>>>()?;
+            let span = self.source.node(block).span;
+            if self.source.raw.as_bytes()[span.start] == b'{' {
+                let start = span.start + 1;
+                inserts.push((start, Code::concat(code)));
+            } else {
+                self.convert_do(block);
+                inserts.push((
+                    span.start,
+                    Code::concat([self.g("{\n", block), Code::concat(code)]),
+                ));
+                inserts.push((span.end, self.g("\n}", block)));
+            }
+        }
+        Ok(NativeStorage {
+            replacements,
+            inserts,
+        })
+    }
+    fn storage_query(&mut self, id: NodeId) -> Result<String> {
+        let code = self.query_value(id)?.finish().text;
+        let query = self.native("type_of");
+        Ok(format!("{query}({code})"))
+    }
+    fn protection(&mut self, id: NodeId) -> Result<Option<Protection>> {
+        let source = self.source;
+        let node = source.node(id);
+        if node.kind == "Paren" {
+            return self.protection(self.role(id, "expr")?);
+        }
+        if let Some(projection) = self.resolver.projection(self.reference(id)) {
+            if self.resolver.projection_indirect(&projection) {
+                return Ok(None);
+            }
+            if projection.owner.file == self.file {
+                return self.protection(projection.owner.node);
+            }
+            let owner = self
+                .resolver
+                .symbol(projection.owner)
+                .map(|id| self.resolver.symbols[id].clone());
+            return Ok(owner
+                .filter(|owner| owner.immutable)
+                .map(|owner| Protection {
+                    name: owner.name,
+                    predicates: vec![],
+                }));
+        }
+        if let Some(index) = self.resolver.symbol(self.reference(id)) {
+            let sym = &self.resolver.symbols[index];
+            let owner = &self.resolver.sources[sym.reference.file];
+            let typed_index = owner.node(sym.reference.node).kind == "Range"
+                && sym.index == 1
+                && owner.role(sym.reference.node, "index_type").is_some();
+            return Ok((sym.immutable || typed_index).then(|| Protection {
+                name: sym.name.clone(),
+                predicates: vec![],
+            }));
+        }
+        if node.kind == "Deref" || !matches!(node.kind.as_str(), "Selector" | "Index") {
+            return Ok(None);
+        }
+        let base = self.role(id, "expr")?;
+        let Some(mut protected) = self.protection(base)? else {
+            return Ok(None);
+        };
+        let typ = storage_type(self.typ(base));
+        if node.kind == "Selector" {
+            if matches!(typ, Type::Pointer(_)) {
+                return Ok(None);
+            }
+            // A concrete promoted pointer is also a shallow access path.
+            if let Some(field) = source.role(id, "field") {
+                if let Some(path) = self.resolver.member_path(&typ, source.text(field)) {
+                    let mut current = typ.clone();
+                    for field in path {
+                        if matches!(storage_type(current.clone()), Type::Pointer(_)) {
+                            return Ok(None);
+                        }
+                        current = self.resolver.member_type(&current, &field);
+                    }
+                }
+            }
+            if typ.is_unknown() {
+                protected.predicates.push(Predicate::NotPointer(base));
+            }
+        } else {
+            if matches!(
+                typ,
+                Type::Slice(_) | Type::Dynamic(_) | Type::Pointer(_) | Type::String { .. }
+            ) {
+                return Ok(None);
+            }
+            if typ.is_unknown() {
+                protected.predicates.push(Predicate::InlineIndex(base));
+            }
+        }
+        Ok(Some(protected))
+    }
+    pub(super) fn render_storage_guard(&mut self, guard: Guard) -> Result<Code> {
+        // Resolve reference expressions in the current capture environment.
+        // A lowered helper may name the original local through a parameter.
+        self.meta = true;
+        let meta = format!("{}meta", self.prefix);
+        let mut parts = vec![];
+        for predicate in guard.predicates {
+            let part = match predicate {
+                Predicate::NotPointer(id) => {
+                    format!("!{meta}.type_is_pointer({})", self.storage_query(id)?)
+                }
+                Predicate::InlineIndex(id) => {
+                    let query = self.storage_query(id)?;
+                    format!("({meta}.type_is_array({query}) || {meta}.type_is_enumerated_array({query}) || {meta}.type_is_map({query}))")
+                }
+                Predicate::Array(id) => {
+                    let query = self.storage_query(id)?;
+                    format!("({meta}.type_is_array({query}) || {meta}.type_is_enumerated_array({query}))")
+                }
+                Predicate::Set(id) => self.set_trait(id)?.finish().text,
+                Predicate::Arrow(id, field) => {
+                    let code = self.query_value(id)?.finish().text;
+                    let query = self.native("type_of");
+                    format!("(!{meta}.type_is_pointer({query}({code})) && {meta}.type_is_pointer({meta}.type_proc_parameter_type({query}(({code}).{field}),0)))")
+                }
+            };
+            parts.push(format!("({part})"));
+        }
+        let condition = parts.join(" && ");
+        let token = self.error_token(guard.origin, &guard.message).finish().text;
+        // These are compile-time inspection predicates. No operand of type_of
+        // is executed, including with assertions disabled in the final program.
+        Ok(self.g(
+            format!("#assert(!({condition}),{})\n", json!(token)),
+            guard.origin,
+        ))
+    }
+    pub(super) fn storage(&mut self) -> Result<()> {
+        for (i, node) in self.source.nodes.iter().enumerate() {
+            let id = NodeId(i);
+            let targets = if node.kind == "Assignment" && node.op != "in" {
+                self.source
+                    .group(id, "lhs")
+                    .iter()
+                    .map(|target| (*target, *target, "write"))
+                    .collect::<Vec<_>>()
+            } else if node.kind == "Unary" && node.op == "&" {
+                vec![(id, self.role(id, "expr")?, "take a mutable address of")]
+            } else if node.kind == "Slice" && !self.source.thor && !self.value_iteration_slice(id) {
+                let expr = self.role(id, "expr")?;
+                vec![(id, expr, "create a mutable slice of")]
+            } else if node.kind == "Cast"
+                && !self.source.thor
+                && matches!(
+                    storage_type(self.typ(self.role(id, "type")?)),
+                    Type::Slice(_)
+                )
+            {
+                vec![(id, self.role(id, "expr")?, "create a mutable slice of")]
+            } else if node.kind == "Range"
+                && self.source.group(id, "names").iter().any(|name| {
+                    self.source.node(*name).kind == "Unary" && self.source.node(*name).op == "&"
+                })
+            {
+                let expr = self.role(id, "expr")?;
+                vec![(expr, expr, "iterate by mutable reference over")]
+            } else if node.kind == "Call" {
+                let callee = self.role(id, "callee")?;
+                let name = self.source.text(callee);
+                if ["raw_data", "soa_unzip", "clear"].contains(&name)
+                    && self.resolver.native_builtin(self.reference(callee), name)
+                {
+                    if let Some(arg) = self.source.group(id, "args").first().copied() {
+                        let typ = storage_type(self.typ(arg));
+                        if name != "clear" {
+                            vec![(id, arg, "obtain a mutable data pointer to")]
+                        } else if matches!(typ, Type::Set(_) | Type::Unknown | Type::Generic) {
+                            vec![(id, arg, "write")]
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    }
+                } else if self.source.node(callee).kind == "Selector"
+                    && self.source.node(callee).op == "->"
+                {
+                    let receiver = self.role(callee, "expr")?;
+                    let field = self.role(callee, "field")?;
+                    let typ = storage_type(self.typ(receiver));
+                    if typ.is_unknown() {
+                        vec![(id, receiver, "take an implicit mutable address of")]
+                    } else if !matches!(typ, Type::Pointer(_)) {
+                        let member = self.resolver.member_type(&typ, self.source.text(field));
+                        let pointer = if let Type::Procedure(signature) = member {
+                            self.resolver
+                                .fields(signature, "params")
+                                .first()
+                                .and_then(|(_, annotation)| *annotation)
+                                .is_some_and(|annotation| {
+                                    matches!(
+                                        storage_type(self.resolver.type_of(annotation)),
+                                        Type::Pointer(_)
+                                    )
+                                })
+                        } else {
+                            false
+                        };
+                        if pointer {
+                            vec![(id, receiver, "take an implicit mutable address of")]
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![]
+            };
+            for (origin, target, action) in targets {
+                let Some(mut protected) = self.protection(target)? else {
+                    continue;
+                };
+                let typ = storage_type(self.typ(target));
+                if action == "write" && node.kind == "Call" && typ.is_unknown() {
+                    protected.predicates.push(Predicate::Set(target));
+                }
+                if action == "take an implicit mutable address of" && typ.is_unknown() {
+                    let field = self
+                        .source
+                        .text(self.role(self.role(id, "callee")?, "field")?)
+                        .to_string();
+                    protected.predicates.push(Predicate::Arrow(target, field));
+                }
+                if [
+                    "iterate by mutable reference over",
+                    "obtain a mutable data pointer to",
+                    "create a mutable slice of",
+                ]
+                .contains(&action)
+                {
+                    if matches!(
+                        typ,
+                        Type::Slice(_)
+                            | Type::Dynamic(_)
+                            | Type::Map { .. }
+                            | Type::Pointer(_)
+                            | Type::String { .. }
+                    ) {
+                        continue;
+                    }
+                    if typ.is_unknown() {
+                        protected.predicates.push(Predicate::Array(target));
+                    }
+                }
+                let message = format!("Cannot {action} immutable storage '{}'", protected.name);
+                if protected.predicates.is_empty() {
+                    self.blocked.insert(origin, message);
+                    continue;
+                }
+                let guard = Guard {
+                    predicates: protected.predicates,
+                    origin,
+                    message,
+                };
+                let statement = std::iter::once(id)
+                    .chain(self.source.ancestors(id))
+                    .find(|node| {
+                        matches!(
+                            self.source.node(*node).kind.as_str(),
+                            "Assignment"
+                                | "Declaration"
+                                | "Return"
+                                | "ExpressionStatement"
+                                | "Range"
+                                | "If"
+                                | "For"
+                                | "Switch"
+                                | "When"
+                        )
+                    })
+                    .unwrap_or(id);
+                let parent = self.source.node(statement).parent;
+                let control = parent
+                    .filter(|parent| {
+                        matches!(self.source.node(*parent).kind.as_str(), "If" | "For")
+                    })
+                    .or_else(|| {
+                        matches!(self.source.node(statement).kind.as_str(), "If" | "For")
+                            .then_some(statement)
+                    });
+                let converted = self.source.ancestors(statement).find(|node| {
+                    self.source.node(*node).kind == "Block"
+                        && self.source.raw.as_bytes()[self.source.node(*node).span.start] != b'{'
+                });
+                if let Some(block) = control
+                    .and_then(|control| self.source.role(control, "body"))
+                    .or(converted)
+                {
+                    self.storage_block_guards
+                        .entry(block)
+                        .or_default()
+                        .push(guard);
+                } else {
+                    self.storage_guards
+                        .entry(statement)
+                        .or_default()
+                        .push(guard);
+                }
+            }
+        }
+        Ok(())
+    }
+}

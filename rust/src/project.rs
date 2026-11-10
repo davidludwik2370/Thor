@@ -345,7 +345,7 @@ impl Project {
         for (reference, issue) in &privileges.issues {
             let source = &self.sources[reference.file];
             let token = format!(
-                "{}expression_error_{}",
+                "{}expression_error_{}_",
                 source.prefix,
                 source.node(reference.node).span.start
             );

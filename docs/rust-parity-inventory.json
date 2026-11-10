@@ -53,12 +53,14 @@
         "rust/src/conditions.rs",
         "rust/src/constants.rs",
         "rust/src/contexts.rs",
-        "rust/src/contextlower.rs"
+        "rust/src/contextlower.rs",
+        "rust/src/projections.rs",
+        "rust/src/storage.rs"
       ],
       "checkpoint": 2,
       "status": "partial",
       "reference_functions": 47,
-      "remaining": "Lookup, substitutions, overloads, using projections and conditional declarations; follow Resolver methods."
+      "remaining": "Resolution acceptance is covered by the overload/type-parameter suites plus lexical using projections and native generic storage guards. Whole-language acceptance remains checkpoint 8; unresolved generic permission decisions belong to checkpoint 3."
     },
     {
       "python": "thorlang/pureborrow.py",

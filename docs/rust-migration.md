@@ -38,6 +38,32 @@ Use focused comparisons while implementing and broader gates at integration
 boundaries. Further architectural optimization and parallel lowering wait for
 behavioral acceptance. The historical sections below record earlier checkpoints.
 
+### Parity-first resolution work
+
+The resolver now follows the reference's `using` lookup and storage-protection
+decisions. Promoted names retain their containing record's type and storage
+origin, including nested `using`, parameter projections, local initializer
+shadowing, and cross-file immutable storage. Existing pointer paths remain
+shallow. A generic value receiver may require an implicit mutable address for
+an arrow call; pointer receivers and by-value receivers keep Odin's behavior.
+
+Storage checks retain native type predicates until generic instantiation. They
+are rendered in the current helper capture environment rather than embedding
+out-of-scope local names. Type queries do not execute index/call operands.
+Mixed `.odin` dependencies receive the same immutable-storage checks as the
+reference, while direct value iteration over an immutable array slice remains
+valid. Direct storage errors take precedence over dependent slice-alias errors;
+independent errors at one source position have separate message tokens.
+
+The focused acceptance files are `test_rust_storage_parity.py` and
+`test_rust_using_parity.py`, alongside the existing resolution and explicit
+type-parameter suites. Runtime checks exercise checked and unchecked release
+builds with explicit panic-based verdicts. The combined resolution/storage/using,
+type-parameter and assertion-hygiene run passed 95 tests; the additional standalone
+parameter-addressability test passed separately. All 15 Rust unit tests pass in
+debug and release, and Clippy passes with warnings denied. Pure `using` projection handling is
+the next permission/purity gap; compile-time execution remains unported.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

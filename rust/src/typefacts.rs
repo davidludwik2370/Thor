@@ -228,6 +228,9 @@ impl Resolver<'_> {
             }
             if let Some(symbol) = self.symbol(r) {
                 let symbol = self.symbols[symbol].clone();
+                if let Some(projection) = symbol.projection {
+                    return self.projected_type(&projection, bindings);
+                }
                 if self.sources[symbol.reference.file]
                     .node(symbol.reference.node)
                     .kind

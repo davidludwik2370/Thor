@@ -1295,6 +1295,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if kind == "Call" {
             return self.call(r, c);
         }
+        if let Some(projection) = self.r.projection(r) {
+            let owner = self.eval(projection.owner, c);
+            return self.member(owner, &projection.member);
+        }
         if kind == "Ident" || (kind == "Selector" && self.r.symbol(r).is_some()) {
             if let Some(symbol) = self.r.symbol(r) {
                 if let Some(v) = self.contexts[c]

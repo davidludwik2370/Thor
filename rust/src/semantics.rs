@@ -12,6 +12,9 @@ mod conditions;
 mod constants;
 #[path = "contexts.rs"]
 mod contexts;
+#[path = "projections.rs"]
+mod projections;
+pub use projections::Projection;
 #[path = "typefacts.rs"]
 mod typefacts;
 pub use calls::CallPlan;
@@ -154,6 +157,7 @@ pub struct Symbol {
     pub constant: bool,
     pub parameter: bool,
     pub result: bool,
+    pub projection: Option<Projection>,
 }
 pub struct Resolver<'a> {
     pub sources: &'a [Source],
@@ -167,6 +171,7 @@ pub struct Resolver<'a> {
     pub parameter_witnesses: BTreeMap<Ref, ParameterWitness>,
     pub conditional_immutables: HashSet<Ref>,
     pub flags: Vec<String>,
+    using_symbols: HashMap<Ref, usize>,
 }
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
     let node = source.node(id);
@@ -218,6 +223,7 @@ impl<'a> Resolver<'a> {
             parameter_witnesses: BTreeMap::new(),
             conditional_immutables: HashSet::new(),
             flags: flags.to_vec(),
+            using_symbols: HashMap::new(),
         };
         for (file, source) in sources.iter().enumerate() {
             if source.excluded {
@@ -322,6 +328,7 @@ impl<'a> Resolver<'a> {
                         constant: node.kind == "Declaration" && !node.mutable,
                         parameter,
                         result,
+                        projection: None,
                     };
                     this.scopes
                         .entry((file, owner, name))
@@ -372,10 +379,16 @@ impl<'a> Resolver<'a> {
                     .extend(ids.iter().map(|id| this.symbols[*id].reference));
             }
         }
+        this.prepare_projections();
         this
     }
     pub fn lookup(&self, reference: Ref, name: &str) -> Option<usize> {
         let source = &self.sources[reference.file];
+        if source.text(reference.node) == name {
+            if let Some(symbol) = self.using_symbols.get(&reference) {
+                return Some(*symbol);
+            }
+        }
         for owner in std::iter::once(reference.node)
             .chain(source.ancestors(reference.node))
             .filter(|id| is_scope(source, *id))
@@ -411,6 +424,14 @@ impl<'a> Resolver<'a> {
                 });
                 if let Some(id) = ids.iter().find(|id| {
                     Some(self.symbols[**id].reference.node) != own_decl
+                        && (owner == NodeId(0)
+                            || source.node(self.symbols[**id].reference.node).kind != "Declaration"
+                            || !source.node(self.symbols[**id].reference.node).mutable
+                            || source.node(reference.node).span.start
+                                >= source.node(self.symbols[**id].reference.node).span.end
+                            || source
+                                .group(self.symbols[**id].reference.node, "names")
+                                .contains(&reference.node))
                         && !own_field.is_some_and(|field| {
                             source
                                 .group(field, "names")
@@ -475,6 +496,9 @@ impl<'a> Resolver<'a> {
         None
     }
     pub fn symbol(&self, reference: Ref) -> Option<usize> {
+        if let Some(symbol) = self.using_symbols.get(&reference) {
+            return Some(*symbol);
+        }
         let source = &self.sources[reference.file];
         match source.node(reference.node).kind.as_str() {
             "Ident" | "PolyType" => {
@@ -988,6 +1012,9 @@ impl<'a> Resolver<'a> {
             "Ident" => {
                 if let Some(id) = self.symbol(r) {
                     let sym = self.symbols[id].clone();
+                    if let Some(projection) = sym.projection {
+                        return self.projected_type(&projection, &Substitutions::new());
+                    }
                     if let Some(annotation) = sym.annotation {
                         if self.compiled_type_parameter(
                             Ref {

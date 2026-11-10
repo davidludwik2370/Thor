@@ -28,6 +28,8 @@ mod pureschema;
 mod purevariants;
 #[path = "sets.rs"]
 mod sets;
+#[path = "storage.rs"]
+mod storage;
 #[path = "switches.rs"]
 mod switches;
 #[path = "typedloops.rs"]
@@ -63,6 +65,8 @@ pub struct Lower<'a, 'r> {
     pub errors: HashMap<String, String>,
     pub type_sites: HashMap<String, (Ref, String)>,
     blocked: HashMap<NodeId, String>,
+    storage_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
+    storage_block_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
     assigning: HashSet<NodeId>,
     native_access: HashSet<NodeId>,
     address_nodes: HashSet<NodeId>,
@@ -107,6 +111,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             errors: HashMap::new(),
             type_sites: HashMap::new(),
             blocked: HashMap::new(),
+            storage_guards: BTreeMap::new(),
+            storage_block_guards: BTreeMap::new(),
             assigning: HashSet::new(),
             native_access: HashSet::new(),
             address_nodes: HashSet::new(),
@@ -130,12 +136,12 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         this.imports()?;
         this.resources()?;
-        this.storage()?;
         this.prepare_contexts()?;
         this.discover_fstrings();
         if this.source.thor {
             this.prepare_defaults()?;
         }
+        this.storage()?;
         Ok(this)
     }
     pub fn instrument_memory(
@@ -270,6 +276,17 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
         }
+        // Keep direct immutable-storage errors ahead of dependent slice/data
+        // permission errors, following the reference check order. In
+        // particular, assigning a slice header is a binding write.
+        if self.blocked.keys().any(|id| {
+            self.source
+                .node(target)
+                .span
+                .contains(self.source.node(*id).span)
+        }) {
+            return;
+        }
         let code = self.error_token(origin, message);
         self.blocked.remove(&target);
         if self.source.thor {
@@ -318,9 +335,10 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
     fn error_token(&mut self, id: NodeId, message: &str) -> Code {
         let token = format!(
-            "{}expression_error_{}",
+            "{}expression_error_{}_{}_end",
             self.source.prefix,
-            self.source.node(id).span.start
+            self.source.node(id).span.start,
+            self.errors.len()
         );
         self.errors.insert(token.clone(), message.into());
         self.g(token, id)
@@ -333,6 +351,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             ));
         }
         if !self.source.thor {
+            let storage = self.native_storage()?;
             let mut inserts: Vec<_> = self
                 .body_prologues
                 .iter()
@@ -343,13 +362,14 @@ impl<'a, 'r> Lower<'a, 'r> {
                     )
                 })
                 .collect();
+            inserts.extend(storage.inserts);
             for (declaration, parts) in &self.declaration_helpers {
                 inserts.push((
                     self.source.node(*declaration).span.end,
                     Code::concat(parts.iter().cloned()),
                 ));
             }
-            let mut code = vec![self.splice(NodeId(0), vec![], inserts)?];
+            let mut code = vec![self.splice(NodeId(0), storage.replacements, inserts)?];
             code.extend(
                 self.helpers
                     .iter()
@@ -483,16 +503,6 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .contains(&self.reference(id))
             {
                 return Err(self.unsupported(id, "conditional immutable binding selection"));
-            }
-            if node.kind == "Using" {
-                for value in self.source.group(id, "values") {
-                    if self.protected(*value).is_some() {
-                        return Err(self.unsupported(id, "using-promoted immutable fields"));
-                    }
-                }
-            }
-            if node.immutable && node.data["using_field"] == true {
-                return Err(self.unsupported(id, "using-promoted immutable declarations"));
             }
             if node.data["pure"] == true && !self.verified_pure.contains(&id) {
                 return Err(self.unsupported(id, "pure-function verification and execution"));
@@ -665,84 +675,6 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         Ok(())
     }
-    fn protected(&mut self, id: NodeId) -> Option<String> {
-        let source = self.source;
-        let node = source.node(id);
-        if let Some(symbol) = self.resolver.symbol(self.reference(id)) {
-            let sym = &self.resolver.symbols[symbol];
-            let source = &self.resolver.sources[sym.reference.file];
-            let typed_index = source.node(sym.reference.node).kind == "Range"
-                && sym.index == 1
-                && source.role(sym.reference.node, "index_type").is_some();
-            if sym.immutable || typed_index {
-                return Some(sym.name.clone());
-            }
-            return None;
-        }
-        match node.kind.as_str() {
-            "Paren" => self.protected(source.role(id, "expr")?),
-            "Selector" | "Index" => {
-                let base = source.role(id, "expr")?;
-                let typ = self.typ(base);
-                if matches!(
-                    typ,
-                    Type::Pointer(_) | Type::Slice(_) | Type::Dynamic(_) | Type::String { .. }
-                ) {
-                    None
-                } else {
-                    self.protected(base)
-                }
-            }
-            _ => None,
-        }
-    }
-    fn storage(&mut self) -> Result<()> {
-        for (i, node) in self.source.nodes.iter().enumerate() {
-            let id = NodeId(i);
-            let targets = if node.kind == "Assignment" {
-                self.source
-                    .group(id, "lhs")
-                    .iter()
-                    .map(|id| (*id, *id, "write"))
-                    .collect::<Vec<_>>()
-            } else if node.kind == "Unary" && node.op == "&" {
-                vec![(id, self.role(id, "expr")?, "take a mutable address of")]
-            } else if node.kind == "Range"
-                && self.source.group(id, "names").iter().any(|name| {
-                    self.source.node(*name).kind == "Unary" && self.source.node(*name).op == "&"
-                })
-            {
-                let expr = self.role(id, "expr")?;
-                vec![(expr, expr, "iterate by mutable reference over")]
-            } else if node.kind == "Call"
-                && self.source.role(id, "callee").is_some_and(|callee| {
-                    matches!(self.source.text(callee), "raw_data" | "soa_unzip")
-                        && self.resolver.symbol(self.reference(callee)).is_none()
-                })
-            {
-                if let Some(arg) = self.source.group(id, "args").first() {
-                    if matches!(self.typ(*arg), Type::Array { .. }) {
-                        vec![(id, *arg, "obtain a mutable data pointer to")]
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                }
-            } else {
-                vec![]
-            };
-            for (origin, target, action) in targets {
-                if let Some(name) = self.protected(target) {
-                    self.blocked.insert(
-                        origin,
-                        format!("Cannot {action} immutable storage '{name}'"),
-                    );
-                }
-            }
-        }
-        Ok(())
-    }
     fn resources(&mut self) -> Result<()> {
         for (i, node) in self.source.nodes.iter().enumerate() {
             let id = NodeId(i);
@@ -858,8 +790,21 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let result = self.render_inner(id, expected, constant);
         self.checked_mode = old;
-        result
+        let code = result?;
+        if self.querying == 0 {
+            if let Some(guards) = self.storage_guards.get(&id).cloned() {
+                let guards = guards
+                    .into_iter()
+                    .map(|guard| self.render_storage_guard(guard))
+                    .collect::<Result<Vec<_>>>()?;
+                return Ok(Code::concat(
+                    guards.into_iter().chain(std::iter::once(code)),
+                ));
+            }
+        }
+        Ok(code)
     }
+
     fn render_inner(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
         if let Some(message) = self.blocked.get(&id).cloned() {
             return Ok(self.error_token(id, &message));
@@ -1368,7 +1313,15 @@ impl<'a, 'r> Lower<'a, 'r> {
             if let Some(prologue) = self.body_prologues.get(&id) {
                 inserts.push((node.span.start + 1, Code::concat(prologue.iter().cloned())));
             }
-            let helpers = self.helper_declarations(id);
+            let mut helpers = self
+                .storage_block_guards
+                .get(&id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|guard| self.render_storage_guard(guard))
+                .collect::<Result<Vec<_>>>()?;
+            helpers.extend(self.helper_declarations(id));
             if !helpers.is_empty() {
                 if self.source.raw.as_bytes()[node.span.start] == b'{' {
                     inserts.push((node.span.start + 1, Code::concat(helpers)));
