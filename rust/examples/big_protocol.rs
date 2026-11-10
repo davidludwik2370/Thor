@@ -50,6 +50,10 @@ fn resolve(request: &Value) -> bigvalues::Result<Value> {
         no_sanitize: true,
         overlays: BTreeMap::new(),
         editor_info: false,
+        run_timeout: std::time::Duration::from_secs(5),
+        clear_cache: false,
+        cache_report: false,
+        raw_diagnostics: false,
     })
     .map_err(|error| error.to_string())?;
     project

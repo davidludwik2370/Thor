@@ -205,6 +205,7 @@ impl Frontend {
                 message: String::from_utf8_lossy(&stderr).trim().to_string(),
                 diagnostics: errors,
                 unsupported: false,
+                exit_status: 1,
             });
         }
         let cache_payload = if cache.is_some() {

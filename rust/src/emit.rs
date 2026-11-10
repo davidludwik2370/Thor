@@ -312,3 +312,154 @@ mod tests {
         assert_eq!(emitted.lookup(3, 4).unwrap().span, Span::new(3, 4));
     }
 }
+#[derive(Clone, Debug)]
+pub struct MappedEdit {
+    pub span: Span,
+    pub text: String,
+    pub origin: Origin,
+}
+impl Emitted {
+    pub fn rewrite(&self, changes: &[MappedEdit]) -> Result<Self, String> {
+        let mut edits = changes.iter().collect::<Vec<_>>();
+        edits.sort_by_key(|edit| edit.span.start);
+        let mut output = Self::default();
+        let mut cursor = 0;
+        let copy = |start: usize, end: usize, out: &mut Self| {
+            let first = out.text.len();
+            out.text.push_str(&self.text[start..end]);
+            for segment in &self.segments {
+                let low = segment.start.max(start);
+                let high = segment.end.min(end);
+                if low >= high {
+                    continue;
+                }
+                let mut origin = segment.origin.clone();
+                if origin.exact {
+                    origin.span.start += low - segment.start;
+                    origin.span.end = origin.span.start + high - low;
+                }
+                out.segments.push(Segment {
+                    start: first + low - start,
+                    end: first + high - start,
+                    origin,
+                });
+            }
+        };
+        for edit in &edits {
+            if edit.span.start < cursor
+                || edit.span.end < edit.span.start
+                || edit.span.end > self.text.len()
+                || !self.text.is_char_boundary(edit.span.start)
+                || !self.text.is_char_boundary(edit.span.end)
+            {
+                return Err("Overlapping or invalid generated-source edits".into());
+            }
+            copy(cursor, edit.span.start, &mut output);
+            let start = output.text.len();
+            output.text.push_str(&edit.text);
+            if !edit.text.is_empty() {
+                output.segments.push(Segment {
+                    start,
+                    end: output.text.len(),
+                    origin: edit.origin.clone(),
+                });
+            }
+            cursor = edit.span.end;
+        }
+        copy(cursor, self.text.len(), &mut output);
+        let shifted = |offset: usize, boundary: bool| {
+            let delta = edits
+                .iter()
+                .filter(|edit| {
+                    edit.span.end < offset
+                        || edit.span.end == offset && (edit.span.start < edit.span.end || boundary)
+                })
+                .map(|edit| edit.text.len() as isize - edit.span.len() as isize)
+                .sum::<isize>();
+            offset
+                .checked_add_signed(delta)
+                .ok_or_else(|| "Invalid shifted source-map boundary".to_string())
+        };
+        let regions = |rows: &[(usize, usize, Origin)]| {
+            rows.iter()
+                .map(|(a, b, origin)| {
+                    Ok((shifted(*a, true)?, shifted(*b, a == b)?, origin.clone()))
+                })
+                .collect::<Result<Vec<_>, String>>()
+        };
+        output.expansions = regions(&self.expansions)?;
+        output.regions = regions(&self.regions)?;
+        Ok(output)
+    }
+}
+
+#[cfg(test)]
+mod rewrite_tests {
+    use super::*;
+    #[test]
+    fn rewrite_keeps_unicode_source_spans_and_shifts_nested_regions() {
+        let path = Path::new("/source.thor");
+        let emitted = Code::source("ab😀cd", path, Span::new(0, 8))
+            .region(path, Span::new(0, 8), "expression-helper")
+            .expansion(path, Span::new(0, 8))
+            .finish();
+        let origin = Origin {
+            file: "/source.thor".into(),
+            span: Span::new(1, 2),
+            kind: "unused-local".into(),
+            exact: false,
+        };
+        let edits = vec![
+            MappedEdit {
+                span: Span::new(0, 0),
+                text: "{\n".into(),
+                origin: origin.clone(),
+            },
+            MappedEdit {
+                span: Span::new(2, 6),
+                text: "x".into(),
+                origin: origin.clone(),
+            },
+            MappedEdit {
+                span: Span::new(8, 8),
+                text: "\n}".into(),
+                origin,
+            },
+        ];
+        let result = emitted.rewrite(&edits).unwrap();
+        assert_eq!(result.text, "{\nabxcd\n}");
+        assert_eq!(result.lookup(5, 1).unwrap().span, Span::new(6, 7));
+        assert_eq!(result.regions[0].0, 2);
+        assert_eq!(result.regions[0].1, 7);
+    }
+    #[test]
+    fn rewrite_rejects_overlaps_and_utf8_splits() {
+        let path = Path::new("/source.thor");
+        let emitted = Code::source("😀", path, Span::new(0, 4)).finish();
+        let origin = Origin {
+            file: "/source.thor".into(),
+            span: Span::new(0, 4),
+            kind: "generated".into(),
+            exact: false,
+        };
+        let split = emitted.rewrite(&[MappedEdit {
+            span: Span::new(1, 2),
+            text: "x".into(),
+            origin: origin.clone(),
+        }]);
+        assert!(split.is_err());
+        let overlap = emitted.rewrite(&[
+            MappedEdit {
+                span: Span::new(0, 4),
+                text: "x".into(),
+                origin: origin.clone(),
+            },
+            MappedEdit {
+                span: Span::new(0, 4),
+                text: "y".into(),
+                origin,
+            },
+        ]);
+        assert!(overlap.is_err());
+    }
+}

@@ -331,6 +331,31 @@ that comparison, and stalled test processes were cleaned up. The source-map
 consumer checks pass, but they are not a substitute for completing live DAP
 acceptance. This remains part of checkpoint 7.
 
+### Native invocation, warning recovery and CLI controls
+
+The native build path now follows the reference's unused-inner-local policy.
+Only Odin's default single-declaration control-block rejection becomes a warning;
+explicit unused-variable/procedure vetting remains strict. Recovery keeps the
+declaration, initializer and deferred cleanup intact, inserts an inert statement,
+and rewrites source segments, expansion/capture regions and persisted map hashes
+before the next native check. Ordinary successful compilations still use one
+backend invocation. Isolated compile-time helpers use the same recovery path.
+
+The CLI now supports `--run-timeout`, `--clear-cache`, `--cache-report` and
+`--raw-diagnostics`, plus equals-form value options. Cache clearing preserves
+unmanaged files and symlinks. Usage errors have status 2. Compiler-looking options
+after `--` reach the program. Warning suppression/promotion and deduplication
+match the reference. Plain-text native-tool output and backend signals retain
+toolchain diagnostics, signal names, native detail and failure status.
+
+All 98 combined invocation/compiler/debug-map/assertion-hygiene tests passed.
+The focused 19-test run and two controlled toolchain-failure comparisons also
+passed. Runtime fixtures check required side effects and deferred work in both
+checked and unchecked builds; map-consumer tests verify that unused-`do` recovery
+keeps the final executable identity and generated-source hashes consistent.
+All 32 Rust unit tests passed in debug and release; Clippy passed with warnings
+denied. Native `vet` and publishing ports and whole-language acceptance remain.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

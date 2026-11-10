@@ -101,3 +101,12 @@ main::proc(){
         info=self.inspect(manifest,binary,8)
         self.assertTrue(info['candidates'])
         self.assertTrue(any(r['kind']=='source-call-target' and r['text']=='type_of' for r in info['regions']))
+
+    @unittest.skipUnless(shutil.which('node'), 'Node is required for the real map consumer')
+    def test_unused_do_warning_rewrites_maps_and_executable_identity_together(self):
+        source='package main\nmain::proc(){\n if true do unused:=7\n value:=8\n if value!=8{panic("value")}\n}\n'
+        manifest,data,binary=self.build(source)
+        info=self.inspect(manifest,binary,4)
+        self.assertTrue(info['candidates'])
+        info=self.inspect(manifest,binary,3)
+        self.assertTrue(info['candidates'])

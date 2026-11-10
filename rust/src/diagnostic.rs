@@ -27,6 +27,7 @@ pub struct Error {
     pub diagnostics: Vec<Value>,
     /// A migration gap is different from an invalid Thor program.
     pub unsupported: bool,
+    pub exit_status: u8,
 }
 pub type Result<T> = std::result::Result<T, Error>;
 impl Error {
@@ -35,7 +36,13 @@ impl Error {
             message: message.into(),
             diagnostics: vec![],
             unsupported: false,
+            exit_status: 1,
         }
+    }
+    pub fn usage(message: impl Into<String>) -> Self {
+        let mut error = Self::new(message);
+        error.exit_status = 2;
+        error
     }
     pub fn at(source: &Source, span: Span, message: impl Into<String>) -> Self {
         let message = message.into();
@@ -43,6 +50,7 @@ impl Error {
         Self {
             message: message.clone(),
             unsupported: false,
+            exit_status: 1,
             diagnostics: vec![json!({"type":"error", "stage":"thor", "pos": {
                 "file":source.path, "offset":span.start, "end_offset":span.end,
                 "line":line, "column":column}, "msgs":[message]})],

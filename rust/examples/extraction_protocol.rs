@@ -33,6 +33,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         no_sanitize: true,
         overlays: BTreeMap::new(),
         editor_info: false,
+        run_timeout: std::time::Duration::from_secs(5),
+        clear_cache: false,
+        cache_report: false,
+        raw_diagnostics: false,
     })?;
     project.inspect_sources()?;
     let mut resolver = Resolver::new(&project.sources);

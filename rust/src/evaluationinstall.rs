@@ -7,8 +7,13 @@ impl Project {
             return Ok(());
         }
         let mut scheduler =
-            crate::evaluation::Scheduler::new(self, std::time::Duration::from_secs(5));
-        scheduler.evaluate_all()?;
+            crate::evaluation::Scheduler::new(self, self.options.run_timeout);
+        let result = scheduler.evaluate_all();
+        if self.options.cache_report {
+            let report=scheduler.cache_report();
+            println!("{}",json!({"thor_cache":report["stats"],"thor_prepared_hits":report["prepared_hits"]}));
+        }
+        result?;
         let values = std::mem::take(&mut scheduler.results);
         let cases = std::mem::take(&mut scheduler.cases);
         let witnesses = std::mem::take(&mut scheduler.scalar_witnesses);

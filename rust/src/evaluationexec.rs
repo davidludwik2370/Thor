@@ -245,6 +245,10 @@ impl Project {
                 no_sanitize: true,
                 overlays: self.options.overlays.clone(),
                 editor_info: false,
+                run_timeout: std::time::Duration::from_secs(5),
+                clear_cache: false,
+                cache_report: false,
+                raw_diagnostics: false,
             },
             frontend: self.frontend.clone(),
             sources,
@@ -382,8 +386,9 @@ impl Project {
             .args(&flags)
             .arg(format!("-out:{}", executable.display()))
             .arg("-json-errors");
+        if !flags.iter().any(|flag|flag.starts_with("-max-error-count:")) { command.arg("-max-error-count:1000"); }
         let built =
-            capture(&mut command, timeout.max(Duration::from_secs(30))).map_err(|error| {
+            helper.run_backend(&mut command, |command|capture(command, timeout.max(Duration::from_secs(30)))).map_err(|error| {
                 fail(format!(
                     "{label} could not start the helper compiler: {error}"
                 ))
@@ -422,6 +427,7 @@ impl Project {
                     message: "Compile-time helper compilation failed.".into(),
                     diagnostics,
                     unsupported: false,
+                    exit_status: 1,
                 });
             }
             let detail = String::from_utf8_lossy(if built.stderr.is_empty() {

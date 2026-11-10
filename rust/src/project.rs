@@ -15,6 +15,8 @@ use std::{
     path::{Component, Path, PathBuf},
     process::{Command, Stdio},
 };
+#[path = "backend.rs"]
+mod backend;
 #[path = "evaluationexec.rs"]
 mod evaluationexec;
 #[path = "evaluationinstall.rs"]
@@ -44,6 +46,10 @@ pub struct Options {
     pub no_sanitize: bool,
     pub overlays: BTreeMap<PathBuf, String>,
     pub editor_info: bool,
+    pub run_timeout: std::time::Duration,
+    pub clear_cache: bool,
+    pub cache_report: bool,
+    pub raw_diagnostics: bool,
 }
 pub struct Project {
     pub options: Options,
@@ -161,6 +167,18 @@ impl Project {
                     options.entry.join(".thor-cache")
                 }
             });
+        if options.clear_cache {
+            crate::evaluationcache::EvaluationCache::new(&cache, true).clear();
+            if let Ok(entries)=fs::read_dir(cache.join("rust-parse-v1")) {
+                for entry in entries.flatten() {
+                    let path=entry.path();
+                    if entry.file_type().is_ok_and(|kind|kind.is_file()) && path.extension().is_some_and(|extension|extension=="json")
+                        && path.file_stem().and_then(|name|name.to_str()).is_some_and(|name|name.len()==64 && name.bytes().all(|c|c.is_ascii_hexdigit() && !c.is_ascii_uppercase())) {
+                        let _=fs::remove_file(path);
+                    }
+                }
+            }
+        }
         let test = options.command == "test"
             || options.flags.iter().any(|flag| flag == "-build-mode:test");
         let target = options
@@ -985,8 +1003,9 @@ impl Project {
         }
         result
     }
-    pub fn compile(&self, target: &Path) -> Result<i32> {
-        let action = self.options.command.as_str();
+    pub fn compile(&mut self, target: &Path) -> Result<i32> {
+        let action = self.options.command.clone();
+        let action = action.as_str();
         let mut command = Command::new(&self.frontend.odin);
         command.envs(&self.native_environment);
         command
@@ -999,7 +1018,8 @@ impl Project {
         if self.file_entry {
             command.arg("-file");
         }
-        command.args(self.native_flags()).arg("-json-errors");
+        command.args(self.native_flags());
+        if !self.options.raw_diagnostics { command.arg("-json-errors"); }
         let explicit = self
             .options
             .flags
@@ -1031,13 +1051,34 @@ impl Project {
         if action == "test" {
             command.arg("-build-mode:test");
         }
-        let output = command.output()?;
-        let mut errors = if output.stderr.is_empty() {
+        if !self.options.raw_diagnostics && !self.options.flags.iter().any(|flag|flag.starts_with("-max-error-count:")) { command.arg("-max-error-count:1000"); }
+        let output = if self.options.raw_diagnostics {
+            let status=command.stdout(Stdio::inherit()).stderr(Stdio::inherit()).status()?;
+            evaluationexec::Captured{status,stdout:vec![],stderr:vec![],timed_out:false,oversized:false}
+        } else { self.run_backend(&mut command, |command| {
+            let output=command.output()?;
+            Ok(evaluationexec::Captured{status:output.status,stdout:output.stdout,stderr:output.stderr,timed_out:false,oversized:false})
+        })? };
+        let mut backend_status=output.status.code().unwrap_or(1);
+        let mut errors = if output.status.code().is_none() {
+            #[cfg(unix)]
+            let number={use std::os::unix::process::ExitStatusExt;output.status.signal().unwrap_or(0)};
+            #[cfg(not(unix))]
+            let number=0;
+            backend_status=128+number;
+            let display=output.status.to_string();
+            let fallback=number.to_string();
+            let name=display.rsplit_once('(').and_then(|(_,suffix)|suffix.strip_suffix(')')).unwrap_or(&fallback);
+            let mut messages=vec![format!("Odin compiler terminated by {name} (signal {number}). This is a backend compiler failure; no source location was provided.")];
+            if !output.stderr.is_empty(){messages.push(String::from_utf8_lossy(&output.stderr).trim().to_string());}
+            vec![json!({"type":"error","stage":"toolchain","pos":null,"msgs":messages})]
+        } else if output.stderr.is_empty() {
             vec![]
-        } else {
-            let packet: Value = serde_json::from_slice(&output.stderr)
-                .map_err(|_| Error::new(String::from_utf8_lossy(&output.stderr).into_owned()))?;
+        } else if let Ok(packet)=serde_json::from_slice::<Value>(&output.stderr) {
             packet["errors"].as_array().cloned().unwrap_or_default()
+        } else {
+            vec![json!({"type":if output.status.success(){"warning"}else{"error"},"stage":"toolchain","pos":null,
+                "msgs":[String::from_utf8_lossy(&output.stderr).trim()]})]
         };
         for source in &self.sources {
             errors.extend(
@@ -1048,12 +1089,9 @@ impl Project {
                     .cloned(),
             );
         }
-        if output.status.code().is_none() {
-            return Err(Error::new(format!("Odin compiler terminated by {}. This is a backend compiler failure; no source location was provided.",output.status)));
-        }
-        self.report(&errors);
-        if !output.status.success() {
-            return Ok(output.status.code().unwrap_or(1));
+        let reported_errors=if self.options.raw_diagnostics && errors.is_empty(){false}else{self.report(&errors)};
+        if !output.status.success() || reported_errors {
+            return Ok(if backend_status==0 {1}else{backend_status});
         }
         if matches!(action, "build" | "run" | "test")
             && self.options.flags.iter().any(|flag|flag=="-debug") && binary.is_file() {
@@ -1373,8 +1411,18 @@ impl Project {
         }
         text
     }
-    fn report(&self, errors: &[Value]) {
-        let errors = self.translate(errors);
+    fn report(&self, errors: &[Value]) -> bool {
+        let mut seen=BTreeSet::new();
+        let errors=self.translate(errors).into_iter().filter_map(|mut error| {
+            if error["type"]=="warning" && self.options.flags.iter().any(|flag|flag=="-ignore-warnings") { return None; }
+            if let Some(messages)=error["msgs"].as_array_mut() { for message in messages {
+                if let Some(text)=message.as_str().and_then(|text|text.strip_prefix("Syntax Warning: ")) { *message=json!(text); }
+            }}
+            if error["type"]=="warning" && self.options.flags.iter().any(|flag|flag=="-warnings-as-errors") { error["type"]=json!("error"); }
+            let key=json!([error["type"],error["pos"]["file"],error["pos"]["offset"],error["msgs"]]).to_string();
+            seen.insert(key).then_some(error)
+        }).collect::<Vec<_>>();
+        let failed=errors.iter().any(|error|error["type"]=="error");
         if self.options.json {
             let mut packet = json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors});
             if self.options.editor_info { packet["slice_access"] = json!(self.editor_info); }
@@ -1384,6 +1432,7 @@ impl Project {
                 print_diagnostic(&error);
             }
         }
+        failed
     }
 }
 pub fn print_diagnostic(error: &Value) {

@@ -422,12 +422,13 @@
     {
       "python": "thorlang/backend.py",
       "rust": [
+        "rust/src/backend.rs",
         "rust/src/project.rs"
       ],
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 1,
-      "remaining": "Complete invocation, warnings, errors and termination handling."
+      "remaining": "Native and isolated-helper invocation includes reference unused-local recovery, source-map rewrites, warning controls, plain toolchain output and signal status. Complete command orchestration and whole-language acceptance."
     },
     {
       "python": "thorlang/compiler.py",
@@ -461,7 +462,7 @@
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Port remaining command/option behavior and orchestration."
+      "remaining": "Project creation, ordinary compilation, cache/time-limit controls, raw/mapped diagnostics and runtime argument separation are connected. Finish vet/publishing command orchestration and whole-language acceptance."
     },
     {
       "python": "thorlang/hygiene.py",
@@ -528,7 +529,7 @@
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 11,
-      "remaining": "Structured maps include helper/capture/source-call-target/checked-procedure regions and generated AST kinds. The real Node consumer accepts native manifests, executable identities and capture conditions. Complete rewrite support, live DAP and whole-language acceptance."
+      "remaining": "Structured maps include helper/capture/source-call-target/checked-procedure regions, generated AST kinds and validated rewrite/region boundary behavior. The real Node consumer accepts native manifests, executable identities and capture conditions, including unused-do recovery. Complete live DAP and whole-language acceptance."
     },
     {
       "python": "thorlang/symbolizer.py",
