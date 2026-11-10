@@ -8,6 +8,12 @@ use crate::{
 };
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
+#[path = "bignumbers.rs"]
+mod bignumbers;
+#[path = "bigownership.rs"]
+mod bigownership;
+#[path = "bigoperators.rs"]
+mod bigoperators;
 #[path = "access.rs"]
 mod access;
 #[path = "comprehensions.rs"]
@@ -70,6 +76,7 @@ pub struct Lower<'a, 'r> {
     fstring_frames: Vec<(String, HashSet<NodeId>)>,
     fstring_busy: HashSet<NodeId>,
     querying: usize,
+    logical: bignumbers::State,
     temporary_serial: usize,
     temporary_discarding: HashSet<NodeId>,
     default: bool,
@@ -144,6 +151,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             fstring_frames: vec![],
             fstring_busy: HashSet::new(),
             querying: 0,
+            logical: bignumbers::State::default(),
             temporary_serial: 0,
             temporary_discarding: HashSet::new(),
             default: false,
@@ -583,20 +591,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             if node.kind == "Run" && !evaluated {
                 return Err(self.unsupported(id, &node.kind));
             }
-            if node.kind == "Ident"
-                && matches!(self.source.text(id), "Integer" | "Rational")
-                && self.resolver.symbol(self.reference(id)).is_none()
-            {
-                let toolchain = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .parent()
-                    .unwrap();
-                if self.source.path.parent() != Some(toolchain.join("runtime/basic").as_path()) {
-                    return Err(self.unsupported(id, "arbitrary-precision numbers"));
-                }
-                let big = self.module("big");
-                self.switch_replacements
-                    .insert(id, self.g(format!("{big}.{}", self.source.text(id)), id));
-            }
         }
         Ok(())
     }
@@ -863,6 +857,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         if let Some(message) = self.blocked.get(&id).cloned() {
             return Ok(self.error_token(id, &message));
         }
+        if let Some(code) = self.logical.replacements.get(&id) {
+            return Ok(code.clone());
+        }
         if let Some(code) = self.switch_replacements.get(&id) {
             return Ok(code.clone());
         }
@@ -1022,6 +1019,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
+        if let Some(code) = self.big_expression(id, expected.clone(), constant)? { return Ok(code); }
         if self.source.thor {
             if let Some(code) = self.temporary_expression(id, constant)? { return Ok(code); }
         }
@@ -1325,6 +1323,30 @@ impl<'a, 'r> Lower<'a, 'r> {
                     }
                 }
             }
+            "Compound" if !self.is_array(id) => {
+                let annotation=self.source.role(id,"type");
+                let typ=annotation.map(|a|self.typ(a)).or_else(||expected.as_ref().and_then(|h|h.semantic.clone())).unwrap_or(Type::Unknown);
+                let target=if let Some(a)=annotation{Some(self.render(a,None,true)?)}else{expected.as_ref().map(|h|h.code.clone())};
+                let fields=self.resolver.record_fields(&typ);
+                for (index,value) in self.source.group(id,"elems").iter().enumerate(){
+                    let field=if self.source.node(*value).kind=="FieldValue"{self.source.role(*value,"field").map(|id|self.source.text(id).to_string())}else{fields.get(index).map(|(name,_)|name.clone())};
+                    let map=matches!(typ,Type::Map{..});
+                    let sequence=typ.is_sequence();
+                    let semantic=if map||sequence{typ.element().cloned()}else if let Some(field)=&field{
+                        fields.iter().find(|(name,_)|name==field).map(|(_,typ)|typ.clone()).or_else(||typ.is_unknown().then_some(Type::Generic))
+                    }else{None};
+                    let hint=if let Some(target)=target.as_ref().filter(|_|map||sequence||field.is_some()){
+                        self.meta=true;
+                        let query=if sequence{"type_elem_type"}else{"type_field_type"};
+                        let mut code=vec![self.g(format!("#type {}meta.{query}(",self.prefix),id),target.clone()];
+                        if !map&&!sequence{if let Some(field)=&field{code.push(self.g(format!(",{}",json!(field)),*value));}}
+                        code.push(self.g(")",id));
+                        let code=if map{let witness=self.module("comprehension");let type_of=self.native("type_of");Code::concat([self.g(format!("{type_of}({witness}.second(("),id),target.clone(),self.g("){}))",id)])}else{Code::concat(code)};
+                        Some(Hint{code,semantic,element_only:false,plain_array:false})
+                    }else{None};
+                    overrides.insert(*value,(hint,constant));
+                }
+            }
             "Call" => {
                 let callee = self.role(id, "callee")?;
                 for arg in self.source.group(id, "args") {
@@ -1428,7 +1450,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             let (hint, con) = overrides.get(child).cloned().unwrap_or((None, constant));
             replacements.push((
                 self.source.node(*child).span,
-                self.render(*child, hint, con)?,
+                if self.big_owning_child(id,*child) {self.big_owned(*child,hint,con)?} else {self.render(*child, hint, con)?},
             ));
         }
         let mut inserts = vec![];
@@ -1609,9 +1631,9 @@ impl<'a, 'r> Lower<'a, 'r> {
                 values.push(self.g(", ", id));
             }
             values.push(if i == 0 && first_rendered.is_some() {
-                first_rendered.clone().unwrap()
+                if self.big_enabled(){self.big_owned(*value,Some(hint.clone()),constant)?}else{first_rendered.clone().unwrap()}
             } else {
-                self.render(*value, Some(hint.clone()), constant)?
+                self.big_owned(*value, Some(hint.clone()), constant)?
             });
         }
         for span in &self.source.comments {
@@ -1965,6 +1987,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         .expansion(&self.source.path, self.source.node(id).span))
     }
     fn has_context(&self, id: NodeId) -> bool {
+        if self.logical.globalizing>0{return true;}
         let owner = self
             .source
             .ancestors(id)
@@ -2075,7 +2098,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     .fields(signature, "results")
                     .len()
                     .saturating_sub(1);
-            } else if self.extrema_name(callee, &mut HashSet::new()).is_none()
+            } else if self.big_constructor_type(primary).is_none() && self.extrema_name(callee, &mut HashSet::new()).is_none()
                 && !matches!(self.source.text(callee), "make" | "new" | "new_clone")
             {
                 return Err(self.unsupported(
@@ -2360,7 +2383,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             let global_switch = !self.evaluation_mode
                 && (flavor.starts_with("switch")
                     || flavor.starts_with("compile_switch")
-                    || flavor.starts_with("comprehension"))
+                    || flavor.starts_with("comprehension")
+                    || flavor.starts_with("big_global"))
                 && !self
                     .source
                     .ancestors(id)

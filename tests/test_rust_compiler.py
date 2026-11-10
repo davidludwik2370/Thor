@@ -667,7 +667,7 @@ release::proc(text:string){}
 
     def test_unported_features_fail_closed_without_python(self):
         for code in ['T::int;when T==int {value:=1} else {value :> 1};value=2;_=value',
-                     'value:Integer=2;_=value']:
+                     'VALUE::Integer(2);_=VALUE']:
             with self.subTest(code=code):
                 self.source.write_text(self.program(code, 'calculate::proc()->int{return 2}\n'))
                 result = self.invoke('rust', command='check', flags=['-json-errors'])

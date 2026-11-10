@@ -192,7 +192,10 @@
     },
     {
       "python": "thorlang/scalarcache.py",
-      "rust": ["rust/src/evaluationscalar.rs", "rust/src/evaluationprepared.rs"],
+      "rust": [
+        "rust/src/evaluationscalar.rs",
+        "rust/src/evaluationprepared.rs"
+      ],
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 9,
@@ -233,20 +236,25 @@
         "rust/src/semantics.rs",
         "rust/src/typefacts.rs",
         "rust/src/specialization.rs",
-        "rust/src/contextlower.rs"
+        "rust/src/contextlower.rs",
+        "rust/src/bignumbers.rs",
+        "rust/src/bigownership.rs",
+        "rust/src/temporaries.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 53,
-      "remaining": "Logical type identities, aliases, property/result shapes and text-constructor status slots are resolved. Port runtime constructors, direct ownership, assignments, properties and call consumers; complete integration and acceptance."
+      "remaining": "Runtime constructors, contextual literals, direct copies/assignments, components, call consumers, optional/multiple results and global initialization are ported. Finish constant bindings, remaining generic/call integrations and whole-language acceptance."
     },
     {
       "python": "thorlang/bigoperators.py",
-      "rust": [],
+      "rust": [
+        "rust/src/bigoperators.rs"
+      ],
       "checkpoint": 6,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 10,
-      "remaining": "Port operator dispatch."
+      "remaining": "Runtime unary/binary/comparison and compound-update dispatch retains native generic specializations. Complete constant operators, remaining interactions and acceptance."
     },
     {
       "python": "thorlang/bigvalues.py",
@@ -361,12 +369,14 @@
         "rust/src/temporaries.rs",
         "rust/src/sets.rs",
         "rust/src/switches.rs",
-        "rust/src/lower.rs"
+        "rust/src/lower.rs",
+        "rust/src/bignumbers.rs",
+        "rust/src/bigownership.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 26,
-      "remaining": "Known native string/Set consumers now carry selected ownership, retain view owners, release discarded values and loop/update operands, and preserve arbitrary-call transfer semantics. Complete logical-number producer/destruction traits in the big-number port and broad cross-feature acceptance."
+      "remaining": "Strings, Sets and logical-number producer/destructor lifetimes are integrated with known consumers, selected arms and discarded results. Finish logical generic/builtin/constant interactions and whole-language acceptance."
     },
     {
       "python": "thorlang/repetition.py",

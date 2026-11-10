@@ -65,6 +65,7 @@ query("selected",Integer);query("value",a);query("property",b.denominator)
         self.compare('''a,ok:=Integer("12")
 b,b_ok:=Rational("1.2(3)")
 c,c_ok:=Rational(numerator="12",denominator="13")
+query("branch",Integer("1") or_return);query("panic",Integer("1") or_panic)
 query("a",a);query("ok",ok);query("b",b);query("b_ok",b_ok);query("c",c);query("c_ok",c_ok)
 ''')
 

@@ -132,6 +132,37 @@ passed after this change. All 29 Rust unit tests passed in debug and release;
 Clippy passed with warnings denied. These changes do not enable the unfinished
 numeric lowerer or change the supported-default Python engine.
 
+### Runtime logical numbers and direct ownership
+
+Rust now lowers `Integer` and `Rational` constructors, exact contextual literals,
+aliases, text status results, ordinary arithmetic/comparisons and compound
+updates. Native generic instantiations retain their Odin operation. Direct
+numeric copies own independent backing; aggregate copies remain shallow. Rational
+components are read-only, independently owned results.
+
+Simultaneous assignment captures destinations and snapshots inputs before
+replacing owners. Map keys are evaluated once. Owning field/element contexts
+cover records, arrays, map literals, dynamic append and comprehension output.
+Anonymous numeric call arguments and discarded results are released, including
+mixed blank destinations and multiple results. Optional selection preserves
+caller return/continue/panic behavior and cleans failed owned results. Global
+initialization establishes the default context; predefined and imported numeric
+values do not require callers to spell an explicit runtime import.
+
+Native argument witnesses are built inside their helper's capture scope, after
+semantic ownership decisions. Variadic groups use element contexts, and named
+generic record fields retain their field type. The ordinary result inference
+path now also propagates types through `or_return` and loop branch expressions.
+
+The final compiler/resolution/generic/temporary/f-string/execution/assertion-hygiene
+gate passed all 160 tests, including 21 new runtime-number comparisons with
+allocation tracking in checked and unchecked builds. All 29 Rust unit tests
+passed in debug and release, and Clippy passed with warnings denied.
+
+This remains checkpoint 6. Read-only constant folding/static source bindings,
+numeric builtins/generic components, and logical-number pure execution and cache
+reconstruction still need integration. Python remains the supported default.
+
 ### Parity-first resolution work
 
 The expression-coercion predicate now follows the reference's syntax-sensitive

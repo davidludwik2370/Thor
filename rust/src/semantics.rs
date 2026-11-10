@@ -1396,7 +1396,7 @@ impl<'a> Resolver<'a> {
             "FieldValue" => child("value")
                 .map(|r| self.type_of(r))
                 .unwrap_or(Type::Unknown),
-            "SwitchExpr" | "CompileSwitchExpr" | "OrPanic" => {
+            "SwitchExpr" | "CompileSwitchExpr" | "OrPanic" | "OrReturn" | "OrBranch" => {
                 self.result_type(r, 0, &mut HashSet::new())
             }
             "Call" => {

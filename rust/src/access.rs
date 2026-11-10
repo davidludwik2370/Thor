@@ -76,7 +76,7 @@ impl Lower<'_, '_> {
         }
         false
     }
-    fn render_address(&mut self, id: NodeId) -> Result<Code> {
+    pub(super) fn render_address(&mut self, id: NodeId) -> Result<Code> {
         let inserted = self.address_nodes.insert(id);
         let code = self.render(id, None, false);
         if inserted {
@@ -84,7 +84,7 @@ impl Lower<'_, '_> {
         }
         code
     }
-    fn addressable(&mut self, id: NodeId) -> Result<String> {
+    pub(super) fn addressable(&mut self, id: NodeId) -> Result<String> {
         let node = self.source.node(id);
         if node.kind == "Paren" {
             return self.addressable(self.role(id, "expr")?);

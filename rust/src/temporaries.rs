@@ -34,6 +34,7 @@ impl Lower<'_, '_> {
                 && !self.resolver.denotes_type(self.reference(b))
     }
     pub(super) fn temporary_producer(&mut self, id: NodeId) -> bool {
+        if self.big_enabled()&&self.big_fresh(id){return true;}
         let node = self.source.node(id);
         match node.kind.as_str() {
             "Paren" => self
@@ -73,6 +74,7 @@ impl Lower<'_, '_> {
                 .role(id, "expr")
                 .is_some_and(|expr| self.temporary_view(expr));
         }
+        if self.big_enabled()&&self.big_property(id).is_some(){return false;}
         matches!(node.kind.as_str(), "Slice" | "Selector")
             && self
                 .source
@@ -122,6 +124,12 @@ impl Lower<'_, '_> {
         code.extend([self.render(id, hint, false)?, self.g("\n", id)]);
         let owned = if !self.temporary_producer(id) || self.temporary_captured(id) {
             "false".into()
+        } else if self.big_enabled()&&self.big_fresh(id) {
+            if self.typ(id).big_name().is_some(){"true".into()}else{
+                let typ=self.native_type(id)?.finish().text;let module=self.module("big");
+                let big=format!("({typ}=={module}.Integer || {typ}=={module}.Rational)");
+                if self.temporary_math(id){format!("({big} || {})",self.set_value_trait(&format!("({typ}){{}}")))}else{big}
+            }
         } else if node.kind == "Binary" && !matches!(self.typ(id), Type::Set(_)) {
             let typ = self.native_type(id)?.finish().text;
             let test = self.set_value_trait(&format!("({typ}){{}}"));
@@ -146,6 +154,7 @@ impl Lower<'_, '_> {
         if temp.owned != "false" {
             let destroy = match self.typ(temp.origin) {
                 Type::String { .. } => format!("{}({})", self.native("delete"), temp.value),
+                Type::BigInteger | Type::BigRational => format!("{}.compiler_destroy_value({})",self.module("big"),temp.value),
                 Type::Set(_) => format!("{}.destroy({})", self.module("sets"), temp.value),
                 _ => {
                     self.meta = true;
@@ -154,7 +163,8 @@ impl Lower<'_, '_> {
                     let test = self.set_value_trait(&format!("({typ}){{}}"));
                     {
                         let delete = self.native("delete");
-                        format!("when {}meta.type_is_string({typ}) {{{delete}({})}} else when {test} {{{sets}.destroy({})}}",self.prefix,temp.value,temp.value)
+                        let fallback=if self.big_enabled(){let module=self.module("big");format!(" else when {typ}=={module}.Integer || {typ}=={module}.Rational {{{module}.compiler_destroy_value({})}}",temp.value)}else{String::new()};
+                        format!("when {}meta.type_is_string({typ}) {{{delete}({})}} else when {test} {{{sets}.destroy({})}}{fallback}",self.prefix,temp.value,temp.value)
                     }
                 }
             };
@@ -397,7 +407,7 @@ impl Lower<'_, '_> {
         })?;
         Ok(self.helper_call(id, &name, args))
     }
-    fn temporary_discard(&mut self, id: NodeId) -> Result<Option<Code>> {
+    pub(super) fn temporary_discard(&mut self, id: NodeId) -> Result<Option<Code>> {
         if self.temporary_discarding.contains(&id) || !self.temporary_producer(id) {
             return Ok(None);
         }
