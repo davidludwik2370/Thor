@@ -108,6 +108,21 @@ has not been edited to hide this discrepancy.
 The conditional/branch/native-compiler regression gate passed 87 tests, followed
 by 15 transitive-call and explicit-type checks. Clippy passes with warnings denied.
 
+### Symbolic ownership primitives
+
+`permissions.rs` ports Python's `Access` and `Permission` operations, including
+canonical joins, conjunction, caller substitution, type traits and bounded path
+projection. `borrowflow.rs` ports the reference `Flow` primitives using arena IDs
+for cyclic metadata: member/item/dereference access, header copies, joins, writes,
+and stack-owner inspection. These modules are not wired into lowering yet and
+do not remove the remaining generic ownership migration errors.
+
+The permission protocol harness compares 753 generated and boundary expressions
+directly against Python's algebra. All 22 Rust unit tests pass in debug and
+release, the eight-test differential/assertion-hygiene group passes, and Clippy
+passes for all targets with warnings denied. The next work is the AST flow
+evaluator, binding/store fixed point and checked-call ownership arguments.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
