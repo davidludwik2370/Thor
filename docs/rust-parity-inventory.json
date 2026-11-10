@@ -321,7 +321,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Finish all reference lifetime contexts."
+      "remaining": "Anonymous call scopes preserve tuple arity, optional boolean/allocator-error statuses, selected overload/indirect signatures and switch-arm borrow lifetimes. SDK interpolation signature inspection and query/lazy exclusions are connected; checked/unchecked tracked tests pass. Complete broader temporary-producer, logical-number and remaining lifetime interactions."
     },
     {
       "python": "thorlang/imports.py",

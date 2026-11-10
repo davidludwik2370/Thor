@@ -784,6 +784,30 @@ All 29 Rust units pass in debug and release, and Clippy passes with warnings
 denied. Remaining arbitrary-precision and temporary-ownership paths are still
 explicit migration gaps.
 
+### F-string tuple and optional-result lifetimes
+
+Anonymous f-string call scopes now preserve multiple return values and Odin's
+optional-result tags. Boolean and allocator-error status slots retain their
+native fixed types, while the other result slots use native signature queries.
+SDK signature inspection is enabled for interpolation-bearing sources as well,
+so ordinary imported calls such as `strings.clone` retain their optional error.
+Overloaded and indirect calls use the selected tuple signature.
+
+Lifetime discovery also crosses the native statement/block nodes inside switch
+value arms. An inner call returning a borrowed string therefore keeps the
+anonymous input alive until the enclosing expression finishes. Named strings
+and `f!` arguments retain their existing ownership contracts; type queries and
+lazy branches do not evaluate their arguments.
+
+All 135 focused tuple/checked-call/type-parameter/command/compiler/assertion
+checks pass. An additional pure owned-string tuple check passes separately.
+The native memory checks run in debug and unchecked release with empty tracking
+reports, including early return/continue, SDK optional errors and switch borrows.
+One initial fixture incorrectly applied `size_of` to a two-valued call; both
+compilers rejected it. The corrected single-result query test passes. All 29
+Rust units pass in debug and release, and Clippy passes with warnings denied.
+Other temporary-producer and arbitrary-precision lowering paths remain pending.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

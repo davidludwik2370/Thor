@@ -774,10 +774,11 @@ impl Project {
     }
     fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
         if !self.sources.iter().any(|s| {
-            s.nodes
-                .iter()
-                .any(|n| n.immutable || n.data["pure"] == true || n.kind == "Run")
-                || s.selections.iter().any(|selection| selection.wildcard)
+            s.nodes.iter().any(|n| {
+                n.immutable
+                    || n.data["pure"] == true
+                    || matches!(n.kind.as_str(), "Run" | "Interpolation")
+            }) || s.selections.iter().any(|selection| selection.wildcard)
                 || s.info["mut_parameters"]
                     .as_array()
                     .is_some_and(|rows| !rows.is_empty())

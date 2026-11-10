@@ -2288,10 +2288,20 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .strip_prefix("tuple:")
                 .and_then(|n| n.parse::<usize>().ok())
             {
-                let types = (0..count)
+                let fixed_status = if flavor == "fstring_optional_ok" {
+                    Some(self.native("bool"))
+                } else if flavor == "fstring_optional_allocator_error" {
+                    let alias = format!("{}fstring_runtime", self.prefix);
+                    self.modules.insert(alias.clone(), "base:runtime".into());
+                    Some(format!("{alias}.Allocator_Error"))
+                } else {
+                    None
+                };
+                let mut types = (0..count - usize::from(fixed_status.is_some()))
                     .map(|i| format!("{}Result_{i}", self.prefix))
                     .collect::<Vec<_>>();
                 params.extend(types.iter().map(|name| format!("${name}: typeid")));
+                types.extend(fixed_status);
                 format!(" -> ({})", types.join(", "))
             } else if result.is_empty() || result == "^" {
                 params.push(format!("${}Result: typeid", self.prefix));
@@ -2400,8 +2410,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                 format!(
                     "\n{private}{name} :: proc \"{convention}\"({}){returns} {}{{\n",
                     params.join(", "),
-                    if flavor == "extrema_optional" {
+                    if flavor == "extrema_optional" || flavor == "fstring_optional_ok" {
                         "#optional_ok "
+                    } else if flavor == "fstring_optional_allocator_error" {
+                        "#optional_allocator_error "
                     } else {
                         ""
                     }
@@ -2611,9 +2623,28 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             if let Some(call) = argument {
                 let mut root = call;
+                let switches = self
+                    .source
+                    .ancestors(call)
+                    .filter(|parent| {
+                        matches!(
+                            self.source.node(*parent).kind.as_str(),
+                            "SwitchExpr" | "CompileSwitchExpr"
+                        )
+                    })
+                    .map(|parent| self.source.node(parent).span)
+                    .collect::<Vec<_>>();
                 for parent in self.source.ancestors(call) {
                     if EXPRESSIONS.contains(&self.source.node(parent).kind.as_str()) {
                         root = parent;
+                    } else if matches!(
+                        self.source.node(parent).kind.as_str(),
+                        "Case" | "Block" | "ExpressionStatement"
+                    ) && switches
+                        .iter()
+                        .any(|span| span.contains(self.source.node(parent).span))
+                    {
+                        continue;
                     } else {
                         break;
                     }
@@ -2633,29 +2664,74 @@ impl<'a, 'r> Lower<'a, 'r> {
             .node(id)
             .parent
             .is_some_and(|p| self.source.node(p).kind == "ExpressionStatement");
+        let mut signature = None;
         if !statement && self.source.node(id).kind == "Call" {
             let callee = self.role(id, "callee")?;
-            if let Some(signature) = self.resolver.signature(self.reference(callee)) {
-                if self.resolver.fields(signature, "results").len() != 1 {
-                    return Err(self.unsupported(id, "multi-result f-string argument scopes"));
-                }
-            }
+            let plans = self
+                .resolver
+                .call_plans(self.reference(id), &Default::default());
+            signature = if let [plan] = plans.as_slice() {
+                Some(plan.signature)
+            } else {
+                self.resolver.signature(self.reference(callee))
+            };
         }
+        let count = if statement {
+            0
+        } else {
+            signature
+                .map(|signature| self.resolver.fields(signature, "results").len())
+                .unwrap_or(1)
+        };
+        let optional = signature
+            .map(|signature| {
+                &self.resolver.sources[signature.file]
+                    .node(signature.node)
+                    .data
+            })
+            .filter(|data| data["optional_ok"] == true || data["optional_allocator_error"] == true)
+            .map(|data| {
+                if data["optional_allocator_error"] == true {
+                    "fstring_optional_allocator_error"
+                } else {
+                    "fstring_optional_ok"
+                }
+            });
         self.fstring_busy.insert(id);
         self.querying += 1;
-        let query = if statement {
-            Ok(None)
+        let query = if count == 0 {
+            Ok(vec![])
+        } else if count > 1 {
+            self.meta = true;
+            let type_of = self.native("type_of");
+            self.render(id, None, false).map(|code| {
+                (0..count - usize::from(optional.is_some()))
+                    .map(|index| {
+                        Code::concat([
+                            self.g(
+                                format!(
+                                    "{}meta.type_proc_return_type({type_of}({}meta.procedure_of(",
+                                    self.prefix, self.prefix
+                                ),
+                                id,
+                            ),
+                            code.clone(),
+                            self.g(format!(")),{index})"), id),
+                        ])
+                    })
+                    .collect()
+            })
         } else if let Some(hint) = expected {
-            Ok(Some(hint.code))
+            Ok(vec![hint.code])
         } else {
             self.default = true;
             let typeof_ = self.native("type_of");
             self.render(id, None, false).map(|code| {
-                Some(Code::concat([
+                vec![Code::concat([
                     self.g(format!("{typeof_}({}default_value(", self.prefix), id),
                     code,
                     self.g("))", id),
-                ]))
+                ])]
             })
         };
         self.querying -= 1;
@@ -2673,15 +2749,20 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.source.node(id).span.start
         );
         let pointer = format!("{}fstring_scope", self.prefix);
-        let (name,mut args)=self.closed(id,"fstring_expression",if statement{None}else{Some("")},|this|{
+        let result = if count == 0 {
+            None
+        } else if count == 1 {
+            Some(String::new())
+        } else {
+            Some(format!("tuple:{count}"))
+        };
+        let (name,mut args)=self.closed(id,optional.unwrap_or("fstring_expression"),result.as_deref(),|this|{
             let code=this.g(format!("{prefix}entries:[{}]{module}.Entry\n{prefix}scope: {module}.Scope = {{entries={prefix}entries[:]}}\n{pointer} := &{prefix}scope\ndefer {module}.destroy({pointer})\n",targets.len()),id);
             this.fstring_frames.push((pointer.clone(),targets));let expression=this.render(id,None,false);this.fstring_frames.pop();
-            Ok(Code::concat([code,this.g(if statement{""}else{"return "},id),expression?]))
+            Ok(Code::concat([code,this.g(if count==0{""}else{"return "},id),expression?]))
         })?;
         self.fstring_busy.remove(&id);
-        if let Some(query) = query {
-            args.push(query);
-        }
+        args.extend(query);
         Ok(self.helper_call(id, &name, args))
     }
     fn helper_declarations(&self, owner: NodeId) -> Vec<Code> {
