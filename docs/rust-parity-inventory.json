@@ -201,20 +201,23 @@
     {
       "python": "thorlang/values.py",
       "rust": [
-        "rust/src/values.rs"
+        "rust/src/values.rs",
+        "rust/src/bigstatic.rs"
       ],
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 9,
-      "remaining": "Native scalar and aggregate reconstruction is installed through normal command evaluation. Complete logical big-number backing and reconstruction in checkpoint 6."
+      "remaining": "Normal command evaluation reconstructs native scalar/aggregate packets. Numeric backing callbacks now reconstruct logical-number packets independently; connect them during the language-level big-number port."
     },
     {
       "python": "thorlang/bigconstants.py",
-      "rust": [],
+      "rust": [
+        "rust/src/bigstatic.rs"
+      ],
       "checkpoint": 6,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 10,
-      "remaining": "Port constants and static backing."
+      "remaining": "Read-only limb layout, zero views, sign headers, static identity and deduplication are ported. Complete AST constant evaluation and read-only source binding checks."
     },
     {
       "python": "thorlang/bigintegration.py",
@@ -242,11 +245,14 @@
     },
     {
       "python": "thorlang/bigvalues.py",
-      "rust": [],
+      "rust": [
+        "rust/src/bigvalues.rs",
+        "rust/src/values.rs"
+      ],
       "checkpoint": 6,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 7,
-      "remaining": "Port arbitrary-precision contents validation/reconstruction."
+      "remaining": "Canonical arbitrary-precision packets, exact numeric lexemes and nested contents detection have native implementations. Static-backed reconstruction is tested independently; connect the remaining language-level type/operator/constant paths and complete broad acceptance."
     },
     {
       "python": "thorlang/comprehensions.py",

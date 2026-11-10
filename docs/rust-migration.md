@@ -69,6 +69,33 @@ Rust produced the expected result; four isolated comparisons and the clean full
 gate passed. The extracted crash record extends the existing upstream issue
 bundle at `upstream/odin-codegen-race/evidence/recurrence-2026-11-10.txt`.
 
+### Exact logical-number contents and static backing
+
+The native protocol now validates canonical arbitrary-precision integers and
+reduced rationals with positive denominators. Numeric lexemes are parsed exactly,
+including alternate bases, decimal scales and values with thousands of digits;
+parsing never goes through a machine float. Exact fraction construction keeps
+its normalization invariant private to the numeric contents module.
+
+The static backing emitter matches the reference's 63-bit limbs, minimum
+four-limb headers, signs, zero representations and content identities. Value
+reconstruction accepts a backing callback and clones logical numbers into
+independent runtime owners, including nested records, slices and unions. Existing
+callers retain the ordinary protocol API. The `big_protocol` Cargo example is an
+internal differential harness.
+
+This is a foundation for checkpoint 6. Big-number language types, constructors,
+operators, source constant bindings and native execution integration remain to be
+connected; normal Rust commands still report those migration gaps explicitly.
+Python remains the default.
+
+The focused protocol/reconstruction/native-execution/assertion-hygiene gate
+passed all 33 tests. Comparisons include 200 generated mixed packets, limb/sign
+boundary cases and canonical-packet rejections. Direct Odin reconstruction ran
+32 scalar/aggregate cases across checked and unchecked builds, with explicit
+allocation-map and bad-free verdicts. All 29 Rust unit tests passed in debug
+and release; Clippy passed with warnings denied.
+
 ### Parity-first resolution work
 
 The resolver now follows the reference's `using` lookup and storage-protection

@@ -143,14 +143,35 @@ fn numeric(value: &Value, typ: &str, float: bool) -> Result<String> {
 }
 
 pub fn expression(value: &Value, typ: &str, meta: &str) -> Result<String> {
-    expression_at(value, typ, meta, 0)
+    expression_with_big(value, typ, meta, &mut |_, _| {
+        Err(error(
+            "Big-number reconstruction requires static numeric backing.",
+        ))
+    })
 }
-fn expression_at(value: &Value, typ: &str, meta: &str, depth: usize) -> Result<String> {
+pub fn validate(value: &Value) -> Result<()> {
+    expression_with_big(value, "T", "meta", &mut |_, _| Ok("0".into())).map(|_| ())
+}
+pub fn expression_with_big(
+    value: &Value,
+    typ: &str,
+    meta: &str,
+    big: &mut NumericView<'_>,
+) -> Result<String> {
+    expression_at(value, typ, meta, 0, big)
+}
+fn expression_at(
+    value: &Value,
+    typ: &str,
+    meta: &str,
+    depth: usize,
+    big: &mut NumericView<'_>,
+) -> Result<String> {
     if depth > MAX_DEPTH {
         return Err(error("Invalid nested compile-time value."));
     }
     let variant = kind(value)?;
-    let child = |v: &Value, t: &str| expression_at(v, t, meta, depth + 1);
+    let mut child = |v: &Value, t: &str| expression_at(v, t, meta, depth + 1, big);
     match variant {
         "specialized" => {
             for name in list(value, "types", "Invalid specialization metadata.")? {
@@ -161,9 +182,10 @@ fn expression_at(value: &Value, typ: &str, meta: &str, depth: usize) -> Result<S
             }
             child(&value["value"], typ)
         }
-        "big_integer" | "big_rational" => Err(error(
-            "Big-number reconstruction requires static numeric backing.",
-        )),
+        "big_integer" | "big_rational" => {
+            crate::bigvalues::number(value).map_err(ProtocolError)?;
+            big(value, typ)
+        }
         "bool" => value
             .get("value")
             .and_then(Value::as_bool)
@@ -351,6 +373,8 @@ pub fn has_dynamic(value: &Value) -> bool {
     }
 }
 
+pub type NumericView<'a> = dyn FnMut(&Value, &str) -> Result<String> + 'a;
+
 pub fn materialize(
     value: &Value,
     typ: &str,
@@ -358,116 +382,118 @@ pub fn materialize(
     module: &str,
     prefix: &str,
 ) -> Result<String> {
-    // Validate before generating names or statements. Reconstruction buffers are
-    // compiler-owned; only the resulting program allocations survive execution.
-    expression(value, typ, meta)?;
-    let mut statements = vec![];
-    let mut serial = 0;
-    let result = materialize_at(
-        value,
-        typ,
-        meta,
-        module,
-        prefix,
-        &mut statements,
-        &mut serial,
-    )?;
-    statements.push(format!("return {result}"));
-    Ok(statements.join("\n"))
+    materialize_with_big(value, typ, meta, module, prefix, &mut |_, _| {
+        Err(error(
+            "Big-number reconstruction requires static numeric backing.",
+        ))
+    })
 }
-fn materialize_at(
+pub fn materialize_with_big(
     value: &Value,
     typ: &str,
     meta: &str,
     module: &str,
     prefix: &str,
-    statements: &mut Vec<String>,
-    serial: &mut usize,
+    big: &mut NumericView<'_>,
 ) -> Result<String> {
-    if !has_owned(value, false) {
-        return expression(value, typ, meta);
-    }
-    match kind(value)? {
-        "specialized" => materialize_at(
-            &value["value"],
-            typ,
-            meta,
-            module,
-            prefix,
-            statements,
-            serial,
-        ),
-        "string" => Ok(format!("{module}.clone({})", expression(value, typ, meta)?)),
-        "sequence" => {
-            let storage = value["storage"].as_str().unwrap_or("array");
-            let element = format!("{meta}.type_elem_type({typ})");
-            if storage == "dynamic" || storage == "slice" || value["nil"] == true {
-                *serial += 1;
-                let name = format!("{prefix}{serial}");
-                let length = value["values"].as_array().unwrap().len();
-                let non_nil = value["nil"] != true;
-                let allocate = if storage == "dynamic" {
-                    format!(
-                        "{module}.allocate_dynamic({typ},{length},{},{non_nil})",
-                        value["capacity"]
-                    )
-                } else {
-                    format!("{module}.allocate_slice({typ},{length},{non_nil})")
-                };
-                statements.push(format!("{name}:={allocate}"));
-                for (index, item) in value["values"].as_array().unwrap().iter().enumerate() {
-                    let text =
-                        materialize_at(item, &element, meta, module, prefix, statements, serial)?;
-                    statements.push(format!("{name}[{index}]={text}"));
+    expression_with_big(value, typ, meta, big)?;
+    let mut materializer = Materializer {
+        meta,
+        module,
+        prefix,
+        big,
+        statements: vec![],
+        serial: 0,
+    };
+    let result = materializer.build(value, typ)?;
+    materializer.statements.push(format!("return {result}"));
+    Ok(materializer.statements.join("\n"))
+}
+struct Materializer<'a, 'b> {
+    meta: &'a str,
+    module: &'a str,
+    prefix: &'a str,
+    big: &'a mut NumericView<'b>,
+    statements: Vec<String>,
+    serial: usize,
+}
+impl Materializer<'_, '_> {
+    fn build(&mut self, value: &Value, typ: &str) -> Result<String> {
+        if !has_owned(value, false) {
+            return expression_with_big(value, typ, self.meta, self.big);
+        }
+        let module = self.module;
+        match kind(value)? {
+            "specialized" => self.build(&value["value"], typ),
+            "string" | "big_integer" | "big_rational" => Ok(format!(
+                "{module}.clone({})",
+                expression_with_big(value, typ, self.meta, self.big)?
+            )),
+            "sequence" => {
+                let storage = value["storage"].as_str().unwrap_or("array");
+                let element = format!("{}.type_elem_type({typ})", self.meta);
+                if storage == "dynamic" || storage == "slice" || value["nil"] == true {
+                    self.serial += 1;
+                    let name = format!("{}{}", self.prefix, self.serial);
+                    let length = value["values"].as_array().unwrap().len();
+                    let non_nil = value["nil"] != true;
+                    let allocate = if storage == "dynamic" {
+                        format!(
+                            "{module}.allocate_dynamic({typ},{length},{},{non_nil})",
+                            value["capacity"]
+                        )
+                    } else {
+                        format!("{module}.allocate_slice({typ},{length},{non_nil})")
+                    };
+                    self.statements.push(format!("{name}:={allocate}"));
+                    for (index, item) in value["values"].as_array().unwrap().iter().enumerate() {
+                        let text = self.build(item, &element)?;
+                        self.statements.push(format!("{name}[{index}]={text}"));
+                    }
+                    return Ok(name);
                 }
-                return Ok(name);
+                let texts = value["values"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| self.build(item, &element))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(format!("{typ}{{{}}}", texts.join(",")))
             }
-            let texts = value["values"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|item| {
-                    materialize_at(item, &element, meta, module, prefix, statements, serial)
-                })
-                .collect::<Result<Vec<_>>>()?;
-            Ok(format!("{typ}{{{}}}", texts.join(",")))
-        }
-        "record" | "enum_array" => {
-            let mut parts = vec![];
-            let enumeration = kind(value)? == "enum_array";
-            for pair in value["fields"].as_array().unwrap() {
-                let name = pair[0].as_str().unwrap();
-                let field = if enumeration {
-                    format!("{meta}.type_elem_type({typ})")
-                } else {
-                    format!("type_of(({typ}{{}}).{name})")
-                };
-                let text =
-                    materialize_at(&pair[1], &field, meta, module, prefix, statements, serial)?;
-                parts.push(format!(
-                    "{}{name}={text}",
-                    if enumeration { "." } else { "" }
-                ));
+            "record" | "enum_array" => {
+                let mut parts = vec![];
+                let enumeration = kind(value)? == "enum_array";
+                for pair in value["fields"].as_array().unwrap() {
+                    let name = pair[0].as_str().unwrap();
+                    let field = if enumeration {
+                        format!("{}.type_elem_type({typ})", self.meta)
+                    } else {
+                        format!("type_of(({typ}{{}}).{name})")
+                    };
+                    let text = self.build(&pair[1], &field)?;
+                    parts.push(format!(
+                        "{}{name}={text}",
+                        if enumeration { "." } else { "" }
+                    ));
+                }
+                Ok(format!(
+                    "{}{typ}{{{}}}",
+                    if enumeration { "#partial " } else { "" },
+                    parts.join(",")
+                ))
             }
-            Ok(format!(
-                "{}{typ}{{{}}}",
-                if enumeration { "#partial " } else { "" },
-                parts.join(",")
-            ))
+            "union" => Ok(format!(
+                "{typ}({})",
+                self.build(
+                    &value["value"],
+                    &format!(
+                        "{}.type_variant_type_of({typ},{})",
+                        self.meta, value["variant"]
+                    )
+                )?
+            )),
+            _ => expression_with_big(value, typ, self.meta, self.big),
         }
-        "union" => Ok(format!(
-            "{typ}({})",
-            materialize_at(
-                &value["value"],
-                &format!("{meta}.type_variant_type_of({typ},{})", value["variant"]),
-                meta,
-                module,
-                prefix,
-                statements,
-                serial
-            )?
-        )),
-        _ => expression(value, typ, meta),
     }
 }
 
