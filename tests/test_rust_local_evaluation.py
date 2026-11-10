@@ -52,6 +52,28 @@ class RustLocalEvaluationTests(unittest.TestCase):
             'import "core:fmt"\nwork::proc(n:int)->int{return n+1}\n'
             'generic::proc($T:typeid)->int{return #run work(size_of(T))}'),output='25\n')
 
+    def test_unused_outer_constant_still_distinguishes_local_native_types(self):
+        for definition in ('struct{x:int}', 'enum{one,two}', 'union{int,bool}', 'distinct int'):
+            for flags in (['-debug'],native.UNCHECKED):
+                with self.subTest(definition=definition,flags=flags):
+                    self.compare(self.program('fmt.println(outer(2),outer(4))',
+                        'import "core:fmt"\nwork::proc(b:bool)->int{return b?9:7}\n'
+                        'generic::proc($T:typeid)->int{return #run work(size_of(T)>0)}\n'
+                        'outer::proc($N:int)->int{Local::'+definition+';return generic(Local)}'),
+                        flags=flags,output='9 9\n',
+                        reference_failure=('Undeclared name: Local' if definition=='distinct int' else
+                            'Cannot resolve the nominal type' if flags==native.UNCHECKED else None),
+                        reference_specialized_gap={'reference':([] if definition=='distinct int' else [{'kind':'integer','value':'9'}]),
+                            'rust':[{'kind':'integer','value':'9'},{'kind':'integer','value':'9'}]})
+
+    def test_unused_outer_constant_distinguishes_local_sequence_elements(self):
+        self.compare(self.program('fmt.println(outer(2),outer(4))',
+            'import "core:fmt"\nwork::proc(b:bool)->int{return b?9:7}\n'
+            'generic::proc($T:typeid)->int{return #run work(size_of(T)>0)}\n'
+            'outer::proc($N:int)->int{Local::struct{x:int};return generic([2]Local)}'),output='9 9\n',
+            reference_specialized_gap={'reference':[{'kind':'integer','value':'9'}],
+                'rust':[{'kind':'integer','value':'9'},{'kind':'integer','value':'9'}]})
+
     def test_local_generic_record_type(self):
         self.compare(self.program('Local::struct($E:typeid){value:E};fmt.println(generic(Local(int)),generic(Local(i16)))',
             'import "core:fmt"\nwork::proc(n:int)->int{return n+1}\n'

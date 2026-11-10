@@ -307,7 +307,8 @@ impl Specializations {
                         .start,
                     name,
                     typ,
-                    binding.value
+                    binding.value,
+                    binding.condition
                 ])
             })
             .collect::<Vec<_>>();

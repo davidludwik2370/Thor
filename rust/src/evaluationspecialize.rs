@@ -4,6 +4,16 @@ use super::*;
 use serde_json::json;
 impl Scheduler<'_> {
     fn binding_condition(&mut self, typ: &Type) -> Result<String> {
+        match typ {
+            Type::Array { elem: element, .. }
+            | Type::Fixed { elem: element, .. }
+            | Type::Slice(element)
+            | Type::Dynamic(element)
+            | Type::Pointer(element)
+            | Type::Soa(element)
+            | Type::Set(element) => return self.binding_condition(element),
+            _ => {}
+        }
         let at = match typ {
             Type::Nominal(at, _)
             | Type::Struct(at)

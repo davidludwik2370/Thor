@@ -646,6 +646,23 @@ no helper compiler. The full key/dependency/storage/cached-execution group passe
 all 57 tests. Normal Rust commands still do not enable the scheduler; prepared
 and scalar-site reuse and command adoption remain outstanding.
 
+### Local types in enclosing generic instances
+
+Specialization fingerprints now retain the lexical condition of local nominal
+types, including sequence element types. Odin gives a local struct, enum, union
+or distinct type a different identity in each enclosing generic instance even
+when the outer constant is unused by its fields. Merging those instances left
+the second call without a generated evaluation case. Rust now keeps both cases.
+The frozen reference still merges them, or fails its nominal identity probe;
+the differential tests pin those reference outcomes explicitly.
+
+The 20-test local-type/replay run passed all native output checks and found three
+incorrect expectations about the reference's partially scheduled results in
+unchecked builds. After pinning those results, the complete eight-case new
+struct/enum/union/distinct matrix passed separately, in checked and unchecked
+builds. The structural-sequence test also passed. Debug units, assertion hygiene
+and Clippy with warnings denied pass.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
