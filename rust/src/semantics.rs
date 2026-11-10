@@ -1559,7 +1559,7 @@ impl<'a> Resolver<'a> {
             _ => None,
         }
     }
-    pub fn runtime_operand(&self, r: Ref) -> bool {
+    pub fn runtime_operand(&mut self, r: Ref) -> bool {
         self.runtime(r, &mut HashSet::new())
     }
     pub fn denotes_type(&self, r: Ref) -> bool {
@@ -1688,18 +1688,37 @@ impl<'a> Resolver<'a> {
                 })
         })
     }
-    fn runtime(&self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
+    fn runtime(&mut self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
         if !seen.insert(r) {
             return false;
         }
         let s = &self.sources[r.file];
         let n = s.node(r.node);
-        if n.kind == "Literal" || n.kind.ends_with("Type") {
+        if self.evaluated.contains_key(&r)
+            || matches!(n.kind.as_str(), "Run" | "Literal")
+            || n.kind.ends_with("Type")
+        {
             return false;
+        }
+        if n.kind == "Selector" {
+            return s
+                .role(r.node, "expr")
+                .is_some_and(|node| self.runtime(Ref { file: r.file, node }, seen));
         }
         if let Some(id) = self.symbol(r) {
             let symbol = &self.symbols[id];
-            if !symbol.constant {
+            let owner = &self.sources[symbol.reference.file];
+            let declaration = owner.node(symbol.reference.node);
+            if matches!(declaration.kind.as_str(), "Range" | "TypeSwitch") {
+                return true;
+            }
+            if declaration.kind == "Field" {
+                return !owner
+                    .group(symbol.reference.node, "names")
+                    .iter()
+                    .any(|name| owner.node(*name).kind == "PolyType");
+            }
+            if declaration.kind == "Declaration" && (declaration.mutable || declaration.immutable) {
                 return true;
             }
         }
@@ -1709,44 +1728,19 @@ impl<'a> Resolver<'a> {
                     file: r.file,
                     node: callee,
                 };
-                if !self.native_builtin(callee, s.text(callee.node)) && !self.denotes_type(callee) {
+                if crate::purity::builtin_call(self, r).is_none() && !self.denotes_type(callee) {
                     return true;
                 }
             }
-            let name = s.role(r.node, "callee").map(|id| s.text(id)).unwrap_or("");
-            if !matches!(
-                name,
-                "len"
-                    | "cap"
-                    | "size_of"
-                    | "align_of"
-                    | "type_of"
-                    | "min"
-                    | "max"
-                    | "abs"
-                    | "clamp"
-                    | "#config"
-            ) && !matches!(
-                name,
-                "int"
-                    | "uint"
-                    | "i8"
-                    | "i16"
-                    | "i32"
-                    | "i64"
-                    | "i128"
-                    | "u8"
-                    | "u16"
-                    | "u32"
-                    | "u64"
-                    | "u128"
-                    | "f16"
-                    | "f32"
-                    | "f64"
-                    | "string"
-            ) {
-                return true;
-            }
+            return s.group(r.node, "args").iter().any(|node| {
+                self.runtime(
+                    Ref {
+                        file: r.file,
+                        node: *node,
+                    },
+                    &mut seen.clone(),
+                )
+            });
         }
         n.children.iter().any(|node| {
             self.runtime(

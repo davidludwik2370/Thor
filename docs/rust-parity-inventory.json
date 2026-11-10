@@ -266,7 +266,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 5,
-      "remaining": "Finish reference interactions."
+      "remaining": "Native constant chains, contextual empty literals, distinct container identity, generic constant operands and ordinary-array argument contexts match focused comparisons. An explicit test records the frozen reference's second bare generic array identity-cast gap. Complete whole-suite acceptance and remaining cross-feature interactions."
     },
     {
       "python": "thorlang/defaults.py",

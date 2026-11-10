@@ -11,6 +11,7 @@ pub struct ContextHint {
     pub annotation: Ref,
     pub values: Vec<Type>,
     pub witnesses: Vec<Option<(Ref, bool, usize)>>,
+    pub plain_array: bool,
 }
 impl Resolver<'_> {
     pub fn prepare_contexts(&mut self) {
@@ -161,12 +162,17 @@ impl Resolver<'_> {
                                     .is_some_and(|span| s.slice(*span) == "[")
                         })
                     {
+                        let plain_array = matches!(
+                            self.specialized_type(annotation, &plan.bindings),
+                            Type::Array { .. }
+                        );
                         self.context_hints.insert(
                             *arg,
                             ContextHint {
                                 annotation,
                                 values: values.clone(),
                                 witnesses: witnesses.clone(),
+                                plain_array,
                             },
                         );
                         self.parameter_witnesses.insert(

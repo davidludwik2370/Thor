@@ -1861,7 +1861,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(self.error_token(*value,"Array concatenation ('++') requires compile-time constant operands; runtime variables and immutable bindings do not qualify."));
             }
             let typ = self.typ(*value);
-            let current=match typ{Type::Array{..}=>"array",Type::Slice(_)=>"slice",Type::Unknown|Type::Generic=>return Err(self.unsupported(*value,"generic concatenation types")),_=>return Ok(self.error_token(*value,"Array concatenation ('++') requires fixed arrays or constant slices; use + for constant strings."))};
+            let mut base = &typ;
+            while let Type::Nominal(_, inner) = base {
+                base = inner;
+            }
+            let current=match base{Type::Array{..}=>"array",Type::Slice(_)=>"slice",Type::Unknown|Type::Generic=>continue,_=>return Ok(self.error_token(*value,"Array concatenation ('++') requires fixed arrays or constant slices; use + for constant strings."))};
             if kind.is_some_and(|kind| kind != current) {
                 return Ok(self.error_token(*value,"Array concatenation ('++') cannot mix fixed arrays and slices; convert the operands to the same container kind explicitly."));
             }
@@ -1879,14 +1883,35 @@ impl<'a, 'r> Lower<'a, 'r> {
             plain_array: false,
         });
         if hint.is_none() {
+            let inner = |mut value| {
+                while self.source.node(value).kind == "Paren" {
+                    let Some(next) = self.source.role(value, "expr") else {
+                        break;
+                    };
+                    value = next;
+                }
+                value
+            };
             if let Some(anchor) = values
                 .iter()
-                .find(|id| !self.is_array(**id))
-                .or(values.first())
+                .find(|id| {
+                    !self.is_array(inner(**id))
+                        && matches!(
+                            self.typ(**id),
+                            Type::Array { .. } | Type::Slice(_) | Type::Nominal(..)
+                        )
+                })
+                .or_else(|| {
+                    values.iter().find(|id| {
+                        self.is_array(inner(**id))
+                            && !self.source.group(inner(**id), "elems").is_empty()
+                    })
+                })
             {
-                let code = if self.is_array(*anchor) {
+                let anchor_inner = inner(*anchor);
+                let code = if self.is_array(anchor_inner) {
                     self.source
-                        .group(*anchor, "elems")
+                        .group(anchor_inner, "elems")
                         .first()
                         .map(|id| self.render(*id, None, true))
                         .transpose()?
@@ -1896,7 +1921,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 if let Some(code) = code {
                     self.default = true;
                     let typeof_ = self.native("type_of");
-                    let code = if self.is_array(*anchor) {
+                    let code = if self.is_array(anchor_inner) {
                         Code::concat([
                             self.g(format!("{typeof_}({}default_value(", self.prefix), id),
                             code,
@@ -1921,9 +1946,16 @@ impl<'a, 'r> Lower<'a, 'r> {
             if i > 0 {
                 parts.push(self.g(", ", id));
             }
+            let mut inner = *value;
+            while self.source.node(inner).kind == "Paren" {
+                let Some(next) = self.source.role(inner, "expr") else {
+                    break;
+                };
+                inner = next;
+            }
             parts.push(self.render(
                 *value,
-                if self.is_array(*value) {
+                if self.is_array(inner) {
                     hint.clone()
                 } else {
                     None

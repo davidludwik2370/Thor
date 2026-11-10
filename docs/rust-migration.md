@@ -739,6 +739,26 @@ separate remaining integration/performance task, not a claimed speedup here.
 All 29 Rust units pass in debug and release, Clippy passes with warnings denied,
 and all seven assertion-hygiene checks pass.
 
+### Constant concatenation and literal contexts
+
+Concatenation now follows the reference for unresolved generic operands,
+distinct arrays/slices, parenthesized empty literals and established element
+contexts. Runtime-operand checks recognize compile-time parameters, constant
+record fields, native builtins and named type conversions; runtime values still
+fail before constant declarations are emitted.
+
+Context witnesses retain whether the instantiated destination is an ordinary
+array. Such bracket arguments remain native compound literals: even an identity
+cast makes an otherwise valid array invalid as an Odin constant parameter.
+The frozen reference has the same cast gap for an unconstrained generic's second
+bare bracket argument. A dedicated test pins its rejection and verifies Rust's
+accepted output against an ordinary Odin program; Python remains unchanged.
+
+The 113-test concatenation/resolution/type-parameter/compiler gate passes.
+Additional tests verify the reference cast gap and generic calls in checked and
+unchecked builds. Debug units, assertion hygiene and Clippy pass. Native
+constant-expression string counts are the next lowering gap.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

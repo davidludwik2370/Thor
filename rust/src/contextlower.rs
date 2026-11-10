@@ -180,7 +180,7 @@ impl Lower<'_, '_> {
         Some(Hint {
             code: Code::concat(code),
             element_only: false,
-            plain_array: false,
+            plain_array: hint.plain_array,
         })
     }
 }
