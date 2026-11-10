@@ -1,7 +1,7 @@
 //! Internal differential harness for canonical logical-number contents.
 use serde_json::{json, Value};
 use std::io::{self, BufRead};
-use thor_compiler::{bigstatic, bigvalues, values};
+use thor_compiler::{bigconstantvalue, bigstatic, bigvalues, values};
 fn resolve(request: &Value) -> bigvalues::Result<Value> {
     use std::{collections::BTreeMap, path::Path};
     use thor_compiler::{
@@ -89,6 +89,14 @@ fn run(request: Value) -> bigvalues::Result<Value> {
     let op = request["operation"].as_str().ok_or("Invalid operation.")?;
     match op {
         "resolve" => resolve(&request),
+        "constant_unary" => {
+            bigconstantvalue::unary(&request["a"], request["operator"].as_str().unwrap_or(""))
+        }
+        "constant_binary" => bigconstantvalue::binary(
+            &request["a"],
+            &request["b"],
+            request["operator"].as_str().unwrap_or(""),
+        ),
         "literal" => {
             let number =
                 bigvalues::literal(request["text"].as_str().ok_or("Invalid numeric literal.")?)?;

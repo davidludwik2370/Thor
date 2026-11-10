@@ -163,6 +163,22 @@ This remains checkpoint 6. Read-only constant folding/static source bindings,
 numeric builtins/generic components, and logical-number pure execution and cache
 reconstruction still need integration. Python remains the supported default.
 
+### Exact constant arithmetic foundation
+
+`bigconstantvalue` now performs logical-number arithmetic directly on canonical
+arbitrary-precision contents, including truncating division/remainder, floor
+modulus, signed bitwise operations, comparisons, shifts and integral powers.
+It preserves the reference's domain and result-size checks without a machine
+floating-point conversion. The internal `big_protocol` harness exposes these
+operations for differential checks. Source constant bindings are not connected
+yet; normal Rust commands still report that migration gap.
+
+The four permanent arithmetic tests compare 4,892 cases against the actual Python
+constant evaluator. The combined arithmetic, exact-value protocol, reconstruction
+and assertion-hygiene gate passed all 26 tests. Debug arithmetic comparisons and
+Clippy also passed. An isolated optimized prototype passed the same arithmetic
+boundary corpus with debug assertions and overflow checks disabled.
+
 ### Parity-first resolution work
 
 The expression-coercion predicate now follows the reference's syntax-sensitive

@@ -215,12 +215,13 @@
     {
       "python": "thorlang/bigconstants.py",
       "rust": [
-        "rust/src/bigstatic.rs"
+        "rust/src/bigstatic.rs",
+        "rust/src/bigconstantvalue.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Read-only limb layout, zero views, sign headers, static identity and deduplication are ported. Complete AST constant evaluation and read-only source binding checks."
+      "remaining": "Read-only limbs and canonical exact constant operators are ported. Complete AST constant evaluation, source binding/read-only checks, switch selection and integration."
     },
     {
       "python": "thorlang/bigintegration.py",
@@ -249,12 +250,13 @@
     {
       "python": "thorlang/bigoperators.py",
       "rust": [
-        "rust/src/bigoperators.rs"
+        "rust/src/bigoperators.rs",
+        "rust/src/bigconstantvalue.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Runtime unary/binary/comparison and compound-update dispatch retains native generic specializations. Complete constant operators, remaining interactions and acceptance."
+      "remaining": "Runtime dispatch and canonical constant arithmetic are ported. Connect source constant operators and complete remaining interactions and acceptance."
     },
     {
       "python": "thorlang/bigvalues.py",
