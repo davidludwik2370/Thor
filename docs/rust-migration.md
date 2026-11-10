@@ -38,6 +38,37 @@ Use focused comparisons while implementing and broader gates at integration
 boundaries. Further architectural optimization and parallel lowering wait for
 behavioral acceptance. The historical sections below record earlier checkpoints.
 
+### Anonymous producer ownership
+
+The shared temporary algebra now follows `thorlang/ownership.py` for strings and
+Sets. Known consumers retain the selected ownership flag, release intermediate
+operands in reverse order, preserve lazy branches and keep view owners alive
+through indexing, membership, queries, formatting and iteration. Anonymous union
+chains may reuse their owned left table; named operands remain borrowed. Set
+updates capture the destination before evaluating the right operand. Discarded
+expressions, mixed blank destinations and loop exits release only owned values.
+
+Ordinary procedure results remain borrowed by this layer. Passing an anonymous
+Set to an arbitrary procedure keeps the reference's transfer behavior; automatic
+f-string call scopes retain their existing separate contract. Escaping a view or
+address into an anonymous allocation reports the original named-owner diagnostic.
+Native type queries do not execute their operands. Generated type-query helpers
+have separate identities for scopes that carry an f-string cleanup frame.
+
+This remains checkpoint 6: logical-number producers/destructors and broader
+integration are still outstanding. Python remains the supported default.
+
+The corrected combined ownership/f-string/checked-call/compiler/numeric/generic
+and assertion-hygiene gate passed all 156 tests. Rust's 29 unit tests passed in
+both debug and release; Clippy passed with warnings denied. Runtime ownership
+fixtures exercise allocation tracking in checked and unchecked builds.
+
+The initial gate had two obsolete migration-gap expectations and one transient
+Odin SIGSEGV while compiling the Python reference's typed numeric loop fixture.
+Rust produced the expected result; four isolated comparisons and the clean full
+gate passed. The extracted crash record extends the existing upstream issue
+bundle at `upstream/odin-codegen-race/evidence/recurrence-2026-11-10.txt`.
+
 ### Parity-first resolution work
 
 The resolver now follows the reference's `using` lookup and storage-protection

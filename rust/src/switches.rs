@@ -8,6 +8,27 @@ struct Case {
     result: NodeId,
 }
 impl Lower<'_, '_> {
+    pub(super) fn temporary_switch<F>(&mut self, id: NodeId, mut arm: F) -> Result<Code>
+    where F: FnMut(&mut Self, NodeId) -> Result<Code> {
+        if let Some(problem) = self.switch_problem(id, 1)? { return Ok(problem); }
+        let cases = self.cases(id)?;
+        if self.source.node(id).kind == "SwitchExpr" {
+            let mut branches = HashMap::new();
+            for case in cases { branches.insert(case.result, arm(self, case.result)?); }
+            return self.native_switch(id, &[None], Some(&[]), Some(&branches));
+        }
+        let validation = self.switch_validation(id)?;
+        let mut code = vec![self.g("when ", id), validation, self.g(" {\n", id)];
+        for (index, case) in cases.iter().filter(|case|!case.matches.is_empty())
+            .chain(cases.iter().filter(|case|case.matches.is_empty())).enumerate() {
+            let condition = self.case_condition(id, case)?;
+            let branch = arm(self, case.result)?;
+            code.extend([self.g(if index==0 {"when "} else {"else when "},id), condition,
+                self.g(" {\n", id), branch, self.g("}\n", id)]);
+        }
+        code.push(self.g("}\n", id));
+        Ok(Code::concat(code))
+    }
     pub(super) fn unparen(&self, mut id: NodeId) -> NodeId {
         while self.source.node(id).kind == "Paren" {
             let Some(child) = self.source.role(id, "expr") else {
@@ -680,6 +701,7 @@ impl Lower<'_, '_> {
         id: NodeId,
         hints: &[Option<Hint>],
         targets: Option<&[Code]>,
+        branches: Option<&HashMap<NodeId, Code>>,
     ) -> Result<Code> {
         let cases = self.cases(id)?;
         let selector = self.source.role(id, "selector");
@@ -729,7 +751,9 @@ impl Lower<'_, '_> {
             if self.source.node(case.result).kind == "SwitchBreak" {
                 continue;
             }
-            if self.diverging(case.result) {
+            if let Some(branch) = branches.and_then(|branches| branches.get(&case.result)) {
+                code.push(branch.clone());
+            } else if self.diverging(case.result) {
                 code.push(self.render(case.result, None, false)?);
             } else {
                 code.push(self.switch_consume(id, case.result, hints, targets)?);
@@ -842,7 +866,7 @@ impl Lower<'_, '_> {
             .collect::<Vec<_>>();
         let flavor = format!("tuple:{}", hints.len());
         let (name, mut args) = self.closed(id, "switch", Some(&flavor), |this| {
-            this.native_switch(id, &generic, None)
+            this.native_switch(id, &generic, None, None)
         })?;
         args.extend(types);
         Ok(self.helper_call(id, &name, args))
@@ -1194,7 +1218,7 @@ impl Lower<'_, '_> {
                     }));
                     targets.push(value);
                 }
-                code.push(this.native_switch(id, &local_hints, Some(&targets))?);
+                code.push(this.native_switch(id, &local_hints, Some(&targets), None)?);
                 if post {
                     code.push(this.g("\nreturn true", owner));
                 }

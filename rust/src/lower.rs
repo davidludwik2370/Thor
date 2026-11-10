@@ -42,6 +42,8 @@ mod storage;
 mod switches;
 #[path = "typedloops.rs"]
 mod typedloops;
+#[path = "temporaries.rs"]
+mod temporaries;
 
 #[derive(Clone, Debug)]
 pub struct Hint {
@@ -67,6 +69,8 @@ pub struct Lower<'a, 'r> {
     fstring_frames: Vec<(String, HashSet<NodeId>)>,
     fstring_busy: HashSet<NodeId>,
     querying: usize,
+    temporary_serial: usize,
+    temporary_discarding: HashSet<NodeId>,
     default: bool,
     meta: bool,
     builtin: bool,
@@ -139,6 +143,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             fstring_frames: vec![],
             fstring_busy: HashSet::new(),
             querying: 0,
+            temporary_serial: 0,
+            temporary_discarding: HashSet::new(),
             default: false,
             meta: false,
             builtin: false,
@@ -550,12 +556,6 @@ impl<'a, 'r> Lower<'a, 'r> {
         ))
     }
     fn preflight(&mut self) -> Result<()> {
-        let managed_composites = self
-            .fstring_plans
-            .values()
-            .flatten()
-            .flat_map(|target| self.source.ancestors(*target))
-            .collect::<HashSet<_>>();
         for (i, node) in self.source.nodes.iter().enumerate() {
             let id = NodeId(i);
             if self
@@ -564,45 +564,6 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .is_some_and(|view| !view.retains(self.source, id))
             {
                 continue;
-            }
-            let set_temporary = (node.kind == "Compound" && matches!(self.typ(id), Type::Set(_)))
-                || (node.kind == "Binary"
-                    && matches!(node.op.as_str(), "|" | "&" | "-" | "~")
-                    && matches!(self.typ(id), Type::Set(_)));
-            if set_temporary {
-                let mut root = id;
-                while let Some(parent) = self
-                    .source
-                    .node(root)
-                    .parent
-                    .filter(|parent| self.source.node(*parent).kind == "Paren")
-                {
-                    root = parent;
-                }
-                if let Some(parent) = self.source.node(root).parent {
-                    let kind = self.source.node(parent).kind.as_str();
-                    let delete = kind == "Call"
-                        && self.source.role(parent, "callee").is_some_and(|callee| {
-                            self.resolver
-                                .native_builtin(self.reference(callee), "delete")
-                        });
-                    if matches!(
-                        kind,
-                        "Call" | "Binary" | "Index" | "Slice" | "Selector" | "Interpolation"
-                    ) && !delete
-                    {
-                        return Err(self.unsupported(id, "anonymous Set temporary ownership"));
-                    }
-                    if kind == "Assignment"
-                        && self
-                            .source
-                            .group(parent, "lhs")
-                            .iter()
-                            .any(|lhs| self.source.text(*lhs) == "_")
-                    {
-                        return Err(self.unsupported(id, "discarded Set temporary cleanup"));
-                    }
-                }
             }
             if self
                 .resolver
@@ -613,35 +574,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             if node.data["pure"] == true && !self.verified_pure.contains(&id) {
                 return Err(self.unsupported(id, "pure-function verification and execution"));
-            }
-            if matches!(
-                node.kind.as_str(),
-                "Binary" | "Ternary" | "WhenExpr" | "Index" | "Slice" | "Selector" | "Unary"
-            ) {
-                let temporary = self.source.descendants(id).any(|child| {
-                    let n = self.source.node(child);
-                    n.kind == "Interpolation" && n.data["manual_lifetime"] != true
-                });
-                let managed = managed_composites.contains(&id);
-                if temporary && !managed {
-                    return Err(
-                        self.unsupported(id, "anonymous-string ownership in composite expressions")
-                    );
-                }
-            }
-            if node.kind == "Assignment"
-                && self
-                    .source
-                    .group(id, "lhs")
-                    .iter()
-                    .all(|lhs| self.source.text(*lhs) == "_")
-                && self
-                    .source
-                    .group(id, "rhs")
-                    .iter()
-                    .any(|rhs| self.anonymous_string(*rhs))
-            {
-                return Err(self.unsupported(id, "discarded anonymous-string cleanup"));
             }
             let evaluated = self.evaluated.contains_key(&id)
                 || self.evaluation_skips.contains_key(&id)
@@ -1088,6 +1020,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             if let Some(code) = self.ownership_signature(id)? {
                 return Ok(code);
             }
+        }
+        if self.source.thor {
+            if let Some(code) = self.temporary_expression(id, constant)? { return Ok(code); }
         }
         if matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
             if let Some(code) = self.switch_statement(id, constant)? {
@@ -1701,6 +1636,39 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         Ok(literal.expansion(&self.source.path, self.source.node(id).span))
     }
+    fn membership_helper(&mut self, id: NodeId) -> String {
+        let helper = format!("{}contains", self.prefix);
+        let key = (NodeId(0), self.prefix.clone(), helper.clone());
+        if !self.helpers.contains_key(&key) {
+            let mut parts = String::new();
+            let mut names = vec![];
+            for (suffix, signature) in [
+                ("array", "$C/[$N]$E"),
+                ("slice", "$C/[]$E"),
+                ("dynamic", "$C/[dynamic]$E"),
+                ("fixed", "$C/[dynamic; $N]$E"),
+            ] {
+                let name = format!("{helper}_{suffix}");
+                names.push(name.clone());
+                parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values: {signature}, value:E)->bool {{ for element in values {{if element==value {{return true}}}}; return false }}\n"));
+            }
+            for (suffix, signature, element) in [("map", "$C/map[$K]$V", "K"), ("bits", "$C/bit_set[$E]", "E")] {
+                let name=format!("{helper}_{suffix}");
+                names.push(name.clone());
+                parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values:{signature},value:{element})->bool{{return value in values}}\n"));
+            }
+            let sets=self.module("sets");
+            let name=format!("{helper}_set");
+            names.push(name.clone());
+            parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values:{sets}.Set($E),value:E)->bool{{return value in values.table}}\n"));
+            parts.push_str(&format!(
+                "\n@(private=\"file\")\n{helper} :: proc{{{}}}\n",
+                names.join(", ")
+            ));
+            self.helpers.insert(key, self.g(parts, id));
+        }
+        helper
+    }
     fn membership(&mut self, id: NodeId, constant: bool) -> Result<Code> {
         let left = self.role(id, "left")?;
         let right = self.role(id, "right")?;
@@ -1790,27 +1758,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         if !typ.is_sequence() && !self.is_array(sequence) {
             return Err(self.unsupported(id, "generic/bit-set/set membership dispatch"));
         }
-        let helper = format!("{}contains", self.prefix);
-        let key = (NodeId(0), self.prefix.clone(), helper.clone());
-        if !self.helpers.contains_key(&key) {
-            let mut parts = String::new();
-            let mut names = vec![];
-            for (suffix, signature) in [
-                ("array", "$C/[$N]$E"),
-                ("slice", "$C/[]$E"),
-                ("dynamic", "$C/[dynamic]$E"),
-                ("fixed", "$C/[dynamic; $N]$E"),
-            ] {
-                let name = format!("{helper}_{suffix}");
-                names.push(name.clone());
-                parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values: {signature}, value:E)->bool {{ for element in values {{if element==value {{return true}}}}; return false }}\n"));
-            }
-            parts.push_str(&format!(
-                "\n@(private=\"file\")\n{helper} :: proc{{{}}}\n",
-                names.join(", ")
-            ));
-            self.helpers.insert(key, self.g(parts, id));
-        }
+        let helper = self.membership_helper(id);
         let a = self.render(left, None, constant)?;
         let b = if self.is_array(sequence) {
             self.array(sequence, None, Some(left), constant)?
@@ -2192,7 +2140,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         let span = node.span;
         let owner = self.helper_scope(id);
         let variant = if self.querying > 0 {
-            "_query"
+            if self.fstring_frames.is_empty() { "_query" } else { "_query_temporary" }
         } else if self.fstring_frames.is_empty() {
             ""
         } else {
@@ -2512,14 +2460,18 @@ impl<'a, 'r> Lower<'a, 'r> {
             for (index,(field,literal,spec,widths)) in parsed.iter().enumerate(){
                 if let Some(literal)=literal{code.push(this.g(format!("{formatting}.buffer_write_string(&{builder}, {literal})\n"),id));continue;}
                 let field=field.ok_or_else(||Error::new("missing interpolation field"))?;
-                let value=format!("{prefix}value_{index}");let expression=this.render(field,None,false)?;
-                code.extend([this.g(format!("{value} := "),field),expression,this.g("\n",field)]);
-                let owned=this.anonymous_string(field);
-                let captured=this.fstring_frames.iter().any(|(_,targets)|targets.contains(&field));
+                let temporary=this.temporary_evaluate(field,&mut code,None)?;
+                let mut value=temporary.value.clone();
+                if !widths.is_empty() {
+                    let snapshot=format!("{prefix}snapshot_{index}");
+                    code.push(this.g(format!("{snapshot}:={formatting}.compiler_capture_width_value({value},{})\n",temporary.owned),field));
+                    value=snapshot;
+                }
                 let width_name=format!("{prefix}width_{index}");
                 for width in widths{
-                    let rendered=this.render(*width,None,false)?;
-                    code.extend([this.g(format!("{width_name} := {formatting}.normalize_width("),*width),rendered,this.g(")\n",*width)]);
+                    let evaluated=this.temporary_evaluate(*width,&mut code,None)?;
+                    code.push(this.g(format!("{width_name} := {formatting}.normalize_width({})\n",evaluated.value),*width));
+                    this.temporary_release(&evaluated,&mut code,false)?;
                 }
                 let options=spec.as_ref().ok_or_else(||Error::new("missing interpolation format"))?.options(&width_name);
                 if this.checked_mode && this.querying==0 {
@@ -2527,7 +2479,8 @@ impl<'a, 'r> Lower<'a, 'r> {
                     code.push(this.g(format!("{formatting}.validate_pure_value({query}({value}))\n"),field));
                 }
                 code.push(this.g(format!("{formatting}.write_spec(&{builder}.builder,{value},{options})\n"),field));
-                if owned&&!captured{let delete=this.native("delete");code.push(this.g(format!("{delete}({value})\n"),field));}
+                if !widths.is_empty() {code.push(this.g(format!("{formatting}.compiler_release_width_value({value},{})\n",temporary.owned),field));}
+                this.temporary_release(&temporary,&mut code,false)?;
             }
             code.push(this.g(format!("return {formatting}.buffer_owned_text(&{builder})"),id));Ok(Code::concat(code))
         })?;

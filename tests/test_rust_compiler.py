@@ -466,11 +466,8 @@ fmt.println("clean")
         self.assertIn(str(self.source),result.stderr)
         self.assertNotIn(str(self.root/'rust'),result.stderr)
 
-    def test_set_temporary_ownership_gaps_are_reported(self):
-        self.source.write_text(self.program('_=len(set[int]{1,2})'))
-        result=self.invoke('rust',command='check')
-        self.assertEqual(result.returncode,3,result.stderr)
-        self.assertIn('anonymous Set temporary ownership',result.stderr)
+    def test_set_temporary_query_matches_reference(self):
+        self.compare(self.program('if len(set[int]{1,2})!=2{panic("temporary query")}'))
 
     def test_immutable_inline_storage_rejected(self):
         self.compare(self.program('values :> [1,2]; values[0]=3'), command='check',
@@ -660,16 +657,22 @@ release::proc(text:string){}
             self.assertTrue(all('immutable' not in node for node in packet['payload']['nodes']))
 
     def test_unported_features_fail_closed_without_python(self):
-        for code in ['value:=f"hello {2}"=="hello 2";_=value',
-                     'T::int;when T==int {value:=1} else {value :> 1};value=2;_=value',
-                     'value:Integer=2;_=value',
-                     'value:=len(set[int]{1,2});_=value']:
+        for code in ['T::int;when T==int {value:=1} else {value :> 1};value=2;_=value',
+                     'value:Integer=2;_=value']:
             with self.subTest(code=code):
                 self.source.write_text(self.program(code, 'calculate::proc()->int{return 2}\n'))
                 result = self.invoke('rust', command='check', flags=['-json-errors'])
                 self.assertEqual(result.returncode, 3, result.stderr)
                 packet = json.loads(result.stderr)
                 self.assertEqual(packet['errors'][0]['stage'], 'rust-migration')
+
+    def test_supported_temporary_consumers_have_clean_json_diagnostics(self):
+        for code in ['value:=f"hello {2}"=="hello 2";_=value',
+                     'value:=len(set[int]{1,2});_=value']:
+            with self.subTest(code=code):
+                result=self.compare(self.program(code),command='check',flags=['-json-errors'])
+                packet=json.loads(result.stderr)
+                self.assertEqual(packet['error_count'],0)
 
     def test_capabilities_admit_incomplete_port(self):
         result = subprocess.run([str(RUST), '--capabilities'], capture_output=True, text=True)

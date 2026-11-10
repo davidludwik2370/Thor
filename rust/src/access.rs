@@ -29,7 +29,7 @@ impl Lower<'_, '_> {
         self.querying -= 1;
         code
     }
-    fn native_type(&mut self, id: NodeId) -> Result<Code> {
+    pub(super) fn native_type(&mut self, id: NodeId) -> Result<Code> {
         let value = self.query_value(id)?;
         let type_of = self.native("type_of");
         self.default = true;
@@ -39,13 +39,13 @@ impl Lower<'_, '_> {
             self.g("))", id),
         ]))
     }
-    fn sequence_trait(&mut self, id: NodeId) -> Result<String> {
+    pub(super) fn sequence_trait(&mut self, id: NodeId) -> Result<String> {
         let typ = self.native_type(id)?.finish().text;
         self.meta = true;
         let m = format!("{}meta", self.prefix);
         Ok(format!("(({m}.type_is_array({typ}) && !{m}.type_is_enumerated_array({typ})) || {m}.type_is_slice({typ}) || {m}.type_is_dynamic_array({typ}) || {m}.type_is_fixed_capacity_dynamic_array({typ}) || {m}.type_is_string({typ}))"))
     }
-    fn write_access(&self, id: NodeId) -> bool {
+    pub(super) fn write_access(&self, id: NodeId) -> bool {
         if self.address_nodes.contains(&id) {
             return true;
         }

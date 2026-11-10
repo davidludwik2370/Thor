@@ -347,13 +347,15 @@
     {
       "python": "thorlang/ownership.py",
       "rust": [
-        "rust/src/lower.rs",
-        "rust/src/sets.rs"
+        "rust/src/temporaries.rs",
+        "rust/src/sets.rs",
+        "rust/src/switches.rs",
+        "rust/src/lower.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 26,
-      "remaining": "Finish temporary lifetime handling."
+      "remaining": "Known native string/Set consumers now carry selected ownership, retain view owners, release discarded values and loop/update operands, and preserve arbitrary-call transfer semantics. Complete logical-number producer/destruction traits in the big-number port and broad cross-feature acceptance."
     },
     {
       "python": "thorlang/repetition.py",

@@ -8,13 +8,17 @@ impl Lower<'_, '_> {
         let rendered = self.render(id, None, false);
         self.querying -= 1;
         let rendered = rendered?.finish().text;
+        let test = self.set_value_trait(&rendered);
+        Ok(self.g(test, id))
+    }
+    pub(super) fn set_value_trait(&mut self, rendered: &str) -> String {
         self.default = true;
         self.meta = true;
         let type_of = self.native("type_of");
         let sets = self.module("sets");
         let m = format!("{}meta", self.prefix);
         let t = format!("{type_of}({}default_value({rendered}))", self.prefix);
-        Ok(self.g(format!("((({t}=={sets}.Set({type_of}({sets}.key_witness(({rendered}).table)))) when {m}.type_is_map({type_of}(({rendered}).table)) else false) when {m}.type_has_field({t},\"table\") else false)"),id))
+        format!("((({t}=={sets}.Set({type_of}({sets}.key_witness(({rendered}).table)))) when {m}.type_is_map({type_of}(({rendered}).table)) else false) when {m}.type_has_field({t},\"table\") else false)")
     }
     pub(super) fn set_expression(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
         let s = self.source;
@@ -149,6 +153,7 @@ impl Lower<'_, '_> {
             };
             if let Some(name) = name {
                 let sets = self.module("sets");
+                if let Some(code) = self.temporary_update(id, &format!("{sets}.{name}"))? { return Ok(Some(code)); }
                 let post = s.node(id).parent.is_some_and(|parent| {
                     s.node(parent).kind == "For" && s.role(parent, "post") == Some(id)
                 });
