@@ -11,6 +11,7 @@ pub mod digest;
 pub mod emit;
 pub mod evaluation;
 pub mod evaluationcache;
+pub mod evaluationinputs;
 mod extremaplan;
 pub mod formatting;
 pub mod frontend;

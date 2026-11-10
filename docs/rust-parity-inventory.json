@@ -181,11 +181,13 @@
     },
     {
       "python": "thorlang/dependencies.py",
-      "rust": [],
+      "rust": [
+        "rust/src/evaluationinputs.rs"
+      ],
       "checkpoint": 5,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 9,
-      "remaining": "Port file/package/resource dependency tracking."
+      "remaining": "File/stat/raw-content observations, directory/tree/package membership, resource inputs and symlink bindings are compared with Python. Connect the snapshots to toolchain identities and scalar/prepared result reuse."
     },
     {
       "python": "thorlang/scalarcache.py",

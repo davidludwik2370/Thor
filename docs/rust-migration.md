@@ -575,6 +575,29 @@ All seven neighboring value-protocol tests pass, including native checked and
 unchecked reconstruction round trips. All 29 Rust units pass in debug and release,
 Clippy passes with warnings denied, and all seven assertion-hygiene checks pass.
 
+### Dependency snapshots for cached results
+
+`evaluationinputs.rs` ports file-content/stat observations, package membership,
+directory/tree snapshots, resource loads and path bindings. Identical-byte
+rewrites preserve content-tracked inputs; metadata-only inputs retain exact stat
+checks. Conflicting observations and unsaved source/content mismatches disable
+reuse. Missing files and immediate directory-resource members are tracked without
+including nested resources or generated cache/build folders.
+
+Path bindings resolve existing symlinks even when the final file is missing.
+Retargeting a link invalidates the snapshot, and cyclic links conservatively
+disable reuse. On systems without the native stat fields used by this fast path,
+the snapshot declines reuse rather than inventing a weaker signature. That only
+affects the optional cache path. Toolchain identity, final dependency keys and
+scalar/prepared scheduler reuse remain separate follow-up work in checkpoint 5.
+
+The combined dependency/storage gate passes all 32 tests; the dependency tests
+also pass through the debug Rust harness. All 29 Rust units pass in debug and
+release, Clippy passes with warnings denied, and assertion hygiene passes seven
+checks. A mutable reference snapshot in the initial differential-test harness
+was corrected to copy its input, so one engine cannot update the other engine's
+starting observations.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

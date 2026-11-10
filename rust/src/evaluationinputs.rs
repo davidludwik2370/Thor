@@ -1,0 +1,367 @@
+//! Reference file/package/resource snapshots for compile-time cache reuse.
+use crate::{
+    ast::{NodeId, Source},
+    digest::sha256,
+    lower::unquote,
+};
+use serde_json::{json, Value};
+use std::{
+    env, fs, io,
+    path::{Component, Path, PathBuf},
+};
+
+pub fn file_digest(path: &Path) -> io::Result<String> {
+    fs::read(path).map(|data| sha256(&data))
+}
+pub fn signature(path: &Path) -> io::Result<Option<Value>> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let stamp = |seconds: i64, nanos: i64| {
+            serde_json::to_value(i128::from(seconds) * 1_000_000_000 + i128::from(nanos))
+                .map_err(io::Error::other)
+        };
+        Ok(Some(json!([
+            metadata.dev(),
+            metadata.ino(),
+            metadata.mode(),
+            metadata.len(),
+            stamp(metadata.mtime(), metadata.mtime_nsec())?,
+            stamp(metadata.ctime(), metadata.ctime_nsec())?
+        ])))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        // Missing native stat fields disable this optional fast path; they
+        // never invent a potentially reusable metadata identity.
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "native cache stat signature unavailable",
+        ))
+    }
+}
+pub fn members(path: &Path, suffixes: &[String]) -> io::Result<Vec<String>> {
+    let mut names = vec![];
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file()
+            && path.extension().is_some_and(|extension| {
+                suffixes
+                    .iter()
+                    .any(|suffix| suffix.strip_prefix('.').unwrap_or(suffix) == extension)
+            })
+        {
+            names.push(entry.file_name().to_string_lossy().into_owned());
+        }
+    }
+    names.sort();
+    Ok(names)
+}
+fn absolute(path: &Path) -> io::Result<PathBuf> {
+    let path = if path.is_absolute() {
+        path.into()
+    } else {
+        env::current_dir()?.join(path)
+    };
+    Ok(path.components().collect())
+}
+/// Resolve existing symlinks even when the final resource does not exist yet.
+pub fn resolve(path: &Path) -> io::Result<PathBuf> {
+    fn walk(path: &Path, depth: usize) -> io::Result<PathBuf> {
+        if depth > 40 {
+            return Err(io::Error::other("cyclic or excessive symlink nesting"));
+        }
+        let mut result = PathBuf::new();
+        for component in path.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    result.pop();
+                }
+                component => {
+                    result.push(component.as_os_str());
+                    match fs::symlink_metadata(&result) {
+                        Ok(metadata) if metadata.file_type().is_symlink() => {
+                            let link = fs::read_link(&result)?;
+                            let target = if link.is_absolute() {
+                                link
+                            } else {
+                                result.parent().unwrap().join(link)
+                            };
+                            result = walk(&target, depth + 1)?;
+                        }
+                        Err(error)
+                            if ![io::ErrorKind::NotFound, io::ErrorKind::NotADirectory]
+                                .contains(&error.kind()) =>
+                        {
+                            return Err(error)
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        Ok(result)
+    }
+    walk(&absolute(path)?, 0)
+}
+pub struct Inputs {
+    pub data: Value,
+    pub usable: bool,
+}
+impl Default for Inputs {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+impl Inputs {
+    pub fn new(data: Option<Value>) -> Self {
+        Self {
+            data: data
+                .unwrap_or_else(|| json!({"files":{},"directories":{},"members":{},"bindings":{}})),
+            usable: true,
+        }
+    }
+    fn map(&mut self, name: &str) -> Option<&mut serde_json::Map<String, Value>> {
+        let value = self.data.get_mut(name)?.as_object_mut();
+        if value.is_none() {
+            self.usable = false;
+        }
+        value
+    }
+    pub fn file(&mut self, path: &Path, raw: Option<&[u8]>, content: bool) {
+        let run = (|| -> io::Result<(Option<Value>, Option<String>, Option<Value>)> {
+            let before = signature(path)?;
+            let digest = if content && before.is_some() {
+                Some(file_digest(path)?)
+            } else {
+                None
+            };
+            Ok((before, digest, signature(path)?))
+        })();
+        let Ok((before, digest, after)) = run else {
+            self.usable = false;
+            return;
+        };
+        if before != after || raw.is_some_and(|raw| Some(sha256(raw)) != digest) {
+            self.usable = false;
+        }
+        let path = path.to_string_lossy().into_owned();
+        let previous = self.data.get("files").and_then(|files| files.get(&path));
+        if previous.is_some_and(|previous| previous["stat"] != json!(before)) {
+            self.usable = false;
+        }
+        let replace = previous.is_none() || content;
+        if replace {
+            if let Some(files) = self.map("files") {
+                files.insert(path, json!({"stat":before,"sha256":digest}));
+            }
+        }
+    }
+    pub fn binding(&mut self, path: &Path) {
+        let paths =
+            absolute(path).and_then(|absolute| resolve(path).map(|resolved| (absolute, resolved)));
+        let Ok((path, resolved)) = paths else {
+            self.usable = false;
+            return;
+        };
+        let path = path.to_string_lossy().into_owned();
+        let resolved = json!(resolved.to_string_lossy());
+        if let Some(bindings) = self.map("bindings") {
+            if let Some(previous) = bindings.get(&path) {
+                if previous != &resolved {
+                    self.usable = false;
+                }
+            } else {
+                bindings.insert(path, resolved);
+            }
+        }
+    }
+    pub fn package(&mut self, directory: &Path, paths: &[PathBuf], suffixes: &[String]) {
+        let mut names = paths
+            .iter()
+            .filter_map(|path| path.file_name())
+            .map(|name| name.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        let value = json!({"suffixes":suffixes,"names":names});
+        if let Some(packages) = self.map("members") {
+            let key = directory.to_string_lossy().into_owned();
+            if let Some(previous) = packages.get(&key) {
+                if previous != &value {
+                    self.usable = false;
+                }
+            } else {
+                packages.insert(key, value);
+            }
+        }
+    }
+    pub fn directory(&mut self, path: &Path) {
+        let stamp = match signature(path) {
+            Ok(stamp) => stamp,
+            Err(_) => {
+                self.usable = false;
+                return;
+            }
+        };
+        if let Some(directories) = self.map("directories") {
+            directories.insert(path.to_string_lossy().into_owned(), json!(stamp));
+        }
+    }
+    pub fn tree(&mut self, root: &Path) {
+        self.tree_with_extensions(root, &["odin", "py"]);
+    }
+    pub fn tree_with_extensions(&mut self, root: &Path, extensions: &[&str]) {
+        if !root.exists() {
+            self.file(root, None, false);
+            return;
+        }
+        self.directory(root);
+        let entries =
+            fs::read_dir(root).and_then(|entries| entries.collect::<io::Result<Vec<_>>>());
+        let Ok(mut entries) = entries else {
+            self.usable = false;
+            return;
+        };
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let path = entry.path();
+            let typ = match entry.file_type() {
+                Ok(typ) => typ,
+                Err(_) => {
+                    self.usable = false;
+                    continue;
+                }
+            };
+            if typ.is_dir() {
+                if !["__pycache__", ".git", ".thor-cache", ".thor-build"]
+                    .contains(&entry.file_name().to_string_lossy().as_ref())
+                {
+                    self.tree_with_extensions(&path, extensions);
+                }
+            } else if !(typ.is_symlink() && path.is_dir())
+                && path.extension().is_some_and(|extension| {
+                    extensions.iter().any(|expected| extension == *expected)
+                })
+            {
+                self.file(&path, None, false);
+            }
+        }
+    }
+    pub fn source(&mut self, source: &Source, source_file: bool) {
+        if source_file {
+            self.file(&source.path, Some(source.raw.as_bytes()), true);
+        }
+        for (index, _) in source
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, node)| node.kind == "Call")
+        {
+            let Some(callee) = source.role(NodeId(index), "callee") else {
+                continue;
+            };
+            let name = source.text(callee);
+            if !["#load", "#load_hash", "#load_directory", "#exists"].contains(&name) {
+                continue;
+            }
+            let path = source
+                .group(NodeId(index), "args")
+                .first()
+                .filter(|arg| source.node(**arg).kind == "Literal")
+                .and_then(|arg| unquote(source.text(*arg)).ok())
+                .and_then(|name| {
+                    if let Some((collection, suffix)) = name.split_once(':') {
+                        source
+                            .collection_roots
+                            .get(collection)
+                            .map(|root| root.join(suffix))
+                    } else {
+                        Some(source.path.parent().unwrap().join(name))
+                    }
+                });
+            let Some(path) = path else {
+                self.usable = false;
+                continue;
+            };
+            self.binding(&path);
+            let path = match resolve(&path) {
+                Ok(path) => path,
+                Err(_) => {
+                    self.usable = false;
+                    continue;
+                }
+            };
+            if path.is_dir() {
+                self.directory(&path);
+                if name == "#load_directory" {
+                    match fs::read_dir(&path)
+                        .and_then(|entries| entries.collect::<io::Result<Vec<_>>>())
+                    {
+                        Ok(mut entries) => {
+                            entries.sort_by_key(|entry| entry.file_name());
+                            for entry in entries {
+                                let path = entry.path();
+                                if path.is_file() {
+                                    self.file(&path, None, true);
+                                }
+                            }
+                        }
+                        Err(_) => self.usable = false,
+                    }
+                }
+            } else {
+                self.file(&path, None, true);
+            }
+        }
+    }
+    pub fn valid(&self) -> bool {
+        if !self.usable {
+            return false;
+        }
+        let check = (|| -> Option<bool> {
+            for (path, value) in self.data.get("files")?.as_object()? {
+                let path = Path::new(path);
+                let current = json!(signature(path).ok()?);
+                let expected = value.get("stat")?;
+                let digest = value.get("sha256")?;
+                if &current != expected && digest.is_null() {
+                    return Some(false);
+                }
+                if !digest.is_null() && file_digest(path).ok()?.as_str() != digest.as_str()? {
+                    return Some(false);
+                }
+            }
+            for (path, expected) in self.data.get("directories")?.as_object()? {
+                if json!(signature(Path::new(path)).ok()?) != *expected {
+                    return Some(false);
+                }
+            }
+            for (path, expected) in self.data.get("members")?.as_object()? {
+                let suffixes = expected
+                    .get("suffixes")?
+                    .as_array()?
+                    .iter()
+                    .map(|value| value.as_str().map(str::to_string))
+                    .collect::<Option<Vec<_>>>()?;
+                if json!(members(Path::new(path), &suffixes).ok()?) != *expected.get("names")? {
+                    return Some(false);
+                }
+            }
+            for (path, expected) in self.data.get("bindings")?.as_object()? {
+                if resolve(Path::new(path)).ok()?.to_string_lossy().as_ref() != expected.as_str()? {
+                    return Some(false);
+                }
+            }
+            Some(true)
+        })();
+        check == Some(true)
+    }
+}
