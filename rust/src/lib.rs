@@ -10,6 +10,7 @@ pub mod diagnostic;
 pub mod digest;
 pub mod emit;
 pub mod evaluation;
+pub mod evaluationcache;
 mod extremaplan;
 pub mod formatting;
 pub mod frontend;

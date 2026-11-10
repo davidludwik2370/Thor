@@ -547,6 +547,34 @@ and assertion hygiene passes seven checks. The independent execution harness is
 ready for the contents-cache port and normal command adoption; Python remains
 the default, and this does not declare whole-language acceptance.
 
+### Contents-cache storage primitives
+
+`evaluationcache.rs` ports the optional contents store, checksummed metadata
+records, prepared-target links, atomic publication, counters and selective
+clearing policy. Native packets can be read by Python and vice versa. Invalid
+values, partial/corrupt/oversized records and unavailable storage are misses or
+optional write failures. Clearing preserves unrelated names, directories and
+symlinks. Concurrent writers publish whole packets through separate temporary
+files. Native value validation currently uses the existing reconstruction API;
+logical big-number packets will join it with the big-number backing port.
+
+Canonical JSON keys preserve sorted object keys, ASCII Unicode escapes and
+Python's finite-float notation. Generated float tests exposed the JSON parser's
+default approximate decimal conversion; the locked `serde_json` dependency now
+enables its existing `float_roundtrip` feature without adding a dependency.
+The tests compare 212 finite float values as well as Unicode/control characters,
+checksums, native packet interoperability and cache metadata behavior.
+
+This is the storage foundation of checkpoint 5. Dependency/toolchain keys,
+prepared and scalar-site reuse, scheduler integration and command adoption remain
+to be connected. Ordinary Rust commands still do not consult this contents store.
+
+All 14 storage tests pass against debug and release Rust harnesses, including
+the generated canonical encodings and Python/Rust packet interoperability.
+All seven neighboring value-protocol tests pass, including native checked and
+unchecked reconstruction round trips. All 29 Rust units pass in debug and release,
+Clippy passes with warnings denied, and all seven assertion-hygiene checks pass.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

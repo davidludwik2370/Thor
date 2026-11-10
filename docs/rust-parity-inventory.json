@@ -171,11 +171,13 @@
     },
     {
       "python": "thorlang/cache.py",
-      "rust": [],
+      "rust": [
+        "rust/src/evaluationcache.rs"
+      ],
       "checkpoint": 5,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 13,
-      "remaining": "Port contents-result cache and validation."
+      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links and selective clearing are independently compared with Python. Port toolchain/resource keys and connect dependency validation and scalar/prepared reuse to scheduling."
     },
     {
       "python": "thorlang/dependencies.py",
