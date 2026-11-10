@@ -1002,10 +1002,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 if origin.aspect == Aspect::Inline {
                     continue;
                 }
-                if let Some(conditional) = unresolved {
-                    self.facts.unresolved.insert(operation, conditional);
-                    continue;
-                }
+                // A concrete read-only seed is checked at its original native
+                // statement. Its surrounding when/marker chooses whether that
+                // statement is active; it does not require branch prediction.
                 let name = self.text(seed);
                 let message = format!("Cannot {reason}: read-only slice access from '{name}'.");
                 self.facts.issues.entry(operation).or_insert(Issue {

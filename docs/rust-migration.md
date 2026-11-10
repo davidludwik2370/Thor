@@ -416,6 +416,23 @@ Three final CLI checks also passed for toolchain-first validation, publishing
 TLS metadata, combined warning/error packets and relocated #run applications.
 The native path never invokes Python; the Python engine remains the default.
 
+### Native-selected conditional mutability
+
+Conditional declarations now carry the reference's compile-time immutable marker
+rather than an unconditional migration rejection. Native `when` and compile-switch
+selection decides whether storage and slice-access guards apply. Imported bindings
+use generated module access; conditional reference-view errors retain original
+source positions and related declarations. The marker and its checks add no
+runtime work. Existing native intervals and backing aliasing rules are unchanged.
+
+The focused comparisons cover scalar assignment/address-taking, fixed-array
+copies, slice writes/aliases/addresses/#mut calls, imported bindings, independent
+clones, generic and non-braced branches, and pure/#run execution. All 127 combined
+storage/using/resolution/editor/borrow-model/local-ownership/assertion-hygiene tests
+passed, plus the additional Unicode TLS diagnostic-location check. All 34 Rust
+unit tests passed in debug and release; Clippy passed with warnings denied.
+Remaining migration guards and project acceptance continue before optimization.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

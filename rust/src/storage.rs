@@ -4,6 +4,7 @@ use super::*;
 
 #[derive(Clone)]
 enum Predicate {
+    Immutable(Ref,String),
     NotPointer(NodeId),
     InlineIndex(NodeId),
     Set(NodeId),
@@ -251,12 +252,10 @@ impl Lower<'_, '_> {
                 .resolver
                 .symbol(projection.owner)
                 .map(|id| self.resolver.symbols[id].clone());
-            return Ok(owner
-                .filter(|owner| owner.immutable)
-                .map(|owner| Protection {
-                    name: owner.name,
-                    predicates: vec![],
-                }));
+            return Ok(owner.and_then(|owner|{
+                let marker=self.resolver.immutable_markers.get(&(owner.reference,owner.name.clone()));
+                (owner.immutable||marker.is_some()).then(||Protection{name:owner.name.clone(),predicates:marker.map(|name|vec![Predicate::Immutable(owner.reference,name.clone())]).unwrap_or_default()})
+            }));
         }
         if let Some(index) = self.resolver.symbol(self.reference(id)) {
             let sym = &self.resolver.symbols[index];
@@ -264,9 +263,9 @@ impl Lower<'_, '_> {
             let typed_index = owner.node(sym.reference.node).kind == "Range"
                 && sym.index == 1
                 && owner.role(sym.reference.node, "index_type").is_some();
-            return Ok((sym.immutable || typed_index).then(|| Protection {
-                name: sym.name.clone(),
-                predicates: vec![],
+            let marker=self.resolver.immutable_markers.get(&(sym.reference,sym.name.clone()));
+            return Ok((sym.immutable||typed_index||marker.is_some()).then(||Protection{
+                name:sym.name.clone(),predicates:marker.map(|name|vec![Predicate::Immutable(sym.reference,name.clone())]).unwrap_or_default(),
             }));
         }
         if node.kind == "Deref" || !matches!(node.kind.as_str(), "Selector" | "Index") {
@@ -320,6 +319,7 @@ impl Lower<'_, '_> {
         let mut parts = vec![];
         for predicate in guard.predicates {
             let part = match predicate {
+                Predicate::Immutable(owner,name)=>self.immutable_access(owner,&name),
                 Predicate::NotPointer(id) => {
                     format!("!{meta}.type_is_pointer({})", self.storage_query(id)?)
                 }
@@ -492,5 +492,43 @@ impl Lower<'_, '_> {
             }
         }
         Ok(())
+    }
+}
+
+impl Lower<'_, '_>{
+    fn immutable_access(&mut self,owner:Ref,name:&str)->String{
+        let directory=self.resolver.sources[owner.file].path.parent().unwrap();
+        if self.source.path.parent()==Some(directory){return name.into();}
+        for node in &self.source.nodes{if node.kind!="Import"{continue;}
+            let Ok(path)=unquote(&node.op)else{continue;};
+            let base=if let Some((collection,suffix))=path.split_once(':'){self.source.collection_roots.get(collection).map(|root|root.join(suffix))}
+                else{self.source.path.parent().map(|root|root.join(&path))};
+            if base.and_then(|path|std::fs::canonicalize(path).ok()).as_deref()!=Some(directory){continue;}
+            let alias=format!("{}immutable_import_{}",self.source.prefix,node.span.start);self.modules.insert(alias.clone(),path);return format!("{alias}.{name}");
+        }
+        name.into()
+    }
+    pub(super) fn prepare_immutable_markers(&mut self){
+        for (index,node) in self.source.nodes.iter().enumerate(){
+            if node.kind!="Declaration"{continue;}
+            let id=NodeId(index);
+            if !self.source.group(id,"names").iter().any(|name|self.resolver.immutable_markers.contains_key(&(self.reference(id),self.source.text(*name).to_string()))){continue;}
+            if let Some(block)=self.source.ancestors(id).find(|node|self.source.node(*node).kind=="Block"){
+                if self.source.raw.as_bytes()[self.source.node(block).span.start]!=b'{'{let code=self.g("\n",block);self.body_prologues.entry(block).or_default().push(code);}
+            }
+        }
+    }
+    pub(super) fn immutable_declaration(&self,id:NodeId)->Code{
+        let mut parts=vec![];
+        for name in self.source.group(id,"names"){
+            if let Some(marker)=self.resolver.immutable_markers.get(&(self.reference(id),self.source.text(*name).to_string())){
+                parts.push(self.gen(format!("\n{marker} :: {}\n",self.source.node(id).immutable),self.source.node(*name).span,"immutable"));
+            }
+        }
+        Code::concat(parts)
+    }
+    pub(super) fn conditional_immutable_issue(&mut self,origin:NodeId,seed:Ref,message:&str)->bool{
+        let Some((owner,name))=self.resolver.immutable_marker(seed)else{return false;};
+        self.place_storage_guard(origin,Guard{predicates:vec![Predicate::Immutable(owner,name)],origin,message:message.into(),checked_only:false});true
     }
 }

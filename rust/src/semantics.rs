@@ -187,7 +187,7 @@ pub struct Resolver<'a> {
     conditions: RefCell<HashSet<Ref>>,
     pub context_hints: HashMap<Ref, ContextHint>,
     pub parameter_witnesses: BTreeMap<Ref, ParameterWitness>,
-    pub conditional_immutables: HashSet<Ref>,
+    pub immutable_markers: BTreeMap<(Ref,String),String>,
     pub flags: Vec<String>,
     pub evaluated: BTreeMap<Ref, serde_json::Value>,
     pub logical_constants: BTreeMap<Ref,serde_json::Value>,
@@ -271,7 +271,7 @@ impl<'a> Resolver<'a> {
             conditions: RefCell::new(HashSet::new()),
             context_hints: HashMap::new(),
             parameter_witnesses: BTreeMap::new(),
-            conditional_immutables: HashSet::new(),
+            immutable_markers: BTreeMap::new(),
             flags: flags.to_vec(),
             evaluated: BTreeMap::new(),
             logical_constants: BTreeMap::new(),
@@ -407,35 +407,22 @@ impl<'a> Resolver<'a> {
             };
             groups.entry(key).or_default().push(index);
         }
-        for ids in groups.values() {
-            if ids.len() > 1
-                && ids.iter().any(|id| this.symbols[*id].immutable)
-                && ids.iter().any(|id| {
-                    let s = &this.symbols[*id];
-                    sources[s.reference.file]
-                        .ancestors(s.reference.node)
-                        .any(|a| {
-                            matches!(
-                                sources[s.reference.file].node(a).kind.as_str(),
-                                "When" | "CompileSwitch"
-                            ) && sources[s.reference.file]
-                                .role(a, "cond")
-                                .is_none_or(|node| {
-                                    this.condition(Ref {
-                                        file: s.reference.file,
-                                        node,
-                                    })
-                                    .is_none()
-                                })
-                        })
-                })
-            {
-                this.conditional_immutables
-                    .extend(ids.iter().map(|id| this.symbols[*id].reference));
-            }
+        for ids in groups.values(){
+            if !ids.iter().any(|id|this.symbols[*id].immutable)||!ids.iter().any(|id|{
+                let symbol=&this.symbols[*id];sources[symbol.reference.file].ancestors(symbol.reference.node)
+                    .any(|node|matches!(sources[symbol.reference.file].node(node).kind.as_str(),"When"|"CompileSwitch"))
+            }){continue;}
+            let first=&this.symbols[ids[0]];let source=&sources[first.reference.file];
+            let key=crate::digest::sha256(format!("{}{}",first.name,source.node(first.scope).span.start).as_bytes());
+            let marker=format!("{}immutable_{}",source.prefix,&key[..12]);
+            for id in ids{let symbol=&this.symbols[*id];this.immutable_markers.insert((symbol.reference,symbol.name.clone()),marker.clone());}
         }
         this.prepare_projections();
         this
+    }
+    pub fn immutable_marker(&self,reference:Ref)->Option<(Ref,String)>{
+        let symbol=&self.symbols[self.symbol(reference)?];
+        self.immutable_markers.get(&(symbol.reference,symbol.name.clone())).map(|name|(symbol.reference,name.clone()))
     }
     pub fn lookup(&self, reference: Ref, name: &str) -> Option<usize> {
         let source = &self.sources[reference.file];

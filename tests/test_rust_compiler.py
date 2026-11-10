@@ -665,14 +665,8 @@ release::proc(text:string){}
             self.assertEqual(packet['schema'],'odin-frontend-raw-v1')
             self.assertTrue(all('immutable' not in node for node in packet['payload']['nodes']))
 
-    def test_unported_features_fail_closed_without_python(self):
-        for code in ['T::int;when T==int {value:=1} else {value :> 1};value=2;_=value']:
-            with self.subTest(code=code):
-                self.source.write_text(self.program(code, 'calculate::proc()->int{return 2}\n'))
-                result = self.invoke('rust', command='check', flags=['-json-errors'])
-                self.assertEqual(result.returncode, 3, result.stderr)
-                packet = json.loads(result.stderr)
-                self.assertEqual(packet['errors'][0]['stage'], 'rust-migration')
+    def test_native_selected_mutable_branch_is_supported(self):
+        self.compare(self.program('T::int;when T==int {value:=1} else {value :> 1};value=2;_=value'),command='check',flags=['-json-errors'])
 
     def test_supported_temporary_consumers_have_clean_json_diagnostics(self):
         for code in ['value:=f"hello {2}"=="hello 2";_=value',

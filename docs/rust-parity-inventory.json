@@ -60,7 +60,7 @@
       "checkpoint": 2,
       "status": "partial",
       "reference_functions": 47,
-      "remaining": "Resolution acceptance is covered by the overload/type-parameter suites plus lexical using projections and native generic storage guards. Whole-language acceptance remains checkpoint 8; unresolved generic permission decisions belong to checkpoint 3."
+      "remaining": "Lexical projections, native generic storage guards and native-selected conditional immutable/slice markers follow reference behavior. Complete whole-language resolution acceptance; remaining symbolic generic decisions belong to permission analysis."
     },
     {
       "python": "thorlang/pureborrow.py",

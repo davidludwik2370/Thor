@@ -216,6 +216,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         if this.source.thor {
             this.prepare_defaults()?;
         }
+        this.prepare_immutable_markers();
         this.storage()?;
         if let Some(view) = this.evaluation.clone() {
             this.modules.extend(view.imports);
@@ -325,9 +326,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .map(|r| r.node),
         );
         for (reference, issue) in &facts.issues {
-            if reference.file == self.file {
-                self.permission_error(reference.node, &issue.message);
-            }
+            if reference.file == self.file&&!self.conditional_immutable_issue(reference.node,issue.seed,&issue.message){self.permission_error(reference.node, &issue.message);}
         }
         for (reference, message) in &facts.invalid {
             if reference.file == self.file {
@@ -584,13 +583,6 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .is_some_and(|view| !view.retains(self.source, id))
             {
                 continue;
-            }
-            if self
-                .resolver
-                .conditional_immutables
-                .contains(&self.reference(id))
-            {
-                return Err(self.unsupported(id, "conditional immutable binding selection"));
             }
             if node.data["pure"] == true && !self.verified_pure.contains(&id) {
                 return Err(self.unsupported(id, "pure-function verification and execution"));
@@ -864,6 +856,9 @@ impl<'a, 'r> Lower<'a, 'r> {
                 && !self.resolver.native_builtin(self.reference(id), name) {
                 code = code.region(&self.source.path, self.source.node(id).span, "source-call-target");
             }
+        }
+        if self.querying==0&&self.source.node(id).kind=="Declaration" {
+            code=Code::concat([code,self.immutable_declaration(id)]);
         }
         if self.querying == 0 {
             if let Some(guards) = self.storage_guards.get(&id).cloned() {
