@@ -32,6 +32,8 @@ mod pureproofs;
 mod pureschema;
 #[path = "purevariants.rs"]
 mod purevariants;
+#[path = "repetition.rs"]
+mod repetition;
 #[path = "sets.rs"]
 mod sets;
 #[path = "storage.rs"]
@@ -1226,9 +1228,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 "*" => {
                     let a = self.role(id, "left")?;
                     let b = self.role(id, "right")?;
-                    if matches!(self.typ(a), Type::String { .. })
-                        || matches!(self.typ(b), Type::String { .. })
-                    {
+                    if self.typ(a).is_string() || self.typ(b).is_string() {
                         return self.repeat(id, a, b);
                     }
                 }
@@ -1965,86 +1965,6 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         parts.push(self.g(")", id));
         Ok(Code::concat(parts).expansion(&self.source.path, self.source.node(id).span))
-    }
-    fn repeat(&mut self, id: NodeId, mut text: NodeId, mut count: NodeId) -> Result<Code> {
-        if matches!(self.typ(count), Type::String { .. }) {
-            std::mem::swap(&mut text, &mut count);
-        }
-        if self.resolver.runtime_operand(self.reference(text))
-            || self.resolver.runtime_operand(self.reference(count))
-        {
-            return Ok(self.error_token(id,"String repetition requires compile-time constant operands, like string concatenation (+)."));
-        }
-        let Some(amount) = self.resolver.constant_int(self.reference(count)) else {
-            return Err(
-                self.unsupported(count, "native constant-expression string repetition counts")
-            );
-        };
-        if amount < 0 {
-            return Ok(self.error_token(count, "String repetition requires a nonnegative count."));
-        }
-        if amount > 16 * 1024 * 1024 {
-            return Ok(self.error_token(
-                count,
-                "String repetition result exceeds the 16 MiB compile-time limit.",
-            ));
-        }
-        let name = format!(
-            "{}repeat_{}_{}",
-            self.prefix,
-            self.source.node(id).span.start,
-            self.source.node(id).span.end
-        );
-        let scope = self.helper_scope(id);
-        let key = (scope, self.prefix.clone(), name.clone());
-        if !self.helpers.contains_key(&key) {
-            let value = self.render(text, None, true)?;
-            let mut parts = vec![
-                self.g(format!("\n{name}_base :: ("), id),
-                value,
-                self.g(") + \"\"\n", id),
-            ];
-            let len = self.native("len");
-            let max = self.native("max");
-            parts.push(self.g(format!("#assert({len}({name}_base) == 0 || {amount} <= 16777216 / {max}({len}({name}_base), 1), \"String repetition result exceeds the 16 MiB compile-time limit.\")\n"),id));
-            let mut remaining = amount as u128;
-            let mut bit = 0;
-            let mut terms = vec![];
-            while remaining > 0 {
-                if bit == 0 {
-                    parts.push(self.g(format!("{name}_chunk_0 :: {name}_base\n"), id));
-                } else {
-                    parts.push(self.g(
-                        format!(
-                            "{name}_chunk_{bit} :: {name}_chunk_{} + {name}_chunk_{}\n",
-                            bit - 1,
-                            bit - 1
-                        ),
-                        id,
-                    ));
-                }
-                if remaining & 1 != 0 {
-                    terms.push(format!("{name}_chunk_{bit}"));
-                }
-                remaining >>= 1;
-                bit += 1;
-            }
-            parts.push(self.g(
-                format!(
-                    "{name} :: {}\n",
-                    if terms.is_empty() {
-                        format!("{name}_base[:0]")
-                    } else {
-                        terms.join(" + ")
-                    }
-                ),
-                id,
-            ));
-            self.helpers.insert(key, Code::concat(parts));
-        }
-        Ok(self
-            .g(name, id)
-            .expansion(&self.source.path, self.source.node(id).span))
     }
     fn power(&mut self, id: NodeId, constant: bool) -> Result<Code> {
         if constant {

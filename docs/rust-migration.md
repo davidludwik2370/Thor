@@ -759,6 +759,31 @@ Additional tests verify the reference cast gap and generic calls in checked and
 unchecked builds. Debug units, assertion hygiene and Clippy pass. Native
 constant-expression string counts are the next lowering gap.
 
+### Native constant string repetition
+
+`repetition.rs` now follows the reference's native doubling-chain renderer.
+Counts may be native constant expressions, configuration values, converted
+integers, record fields or generic constant parameters. Integer/nonnegative/size
+checks remain compile-time checks in unchecked builds. Repetitions preserve
+typed/untyped and distinct string identity, including zero/empty results and
+`cstring` coercion. Nested helpers precede their consumers; hoisted helpers retain
+lazy `when` and compile-switch selection. Generic signatures use the reference's
+fixed-count inline form and explicit variable-count boundary.
+
+Ordinary type inference now retains distinct type wrappers, matching the
+specialized resolver; previously a named string operation could be mistaken for
+native numeric multiplication. A generic-record test records the frozen
+reference's invalid inline type query and verifies Rust's valid result against
+ordinary Odin code. The reference source remains unchanged.
+
+All 153 repetition/concatenation/type/overload/compiler/reference/assertion checks
+pass. The group includes checked/unchecked programs, UTF-8 and arbitrary string
+bytes, clear invalid-count diagnostics and a million-character result whose
+generated source stays below 30,000 characters without execution-cache writes.
+All 29 Rust units pass in debug and release, and Clippy passes with warnings
+denied. Remaining arbitrary-precision and temporary-ownership paths are still
+explicit migration gaps.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

@@ -358,12 +358,13 @@
     {
       "python": "thorlang/repetition.py",
       "rust": [
-        "rust/src/lower.rs"
+        "rust/src/repetition.rs",
+        "rust/src/semantics.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 7,
-      "remaining": "Finish reference constant scheduling and interactions."
+      "remaining": "Native doubling chains, arbitrary native constant counts, typed/untyped and distinct strings, generic body/signature boundaries, lazy selection and logarithmic output size pass focused and broader comparisons. A test pins the frozen reference's generic-record inline type-query gap against ordinary Odin. Complete whole-language acceptance and remaining cross-feature interactions."
     },
     {
       "python": "thorlang/switches.py",

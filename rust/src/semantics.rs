@@ -72,6 +72,13 @@ pub enum Type {
     Procedure(Ref),
 }
 impl Type {
+    pub fn is_string(&self) -> bool {
+        match self {
+            Self::String { .. } => true,
+            Self::Nominal(_, inner) => inner.is_string(),
+            _ => false,
+        }
+    }
     pub fn scalar(name: &str) -> Self {
         Self::Scalar {
             name: name.into(),
@@ -1249,6 +1256,14 @@ impl<'a> Resolver<'a> {
                     .unwrap_or(Type::Unknown),
             )),
             "StructType" => Type::Struct(r),
+            "DistinctType" => Type::Nominal(
+                r,
+                Box::new(
+                    child("type")
+                        .map(|r| self.type_of(r))
+                        .unwrap_or(Type::Unknown),
+                ),
+            ),
             "UnionType" => Type::Union(r),
             "EnumType" => Type::Enum(r),
             "PolyType" => child("specialization")
@@ -1300,7 +1315,7 @@ impl<'a> Resolver<'a> {
                 let b = child("right")
                     .map(|r| self.type_of(r))
                     .unwrap_or(Type::Unknown);
-                if n.op == "*" && matches!(b, Type::String { .. }) {
+                if n.op == "*" && b.is_string() {
                     return b;
                 }
                 if a.untyped() && !b.untyped() {
