@@ -37,6 +37,17 @@ fn main() -> ExitCode {
     }
 }
 fn run(mut args: Vec<String>) -> Result<i32> {
+    if args.first().is_some_and(|arg| arg == "new") {
+        let root = env::var_os("THOR_ROOT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .unwrap()
+                    .to_path_buf()
+            });
+        return thor_compiler::project_template::main(&args[1..], &absolute(&root)?);
+    }
     if args.iter().any(|arg| arg == "--version") {
         println!("Thor {VERSION} (Rust migration, incomplete)");
         return Ok(0);
@@ -52,7 +63,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         return Ok(0);
     }
     if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
+        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
         return Ok(0);
     }
     let command = args.remove(0);

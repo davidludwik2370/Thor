@@ -24,6 +24,7 @@ pub mod memory;
 pub mod permissions;
 pub mod privileges;
 pub mod project;
+pub mod project_template;
 pub mod purity;
 pub mod semantics;
 pub mod specialization;

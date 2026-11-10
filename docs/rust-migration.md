@@ -286,6 +286,22 @@ unchecked builds. All 29 Rust unit tests passed in debug and release; Clippy
 passed with warnings denied. This closes the known constant-type prepass gap;
 remaining integration and whole-language acceptance work continues below.
 
+### Native project creation
+
+The Rust CLI now handles `new` directly, without requiring Python or Odin. It
+creates the same named source file and minimal VS Code task/launch configuration
+as the reference, including custom UTF-8 template bytes, optional `.gitignore`,
+explicit Odin paths, filename-filtering warnings and optional editor opening.
+Existing directories and dangling symlinks are preserved. Generated editor tasks
+continue to use the supported `thor` launcher; creating a project does not switch
+its compiler to the incomplete Rust engine.
+
+All seven new integration tests passed, including creating and running a project
+with both engines and creating projects with no tools on `PATH`. Fourteen earlier
+factory/CLI comparisons also passed. All 29 Rust debug unit tests and Clippy with
+warnings denied passed. This is part of checkpoint 7; publishing, vet, complete
+TLS/debugger integration and whole-language acceptance are still outstanding.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

@@ -496,11 +496,13 @@
     },
     {
       "python": "thorlang/project_template.py",
-      "rust": [],
+      "rust": [
+        "rust/src/project_template.rs"
+      ],
       "checkpoint": 7,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 4,
-      "remaining": "Port new-project command/templates."
+      "remaining": "Native project creation matches factory/CLI comparisons and creates projects runnable by either engine. Generated tasks retain the supported Python launcher. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/publish_deps.py",
