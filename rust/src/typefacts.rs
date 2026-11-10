@@ -57,6 +57,7 @@ impl Resolver<'_> {
     }
     pub fn member_type(&mut self, typ: &Type, name: &str) -> Type {
         match typ {
+            Type::BigRational if matches!(name,"numerator"|"denominator") => Type::BigInteger,
             Type::Nominal(_, base) | Type::Pointer(base) => self.member_type(base, name),
             Type::Array { elem, length }
                 if !name.is_empty() && name.chars().all(|c| "xyzwrgba".contains(c)) =>
@@ -229,6 +230,7 @@ impl Resolver<'_> {
         if !seen.insert(r) {
             return Type::Unknown;
         }
+        if let Some(typ) = self.logical_type(r) { return typ; }
         let s = &self.sources[r.file];
         let n = s.node(r.node);
         let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
@@ -306,7 +308,7 @@ impl Resolver<'_> {
                     }
                 }
                 if let Some(node) = symbol.annotation.or(symbol.value) {
-                    return self.specialize(
+                    let typ = self.specialize(
                         Ref {
                             file: symbol.reference.file,
                             node,
@@ -314,6 +316,7 @@ impl Resolver<'_> {
                         bindings,
                         seen,
                     );
+                    return if symbol.annotation.is_some() || symbol.constant { typ } else { typ.defaulted() };
                 }
             }
         }
@@ -586,6 +589,7 @@ impl Resolver<'_> {
                 Type::Unknown
             }
             "Call" => {
+                if let Some(typ) = self.logical_result(r,index) { return typ; }
                 let typ = self.specialized_result(r, index, bindings);
                 if !typ.is_unknown() {
                     return typ;

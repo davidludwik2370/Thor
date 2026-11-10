@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,6 +151,12 @@ impl TypeCode {
         Ok(format!("{alias}.{name}"))
     }
     pub fn render(&mut self, typ: &Type, r: &Resolver<'_>) -> Result<String> {
+        if let Some(name) = typ.big_name() {
+            let alias = format!("{}evaluation_big",r.sources[self.file].prefix);
+            let directory = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("runtime/big");
+            self.imports.insert(alias.clone(),directory);
+            return Ok(format!("{alias}.{name}"));
+        }
         match typ {
             Type::Constant(Constant::Integer(value)) => return Ok(value.to_string()),
             Type::Constant(Constant::Boolean(value)) => return Ok(value.to_string()),

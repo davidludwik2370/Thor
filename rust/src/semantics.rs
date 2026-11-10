@@ -38,6 +38,8 @@ pub enum Type {
     Constant(Constant),
     Unknown,
     Generic,
+    BigInteger,
+    BigRational,
     Scalar {
         name: String,
         untyped: bool,
@@ -72,6 +74,13 @@ pub enum Type {
     Procedure(Ref),
 }
 impl Type {
+    pub fn big_name(&self) -> Option<&'static str> {
+        match self {
+            Self::BigInteger => Some("Integer"),
+            Self::BigRational => Some("Rational"),
+            _ => None,
+        }
+    }
     pub fn is_string(&self) -> bool {
         match self {
             Self::String { .. } => true,
@@ -773,6 +782,54 @@ impl<'a> Resolver<'a> {
             _ => None,
         }
     }
+    pub(crate) fn logical_type(&self, r: Ref) -> Option<Type> {
+        let source = &self.sources[r.file];
+        let name = if let Some(index) = self.symbol(r) {
+            let symbol = &self.symbols[index];
+            let owner = &self.sources[symbol.reference.file];
+            let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()?
+                .join("runtime/big/big.odin");
+            if owner.path != expected {
+                return None;
+            }
+            symbol.name.as_str()
+        } else if source.thor && source.node(r.node).kind == "Ident" {
+            source.text(r.node)
+        } else {
+            return None;
+        };
+        match name {
+            "Integer" => Some(Type::BigInteger),
+            "Rational" => Some(Type::BigRational),
+            _ => None,
+        }
+    }
+    pub(crate) fn logical_result(&mut self, r: Ref, index: usize) -> Option<Type> {
+        let source = &self.sources[r.file];
+        if source.node(r.node).kind != "Call" {
+            return None;
+        }
+        let callee = Ref {
+            file: r.file,
+            node: source.role(r.node, "callee")?,
+        };
+        if !self.denotes_type(callee) {
+            return None;
+        }
+        let typ = self.type_of(callee);
+        typ.big_name()?;
+        if index == 0 {
+            return Some(typ);
+        }
+        if index == 1 && source.group(r.node, "args").iter().any(|arg| {
+            let node = source.role(*arg, "value").unwrap_or(*arg);
+            self.type_of(Ref { file: r.file, node }).is_string()
+        }) {
+            return Some(Type::scalar("bool"));
+        }
+        None
+    }
     pub fn primitive(&self, r: Ref) -> Option<Type> {
         let source = &self.sources[r.file];
         let name = if source.node(r.node).kind == "Ident" {
@@ -1028,6 +1085,9 @@ impl<'a> Resolver<'a> {
         typ
     }
     fn infer(&mut self, r: Ref) -> Type {
+        if let Some(typ) = self.logical_type(r) {
+            return typ;
+        }
         let s = &self.sources[r.file];
         let n = s.node(r.node);
         let child = |name: &str| s.role(r.node, name).map(|node| Ref { file: r.file, node });
@@ -1584,7 +1644,7 @@ impl<'a> Resolver<'a> {
         if !seen.insert(r) {
             return false;
         }
-        if self.primitive(r).is_some() {
+        if self.primitive(r).is_some() || self.logical_type(r).is_some() {
             return true;
         }
         let source = &self.sources[r.file];

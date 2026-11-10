@@ -96,6 +96,27 @@ boundary cases and canonical-packet rejections. Direct Odin reconstruction ran
 allocation-map and bad-free verdicts. All 29 Rust unit tests passed in debug
 and release; Clippy passed with warnings denied.
 
+### Logical type resolution
+
+`Integer` and `Rational` now have distinct native semantic identities. The
+resolver recognizes predefined names and the real runtime bridge, while user
+types and local variables can still shadow those names. It retains aliases,
+structural containers, native/helper return types, independent rational property
+types and boolean text-constructor status slots. Native type spelling can import
+the shared bridge for isolated helper metadata. Runtime lowering is still pending.
+
+The new shape comparisons also found a general specialization mismatch: mutable
+locals inherited the untyped flag of their literal initializer. That path now
+defaults mutable values, matching the reference, while constant literals retain
+their untyped status. Ordinary large numeric lexemes retain native scalar types;
+these type changes do not infer logical numbers from native overflow expressions.
+
+The focused logical-resolution/ordinary-resolution/generic-binding/compiler/
+numeric/assertion-hygiene gate passed all 137 tests, including the eight new shape
+comparisons. All 29 Rust unit tests passed in debug and release, and Clippy
+passed with warnings denied. Python remains the supported default; this is a
+checkpoint within the remaining logical-number port.
+
 ### Parity-first resolution work
 
 The resolver now follows the reference's `using` lookup and storage-protection

@@ -229,11 +229,16 @@
     },
     {
       "python": "thorlang/bignumbers.py",
-      "rust": [],
+      "rust": [
+        "rust/src/semantics.rs",
+        "rust/src/typefacts.rs",
+        "rust/src/specialization.rs",
+        "rust/src/contextlower.rs"
+      ],
       "checkpoint": 6,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 53,
-      "remaining": "Port constructors, types and owned assignments."
+      "remaining": "Logical type identities, aliases, property/result shapes and text-constructor status slots are resolved. Port runtime constructors, direct ownership, assignments, properties and call consumers; complete integration and acceptance."
     },
     {
       "python": "thorlang/bigoperators.py",

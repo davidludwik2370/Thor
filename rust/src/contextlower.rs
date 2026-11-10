@@ -94,6 +94,7 @@ impl Lower<'_, '_> {
     }
     fn context_type(&mut self, typ: &Type) -> Option<String> {
         Some(match typ {
+            Type::BigInteger | Type::BigRational => format!("{}.{}",self.module("big"),typ.big_name()?),
             Type::Scalar { name, .. } | Type::String { name, .. } => self.native(name),
             Type::Array {
                 elem,
