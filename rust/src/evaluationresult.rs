@@ -155,13 +155,16 @@ impl Lower<'_, '_> {
             value["storage"] = json!("array");
             value["nil"] = json!(false);
         }
+        if constant && crate::bigvalues::contains(&value) && !matches!(value["kind"].as_str(),Some("big_integer"|"big_rational")) {
+            return Ok(self.error_token(id,if self.source.node(id).kind=="Comprehension"{"An Integer/Rational-containing comprehension needs a runtime binding; :: supports individual logical-number constants."}else{"An aggregate containing Integer/Rational results needs a runtime binding (:=); use :: for individual numeric constants."}));
+        }
         let value = &value;
         let type_code = if untyped {
             String::new()
         } else {
             typ.finish().text
         };
-        let mut literal = crate::values::expression(value, &type_code, &meta).map_err(|error| {
+        let mut literal = crate::values::expression_with_big(value, &type_code, &meta, &mut |packet,_|self.big_constant_view(id,packet).map(|code|code.finish().text).map_err(|error|crate::values::ProtocolError(error.to_string()))).map_err(|error| {
             Error::at(
                 self.source,
                 self.source.node(id).span,
@@ -204,7 +207,7 @@ impl Lower<'_, '_> {
             self.source.node(id).span.start
         );
         let result = format!("{}Result", self.prefix);
-        let body = crate::values::materialize(value, &result, &meta, &module, &prefix).map_err(
+        let body = crate::values::materialize_with_big(value, &result, &meta, &module, &prefix, &mut |packet,_|self.big_constant_view(id,packet).map(|code|code.finish().text).map_err(|error|crate::values::ProtocolError(error.to_string()))).map_err(
             |error| Error::at(self.source, self.source.node(id).span, error.to_string()),
         )?;
         let flavor = format!(
@@ -217,6 +220,7 @@ impl Lower<'_, '_> {
         Ok(self.helper_call(id, &name, arguments))
     }
     fn evaluation_result_type(&mut self, call: NodeId) -> Result<Code> {
+        if let Some(typ)=self.big_constructor_type(call){let module=self.module("big");return Ok(self.g(format!("{module}.{}",typ.big_name().unwrap()),call));}
         let witness = self.evaluation_witnesses.get(&call).cloned();
         if self.source.node(call).kind == "Comprehension" {
             return self.comp_target(call, None);

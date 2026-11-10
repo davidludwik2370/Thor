@@ -408,6 +408,7 @@ impl Lower<'_, '_> {
         if self.resolver.denotes_type(self.reference(id)) {
             return Ok(None);
         }
+        if self.big_constructor_type(id).is_some(){return Ok(None);}
         let target_type = self.typ(_target);
         let operand = if node.kind == "Cast" {
             self.source.role(id, "expr")
@@ -601,7 +602,7 @@ impl Lower<'_, '_> {
         code.push(self.g("))", id));
         Ok(Code::concat(code))
     }
-    fn queried_pure_expression(&mut self, id: NodeId) -> bool {
+    pub(super) fn queried_pure_expression(&mut self, id: NodeId) -> bool {
         if let Some(proc) = self
             .source
             .ancestors(id)

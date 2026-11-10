@@ -249,7 +249,7 @@ impl<'a> Resolver<'a> {
         self.logical_constants.insert(node,value);self.types.clear();
     }
     pub(crate) fn logical_constant_type(&self,node:Ref)->Option<Type>{
-        match self.logical_constants.get(&node)?["kind"].as_str()?{
+        match self.logical_constants.get(&node).or_else(||self.evaluated.get(&node))?["kind"].as_str()?{
             "big_integer"=>Some(Type::BigInteger),"big_rational"=>Some(Type::BigRational),_=>None,
         }
     }

@@ -333,7 +333,7 @@ impl Lower<'_, '_> {
                 .union_variants(*owner)
                 .iter()
                 .any(|typ| self.pure_owns(typ, seen)),
-            Type::Slice(_)
+            Type::BigInteger | Type::BigRational | Type::Slice(_)
             | Type::Dynamic(_)
             | Type::String { .. }
             | Type::Unknown

@@ -5,6 +5,7 @@ pub(super) struct State {
     pub enabled: Option<bool>,
     pub busy: HashSet<NodeId>,
     pub integration_busy: HashSet<NodeId>,
+    pub pure_storage_busy: HashSet<NodeId>,
     pub owning: HashSet<NodeId>,
     pub replacements: HashMap<NodeId, Code>,
     pub globalizing: usize,
@@ -74,18 +75,7 @@ impl Lower<'_, '_> {
     pub(super) fn big_literal(&self, id: NodeId) -> Option<String> {
         self.big_literal_at(self.reference(id), &mut HashSet::new())
     }
-    pub(super) fn big_constructor_type(&mut self, id: NodeId) -> Option<Type> {
-        if self.source.node(id).kind != "Call" {
-            return None;
-        }
-        let callee = self.source.role(id, "callee")?;
-        if !self.resolver.denotes_type(self.reference(callee)) {
-            return None;
-        }
-        let typ = self.typ(callee);
-        typ.big_name()?;
-        Some(typ)
-    }
+    pub(super) fn big_constructor_type(&mut self,id:NodeId)->Option<Type>{self.resolver.logical_constructor(self.reference(id))}
     fn big_default_value(&self, id: NodeId) -> bool {
         for ancestor in self.source.ancestors(id) {
             let node = self.source.node(ancestor);
@@ -1182,7 +1172,7 @@ impl Lower<'_, '_> {
         }
         if matches!(
             node.kind.as_str(),
-            "OrElse" | "OrReturn" | "OrBranch" | "OrPanic"
+            "OrElse" | "OrReturn" | "OrBranch"
         ) {
             if let Some(code) = self.big_optional(id)? {
                 return Ok(Some(code));

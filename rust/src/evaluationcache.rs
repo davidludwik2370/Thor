@@ -295,7 +295,7 @@ impl EvaluationCache {
                     .filter(|value| {
                         packet["checksum"].as_str() == Some(sha256(&canonical(value)).as_str())
                     })
-                    .filter(|value| values::expression(value, "T", "meta").is_ok())
+                    .filter(|value| values::validate(value).is_ok())
                     .cloned()
             }
             _ => None,
@@ -312,7 +312,7 @@ impl EvaluationCache {
         let Some(key) = key.filter(|key| key_valid(key)) else {
             return;
         };
-        if values::expression(value, "T", "meta").is_err() {
+        if values::validate(value).is_err() {
             return;
         }
         let contents = canonical(value);

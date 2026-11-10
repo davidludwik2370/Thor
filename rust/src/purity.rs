@@ -416,6 +416,12 @@ impl<'a, 'r> Purity<'a, 'r> {
                 }
             }
             "Ident" | "Selector" => {
+                if kind=="Selector"&&self.role(node,"field").is_some_and(|field|matches!(self.text(field),"_value"|"_numerator"|"_denominator")) {
+                    if let Some(base)=self.role(node,"expr"){
+                        let mut typ=self.r.specialized_type(base,bindings);while let Type::Pointer(inner)=typ{typ = *inner;}
+                        if typ.big_name().is_some(){self.fault(root,node,via,"Pure code cannot inspect Integer/Rational implementation storage; use numeric operators and public properties.");}
+                    }
+                }
                 if self.reference(node) {
                     if self.text(node)=="ODIN_BUILD_PROJECT_NAME" && self.r.symbol(node).is_none() {
                         self.fault(root,node,via,"Source-location-dependent constants are not eligible for pure execution yet; pass ordinary data explicitly.");
@@ -446,7 +452,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 for id in self.r.sources[node.file].group(node.node,"args").to_vec() {
                     let arg=Ref{file:node.file,node:id};
                     let typ=self.r.specialized_type(arg,bindings);
-                    if !typ.is_unknown() && !matches!(typ,Type::Scalar{..}|Type::String{..}|Type::Enum(_)) {
+                    if !typ.is_unknown() && !matches!(typ,Type::Scalar{..}|Type::String{..}|Type::Enum(_)|Type::BigInteger|Type::BigRational) {
                         self.fault(root,arg,via,"Pure formatting supports deterministic scalar/string values only; custom record formatters are not eligible.");
                     }
                 }

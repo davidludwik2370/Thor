@@ -10,7 +10,7 @@ impl Lower<'_, '_> {
             let expression = if let crate::evaluation::Mode::Case(index) = request.mode {
                 self.evaluation_case_condition(id, index)?
             } else {
-                self.render(id, None, false)?
+                self.render(id, None, matches!(request.mode,crate::evaluation::Mode::Condition))?
             };
             let eval = self.module("eval");
             let pure = self.module("pure");

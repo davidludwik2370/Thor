@@ -230,6 +230,44 @@ assertion-hygiene tests passed. The twelve new focused comparisons run with
 allocation tracking in checked and unchecked builds. All 29 Rust unit tests
 passed in debug and release, and Clippy passed with warnings denied.
 
+### Logical pure execution and result-cache integration
+
+Logical numbers now participate in pure contracts, independently owned fn/#run
+results, canonical contents caches and the reference's prepared-result reuse.
+Native helpers reconstruct scalar numbers and owned numeric records/slices from
+contents packets; static scalar results retain read-only backing. Runtime copies
+and repeated cached results own independent storage. Numeric aggregates and
+numeric-containing comprehension constants retain the reference's runtime-binding
+requirement, and native generic value slots reject allocated logical types.
+
+Direct numeric copies reset borrowed storage provenance; shallow aggregate fields
+remain borrowed. Native generic ownership predicates distinguish numeric copies
+from ordinary reference headers. Exact private-storage guards preserve ordinary
+user fields while rejecting Integer/Rational internals in checked code. Pure
+formatting accepts logical values, and contextless results retain their allocation
+restriction. Isolated boolean selection uses constant rendering, matching Python.
+
+This integration also fixed two shared helper bugs: capture collection now includes
+a root identifier, and storage guards placed around a deferred operation no longer
+cause its operation to execute immediately. Numeric `or_panic` follows the reference's
+single optional lowerer, preserving capture scope and independent selected owners.
+
+The two integration batches passed all 462 tests (167 and 295), covering the new
+numeric cases plus ordinary purity, storage, scheduling, native execution, cache,
+compiler, generic, temporary, formatting and assertion-hygiene paths. Runtime
+ownership cases exercise checked and unchecked builds. All 29 Rust unit tests
+passed in debug and release, and Clippy passed with warnings denied.
+
+A reference limitation remains pinned: direct text-constructor `#run` has a result
+count diagnostic; a pure wrapper that consumes the optional status executes and
+reconstructs correctly. No Python fallback or Odin compiler changes were added.
+
+Checkpoint 6 still needs the all-source constant-type prepass: an additional probe
+found that a selected imported compile-time switch arm can keep an inactive scalar
+arm's type until its owning source is lowered. Python performs an earlier exact
+constant pass. This is being ported before moving to command/editor integration.
+Python remains the supported default.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

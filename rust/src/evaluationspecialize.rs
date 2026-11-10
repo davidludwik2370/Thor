@@ -162,6 +162,7 @@ impl Scheduler<'_> {
                         name: "int".into(),
                         untyped: false,
                     });
+                if typ.big_name().is_some(){return Err(self.fail(arg.unwrap_or(call),"Integer/Rational values cannot be native generic constant parameters; pass a borrowed numeric value to fn/#run instead."));}
                 let data = if let Some(arg) = arg {
                     if !self.known(arg)? {
                         return Ok(());

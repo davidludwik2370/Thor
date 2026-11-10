@@ -599,7 +599,7 @@ impl<'p> Scheduler<'p> {
                         let typ = self.resolver.type_of(arg);
                         if !matches!(
                             typ,
-                            Type::Scalar { .. } | Type::Enum(_) | Type::String { .. }
+                            Type::Scalar { .. } | Type::Enum(_) | Type::String { .. } | Type::BigInteger | Type::BigRational
                         ) {
                             return Ok(false);
                         }
@@ -1168,7 +1168,8 @@ impl<'p> Scheduler<'p> {
                     self.kind(plan.procedure) == "Procedure"
                         && self.role(plan.procedure, "body").is_some()
                 });
-            if !targets && builtin.is_none() && !approved {
+            let constructor=self.role(call,"callee").is_some_and(|callee|self.resolver.denotes_type(callee)&&self.resolver.type_of(callee).big_name().is_some());
+            if !targets && builtin.is_none() && !approved && !constructor {
                 if library_origin(&self.resolver, callee)
                     .is_some_and(|(path, _)| path == "base:intrinsics")
                 {

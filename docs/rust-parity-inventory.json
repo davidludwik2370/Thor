@@ -109,12 +109,13 @@
         "rust/src/purity.rs",
         "rust/src/pureschema.rs",
         "rust/src/pureproofs.rs",
-        "rust/src/pureintrinsics.rs"
+        "rust/src/pureintrinsics.rs",
+        "rust/src/purebig.rs"
       ],
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 77,
-      "remaining": "Runtime source eligibility includes native generic overload/effect selection, formatting/transmute predicates and native type errors. Complete explicit compile-time entry eligibility during checkpoint 4; logical numbers follow in checkpoint 6."
+      "remaining": "Runtime and evaluation-mode eligibility include native overloads/effects, exact schemas, conversions, logical numeric ownership and private backing guards. Complete command/editor adoption and whole-language acceptance."
     },
     {
       "python": "thorlang/sliceaccess.py",
@@ -145,7 +146,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Concrete known/active scheduling, nested requests, helper execution, generic caller frames, nominal identities and scalar/owned/comprehension reconstruction are connected to normal Rust commands. Exact integer constants, native floating parameter coercion, reviewed call identities, entry diagnostics, automatic extrema and contents/prepared/scalar-site caches are integrated. Complete remaining logical-number paths in checkpoint 6 and broad execution/editor acceptance in checkpoints 7-8."
+      "remaining": "Native extraction, scheduling, generic frames, scalar/aggregate/logical reconstruction and contents/prepared/site caches are connected. Finish remaining constant-type ordering and command/editor adoption, then broad acceptance."
     },
     {
       "python": "thorlang/native.py",
@@ -210,7 +211,7 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 9,
-      "remaining": "Normal command evaluation reconstructs native scalar/aggregate packets. Numeric backing callbacks now reconstruct logical-number packets independently; connect them during the language-level big-number port."
+      "remaining": "Canonical logical packets, static backing callbacks and independent runtime materialization are connected to normal fn/#run and cached results, including nested records/slices. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/bigconstants.py",
@@ -223,7 +224,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Exact source bindings, read-only static backing, canonical operators, numeric builtin constants, exact membership and lazy switch/range validation are connected. Finish native execution-result integration and broad acceptance."
+      "remaining": "Exact folding, static backing, read-only bindings, compile-time membership and lazy switches are connected to source and evaluated results. Finish the all-source constant-type prepass before copy lowering, then broad acceptance."
     },
     {
       "python": "thorlang/bigintegration.py",
@@ -236,7 +237,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 12,
-      "remaining": "Numeric builtins, expanded extrema, generic components/read-only guards, content membership, generic native collection dispatch and owned runtime switch selection are ported. Complete pure/evaluation interactions and whole-language acceptance."
+      "remaining": "Logical builtins, expanded extrema, generic component guards, membership and owned runtime selection are connected, with pure/evaluation interactions covered by the combined 462-test gate. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/bignumbers.py",
@@ -252,7 +253,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 53,
-      "remaining": "Direct runtime ownership, exact source constants, anonymous constructor inputs, numeric builtins/generic components and owned runtime switch selection are connected. Complete logical fn/#run/cache reconstruction and whole-language acceptance."
+      "remaining": "Runtime ownership, source constants, builtins/generic components, owned switches, pure numeric copy permissions and fn/#run/cache reconstruction are connected. Finish the all-source logical constant-type prepass and whole-language acceptance."
     },
     {
       "python": "thorlang/bigoperators.py",

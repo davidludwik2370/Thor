@@ -38,6 +38,8 @@ mod ownershiplower;
 mod purelower;
 #[path = "pureproofs.rs"]
 mod pureproofs;
+#[path = "purebig.rs"]
+mod purebig;
 #[path = "pureschema.rs"]
 mod pureschema;
 #[path = "purevariants.rs"]
@@ -902,6 +904,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if let Some(code)=self.pure_big_storage(id,expected.clone(),constant)?{return Ok(code);}
         if self.checked_mode
             && kind == "ExpressionStatement"
             && !self.pure_panic_busy.contains(&id)
@@ -2162,7 +2165,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             let names=(0..count).map(|index|format!("{prefix}value_{index}")).collect::<Vec<_>>();
             let values=if names.is_empty(){String::new()}else{format!("{}, ",names.join(", "))};
             let mut code=vec![this.g(format!("{values}{prefix}status := "),id),expression,this.g(format!("\nif !{module}.succeeded({prefix}status) {{ {module}.{fail}({prefix}status,{summary},{location}{extra}) }}\n"),id)];
-            if !names.is_empty(){code.push(this.g(format!("return {}",names.join(", ")),id));}Ok(Code::concat(code))
+            if !names.is_empty(){let outputs=if this.big_enabled(){let big=this.module("big");let fresh=this.big_fresh(primary);names.iter().map(|value|format!("{big}.compiler_own({value},{fresh})")).collect::<Vec<_>>()}else{names};code.push(this.g(format!("return {}",outputs.join(", ")),id));}Ok(Code::concat(code))
         })?;
         args.extend(queries);
         Ok(self.helper_call(id, &name, args))
@@ -2194,7 +2197,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         let key = (owner, self.prefix.clone(), name.clone());
         let mut variables = vec![];
         let mut seen = HashSet::new();
-        for child in self.source.descendants(id) {
+        for child in std::iter::once(id).chain(self.source.descendants(id)) {
             let node = self.source.node(child);
             if node.kind != "Ident" {
                 continue;

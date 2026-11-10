@@ -356,16 +356,6 @@ impl Lower<'_, '_> {
         }
         inputs.extend(types);
         let replacement = self.helper_call(id, &name, inputs);
-        if self.source.node(id).kind == "OrPanic" {
-            let old = self.logical.replacements.insert(primary, replacement);
-            let code = self.or_panic(id);
-            if let Some(old) = old {
-                self.logical.replacements.insert(primary, old);
-            } else {
-                self.logical.replacements.remove(&primary);
-            }
-            return code.map(Some);
-        }
         self.splice(
             id,
             vec![(self.source.node(primary).span, replacement)],

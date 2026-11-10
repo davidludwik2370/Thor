@@ -100,6 +100,10 @@ impl Lower<'_, '_> {
             format!("else when {meta}.type_is_dynamic_array(T){{when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc\"+Site)}}else when Result || Allow_Refs{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}else{{{module}.validate(T,false,Depth,Site)}}}}"),
             format!("else when {meta}.type_is_struct(T){{\nwhen {meta}.type_struct_field_count(T)!=({}){{#panic(\"Pure record fields could not be fully resolved\"+Site)}}",field_count(&names,&meta)),
         ];
+        if self.big_enabled(){
+            let big=self.module("big");
+            parts.insert(2,format!("else when T=={big}.Integer || T=={big}.Rational{{when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc\"+Site)}}}}"));
+        }
         parts.push(format!("when {}>1{{#panic(\"Raw-union storage cannot be proved pure: overlapping fields in a raw-union\"+Site)}}else{{",overlap_count(&names,&meta,&builtin)));
         for (file, owner) in self.resolver.sources.iter().enumerate() {
             if owner.path.parent() != self.source.path.parent() {

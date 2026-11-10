@@ -294,15 +294,14 @@ impl Facts {
                 };
                 let mut checks = crate::permissions::OWNED;
                 for lhs in targets {
-                    checks = checks.join(&eval.storage(lhs, &mut env));
+                    checks = checks.join(&eval.borrowed_write(lhs, &mut env));
                 }
                 if eval.builtin(node).as_deref() == Some("delete") {
                     let target = eval
                         .argument(node, "array", 0)
                         .or_else(|| eval.argument(node, "str", 0));
                     if let Some(target) = target {
-                        let value = eval.flow(target, &mut env);
-                        checks = checks.join(&eval.arena.values[value].borrowed);
+                        checks=checks.join(&eval.borrowed_consumption(target,&mut env));
                     }
                 }
                 if !checks.is_owned() {

@@ -45,7 +45,7 @@ impl Lower<'_, '_> {
         kind: Option<&'static str>,
         seen: &mut HashSet<Ref>,
     ) -> FoldResult {
-        if let Some(value) = self.logical.constants.get(&r) {
+        if let Some(value) = self.logical.constants.get(&r).or_else(||self.resolver.evaluated.get(&r)) {
             return Ok(value.clone());
         }
         let source = &self.resolver.sources[r.file];
@@ -306,7 +306,7 @@ impl Lower<'_, '_> {
     }
 }
 impl Lower<'_, '_> {
-    fn big_constant_view(&mut self, id: NodeId, value: &Value) -> Result<Code> {
+    pub(super) fn big_constant_view(&mut self, id: NodeId, value: &Value) -> Result<Code> {
         let module = self.module("big");
         let mut backing = crate::bigstatic::Backing::new(&self.prefix, &module);
         let view = backing

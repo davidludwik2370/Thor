@@ -710,7 +710,7 @@ impl Model {
                 };
                 let mut permission = crate::permissions::OWNED;
                 for target in targets {
-                    permission = permission.join(&eval.storage(target, env));
+                    permission = permission.join(&eval.borrowed_write(target, env));
                 }
                 if eval
                     .builtin(*node)
@@ -726,8 +726,7 @@ impl Model {
                             .or_else(|| eval.argument(*node, "m", 0))
                     };
                     if let Some(target) = target {
-                        let value = eval.flow(target, env);
-                        permission = permission.join(&eval.arena.values[value].borrowed);
+                        permission=permission.join(&eval.borrowed_consumption(target,env));
                     }
                 }
                 if !permission.is_owned() {

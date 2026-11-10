@@ -103,7 +103,7 @@ impl Lower<'_, '_> {
                 match trait_ {
                     Trait::Pointer=>Ok(format!("{meta}.type_is_pointer({query})")),
                     Trait::Sequence=>Ok(format!("({meta}.type_is_slice({query}) || {meta}.type_is_dynamic_array({query}) || {meta}.type_is_string({query}))")),
-                    _=>Err(self.unsupported(site,"symbolic logical-number ownership traits")),
+                    Trait::Big|Trait::NotBig=>{let module=self.module("big");let predicate=format!("({query}=={module}.Integer || {query}=={module}.Rational)");Ok(if *trait_==Trait::NotBig{format!("!{predicate}")}else{predicate})},
                 }
             }
             Permission::And(left, right) => Ok(format!(
@@ -122,7 +122,7 @@ impl Lower<'_, '_> {
         }
     }
     fn place_storage_guard(&mut self, id: NodeId, guard: Guard) {
-        let statement = std::iter::once(id)
+        let mut statement = std::iter::once(id)
             .chain(self.source.ancestors(id))
             .find(|node| {
                 matches!(
@@ -139,6 +139,11 @@ impl Lower<'_, '_> {
                 )
             })
             .unwrap_or(id);
+        // A prefixed guard must not become the single statement owned by defer.
+        // The deferred operation must retain its original execution time.
+        if matches!(self.source.node(statement).kind.as_str(),"ExpressionStatement"|"Assignment") {
+            if let Some(parent)=self.source.node(statement).parent.filter(|parent|self.source.node(*parent).kind=="Defer"){statement=parent;}
+        }
         let parent = self.source.node(statement).parent;
         let control = parent
             .filter(|parent| matches!(self.source.node(*parent).kind.as_str(), "If" | "For"))

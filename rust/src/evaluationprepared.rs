@@ -78,9 +78,7 @@ impl Scheduler<'_> {
         {
             return None;
         }
-        let Type::Scalar { name, .. } = self.resolver.type_of(node) else {
-            return None;
-        };
+        let name=match self.resolver.type_of(node){Type::Scalar{name,..}=>name,Type::BigInteger=>"Integer".into(),Type::BigRational=>"Rational".into(),_=>return None};
         if ["any", "typeid", "rawptr", "cstring"].contains(&name.as_str())
             || graph.procedures.iter().any(|procedure| {
                 !crate::specialization::parameters(*procedure, &self.resolver).is_empty()

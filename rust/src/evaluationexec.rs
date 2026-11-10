@@ -494,7 +494,7 @@ impl Project {
         }
         let value =
             crate::values::decode(&result.stdout).map_err(|error| fail(error.to_string()))?;
-        crate::values::expression(&value, "__result_type", "__result_meta")
+        crate::values::validate(&value)
             .map_err(|error| fail(error.to_string()))?;
         if let Some(cache) = &mut cache {
             if key.is_some() {

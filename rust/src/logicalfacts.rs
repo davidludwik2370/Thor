@@ -139,3 +139,215 @@ impl Resolver<'_> {
             .cloned()
     }
 }
+
+impl Resolver<'_> {
+    pub(crate) fn logical_constructor(&mut self, r: Ref) -> Option<Type> {
+        let source = &self.sources[r.file];
+        if source.node(r.node).kind != "Call" {
+            return None;
+        }
+        let callee = Ref {
+            file: r.file,
+            node: source.role(r.node, "callee")?,
+        };
+        if !self.denotes_type(callee) {
+            return None;
+        }
+        let typ = self.type_of(callee);
+        typ.big_name()?;
+        Some(typ)
+    }
+    pub(crate) fn logical_literal(&self, r: Ref, seen: &mut HashSet<Ref>) -> Option<String> {
+        if !seen.insert(r) {
+            return None;
+        }
+        let s = &self.sources[r.file];
+        let n = s.node(r.node);
+        match n.kind.as_str() {
+            "Paren" => self.logical_literal(
+                Ref {
+                    file: r.file,
+                    node: s.role(r.node, "expr")?,
+                },
+                seen,
+            ),
+            "Literal" if matches!(n.op.as_str(), "integer" | "float") => {
+                Some(s.text(r.node).into())
+            }
+            "Unary" if matches!(n.op.as_str(), "+" | "-") => Some(format!(
+                "{}{}",
+                n.op,
+                self.logical_literal(
+                    Ref {
+                        file: r.file,
+                        node: s.role(r.node, "expr")?
+                    },
+                    seen
+                )?
+            )),
+            "Ident" => {
+                let symbol = &self.symbols[self.symbol(r)?];
+                let owner = &self.sources[symbol.reference.file];
+                if !symbol.constant
+                    || symbol.annotation.is_some()
+                    || owner.node(symbol.reference.node).kind != "Declaration"
+                {
+                    return None;
+                }
+                self.logical_literal(
+                    Ref {
+                        file: symbol.reference.file,
+                        node: symbol.value?,
+                    },
+                    seen,
+                )
+            }
+            _ => None,
+        }
+    }
+    pub(crate) fn logical_dynamic_property(&mut self, r: Ref) -> bool {
+        let source = &self.sources[r.file];
+        if source.node(r.node).kind != "Selector" {
+            return false;
+        }
+        let Some(field) = source.role(r.node, "field") else {
+            return false;
+        };
+        if !matches!(source.text(field), "numerator" | "denominator") {
+            return false;
+        }
+        let Some(base) = source.role(r.node, "expr") else {
+            return false;
+        };
+        let at = Ref {
+            file: r.file,
+            node: base,
+        };
+        if self.denotes_type(at) {
+            return false;
+        }
+        if source.node(base).kind == "Ident" && self.symbol(at).is_none() {
+            let namespace = source.text(base);
+            if source.nodes.iter().any(|node| {
+                if node.kind != "Import" {
+                    return false;
+                }
+                let name = source.names.get(node.name);
+                if !name.is_empty() {
+                    return name == namespace;
+                }
+                crate::lower::unquote(&node.op).ok().is_some_and(|path| {
+                    path.rsplit('/').next().unwrap_or(&path).rsplit(':').next() == Some(namespace)
+                })
+            }) {
+                return false;
+            }
+        }
+        let mut typ = self.type_of(at);
+        while let Type::Pointer(inner) = typ {
+            typ = *inner;
+        }
+        typ.is_unknown()
+    }
+    pub(crate) fn logical_fresh(&mut self, mut r: Ref) -> bool {
+        while self.sources[r.file].node(r.node).kind == "Paren" {
+            let Some(expr) = self.sources[r.file].role(r.node, "expr") else {
+                break;
+            };
+            r.node = expr;
+        }
+        let source = &self.sources[r.file];
+        let node = source.node(r.node);
+        if node.kind == "Literal" || self.logical_literal(r, &mut HashSet::new()).is_some() {
+            return false;
+        }
+        let typ = self.type_of(r);
+        match node.kind.as_str() {
+            "Binary" | "Unary" if self.logical_operator(r, None) => {
+                !matches!(node.op.as_str(), "==" | "!=" | "<" | "<=" | ">" | ">=")
+            }
+            "Selector" => {
+                let known = source
+                    .role(r.node, "field")
+                    .is_some_and(|field| matches!(source.text(field), "numerator" | "denominator"))
+                    && source.role(r.node, "expr").is_some_and(|expr| {
+                        let mut typ = self.type_of(Ref {
+                            file: r.file,
+                            node: expr,
+                        });
+                        while let Type::Pointer(inner) = typ {
+                            typ = *inner;
+                        }
+                        matches!(typ, Type::BigRational)
+                    });
+                known || self.logical_dynamic_property(r)
+            }
+            "Compound" => typ.big_name().is_some(),
+            "OrElse" | "OrReturn" | "OrBranch" | "OrPanic" | "Run" => {
+                typ.big_name().is_some() || matches!(typ, Type::Generic)
+            }
+            "Call" if !self.denotes_type(r) => {
+                if typ.big_name().is_some() || self.logical_numeric_result(r).is_some() {
+                    return true;
+                }
+                let Some(callee) = source.role(r.node, "callee") else {
+                    return false;
+                };
+                self.signature(Ref {
+                    file: r.file,
+                    node: callee,
+                })
+                .is_some_and(|signature| !self.fields(signature, "results").is_empty())
+                    && typ.is_unknown()
+            }
+            _ => false,
+        }
+    }
+    pub(crate) fn logical_generic_reference(
+        &mut self,
+        mut r: Ref,
+        seen: &mut HashSet<Ref>,
+    ) -> bool {
+        while self.sources[r.file].node(r.node).kind == "Paren" {
+            let Some(expr) = self.sources[r.file].role(r.node, "expr") else {
+                break;
+            };
+            r.node = expr;
+        }
+        if !seen.insert(r) {
+            return false;
+        }
+        if matches!(self.type_of(r), Type::Generic) {
+            return true;
+        }
+        let source = &self.sources[r.file];
+        let node = source.node(r.node);
+        if matches!(node.kind.as_str(), "Selector" | "Index" | "Deref") {
+            return source.role(r.node, "expr").is_some_and(|expr| {
+                self.logical_generic_reference(
+                    Ref {
+                        file: r.file,
+                        node: expr,
+                    },
+                    seen,
+                )
+            });
+        }
+        if node.kind == "Ident" {
+            if let Some(symbol) = self.symbol(r).map(|index| self.symbols[index].clone()) {
+                if symbol.reference.file == r.file {
+                    return symbol.value.is_some_and(|value| {
+                        self.logical_generic_reference(
+                            Ref {
+                                file: r.file,
+                                node: value,
+                            },
+                            seen,
+                        )
+                    });
+                }
+            }
+        }
+        false
+    }
+}
