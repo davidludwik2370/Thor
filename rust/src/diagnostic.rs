@@ -47,13 +47,14 @@ impl Error {
     pub fn at(source: &Source, span: Span, message: impl Into<String>) -> Self {
         let message = message.into();
         let (line, column) = source.position(span.start);
+        let (end_line, end_column) = source.position(span.end);
         Self {
             message: message.clone(),
             unsupported: false,
             exit_status: 1,
             diagnostics: vec![json!({"type":"error", "stage":"thor", "pos": {
                 "file":source.path, "offset":span.start, "end_offset":span.end,
-                "line":line, "column":column}, "msgs":[message]})],
+                "line":line, "column":column,"end_line":end_line,"end_column":end_column}, "msgs":[message]})],
         }
     }
     pub fn unsupported(source: &Source, span: Span, feature: &str) -> Self {

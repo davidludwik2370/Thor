@@ -117,6 +117,23 @@ pub fn absolute(path: &Path) -> Result<PathBuf> {
     }
     Ok(result)
 }
+fn reference_coordinates(suffix: &str) -> Option<(usize, usize, usize)> {
+    let (line, column, length) = if let Some(rest) = suffix.strip_prefix('(') {
+        let close = rest.find(')')?;
+        let (line, column) = rest[..close].split_once([':', ','])?;
+        (line, column, close + 2)
+    } else {
+        let rest = suffix.strip_prefix(':')?;
+        let (line, rest) = rest.split_once(':')?;
+        let column_end = rest.bytes().take_while(u8::is_ascii_digit).count();
+        let delimiter = usize::from(rest.as_bytes().get(column_end) == Some(&b':'));
+        (line, &rest[..column_end], line.len() + 2 + column_end + delimiter)
+    };
+    let line = line.trim().parse::<usize>().ok()?;
+    let column = column.trim().parse::<usize>().ok()?;
+    (line > 0 && column > 0).then_some((line, column, length))
+}
+
 fn package_files(entry: &Path, test: bool) -> Result<Vec<PathBuf>> {
     if entry.is_file() {
         return Ok(vec![entry.to_path_buf()]);
@@ -365,6 +382,9 @@ impl Project {
                         Some(path.parent().unwrap().join(import))
                     };
                     if let Some(directory) = directory {
+                        if !directory.exists() {
+                            return Err(Error::at(&source,node.span,format!("imported package does not exist: {}",directory.display())));
+                        }
                         imports.push(directory);
                     }
                 }
@@ -1248,13 +1268,14 @@ impl Project {
         Ok(0)
     }
     pub fn translate(&self, errors: &[Value]) -> Vec<Value> {
-        errors.iter().map(|error|{
+        let translated=errors.iter().map(|error|{
             let mut error=error.clone();
             let pure_site=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.pure_error_sites.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,site)|*site));
             let related=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.related.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,notes)|notes.clone()));
             if let Some(notes)=related {error["related"]=json!(notes);}
+            let mut mapped = None;
             let mut expression_texts=vec![];
             let file=error["pos"]["file"].as_str().map(PathBuf::from);
             if let Some((index,emitted))=file.as_ref().and_then(|file|self.outputs.get(file)){
@@ -1270,6 +1291,7 @@ impl Project {
                         }
                     }
                     error["pos"]=json!({"file":origin.file,"offset":origin.span.start,"end_offset":origin.span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column});
+                    mapped = Some(origin);
                 }
             }
             if let Some(messages)=error["msgs"].as_array_mut(){for message in messages{
@@ -1287,13 +1309,15 @@ impl Project {
             }
             if let Some(site)=pure_site { self.pure_type_context(&mut error,site,true); }
             self.optional_diagnostic(&mut error);
-            if let Some(messages)=error["msgs"].as_array_mut() {
-                for message in messages {
-                    if let Some(text)=message.as_str() { *message=json!(self.hide_generated_names(text)); }
-                }
-            }
-            error
-        }).collect()
+            (error, mapped)
+        }).collect();
+        let mut translated=crate::diagnosticcleanup::clean(self,translated);
+        for error in &mut translated {
+            if let Some(messages)=error["msgs"].as_array_mut(){for message in messages {
+                if let Some(text)=message.as_str(){*message=json!(self.hide_generated_names(text));}
+            }}
+        }
+        translated
     }
     fn optional_diagnostic(&self,error:&mut Value) {
         if error["pos"]["file"].as_str().is_some_and(|file|Path::new(file)==self.options.root.join("runtime/optional/optional.odin")) {
@@ -1454,38 +1478,25 @@ impl Project {
         }
         error["related"] = json!(notes);
     }
-    fn instantiation_locations(&self, error: &Value) -> Vec<(usize, usize)> {
+    pub(crate) fn instantiation_locations(&self, error: &Value) -> Vec<(usize, usize)> {
+        self.source_locations(error,true)
+    }
+    pub(crate) fn source_locations(&self,error:&Value,instantiations_only:bool)->Vec<(usize,usize)> {
         let mut result = vec![];
         for text in error["msgs"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(Value::as_str)
-            .filter(|message| message.contains("instantiated as"))
+            .filter(|message| !instantiations_only||message.contains("instantiated as"))
         {
             for (file, source) in self.sources.iter().enumerate() {
-                let pattern = format!("{}(", source.path.display());
-                for (_, tail) in text
-                    .match_indices(&pattern)
-                    .map(|(offset, _)| (offset, &text[offset + pattern.len()..]))
-                {
-                    let Some(coordinates) = tail.split(')').next() else {
+                let path = source.path.to_string_lossy();
+                for (offset, _) in text.match_indices(path.as_ref()) {
+                    let suffix = &text[offset + path.len()..];
+                    let Some((line, column, _)) = reference_coordinates(suffix) else {
                         continue;
                     };
-                    let Some((line, column)) = coordinates
-                        .split_once(':')
-                        .or_else(|| coordinates.split_once(','))
-                    else {
-                        continue;
-                    };
-                    let (Ok(line), Ok(column)) =
-                        (line.trim().parse::<usize>(), column.trim().parse::<usize>())
-                    else {
-                        continue;
-                    };
-                    if line == 0 || column == 0 {
-                        continue;
-                    }
                     let Some(row) = source.raw.split_inclusive('\n').nth(line - 1) else {
                         continue;
                     };
@@ -1514,27 +1525,17 @@ impl Project {
     fn remap_references(&self, text: &str) -> String {
         let mut text = text.to_string();
         for (path, (file, emitted)) in &self.outputs {
-            let pattern = format!("{}(", path.display());
+            let pattern = path.to_string_lossy();
             let mut cursor = 0;
-            while let Some(found) = text[cursor..].find(&pattern) {
+            while let Some(found) = text[cursor..].find(pattern.as_ref()) {
                 let start = cursor + found;
                 let coordinates = start + pattern.len();
-                let Some(close) = text[coordinates..].find(')') else {
-                    break;
-                };
-                let end = coordinates + close;
-                let pair = text[coordinates..end]
-                    .split_once(':')
-                    .or_else(|| text[coordinates..end].split_once(','));
-                let Some((line, column)) = pair.and_then(|(line, column)| {
-                    Some((
-                        line.trim().parse::<usize>().ok()?,
-                        column.trim().parse::<usize>().ok()?,
-                    ))
-                }) else {
-                    cursor = end + 1;
+                let suffix = &text[coordinates..];
+                let Some((line, column, length)) = reference_coordinates(suffix) else {
+                    cursor = coordinates;
                     continue;
                 };
+                let end = coordinates + length;
                 // Odin's textual instantiation notes count Unicode scalars;
                 // source-map spans use UTF-8 bytes. Primary JSON positions
                 // already include their byte offset and take another path.
@@ -1543,7 +1544,7 @@ impl Project {
                     .split_inclusive('\n')
                     .nth(line.saturating_sub(1));
                 let Some(row) = row else {
-                    cursor = end + 1;
+                    cursor = end;
                     continue;
                 };
                 let offset = emitted
@@ -1559,11 +1560,16 @@ impl Project {
                         .sum::<usize>();
                 if let Some(origin) = emitted.lookup(offset, 1) {
                     let (line, column) = self.sources[*file].position(origin.span.start);
-                    let replacement = format!("{}({line}:{column})", origin.file);
-                    text.replace_range(start..end + 1, &replacement);
+                    let replacement = if suffix.starts_with(':') {
+                        let delimiter = if suffix[..length].ends_with(':') { ":" } else { "" };
+                        format!("{}:{line}:{column}{delimiter}", origin.file)
+                    } else {
+                        format!("{}({line}:{column})", origin.file)
+                    };
+                    text.replace_range(start..end, &replacement);
                     cursor = start + replacement.len();
                 } else {
-                    cursor = end + 1;
+                    cursor = end;
                 }
             }
         }

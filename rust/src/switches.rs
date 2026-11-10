@@ -186,7 +186,18 @@ impl Lower<'_, '_> {
                 }
                 let actual = self.arm_count(case.result)?;
                 if actual != count {
-                    return Ok(Some(self.error_token(case.result,&format!("Every switch value arm must return {count} results; this arm returns {actual}."))));
+                    let message = if actual == 0
+                        && count == 1
+                        && self.source.node(arm).kind == "Call"
+                    {
+                        format!(
+                            "'{}' call does not return a value and cannot be used as a value",
+                            self.source.text(arm)
+                        )
+                    } else {
+                        format!("Every switch value arm must return {count} results; this arm returns {actual}.")
+                    };
+                    return Ok(Some(self.error_token(case.result, &message)));
                 }
             }
         } else if let Some(problem) = self.compile_case_problem(id)? {
@@ -538,6 +549,16 @@ impl Lower<'_, '_> {
                 types.push(self.error_token(id,"A switch expression with only nonreturning/break arms requires expected result types."));
                 continue;
             }
+            let first = self.unparen(values[0].0.result);
+            let origin = if self.source.node(first).kind == "SwitchResults" {
+                self.source
+                    .group(first, "args")
+                    .get(index)
+                    .copied()
+                    .unwrap_or(first)
+            } else {
+                first
+            };
             let mut query = values.last().unwrap().1.clone();
             if compile {
                 if let Some((_, code)) = values.iter().find(|(case, _)| case.matches.is_empty()) {
@@ -550,32 +571,32 @@ impl Lower<'_, '_> {
                 {
                     let cond = self.case_condition(id, case)?;
                     query = Code::concat([
-                        self.g("(", id),
+                        self.g("(", origin),
                         code,
-                        self.g(" when ", id),
+                        self.g(" when ", origin),
                         cond,
-                        self.g(" else ", id),
+                        self.g(" else ", origin),
                         query,
-                        self.g(")", id),
+                        self.g(")", origin),
                     ]);
                 }
             } else {
                 for (_, code) in values[..values.len() - 1].iter().rev() {
                     query = Code::concat([
-                        self.g("(false ? (", id),
+                        self.g("(false ? (", origin),
                         code.clone(),
-                        self.g(") : (", id),
+                        self.g(") : (", origin),
                         query,
-                        self.g("))", id),
+                        self.g("))", origin),
                     ]);
                 }
             }
             self.default = true;
             let type_of = self.native("type_of");
             types.push(Code::concat([
-                self.g(format!("{type_of}({}default_value(", self.prefix), id),
+                self.g(format!("{type_of}({}default_value(", self.prefix), origin),
                 query,
-                self.g("))", id),
+                self.g("))", origin),
             ]));
         }
         Ok(types)

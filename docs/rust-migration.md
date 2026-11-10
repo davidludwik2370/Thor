@@ -85,6 +85,20 @@ and verified that their original Thor sources were unchanged. The editor Node
 suite passed 141 tests. These project and editor checks complement, rather than
 replace, the remaining original-language fixture comparisons.
 
+### Native diagnostic parity
+
+Rust now uses emission ranges and source syntax to restore original expressions
+and filter dependent Odin diagnostics. Independent errors in separate operands
+or f-string fields remain visible. The port also locates missing imports,
+wildcard conflicts, switch results, optional failures and runtime support checks
+in the original source, including unsaved buffers and Unicode. Invalid native
+overload calls in `#run` retain Odin's candidate list with the original package
+names.
+
+The original diagnostic fixtures, terminal source excerpts and two capture
+runtime checks passed together in a 113-test debug gate. Whole-language parity
+remains under verification.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

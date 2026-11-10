@@ -10,6 +10,7 @@ pub mod borrowflow;
 pub mod borrowlocals;
 pub mod borrowprogram;
 pub mod diagnostic;
+mod diagnosticcleanup;
 pub mod digest;
 pub mod emit;
 pub mod evaluation;

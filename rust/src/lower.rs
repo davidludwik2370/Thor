@@ -463,6 +463,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         if !self.source.thor {
             let storage = self.native_storage()?;
             let mut replacements = storage.replacements;
+            replacements.extend(self.native_default_guards());
             if let Some(view) = &self.evaluation {
                 for (id, value) in &view.values {
                     if view.retains(self.source, *id) {
@@ -688,6 +689,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                     .insert(name.clone(), format!("{alias}.{name}"))
                     .is_some()
                 {
+                    if selection.wildcard {
+                        return Err(Error::at(s, Span::new(selection.start, selection.end),
+                            format!("Conflicting wildcard import: {name}")));
+                    }
                     return Err(Error::at(s, span, "duplicate name in selective import"));
                 }
                 // Resolve even unused selected names without making them package
@@ -711,7 +716,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         return Err(Error::at(
                             s,
                             s.node(self.resolver.symbols[symbol].name_node).span,
-                            format!("declaration conflicts with selective import: {name}"),
+                            format!("declaration conflicts with {} import: {name}", if selection.wildcard { "wildcard" } else { "selective" }),
                         ));
                     }
                 }
@@ -1063,11 +1068,23 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return self.fstring_expression(id, expected, targets);
             }
         }
-        if let Some(code) = self.big_expression(id, expected.clone(), constant)? { return Ok(code); }
-        if self.source.thor {
+        // Let Odin diagnose indexing a type in the original assignment. Value
+        // helpers would add address and conversion errors for the invalid target.
+        let native_type_operand = kind == "Assignment"
+            && self.source.group(id, "lhs").iter().any(|lhs| {
+                std::iter::once(*lhs)
+                    .chain(self.source.descendants(*lhs))
+                    .any(|operand| self.index_uses_type_operand(operand))
+            });
+        if !native_type_operand {
+            if let Some(code) = self.big_expression(id, expected.clone(), constant)? {
+                return Ok(code);
+            }
+        }
+        if self.source.thor && !native_type_operand {
             if let Some(code) = self.temporary_expression(id, constant)? { return Ok(code); }
         }
-        if matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
+        if !native_type_operand && matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
             if let Some(code) = self.switch_statement(id, constant)? {
                 return Ok(code);
             }
@@ -1086,7 +1103,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
-        if self.source.thor && kind == "Assignment" {
+        if self.source.thor && kind == "Assignment" && !native_type_operand {
             if let Some(code) = self.access_assignment(id, constant)? {
                 return Ok(code);
             }
@@ -1259,7 +1276,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     overrides.insert(*value, (hint.clone(), !node.mutable));
                 }
             }
-            "Assignment" => {
+            "Assignment" if !native_type_operand => {
                 for (lhs, rhs) in self
                     .source
                     .group(id, "lhs")
@@ -1567,6 +1584,12 @@ impl<'a, 'r> Lower<'a, 'r> {
                 }
             }
         }
+        if kind=="Case" {
+            let helpers=self.helper_declarations(id);
+            if !helpers.is_empty() {
+                if let Some(colon)=node.spans.get("colon"){inserts.push((colon.end,Code::concat(helpers)));}
+            }
+        }
         let code = self.splice(id, replacements, inserts)?;
         if let Some(helpers) = self.declaration_helpers.get(&id) {
             Ok(Code::concat(
@@ -1700,7 +1723,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.g("{", id),
             contents.clone(),
             self.g("})", id),
-        ]);
+        ]).expansion(&self.source.path,self.source.node(id).span);
         if let Some(target) = target {
             if !expected.as_ref().is_some_and(|hint| hint.plain_array) {
                 if expected.as_ref().is_some_and(|hint|hint.constant_literal){
@@ -1748,7 +1771,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 "\n@(private=\"file\")\n{helper} :: proc{{{}}}\n",
                 names.join(", ")
             ));
-            self.helpers.insert(key, self.g(parts, id));
+            self.helpers.insert(key, self.gen(parts,self.source.node(id).span,"membership-helper"));
         }
         helper
     }
@@ -2016,7 +2039,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.g(") : (", id),
             b.clone(),
             self.g(")))", id),
-        ]);
+        ]).region(&self.source.path,self.source.node(id).span,"power-type");
         Ok(Code::concat([
             self.g(format!("{module}.power(("), id),
             typ.clone(),
@@ -2797,19 +2820,14 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
 
     fn helper_scope(&self, id: NodeId) -> NodeId {
-        self.source
-            .ancestors(id)
-            .find(|id| {
-                self.source.node(*id).kind == "Block"
-                    && !self
-                        .source
-                        .ancestors(*id)
-                        .any(|parent| self.source.node(parent).kind == "Comprehension")
-                    && self.source.node(*id).parent.is_none_or(|p| {
-                        !matches!(self.source.node(p).kind.as_str(), "Switch" | "TypeSwitch")
-                    })
-            })
-            .unwrap_or(NodeId(0))
+        let mut owner=id;
+        if let Some(comprehension)=self.source.ancestors(owner).find(|at|self.source.node(*at).kind=="Comprehension"){owner=comprehension;}
+        if let Some(deferred)=self.source.ancestors(owner).filter(|at|self.source.node(*at).kind=="Defer").last(){owner=deferred;}
+        self.source.ancestors(owner).find(|at| {
+            let node=self.source.node(*at);
+            node.kind=="Case"&&node.spans.get("colon").is_some_and(|colon|self.source.node(id).span.start>=colon.end)
+                ||node.kind=="Block"&&node.parent.is_none_or(|parent|!matches!(self.source.node(parent).kind.as_str(),"Switch"|"TypeSwitch"|"CompileSwitch"))
+        }).unwrap_or(NodeId(0))
     }
 }
 pub fn unquote(text: &str) -> Result<String> {

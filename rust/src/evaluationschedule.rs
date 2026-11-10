@@ -1164,11 +1164,18 @@ impl<'p> Scheduler<'p> {
                 let symbol = &self.resolver.symbols[index];
                 symbol.constant && !symbol.immutable && !symbol.parameter && !symbol.result
             });
-            let targets = direct
-                && plans.iter().any(|plan| {
-                    self.kind(plan.procedure) == "Procedure"
-                        && self.role(plan.procedure, "body").is_some()
-                });
+            let fallback = (direct && plans.is_empty()).then(|| self.resolver.candidates(callee));
+            let inspectable = |target| {
+                self.kind(target) == "Procedure" && self.role(target, "body").is_some()
+            };
+            let targets = direct && if let Some(candidates) = fallback {
+                // Let the helper's checker diagnose argument errors for a
+                // direct overload group whose implementations are available.
+                // Purity verification still runs before the helper can execute.
+                !candidates.is_empty() && candidates.into_iter().all(inspectable)
+            } else {
+                plans.iter().any(|plan| inspectable(plan.procedure))
+            };
             let constructor=self.role(call,"callee").is_some_and(|callee|self.resolver.denotes_type(callee)&&self.resolver.type_of(callee).big_name().is_some());
             if !targets && builtin.is_none() && !approved && !constructor {
                 if library_origin(&self.resolver, callee)

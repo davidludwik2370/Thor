@@ -176,8 +176,17 @@ impl Lower<'_, '_> {
             _ => false,
         }
     }
+    pub(super) fn index_uses_type_operand(&self, id: NodeId) -> bool {
+        matches!(self.source.node(id).kind.as_str(), "Index" | "Slice")
+            && self.source.role(id, "expr").is_some_and(|base| {
+                self.resolver.known_type_operand(self.reference(base))
+            })
+    }
     pub(super) fn access(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
         let base = self.role(id, "expr")?;
+        if self.index_uses_type_operand(id) {
+            return Ok(None);
+        }
         let typ = self.typ(base);
         if self.native_access.contains(&id)
             || matches!(typ, Type::Map { .. } | Type::Enum(_) | Type::Pointer(_))

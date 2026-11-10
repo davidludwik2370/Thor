@@ -13,6 +13,7 @@ from thorlang.diagnostics import Diagnostics, backend_error_flags
 
 
 class DiagnosticHardeningTests(unittest.TestCase):
+    compiler = diagnostics.DiagnosticTests.compiler
     invoke=diagnostics.DiagnosticTests.invoke
     at=diagnostics.DiagnosticTests.at
 

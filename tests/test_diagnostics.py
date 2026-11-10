@@ -55,6 +55,8 @@ class MapTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    compiler = ROOT / 'thor'
+
     def test_type_used_as_array_has_one_error_and_declaration_note(self):
         for operation in ['_=Rows[0]', 'i:=1;_=Rows[i]', 'i:=1;Rows[i]={1}',
                           'i:=1;Rows[i]+={1}', 'i:=-1;_=Rows[i:]', '_=Rows[:]']:
@@ -134,12 +136,12 @@ main::proc(){
     def test_type_operand_terminal_note_and_native_raw_escape_hatch(self):
         source='package main\nRows::[2]int\nmain::proc(){i:=1;_=Rows[i]}\n'
         entry,output,errors,_=self.invoke(source)
-        result=subprocess.run([str(ROOT/'thor'),'check',str(entry),'--output-dir',str(output)],capture_output=True,text=True,timeout=40)
+        result=subprocess.run([str(self.compiler),'check',str(entry),'--output-dir',str(output)],capture_output=True,text=True,timeout=40)
         self.assertEqual(result.returncode,1)
         self.assertIn('Cannot index',result.stderr)
         self.assertIn('(2:1): Note:',result.stderr)
         self.assertIn('Rows::[2]int',result.stderr)
-        raw=subprocess.run([str(ROOT/'thor'),'check',str(entry),'--output-dir',str(output),'--raw-diagnostics'],capture_output=True,text=True,timeout=40)
+        raw=subprocess.run([str(self.compiler),'check',str(entry),'--output-dir',str(output),'--raw-diagnostics'],capture_output=True,text=True,timeout=40)
         self.assertIn('is not an expression but a type',raw.stderr)
         self.assertNotIn('it names a type',raw.stderr)
 
@@ -614,7 +616,7 @@ main::proc(){
             overlay = root / "overlay.json"
             overlay.write_text(json.dumps({"Replace": replacements}))
             overlay_flags = ["--overlay", str(overlay)]
-        result = subprocess.run([str(ROOT / "thor"), command, str(entry.parent), "--output-dir", str(root / "out"),
+        result = subprocess.run([str(self.compiler), command, str(entry.parent), "--output-dir", str(root / "out"),
                                  "--diagnostic-format=json", *overlay_flags, *flags], capture_output=True, text=True, timeout=40)
         data = json.loads(result.stderr)
         self.assertEqual(result.returncode == 0, success, data)
@@ -710,7 +712,7 @@ main::proc(){
         entry, output, _, _ = self.invoke('package main\nmain :: proc(){_ = missing}\n')
         for flag in ['-terse-errors', '--raw-diagnostics']:
             with self.subTest(flag=flag):
-                result = subprocess.run([str(ROOT / 'thor'), 'check', str(entry), '--output-dir', str(output), flag], capture_output=True, text=True)
+                result = subprocess.run([str(self.compiler), 'check', str(entry), '--output-dir', str(output), flag], capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
                 if flag == '-terse-errors':
                     self.assertIn(str(entry), result.stderr)
@@ -782,7 +784,7 @@ main::proc(){
 
     def test_text_output_and_unix_locations(self):
         entry, output, _, _ = self.invoke('package main\nmain :: proc(){ _ = missing }\n')
-        result = subprocess.run([str(ROOT / 'thor'), 'check', str(entry), '--output-dir', str(output), '-error-pos-style:unix'], capture_output=True, text=True)
+        result = subprocess.run([str(self.compiler), 'check', str(entry), '--output-dir', str(output), '-error-pos-style:unix'], capture_output=True, text=True)
         self.assertIn(f'{entry}:2:', result.stderr)
         self.assertIn('_ = missing', result.stderr)
         self.assertIn('^^^^^^^', result.stderr)
@@ -793,7 +795,7 @@ main::proc(){
         self.addCleanup(temporary.cleanup)
         entry = Path(temporary.name) / 'main.thor'
         entry.write_text('package main\nimport "core:fmt"\nimport "core:os"\nmain :: proc(){ fmt.eprintln("not JSON: compiler text"); os.exit(7) }\n')
-        result = subprocess.run([str(ROOT / 'thor'), 'run', str(entry), '--output-dir', str(entry.parent / 'out')], capture_output=True, text=True)
+        result = subprocess.run([str(self.compiler), 'run', str(entry), '--output-dir', str(entry.parent / 'out')], capture_output=True, text=True)
         self.assertEqual(result.returncode, 7)
         self.assertEqual(result.stderr, 'not JSON: compiler text\n')
 

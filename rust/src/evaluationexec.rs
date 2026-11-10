@@ -416,7 +416,22 @@ impl Project {
                 .and_then(|packet| packet["errors"].as_array().cloned())
                 .unwrap_or_default();
             let mut diagnostics = helper.translate(&errors);
+            let package_names = helper.sources.iter().filter_map(|source| {
+                let span = *source.node(NodeId(0)).spans.get("package")?;
+                let name = source.edits.iter().find(|edit| edit.span == span && edit.text.starts_with("thor_eval_"))?;
+                Some((format!("{}.", name.text), format!("{}.", source.slice(span))))
+            }).collect::<BTreeMap<_, _>>();
             for diagnostic in &mut diagnostics {
+                if let Some(messages) = diagnostic["msgs"].as_array_mut() {
+                    for message in messages {
+                        if let Some(text) = message.as_str() {
+                            let restored = package_names.iter().fold(text.to_owned(), |text, (internal, original)| {
+                                text.replace(internal, original)
+                            });
+                            *message = json!(restored);
+                        }
+                    }
+                }
                 if diagnostic["pos"].is_null() {
                     diagnostic["pos"] = fail(String::new()).diagnostics[0]["pos"].clone();
                 }

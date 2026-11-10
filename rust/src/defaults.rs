@@ -406,3 +406,113 @@ impl Lower<'_, '_> {
         Ok(vec![(position, Code::concat(code))])
     }
 }
+
+impl Lower<'_, '_> {
+    /// Odin inputs retain native semantics. Anonymous generic defaults cannot
+    /// be specialized by Odin: leave the reference guard at the signature so
+    /// inactive arms and uninstantiated enclosing bodies remain lazy.
+    pub(super) fn native_default_guards(&mut self) -> Vec<(Span, Code)> {
+        fn dependencies(
+            r: &Resolver<'_>,
+            file: usize,
+            id: NodeId,
+            host: NodeId,
+            proc: NodeId,
+            names: &mut std::collections::BTreeSet<String>,
+        ) {
+            let source = &r.sources[file];
+            let node = source.node(id);
+            if matches!(
+                node.kind.as_str(),
+                "Call" | "Selector" | "WhenExpr" | "Ternary" | "Binary"
+            ) {
+                return;
+            }
+            if node.kind == "PolyType" {
+                names.insert(source.names.get(node.name).to_string());
+            }
+            if node.kind == "Ident" {
+                if let Some(symbol) = r
+                    .symbol(Ref { file, node: id })
+                    .map(|index| &r.symbols[index])
+                {
+                    if symbol.reference.file == file
+                        && [host, proc].contains(&symbol.scope)
+                        && source.node(symbol.name_node).kind == "PolyType"
+                    {
+                        names.insert(symbol.name.clone());
+                    }
+                }
+            }
+            if node.kind == "Field" {
+                for name in source.group(id, "names") {
+                    if source.node(*name).kind == "PolyType" {
+                        names.insert(source.names.get(source.node(*name).name).to_string());
+                    }
+                }
+                if let Some(typ) = source.role(id, "type") {
+                    dependencies(r, file, typ, host, proc, names);
+                }
+            } else {
+                for child in &node.children {
+                    dependencies(r, file, *child, host, proc, names);
+                }
+            }
+        }
+        let mut guards = vec![];
+        for index in 0..self.source.nodes.len() {
+            let proc = NodeId(index);
+            if self.source.node(proc).kind != "Procedure" {
+                continue;
+            }
+            let mut value = proc;
+            while let Some(parent) = self.source.node(value).parent.filter(|parent| {
+                self.source.node(*parent).kind == "Paren"
+                    && self.source.role(*parent, "expr") == Some(value)
+            }) {
+                value = parent;
+            }
+            let Some(field) = self.source.node(value).parent.filter(|parent| {
+                self.source.node(*parent).kind == "Field"
+                    && self.source.role(*parent, "default") == Some(value)
+            }) else {
+                continue;
+            };
+            let Some(hostsig) = self
+                .source
+                .ancestors(field)
+                .find(|id| self.source.node(*id).kind == "ProcedureType")
+            else {
+                continue;
+            };
+            if self.source.node(field).parent != self.source.role(hostsig, "params") {
+                continue;
+            }
+            let host = self
+                .source
+                .node(hostsig)
+                .parent
+                .filter(|id| self.source.node(*id).kind == "Procedure")
+                .unwrap_or(hostsig);
+            let Some(signature) = self.source.role(proc, "type") else {
+                continue;
+            };
+            let mut names = std::collections::BTreeSet::new();
+            dependencies(self.resolver, self.file, signature, host, proc, &mut names);
+            if names.is_empty() {
+                continue;
+            }
+            let parameters = self
+                .source
+                .group(field, "names")
+                .iter()
+                .map(|id| self.source.text(*id))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let message=format!("Anonymous default procedure for '{parameters}' has an unspecialized generic signature ({}). Use a named generic procedure as the default, or require an explicit callback.",names.into_iter().collect::<Vec<_>>().join(", "));
+            let code = self.error_token(signature, &message);
+            guards.push((self.source.node(proc).span, code));
+        }
+        guards
+    }
+}

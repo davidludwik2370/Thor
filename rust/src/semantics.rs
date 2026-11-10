@@ -1644,6 +1644,25 @@ impl<'a> Resolver<'a> {
     pub fn runtime_operand(&mut self, r: Ref) -> bool {
         self.runtime(r, &mut HashSet::new())
     }
+    /// Conclusive type expressions for lazy value-use diagnostics. Approximate
+    /// shapes, generic parameters and competing definitions remain Odin's job.
+    pub fn known_type_operand(&self,r:Ref)->bool {
+        self.known_type_seen(r,&mut HashSet::new())
+    }
+    fn known_type_seen(&self,r:Ref,seen:&mut HashSet<Ref>)->bool {
+        if !seen.insert(r){return false;}
+        let source=&self.sources[r.file];let node=source.node(r.node);
+        if node.kind=="Paren" {return source.role(r.node,"expr").is_some_and(|node|self.known_type_seen(Ref{file:r.file,node},seen));}
+        if node.kind.ends_with("Type"){return node.kind!="PolyType";}
+        if let Some(index)=self.symbol(r) {
+            let symbol=&self.symbols[index];let owner=&self.sources[symbol.reference.file];
+            if symbol.parameter||symbol.result||!symbol.constant||symbol.immutable{return false;}
+            if self.scopes.get(&(symbol.reference.file,symbol.scope,symbol.name.clone())).is_some_and(|symbols|symbols.len()>1){return false;}
+            return owner.node(symbol.reference.node).kind=="Declaration"&&symbol.value.is_some_and(|node|self.known_type_seen(Ref{file:symbol.reference.file,node},seen));
+        }
+        if node.kind=="Call" {return source.role(r.node,"callee").is_some_and(|node|self.native_builtin(Ref{file:r.file,node},"type_of"));}
+        node.kind=="Ident"&&self.denotes_type(r)
+    }
     pub fn denotes_type(&self, r: Ref) -> bool {
         self.type_operand(r, &mut HashSet::new())
     }

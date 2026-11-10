@@ -194,9 +194,9 @@ impl Lower<'_, '_> {
             if constant
                 && (crate::values::has_owned(value, true) || crate::values::has_dynamic(value))
             {
-                return Ok(self.error_token(id,if crate::values::has_dynamic(value) {
-                    "A dynamic-array-containing #run/fn result needs a runtime binding (:=); use a pure consumer to compute a scalar constant."
-                } else {"A slice-containing #run/fn result needs a runtime binding (:=); use a pure consumer to compute a scalar constant."}));
+                let label=if self.source.node(id).kind=="Run"{"#run"}else{"fn"};
+                let container=if crate::values::has_dynamic(value){"dynamic-array"}else{"slice"};
+                return Ok(self.error_token(id,&format!("A {container}-containing {label} result needs a runtime binding (:=); use a pure consumer to compute a scalar constant.")));
             }
             return Ok(self.g(literal, id));
         }
