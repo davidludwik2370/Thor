@@ -27,6 +27,7 @@ pub mod privileges;
 pub mod project;
 pub mod project_template;
 pub mod purity;
+mod purediagnostics;
 pub mod semantics;
 pub mod specialization;
 pub mod values;

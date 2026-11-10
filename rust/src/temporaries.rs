@@ -408,7 +408,10 @@ impl Lower<'_, '_> {
         Ok(self.helper_call(id, &name, args))
     }
     pub(super) fn temporary_discard(&mut self, id: NodeId) -> Result<Option<Code>> {
-        if self.temporary_discarding.contains(&id) || !self.temporary_producer(id) {
+        if self.temporary_discarding.contains(&id)
+            || !self.temporary_producer(id)
+            || self.scope_cleanup_call(id)
+        {
             return Ok(None);
         }
         let Some(parent) = self.source.node(id).parent else {

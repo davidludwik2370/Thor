@@ -269,6 +269,9 @@ impl Project {
         let mut actual = self.evaluation_snapshot(work.0.join("actual"), results, skips, cases)?;
         for _ in 0..12 {
             actual.specialized = cases.clone();
+            // Lowering adds generated collections. Reuse the original
+            // collection set so their aliases stay the same across passes.
+            actual.collections.clone_from(&self.collections);
             actual.lower()?;
             let mut changed = false;
             for ((at, _, _), group) in &pending {

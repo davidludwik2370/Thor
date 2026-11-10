@@ -3,6 +3,7 @@
 use crate::{
     ast::NodeId,
     diagnostic::{Error, Result},
+    purediagnostics::{self, function_context, function_owner, procedure_name},
     semantics::{Ref, Resolver, Substitutions, Type},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -207,6 +208,18 @@ impl<'a, 'r> Purity<'a, 'r> {
             entry.related.dedup();
             return;
         }
+        let sources = self.r.sources;
+        let via = if function_owner(sources, origin).is_some() {
+            &[]
+        } else if let Some((_, path)) = function_context(sources, via) {
+            path
+        } else if sources[origin.file].shared_native {
+            // An explicit #run of native code still needs a visible call site.
+            via.iter().rposition(|site| !sources[site.file].shared_native)
+                .map_or(&[][..], |index| &via[index..])
+        } else {
+            &[]
+        };
         let site = via.first().copied().unwrap_or(origin);
         let faults = self.facts.faults.entry(root).or_default();
         if !faults.iter().any(|f| {
@@ -275,13 +288,22 @@ impl<'a, 'r> Purity<'a, 'r> {
                 "Declared pure functions require the Odin calling convention.",
             );
         }
-        if let Some(decl) = self.r.sources[proc.file].node(proc.node).parent {
-            for (name, value) in self.r.attributes(Ref {
-                file: proc.file,
-                node: decl,
-            }) {
-                if name.starts_with("deferred_") || ["init", "fini"].contains(&name.as_str()) {
-                    self.fault(root,value.unwrap_or(Ref{file:proc.file,node:decl}),&via,"Pure calls cannot use package initialization/finalization or implicit deferred callbacks.");
+        let source = &self.r.sources[proc.file];
+        if let Some(decl) = source.ancestors(proc.node).find(|id| source.node(*id).kind != "Paren") {
+            for &attribute in source.group(decl, "attributes") {
+                let names = source.group(attribute, "elems").iter()
+                    .map(|&id| source.text(source.role(id, "field").unwrap_or(id)));
+                let (mut lifecycle, mut deferred) = (false, false);
+                for name in names {
+                    lifecycle |= matches!(name, "init" | "fini");
+                    deferred |= name.starts_with("deferred_");
+                }
+                if lifecycle {
+                    self.fault(root, proc, &via, "Package initializers/finalizers are not eligible pure call targets.");
+                }
+                if deferred {
+                    self.fault(root, Ref { node: attribute, ..proc }, &via,
+                        "Pure calls cannot use implicit deferred procedure callbacks; make eligible calls explicit in the body.");
                 }
             }
         }
@@ -292,7 +314,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                 }
                 let typ = self.r.specialized_type(annotation, &bindings);
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
-                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, typeid, any, maps, sets and procedure values are not pure inputs/results.");
+                    let procedure = procedure_name(self.r.sources, proc);
+                    let cause = self.unsupported_signature_type(&typ);
+                    self.fault(root, annotation, &via, format!(
+                        "{cause}\nWhile checking parameter '{name}' in pure call '{procedure}'."
+                    ));
                 }
             }
         }
@@ -300,7 +326,11 @@ impl<'a, 'r> Purity<'a, 'r> {
             if let Some(annotation) = annotation {
                 let typ = self.r.specialized_type(annotation, &bindings);
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
-                    self.fault(root,annotation,&via,"Unsupported pure value type: raw pointers, typeid, any, maps, sets, raw unions and procedure values are not pure inputs/results.");
+                    let procedure = procedure_name(self.r.sources, proc);
+                    let cause = self.unsupported_signature_type(&typ);
+                    self.fault(root, annotation, &via, format!(
+                        "{cause}\nWhile checking a result in pure call '{procedure}'."
+                    ));
                 }
             }
         }
@@ -352,6 +382,11 @@ impl<'a, 'r> Purity<'a, 'r> {
         via: &[Ref],
     ) {
         let kind = self.kind(node).to_owned();
+        if kind == "Call" && self.package_constant_resource(node) {
+            // Odin evaluates these directives while checking the retained
+            // declaration. The evaluation cache tracks the resource separately.
+            return;
+        }
         if kind == "Procedure" {
             return;
         }
@@ -440,7 +475,22 @@ impl<'a, 'r> Purity<'a, 'r> {
                         let owner=&self.r.sources[symbol.reference.file];
                         let local=symbol.reference.file==proc.file && self.r.sources[proc.file].node(proc.node).span.contains(owner.node(symbol.reference.node).span);
                         if !local && (owner.node(symbol.reference.node).mutable || symbol.immutable) {
-                            self.fault(root,node,via,format!("Pure code cannot read or write runtime storage '{}' outside the function.",symbol.name));
+                            let message = format!("Pure code cannot read or write runtime storage '{}' outside the function.",symbol.name);
+                            let ordinary_body = !source.shared_native
+                                && !self.r.sources[proc.file].shared_native
+                                && function_owner(self.r.sources, node).is_none()
+                                && purediagnostics::procedure_owner(self.r.sources, node) == Some(proc);
+                            if self.speculative.is_empty() && ordinary_body
+                                && function_context(self.r.sources, via).is_some()
+                            {
+                                // Keep checking independent source expressions in the
+                                // ordinary body. Only the checked copy rejects this use.
+                                self.facts.conditional.entry(node).or_insert(Fault {
+                                    site: node, message, related: vec![],
+                                });
+                            } else {
+                                self.fault(root, node, via, message);
+                            }
                         }
                     }
                 }
@@ -515,6 +565,23 @@ impl<'a, 'r> Purity<'a, 'r> {
         for child in self.children(node) {
             self.walk(root, proc, child, bindings, via);
         }
+    }
+    fn package_constant_resource(&self, site: Ref) -> bool {
+        let Some(callee) = self.role(site, "callee") else {
+            return false;
+        };
+        if !matches!(self.text(callee), "#load" | "#load_hash" | "#exists") {
+            return false;
+        }
+        let source = &self.r.sources[site.file];
+        source.ancestors(site.node)
+            .take_while(|id| source.node(*id).kind != "Procedure")
+            .find(|id| source.node(*id).kind == "Declaration")
+            .is_some_and(|id| {
+                let declaration = source.node(id);
+                !declaration.mutable && !declaration.immutable
+                    && crate::semantics::scope(source, id) == NodeId(0)
+            })
     }
     fn reference(&self, r: Ref) -> bool {
         let s = &self.r.sources[r.file];
@@ -599,8 +666,23 @@ impl<'a, 'r> Purity<'a, 'r> {
             if ["type_of", "size_of", "align_of", "offset_of"].contains(&name) {
                 return;
             }
-            if name == "delete" && args.len() > 1 {
-                self.fault(root, call, via, "Pure code cannot select an allocator.");
+            let explicit_allocator = args.iter().any(|&arg| {
+                self.kind(arg) == "FieldValue"
+                    && self.role(arg, "field").is_some_and(|field| self.text(field) == "allocator")
+            });
+            if name == "delete" {
+                let mut positional = args.iter().copied().filter(|&arg| self.kind(arg) != "FieldValue");
+                let target = args.iter().copied().find_map(|arg| {
+                    let field = self.role(arg, "field")?;
+                    matches!(self.text(field), "array" | "str" | "m")
+                        .then(|| self.role(arg, "value")).flatten()
+                }).or_else(|| positional.next());
+                let allocator = explicit_allocator || positional.next().is_some() && target.is_some_and(|target| {
+                    !matches!(self.r.specialized_type(target, bindings), Type::Dynamic(_) | Type::Map { .. })
+                });
+                if allocator {
+                    self.fault(root, call, via, "Pure code cannot select an allocator.");
+                }
             }
             if name == "make" {
                 let typ = args
@@ -620,7 +702,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 } else {
                     2
                 };
-                if args.len() > limit {
+                if args.len() > limit || explicit_allocator {
                     self.fault(
                         root,
                         call,
@@ -863,6 +945,22 @@ impl<'a, 'r> Purity<'a, 'r> {
             _ => false,
         }
     }
+    fn raw_union(&self, typ: &Type) -> bool {
+        match typ {
+            Type::Nominal(_, base) => self.raw_union(base),
+            Type::Struct(owner) | Type::Record(owner, _) => {
+                self.r.sources[owner.file].node(owner.node).op == "raw_union"
+            }
+            _ => false,
+        }
+    }
+    fn unsupported_signature_type(&self, typ: &Type) -> &'static str {
+        if self.raw_union(typ) {
+            "Raw-union storage cannot be proved pure."
+        } else {
+            "Unsupported pure value type: raw pointers, typeid, any, maps, sets and procedure values are not pure inputs/results."
+        }
+    }
     fn unsafe_storage(&mut self, t: &Type, seen: &mut HashSet<Type>) -> bool {
         if !seen.insert(t.clone()) {
             return false;
@@ -879,11 +977,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 ["rawptr", "any", "typeid", "cstring", "cstring16"].contains(&name.as_str())
             }
             Type::Map { .. } | Type::Set(_) | Type::Procedure(_) => true,
-            Type::Struct(owner) | Type::Record(owner, _)
-                if self.r.sources[owner.file].node(owner.node).op == "raw_union" =>
-            {
-                true
-            }
+            Type::Struct(_) | Type::Record(..) if self.raw_union(t) => true,
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .r
                 .record_fields(t)
@@ -982,11 +1076,12 @@ impl Facts {
             for fault in faults {
                 let source = &r.sources[fault.site.file];
                 let io=fault.message.contains("because it performs I/O.");
-                let site=if io {source.role(fault.site.node,"callee").unwrap_or(fault.site.node)}else{fault.site.node};
+                let site=if io && fault.related.is_empty() {source.role(fault.site.node,"callee").unwrap_or(fault.site.node)}else{fault.site.node};
                 let mut diagnostic =
-                    Error::at(source, source.node(site).span, &fault.message)
+                    Error::at(source, purediagnostics::diagnostic_span(source, site), &fault.message)
                         .diagnostics
                         .remove(0);
+                diagnostic["msgs"] = serde_json::json!(fault.message.lines().collect::<Vec<_>>());
                 if io {diagnostic["stage"]=serde_json::json!("checker");}
                 if fault.message.contains("An indirect call through runtime procedure value") {
                     for call in std::iter::once(fault.site).chain(fault.related.iter().copied()) {
@@ -1000,11 +1095,19 @@ impl Facts {
                         break;
                     }
                 }
-                if !fault.related.is_empty() {
-                    diagnostic["related"]=serde_json::json!(fault.related.iter().map(|reference|{
-                        let s=&r.sources[reference.file];let span=s.node(reference.node).span;let (line,column)=s.position(span.start);
-                        serde_json::json!({"pos":{"file":s.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},"msgs":["Purity violation in the called implementation."]})
-                    }).collect::<Vec<_>>());
+                if let Some((&origin, calls)) = fault.related.split_last() {
+                    let mut path = vec![fault.site];
+                    path.extend_from_slice(calls);
+                    if let Some(context) = function_context(r.sources, &path) {
+                        purediagnostics::contextualize(r.sources, &mut diagnostic, origin, &[context]);
+                    } else {
+                        let message = if r.sources[origin.file].shared_native {
+                            "Purity violation in standard-library implementation."
+                        } else {
+                            "Underlying purity violation in this checked implementation."
+                        };
+                        diagnostic["related"] = serde_json::json!([purediagnostics::note(r.sources, origin, message)]);
+                    }
                 }
                 error.diagnostics.push(diagnostic);
             }

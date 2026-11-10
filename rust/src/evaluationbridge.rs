@@ -32,7 +32,9 @@ impl Plan {
     ) -> Result<()> {
         let source = &r.sources[expression.file];
         let mut types = TypeCode::new(expression.file, Some(expression));
-        types.allow_imports = true;
+        // If the generic package cannot name a caller's type through its
+        // own imports, evaluate from the concrete caller through a bridge.
+        // Importing the caller back into the generic package can form a cycle.
         let direct = Specializations::declarations(context.bindings, &mut types, r);
         let mut request = Request {
             expression: expression.node,
@@ -46,7 +48,6 @@ impl Plan {
             let mut selected = None;
             for (origin, bindings) in context.frames.iter().rev() {
                 let mut types = TypeCode::new(origin.file, Some(*origin));
-                types.allow_imports = true;
                 if context
                     .bindings
                     .values()

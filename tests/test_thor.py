@@ -32,7 +32,8 @@ class ThorTests(unittest.TestCase):
             path = entry.parent / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
-        argv = [str(THOR), command, str(entry.parent if directory else entry), "--output-dir", str(root / "output"), *flags]
+        compiler = getattr(self, "compiler", THOR)
+        argv = [str(compiler), command, str(entry.parent if directory else entry), "--output-dir", str(root / "output"), *flags]
         if args:
             argv += ["--", *args]
         result = subprocess.run(argv, cwd=root if command == "build" else None,

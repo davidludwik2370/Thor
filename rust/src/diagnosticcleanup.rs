@@ -4,6 +4,7 @@ use crate::{
     ast::{NodeId, Source, Span},
     emit::Origin,
     project::Project,
+    semantics::Ref,
 };
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, path::Path};
@@ -160,6 +161,20 @@ fn query(messages: &[String]) -> bool {
             || m.contains("Cannot determine polymorphic type from parameter: 'invalid type'")
     })
 }
+fn sequence_group(project: &Project, message: &str, operation: &str) -> bool {
+    let Some((_, group)) = message.split_once("procedure group '") else {
+        return false;
+    };
+    let Some((name, _)) = group.split_once('\'') else {
+        return false;
+    };
+    name.strip_suffix(operation)
+        .is_some_and(|module| module.ends_with("sequence."))
+        && project
+            .sources
+            .iter()
+            .any(|source| name.starts_with(&source.prefix))
+}
 fn inference_contexts(source: &Source, span: Span) -> Vec<Span> {
     let operations = [
         "Binary",
@@ -224,12 +239,16 @@ fn inference_contexts(source: &Source, span: Span) -> Vec<Span> {
 struct Candidate {
     packet: Value,
     location: Option<(String, Span)>,
+    purity_cause: Option<(String, Span)>,
     depends_on: Vec<Span>,
     invalid_target: Option<crate::semantics::Ref>,
     cascade: bool,
 }
 
-pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> Vec<Value> {
+pub(crate) fn clean(
+    project: &Project,
+    errors: Vec<(Value, Option<Origin>, Option<Ref>)>,
+) -> Vec<Value> {
     if errors.is_empty() {
         return vec![];
     }
@@ -270,7 +289,7 @@ pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> 
         crate::semantics::Resolver::with_flags(&project.sources, &project.options.flags);
     let runtime = project.options.root.join("runtime");
     let mut items = vec![];
-    for (mut error, origin) in errors {
+    for (mut error, origin, purity_cause) in errors {
         let mut msgs = messages(&error);
         let original = msgs.clone();
         let mut invalid_target = None;
@@ -448,21 +467,9 @@ pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> 
                         && (m.starts_with("Expected a type for 'type_is_")
                             || m.ends_with("' is not a type")
                             || m.contains("is not an expression but a type"))
-                    || project.sources.iter().any(|source| {
-                        m.contains(&format!(
-                            "procedure group '{}sequence.element'",
-                            source.prefix
-                        ))
-                    })
+                    || sequence_group(project, m, "element")
             }) || msgs.iter().any(|m| m.contains("invalid type"))
-                && msgs.iter().any(|m| {
-                    project.sources.iter().any(|source| {
-                        m.contains(&format!(
-                            "procedure group '{}sequence.normalize'",
-                            source.prefix
-                        ))
-                    })
-                }));
+                && msgs.iter().any(|m| sequence_group(project, m, "normalize")));
         let mut inference = generated_query
             || (kind == "power-type"
                 && msgs
@@ -510,14 +517,10 @@ pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> 
                         }
                     }
                 }
-                let normalization = msgs.iter().any(|m| {
-                    project.sources.iter().any(|source| {
-                        m.contains(&format!(
-                            "procedure group '{}sequence.normalize'",
-                            source.prefix
-                        ))
-                    })
-                });
+                let normalization = msgs.iter().any(|m| sequence_group(project, m, "normalize"));
+                if normalization && msgs.iter().any(|message| message.contains("invalid type")) {
+                    inference = true;
+                }
                 for (index, operation) in source
                     .nodes
                     .iter()
@@ -570,16 +573,17 @@ pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> 
                             }
                             _ => None,
                         };
-                        let actual = if normalization {
-                            msgs.iter()
-                                .filter_map(|m| m.trim_start().strip_prefix("• "))
-                                .nth(1)
-                                .filter(|typ| *typ != "invalid type")
-                                .map(str::to_owned)
-                                .or(actual)
-                        } else {
-                            actual
-                        };
+                        let actual = actual.or_else(|| {
+                            normalization
+                                .then(|| {
+                                    msgs.iter()
+                                        .filter_map(|m| m.trim_start().strip_prefix("• "))
+                                        .nth(1)
+                                        .filter(|typ| *typ != "invalid type")
+                                        .map(str::to_owned)
+                                })
+                                .flatten()
+                        });
                         if let Some(actual) = actual {
                             let subject = if label == "index" {
                                 "Sequence indices".into()
@@ -852,6 +856,13 @@ pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> 
         items.push(Candidate {
             packet: error,
             location,
+            purity_cause: purity_cause.map(|site| {
+                let source = &project.sources[site.file];
+                (
+                    source.path.to_string_lossy().into_owned(),
+                    source.node(site.node).span,
+                )
+            }),
             depends_on,
             invalid_target,
             cascade: inference || generated_return || set_cascade || kind == "range-type",
@@ -883,17 +894,21 @@ pub(crate) fn clean(project: &Project, errors: Vec<(Value, Option<Origin>)>) -> 
                 if other.cascade || other.packet["type"] != "error" {
                     return false;
                 }
-                let (Some((file, _)), Some((other_file, at))) =
-                    (&candidate.location, &other.location)
-                else {
+                let Some((file, _)) = &candidate.location else {
                     return false;
                 };
-                file == other_file
-                    && !at.is_empty()
-                    && candidate
-                        .depends_on
-                        .iter()
-                        .any(|context| context.contains(*at))
+                other
+                    .location
+                    .iter()
+                    .chain(&other.purity_cause)
+                    .any(|(other_file, at)| {
+                        file == other_file
+                            && !at.is_empty()
+                            && candidate
+                                .depends_on
+                                .iter()
+                                .any(|context| context.contains(*at))
+                    })
             })
         {
             continue;

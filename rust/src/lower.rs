@@ -1089,6 +1089,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
+        if kind == "Return" {
+            if let Some(code) = self.pure_return(id, constant)? {
+                return Ok(code);
+            }
+        }
         if matches!(kind.as_str(), "SwitchExpr" | "CompileSwitchExpr") {
             return self.switch_expression(id, vec![expected], constant);
         }
@@ -2251,6 +2256,32 @@ impl<'a, 'r> Lower<'a, 'r> {
             ||sym.parameter&&owner.group(sym.reference.node,"names").iter().any(|name|owner.node(*name).kind=="PolyType") {return None;}
         Some(symbol)
     }
+    fn scope_cleanup_call(&mut self, id: NodeId) -> bool {
+        let id = self.unparen(id);
+        if self.source.node(id).kind != "Call" {
+            return false;
+        }
+        let Some(callee) = self.source.role(id, "callee") else {
+            return false;
+        };
+        let Some(signature) = self.resolver.signature(self.reference(callee)) else {
+            return false;
+        };
+        let source = &self.resolver.sources[signature.file];
+        let Some(declaration) = source.node(signature.node).parent
+            .filter(|parent| source.node(*parent).kind == "Procedure")
+            .and_then(|parent| source.node(parent).parent)
+        else {
+            return false;
+        };
+        source.group(declaration, "attributes").iter()
+            .flat_map(|attribute| source.group(*attribute, "elems"))
+            .any(|item| source.node(*item).kind == "FieldValue"
+                && source.role(*item, "field").is_some_and(|field| {
+                    source.text(field).starts_with("deferred_")
+                }))
+    }
+
     fn closed<F>(
         &mut self,
         id: NodeId,
@@ -2389,30 +2420,9 @@ impl<'a, 'r> Lower<'a, 'r> {
                 {
                     continue;
                 }
-                let callee = self.role(child, "callee")?;
-                if let Some(signature) = self.resolver.signature(self.reference(callee)) {
-                    let source = &self.resolver.sources[signature.file];
-                    let declaration = source
-                        .node(signature.node)
-                        .parent
-                        .filter(|parent| source.node(*parent).kind == "Procedure")
-                        .and_then(|parent| source.node(parent).parent);
-                    if let Some(declaration) = declaration {
-                        let deferred = source
-                            .group(declaration, "attributes")
-                            .iter()
-                            .flat_map(|attribute| source.group(*attribute, "elems"))
-                            .any(|item| {
-                                source.node(*item).kind == "FieldValue"
-                                    && source.role(*item, "field").is_some_and(|field| {
-                                        source.text(field).starts_with("deferred_")
-                                    })
-                            });
-                        if deferred {
-                            cleanup = Some(child);
-                            break;
-                        }
-                    }
+                if self.scope_cleanup_call(child) {
+                    cleanup = Some(child);
+                    break;
                 }
             }
             let body = if let Some(cleanup) = cleanup {

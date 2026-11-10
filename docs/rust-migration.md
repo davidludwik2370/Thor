@@ -105,6 +105,31 @@ The original diagnostic fixtures, terminal source excerpts and two capture
 runtime checks passed together in a 113-test debug gate. Whole-language parity
 remains under verification.
 
+### Purity context, owned results and compile-time bindings
+
+Purity errors now trace a checked ordinary procedure back to the declared
+`fn` call and retain the original operation and function signature as related
+locations. An explicit `#run` of an ordinary procedure identifies the
+underlying violation at its original source location. Independent type errors
+remain visible when the compiler moves a purity diagnostic to its caller.
+The validator distinguishes source-location arguments to `delete` from
+allocator overrides and preserves automatic cleanup in the caller's scope
+when its result is discarded.
+
+The owned-result wrapper now promotes named slots after user defers. It can
+copy temporary views of local arrays while their backing is alive, including
+non-nil empty slices. Isolated evaluation retains result type annotations for
+local `fn` declarations and validates `type_of` operands without evaluating
+their runtime initializers.
+
+Generic evaluation uses the original concrete caller's scope when its types
+are unavailable in the library. Probe iterations keep generated import names
+stable while rebasing local type identities. Package constants may use Odin's
+compile-time file and existence directives, with resource contents, presence
+and build defines participating in cache validation. Focused gates passed
+for these changes, including an assertion-disabled owned-result regression
+on both engines. The combined release acceptance gate is separate.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

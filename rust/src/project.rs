@@ -473,6 +473,7 @@ impl Project {
                 json!({"pos":{"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},
                     "msgs":["Required by this pure call; the selected implementation must obey pure function rules."]})
             }).collect();
+            self.pure_error_sites.insert(token.clone(), *site);
             self.related.insert(token, notes);
         }
         let sdk = sdkmirror::SdkMirror::plan(
@@ -646,14 +647,13 @@ impl Project {
                     let suffix = generated
                         .strip_prefix(&self.destination)
                         .map_err(|_| Error::new("evaluation import outside generated tree"))?;
+                    let suffix = if suffix.as_os_str().is_empty() {
+                        ".".to_owned()
+                    } else {
+                        suffix.to_string_lossy().replace('\\', "/")
+                    };
                     let path = crate::evaluation::dependency_path(source, directory);
-                    import_paths.insert(
-                        path,
-                        format!(
-                            "{project_collection}:{}",
-                            suffix.to_string_lossy().replace('\\', "/")
-                        ),
-                    );
+                    import_paths.insert(path, format!("{project_collection}:{suffix}"));
                 }
             }
             lower.remap_imports(import_paths);
@@ -1270,6 +1270,7 @@ impl Project {
     pub fn translate(&self, errors: &[Value]) -> Vec<Value> {
         let translated=errors.iter().map(|error|{
             let mut error=error.clone();
+            let mut purity_cause = None;
             let pure_site=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.pure_error_sites.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,site)|*site));
             let related=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
@@ -1299,17 +1300,28 @@ impl Project {
             }}
             if let Some((token,(site,description)))=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.type_sites.iter().find(|(token,_)|message.contains(token.as_str()))) {
-                let source=&self.sources[site.file];let span=source.node(site.node).span;
+                let source=&self.sources[site.file];let span=crate::purediagnostics::diagnostic_span(source,site.node);
                 let (line,column)=source.position(span.start);let (end_line,end_column)=source.position(span.end);
-                let primary=error["msgs"][0].as_str().unwrap_or("Invalid pure value type").replace(token,"");
+                let primary=error["msgs"][0].as_str().unwrap_or("Invalid pure value type")
+                    .trim_start_matches("Compile time panic: ").replace(token,"");
                 error["pos"]=json!({"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column});
                 error["stage"]=json!("thor");
                 error["msgs"]=json!([primary,format!("While checking {description}")]);
+                purity_cause = Some(*site);
                 self.pure_type_context(&mut error,*site,false);
             }
-            if let Some(site)=pure_site { self.pure_type_context(&mut error,site,true); }
+            if let Some(site)=pure_site {
+                purity_cause = Some(site);
+                self.pure_type_context(&mut error,site,true);
+                if let Some(messages) = error["msgs"].as_array_mut() {
+                    messages.retain(|message| !message.as_str().is_some_and(|text| {
+                        let text = text.trim_start();
+                        text.starts_with("Called within") || text.contains("instantiated as")
+                    }));
+                }
+            }
             self.optional_diagnostic(&mut error);
-            (error, mapped)
+            (error, mapped, purity_cause)
         }).collect();
         let mut translated=crate::diagnosticcleanup::clean(self,translated);
         for error in &mut translated {
@@ -1360,26 +1372,21 @@ impl Project {
         site: crate::semantics::Ref,
         select_active: bool,
     ) {
-        use crate::semantics::Ref;
-        let source = &self.sources[site.file];
-        let Some(proc) = source
-            .ancestors(site.node)
-            .find(|node| source.node(*node).kind == "Procedure")
-        else {
+        use crate::{purediagnostics, semantics::Ref};
+        let Some(procedure) = purediagnostics::procedure_owner(&self.sources, site) else {
             return;
         };
-        if source.node(proc).data["pure"] == true {
+        if purediagnostics::function_owner(&self.sources, site).is_some() {
             return;
         }
-        let Some(paths) = self.pure_call_paths.get(&Ref {
-            file: site.file,
-            node: proc,
-        }) else {
+        let Some(paths) = self.pure_call_paths.get(&procedure) else {
             return;
         };
         let mut paths = paths
             .iter()
-            .filter(|(_, via)| !via.is_empty())
+            .filter_map(|(_, via)| purediagnostics::function_context(&self.sources, via))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>();
         if paths.is_empty() {
             return;
@@ -1416,67 +1423,7 @@ impl Project {
                     .collect();
             }
         }
-        let position = |reference: Ref| {
-            let s = &self.sources[reference.file];
-            let span = s.node(reference.node).span;
-            let (line, column) = s.position(span.start);
-            let (end_line, end_column) = s.position(span.end);
-            json!({"file":s.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column})
-        };
-        let procedure_name = |reference: Ref| {
-            let s = &self.sources[reference.file];
-            s.node(reference.node)
-                .parent
-                .and_then(|decl| s.group(decl, "names").first().copied())
-                .map(|name| s.text(name).to_string())
-                .unwrap_or_else(|| "anonymous fn".into())
-        };
-        let mut notes = vec![
-            json!({"pos":position(site),"msgs":["Underlying purity violation in this checked implementation."]}),
-        ];
-        let mut chains = vec![];
-        for (root, via) in &paths {
-            let root_name = procedure_name(*root);
-            let mut names = vec![root_name.clone()];
-            for call in via {
-                let s = &self.sources[call.file];
-                if let Some(callee) = s.role(call.node, "callee") {
-                    names.push(s.text(callee).to_string());
-                }
-            }
-            chains.push(names.join(" -> "));
-            notes.push(json!({"pos":position(*root),"msgs":[format!("fn '{root_name}' requires its entire call chain to be pure; ordinary proc callers do not impose this requirement.")]}));
-            for call in via.iter().skip(usize::from(paths.len() == 1)) {
-                notes.push(json!({"pos":position(*call),"msgs":[format!("Checked call reached from fn '{root_name}'.")]}));
-            }
-        }
-        if paths.len() == 1 {
-            let (root, via) = paths[0];
-            let first = via[0];
-            let s = &self.sources[first.file];
-            let callee = s
-                .role(first.node, "callee")
-                .map(|node| s.text(node))
-                .unwrap_or("this procedure");
-            let primary = error["msgs"][0]
-                .as_str()
-                .unwrap_or("Invalid pure value type")
-                .trim_start_matches("Compile time panic: ")
-                .to_string();
-            error["pos"] = position(first);
-            error["msgs"][0] = json!(format!(
-                "Pure function '{}' cannot call '{callee}': {primary}",
-                procedure_name(*root)
-            ));
-        }
-        if let Some(messages) = error["msgs"].as_array_mut() {
-            messages.push(json!(format!(
-                "Pure call chain{}: {}.",
-                if chains.len() == 1 { "" } else { "s" },
-                chains.join("; ")
-            )));
-        }
-        error["related"] = json!(notes);
+        purediagnostics::contextualize(&self.sources, error, site, &paths);
     }
     pub(crate) fn instantiation_locations(&self, error: &Value) -> Vec<(usize, usize)> {
         self.source_locations(error,true)

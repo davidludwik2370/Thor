@@ -291,15 +291,21 @@ impl Lower<'_, '_> {
                     self.querying += 1;
                     let original = self.render(query.node, None, false);
                     self.querying -= 1;
-                    let type_of = self.native("type_of");
-                    self.default = true;
+                    let (open, close) = if crate::purity::builtin_call(self.resolver, query)
+                        .as_deref() == Some("type_of")
+                    {
+                        // A type query supplies a type operand, so keep it
+                        // in a native type context while validating the use.
+                        (format!("\n_ = {}(", self.native("size_of")), ")\n")
+                    } else {
+                        self.default = true;
+                        let type_of = self.native("type_of");
+                        (format!("\n_ = {type_of}({}default_value(", self.prefix), "))\n")
+                    };
                     let check = Code::concat([
-                        self.g(
-                            format!("\n_ = {type_of}({}default_value(", self.prefix),
-                            query.node,
-                        ),
+                        self.g(open, query.node),
                         original?,
-                        self.g("))\n", query.node),
+                        self.g(close, query.node),
                     ]);
                     self.declaration_helpers
                         .entry(owner)

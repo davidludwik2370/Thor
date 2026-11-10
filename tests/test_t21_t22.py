@@ -70,7 +70,8 @@ class CacheTests(unittest.TestCase):
         return next(json.loads(line)['thor_cache'] for line in result.stdout.splitlines() if line.startswith('{"thor_cache"'))
 
     def again(self,root,*,flags=(),fail=None):
-        result=subprocess.run([str(base.THOR),'run',str(root/'input'),'--output-dir',str(root/'output'),
+        compiler=getattr(self,'compiler',base.THOR)
+        result=subprocess.run([str(compiler),'run',str(root/'input'),'--output-dir',str(root/'output'),
                                '--cache-report',*flags],capture_output=True,text=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0);self.assertIn(fail,result.stderr)
         else:self.assertEqual(result.returncode,0,result.stderr)
@@ -139,7 +140,7 @@ VALUE::#run work()
         marker=root/'block-helper'
         wrapper=root/'odin-wrapper'
         wrapper.write_text('#!/usr/bin/env python3\nimport os,sys\nfrom pathlib import Path\n'
-            f'if Path({str(marker)!r}).exists() and "build" in sys.argv and any("thor-run-" in x for x in sys.argv):\n'
+            f'if Path({str(marker)!r}).exists() and "build" in sys.argv and any("thor-run-" in x or "thor-rust-run-" in x for x in sys.argv):\n'
             ' print("helper build blocked by test",file=sys.stderr);sys.exit(1)\n'
             f'os.execv({shutil.which("odin")!r},[{shutil.which("odin")!r},*sys.argv[1:]])\n')
         wrapper.chmod(0o755)
@@ -347,6 +348,37 @@ a:=local();b:=#run local();testing.expect(t,a[0]==9&&b[0]==9);pure.destroy(a);pu
         self.invoke(self.program('a:=#run local();assert(a[0]==9);pure.destroy(a)',
             'import pure "thor:pure"\nlocal::fn()->[]int{data:=[1,2];defer data[0]=9;return data[:]}\n'),
             flags=['-warnings-as-errors'])
+
+    def test_promotion_copies_named_and_multiple_results_in_checked_and_unchecked_builds(self):
+        source=self.program('''
+input:=1
+left,right:=both(input)
+defer delete(left)
+defer delete(right)
+if left[0]!=9 || right[0]!=2 {panic("result after defer")}
+left[0]=4
+if right[0]!=2 {panic("shared result")}
+folded:=#run local(3)
+defer delete(folded)
+if len(folded)!=2 || folded[0]!=9 || folded[1]!=4 {panic("compile-time result")}
+''','''
+both::fn(n:int)->(first:[]int,second:[]int){
+    data:=[n,n+1]
+    defer data[0]=9
+    first,second=data[:],data[1:]
+    return
+}
+local::fn(n:int)->[]int{
+    data:=[n,n+1]
+    defer data[0]=9
+    if n>0 do return data[:]
+    return nil
+}
+''')
+        for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']]:
+            with self.subTest(flags=flags):
+                _,result=self.invoke(source,flags=flags)
+                self.assertEqual(result.stderr,'')
 
     def test_or_return_preserves_named_results_and_error_payloads(self):
         self.memory('''

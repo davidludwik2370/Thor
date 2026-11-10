@@ -21,7 +21,12 @@ impl Lower<'_, '_> {
                 continue;
             }
             facts.validate(self.resolver, root)?;
-            self.prepare_pure(root, false)?;
+            // Local declarations can be retained in the synthetic entry's
+            // scope without appearing in the file's ordinary keep set.
+            let view = self.evaluation.take();
+            let prepared = self.prepare_pure(root, false);
+            self.evaluation = view;
+            prepared?;
         }
         self.prepare_checked_variants(facts)?;
         Ok(())
@@ -173,12 +178,7 @@ impl Lower<'_, '_> {
         for (index, (name, annotation)) in results.into_iter().enumerate() {
             let annotation =
                 annotation.ok_or_else(|| self.unsupported(proc, "inferred pure result types"))?;
-            let name = if name.is_empty() || name == "_" {
-                format!("{prefix}_result_{index}")
-            } else {
-                name
-            };
-            names.push(name);
+            names.push(Self::pure_result_name(&prefix, name, index));
             slots.push(format!("{prefix}_slot_{index}"));
             types.push(self.render(annotation.node, None, true)?);
         }
@@ -315,6 +315,76 @@ impl Lower<'_, '_> {
         ));
         Ok(Code::concat(code))
     }
+
+    fn pure_result_name(prefix: &str, name: String, index: usize) -> String {
+        if name.is_empty() || name == "_" {
+            format!("{prefix}_result_{index}")
+        } else {
+            name
+        }
+    }
+
+    pub(super) fn pure_return(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
+        if self.pure_busy.is_empty() {
+            return Ok(None);
+        }
+        let s = self.source;
+        let Some(proc) = s
+            .ancestors(id)
+            .find(|node| s.node(*node).kind == "Procedure")
+            .filter(|proc| self.pure_busy.contains(proc))
+        else {
+            return Ok(None);
+        };
+        let signature = self.role(proc, "type")?;
+        let results = self.resolver.fields(self.reference(signature), "results");
+        let prefix = format!("{}pure_{}", self.prefix, s.node(proc).span.start);
+        let names = results
+            .iter()
+            .enumerate()
+            .map(|(index, (name, _))| Self::pure_result_name(&prefix, name.clone(), index))
+            .collect::<Vec<_>>();
+        let values = s.group(id, "values");
+        if let Some(parent) = s.node(id).parent.filter(|parent| {
+            s.node(*parent).kind == "Block" && s.raw.as_bytes()[s.node(*parent).span.start] != b'{'
+        }) {
+            self.convert_do(parent);
+        }
+        let span = s.node(id).span;
+        let mut code = vec![self.gen("{", span, "pure-return")];
+        if !values.is_empty() {
+            code.push(self.gen(format!("{}=", names.join(",")), span, "pure-return"));
+            for (index, &value) in values.iter().enumerate() {
+                if index > 0 {
+                    code.push(self.gen(",", span, "pure-return"));
+                }
+                let hint = if let Some((_, Some(annotation))) = results.get(index) {
+                    Some(Hint {
+                        constant_literal: false,
+                        semantic: Some(self.typ(annotation.node)),
+                        code: self.render(annotation.node, None, true)?,
+                        element_only: false,
+                        plain_array: s.node(annotation.node).kind == "ArrayType",
+                    })
+                } else {
+                    None
+                };
+                code.push(self.big_owned(value, hint, constant)?);
+            }
+            code.push(self.gen(";", span, "pure-return"));
+        }
+        // These native results are discarded. The deferred promotion reads
+        // the named slots after user defers while their local storage is alive.
+        let type_of = self.native("type_of");
+        let returned = names
+            .iter()
+            .map(|name| format!("transmute({type_of}({name})){name}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        code.push(self.gen(format!("return {returned}}}"), span, "pure-return"));
+        Ok(Some(Code::concat(code)))
+    }
+
     pub(super) fn pure_owns(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
         if !seen.insert(typ.clone()) {
             return false;
@@ -333,7 +403,9 @@ impl Lower<'_, '_> {
                 .union_variants(*owner)
                 .iter()
                 .any(|typ| self.pure_owns(typ, seen)),
-            Type::BigInteger | Type::BigRational | Type::Slice(_)
+            Type::BigInteger
+            | Type::BigRational
+            | Type::Slice(_)
             | Type::Dynamic(_)
             | Type::String { .. }
             | Type::Unknown
