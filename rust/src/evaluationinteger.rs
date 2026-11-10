@@ -22,6 +22,7 @@ impl Scheduler<'_> {
                 .specializations
                 .bindings
                 .get(&(symbol.reference, symbol.name.clone()))
+                .filter(|binding| !binding.typ.native_float_constant())
                 .and_then(|binding| binding.value.as_ref())
                 .filter(|value| value["kind"] == "integer")
             {

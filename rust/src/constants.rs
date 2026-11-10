@@ -1,6 +1,20 @@
 //! Compile-time arguments carry values, rather than just their scalar types.
 use super::*;
 impl Type {
+    /// Floating/complex constant coercion is authoritative in Odin. In
+    /// particular, an integer source packet is not its rounded formal value.
+    pub(crate) fn native_float_constant(&self) -> bool {
+        match self {
+            Self::Nominal(_, inner) => inner.native_float_constant(),
+            Self::Scalar { name, .. } => {
+                name.starts_with("complex")
+                    || name.starts_with("quaternion")
+                    || name.starts_with('f')
+                        && name.chars().nth(1).is_some_and(|ch| ch.is_ascii_digit())
+            }
+            _ => false,
+        }
+    }
     pub fn resolved(&self) -> bool {
         match self {
             Self::Unknown | Self::Generic => false,
@@ -33,6 +47,9 @@ impl Resolver<'_> {
         bindings: &Substitutions,
         expected: Option<&Type>,
     ) -> Option<Constant> {
+        if expected.is_some_and(Type::native_float_constant) {
+            return None;
+        }
         self.constant_value_seen(r, bindings, expected, &mut HashSet::new())
     }
     fn constant_value_seen(
@@ -56,6 +73,14 @@ impl Resolver<'_> {
         let n = s.node(r.node);
         let role = |name| s.role(r.node, name).map(|node| Ref { file: r.file, node });
         if matches!(n.kind.as_str(), "Ident" | "PolyType" | "Selector") {
+            if self.symbol(r).is_some_and(|index| {
+                let symbol = &self.symbols[index];
+                self.bound_constants
+                    .get(&(symbol.reference, symbol.name.clone()))
+                    .is_some_and(|(typ, _)| typ.native_float_constant())
+            }) {
+                return None;
+            }
             if let Some(Type::Constant(value)) = self.bound_type(r, bindings) {
                 return Some(value.clone());
             }

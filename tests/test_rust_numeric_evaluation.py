@@ -53,5 +53,30 @@ class RustNumericEvaluationTests(unittest.TestCase):
     def test_inactive_compile_time_branch_does_not_fold_bad_power(self):
         self.compare(self.program('when false{_=2**-1};fmt.println(7)','import "core:fmt"'),output='7\n')
 
+    def test_generic_float_parameter_conditions_use_native_rounding(self):
+        for typ,argument,rounded in [('f32','16777217','16777216'),('f64','9007199254740993','9007199254740992')]:
+            for flags in (['-debug'],native.UNCHECKED):
+                with self.subTest(typ=typ,flags=flags):
+                    self.compare(self.program('fmt.println(generic('+argument+'))',
+                        'import "core:fmt"\nwork::proc()->int{return 9}\n'
+                        'generic::proc($N:'+typ+')->int{when N=='+rounded+'{return #run work()}else{return 0}}'),
+                        flags=flags,output=('0\n' if typ=='f32' else '9\n'))
+
+    def test_negative_float_parameters_keep_native_coercion(self):
+        self.compare(self.program('fmt.println(generic(-9007199254740993))',
+            'import "core:fmt"\nwork::proc()->int{return 9}\n'
+            'generic::proc($N:f64)->int{when N == -9007199254740992{return #run work()}else{return 0}}'),output='9\n')
+
+    def test_distinct_float_parameter_keeps_native_coercion(self):
+        self.compare(self.program('fmt.println(generic(-9007199254740993))',
+            'import "core:fmt"\nReal::distinct f64\nwork::proc()->int{return 9}\n'
+            'generic::proc($N:Real)->int{when N == -9007199254740992{return #run work()}else{return 0}}'),output='9\n',
+            reference_failure='Compile-time helper compilation failed')
+
+    def test_native_float_selection_does_not_check_an_inactive_impure_arm(self):
+        self.compare(self.program('fmt.println(#run generic(9007199254740993))',
+            'import "core:fmt"\nstate:int\n'
+            'generic::proc($N:f64)->int{when N==9007199254740992{return 9}else{return state}}'),output='9\n')
+
 if __name__=='__main__':
     unittest.main()

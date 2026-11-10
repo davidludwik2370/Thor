@@ -1447,11 +1447,14 @@ impl<'a> Resolver<'a> {
             .flatten()
             .map(|index| &self.symbols[index])
         {
-            if let Some((_, value)) = self
+            if let Some((typ, value)) = self
                 .bound_constants
                 .get(&(symbol.reference, symbol.name.clone()))
                 .filter(|(_, value)| value["kind"] == "integer")
             {
+                if typ.native_float_constant() {
+                    return None;
+                }
                 return value["value"].as_str()?.parse().ok();
             }
         }

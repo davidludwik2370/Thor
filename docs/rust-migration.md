@@ -702,6 +702,21 @@ connected through the independent scheduler after source discovery. Normal
 command adoption, early SDK discovery avoidance and result-type witness
 integration remain outstanding.
 
+### Native coercion of floating constant parameters
+
+Host integer folding no longer treats an integer source packet as the final
+value of a floating/complex constant parameter. Those values and conditions
+remain native, so Odin decides their formal coercion before branch selection.
+Previously a rounded `f64` argument could suppress a required `#run` case.
+Odin's compile-time `f32` behavior differs at the corresponding precision
+boundary; tests preserve that native behavior rather than simulating a cast.
+
+All 13 numeric scheduling tests pass, including positive/negative boundaries,
+checked/unchecked builds and an inactive impure arm. A distinct floating alias
+is valid native code but the frozen reference fails its helper compilation;
+the differential test records that reference gap explicitly. The Rust output
+matches the ordinary Odin program. No Python or Odin compiler source changed.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
