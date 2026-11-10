@@ -45,6 +45,12 @@ the exported symbol, allowing invalid writes and frees of static backing. This
 fix is isolated from the Rust port; the frozen reference tag is retained. The
 regression also verifies that an independent runtime copy remains mutable.
 
+A separate publishing reference fix puts the package payload in a uniquely named
+staging directory. Application names `package.zip`, `package.tar.gz` and
+`previous` can now be published and republished without colliding with temporary
+archives or the replacement backup. All 41 publishing checks and seven assertion
+hygiene checks passed; the frozen comparison tag remains unchanged.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

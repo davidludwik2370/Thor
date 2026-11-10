@@ -371,6 +371,28 @@ class PublishTests(PublishFixture):
                         self.assertTrue(archive.getmember('output/AppRun').mode & 0o111)
                 self.plan(system=system).check_output()
 
+    def test_package_names_do_not_collide_with_staging_archives_or_backups(self):
+        for system, name in [('windows', 'package.zip'), ('linux', 'package.tar.gz'), ('darwin', 'previous')]:
+            for version in range(2):
+                with self.subTest(system=system, name=name, version=version), tempfile.TemporaryDirectory(dir=self.directory) as temporary:
+                    scratch = Path(temporary)
+                    binary = scratch / 'native-input'
+                    content = f'input {version}'.encode()
+                    binary.write_bytes(content)
+                    plan = self.plan(system=system, app_name=name)
+                    with patch('thorlang.publish_deps.bundle_dependencies', return_value=[]), patch('thorlang.publish_deps.sign_macos'):
+                        artifact = plan.package(binary, scratch)
+                    if system == 'windows':
+                        with zipfile.ZipFile(artifact) as archive:
+                            actual = archive.read(f'{name}/{plan.executable_name}')
+                    elif system == 'linux':
+                        with tarfile.open(artifact) as archive:
+                            actual = archive.extractfile(f'{name}/bin/{plan.executable_name}').read()
+                    else:
+                        actual = (artifact / 'Contents/MacOS' / plan.executable_name).read_bytes()
+                    self.assertEqual(actual, content)
+                    plan.check_output()
+
     def test_linux_desktop_installer_records_absolute_paths_and_gui_choice(self):
         self.image()
         directory = self.directory / 'a path $ with % and quote "'

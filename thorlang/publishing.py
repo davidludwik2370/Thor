@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 from .compiler import ThorError
@@ -333,7 +334,8 @@ class Publisher:
 
     def package(self, executable, scratch):
         from .publish_deps import bundle_dependencies, sign_macos
-        root = scratch / (self.name + (".app" if self.system == "darwin" else ""))
+        staging = Path(tempfile.mkdtemp(prefix='payload-', dir=scratch))
+        root = staging / (self.name + (".app" if self.system == "darwin" else ""))
         if self.system == "darwin":
             binary_dir, resource_dir, library_dir = root / "Contents/MacOS", root / "Contents/Resources", root / "Contents/Frameworks"
         elif self.system == "windows":
