@@ -328,6 +328,11 @@ impl Resolver<'_> {
         };
         match n.kind.as_str() {
             "Paren" | "Run" => subtype("expr"),
+            "Binary" if n.op == "++" => {
+                crate::lower::concatenation::result_type(s, r.node, |node| {
+                    self.specialize(Ref { node, ..r }, bindings, &mut seen.clone())
+                })
+            }
             "WhenExpr" => {
                 if let Some(cond) = child("cond").and_then(|r| self.context_condition(r, bindings))
                 {

@@ -242,6 +242,7 @@ struct Candidate {
     purity_cause: Option<(String, Span)>,
     depends_on: Vec<Span>,
     invalid_target: Option<crate::semantics::Ref>,
+    concat_operand_failure: bool,
     cascade: bool,
 }
 
@@ -293,12 +294,44 @@ pub(crate) fn clean(
         let mut msgs = messages(&error);
         let original = msgs.clone();
         let mut invalid_target = None;
+        let mut concat_operand_failure = false;
+        let mut concat_declaration_failure = false;
         let mut exact = origin.as_ref().is_none_or(|origin| origin.exact);
         let kind = origin
             .as_ref()
             .map(|origin| origin.kind.as_str())
             .unwrap_or("");
         let mut location = span(&error);
+        let mentions_concat = msgs.iter().any(|message| {
+            message.contains("'concatenate'") || message.starts_with("Invalid declaration value")
+        });
+        if let Some((file, at)) = location.as_ref().filter(|_| mentions_concat) {
+            let concatenation = project.sources.iter().any(|source| {
+                source.path == Path::new(file)
+                    && source.nodes.iter().any(|node| {
+                        node.kind == "Binary" && node.op == "++" && node.span.contains(*at)
+                    })
+            });
+            if concatenation {
+                concat_operand_failure = msgs
+                    .iter()
+                    .any(|text| text.contains("'concatenate' expects a constant array or slice"));
+                concat_declaration_failure = msgs
+                    .iter()
+                    .any(|text| text.starts_with("Invalid declaration value"));
+                for message in &mut msgs {
+                    *message = message
+                        .replace("'concatenate' expects a constant array or slice",
+                                 "Array concatenation ('++') requires compile-time constant arrays or slices")
+                        .replace("'concatenate' expects constant values of the same element-type, got",
+                                 "Array concatenation ('++') requires matching element types; got")
+                        .replace("'concatenate' expects constant values of the same slice type, got",
+                                 "Array concatenation ('++') requires matching slice types; got")
+                        .replace("'concatenate' does not allow the use of 'field = value' to be concatenated together",
+                                 "Array concatenation ('++') requires positional entries; named/indexed literal entries are not supported");
+                }
+            }
+        }
         if let Some(name) = msgs
             .first()
             .and_then(|message| message.strip_prefix("Undeclared name: "))
@@ -865,12 +898,31 @@ pub(crate) fn clean(
             }),
             depends_on,
             invalid_target,
-            cascade: inference || generated_return || set_cascade || kind == "range-type",
+            concat_operand_failure,
+            cascade: inference
+                || generated_return
+                || set_cascade
+                || concat_declaration_failure
+                || kind == "range-type",
         });
     }
     let mut result = vec![];
     let mut seen = BTreeSet::new();
     for candidate in &items {
+        if candidate.concat_operand_failure
+            && candidate.location.as_ref().is_some_and(|(file, span)| {
+                items.iter().any(|other| {
+                    !other.concat_operand_failure
+                        && !other.cascade
+                        && other.packet["type"] == "error"
+                        && other.location.as_ref().is_some_and(|(other_file, at)| {
+                            file == other_file && !at.is_empty() && span.contains(*at)
+                        })
+                })
+            })
+        {
+            continue;
+        }
         if items
             .iter()
             .filter_map(|item| item.invalid_target)

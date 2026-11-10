@@ -1369,6 +1369,11 @@ impl<'a> Resolver<'a> {
                 Type::Unknown
             }
             "Binary" => {
+                if n.op == "++" {
+                    return crate::lower::concatenation::result_type(s, r.node, |node| {
+                        self.type_of(Ref { node, ..r })
+                    });
+                }
                 if matches!(
                     n.op.as_str(),
                     "in" | "not_in" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||"

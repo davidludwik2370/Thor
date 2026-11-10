@@ -23,6 +23,8 @@ mod bigoperators;
 mod access;
 #[path = "comprehensions.rs"]
 mod comprehensions;
+#[path = "concatenation.rs"]
+pub(crate) mod concatenation;
 #[path = "contextlower.rs"]
 mod contextlower;
 #[path = "defaults.rs"]
@@ -1888,141 +1890,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.g(if op == "not_in" { ")))" } else { "))" }, id),
         ])
         .expansion(&self.source.path, self.source.node(id).span))
-    }
-    fn concatenate(&mut self, id: NodeId, expected: Option<Hint>) -> Result<Code> {
-        fn flatten(s: &Source, id: NodeId, out: &mut Vec<NodeId>) {
-            let mut n = id;
-            while s.node(n).kind == "Paren" {
-                if let Some(inner) = s.role(n, "expr") {
-                    n = inner;
-                } else {
-                    break;
-                }
-            }
-            if s.node(n).kind == "Binary" && s.node(n).op == "++" {
-                for role in ["left", "right"] {
-                    if let Some(child) = s.role(n, role) {
-                        flatten(s, child, out);
-                    }
-                }
-            } else {
-                out.push(id);
-            }
-        }
-        let mut values = vec![];
-        flatten(self.source, id, &mut values);
-        let mut kind = None;
-        for value in &values {
-            if self.resolver.runtime_operand(self.reference(*value)) {
-                return Ok(self.error_token(*value,"Array concatenation ('++') requires compile-time constant operands; runtime variables and immutable bindings do not qualify."));
-            }
-            let typ = self.typ(*value);
-            let mut base = &typ;
-            while let Type::Nominal(_, inner) = base {
-                base = inner;
-            }
-            let current=match base{Type::Array{..}=>"array",Type::Slice(_)=>"slice",Type::Unknown|Type::Generic=>continue,_=>return Ok(self.error_token(*value,"Array concatenation ('++') requires fixed arrays or constant slices; use + for constant strings."))};
-            if kind.is_some_and(|kind| kind != current) {
-                return Ok(self.error_token(*value,"Array concatenation ('++') cannot mix fixed arrays and slices; convert the operands to the same container kind explicitly."));
-            }
-            kind = Some(current);
-        }
-        self.meta = true;
-        let mut parts = vec![self.g(format!("{}meta.concatenate(", self.prefix), id)];
-        let mut hint = expected.map(|hint| Hint {constant_literal:false,
-            semantic: hint.semantic.as_ref().and_then(|typ|typ.element().cloned()),
-            code: Code::concat([
-                self.g(format!("{}meta.type_elem_type(", self.prefix), id),
-                hint.code,
-                self.g(")", id),
-            ]),
-            element_only: true,
-            plain_array: false,
-        });
-        if hint.is_none() {
-            let inner = |mut value| {
-                while self.source.node(value).kind == "Paren" {
-                    let Some(next) = self.source.role(value, "expr") else {
-                        break;
-                    };
-                    value = next;
-                }
-                value
-            };
-            if let Some(anchor) = values
-                .iter()
-                .find(|id| {
-                    !self.is_array(inner(**id))
-                        && matches!(
-                            self.typ(**id),
-                            Type::Array { .. } | Type::Slice(_) | Type::Nominal(..)
-                        )
-                })
-                .or_else(|| {
-                    values.iter().find(|id| {
-                        self.is_array(inner(**id))
-                            && !self.source.group(inner(**id), "elems").is_empty()
-                    })
-                })
-            {
-                let anchor_inner = inner(*anchor);
-                let code = if self.is_array(anchor_inner) {
-                    self.source
-                        .group(anchor_inner, "elems")
-                        .first()
-                        .map(|id| self.render(*id, None, true))
-                        .transpose()?
-                } else {
-                    Some(self.render(*anchor, None, true)?)
-                };
-                if let Some(code) = code {
-                    self.default = true;
-                    let typeof_ = self.native("type_of");
-                    let code = if self.is_array(anchor_inner) {
-                        Code::concat([
-                            self.g(format!("{typeof_}({}default_value(", self.prefix), id),
-                            code,
-                            self.g("))", id),
-                        ])
-                    } else {
-                        Code::concat([
-                            self.g(format!("{}meta.type_elem_type({typeof_}(", self.prefix), id),
-                            code,
-                            self.g("))", id),
-                        ])
-                    };
-                    hint = Some(Hint {constant_literal:false,
-                        semantic: None,
-                        code,
-                        element_only: true,
-                        plain_array: false,
-                    });
-                }
-            }
-        }
-        for (i, value) in values.iter().enumerate() {
-            if i > 0 {
-                parts.push(self.g(", ", id));
-            }
-            let mut inner = *value;
-            while self.source.node(inner).kind == "Paren" {
-                let Some(next) = self.source.role(inner, "expr") else {
-                    break;
-                };
-                inner = next;
-            }
-            parts.push(self.render(
-                *value,
-                if self.is_array(inner) {
-                    hint.clone()
-                } else {
-                    None
-                },
-                true,
-            )?);
-        }
-        parts.push(self.g(")", id));
-        Ok(Code::concat(parts).expansion(&self.source.path, self.source.node(id).span))
     }
     fn power(&mut self, id: NodeId, constant: bool) -> Result<Code> {
         if constant {

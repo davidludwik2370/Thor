@@ -130,6 +130,16 @@ and build defines participating in cache validation. Focused gates passed
 for these changes, including an assertion-disabled owned-result regression
 on both engines. The combined release acceptance gate is separate.
 
+### Constant array and slice concatenation
+
+The resolver now uses the length of the whole concatenation for subsequent
+indexing and type queries. Untyped bracket literals inherit the element type
+of an established operand, including a distinct array used as an element.
+Odin still evaluates a single concatenation intrinsic. Native errors map to
+the original operand and preserve independent literal diagnostics. All 25
+original concatenation fixtures passed, including checked debug and unchecked
+release tests that verify the operation does not allocate.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and
