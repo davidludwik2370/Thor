@@ -1,0 +1,485 @@
+{
+  "schema": 1,
+  "reference_commit": "825ee0a438d5023eba62c104a8b9820243a05d06",
+  "rust_checkpoint": "825ee0a438d5023eba62c104a8b9820243a05d06",
+  "policy": "Keep tested Rust foundations; translate reference algorithms and decision order; optimize after parity.",
+  "modules": [
+    {
+      "python": "thorlang/__init__.py",
+      "rust": [
+        "rust/src/lib.rs"
+      ],
+      "checkpoint": 1,
+      "status": "partial",
+      "reference_functions": 0,
+      "remaining": "Retain package/crate entry."
+    },
+    {
+      "python": "thorlang/parsecache.py",
+      "rust": [
+        "rust/src/frontend.rs"
+      ],
+      "checkpoint": 1,
+      "status": "partial",
+      "reference_functions": 2,
+      "remaining": "Retain independent parser cache; complete policy parity if a mismatch is found."
+    },
+    {
+      "python": "thorlang/sdkmirror.py",
+      "rust": [
+        "rust/src/sdkmirror.rs"
+      ],
+      "checkpoint": 1,
+      "status": "partial",
+      "reference_functions": 2,
+      "remaining": "Retain sparse SDK views; complete overlay and witness parity."
+    },
+    {
+      "python": "thorlang/shared.py",
+      "rust": [
+        "rust/src/runtimeview.rs"
+      ],
+      "checkpoint": 1,
+      "status": "partial",
+      "reference_functions": 8,
+      "remaining": "Retain shared runtime installation."
+    },
+    {
+      "python": "thorlang/semantics.py",
+      "rust": [
+        "rust/src/semantics.rs",
+        "rust/src/typefacts.rs",
+        "rust/src/calls.rs",
+        "rust/src/conditions.rs",
+        "rust/src/constants.rs",
+        "rust/src/contexts.rs",
+        "rust/src/contextlower.rs"
+      ],
+      "checkpoint": 2,
+      "status": "partial",
+      "reference_functions": 47,
+      "remaining": "Lookup, substitutions, overloads, using projections and conditional declarations; follow Resolver methods."
+    },
+    {
+      "python": "thorlang/pureborrow.py",
+      "rust": [
+        "rust/src/privileges.rs",
+        "rust/src/purevariants.rs"
+      ],
+      "checkpoint": 3,
+      "status": "partial",
+      "reference_functions": 24,
+      "remaining": "Port symbolic Permission/Access propagation for unresolved generic ownership."
+    },
+    {
+      "python": "thorlang/purecalls.py",
+      "rust": [
+        "rust/src/purevariants.rs",
+        "rust/src/purelower.rs"
+      ],
+      "checkpoint": 3,
+      "status": "partial",
+      "reference_functions": 16,
+      "remaining": "Finish checked-callee contexts and return lifetimes."
+    },
+    {
+      "python": "thorlang/purediagnostics.py",
+      "rust": [
+        "rust/src/project.rs",
+        "rust/src/diagnostic.rs"
+      ],
+      "checkpoint": 3,
+      "status": "partial",
+      "reference_functions": 4,
+      "remaining": "Complete pure-call error grouping and related locations."
+    },
+    {
+      "python": "thorlang/purity.py",
+      "rust": [
+        "rust/src/purity.rs",
+        "rust/src/pureschema.rs",
+        "rust/src/pureproofs.rs",
+        "rust/src/pureintrinsics.rs"
+      ],
+      "checkpoint": 3,
+      "status": "partial",
+      "reference_functions": 77,
+      "remaining": "Complete callable/default/effect eligibility with the reference decisions."
+    },
+    {
+      "python": "thorlang/sliceaccess.py",
+      "rust": [
+        "rust/src/privileges.rs",
+        "rust/src/access.rs"
+      ],
+      "checkpoint": 3,
+      "status": "partial",
+      "reference_functions": 62,
+      "remaining": "Align outstanding slice permissions, copies, aliases and effect propagation with Python."
+    },
+    {
+      "python": "thorlang/evaluation.py",
+      "rust": [],
+      "checkpoint": 4,
+      "status": "not_ported",
+      "reference_functions": 35,
+      "remaining": "Port known/active/evaluate/closure/execute scheduling and helper generation in that order."
+    },
+    {
+      "python": "thorlang/native.py",
+      "rust": [
+        "rust/src/nativefacts.rs",
+        "rust/src/sdkmirror.rs"
+      ],
+      "checkpoint": 4,
+      "status": "partial",
+      "reference_functions": 7,
+      "remaining": "Complete demand-loaded SDK access and extraction behavior."
+    },
+    {
+      "python": "thorlang/specialization.py",
+      "rust": [],
+      "checkpoint": 4,
+      "status": "not_ported",
+      "reference_functions": 11,
+      "remaining": "Port lexical Binding contexts and specialization scheduling."
+    },
+    {
+      "python": "thorlang/cache.py",
+      "rust": [],
+      "checkpoint": 5,
+      "status": "not_ported",
+      "reference_functions": 13,
+      "remaining": "Port contents-result cache and validation."
+    },
+    {
+      "python": "thorlang/dependencies.py",
+      "rust": [],
+      "checkpoint": 5,
+      "status": "not_ported",
+      "reference_functions": 9,
+      "remaining": "Port file/package/resource dependency tracking."
+    },
+    {
+      "python": "thorlang/scalarcache.py",
+      "rust": [],
+      "checkpoint": 5,
+      "status": "not_ported",
+      "reference_functions": 9,
+      "remaining": "Port scalar-site reuse and invalidation."
+    },
+    {
+      "python": "thorlang/values.py",
+      "rust": [
+        "rust/src/values.rs"
+      ],
+      "checkpoint": 5,
+      "status": "partial",
+      "reference_functions": 9,
+      "remaining": "Reuse reconstruction; finish evaluator integration and big-number backing in checkpoint 6."
+    },
+    {
+      "python": "thorlang/bigconstants.py",
+      "rust": [],
+      "checkpoint": 6,
+      "status": "not_ported",
+      "reference_functions": 10,
+      "remaining": "Port constants and static backing."
+    },
+    {
+      "python": "thorlang/bigintegration.py",
+      "rust": [],
+      "checkpoint": 6,
+      "status": "not_ported",
+      "reference_functions": 12,
+      "remaining": "Port logical-number integration."
+    },
+    {
+      "python": "thorlang/bignumbers.py",
+      "rust": [],
+      "checkpoint": 6,
+      "status": "not_ported",
+      "reference_functions": 53,
+      "remaining": "Port constructors, types and owned assignments."
+    },
+    {
+      "python": "thorlang/bigoperators.py",
+      "rust": [],
+      "checkpoint": 6,
+      "status": "not_ported",
+      "reference_functions": 10,
+      "remaining": "Port operator dispatch."
+    },
+    {
+      "python": "thorlang/bigvalues.py",
+      "rust": [],
+      "checkpoint": 6,
+      "status": "not_ported",
+      "reference_functions": 7,
+      "remaining": "Port arbitrary-precision contents validation/reconstruction."
+    },
+    {
+      "python": "thorlang/comprehensions.py",
+      "rust": [
+        "rust/src/comprehensions.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 12,
+      "remaining": "Finish constant evaluation and reference interactions."
+    },
+    {
+      "python": "thorlang/concatenation.py",
+      "rust": [
+        "rust/src/lower.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 5,
+      "remaining": "Finish reference interactions."
+    },
+    {
+      "python": "thorlang/defaults.py",
+      "rust": [
+        "rust/src/defaults.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 6,
+      "remaining": "Finish reference contexts and edge cases."
+    },
+    {
+      "python": "thorlang/expressions.py",
+      "rust": [
+        "rust/src/lower.rs",
+        "rust/src/access.rs",
+        "rust/src/extrema.rs",
+        "rust/src/sets.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 58,
+      "remaining": "Finish expression lowering without changing accepted syntax or ownership."
+    },
+    {
+      "python": "thorlang/extrema.py",
+      "rust": [
+        "rust/src/extrema.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 8,
+      "remaining": "Finish constant execution and arities."
+    },
+    {
+      "python": "thorlang/formatting.py",
+      "rust": [
+        "rust/src/formatting.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 2,
+      "remaining": "Retain the accepted formatting grammar and behavior."
+    },
+    {
+      "python": "thorlang/fstrings.py",
+      "rust": [
+        "rust/src/lower.rs",
+        "rust/src/formatting.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 13,
+      "remaining": "Finish all reference lifetime contexts."
+    },
+    {
+      "python": "thorlang/imports.py",
+      "rust": [
+        "rust/src/lower.rs",
+        "rust/src/semantics.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 4,
+      "remaining": "Finish wildcard exports, aliases, privacy and name resolution."
+    },
+    {
+      "python": "thorlang/optional.py",
+      "rust": [
+        "rust/src/lower.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 2,
+      "remaining": "Finish optional-result arity/branch behavior."
+    },
+    {
+      "python": "thorlang/ownership.py",
+      "rust": [
+        "rust/src/lower.rs",
+        "rust/src/sets.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 26,
+      "remaining": "Finish temporary lifetime handling."
+    },
+    {
+      "python": "thorlang/repetition.py",
+      "rust": [
+        "rust/src/lower.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 7,
+      "remaining": "Finish reference constant scheduling and interactions."
+    },
+    {
+      "python": "thorlang/switches.py",
+      "rust": [
+        "rust/src/switches.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 30,
+      "remaining": "Finish reference contexts, using and callback interactions."
+    },
+    {
+      "python": "thorlang/typedloops.py",
+      "rust": [
+        "rust/src/typedloops.rs"
+      ],
+      "checkpoint": 6,
+      "status": "partial",
+      "reference_functions": 7,
+      "remaining": "Retain supported paths; complete remaining reference interactions."
+    },
+    {
+      "python": "thorlang/backend.py",
+      "rust": [
+        "rust/src/project.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 1,
+      "remaining": "Complete invocation, warnings, errors and termination handling."
+    },
+    {
+      "python": "thorlang/compiler.py",
+      "rust": [
+        "rust/src/ast.rs",
+        "rust/src/lower.rs",
+        "rust/src/project.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 46,
+      "remaining": "Retain source/AST/emission infrastructure; finish integration and editor information."
+    },
+    {
+      "python": "thorlang/diagnostics.py",
+      "rust": [
+        "rust/src/diagnostic.rs",
+        "rust/src/project.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 16,
+      "remaining": "Finish diagnostic cleanup and editor parity."
+    },
+    {
+      "python": "thorlang/driver.py",
+      "rust": [
+        "rust/src/main.rs",
+        "rust/src/project.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 13,
+      "remaining": "Port remaining command/option behavior and orchestration."
+    },
+    {
+      "python": "thorlang/hygiene.py",
+      "rust": [
+        "rust/src/lower.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 3,
+      "remaining": "Complete generated-name/diagnostic metadata parity."
+    },
+    {
+      "python": "thorlang/memory_debug.py",
+      "rust": [
+        "rust/src/memory.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 6,
+      "remaining": "Finish platform/flag and debugger interactions."
+    },
+    {
+      "python": "thorlang/memorymap.py",
+      "rust": [
+        "rust/src/memory.rs",
+        "rust/src/emit.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 8,
+      "remaining": "Finish tracking/sanitizer source region behavior."
+    },
+    {
+      "python": "thorlang/project_template.py",
+      "rust": [],
+      "checkpoint": 7,
+      "status": "not_ported",
+      "reference_functions": 4,
+      "remaining": "Port new-project command/templates."
+    },
+    {
+      "python": "thorlang/publish_deps.py",
+      "rust": [],
+      "checkpoint": 7,
+      "status": "not_ported",
+      "reference_functions": 14,
+      "remaining": "Port published dependency handling."
+    },
+    {
+      "python": "thorlang/publishing.py",
+      "rust": [],
+      "checkpoint": 7,
+      "status": "not_ported",
+      "reference_functions": 15,
+      "remaining": "Port publishing command."
+    },
+    {
+      "python": "thorlang/sourcemap.py",
+      "rust": [
+        "rust/src/emit.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 11,
+      "remaining": "Finish regions/debugger metadata while retaining accepted wire format."
+    },
+    {
+      "python": "thorlang/symbolizer.py",
+      "rust": [
+        "rust/src/memory.rs"
+      ],
+      "checkpoint": 7,
+      "status": "partial",
+      "reference_functions": 7,
+      "remaining": "Finish direct executable/debugger remapping."
+    },
+    {
+      "python": "thorlang/vet.py",
+      "rust": [],
+      "checkpoint": 7,
+      "status": "not_ported",
+      "reference_functions": 11,
+      "remaining": "Port vet commands and edits."
+    }
+  ]
+}

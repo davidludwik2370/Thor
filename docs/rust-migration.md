@@ -10,6 +10,34 @@ The reference baseline is commit `ca2df99`, also tagged
 `thor-rust` builds its release binary and launches it. It never runs the Python
 compiler, including for unsupported syntax.
 
+## Active parity-first plan
+
+The accepted comparison snapshot for the parity-first migration is `825ee0a`.
+Both Python and Rust are preserved there; the older `ca2df99` baseline remains
+available for history. The Python snapshot includes the explicitly recorded
+correctness fixes made during the initial migration. Further reference fixes
+must remain separate, documented commits rather than silently changing the target.
+
+The [module inventory](rust-parity-inventory.json) maps every Python module to
+its current Rust counterparts and the checkpoint responsible for remaining work.
+A mapped module or a test count is not a declaration of complete parity.
+
+1. **Reference/inventory:** preserve the snapshot and map all modules (complete).
+2. **Resolution:** finish symbols, types, overloads and generic/conditional lookup.
+3. **Permissions/purity:** follow reference permission propagation and call checks.
+4. **Execution:** port compile-time extraction, scheduling and helper execution.
+5. **Results/cache:** install reconstructed results and port result cache policy.
+6. **Lowering:** complete logical numbers and remaining expression/ownership gaps.
+7. **Integration:** finish commands, TLS, diagnostics and debugger metadata.
+8. **Acceptance:** run whole-suite/project comparisons, then profile performance.
+
+Checkpoints 2–5 complete the previously discussed type/purity/compile-time scope.
+Retain existing Rust parser, node IDs, emission and tested lowerers. For unfinished
+or divergent semantic paths, follow the Python functions and decision order.
+Use focused comparisons while implementing and broader gates at integration
+boundaries. Further architectural optimization and parallel lowering wait for
+behavioral acceptance. The historical sections below record earlier checkpoints.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
@@ -105,16 +133,9 @@ rather than behavior the native port should reproduce.
 
 ## Remaining work
 
-The remaining migration is organized into eight independently verified chunks:
-
-1. Type resolution and generic specialization.
-2. Complete pure-call verification and checked ordinary callees.
-3. Compile-time dependency extraction, execution, reconstruction and caching.
-4. Integer/Rational lowering and values.
-5. Remaining language and temporary-ownership interactions.
-6. Diagnostics, TLS editor information and full debugger mapping.
-7. Remaining commands, including vet, project creation and publishing.
-8. Whole-suite/real-project differential acceptance and performance measurement.
+The active eight-checkpoint plan and full module mapping are above. Earlier
+references to “stages 1–3” mean type resolution, purity and compile-time execution;
+they are not completion claims for checkpoints in the active plan.
 
 Each checkpoint retains Python as the default and records its actual test scope;
 an implemented subset is not whole-language acceptance. Optimization and parallel
