@@ -224,7 +224,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Exact folding, static backing, read-only bindings, compile-time membership and lazy switches are connected to source and evaluated results. Finish the all-source constant-type prepass before copy lowering, then broad acceptance."
+      "remaining": "Exact folding, static backing, read-only bindings, compile-time membership, lazy switches and the all-source constant-type prepass are connected, including imported/forward constants used by #run. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/bigintegration.py",
@@ -253,7 +253,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 53,
-      "remaining": "Runtime ownership, source constants, builtins/generic components, owned switches, pure numeric copy permissions and fn/#run/cache reconstruction are connected. Finish the all-source logical constant-type prepass and whole-language acceptance."
+      "remaining": "Runtime ownership, source constants and their type prepass, builtins/generic components, owned switches, pure numeric copy permissions and fn/#run/cache reconstruction are connected. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/bigoperators.py",
@@ -264,7 +264,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Runtime dispatch and exact source constant arithmetic are connected. Complete remaining generic/builtin interactions and whole-language acceptance."
+      "remaining": "Runtime dispatch, generic/builtin integration and exact source constant arithmetic are connected. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/bigvalues.py",
@@ -275,7 +275,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 7,
-      "remaining": "Canonical arbitrary-precision packets, exact numeric lexemes and nested contents detection have native implementations. Static-backed reconstruction is tested independently; connect the remaining language-level type/operator/constant paths and complete broad acceptance."
+      "remaining": "Canonical arbitrary-precision packets, exact numeric lexemes, nested contents, static backing and source/runtime/native-execution reconstruction are connected. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/comprehensions.py",
@@ -386,7 +386,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 26,
-      "remaining": "Strings, Sets and logical numeric producers/destructors are integrated with known consumers, selected arms, result-slot discards, builtins, membership and generic components. Complete logical pure/evaluation interactions and whole-language acceptance."
+      "remaining": "Strings, Sets and logical numeric producers/destructors are integrated with known consumers, selected arms, result-slot discards, builtins, membership, generic components and pure/evaluation interactions. Complete whole-language acceptance."
     },
     {
       "python": "thorlang/repetition.py",

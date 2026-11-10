@@ -341,6 +341,7 @@ impl Project {
         if let Some(plan) = &self.evaluation {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
         }
+        crate::lower::prime_logical_constants(&mut resolver);
         let mut privileges =
             crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = if let Some(plan) = &self.evaluation {

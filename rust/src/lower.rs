@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 mod bigintegration;
 #[path = "bigconstants.rs"]
 mod bigconstants;
+pub(crate) use bigconstants::prime as prime_logical_constants;
 #[path = "bignumbers.rs"]
 mod bignumbers;
 #[path = "bigownership.rs"]
@@ -129,17 +130,13 @@ impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
         Self::new_with_view(file, resolver, None)
     }
-    pub(crate) fn new_with_view(
-        file: usize,
-        resolver: &'r mut Resolver<'a>,
-        evaluation: Option<crate::evaluation::FileView>,
-    ) -> Result<Self> {
+    fn unprepared(file:usize,resolver:&'r mut Resolver<'a>,evaluation:Option<crate::evaluation::FileView>)->Self{
         let source = &resolver.sources[file];
         let borrow_marker = format!(
             "{}checked_call",
             resolver.sources.first().unwrap_or(source).prefix
         );
-        let mut this = Self {
+        Self {
             source,
             file,
             resolver,
@@ -199,7 +196,15 @@ impl<'a, 'r> Lower<'a, 'r> {
             evaluation_skips: BTreeMap::new(),
             evaluation_queries: HashSet::new(),
             evaluation_witnesses: BTreeMap::new(),
-        };
+        }
+    }
+    pub(crate) fn new_with_view(
+        file: usize,
+        resolver: &'r mut Resolver<'a>,
+        evaluation: Option<crate::evaluation::FileView>,
+    ) -> Result<Self> {
+        let mut this=Self::unprepared(file,resolver,evaluation);
+        let source=this.source;
         for edit in &source.edits {
             this.edits
                 .push((edit.span, this.gen(edit.text.clone(), edit.span, "syntax")));

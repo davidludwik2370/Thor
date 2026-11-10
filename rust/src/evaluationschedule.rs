@@ -43,6 +43,7 @@ impl<'p> Scheduler<'p> {
     pub fn new(project: &'p Project, timeout: Duration) -> Self {
         let mut resolver = Resolver::with_flags(&project.sources, &project.options.flags);
         resolver.prepare_contexts();
+        crate::lower::prime_logical_constants(&mut resolver);
         let cache_directory = project
             .frontend
             .cache_dir

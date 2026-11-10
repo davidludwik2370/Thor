@@ -114,4 +114,24 @@ LAZY::Integer(4) in [4,missing()]
         self.compare(self.numeric('_=VALUE','VALUE::Integer("12")\n'),command='check',fail='use #run')
 
 
+    def test_selected_imported_constant_types_settle_before_copy_lowering(self):
+        files={'library/main.thor':'''package library
+CHOICE::#switch{case false:0;case:Integer(123)}
+RATIO::#switch{case false:0;case:Rational(1,3)}
+'''}
+        self.tracked(self.numeric('''copy:=library.CHOICE;copy+=1;ratio:=library.RATIO;ratio+=1
+expect(copy,"124");expect(library.CHOICE,"123");expect(ratio,"4/3")
+delete(copy);delete(ratio)
+''','import "library"\n'),files=files)
+        self.compare(self.numeric('delete(library.CHOICE)','import "library"\n'),files=files,command='check',fail='read-only')
+
+    def test_forward_declared_selected_constant_types_are_ready_for_mutation(self):
+        source=self.numeric('copy:=CHOICE;copy+=1;expect(copy,"124");delete(copy)')+'\nCHOICE::#switch{case false:0;case:Integer(123)}\n'
+        self.tracked(source)
+
+    def test_selected_constant_types_are_ready_before_native_execution_scheduling(self):
+        files={'library/main.thor':'package library\nCHOICE::#switch{case false:0;case:Integer(123)}\n'}
+        self.tracked(self.numeric('''copy:=#run identity(library.CHOICE);copy+=1;expect(copy,"124");delete(copy)
+''','import "library"\nidentity::fn(value:Integer)->Integer{return value}\n'),files=files)
+
 if __name__=='__main__':unittest.main()

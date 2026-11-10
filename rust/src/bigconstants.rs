@@ -750,3 +750,19 @@ impl Lower<'_, '_> {
         Ok(json!({"kind":"bool","value":if source.node(r.node).op=="in"{found}else{!found}}))
     }
 }
+
+// Resolve every successful source numeric constant before ownership/type decisions.
+// This mirrors driver.Project.emit's all-source constant pass. No source is emitted
+// here; ordinary lowering recreates backing and reports invalid constants.
+pub(crate) fn prime(resolver:&mut Resolver<'_>){
+    for file in 0..resolver.sources.len(){
+        if !resolver.logical_enabled(file){continue;}
+        let mut folder=Lower::unprepared(file,resolver,None);
+        let declarations=folder.source.nodes.iter().enumerate().filter(|(_,node)|node.kind=="Declaration"&&!node.mutable).map(|(index,_)|NodeId(index)).collect::<Vec<_>>();
+        for declaration in declarations{
+            let expected=folder.source.role(declaration,"type").map(|id|folder.typ(id)).filter(|typ|typ.big_name().is_some());
+            let hint=expected.map(|typ|{let module=folder.module("big");Hint{code:folder.g(format!("{module}.{}",typ.big_name().unwrap()),declaration),semantic:Some(typ),element_only:false,plain_array:false}});
+            for value in folder.source.group(declaration,"values").to_vec(){let _=folder.big_constant_render(value,hint.as_ref());}
+        }
+    }
+}

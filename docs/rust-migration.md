@@ -268,6 +268,24 @@ arm's type until its owning source is lowered. Python performs an earlier exact
 constant pass. This is being ported before moving to command/editor integration.
 Python remains the supported default.
 
+### Constant types before ownership lowering
+
+The native resolver now primes exact logical constants across all source files
+before scheduling native execution or lowering runtime copies. This follows the
+reference's numeric-constant prepass. A constant selected from a compile-time
+switch retains the selected `Integer` or `Rational` type even when its first,
+inactive arm is a native scalar literal. Imported and forward-declared constants
+therefore receive the same independent-copy, update and deletion behavior as
+constants declared earlier in the same file. Final lowering still emits static
+backing and reports invalid constant expressions at their original source sites.
+
+All 97 focused constant, numeric execution/purity/cache, scheduling, type-parameter
+and assertion-hygiene checks passed. The new cases include imported constants,
+forward declarations and selected constants passed into `#run`, in checked and
+unchecked builds. All 29 Rust unit tests passed in debug and release; Clippy
+passed with warnings denied. This closes the known constant-type prepass gap;
+remaining integration and whole-language acceptance work continues below.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical
