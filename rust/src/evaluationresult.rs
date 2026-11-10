@@ -113,7 +113,14 @@ impl Lower<'_, '_> {
         } else {
             id
         };
-        let mut typ = self.evaluation_result_type(call)?;
+        let untyped = self.source.node(id).kind == "Binary"
+            && self.source.node(id).op == "**"
+            && self.typ(id).untyped();
+        let mut typ = if untyped && value["kind"] == "integer" {
+            self.g("", id)
+        } else {
+            self.evaluation_result_type(call)?
+        };
         self.meta = true;
         let meta = format!("{}meta", self.prefix);
         let mut value = value.clone();
@@ -146,14 +153,37 @@ impl Lower<'_, '_> {
             value["nil"] = json!(false);
         }
         let value = &value;
-        let literal =
-            crate::values::expression(value, &typ.finish().text, &meta).map_err(|error| {
-                Error::at(
-                    self.source,
-                    self.source.node(id).span,
-                    format!("Invalid compile-time result: {error}"),
+        let type_code = if untyped {
+            String::new()
+        } else {
+            typ.finish().text
+        };
+        let mut literal = crate::values::expression(value, &type_code, &meta).map_err(|error| {
+            Error::at(
+                self.source,
+                self.source.node(id).span,
+                format!("Invalid compile-time result: {error}"),
+            )
+        })?;
+        if untyped {
+            let check = if value["kind"] == "integer" {
+                let left = self.role(id, "left")?;
+                let right = self.role(id, "right")?;
+                let left = self.render(left, None, false)?.finish().text;
+                let right = self.render(right, None, false)?.finish().text;
+                let common = format!("(({left})+({right}))");
+                self.default = true;
+                let type_of = self.native("type_of");
+                format!(
+                    "{type_of}({}default_value({common}=={common}))==bool",
+                    self.prefix
                 )
-            })?;
+            } else {
+                let typ = typ.finish().text;
+                format!("{typ}=={typ}")
+            };
+            literal = format!("({literal} when ({check}) else {literal})");
+        }
         if !crate::values::has_owned(value, false) || constant {
             if constant
                 && (crate::values::has_owned(value, true) || crate::values::has_dynamic(value))

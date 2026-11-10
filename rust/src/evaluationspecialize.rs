@@ -156,17 +156,21 @@ impl Scheduler<'_> {
                     if !self.known(arg)? {
                         return Ok(());
                     }
-                    match self
-                        .resolver
-                        .constant_value(arg, &Substitutions::new(), None)
-                    {
-                        Some(crate::semantics::Constant::Integer(value)) => {
-                            json!({"kind":"integer","value":value.to_string()})
+                    if let Some(value) = self.constant_integer(arg) {
+                        json!({"kind":"integer","value":value.to_string()})
+                    } else {
+                        match self
+                            .resolver
+                            .constant_value(arg, &Substitutions::new(), None)
+                        {
+                            Some(crate::semantics::Constant::Integer(value)) => {
+                                json!({"kind":"integer","value":value.to_string()})
+                            }
+                            Some(crate::semantics::Constant::Boolean(value)) => {
+                                json!({"kind":"bool","value":value})
+                            }
+                            _ => self.execute(arg, Mode::Value)?,
                         }
-                        Some(crate::semantics::Constant::Boolean(value)) => {
-                            json!({"kind":"bool","value":value})
-                        }
-                        _ => self.execute(arg, Mode::Value)?,
                     }
                 } else if let Some(Type::Constant(crate::semantics::Constant::Integer(value))) =
                     actual

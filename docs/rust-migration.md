@@ -466,6 +466,32 @@ The regression covers escaped quotes, raw values, Unicode and quotes in filename
 All 25 Rust units pass in debug and release, the three neighboring native scope
 regressions pass, and assertion hygiene passes seven checks.
 
+### Exact untyped integer evaluation
+
+The independent scheduler now folds untyped integer powers with exact host
+integers and applies the reference's signed/unsigned 128-bit result boundary.
+The result remains an untyped literal until its native use supplies a type;
+typed integer powers and floating-point powers still execute in the native
+helper. Negative exponents retain the reference diagnostic. Trivial bases and
+zero exponents accept large input constants without narrowing them to machine
+integers. Constant-value generic parameters likewise preserve full `u128`
+literal contents. The host implementation uses the locked `num-bigint` and
+`num-traits` crates; it does not introduce implicit Thor `Integer` conversions.
+
+Native unevaluated guards retain operand checking without forcing a wide
+untyped result through a machine-integer helper. Tests cover signed boundaries,
+overflow, aliases, right associativity, inactive branches, typed wraparound and
+checked/unchecked runtime reconstruction. This extends the independent execution
+harness; ordinary Rust commands still do not enable the scheduler.
+
+The combined numeric/scheduling/specialization/lexical-binding run passed 64 of
+65 tests; Odin terminated with SIGSEGV while compiling one typed-power helper.
+That test passed separately, all nine numeric tests passed on the clean rerun,
+and five further isolated repetitions passed. The crash was not reproduced and
+is recorded as a backend failure, not a clean combined gate. All 27 Rust units
+pass in debug and release, Clippy passes with warnings denied, and all seven
+assertion-hygiene checks pass.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

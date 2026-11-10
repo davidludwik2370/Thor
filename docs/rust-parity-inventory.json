@@ -136,13 +136,14 @@
         "rust/src/evaluationbridge.rs",
         "rust/src/evaluationidentity.rs",
         "rust/src/evaluationschedule.rs",
+        "rust/src/evaluationinteger.rs",
         "rust/src/evaluationspecialize.rs",
         "rust/src/evaluationresult.rs"
       ],
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Helper-relative identity refresh, inactive local-type cases and retained-case filtering are connected. Complete remaining execution eligibility/native-protocol cases, command integration and cache policy."
+      "remaining": "Concrete known/active scheduling, nested requests, helper execution and scalar/owned/comprehension reconstruction are compared through independent harnesses. Directly nameable generic frames and lazy per-specialization reconstruction are connected. Caller-local generic bridges, original-scope identity probes and scope-offset settling are connected. Helper-relative identity refresh, inactive local-type cases and retained-case filtering are connected. Exact untyped integer power results and wide constant-value parameters retain native literal coercion. Complete remaining execution eligibility/native-protocol cases, command integration and cache policy."
     },
     {
       "python": "thorlang/native.py",

@@ -5,6 +5,8 @@ use crate::specialization::{Binding, Bindings, Cases, EvaluatedCase, Specializat
 use crate::{project::Project, semantics::Substitutions};
 use serde_json::Value;
 use std::time::Duration;
+#[path = "evaluationinteger.rs"]
+mod integer;
 #[path = "evaluationspecialize.rs"]
 mod specialize;
 
@@ -1013,7 +1015,11 @@ impl<'p> Scheduler<'p> {
             self.process_specialization(call)?;
         }
         self.ensure_runs(call)?;
-        let value = self.execute(call, Mode::Value)?;
+        let value = if let Some(value) = self.integer_power(call)? {
+            value
+        } else {
+            self.execute(call, Mode::Value)?
+        };
         let bindings = self.specializations.relevant(node, &self.resolver);
         if bindings.is_empty() {
             self.results.insert(node, value.clone());
