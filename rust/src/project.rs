@@ -48,6 +48,8 @@ pub struct Project {
     pub outputs: BTreeMap<PathBuf, (usize, Emitted)>,
     pub errors: HashMap<String, String>,
     pub evaluated: BTreeMap<crate::semantics::Ref, Value>,
+    pub specialized: crate::specialization::Cases,
+    pub evaluation_scheduled: bool,
     pub evaluation_skips: BTreeMap<crate::semantics::Ref, bool>,
     related: HashMap<String, Vec<Value>>,
     type_sites: HashMap<String, (crate::semantics::Ref, String)>,
@@ -208,6 +210,8 @@ impl Project {
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
             evaluated: BTreeMap::new(),
+            specialized: BTreeMap::new(),
+            evaluation_scheduled: false,
             evaluation_skips: BTreeMap::new(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
@@ -323,6 +327,9 @@ impl Project {
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         resolver.evaluated = self.evaluated.clone();
         resolver.prepare_contexts();
+        if let Some(plan) = &self.evaluation {
+            crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
+        }
         let mut privileges =
             crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = if let Some(plan) = &self.evaluation {
@@ -568,6 +575,14 @@ impl Project {
                     .filter(|(node, _)| node.file == file)
                     .map(|(node, value)| (node.node, value.clone()))
                     .collect(),
+            );
+            lower.apply_specialized_results(
+                self.specialized
+                    .iter()
+                    .filter(|(node, _)| node.file == file)
+                    .map(|(node, cases)| (node.node, cases.clone()))
+                    .collect(),
+                self.evaluation_scheduled,
             );
             lower.apply_evaluation_skips(
                 self.evaluation_skips

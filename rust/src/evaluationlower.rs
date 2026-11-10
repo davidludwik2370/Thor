@@ -15,6 +15,9 @@ impl Lower<'_, '_> {
             let eval = self.module("eval");
             let pure = self.module("pure");
             let value = format!("{}evaluation_result", self.prefix);
+            if !request.prelude.is_empty() {
+                self.meta = true;
+            }
             let scratch = format!("{}evaluation_scratch", self.prefix);
             let mut inner = Code::concat([
                 self.g(format!("\n{value} := "), id),
@@ -52,6 +55,7 @@ impl Lower<'_, '_> {
             }
             Ok(Code::concat([
                 self.g(format!("\nmain :: proc() {{\n{scratch}:{pure}.Scratch\n{pure}.scratch_init(&{scratch})\ndefer {pure}.scratch_destroy(&{scratch})\ncontext.allocator={pure}.scratch_allocator(&{scratch})\ncontext.temp_allocator=context.allocator\n"), id),
+                self.g(request.prelude, id),
                 inner,
                 self.g("\n}\n", id),
             ]))

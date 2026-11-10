@@ -16,6 +16,30 @@ use std::{
 #[path = "evaluationschedule.rs"]
 mod schedule;
 pub use schedule::Scheduler;
+/// Borrowed evaluator state used by one isolated helper. Native helper creation
+/// snapshots the selected inputs; the scheduler retains its own registries.
+pub struct Context<'a> {
+    pub results: &'a BTreeMap<Ref, serde_json::Value>,
+    pub skips: &'a BTreeMap<Ref, bool>,
+    pub cases: &'a crate::specialization::Cases,
+    pub bindings: &'a crate::specialization::Bindings,
+    pub frames: &'a [(Ref, crate::specialization::Bindings)],
+}
+static EMPTY_RESULTS: BTreeMap<Ref, serde_json::Value> = BTreeMap::new();
+static EMPTY_SKIPS: BTreeMap<Ref, bool> = BTreeMap::new();
+static EMPTY_CASES: crate::specialization::Cases = BTreeMap::new();
+static EMPTY_BINDINGS: crate::specialization::Bindings = BTreeMap::new();
+impl Default for Context<'_> {
+    fn default() -> Self {
+        Self {
+            results: &EMPTY_RESULTS,
+            skips: &EMPTY_SKIPS,
+            cases: &EMPTY_CASES,
+            bindings: &EMPTY_BINDINGS,
+            frames: &[],
+        }
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct FileView {
@@ -38,6 +62,7 @@ pub struct Request {
     pub expression: NodeId,
     pub locals: BTreeMap<NodeId, Vec<NodeId>>,
     pub mode: Mode,
+    pub prelude: String,
 }
 #[derive(Clone, Copy, Default)]
 pub enum Mode {
@@ -63,6 +88,7 @@ pub struct Plan {
     pub roots: Vec<Ref>,
     pub entries: BTreeSet<Ref>,
     pub requests: Vec<Ref>,
+    pub bindings: crate::specialization::Bindings,
 }
 impl Plan {
     /// Isolate one request using original node identities. Local declarations
@@ -84,13 +110,49 @@ impl Plan {
         skips: &BTreeMap<Ref, bool>,
         mode: Mode,
     ) -> Result<Self> {
+        Self::with_context(
+            r,
+            expression,
+            &Context {
+                results,
+                skips,
+                ..Context::default()
+            },
+            mode,
+        )
+    }
+    pub(crate) fn with_context(
+        r: &mut Resolver<'_>,
+        expression: Ref,
+        context: &Context<'_>,
+        mode: Mode,
+    ) -> Result<Self> {
+        let results = context.results;
+        let skips = context.skips;
         let roots = request_roots(&r.sources[expression.file], expression, mode);
-        let graph = Extraction::build(r, &roots)?;
-        if let Some(nested) = graph
-            .nested_runs
-            .iter()
-            .find(|node| !results.contains_key(node) && !skips.contains_key(node))
-        {
+        let definitions = context
+            .bindings
+            .values()
+            .filter_map(|binding| Extraction::type_definition(&binding.typ))
+            .filter_map(|owner| {
+                r.sources[owner.file]
+                    .node(owner.node)
+                    .parent
+                    .filter(|node| r.sources[owner.file].node(*node).kind == "Declaration")
+                    .map(|node| Ref {
+                        file: owner.file,
+                        node,
+                    })
+            });
+        let graph = Extraction::build(
+            r,
+            &roots.iter().copied().chain(definitions).collect::<Vec<_>>(),
+        )?;
+        if let Some(nested) = graph.nested_runs.iter().find(|node| {
+            !results.contains_key(node)
+                && !skips.contains_key(node)
+                && !context.cases.contains_key(node)
+        }) {
             let source = &r.sources[nested.file];
             return Err(Error::unsupported(
                 source,
@@ -98,7 +160,10 @@ impl Plan {
                 "nested compile-time evaluation scheduling",
             ));
         }
-        let mut plan = Self::default();
+        let mut plan = Self {
+            bindings: context.bindings.clone(),
+            ..Self::default()
+        };
         for source in r.sources {
             plan.files.insert(source.path.clone(), FileView::default());
         }
@@ -235,10 +300,25 @@ impl Plan {
             view.values.insert(callee.node, format!("{alias}.{name}"));
         }
         let source = &r.sources[expression.file];
+        let mut types = TypeCode::new(expression.file, Some(expression));
+        types.allow_imports = true;
+        let prelude =
+            crate::specialization::Specializations::declarations(context.bindings, &mut types, r)
+                .map_err(|error| {
+                Error::at(source, source.node(expression.node).span, error.to_string())
+            })?;
+        for (alias, directory) in types.imports {
+            plan.files
+                .get_mut(&source.path)
+                .unwrap()
+                .imports
+                .insert(alias, dependency_path(source, &directory));
+        }
         plan.files.get_mut(&source.path).unwrap().request = Some(Request {
             expression: expression.node,
             locals,
             mode,
+            prelude,
         });
         plan.requests = roots;
         Ok(plan)

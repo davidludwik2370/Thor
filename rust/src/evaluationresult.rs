@@ -2,6 +2,70 @@
 //! owned values are materialized independently; constants never own buffers.
 use super::*;
 impl Lower<'_, '_> {
+    pub fn apply_specialized_results(
+        &mut self,
+        cases: BTreeMap<NodeId, BTreeMap<String, crate::specialization::EvaluatedCase>>,
+        scheduled: bool,
+    ) {
+        self.specialized.extend(cases);
+        self.evaluation_scheduled = scheduled;
+    }
+    pub(super) fn generic_evaluation(&self, id: NodeId) -> bool {
+        self.source.ancestors(id).any(|owner| {
+            self.source.node(owner).kind == "Procedure"
+                && !crate::specialization::parameters(self.reference(owner), self.resolver)
+                    .is_empty()
+        })
+    }
+    pub(super) fn unbound_evaluation(&mut self, id: NodeId) -> Code {
+        self.error_token(id, "Compile-time evaluation requires resolved generic types and constant parameters at this specialization.")
+    }
+    pub(super) fn specialized_result(
+        &mut self,
+        id: NodeId,
+        expected: Option<Hint>,
+        constant: bool,
+    ) -> Result<Code> {
+        let cases = self.specialized.get(&id).cloned().unwrap_or_default();
+        let mut code = if self.source.node(id).kind == "Run" || constant {
+            self.unbound_evaluation(id)
+        } else {
+            self.render(id, expected, constant)?
+        };
+        for case in cases.values().rev() {
+            let mut context =
+                crate::specialization::TypeCode::new(self.file, Some(self.reference(id)));
+            let predicate = crate::specialization::Specializations::predicate(
+                &case.bindings,
+                &mut context,
+                self.resolver,
+            )
+            .map_err(|error| {
+                Error::at(self.source, self.source.node(id).span, error.to_string())
+            })?;
+            for (alias, directory) in context.imports {
+                self.modules.insert(
+                    alias,
+                    crate::evaluation::dependency_path(self.source, &directory),
+                );
+            }
+            self.meta = true;
+            let value = if let Some(unchecked) = case.skipped {
+                self.evaluation_skipped(id, unchecked)?
+            } else {
+                self.evaluation_result(id, &case.value, constant)?
+            };
+            code = Code::concat([
+                self.g("(", id),
+                value,
+                self.g(format!(" when ({predicate}) else "), id),
+                code,
+                self.g(")", id),
+            ]);
+        }
+        Ok(code)
+    }
+
     pub fn apply_evaluation_skips(&mut self, skips: BTreeMap<NodeId, bool>) {
         self.evaluation_skips.extend(skips);
     }
@@ -92,8 +156,12 @@ impl Lower<'_, '_> {
         let body = crate::values::materialize(value, &result, &meta, &module, &prefix).map_err(
             |error| Error::at(self.source, self.source.node(id).span, error.to_string()),
         )?;
+        let flavor = format!(
+            "run_value_{}",
+            &crate::digest::sha256(body.as_bytes())[..12]
+        );
         let (name, mut arguments) =
-            self.closed(id, "run_value", Some(""), |this| Ok(this.g(body, id)))?;
+            self.closed(id, &flavor, Some(""), |this| Ok(this.g(body, id)))?;
         arguments.push(typ);
         Ok(self.helper_call(id, &name, arguments))
     }

@@ -233,8 +233,28 @@ impl Resolver<'_> {
         let n = s.node(r.node);
         let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
         if matches!(n.kind.as_str(), "Ident" | "PolyType") {
-            if let Some(typ) = self.bound_type(r, bindings) {
-                return typ.clone();
+            if let Some(typ) = self.bound_type(r, bindings).cloned() {
+                if let Type::Constant(value) = typ {
+                    if let Some(annotation) = self.symbol(r).and_then(|index| {
+                        let symbol = &self.symbols[index];
+                        symbol.annotation.map(|node| Ref {
+                            file: symbol.reference.file,
+                            node,
+                        })
+                    }) {
+                        return self.specialize(annotation, bindings, seen);
+                    }
+                    return match value {
+                        Constant::Integer(_) => Type::scalar("int"),
+                        Constant::Boolean(_) => Type::scalar("bool"),
+                        Constant::Text(_) => Type::String {
+                            name: "string".into(),
+                            untyped: false,
+                        },
+                        Constant::Enum(owner, _) => Type::Enum(owner),
+                    };
+                }
+                return typ;
             }
             if n.kind == "PolyType" {
                 return child("specialization")

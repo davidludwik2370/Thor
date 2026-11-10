@@ -1597,8 +1597,17 @@ impl<'a> Resolver<'a> {
         if let Some(symbol) = self.symbol(r) {
             let symbol = &self.symbols[symbol];
             let s = &self.sources[symbol.reference.file];
+            if self
+                .bound_constants
+                .contains_key(&(symbol.reference, symbol.name.clone()))
+            {
+                return false;
+            }
             if s.node(symbol.reference.node).kind == "PolyType" {
-                return true;
+                return !s.node(symbol.reference.node).parent.is_some_and(|parent| {
+                    s.node(parent).kind == "ArrayType"
+                        && s.role(parent, "len") == Some(symbol.reference.node)
+                });
             }
             if symbol.parameter
                 && symbol

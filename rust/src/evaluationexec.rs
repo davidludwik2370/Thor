@@ -114,27 +114,26 @@ impl Project {
     /// Construct a helper from the already selected source snapshot. In
     /// particular, a file-entry request never rediscovers unrelated files.
     pub fn evaluation_helper(&self, expression: Ref, destination: PathBuf) -> Result<Self> {
-        self.evaluation_helper_with_results(
+        self.evaluation_helper_with_context(
             expression,
             destination,
-            &BTreeMap::new(),
-            &BTreeMap::new(),
+            &crate::evaluation::Context::default(),
             crate::evaluation::Mode::Value,
         )
     }
-    pub(crate) fn evaluation_helper_with_results(
+    pub(crate) fn evaluation_helper_with_context(
         &self,
         expression: Ref,
         destination: PathBuf,
-        results: &BTreeMap<Ref, Value>,
-        skips: &BTreeMap<Ref, bool>,
+        context: &crate::evaluation::Context<'_>,
         mode: crate::evaluation::Mode,
     ) -> Result<Self> {
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
-        resolver.evaluated = results.clone();
+        resolver.evaluated = context.results.clone();
         resolver.prepare_contexts();
+        crate::specialization::Specializations::apply_bindings(context.bindings, &mut resolver);
         let mut plan =
-            crate::evaluation::Plan::with_mode(&mut resolver, expression, results, skips, mode)?;
+            crate::evaluation::Plan::with_context(&mut resolver, expression, context, mode)?;
         let entry = self.sources[expression.file]
             .path
             .parent()
@@ -245,8 +244,10 @@ impl Project {
             destination,
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
-            evaluated: results.clone(),
-            evaluation_skips: skips.clone(),
+            evaluated: context.results.clone(),
+            specialized: context.cases.clone(),
+            evaluation_scheduled: true,
+            evaluation_skips: context.skips.clone(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
@@ -261,20 +262,18 @@ impl Project {
         })
     }
     pub fn execute_evaluation(&self, expression: Ref, timeout: Duration) -> Result<Value> {
-        self.execute_evaluation_with_results(
+        self.execute_evaluation_with_context(
             expression,
             timeout,
-            &BTreeMap::new(),
-            &BTreeMap::new(),
+            &crate::evaluation::Context::default(),
             crate::evaluation::Mode::Value,
         )
     }
-    pub(crate) fn execute_evaluation_with_results(
+    pub(crate) fn execute_evaluation_with_context(
         &self,
         expression: Ref,
         timeout: Duration,
-        results: &BTreeMap<Ref, Value>,
-        skips: &BTreeMap<Ref, bool>,
+        context: &crate::evaluation::Context<'_>,
         mode: crate::evaluation::Mode,
     ) -> Result<Value> {
         let source = &self.sources[expression.file];
@@ -305,13 +304,8 @@ impl Project {
             }
         }
         let work = Temporary::new()?;
-        let mut helper = self.evaluation_helper_with_results(
-            expression,
-            work.0.join("source"),
-            results,
-            skips,
-            mode,
-        )?;
+        let mut helper =
+            self.evaluation_helper_with_context(expression, work.0.join("source"), context, mode)?;
         let target = helper.lower()?;
         let executable = work.0.join(format!("helper{}", env::consts::EXE_SUFFIX));
         let mut command = Command::new(&helper.frontend.odin);

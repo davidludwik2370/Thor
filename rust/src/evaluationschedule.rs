@@ -1,9 +1,12 @@
 //! Reference-order readiness and lazy execution scheduling. Generic caller
 //! frames are connected separately; an unbound request is never run eagerly.
 use super::*;
+use crate::specialization::{Binding, Bindings, Cases, EvaluatedCase, Specializations};
 use crate::{project::Project, semantics::Substitutions};
 use serde_json::Value;
 use std::time::Duration;
+#[path = "evaluationspecialize.rs"]
+mod specialize;
 
 pub struct Scheduler<'p> {
     project: &'p Project,
@@ -12,8 +15,12 @@ pub struct Scheduler<'p> {
     pub skipped: BTreeSet<Ref>,
     pub unchecked: BTreeSet<Ref>,
     pub inactive: BTreeSet<Ref>,
-    busy: BTreeSet<Ref>,
-    guard_busy: BTreeSet<Ref>,
+    pub cases: Cases,
+    specializations: Specializations,
+    specialized_skips: BTreeSet<(Ref, String)>,
+    specialized_unchecked: BTreeSet<(Ref, String)>,
+    busy: BTreeSet<(Ref, String)>,
+    guard_busy: BTreeSet<(Ref, String)>,
     explicit_arguments: usize,
     has_pure: bool,
     timeout: Duration,
@@ -29,6 +36,10 @@ impl<'p> Scheduler<'p> {
             skipped: BTreeSet::new(),
             unchecked: BTreeSet::new(),
             inactive: BTreeSet::new(),
+            cases: Cases::new(),
+            specializations: Specializations::default(),
+            specialized_skips: BTreeSet::new(),
+            specialized_unchecked: BTreeSet::new(),
             busy: BTreeSet::new(),
             guard_busy: BTreeSet::new(),
             explicit_arguments: 0,
@@ -132,15 +143,76 @@ impl<'p> Scheduler<'p> {
         })
     }
     fn unbound_generic(&self, node: Ref) -> bool {
-        self.source(node)
-            .ancestors(node.node)
-            .filter(|id| self.source(node).node(*id).kind == "Procedure")
-            .filter_map(|id| self.source(node).role(id, "type"))
-            .any(|signature| {
-                self.source(node)
-                    .descendants(signature)
-                    .any(|id| self.source(node).node(id).kind == "PolyType")
-            })
+        self.source(node).ancestors(node.node).any(|owner| {
+            self.source(node).node(owner).kind == "Procedure"
+                && crate::specialization::parameters(
+                    Ref {
+                        file: node.file,
+                        node: owner,
+                    },
+                    &self.resolver,
+                )
+                .iter()
+                .any(|(name, index, _)| {
+                    !self
+                        .specializations
+                        .bindings
+                        .contains_key(&(self.resolver.symbols[*index].reference, name.clone()))
+                })
+        })
+    }
+    fn key(&self, node: Ref) -> (Ref, String) {
+        self.specializations.key(node, &self.resolver)
+    }
+    fn value(&self, node: Ref) -> Option<&Value> {
+        let (_, key) = self.key(node);
+        if key.is_empty() {
+            self.results.get(&node)
+        } else {
+            self.cases
+                .get(&node)?
+                .get(&key)
+                .filter(|case| case.skipped.is_none())
+                .map(|case| &case.value)
+        }
+    }
+    fn is_skipped(&self, node: Ref) -> bool {
+        let key = self.key(node);
+        if key.1.is_empty() {
+            self.skipped.contains(&node)
+        } else {
+            self.specialized_skips.contains(&key)
+        }
+    }
+    fn skip(&mut self, node: Ref, inactive: bool) {
+        let key = self.key(node);
+        if key.1.is_empty() {
+            self.skipped.insert(node);
+            if inactive {
+                self.inactive.insert(node);
+            }
+        } else {
+            self.specialized_skips.insert(key.clone());
+            if inactive {
+                let bindings = self.specializations.relevant(node, &self.resolver);
+                self.cases.entry(node).or_default().insert(
+                    key.1.clone(),
+                    EvaluatedCase {
+                        bindings,
+                        value: Value::Null,
+                        skipped: Some(self.specialized_unchecked.contains(&key)),
+                    },
+                );
+            }
+        }
+    }
+    fn mark_unchecked(&mut self, node: Ref) {
+        let key = self.key(node);
+        if key.1.is_empty() {
+            self.unchecked.insert(node);
+        } else {
+            self.specialized_unchecked.insert(key);
+        }
     }
     pub fn constant_context(&mut self, node: Ref) -> bool {
         let source = self.source(node);
@@ -283,10 +355,10 @@ impl<'p> Scheduler<'p> {
         if !seen.insert(node) {
             return Ok(false);
         }
-        if self.results.contains_key(&node) {
+        if self.value(node).is_some() {
             return Ok(true);
         }
-        if self.busy.contains(&node) {
+        if self.busy.contains(&self.key(node)) {
             return Err(self.fail(node, "Cyclic #run or automatic fn constant dependency."));
         }
         let source = self.source(node);
@@ -294,7 +366,7 @@ impl<'p> Scheduler<'p> {
         let text = source.text(node.node);
         if ast.kind == "Run" {
             self.evaluate(node)?;
-            return Ok(self.results.contains_key(&node));
+            return Ok(self.value(node).is_some());
         }
         if ast.kind == "Comprehension" {
             return if self.constant_context(node) {
@@ -314,6 +386,16 @@ impl<'p> Scheduler<'p> {
         if self.type_query(node) {
             return Ok(true);
         }
+        if let Some(index) = self.resolver.symbol(node) {
+            let symbol = &self.resolver.symbols[index];
+            if self
+                .specializations
+                .bindings
+                .contains_key(&(symbol.reference, symbol.name.clone()))
+            {
+                return Ok(true);
+            }
+        }
         if self.resolver.denotes_type(node) {
             return Ok(!self.children(node).iter().any(|child| {
                 self.kind(*child) == "PolyType"
@@ -332,6 +414,16 @@ impl<'p> Scheduler<'p> {
         }
         match ast.kind.as_str() {
             "Ident" | "Selector" => {
+                if ast.kind == "Selector" {
+                    let typ = self.resolver.specialized_type(node, &Substitutions::new());
+                    if matches!(
+                        self.resolver
+                            .constant_value(node, &Substitutions::new(), Some(&typ)),
+                        Some(crate::semantics::Constant::Enum(..))
+                    ) {
+                        return Ok(true);
+                    }
+                }
                 if let Some(index) = self.resolver.symbol(node) {
                     let symbol = self.resolver.symbols[index].clone();
                     if !symbol.constant
@@ -566,28 +658,32 @@ impl<'p> Scheduler<'p> {
         let roots = request_roots(self.source(node), node, mode);
         let graph = Extraction::build(&mut self.resolver, &roots)?;
         for nested in graph.nested_runs {
-            if !self.results.contains_key(&nested) {
+            if self.value(nested).is_none() && !self.cases.contains_key(&nested) {
                 self.evaluate(nested)?;
             }
         }
-        self.project.execute_evaluation_with_results(
+        let skips = self
+            .inactive
+            .iter()
+            .map(|node| (*node, self.unchecked.contains(node)))
+            .collect();
+        self.project.execute_evaluation_with_context(
             node,
             self.timeout,
-            &self.results,
-            &self
-                .inactive
-                .iter()
-                .map(|node| (*node, self.unchecked.contains(node)))
-                .collect(),
+            &Context {
+                results: &self.results,
+                skips: &skips,
+                cases: &self.cases,
+                bindings: &self.specializations.bindings,
+                frames: &self.specializations.frames,
+            },
             mode,
         )
     }
     fn ensure_runs(&mut self, node: Ref) -> Result<()> {
         for child in self.children(node) {
-            if self.kind(child) == "Run"
-                && !self.results.contains_key(&child)
-                && !self.skipped.contains(&child)
-                || self.automatic(child) && !self.busy.contains(&child)
+            if self.kind(child) == "Run" && self.value(child).is_none() && !self.is_skipped(child)
+                || self.automatic(child) && !self.busy.contains(&self.key(child))
             {
                 self.evaluate(child)?;
             }
@@ -601,7 +697,8 @@ impl<'p> Scheduler<'p> {
         {
             return Ok(value);
         }
-        if !self.guard_busy.insert(node) {
+        let key = self.key(node);
+        if !self.guard_busy.insert(key.clone()) {
             return Err(self.fail(node, "Cyclic compile-time selection dependency."));
         }
         let result = (|| {
@@ -611,7 +708,7 @@ impl<'p> Scheduler<'p> {
                 self.fail(node, "Compile-time selection requires a boolean condition.")
             })
         })();
-        self.guard_busy.remove(&node);
+        self.guard_busy.remove(&key);
         result
     }
     pub fn active(&mut self, node: Ref, specialization: bool) -> Result<Option<bool>> {
@@ -672,7 +769,7 @@ impl<'p> Scheduler<'p> {
                 );
                 if inside(yes) && !selected || inside(no) && selected {
                     if ["When", "WhenExpr"].contains(&ast.kind.as_str()) {
-                        self.unchecked.insert(node);
+                        self.mark_unchecked(node);
                     }
                     return Ok(Some(false));
                 }
@@ -751,7 +848,7 @@ impl<'p> Scheduler<'p> {
                             .is_some_and(|end| span.end <= end as usize);
                     if inside || selected {
                         if ast.kind != "SwitchExpr" && (!inside || !selected) {
-                            self.unchecked.insert(node);
+                            self.mark_unchecked(node);
                         }
                         return Ok(Some(inside && selected));
                     }
@@ -764,25 +861,25 @@ impl<'p> Scheduler<'p> {
         if self.unbound_generic(node) {
             return Ok(None);
         }
-        if let Some(value) = self.results.get(&node) {
+        if let Some(value) = self.value(node) {
             return Ok(Some(value.clone()));
         }
-        if !self.busy.insert(node) {
+        let key = self.key(node);
+        if !self.busy.insert(key.clone()) {
             return Err(self.fail(node, "Cyclic #run or automatic fn constant dependency."));
         }
         let result = self.evaluate_inner(node);
-        self.busy.remove(&node);
+        self.busy.remove(&key);
         result
     }
     fn evaluate_inner(&mut self, node: Ref) -> Result<Option<Value>> {
         match self.active(node, false)? {
             None => {
-                self.skipped.insert(node);
+                self.skip(node, false);
                 return Ok(None);
             }
             Some(false) => {
-                self.skipped.insert(node);
-                self.inactive.insert(node);
+                self.skip(node, true);
                 return Ok(None);
             }
             Some(true) => {}
@@ -851,9 +948,24 @@ impl<'p> Scheduler<'p> {
         if !ready? {
             return Ok(None);
         }
+        if self.kind(call) == "Call" {
+            self.process_specialization(call)?;
+        }
         self.ensure_runs(call)?;
         let value = self.execute(call, Mode::Value)?;
-        self.results.insert(node, value.clone());
+        let bindings = self.specializations.relevant(node, &self.resolver);
+        if bindings.is_empty() {
+            self.results.insert(node, value.clone());
+        } else {
+            self.cases.entry(node).or_default().insert(
+                Specializations::fingerprint(&bindings, &self.resolver),
+                EvaluatedCase {
+                    bindings,
+                    value: value.clone(),
+                    skipped: None,
+                },
+            );
+        }
         self.resolver.remember_evaluation(node, value.clone());
         Ok(Some(value))
     }
@@ -868,10 +980,13 @@ impl<'p> Scheduler<'p> {
                     node: NodeId(index),
                 };
                 if (self.kind(node) == "Run" || self.automatic(node))
-                    && !self.results.contains_key(&node)
-                    && !self.skipped.contains(&node)
+                    && self.value(node).is_none()
+                    && !self.is_skipped(node)
                 {
                     self.evaluate(node)?;
+                }
+                if self.kind(node) == "Call" {
+                    self.process_specialization(node)?;
                 }
             }
         }

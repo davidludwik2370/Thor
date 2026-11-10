@@ -355,6 +355,45 @@ passes, including nested shadowing and boolean, UTF-8 string and enum constants.
 Clippy passes with warnings denied. The scheduler has not yet adopted these
 environments or emitted per-specialization result cases.
 
+### Native generic evaluation frames
+
+The scheduling harness now traverses user generic procedures in declaration-keyed
+lexical frames. Explicit type and value parameters, inferred array dimensions,
+named arguments, nested and recursive generic calls, and captured outer constant
+parameters retain separate result and inactive-branch records. Entering a child
+frame restores the caller's type and constant facts on exit. Installed Odin SDK
+procedures remain outside this user-body traversal and continue through isolated
+helper dependency extraction.
+
+The emitted program selects a specialization's reconstructed result with native
+compile-time predicates. Uncalled generic procedures and inactive branches stay
+lazy. Required unresolved specializations receive the reference source-error
+fallback; optional runtime calls retain their native fallback. Reconstruction
+helpers for different owned result contents have distinct identities, so two
+specializations cannot accidentally materialize the first one's slice contents.
+The original procedure signatures remain unchanged.
+
+One explicit frozen-reference gap is covered by the enum-constant regression:
+Python's known-value test silently skips `generic(Kind.one)` and
+`generic(Kind.two)`, leaving their inner requests unevaluated. Rust recognizes
+the qualified native enum constants, evaluates the two requests independently,
+and compiles and runs the result as `1 2`. The test requires the reference's
+empty specialization registry explicitly and checks both Rust packets and the
+native runtime output. Python has not been changed.
+
+This completes the directly nameable generic-frame portion of checkpoint 4.
+The combined execution, extraction and scheduling gate ran 88 checks: 87 passed,
+and the enum test initially expected Python's missing results. Its explicit
+reference-gap expectation then passed separately, including native compilation
+and execution. The adjacent resolver/lexical-binding/type-parameter group passed
+48 checks. All 24 Rust units pass in debug and release, Clippy passes with warnings
+denied, and assertion hygiene passes seven checks.
+
+Caller-local nominal types still need isolated generic bridges and original-scope
+identity probes. Remaining eligibility details, command adoption and the contents
+cache are also pending. Python remains the default and frozen reference, and
+normal Rust build commands still reject unported evaluation requests explicitly.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

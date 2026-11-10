@@ -98,6 +98,8 @@ pub struct Lower<'a, 'r> {
     evaluation: Option<crate::evaluation::FileView>,
     evaluation_mode: bool,
     evaluated: BTreeMap<NodeId, serde_json::Value>,
+    specialized: BTreeMap<NodeId, BTreeMap<String, crate::specialization::EvaluatedCase>>,
+    evaluation_scheduled: bool,
     evaluated_busy: HashSet<NodeId>,
     evaluation_skips: BTreeMap<NodeId, bool>,
     evaluation_queries: HashSet<NodeId>,
@@ -167,6 +169,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             evaluation_mode: evaluation.is_some(),
             evaluation,
             evaluated: BTreeMap::new(),
+            specialized: BTreeMap::new(),
+            evaluation_scheduled: false,
             evaluated_busy: HashSet::new(),
             evaluation_skips: BTreeMap::new(),
             evaluation_queries: HashSet::new(),
@@ -632,10 +636,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             {
                 return Err(self.unsupported(id, "discarded anonymous-string cleanup"));
             }
-            if node.kind == "Run"
-                && !self.evaluated.contains_key(&id)
-                && !self.evaluation_skips.contains_key(&id)
-            {
+            let evaluated = self.evaluated.contains_key(&id)
+                || self.evaluation_skips.contains_key(&id)
+                || self.specialized.contains_key(&id)
+                || self.evaluation_scheduled && self.generic_evaluation(id);
+            if node.kind == "Run" && !evaluated {
                 return Err(self.unsupported(id, &node.kind));
             }
             if node.kind == "Ident"
@@ -922,6 +927,20 @@ impl<'a, 'r> Lower<'a, 'r> {
             return Ok(code.clone());
         }
         if !self.evaluated_busy.contains(&id) {
+            if self.specialized.contains_key(&id) {
+                self.evaluated_busy.insert(id);
+                let result = self.specialized_result(id, expected, constant);
+                self.evaluated_busy.remove(&id);
+                return result;
+            }
+            if self.evaluation_scheduled
+                && self.source.node(id).kind == "Run"
+                && self.generic_evaluation(id)
+                && !self.evaluated.contains_key(&id)
+                && !self.evaluation_skips.contains_key(&id)
+            {
+                return Ok(self.unbound_evaluation(id));
+            }
             if let Some(unchecked) = self.evaluation_skips.get(&id).copied() {
                 self.evaluated_busy.insert(id);
                 let result = self.evaluation_skipped(id, unchecked);

@@ -24,7 +24,7 @@ class RustSchedulingTests(unittest.TestCase):
         cls.binary=native.ROOT/'rust/target/release/examples/scheduling_protocol'
         cls.frontend=frontend_binary('odin')[0]
 
-    def compare(self, text, flags=None, files=None, fail=None, reference_failure=None, output=None):
+    def compare(self, text, flags=None, files=None, fail=None, reference_failure=None, output=None, reference_specialized_gap=None):
         flags=['-debug'] if flags is None else flags
         with tempfile.TemporaryDirectory(prefix='thor-scheduling-') as directory:
             entry=Path(directory).resolve()/'main.thor'
@@ -72,11 +72,102 @@ class RustSchedulingTests(unittest.TestCase):
             expected=[[[str(node.source.path),node.kind,node.start,node.end],data]
                       for (node,fingerprint),data in evaluator.results.items() if not fingerprint]
             actual=json.loads(result.stdout)['results']
+            specialized=[[[str(node.source.path),node.kind,node.start,node.end],data]
+                         for (node,fingerprint),data in evaluator.results.items() if fingerprint]
+            actual_specialized=json.loads(result.stdout).get('specialized',[])
+            if reference_specialized_gap is not None:
+                self.assertEqual(specialized,[])
+                runs=[node for source in project.sources.values() for node in source.nodes if node.kind=='Run']
+                self.assertEqual(len(runs),1)
+                node=runs[0]
+                specialized=[[[str(node.source.path),node.kind,node.start,node.end],value] for value in reference_specialized_gap]
+            self.assertEqual(sorted(actual_specialized,key=str),sorted(specialized,key=str))
             self.assertEqual(sorted(actual,key=str),sorted(expected,key=str))
             return actual
 
     def program(self,body,prefix=''):
         return 'package main\n'+prefix+'\nmain::proc(){'+body+'}\n'
+
+    def test_generic_explicit_type_and_constant_bindings(self):
+        for flags in (['-debug'],native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(self.program('fmt.println(generic(int,3),generic(i64,5),generic(int,3))',
+                    'import "core:fmt"\nwork::proc(n:int)->int{return n+2}\n'
+                    'generic::proc($T:typeid,$N:int)->T{VALUE::#run work(N);return T(VALUE)}'),
+                    flags=flags,output='5 7 5\n')
+
+    def test_generic_inferred_element_and_dimension(self):
+        self.compare(self.program('fmt.println(generic([2]int{1,2}),generic([3]f64{1,2,3}))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n+2}\n'
+            'generic::proc(values:[$N]$T)->int{VALUE::#run work(N);return VALUE+size_of(T)}'),output='12 13\n')
+
+    def test_generic_named_arguments_and_defaults(self):
+        self.compare(self.program('fmt.println(generic(N=5),generic(3))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n+2}\n'
+            'generic::proc($N:int,x:int=1)->int{return (#run work(N))+x}'),output='8 6\n')
+
+    def test_generic_boolean_branch_selection(self):
+        self.compare(self.program('fmt.println(generic(true),generic(false))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n+2}\n'
+            'bad::proc()->int{panic("inactive")}\n'
+            'generic::proc($B:bool)->int{when B{return #run work(3)}else{return #run work(7)}}'),output='5 9\n')
+
+    def test_nested_generic_calls_restore_caller_bindings(self):
+        self.compare(self.program('fmt.println(outer(3),outer(7))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n+1}\n'
+            'inner::proc($N:int)->int{return #run work(N)}\n'
+            'outer::proc($N:int)->int{a:=inner(N+2);return a+(#run work(N))}'),output='10 18\n')
+
+    def test_uncalled_generic_request_stays_native_lazy(self):
+        self.compare(self.program('fmt.println(7)',
+            'import "core:fmt"\nunused::proc($T:typeid)->int{return #run missing()}'),output='7\n')
+
+    def test_nested_generic_lexical_constant_shadowing(self):
+        self.compare(self.program('fmt.println(outer(3),outer(8))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n+1}\n'
+            'outer::proc($N:int)->int{inner::proc($M:int)->int{return #run work(N+M)};return inner(2)}'),output='6 11\n')
+
+    def test_generic_request_can_be_a_dependency_of_an_explicit_run(self):
+        self.compare(self.program('fmt.println(#run generic(3))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n+2}\n'
+            'generic::proc($N:int)->int{return #run work(N)}'),output='5\n')
+
+    def test_generic_unselected_panics_stay_lazy_for_each_instantiation(self):
+        self.compare(self.program('fmt.println(generic(true),generic(false))',
+            'import "core:fmt"\nwork::proc()->int{return 5}\nbad::proc()->int{panic("inactive")}\n'
+            'generic::proc($B:bool)->int{when B{if false{_=#run bad()};return #run work()}else{when false{_=#run bad()};return 9}}'),
+            output='5 9\n')
+
+    def test_generic_automatic_fn_result_and_runtime_fallback(self):
+        self.compare(self.program('fmt.println(generic(3),generic(7))',
+            'import "core:fmt"\nwork::fn(n:int)->int{return n+2}\n'
+            'generic::proc($N:int)->int{VALUE::work(N);runtime:=N;return VALUE+work(runtime)}'),output='10 18\n')
+
+    def test_generic_owned_runtime_results_remain_independent(self):
+        self.compare(self.program('a:=generic(2);b:=generic(3);a[0]=9;fmt.println(a,b);delete(a);delete(b)',
+            'import "core:fmt"\nwork::proc(n:int)->[]int{a:=make([]int,n);a[0]=n;return a}\n'
+            'generic::proc($N:int)->[]int{return #run work(N)}'),flags=native.UNCHECKED,output='[9, 0] [3, 0, 0]\n')
+
+    def test_generic_string_constant_parameter(self):
+        self.compare(self.program('fmt.println(generic("abc"),generic("abcdef"))',
+            'import "core:fmt"\nwork::proc(s:string)->int{return len(s)}\n'
+            'generic::proc($S:string)->int{return #run work(S)}'),output='3 6\n')
+
+    def test_generic_enum_constant_parameter(self):
+        self.compare(self.program('fmt.println(generic(Kind.one),generic(Kind.two))',
+            'import "core:fmt"\nKind::enum{one,two}\nwork::proc(k:Kind)->int{return int(k)+1}\n'
+            'generic::proc($K:Kind)->int{return #run work(K)}'),output='1 2\n',
+            reference_specialized_gap=[{'kind':'integer','value':'1'},{'kind':'integer','value':'2'}])
+
+    def test_imported_generic_request_retains_its_original_package(self):
+        self.compare(self.program('fmt.println(lib.generic(int,3),lib.generic(i16,5))',
+            'import "core:fmt"\nimport lib "lib"'),
+            files={'lib/lib.thor':'package lib\nwork::proc(n:int)->int{return n+2}\ngeneric::proc($T:typeid,$N:int)->T{return T(#run work(N))}\n'},output='5 7\n')
+
+    def test_recursive_generic_constants_are_scheduled_lazily(self):
+        self.compare(self.program('fmt.println(generic(3))',
+            'import "core:fmt"\nwork::proc(n:int)->int{return n}\n'
+            'generic::proc($N:int)->int{when N>0{return (#run work(N))+generic(N-1)}else{return 0}}'),output='6\n')
 
     def test_explicit_literal_and_constant_inputs(self):
         self.compare(self.program('_=#run work(BASE)', 'BASE::7\nwork::proc(n:int)->int{return n+2}'))

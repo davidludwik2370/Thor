@@ -45,6 +45,23 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
             ])
         })
         .collect::<Vec<_>>();
+    let cases = std::mem::take(&mut scheduler.cases);
+    let specialized = cases
+        .iter()
+        .flat_map(|(node, cases)| {
+            cases
+                .values()
+                .filter(|case| case.skipped.is_none())
+                .map(|case| {
+                    let source = &project.sources[node.file];
+                    let ast = source.node(node.node);
+                    json!([
+                        [source.path, ast.kind.as_str(), ast.span.start, ast.span.end],
+                        case.value
+                    ])
+                })
+        })
+        .collect::<Vec<_>>();
     let values = std::mem::take(&mut scheduler.results);
     let skips = scheduler
         .inactive
@@ -52,9 +69,11 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         .map(|node| (*node, scheduler.unchecked.contains(node)))
         .collect();
     drop(scheduler);
-    let mut packet = json!({"results":results});
+    let mut packet = json!({"results":results,"specialized":specialized});
     if let Some(destination) = arguments.iter().find_map(|arg| arg.strip_prefix("emit=")) {
         project.evaluated = values;
+        project.specialized = cases;
+        project.evaluation_scheduled = true;
         project.evaluation_skips = skips;
         project.destination = std::fs::canonicalize(Path::new(destination).parent().unwrap())?
             .join(Path::new(destination).file_name().unwrap());

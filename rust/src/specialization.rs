@@ -34,6 +34,54 @@ pub struct Binding {
     pub condition: String,
 }
 pub type Bindings = BTreeMap<(Ref, String), Binding>;
+#[derive(Clone, Debug)]
+pub struct EvaluatedCase {
+    pub bindings: Bindings,
+    pub value: Value,
+    pub skipped: Option<bool>,
+}
+pub type Cases = BTreeMap<Ref, BTreeMap<String, EvaluatedCase>>;
+
+/// Native generic slots are lexical symbols, including dimensions inferred
+/// from a parameter type. Explicit value slots keep their annotated type.
+pub fn parameters(procedure: Ref, r: &Resolver<'_>) -> Vec<(String, usize, bool)> {
+    let source = &r.sources[procedure.file];
+    let Some(signature) = source.role(procedure.node, "type") else {
+        return vec![];
+    };
+    let mut slots = BTreeMap::new();
+    for node in source.descendants(signature) {
+        if source.node(node).kind != "PolyType" {
+            continue;
+        }
+        let name = source.names.get(source.node(node).name).to_string();
+        let at = source
+            .role(procedure.node, "body")
+            .unwrap_or(procedure.node);
+        let Some(symbol) = r.lookup(
+            Ref {
+                file: procedure.file,
+                node: at,
+            },
+            &name,
+        ) else {
+            continue;
+        };
+        let data = &r.symbols[symbol];
+        let value = if let Some(annotation) = data.annotation {
+            source.node(annotation).kind != "TypeidType"
+        } else {
+            source.node(node).parent.is_some_and(|parent| {
+                source.node(parent).kind == "ArrayType" && source.role(parent, "len") == Some(node)
+            })
+        };
+        slots.insert(name, (symbol, value));
+    }
+    slots
+        .into_iter()
+        .map(|(name, (symbol, value))| (name, symbol, value))
+        .collect()
+}
 
 /// Type spelling can add helper-only imports, just like the reference's
 /// evaluation_import callback. The user's project does not acquire those imports.
@@ -203,9 +251,12 @@ pub struct Saved {
 }
 impl Specializations {
     pub fn apply(&self, r: &mut Resolver<'_>) {
+        Self::apply_bindings(&self.bindings, r);
+    }
+    pub fn apply_bindings(bindings: &Bindings, r: &mut Resolver<'_>) {
         let mut types = BTreeMap::new();
         let mut constants = BTreeMap::new();
-        for (key, binding) in &self.bindings {
+        for (key, binding) in bindings {
             if let Some(value) = &binding.value {
                 constants.insert(key.clone(), (binding.typ.clone(), value.clone()));
             } else {
