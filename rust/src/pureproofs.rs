@@ -552,10 +552,11 @@ impl Lower<'_, '_> {
     ) -> Result<Code> {
         let check = operand
             .filter(|operand| {
-                let node = self.source.node(*operand);
+                let operand = self.unparen(*operand);
+                let node = self.source.node(operand);
                 node.kind != "ImplicitSelector"
-                    && self.source.text(*operand) != "nil"
-                    && !(node.kind == "Compound" && self.source.role(*operand, "type").is_none())
+                    && !self.resolver.native_builtin(self.reference(operand), "nil")
+                    && !(node.kind == "Compound" && self.source.role(operand, "type").is_none())
             })
             .filter(|operand| {
                 let typ = self.typ(*operand);
@@ -770,6 +771,7 @@ impl Lower<'_, '_> {
             };
             if self.resolver.denotes_type(self.reference(operand))
                 || self.source.node(operand).kind == "ImplicitSelector"
+                || self.resolver.native_builtin(self.reference(self.unparen(operand)), "nil")
             {
                 continue;
             }

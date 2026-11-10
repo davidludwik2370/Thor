@@ -13,9 +13,60 @@ use std::{
     time::{Duration, Instant},
 };
 
-struct Temporary(PathBuf);
+#[cfg(unix)]
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// The low bit records SIGTERM. The remaining bits count live evaluation
+// directories so the CLI can defer exit until their children and files are gone.
+#[cfg(unix)]
+static EVALUATION_STATE: AtomicUsize = AtomicUsize::new(0);
+
+#[cfg(unix)]
+pub fn cancel_active_evaluation() -> bool {
+    EVALUATION_STATE.fetch_or(1, Ordering::Relaxed) >= 2
+}
+
+#[cfg(unix)]
+pub fn evaluation_cancelled() -> bool {
+    EVALUATION_STATE.load(Ordering::Relaxed) & 1 != 0
+}
+
+#[cfg(not(unix))]
+fn evaluation_cancelled() -> bool {
+    false
+}
+
+fn check_cancellation() -> Result<()> {
+    if evaluation_cancelled() {
+        return Err(Error::new("Compile-time evaluation cancelled."));
+    }
+    Ok(())
+}
+
+struct ActiveEvaluation;
+impl ActiveEvaluation {
+    fn enter() -> Result<Self> {
+        #[cfg(unix)]
+        EVALUATION_STATE.fetch_add(2, Ordering::Relaxed);
+        let active = Self;
+        check_cancellation()?;
+        Ok(active)
+    }
+}
+impl Drop for ActiveEvaluation {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        EVALUATION_STATE.fetch_sub(2, Ordering::Relaxed);
+    }
+}
+
+struct Temporary {
+    path: PathBuf,
+    _active: ActiveEvaluation,
+}
 impl Temporary {
     fn new() -> Result<Self> {
+        let active = ActiveEvaluation::enter()?;
         for sequence in 0..100 {
             let clock = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -32,7 +83,11 @@ impl Temporary {
                 builder.mode(0o700);
             }
             match builder.create(&path) {
-                Ok(()) => return Ok(Self(fs::canonicalize(path)?)),
+                Ok(()) => {
+                    let mut work = Self { path, _active: active };
+                    work.path = fs::canonicalize(&work.path)?;
+                    return Ok(work);
+                }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => return Err(error.into()),
             }
@@ -44,7 +99,7 @@ impl Temporary {
 }
 impl Drop for Temporary {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        let _ = fs::remove_dir_all(&self.path);
     }
 }
 pub(crate) struct Captured {
@@ -74,6 +129,7 @@ fn drain(mut pipe: impl Read, limit: usize) -> std::io::Result<(Vec<u8>, bool)> 
     Ok((bytes, oversized))
 }
 pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captured> {
+    check_cancellation()?;
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -95,8 +151,9 @@ pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captur
         if let Some(status) = child.try_wait()? {
             break status;
         }
-        if start.elapsed() >= timeout {
-            timed_out = true;
+        let cancelled = evaluation_cancelled();
+        if cancelled || start.elapsed() >= timeout {
+            timed_out = !cancelled;
             let _ = child.kill();
             break child.wait()?;
         }
@@ -108,6 +165,7 @@ pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captur
     let (stderr, large_err) = errors
         .join()
         .map_err(|_| Error::new("helper stderr reader failed"))??;
+    check_cancellation()?;
     Ok(Captured {
         status,
         stdout,
@@ -327,7 +385,7 @@ impl Project {
         }
         let work = Temporary::new()?;
         let mut helper =
-            self.evaluation_helper_with_context(expression, work.0.join("source"), context, mode)?;
+            self.evaluation_helper_with_context(expression, work.path.join("source"), context, mode)?;
         if let Some(plan) = &helper.evaluation {
             helper.specialized.retain(|node, cases| {
                 if !plan.emits(&helper.sources[node.file], node.node) {
@@ -383,7 +441,7 @@ impl Project {
         }) {
             return Ok(Executed { value, target: key });
         }
-        let executable = work.0.join(format!("helper{}", env::consts::EXE_SUFFIX));
+        let executable = work.path.join(format!("helper{}", env::consts::EXE_SUFFIX));
         let mut command = Command::new(&helper.frontend.odin);
         command
             .envs(&helper.native_environment)

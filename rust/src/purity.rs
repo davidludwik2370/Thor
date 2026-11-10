@@ -310,6 +310,15 @@ impl<'a, 'r> Purity<'a, 'r> {
         for (name, annotation) in self.r.fields(sig, "params") {
             if let Some(annotation) = annotation {
                 if self.r.compiled_type_parameter(annotation, &name) {
+                    if let Some(typ) = bindings.get(&name) {
+                        if self.unsafe_storage(typ, &mut HashSet::new()) {
+                            let procedure = procedure_name(self.r.sources, proc);
+                            let cause = self.unsupported_signature_type(typ);
+                            self.fault(root, annotation, &via, format!(
+                                "{cause}\nWhile checking type parameter '{name}' in pure call '{procedure}'."
+                            ));
+                        }
+                    }
                     continue;
                 }
                 let typ = self.r.specialized_type(annotation, &bindings);

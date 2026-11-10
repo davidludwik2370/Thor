@@ -109,14 +109,14 @@ main::proc(){value:=VALUE;{value:=3;assert(value==3)};assert(value==2&&selected(
             try:
                 deadline=time.monotonic()+15
                 while time.monotonic()<deadline and process.poll() is None:
-                    if list(scratch.glob('thor-run-*/helper')):break
+                    if list(scratch.glob('thor*run-*/helper')):break
                     time.sleep(.02)
-                self.assertTrue(list(scratch.glob('thor-run-*/helper')),'Native helper did not start')
+                self.assertTrue(list(scratch.glob('thor*run-*/helper')),'Native helper did not start')
                 process.send_signal(signal.SIGTERM)
                 stdout,stderr=process.communicate(timeout=5)
                 self.assertEqual(process.returncode,143,stderr.decode())
                 self.assertNotIn(b'Traceback',stderr)
-                self.assertFalse(list(scratch.glob('thor-run-*')),'Cancelled helper left its work directory')
+                self.assertFalse(list(scratch.glob('thor*run-*')),'Cancelled helper left its work directory')
             finally:
                 if process.poll() is None:process.kill();process.communicate()
 
@@ -168,6 +168,7 @@ OTHER::text(3)
 
 
 class InteractionDiagnostics(unittest.TestCase):
+    compiler=base.THOR
     invoke=diagnostics.DiagnosticTests.invoke
     at=diagnostics.DiagnosticTests.at
 

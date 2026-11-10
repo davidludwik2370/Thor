@@ -22,6 +22,8 @@ mod evaluationexec;
 #[path = "evaluationinstall.rs"]
 mod evaluationinstall;
 pub(crate) use evaluationexec::capture as capture_command;
+#[cfg(unix)]
+pub use evaluationexec::{cancel_active_evaluation, evaluation_cancelled};
 #[path = "nativefacts.rs"]
 mod nativefacts;
 #[path = "runtimeview.rs"]

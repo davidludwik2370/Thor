@@ -172,7 +172,7 @@ impl Project {
             return Ok(());
         }
         let work = Temporary::new()?;
-        let mut probe = self.evaluation_snapshot(work.0.join("probe"), results, skips, cases)?;
+        let mut probe = self.evaluation_snapshot(work.path.join("probe"), results, skips, cases)?;
         probe.type_probe_imports = imports;
         let mut markers = vec![];
         for (index, ((at, condition, code), _)) in pending.iter().enumerate() {
@@ -209,7 +209,7 @@ impl Project {
             .arg("build")
             .arg(target)
             .args(probe.native_flags())
-            .arg(format!("-out:{}", work.0.join("type-probe").display()))
+            .arg(format!("-out:{}", work.path.join("type-probe").display()))
             .arg("-json-errors")
             .arg("-max-error-count:10000");
         if probe.file_entry {
@@ -266,7 +266,7 @@ impl Project {
                 .unwrap()
                 .canonical = canonical.clone();
         }
-        let mut actual = self.evaluation_snapshot(work.0.join("actual"), results, skips, cases)?;
+        let mut actual = self.evaluation_snapshot(work.path.join("actual"), results, skips, cases)?;
         for _ in 0..12 {
             actual.specialized = cases.clone();
             // Lowering adds generated collections. Reuse the original

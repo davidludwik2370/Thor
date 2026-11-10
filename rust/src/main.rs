@@ -6,7 +6,22 @@ use thor_compiler::{
     VERSION,
 };
 
+#[cfg(unix)]
+extern "C" fn terminate(_: libc::c_int) {
+    if !thor_compiler::project::cancel_active_evaluation() {
+        // Outside an isolated evaluation, preserve immediate termination.
+        // SAFETY: _exit is async-signal-safe and never returns.
+        unsafe { libc::_exit(128 + libc::SIGTERM) }
+    }
+}
+
 fn main() -> ExitCode {
+    #[cfg(unix)]
+    // SAFETY: terminate has the C signal-handler ABI and only touches a
+    // lock-free atomic or calls _exit.
+    unsafe {
+        libc::signal(libc::SIGTERM, terminate as *const () as libc::sighandler_t);
+    }
     let args: Vec<String> = env::args().skip(1).collect();
     let compiler_args = args
         .iter()
@@ -19,7 +34,12 @@ fn main() -> ExitCode {
         || compiler_args
             .windows(2)
             .any(|args| args == ["--diagnostic-format", "json"]);
-    match run(args) {
+    let result = run(args);
+    #[cfg(unix)]
+    if thor_compiler::project::evaluation_cancelled() {
+        return ExitCode::from((128 + libc::SIGTERM) as u8);
+    }
+    match result {
         Ok(status) => ExitCode::from(status.clamp(0, 255) as u8),
         Err(error) => {
             if error.exit_status == 2 {

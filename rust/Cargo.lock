@@ -387,6 +387,7 @@ dependencies = [
  "filetime",
  "flate2",
  "image",
+ "libc",
  "num-bigint",
  "num-traits",
  "serde",

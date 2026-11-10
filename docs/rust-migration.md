@@ -162,6 +162,16 @@ The discarded-result allocation test passed on both engines in checked and
 unchecked configurations. The original generic map result test passed with
 the Rust compiler.
 
+### Compile-time helper cancellation and typed nil
+
+On POSIX, `SIGTERM` during native compile-time evaluation stops the active
+child, waits for it, and removes its isolated project before returning status
+143. The same cancellation fixture runs against both compilers. Typed `nil`
+slice arguments remain valid in `#run`. Native conversion proofs still check
+the target type, and resolved invalid pure type arguments report the parameter
+contract even when the procedure also uses that type in its local storage.
+The Unicode diagnostic fixture now selects the same compiler as its test run.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and
