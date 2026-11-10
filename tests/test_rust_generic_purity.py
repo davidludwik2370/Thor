@@ -1,5 +1,4 @@
 """Native generic contracts validate concrete instantiations without an ABI change."""
-import json
 import unittest
 from tests import test_rust_checked_calls as checked
 
@@ -63,14 +62,9 @@ wrap::fn(value:$T)->[]T{out:=make([]T,1);out[0]=value;return out}
                 self.compare(self.program(statement,'same::fn(value:$T)->T{return value}\n'),
                              command='check',fail='Unsupported pure value type')
 
-    def test_unresolved_generic_copy_mutation_is_a_migration_gap_not_a_false_error(self):
-        self.source.write_text(self.program('values:=[3,4];copy:=work(values);if copy[0]!=4||values[0]!=3{panic("array copy")}',
+    def test_generic_copy_mutation_distinguishes_inline_arrays_from_slice_headers(self):
+        self.compare(self.program('values:=[3,4];copy:=work(values);if copy[0]!=4||values[0]!=3{panic("array copy")}',
             'work::fn(value:$T)->T{copy:=value;copy[0]+=1;return copy}\n'))
-        reference=self.invoke('python')
-        self.assertEqual(reference.returncode,0,reference.stderr)
-        native=self.invoke('rust',command='check',flags=['-json-errors'])
-        self.assertEqual(native.returncode,3,native.stderr)
-        self.assertEqual(json.loads(native.stderr)['errors'][0]['stage'],'rust-migration')
 
     def test_indirect_generic_instantiation_cannot_bypass_borrow_checks(self):
         self.source.write_text(self.program('''values:=[3,4]
@@ -81,5 +75,5 @@ _=work(values);_=callback(values[:])
         self.assertEqual(reference.returncode,1,reference.stderr)
         self.assertIn('borrowed from an input',reference.stderr)
         native=self.invoke('rust',command='check',flags=['-json-errors'])
-        self.assertEqual(native.returncode,3,native.stderr)
-        self.assertEqual(json.loads(native.stderr)['errors'][0]['stage'],'rust-migration')
+        self.assertEqual(native.returncode,1,native.stderr)
+        self.assertIn('borrowed from an input',native.stderr)

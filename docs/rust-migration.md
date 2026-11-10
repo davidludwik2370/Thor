@@ -123,6 +123,32 @@ release, the eight-test differential/assertion-hygiene group passes, and Clippy
 passes for all targets with warnings denied. The next work is the AST flow
 evaluator, binding/store fixed point and checked-call ownership arguments.
 
+### Direct generic ownership and helper flow
+
+The reference flow evaluator now guards direct generic `fn` storage operations.
+Array and inline-record copies own their copied storage; slice headers retain
+borrowed backing storage, including reference-containing elements. Native type
+predicates are emitted in the active capture environment and selected native
+`when` arm. Header/do-body checks and nested pure bodies retain their lexical
+scope. Fixed-capacity dynamic types also retain their capacity through ordinary
+inference, including addressed arguments used for overload resolution.
+
+`borrowbind.rs` and `borrowprogram.rs` port helper argument binding, stored aliases,
+stack escapes, transitive requirements and the fixed-point driver. They are
+independently compared with Python using actual parsed ASTs, but their helper
+profiles are **not yet connected to lowering** at this checkpoint. A variadic
+alias case reaches the same nonconvergence rejection in both analyses; the test
+records that rejection rather than claiming successful handling.
+
+The 33-test focused ownership/permissions/assertion-hygiene gate passes, as does
+the expanded ten-case helper-model comparison. All 24 Rust units pass in debug
+and release, and Clippy passes for all targets with warnings denied. A broader
+517-test native run found only two stale expectations of an unported generic
+copy error; their corrected eight-test module passed separately. That broader
+run is not recorded as a clean full-suite acceptance run. Checkpoint 3 continues
+with checked-helper ownership arguments; execution and result caching remain
+unported.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

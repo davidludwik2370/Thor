@@ -306,8 +306,13 @@ impl Project {
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         resolver.prepare_contexts();
-        let privileges = crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
+        let mut privileges =
+            crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = crate::purity::Purity::analyze(&mut resolver);
+        let local_borrowing = crate::borrowlocals::Facts::analyze(&mut resolver, &purity);
+        privileges
+            .unresolved
+            .retain(|site, _| !local_borrowing.covers(&resolver, *site));
         self.pure_call_paths = purity.call_paths.clone();
         for (site, fault) in &purity.conditional {
             let source = &self.sources[site.file];
@@ -455,6 +460,7 @@ impl Project {
             }
             lower.remap_imports(import_paths);
             lower.apply_privileges(&privileges);
+            lower.apply_local_borrowing(&local_borrowing);
             lower.apply_purity(&purity)?;
             lower.instrument_memory(
                 &self.memory,

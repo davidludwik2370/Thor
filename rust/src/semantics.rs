@@ -1146,11 +1146,21 @@ impl<'a> Resolver<'a> {
                     Type::Slice(elem)
                 }
             }
-            "DynamicArrayType" => Type::Dynamic(Box::new(
-                child("elem")
-                    .map(|r| self.type_of(r))
-                    .unwrap_or(Type::Unknown),
-            )),
+            "DynamicArrayType" => {
+                let elem = Box::new(
+                    child("elem")
+                        .map(|r| self.type_of(r))
+                        .unwrap_or(Type::Unknown),
+                );
+                if let Some(capacity) = child("capacity") {
+                    Type::Fixed {
+                        elem,
+                        length: self.constant_int(capacity),
+                    }
+                } else {
+                    Type::Dynamic(elem)
+                }
+            }
             "PointerType" => Type::Pointer(Box::new(
                 child("elem")
                     .map(|r| self.type_of(r))

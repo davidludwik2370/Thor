@@ -68,12 +68,16 @@
         "rust/src/privileges.rs",
         "rust/src/purevariants.rs",
         "rust/src/permissions.rs",
-        "rust/src/borrowflow.rs"
+        "rust/src/borrowflow.rs",
+        "rust/src/borroweval.rs",
+        "rust/src/borrowlocals.rs",
+        "rust/src/borrowbind.rs",
+        "rust/src/borrowprogram.rs"
       ],
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 24,
-      "remaining": "Symbolic Permission/Access and Flow primitives are ported and independently tested. Port the reference AST flow evaluator, binding/store fixed point, requirements and ownership argument emission; then replace unresolved generic ownership gaps."
+      "remaining": "The reference flow evaluator now enforces direct generic fn writes, with binding/store/requirement propagation independently compared against Python. Connect helper ownership argument emission and cover the broader iterator/callee effects before removing remaining migration gaps."
     },
     {
       "python": "thorlang/purecalls.py",

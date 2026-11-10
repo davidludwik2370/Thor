@@ -9,6 +9,7 @@ enum Predicate {
     Set(NodeId),
     Arrow(NodeId, String),
     Array(NodeId),
+    Permission(crate::permissions::Permission),
 }
 #[derive(Clone)]
 pub(super) struct Guard {
@@ -31,6 +32,98 @@ fn storage_type(mut typ: Type) -> Type {
     typ
 }
 impl Lower<'_, '_> {
+    pub fn apply_local_borrowing(&mut self, facts: &crate::borrowlocals::Facts) {
+        for (site, permission) in &facts.checks {
+            if site.file == self.file {
+                self.place_storage_guard(
+                    site.node,
+                    Guard {
+                        predicates: vec![Predicate::Permission(permission.clone())],
+                        origin: site.node,
+                        message:
+                            "Pure code cannot mutate or delete storage borrowed from an input."
+                                .into(),
+                    },
+                );
+            }
+        }
+    }
+    fn permission_query(
+        &mut self,
+        permission: &crate::permissions::Permission,
+        site: NodeId,
+    ) -> Result<String> {
+        use crate::permissions::{Permission, Trait};
+        let meta = format!("{}meta", self.prefix);
+        match permission {
+            Permission::Constant(value) => Ok(value.to_string()),
+            Permission::Type(trait_, node) if node.file == self.file => {
+                let query = self.storage_query(node.node)?;
+                match trait_ {
+                    Trait::Pointer=>Ok(format!("{meta}.type_is_pointer({query})")),
+                    Trait::Sequence=>Ok(format!("({meta}.type_is_slice({query}) || {meta}.type_is_dynamic_array({query}) || {meta}.type_is_string({query}))")),
+                    _=>Err(self.unsupported(site,"symbolic logical-number ownership traits")),
+                }
+            }
+            Permission::And(left, right) => Ok(format!(
+                "({} && {})",
+                self.permission_query(left, site)?,
+                self.permission_query(right, site)?
+            )),
+            Permission::Or(parts) => {
+                let parts = parts
+                    .iter()
+                    .map(|part| self.permission_query(part, site))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(format!("({})", parts.join(" || ")))
+            }
+            _ => Err(self.unsupported(site, "symbolic helper ownership arguments")),
+        }
+    }
+    fn place_storage_guard(&mut self, id: NodeId, guard: Guard) {
+        let statement = std::iter::once(id)
+            .chain(self.source.ancestors(id))
+            .find(|node| {
+                matches!(
+                    self.source.node(*node).kind.as_str(),
+                    "Assignment"
+                        | "Declaration"
+                        | "Return"
+                        | "ExpressionStatement"
+                        | "Range"
+                        | "If"
+                        | "For"
+                        | "Switch"
+                        | "When"
+                )
+            })
+            .unwrap_or(id);
+        let parent = self.source.node(statement).parent;
+        let control = parent
+            .filter(|parent| matches!(self.source.node(*parent).kind.as_str(), "If" | "For"))
+            .or_else(|| {
+                matches!(self.source.node(statement).kind.as_str(), "If" | "For")
+                    .then_some(statement)
+            });
+        let converted = self.source.ancestors(statement).find(|node| {
+            self.source.node(*node).kind == "Block"
+                && self.source.raw.as_bytes()[self.source.node(*node).span.start] != b'{'
+        });
+        if let Some(block) = control
+            .and_then(|control| self.source.role(control, "body"))
+            .or(converted)
+        {
+            self.storage_block_guards
+                .entry(block)
+                .or_default()
+                .push(guard);
+        } else {
+            self.storage_guards
+                .entry(statement)
+                .or_default()
+                .push(guard);
+        }
+    }
     fn value_iteration_slice(&self, mut id: NodeId) -> bool {
         while let Some(parent) = self.source.node(id).parent {
             if self.source.node(parent).kind != "Paren" {
@@ -195,6 +288,9 @@ impl Lower<'_, '_> {
                     let query = self.native("type_of");
                     format!("(!{meta}.type_is_pointer({query}({code})) && {meta}.type_is_pointer({meta}.type_proc_parameter_type({query}(({code}).{field}),0)))")
                 }
+                Predicate::Permission(permission) => {
+                    self.permission_query(&permission, guard.origin)?
+                }
             };
             parts.push(format!("({part})"));
         }
@@ -338,50 +434,7 @@ impl Lower<'_, '_> {
                     origin,
                     message,
                 };
-                let statement = std::iter::once(id)
-                    .chain(self.source.ancestors(id))
-                    .find(|node| {
-                        matches!(
-                            self.source.node(*node).kind.as_str(),
-                            "Assignment"
-                                | "Declaration"
-                                | "Return"
-                                | "ExpressionStatement"
-                                | "Range"
-                                | "If"
-                                | "For"
-                                | "Switch"
-                                | "When"
-                        )
-                    })
-                    .unwrap_or(id);
-                let parent = self.source.node(statement).parent;
-                let control = parent
-                    .filter(|parent| {
-                        matches!(self.source.node(*parent).kind.as_str(), "If" | "For")
-                    })
-                    .or_else(|| {
-                        matches!(self.source.node(statement).kind.as_str(), "If" | "For")
-                            .then_some(statement)
-                    });
-                let converted = self.source.ancestors(statement).find(|node| {
-                    self.source.node(*node).kind == "Block"
-                        && self.source.raw.as_bytes()[self.source.node(*node).span.start] != b'{'
-                });
-                if let Some(block) = control
-                    .and_then(|control| self.source.role(control, "body"))
-                    .or(converted)
-                {
-                    self.storage_block_guards
-                        .entry(block)
-                        .or_default()
-                        .push(guard);
-                } else {
-                    self.storage_guards
-                        .entry(statement)
-                        .or_default()
-                        .push(guard);
-                }
+                self.place_storage_guard(id, guard);
             }
         }
         Ok(())

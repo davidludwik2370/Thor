@@ -1,7 +1,11 @@
 //! Independent native compiler. Python is a differential oracle, never a runtime dependency.
 #![forbid(unsafe_code)]
 pub mod ast;
+pub mod borrowbind;
+pub mod borroweval;
 pub mod borrowflow;
+pub mod borrowlocals;
+pub mod borrowprogram;
 pub mod diagnostic;
 pub mod digest;
 pub mod emit;
