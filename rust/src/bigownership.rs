@@ -230,7 +230,7 @@ impl Lower<'_, '_> {
             for (index, value) in args[1..].iter().enumerate() {
                 let name = format!("{pointer}_value_{index}");
                 let typ = format!("type_of({pointer}^[0])");
-                let hint = Hint {
+                let hint = Hint {constant_literal:false,
                     code: this.g(&typ, *value),
                     semantic: Some(*element.clone()),
                     element_only: false,
@@ -313,7 +313,7 @@ impl Lower<'_, '_> {
                     if this.diverging(fallback) {
                         code.push(this.render(fallback, None, false)?);
                     } else {
-                        let hint = Hint {
+                        let hint = Hint {constant_literal:false,
                             code: this.g(format!("{}Result", this.prefix), id),
                             semantic: Some(kind.clone()),
                             element_only: false,

@@ -82,7 +82,7 @@ impl Lower<'_, '_> {
                 .is_some_and(|base| self.temporary_producer(base) || self.temporary_view(base))
     }
     fn temporary_hint(&self, code: Code) -> Hint {
-        Hint {
+        Hint {constant_literal:false,
             semantic: None,
             code,
             element_only: false,

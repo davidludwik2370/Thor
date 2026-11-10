@@ -784,7 +784,7 @@ impl Lower<'_, '_> {
                 }
                 if let Some(typ)=logical_selector.as_ref(){
                     let module=self.module("big");
-                    let hint=Hint{code:self.g(format!("{module}.{}",typ.big_name().unwrap()),*operand),semantic:Some(typ.clone()),element_only:false,plain_array:false};
+                    let hint=Hint{constant_literal:false,code:self.g(format!("{module}.{}",typ.big_name().unwrap()),*operand),semantic:Some(typ.clone()),element_only:false,plain_array:false};
                     let node=self.source.node(*operand);
                     let value=if node.kind=="Binary"&&matches!(node.op.as_str(),".."|"..<"|"..="){
                         let low=self.role(*operand,"left")?;let high=self.role(*operand,"right")?;
@@ -855,7 +855,7 @@ impl Lower<'_, '_> {
                 let types = self.switch_types(id, &hints)?;
                 let generic = (0..hints.len())
                     .map(|i| {
-                        Some(Hint {
+                        Some(Hint {constant_literal:false,
                             semantic: self.switch_hint_semantic(id,i,&hints),
                             code: self.g(format!("{}Result_{i}", self.prefix), id),
                             element_only: false,
@@ -907,7 +907,7 @@ impl Lower<'_, '_> {
         let types = self.switch_types(id, &hints)?;
         let generic = (0..hints.len())
             .map(|i| {
-                Some(Hint {
+                Some(Hint {constant_literal:false,
                     semantic: self.switch_hint_semantic(id,i,&hints),
                     code: self.g(format!("{}Result_{i}", self.prefix), id),
                     element_only: false,
@@ -1003,7 +1003,7 @@ impl Lower<'_, '_> {
         let hints = match s.node(id).kind.as_str() {
             "Declaration" => {
                 let hint = if let Some(annotation) = s.role(id, "type") {
-                    Some(Hint {
+                    Some(Hint {constant_literal:false,
                         semantic: Some(self.typ(annotation)),
                         code: self.render(annotation, None, false)?,
                         element_only: false,
@@ -1022,7 +1022,7 @@ impl Lower<'_, '_> {
                     } else {
                         let type_of = self.native("type_of");
                         let value = self.query_value_switch(*lhs)?;
-                        hints.push(Some(Hint {
+                        hints.push(Some(Hint {constant_literal:false,
                             semantic: Some(self.typ(*lhs)),
                             code: Code::concat([
                                 self.g(format!("{type_of}("), *lhs),
@@ -1048,7 +1048,7 @@ impl Lower<'_, '_> {
                         let hint = if let Some(annotation) =
                             annotation.filter(|annotation| annotation.file == self.file)
                         {
-                            Some(Hint {
+                            Some(Hint {constant_literal:false,
                                 semantic: Some(self.typ(annotation.node)),
                                 code: self.render(annotation.node, None, false)?,
                                 element_only: false,
@@ -1087,7 +1087,7 @@ impl Lower<'_, '_> {
             let type_of = this.native("type_of");
             let hints = (0..hints.len())
                 .map(|i| {
-                    Some(Hint {
+                    Some(Hint {constant_literal:false,
                         semantic: this.switch_hint_semantic(id,i,hints),
                         code: this.g(
                             format!("{type_of}({}Result{{}}.value_{i})", this.source.prefix),
@@ -1263,7 +1263,7 @@ impl Lower<'_, '_> {
                         this.g(format!("{name}^"), *lhs)
                     };
                     let type_of = this.native("type_of");
-                    local_hints.push(Some(Hint {
+                    local_hints.push(Some(Hint {constant_literal:false,
                         semantic: Some(this.typ(*lhs)),
                         code: Code::concat([
                             this.g(format!("{type_of}("), *lhs),

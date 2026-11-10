@@ -242,7 +242,7 @@ impl Lower<'_, '_> {
         }
         if values.len() == 1 && self.resolver.untyped_operand(self.reference(values[0])) {
             let module = self.big_module();
-            let hint = Hint {
+            let hint = Hint {constant_literal:false,
                 code: self.g(format!("{module}.{}", typ.big_name().unwrap()), id),
                 semantic: Some(typ.clone()),
                 element_only: false,
@@ -538,7 +538,7 @@ impl Lower<'_, '_> {
             let module = self.big_module();
             let semantic = Some(wanted.clone());
             let (name, mut args) = self.closed(id, "big_owned", Some(""), |this| {
-                let hint = Hint {
+                let hint = Hint {constant_literal:false,
                     code: this.g(format!("{}Result", this.prefix), id),
                     semantic,
                     element_only: false,
@@ -743,7 +743,7 @@ impl Lower<'_, '_> {
                         this.source.node(id).span.start,
                         index
                     );
-                    let hint = (target != "_").then(|| Hint {
+                    let hint = (target != "_").then(|| Hint {constant_literal:false,
                         code: this.g(format!("type_of({target})"), *value),
                         semantic: Some(this.typ(lhs[index])),
                         element_only: false,
@@ -842,7 +842,7 @@ impl Lower<'_, '_> {
             }
             if let Some(name) = semantic.as_ref().and_then(Type::big_name) {
                 let module = self.big_module();
-                hints.push(Some(Hint {
+                hints.push(Some(Hint {constant_literal:false,
                     code: self.g(format!("{module}.{name}"), value),
                     semantic,
                     element_only: false,
@@ -851,7 +851,7 @@ impl Lower<'_, '_> {
             } else if let Some(hint) = self.contextual_hint(value) {
                 hints.push(Some(hint));
             } else if annotation.is_some() && !native {
-                hints.push(Some(Hint {
+                hints.push(Some(Hint {constant_literal:false,
                     code: self.g("", value),
                     semantic,
                     element_only: false,
@@ -893,7 +893,7 @@ impl Lower<'_, '_> {
                         id,
                     ),
                 ];
-                hints.push(Some(Hint {
+                hints.push(Some(Hint {constant_literal:false,
                     code: Code::concat(std::mem::take(&mut code)),
                     semantic,
                     element_only: false,

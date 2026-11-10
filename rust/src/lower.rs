@@ -62,6 +62,7 @@ mod temporaries;
 
 #[derive(Clone, Debug)]
 pub struct Hint {
+    pub constant_literal:bool,
     pub code: Code,
     pub semantic: Option<Type>,
     pub element_only: bool,
@@ -1238,7 +1239,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         match kind.as_str() {
             "Declaration" => {
                 let hint = if let Some(annotation) = self.source.role(id, "type") {
-                    Some(Hint {
+                    Some(Hint {constant_literal:false,
                         semantic: Some(self.typ(annotation)),
                         code: self.render(annotation, None, false)?,
                         element_only: false,
@@ -1263,7 +1264,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     let hint = if self.source.text(*lhs) == "_" {
                         None
                     } else {
-                        Some(Hint {
+                        Some(Hint {constant_literal:false,
                             semantic: Some(self.typ(*lhs)),
                             code: Code::concat([
                                 self.g(format!("{type_of}("), id),
@@ -1286,7 +1287,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     overrides.insert(
                         value,
                         (
-                            Some(Hint {
+                            Some(Hint {constant_literal:false,
                                 semantic: Some(self.typ(annotation)),
                                 code,
                                 element_only: false,
@@ -1339,7 +1340,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                                 overrides.insert(
                                     *value,
                                     (
-                                        Some(Hint {
+                                        Some(Hint {constant_literal:false,
                                             semantic: Some(self.typ(annotation.node)),
                                             code,
                                             element_only: false,
@@ -1373,7 +1374,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                         if !map&&!sequence{if let Some(field)=&field{code.push(self.g(format!(",{}",json!(field)),*value));}}
                         code.push(self.g(")",id));
                         let code=if map{let witness=self.module("comprehension");let type_of=self.native("type_of");Code::concat([self.g(format!("{type_of}({witness}.second(("),id),target.clone(),self.g("){}))",id)])}else{Code::concat(code)};
-                        Some(Hint{code,semantic,element_only:false,plain_array:false})
+                        Some(Hint{constant_literal:false,plain_array:matches!(&semantic,Some(Type::Array{..}|Type::Slice(_)|Type::Soa(_))),code,semantic,element_only:false})
                     }else{None};
                     overrides.insert(*value,(hint,constant));
                 }
@@ -1431,7 +1432,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                             overrides.insert(
                                 *arg,
                                 (
-                                    Some(Hint {
+                                    Some(Hint {constant_literal:false,
                                         semantic: Some(self.resolver.specialized_type(*annotation, &Default::default())),
                                         code,
                                         element_only: false,
@@ -1650,11 +1651,12 @@ impl<'a, 'r> Lower<'a, 'r> {
             needle.filter(|needle| !self.resolver.untyped_operand(self.reference(*needle)))
                 .or_else(||elems.first().copied()).or(needle).map(|anchor|self.typ(anchor).defaulted())
         });
-        let hint = Hint {
+        let constant_literal=constant&&expected.as_ref().is_none_or(|hint|hint.element_only||hint.constant_literal);
+        let hint = Hint {constant_literal,
+            plain_array:matches!(&semantic,Some(Type::Array{..}|Type::Slice(_)|Type::Soa(_))),
             semantic,
             code: element.clone(),
             element_only: false,
-            plain_array: false,
         };
         let mut values = vec![];
         for (i, value) in elems.iter().enumerate() {
@@ -1683,15 +1685,19 @@ impl<'a, 'r> Lower<'a, 'r> {
                 );
             }
         }
+        let contents=Code::concat(values);
         let mut literal = Code::concat([
             self.g(format!("([{}]", elems.len()), id),
             element,
             self.g("{", id),
-            Code::concat(values),
+            contents.clone(),
             self.g("})", id),
         ]);
         if let Some(target) = target {
             if !expected.as_ref().is_some_and(|hint| hint.plain_array) {
+                if expected.as_ref().is_some_and(|hint|hint.constant_literal){
+                    literal=Code::concat([self.g("(",id),target,self.g("{",id),contents,self.g("})",id)]);
+                }else{
                 literal = Code::concat([
                     self.g("cast(", id),
                     target,
@@ -1699,6 +1705,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     literal,
                     self.g(")", id),
                 ]);
+                }
             }
         }
         Ok(literal.expansion(&self.source.path, self.source.node(id).span))
@@ -1886,7 +1893,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         self.meta = true;
         let mut parts = vec![self.g(format!("{}meta.concatenate(", self.prefix), id)];
-        let mut hint = expected.map(|hint| Hint {
+        let mut hint = expected.map(|hint| Hint {constant_literal:false,
             semantic: hint.semantic.as_ref().and_then(|typ|typ.element().cloned()),
             code: Code::concat([
                 self.g(format!("{}meta.type_elem_type(", self.prefix), id),
@@ -1948,7 +1955,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                             self.g("))", id),
                         ])
                     };
-                    hint = Some(Hint {
+                    hint = Some(Hint {constant_literal:false,
                         semantic: None,
                         code,
                         element_only: true,

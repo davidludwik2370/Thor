@@ -100,7 +100,7 @@ impl Lower<'_, '_> {
                         this.source.node(id).span.start,
                         index
                     );
-                    let expected = Hint {
+                    let expected = Hint {constant_literal:false,
                         code: typ.clone(),
                         semantic: Some(Type::Generic),
                         element_only: false,
@@ -164,7 +164,7 @@ impl Lower<'_, '_> {
             let module=this.module("big");let mut code=vec![];let targets=this.big_capture_targets(id,&lhs,&mut code)?;let target=&targets[0];let typ=this.native_type(lhs[0])?;let text=typ.clone().finish().text;
             let old=format!("{}big_update_old_{}",this.prefix,this.source.node(id).span.start);let right=format!("{old}_rhs");let result=format!("{old}_result");
             code.push(this.g(format!("when {text}=={module}.Integer || {text}=={module}.Rational {{\n{old}:={module}.compiler_clone({target})\ndefer {module}.compiler_destroy(&{old})\n{right}:{text}="),id));
-            let hint=Hint{code:typ,semantic:Some(Type::Generic),element_only:false,plain_array:false};
+            let hint=Hint{constant_literal:false,code:typ,semantic:Some(Type::Generic),element_only:false,plain_array:false};
             code.extend([this.big_owned(rhs[0],Some(hint),false)?,this.g(format!("\ndefer {module}.compiler_destroy(&{right})\n{result}:={module}.binary({old},{right},{})\n",json!(op)),id)]);
             this.big_commit(id,&targets,&[result],&mut code);
             this.logical.busy.insert(id);let native=this.render(id,None,false);this.logical.busy.remove(&id);

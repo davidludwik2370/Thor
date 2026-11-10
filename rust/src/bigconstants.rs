@@ -426,7 +426,7 @@ impl Lower<'_, '_> {
         let hint = if let Some(annotation) = self.source.role(id, "type") {
             let semantic = self.typ(annotation);
             if semantic.big_name().is_some() {
-                Some(Hint {
+                Some(Hint {constant_literal:false,
                     code: self.render(annotation, None, false)?,
                     semantic: Some(semantic),
                     element_only: false,
@@ -761,7 +761,7 @@ pub(crate) fn prime(resolver:&mut Resolver<'_>){
         let declarations=folder.source.nodes.iter().enumerate().filter(|(_,node)|node.kind=="Declaration"&&!node.mutable).map(|(index,_)|NodeId(index)).collect::<Vec<_>>();
         for declaration in declarations{
             let expected=folder.source.role(declaration,"type").map(|id|folder.typ(id)).filter(|typ|typ.big_name().is_some());
-            let hint=expected.map(|typ|{let module=folder.module("big");Hint{code:folder.g(format!("{module}.{}",typ.big_name().unwrap()),declaration),semantic:Some(typ),element_only:false,plain_array:false}});
+            let hint=expected.map(|typ|{let module=folder.module("big");Hint{constant_literal:false,code:folder.g(format!("{module}.{}",typ.big_name().unwrap()),declaration),semantic:Some(typ),element_only:false,plain_array:false}});
             for value in folder.source.group(declaration,"values").to_vec(){let _=folder.big_constant_render(value,hint.as_ref());}
         }
     }

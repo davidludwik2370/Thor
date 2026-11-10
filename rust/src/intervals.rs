@@ -39,7 +39,7 @@ impl Lower<'_, '_> {
             this.querying-=1;
             let common=this.interval_common(id,parts?);let type_of=this.native("type_of");
             let typ=Code::concat([this.g(format!("{type_of}({}default_value(",this.prefix),id),common,this.g("))",id)]).annotated("range-type");
-            let hint=Hint{code:typ,semantic:None,element_only:false,plain_array:false};
+            let hint=Hint{constant_literal:false,code:typ,semantic:None,element_only:false,plain_array:false};
             let mut code=vec![];let values=operands.iter().map(|operand|this.temporary_evaluate(*operand,&mut code,Some(hint.clone()))).collect::<Result<Vec<_>>>()?;
             let predicate=this.interval_predicate(id,interval,values.iter().map(|value|this.g(&value.value,id)).collect());
             let result=this.temporary_name("range_result");code.extend([this.g(format!("{result} := "),id),predicate,this.g("\n",id)]);

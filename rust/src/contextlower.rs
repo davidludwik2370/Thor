@@ -182,7 +182,7 @@ impl Lower<'_, '_> {
             .map(|witness|witness.used.iter().map(|(name,_)|name.clone()).zip(hint.values.clone()).collect())
             .unwrap_or_default();
         let semantic = Some(self.resolver.specialized_type(hint.annotation,&bindings));
-        Some(Hint {
+        Some(Hint {constant_literal:false,
             semantic,
             code: Code::concat(code),
             element_only: false,

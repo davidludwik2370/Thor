@@ -115,15 +115,10 @@ def _install():
                          (bindings.BatchTests, RESOLUTION)]:
         for name in names:
             setattr(RustReferenceTests, 'test_'+name, getattr(suite, 'test_'+name))
-    # These exclusions are explicit migration gaps, not skip-on-unsupported.
-    # Every other slice fixture must pass against both engines.
-    pending = {'test_compile_time_execution_does_not_bypass_readonly_locals',
-               'test_compile_time_readers_accept_readonly_locals',
-               'test_previously_evaluated_dimensions_select_readonly_generic_paths'}
+    # Every slice fixture, including native compile-time execution, must match.
     for suite in (slices.SliceAccessTests,copies.SliceCopyHardeningTests):
         for name in unittest.defaultTestLoader.getTestCaseNames(suite):
-            if name not in pending:
-                setattr(RustReferenceTests,'test_borrowing_'+name[5:],getattr(suite,name))
+            setattr(RustReferenceTests,'test_borrowing_'+name[5:],getattr(suite,name))
     for name in ('explicit_collections_and_duplicates','flatten_all_destinations_and_map_last_wins',
                  'fstring_elements_keep_owned_storage_and_shallow_slice_elements',
                  'package_runtime_initializers_and_anonymous_owned_arguments',

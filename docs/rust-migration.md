@@ -485,6 +485,23 @@ A final uniform project/suite acceptance run remains required after the further
 array-constant context mismatch is corrected. No original project sources were
 changed.
 
+### Constant array context
+
+Array hints now preserve the reference's distinction between a native array
+literal and a conversion expression. Nested arrays, record fields/defaults and
+explicitly typed constants remain compile-time constants; nested distinct array
+elements retain their compound-literal context. Runtime distinct conversions and
+boxing into `any` keep their existing behavior, and invalid slice conversions or
+length mismatches remain errors.
+
+All 160 array/compiler/resolution/concatenation/numeric/generic/assertion-hygiene
+checks passed, including checked and unchecked runtime comparisons. All 34 Rust
+unit tests passed in debug and release; Clippy passed with warnings denied.
+The three former compile-time slice exclusions also pass and are now included
+in the permanent reference acceptance suite. The full native suite, expanded
+original language fixtures and uniform project-copy sweep continue; this is not
+yet a claim of whole-language acceptance.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

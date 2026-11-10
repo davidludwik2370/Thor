@@ -236,7 +236,7 @@ impl Lower<'_, '_> {
             for(index,(kind,value))in parts.iter().enumerate(){
                 let name=format!("{}big_builtin_{}_{}",this.prefix,this.source.node(id).span.start,index);
                 if *kind==Part::Scalar{
-                    let hint=Hint{code:this.g(&typ,*value),semantic:Some(if target.big_name().is_some(){target.clone()}else{Type::Generic}),element_only:false,plain_array:false};
+                    let hint=Hint{constant_literal:false,code:this.g(&typ,*value),semantic:Some(if target.big_name().is_some(){target.clone()}else{Type::Generic}),element_only:false,plain_array:false};
                     code.extend([this.g(format!("{name}:{typ}="),*value),this.big_owned(*value,Some(hint),false)?,this.g(format!("\ndefer {module}.compiler_destroy(&{name})\n"),*value)]);
                 }else{
                     if *kind==Part::Array&&matches!(this.typ(*value),Type::Array{length:Some(0),..}){return Ok(this.error_token(*value,"An empty fixed array cannot be expanded into min/max."));}
@@ -283,7 +283,7 @@ impl Lower<'_, '_> {
                 return Ok(None);
             };
             let module = self.module("big");
-            let hint = Hint {
+            let hint = Hint {constant_literal:false,
                 code: self.g(format!("{module}.{}", element.big_name().unwrap()), id),
                 semantic: Some(element),
                 element_only: false,
@@ -310,7 +310,7 @@ impl Lower<'_, '_> {
         let (name, args) = self.closed(id, "big_membership", Some("bool"), |this| {
             let typ = this.native_type(target)?;
             let typ_text = typ.clone().finish().text;
-            let hint = Hint {
+            let hint = Hint {constant_literal:false,
                 code: typ,
                 semantic: Some(semantic),
                 element_only: false,
