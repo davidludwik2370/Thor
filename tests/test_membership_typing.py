@@ -41,6 +41,8 @@ assert(TYPED in [FOUR,8])
         self.invoke(self.program('assert(math.PI not_in [3.0,4.0]&&PI not_in [3.0,4.0])',
                                  'import "core:math"\nPI::math.PI\n'))
         self.invoke(self.program('_=math.PI in [1,2]','import "core:math"\n'),command='check',fail='Error:')
+        self.invoke(self.program('_=(PI/2) in [1,2]','import _ "core:math" / PI\n'),
+                    command='check',fail='Error:')
 
     def test_literal_needle_uses_existing_container_type(self):
         self.invoke(self.program('''

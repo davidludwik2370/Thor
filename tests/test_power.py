@@ -124,7 +124,17 @@ assert(true || 2**-3==0)
 '''))
 
     def test_type_queries_do_not_execute_power_or_its_operands(self):
-        self.invoke(self.program('order:=0\nassert(type_of(2**-3)==int)\nassert(type_of(mark(&order,2)**3)==int && order==0)\nrecord:Grid(2);assert(len(record.data)==256)\n','mark::proc(order:^int,value:int)->int{order^+=1;return value}\nGrid::struct($N:int){data:[N**(2**3)]int}\n'))
+        source=self.program('''
+order:=0
+if type_of(2**-3)!=int || type_of(mark(&order,2)**3)!=int || order!=0 {
+    panic("power type query evaluated its operands")
+}
+record:Grid(2)
+if len(record.data)!=256 {panic("wrong generic array length")}
+''','mark::proc(order:^int,value:int)->int{order^+=1;return value}\nGrid::struct($N:int){data:[N**(2**3)]int}\n')
+        for flags in (['-debug'], ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(source,flags=flags)
 
     def test_float_special_values_survive_constant_reconstruction(self):
         self.invoke(self.program('assert(math.is_nan(NAN) && math.is_inf(INFINITY,1))',

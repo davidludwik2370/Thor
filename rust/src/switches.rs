@@ -471,11 +471,15 @@ impl Lower<'_, '_> {
                 s.role(id, role)
                     .is_some_and(|child| self.switch_constant(child, &mut seen.clone()))
             }),
+            "Selector" => s.role(id, "expr").is_some_and(|base| {
+                self.resolver.denotes_type(self.reference(base))
+                    && self.switch_constant(base, seen)
+            }),
             "Call" => s.role(id, "callee").is_some_and(|callee| {
-                (matches!(
+                let config = s.node(callee).kind == "Directive" && s.text(callee) == "#config";
+                (config || matches!(
                     s.text(callee),
-                    "#config"
-                        | "len"
+                    "len"
                         | "size_of"
                         | "align_of"
                         | "type_of"
@@ -489,7 +493,7 @@ impl Lower<'_, '_> {
                     || self.resolver.denotes_type(self.reference(callee)))
                     && s.group(id, "args")
                         .iter()
-                        .skip(usize::from(s.text(callee) == "#config"))
+                        .skip(usize::from(config))
                         .all(|arg| self.switch_constant(*arg, &mut seen.clone()))
             }),
             _ => false,
@@ -521,7 +525,13 @@ impl Lower<'_, '_> {
         );
         let selector = format!("{}selector", self.prefix);
         let owner = self.helper_scope(id);
-        let mut declaration=vec![self.g(format!("\n{}{name} :: proc \"contextless\" (${selector}: ${}Selector) -> bool {{\nswitch {selector} {{\n",if owner.0==0{"@(private=\"file\")\n"}else{""},self.prefix),id)];
+        let partial = self.source.role(id, "selector").is_some_and(|selector| {
+            let typ = self.typ(selector);
+            let mut base = &typ;
+            while let Type::Nominal(_, inner) = base { base = inner; }
+            matches!(base, Type::Enum(_))
+        });
+        let mut declaration=vec![self.g(format!("\n{}{name} :: proc \"contextless\" (${selector}: ${}Selector) -> bool {{\n{}switch {selector} {{\n",if owner.0==0{"@(private=\"file\")\n"}else{""},self.prefix,if partial {"#partial "} else {""}),id)];
         for operand in operands {
             declaration.extend([
                 self.g("case ", operand),
@@ -578,14 +588,22 @@ impl Lower<'_, '_> {
                 condition,
                 self.g(" {\n", id),
             ]);
+            let mut statements = vec![];
+            let mut scope = None;
             for span in row["statements"].as_array().into_iter().flatten() {
                 if let Some(statement) =
                     Span::from_wire(span).and_then(|span| self.source.at(span, id))
                 {
-                    code.push(self.render(statement, None, false)?);
-                    code.push(self.g("\n", statement));
+                    scope = self.source.node(statement).parent
+                        .filter(|parent| self.source.node(*parent).kind == "Case").or(scope);
+                    statements.push(self.render(statement, None, false)?);
+                    statements.push(self.g("\n", statement));
                 }
             }
+            if let Some(scope) = scope {
+                code.extend(self.helper_declarations(scope));
+            }
+            code.extend(statements);
             code.push(self.g("}\n", id));
         }
         code.push(self.g("}", id));
@@ -677,6 +695,16 @@ impl Lower<'_, '_> {
                 .map(|code| Code::concat([self.g("(", arm), code, self.g("){}", arm)])));
         }
         if self.source.node(arm).kind == "Call" {
+            let callee = self.role(arm, "callee")?;
+            if self.resolver.denotes_type(self.reference(callee))
+                || crate::purity::builtin_call(self.resolver, self.reference(arm)).is_some()
+            {
+                return if index == 0 {
+                    Ok(Some(self.query_value_switch(arm)?))
+                } else {
+                    Ok(None)
+                };
+            }
             let code = self.query_value_switch(arm)?;
             self.meta = true;
             let type_of = self.native("type_of");

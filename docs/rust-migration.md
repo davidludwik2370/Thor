@@ -172,6 +172,23 @@ the target type, and resolved invalid pure type arguments report the parameter
 contract even when the procedure also uses that type in its local storage.
 The Unicode diagnostic fixture now selects the same compiler as its test run.
 
+### Constant expressions and lazy imports
+
+Constant membership uses indexed comparisons for fixed arrays and Odin's own
+bit-set membership. Inline lists preserve the typing of imported untyped
+constants. Compile-time `#assert` and `#config` arguments retain constant
+context, including untyped numeric power results. Fixed exponents in generic
+type expressions use native constant arithmetic and type validation.
+
+Compile-time switches retain the selected result's type and emit helpers in
+the owning case. Odin validates constant labels, including enum aliases,
+escaped strings and `#config` values. Wildcard imports leave inactive exports
+lazy, while explicit imports still check each selected name.
+
+All 116 checks in the combined expression, power and import gate passed.
+The expanded membership and unevaluated-power regressions passed on both
+engines, including debug and unchecked power builds.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

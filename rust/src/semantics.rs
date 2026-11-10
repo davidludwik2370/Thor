@@ -1416,6 +1416,11 @@ impl<'a> Resolver<'a> {
                     return Type::Unknown;
                 };
                 let name = s.text(callee.node);
+                if s.node(callee.node).kind == "Directive" && name == "#config" {
+                    if let [_, default] = s.group(r.node, "args") {
+                        return self.type_of(Ref { node: *default, ..r });
+                    }
+                }
                 let builtin = self.native_builtin(callee, name);
                 if builtin && matches!(name, "make" | "new" | "new_clone") {
                     if let Some(arg) = s.group(r.node, "args").first() {

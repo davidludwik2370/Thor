@@ -697,15 +697,16 @@ impl<'a, 'r> Lower<'a, 'r> {
                     }
                     return Err(Error::at(s, span, "duplicate name in selective import"));
                 }
-                // Resolve even unused selected names without making them package
-                // exports. The init-local aliases retain native privacy checks.
-                let owner = NodeId(0);
-                let name_key = format!("validate_import_{start}");
-                let body=format!("\n@(private=\"file\", init)\n{}{name_key} :: proc \"contextless\" () {{ checked :: {alias}.{name} }}\n",self.prefix);
-                self.helpers.insert(
-                    (owner, self.prefix.clone(), name_key),
-                    self.gen(body, span, "import"),
-                );
+                if !selection.wildcard {
+                    // Explicit selections are checked even when unused. A
+                    // wildcard can contain declarations in inactive when arms.
+                    let name_key = format!("validate_import_{start}");
+                    let body=format!("\n@(private=\"file\", init)\n{}{name_key} :: proc \"contextless\" () {{ checked :: {alias}.{name} }}\n",self.prefix);
+                    self.helpers.insert(
+                        (NodeId(0), self.prefix.clone(), name_key),
+                        self.gen(body, span, "import"),
+                    );
+                }
                 if let Some(symbol) = self.resolver.lookup(
                     Ref {
                         file: self.file,
@@ -1412,7 +1413,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             "Call" => {
                 let callee = self.role(id, "callee")?;
-                for arg in self.source.group(id, "args") {
+                let args = self.source.group(id, "args");
+                for arg in args {
                     let value = self.source.role(*arg, "value").unwrap_or(*arg);
                     if let Some(hint) = self.contextual_hint(value) {
                         overrides.insert(*arg, (Some(hint), constant));
@@ -1473,6 +1475,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                                 ),
                             );
                         }
+                    }
+                }
+                if matches!(self.source.text(callee), "#assert" | "#config") {
+                    for arg in args {
+                        overrides.entry(*arg).or_insert((None, true)).1 = true;
                     }
                 }
             }
@@ -1807,18 +1814,35 @@ impl<'a, 'r> Lower<'a, 'r> {
         {
             return self.interval_membership(id,sequence,constant);
         }
-        let type_membership =
-            self.resolver.denotes_type(self.reference(left)) && self.is_array(sequence);
-        if (constant || type_membership) && self.is_array(sequence) {
-            let elems = self.source.group(sequence, "elems").to_vec();
+        let literal = self.is_array(sequence);
+        let type_membership = literal && self.resolver.denotes_type(self.reference(left));
+        let typ = self.typ(right);
+        let length = if literal && (constant || type_membership) {
+            Some(self.source.group(sequence, "elems").len())
+        } else if constant && !self.resolver.runtime_operand(self.reference(sequence)) {
+            let mut container = &typ;
+            while let Type::Nominal(_, underlying) = container {
+                container = underlying;
+            }
+            match container {
+                Type::Array { length: Some(length), .. } => usize::try_from(*length).ok(),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if let Some(length) = length {
+            let elems = self.source.group(sequence, "elems");
             let lhs = self.render(left, None, true)?;
             let rhs = if type_membership {
                 self.g("", id)
-            } else {
+            } else if literal {
                 self.array(sequence, None, Some(left), true)?
+            } else {
+                self.render(right, None, true)?
             };
             let mut parts = vec![self.g("(", id)];
-            if elems.is_empty() {
+            if length == 0 {
                 parts.extend([
                     self.g("((", id),
                     lhs.clone(),
@@ -1834,16 +1858,17 @@ impl<'a, 'r> Lower<'a, 'r> {
                     ),
                 ]);
             }
-            for (i, elem) in elems.iter().enumerate() {
+            let typed_elems = elems.iter().copied().map(Some).chain(std::iter::repeat(None));
+            for (i, elem) in typed_elems.take(length).enumerate() {
                 if i > 0 {
                     parts.push(self.g(if op == "in" { " || " } else { " && " }, id));
                 }
-                if type_membership {
+                if let Some(elem) = elem.filter(|_| type_membership) {
                     parts.extend([
                         self.g("((", id),
                         lhs.clone(),
                         self.g(if op == "in" { ") == (" } else { ") != (" }, id),
-                        self.render(*elem, None, true)?,
+                        self.render(elem, None, true)?,
                         self.g("))", id),
                     ]);
                 } else {
@@ -1859,7 +1884,11 @@ impl<'a, 'r> Lower<'a, 'r> {
             parts.push(self.g(")", id));
             return Ok(Code::concat(parts).expansion(&self.source.path, self.source.node(id).span));
         }
-        let typ = self.typ(right);
+        if constant {
+            let a = self.render(left, None, true)?;
+            let b = self.render(right, None, true)?;
+            return self.splice(id, vec![(self.source.node(left).span, a), (self.source.node(right).span, b)], vec![]);
+        }
         if matches!(typ, Type::Set(_)) {
             let sets = self.module("sets");
             let a = self.render(left, None, constant)?;
@@ -1904,13 +1933,10 @@ impl<'a, 'r> Lower<'a, 'r> {
         .expansion(&self.source.path, self.source.node(id).span))
     }
     fn power(&mut self, id: NodeId, constant: bool) -> Result<Code> {
-        if constant {
-            return Err(self.unsupported(id, "compile-time numeric power"));
-        }
         let left = self.role(id, "left")?;
         let right = self.role(id, "right")?;
-        let a = self.render(left, None, false)?;
-        let b = self.render(right, None, false)?;
+        let a = self.render(left, None, constant)?;
+        let b = self.render(right, None, constant)?;
         let module = self.module("numeric");
         let typeof_ = self.native("type_of");
         self.default = true;
@@ -1924,6 +1950,29 @@ impl<'a, 'r> Lower<'a, 'r> {
             b.clone(),
             self.g(")))", id),
         ]).region(&self.source.path,self.source.node(id).span,"power-type");
+        if constant {
+            if let Some(exponent) = self.resolver.constant_int(self.reference(right))
+                .filter(|exponent| (0..=128).contains(exponent))
+            {
+                let mut parts = vec![self.g(format!("({typeof_}({module}.power(("), id),
+                    typ.clone(), self.g("){},(", id), typ,
+                    self.g("){})))(", id)];
+                if exponent == 0 {
+                    parts.push(self.g("1", id));
+                } else {
+                    for factor in 0..exponent {
+                        parts.push(self.g(if factor == 0 { "(" } else { " * (" }, id));
+                        parts.push(a.clone());
+                        parts.push(self.g(")", id));
+                    }
+                }
+                parts.push(self.g(")", id));
+                return Ok(Code::concat(parts).expansion(&self.source.path, self.source.node(id).span));
+            }
+            if self.source.ancestors(id).any(|node| self.source.node(node).kind == "StructType") {
+                return Ok(self.error_token(id, "Power in a generic type expression requires a fixed nonnegative integer exponent through 128, or a resolved procedure specialization."));
+            }
+        }
         Ok(Code::concat([
             self.g(format!("{module}.power(("), id),
             typ.clone(),

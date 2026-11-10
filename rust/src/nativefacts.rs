@@ -1,7 +1,66 @@
-//! Inspect imports reached through checked bodies before assigning call effects.
+//! Inspect native declarations required for call effects and constant typing.
 use super::*;
 
 impl Project {
+    pub(super) fn discover_membership_facts(&mut self) -> Result<()> {
+        use crate::{ast::NodeId, semantics::Ref};
+
+        let needles = self
+            .sources
+            .iter()
+            .enumerate()
+            .flat_map(|(file, source)| {
+                source
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .filter_map(move |(index, node)| {
+                        if !source.thor
+                            || node.kind != "Binary"
+                            || !matches!(node.op.as_str(), "in" | "not_in")
+                        {
+                            return None;
+                        }
+                        let mut container = source.role(NodeId(index), "right")?;
+                        while source.node(container).kind == "Paren" {
+                            container = source.role(container, "expr")?;
+                        }
+                        let array = source.node(container);
+                        if array.kind != "Compound"
+                            || array
+                                .spans
+                                .get("open")
+                                .is_none_or(|span| source.slice(*span) != "[")
+                        {
+                            return None;
+                        }
+                        source
+                            .role(NodeId(index), "left")
+                            .map(|node| Ref { file, node })
+                    })
+            })
+            .collect::<Vec<_>>();
+        if needles.is_empty() {
+            return Ok(());
+        }
+        let resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        let mut packages = BTreeSet::new();
+        let mut seen = HashSet::new();
+        for needle in needles {
+            Self::referenced_packages(&resolver, needle, &mut seen, &mut packages)?;
+        }
+        packages.retain(|directory| {
+            !self
+                .sources
+                .iter()
+                .any(|source| source.path.parent() == Some(directory))
+        });
+        drop(resolver);
+        if !packages.is_empty() {
+            self.discover_type_facts_from(packages)?;
+        }
+        Ok(())
+    }
     pub(super) fn discover_call_facts(&mut self) -> Result<()> {
         if !self.sources.iter().any(|source| {
             source
@@ -54,7 +113,7 @@ impl Project {
             let mut packages = BTreeSet::new();
             for request in requests {
                 if let Some(callee) = resolver.sources[request.file].role(request.node, "callee") {
-                    Self::callee_packages(
+                    Self::referenced_packages(
                         &resolver,
                         crate::semantics::Ref {
                             file: request.file,
@@ -72,7 +131,7 @@ impl Project {
                     .filter(|id| source.node(*id).kind == "Call")
                 {
                     if let Some(callee) = source.role(node, "callee") {
-                        Self::callee_packages(
+                        Self::referenced_packages(
                             &resolver,
                             crate::semantics::Ref {
                                 file: proc.file,
@@ -100,7 +159,7 @@ impl Project {
         }
         Ok(())
     }
-    fn callee_packages(
+    fn referenced_packages(
         resolver: &Resolver<'_>,
         callee: crate::semantics::Ref,
         seen: &mut HashSet<crate::semantics::Ref>,
@@ -113,7 +172,7 @@ impl Project {
         let node = source.node(callee.node);
         if node.kind == "Paren" {
             if let Some(expr) = source.role(callee.node, "expr") {
-                Self::callee_packages(
+                Self::referenced_packages(
                     resolver,
                     crate::semantics::Ref {
                         file: callee.file,
@@ -124,9 +183,12 @@ impl Project {
                 )?;
             }
         }
-        if node.kind == "ProcedureGroup" {
+        if matches!(
+            node.kind.as_str(),
+            "ProcedureGroup" | "Binary" | "Unary" | "Ternary" | "WhenExpr"
+        ) {
             for child in &node.children {
-                Self::callee_packages(
+                Self::referenced_packages(
                     resolver,
                     crate::semantics::Ref {
                         file: callee.file,
@@ -154,11 +216,6 @@ impl Project {
                 {
                     for import in source.nodes.iter().filter(|node| node.kind == "Import") {
                         let path = unquote(&import.op)?;
-                        if ["base:intrinsics", "base:builtin", "base:runtime"]
-                            .contains(&path.as_str())
-                        {
-                            continue;
-                        }
                         let explicit = source.names.get(import.name);
                         let alias = if explicit.is_empty() {
                             path.rsplit(['/', ':']).next().unwrap_or("")
@@ -168,17 +225,7 @@ impl Project {
                         if alias != source.text(base) {
                             continue;
                         }
-                        let directory = if let Some((name, suffix)) = path.split_once(':') {
-                            source
-                                .collection_roots
-                                .get(name)
-                                .map(|root| root.join(suffix))
-                        } else {
-                            source.path.parent().map(|root| root.join(path))
-                        };
-                        if let Some(directory) =
-                            directory.and_then(|directory| fs::canonicalize(directory).ok())
-                        {
+                        if let Some(directory) = Self::referenced_directory(source, &path) {
                             packages.insert(directory);
                         }
                     }
@@ -191,7 +238,7 @@ impl Project {
         {
             if symbol.constant && !symbol.immutable {
                 if let Some(value) = symbol.value {
-                    Self::callee_packages(
+                    Self::referenced_packages(
                         resolver,
                         crate::semantics::Ref {
                             file: symbol.reference.file,
@@ -202,7 +249,38 @@ impl Project {
                     )?;
                 }
             }
+        } else if node.kind == "Ident" {
+            let name = source.text(callee.node);
+            for selection in &source.selections {
+                if selection.names.iter().any(|selected| selected == name) {
+                    if let Some(directory) =
+                        Self::referenced_directory(source, &unquote(&selection.path)?)
+                    {
+                        packages.insert(directory);
+                    }
+                }
+            }
         }
         Ok(())
+    }
+    fn referenced_directory(source: &Source, path: &str) -> Option<PathBuf> {
+        if matches!(path, "base:intrinsics" | "base:builtin" | "base:runtime") {
+            return None;
+        }
+        let directory = if let Some((name, suffix)) = path.split_once(':') {
+            source
+                .collection_roots
+                .get(name)
+                .map(|root| root.join(suffix))
+                .or_else(|| {
+                    let root = source.info["odin_root"].as_str()?;
+                    ["base", "core", "vendor"]
+                        .contains(&name)
+                        .then(|| Path::new(root).join(name).join(suffix))
+                })?
+        } else {
+            source.path.parent()?.join(path)
+        };
+        fs::canonicalize(directory).ok()
     }
 }

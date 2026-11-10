@@ -402,6 +402,7 @@ impl Project {
     /// compiling output. The differential analysis harness uses this entry.
     pub fn inspect_sources(&mut self) -> Result<()> {
         self.discover_type_facts()?;
+        self.discover_membership_facts()?;
         self.discover_call_facts()?;
         Ok(())
     }
@@ -863,7 +864,7 @@ impl Project {
         self.discover_type_facts_from(BTreeSet::new())
     }
     fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
-        if !self.sources.iter().any(|s| {
+        let general = self.sources.iter().any(|s| {
             s.nodes.iter().any(|n| {
                 n.immutable
                     || n.data["pure"] == true
@@ -872,7 +873,8 @@ impl Project {
                 || s.info["mut_parameters"]
                     .as_array()
                     .is_some_and(|rows| !rows.is_empty())
-        }) {
+        });
+        if packages.is_empty() && !general {
             return Ok(());
         }
         let Some(odin_root) = self
@@ -893,14 +895,14 @@ impl Project {
                 .entry(name.into())
                 .or_insert_with(|| odin_root.join(name));
         }
-        if let Some(base) = roots.get("base") {
+        if let Some(base) = roots.get("base").filter(|_| general) {
             let runtime = base.join("runtime");
             if runtime.join("core.odin").is_file() {
                 packages.insert(runtime);
             }
         }
         for source in &self.sources {
-            if source.shared_native || source.path.starts_with(self.options.root.join("runtime")) {
+            if !general || source.shared_native || source.path.starts_with(self.options.root.join("runtime")) {
                 continue;
             }
             for node in &source.nodes {

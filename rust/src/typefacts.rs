@@ -572,6 +572,11 @@ impl Resolver<'_> {
                 .map(|node| self.specialized_type(Ref { file: r.file, node }, bindings))
                 .unwrap_or(Type::Unknown),
             "SwitchExpr" | "CompileSwitchExpr" => {
+                if n.kind == "CompileSwitchExpr" {
+                    if let Some(arm) = self.selected_compile_switch_value(r, bindings) {
+                        return self.specialized_value_result(arm, index, bindings, seen);
+                    }
+                }
                 let arms = n.data["cases"]
                     .as_array()
                     .into_iter()
@@ -617,6 +622,54 @@ impl Resolver<'_> {
             _ if index == 0 => self.specialized_type(r, bindings),
             _ => Type::Unknown,
         }
+    }
+    fn selected_compile_switch_value(&mut self, r: Ref, bindings: &Substitutions) -> Option<Ref> {
+        let source = &self.sources[r.file];
+        let cases = source.node(r.node).data["cases"].as_array()?;
+        let reference = |span: &serde_json::Value| {
+            crate::ast::Span::from_wire(span)
+                .and_then(|span| source.at(span, r.node))
+                .map(|node| Ref { node, ..r })
+        };
+        let selector = if let Some(node) = source.role(r.node, "selector") {
+            let selector = Ref { node, ..r };
+            let typ = self.specialized_type(selector, bindings);
+            let value = self.constant_value(selector, bindings, Some(&typ))?;
+            Some((value, typ))
+        } else {
+            None
+        };
+        let mut default = None;
+        for case in cases {
+            let operands = case["matches"].as_array()?;
+            if operands.is_empty() {
+                default = reference(&case["result"]);
+                continue;
+            }
+            for operand in operands {
+                let operand = reference(operand)?;
+                let matches = if let Some((value, typ)) = &selector {
+                    let ast = source.node(operand.node);
+                    if ast.kind == "Binary" && matches!(ast.op.as_str(), ".." | "..<" | "..=") {
+                        let integer = |role| {
+                            let node = source.role(operand.node, role)?;
+                            self.context_integer(Ref { node, ..r }, bindings)
+                        };
+                        let (low, high) = (integer("left")?, integer("right")?);
+                        let Constant::Integer(value) = *value else { return None; };
+                        value >= low && (value < high || value == high && ast.op == "..=")
+                    } else {
+                        self.constant_value(operand, bindings, Some(typ)).as_ref()? == value
+                    }
+                } else {
+                    self.context_condition(operand, bindings)?
+                };
+                if matches {
+                    return reference(&case["result"]);
+                }
+            }
+        }
+        default
     }
     fn record_instance(&self, owner: Ref, arguments: Vec<(String, Type)>) -> Type {
         let s = &self.sources[owner.file];
