@@ -170,11 +170,13 @@ class BigConstants:
         return str(value['value']).lower() if value['kind']=='bool' else self.view(value,node)
 
     def readonly(self,node):
-        while node and node.kind in {'Selector','Index','Paren'}:node=node.role('expr')
-        if not node:return False
-        symbol=node.source.resolver.symbol(node)
-        return bool(symbol and symbol.declaration.kind=='Declaration' and not symbol.declaration.data.get('mutable',True)
-                    and node.source.resolver.type_of(node).kind in {'big_integer','big_rational'})
+        while node:
+            symbol=node.source.resolver.symbol(node)
+            if (symbol and symbol.declaration.kind=='Declaration' and not symbol.declaration.data.get('mutable',True)
+                    and node.source.resolver.type_of(node).kind in {'big_integer','big_rational'}):return True
+            if node.kind not in {'Selector','Index','Paren'}:return False
+            node=node.role('expr')
+        return False
 
     def case(self,node,case):
         selector=node.role('selector')

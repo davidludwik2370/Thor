@@ -38,6 +38,13 @@ Use focused comparisons while implementing and broader gates at integration
 boundaries. Further architectural optimization and parallel lowering wait for
 behavioral acceptance. The historical sections below record earlier checkpoints.
 
+One additional reference correctness fix protects qualified numeric constants:
+`library.VALUE` retains the same read-only mutation, address-taking and deletion
+rules as `VALUE`. The previous check removed the package selector before resolving
+the exported symbol, allowing invalid writes and frees of static backing. This
+fix is isolated from the Rust port; the frozen reference tag is retained. The
+regression also verifies that an independent runtime copy remains mutable.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

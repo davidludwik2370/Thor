@@ -11,6 +11,16 @@ class BigCompileTimeTests(base.unittest.TestCase):
     program=language.BigLanguageTests.program
     run_big=language.BigLanguageTests.run_big
 
+    def test_imported_numeric_constants_are_readonly_before_unwrapping_the_package(self):
+        files={'library/main.thor':'package library\nVALUE::Integer(123)\n'}
+        for body in ['library.VALUE=Integer(2)','library.VALUE+=1','_=&library.VALUE',
+                     'delete(library.VALUE)','delete((library.VALUE))']:
+            with self.subTest(body=body):
+                self.invoke(self.program(body,'import "library"\n'),files=files,command='check',fail='read-only')
+        self.run_big('''copy:=library.VALUE;copy+=1;expect(copy,"124")
+expect(library.VALUE,"123");delete(copy)
+''','import "library"\n',files=files)
+
     def test_readonly_constants_exact_arithmetic_and_conditions(self):
         self.run_big('''
 a:=VALUE;b:=NEXT;r:=RATIO;e:=EXACT
