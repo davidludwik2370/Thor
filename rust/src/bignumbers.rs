@@ -7,47 +7,18 @@ pub(super) struct State {
     pub owning: HashSet<NodeId>,
     pub replacements: HashMap<NodeId, Code>,
     pub globalizing: usize,
+    pub constants: HashMap<Ref, serde_json::Value>,
+    pub constant_busy: HashSet<NodeId>,
 }
 impl Lower<'_, '_> {
     fn big_module(&mut self) -> String {
         self.module("big")
     }
     pub(super) fn big_enabled(&mut self) -> bool {
-        if !self.source.thor {
-            return false;
-        }
         if let Some(enabled) = self.logical.enabled {
             return enabled;
         }
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("runtime");
-        let enabled = self
-            .resolver
-            .sources
-            .iter()
-            .enumerate()
-            .any(|(file, source)| {
-                let internal = ["pure", "eval", "format"]
-                    .iter()
-                    .any(|name| source.path.parent() == Some(root.join(name).as_path()));
-                !internal
-                    && source.nodes.iter().enumerate().any(|(index, node)| {
-                        node.kind == "Import"
-                            && unquote(&node.op).ok().as_deref() == Some("thor:big")
-                            || source.thor
-                                && node.kind == "Ident"
-                                && matches!(source.text(NodeId(index)), "Integer" | "Rational")
-                                && self
-                                    .resolver
-                                    .symbol(Ref {
-                                        file,
-                                        node: NodeId(index),
-                                    })
-                                    .is_none()
-                    })
-            });
+        let enabled = self.resolver.logical_enabled(self.file);
         self.logical.enabled = Some(enabled);
         enabled
     }
@@ -150,7 +121,10 @@ impl Lower<'_, '_> {
             return Ok(None);
         };
         if constant {
-            return Err(self.unsupported(id, "logical numeric constant evaluation"));
+            return Ok(Some(self.error_token(
+                id,
+                "This Integer/Rational literal is not a valid exact compile-time number.",
+            )));
         }
         if matches!(typ, Type::BigInteger)
             && crate::bigvalues::literal(&text)
@@ -193,7 +167,7 @@ impl Lower<'_, '_> {
     }
     fn big_render_constructor(&mut self, id: NodeId, typ: Type, constant: bool) -> Result<Code> {
         if constant {
-            return Err(self.unsupported(id, "logical numeric constant constructors"));
+            return Ok(self.error_token(id,"A compile-time Integer/Rational constructor requires exact known numeric inputs; use #run for text parsing or procedure calls."));
         }
         let args = self.source.group(id, "args").to_vec();
         let values = args
@@ -412,68 +386,10 @@ impl Lower<'_, '_> {
             .then(|| field.into())
     }
     pub(super) fn big_handles(&mut self, id: NodeId, hint: Option<&Hint>) -> bool {
-        let node = self.source.node(id);
-        let args = match node.kind.as_str() {
-            "Unary" if matches!(node.op.as_str(), "+" | "-" | "~") => {
-                self.source.role(id, "expr").into_iter().collect::<Vec<_>>()
-            }
-            "Binary"
-                if matches!(
-                    node.op.as_str(),
-                    "+" | "-"
-                        | "*"
-                        | "/"
-                        | "%"
-                        | "%%"
-                        | "**"
-                        | "&"
-                        | "|"
-                        | "~"
-                        | "&~"
-                        | "<<"
-                        | ">>"
-                        | "=="
-                        | "!="
-                        | "<"
-                        | "<="
-                        | ">"
-                        | ">="
-                ) =>
-            {
-                [self.source.role(id, "left"), self.source.role(id, "right")]
-                    .into_iter()
-                    .flatten()
-                    .collect()
-            }
-            _ => return false,
-        };
-        if args
-            .iter()
-            .any(|arg| self.resolver.denotes_type(self.reference(*arg)))
-        {
-            return false;
-        }
-        if args
-            .iter()
-            .any(|arg| matches!(self.typ(*arg),Type::Scalar{name,..} if name=="typeid"))
-        {
-            return false;
-        }
-        if args.iter().any(|arg| self.typ(*arg).big_name().is_some()) {
-            return true;
-        }
-        if args.iter().any(|arg| {
-            self.typ(*arg).is_unknown()
-                && self.source.node(*arg).kind != "ImplicitSelector"
-                && !matches!(self.source.text(*arg), "nil" | "---")
-        }) {
-            return true;
-        }
-        hint.and_then(|hint| hint.semantic.as_ref())
-            .is_some_and(|typ| typ.big_name().is_some() || matches!(typ, Type::Generic))
-            && args
-                .iter()
-                .all(|arg| self.resolver.untyped_operand(self.reference(*arg)))
+        self.resolver.logical_operator(
+            self.reference(id),
+            hint.and_then(|hint| hint.semantic.as_ref()),
+        )
     }
     pub(super) fn big_fresh(&mut self, id: NodeId) -> bool {
         let id = self.unparen(id);
@@ -1227,6 +1143,33 @@ impl Lower<'_, '_> {
             return Ok(None);
         }
         let node = self.source.node(id);
+        if constant {
+            if let Some(code) = self.big_constant_render(id, hint.as_ref())? {
+                return Ok(Some(code));
+            }
+        }
+        if node.kind == "Ident" && !self.big_binding(id) && self.big_constant_readonly(id) {
+            if let Some(code) = self.big_constant_render(id, None)? {
+                return Ok(Some(code));
+            }
+        }
+        if let Some(code) = self.big_constant_declaration(id)? {
+            return Ok(Some(code));
+        }
+        if matches!(node.kind.as_str(), "Assignment" | "IncDec")
+            || node.kind == "Unary" && node.op == "&"
+        {
+            let targets = if node.kind == "Assignment" {
+                self.source.group(id, "lhs").to_vec()
+            } else {
+                self.source.role(id, "expr").into_iter().collect()
+            };
+            for target in targets {
+                if self.big_constant_readonly(target) {
+                    return Ok(Some(self.error_token(target,"A compile-time Integer/Rational constant is read-only; copy it into a runtime binding before changing it or taking its address.")));
+                }
+            }
+        }
         if node.kind == "Declaration" && node.mutable {
             if let Some(code) = self.big_multi_declaration(id)? {
                 return Ok(Some(code));
@@ -1362,6 +1305,9 @@ impl Lower<'_, '_> {
                     .native_builtin(self.reference(callee), "delete")
             {
                 let arg = args[0];
+                if self.big_constant_readonly(arg) {
+                    return Ok(Some(self.error_token(arg,"A compile-time Integer/Rational constant is read-only and cannot be deleted; delete an independent runtime copy instead.")));
+                }
                 let typ = self.typ(arg);
                 if typ.big_name().is_some() || typ.is_unknown() {
                     let root = self.unparen(arg);

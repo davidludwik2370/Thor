@@ -666,8 +666,7 @@ release::proc(text:string){}
             self.assertTrue(all('immutable' not in node for node in packet['payload']['nodes']))
 
     def test_unported_features_fail_closed_without_python(self):
-        for code in ['T::int;when T==int {value:=1} else {value :> 1};value=2;_=value',
-                     'VALUE::Integer(2);_=VALUE']:
+        for code in ['T::int;when T==int {value:=1} else {value :> 1};value=2;_=value']:
             with self.subTest(code=code):
                 self.source.write_text(self.program(code, 'calculate::proc()->int{return 2}\n'))
                 result = self.invoke('rust', command='check', flags=['-json-errors'])

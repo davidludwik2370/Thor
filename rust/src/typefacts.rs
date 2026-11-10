@@ -227,6 +227,7 @@ impl Resolver<'_> {
             })
     }
     fn specialize(&mut self, r: Ref, bindings: &Substitutions, seen: &mut HashSet<Ref>) -> Type {
+        if let Some(typ)=self.logical_constant_type(r){return typ;}
         if !seen.insert(r) {
             return Type::Unknown;
         }

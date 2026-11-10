@@ -44,7 +44,7 @@ impl Lower<'_, '_> {
         let node = self.source.node(id);
         let op = node.op.clone();
         if constant {
-            return Err(self.unsupported(id, "logical numeric constant operators"));
+            return Ok(self.error_token(id,"Compile-time Integer/Rational operators require matching, compile-time-known numeric operands; use fn/#run for computation through procedures."));
         }
         let rational = values
             .iter()

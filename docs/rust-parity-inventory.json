@@ -216,12 +216,14 @@
       "python": "thorlang/bigconstants.py",
       "rust": [
         "rust/src/bigstatic.rs",
-        "rust/src/bigconstantvalue.rs"
+        "rust/src/bigconstantvalue.rs",
+        "rust/src/bigconstants.rs",
+        "rust/src/logicalfacts.rs"
       ],
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Read-only limbs and canonical exact constant operators are ported. Complete AST constant evaluation, source binding/read-only checks, switch selection and integration."
+      "remaining": "Exact source bindings, read-only static backing, canonical operators, numeric builtin constants, exact membership and lazy switch/range validation are connected. Finish native execution-result integration and broad acceptance."
     },
     {
       "python": "thorlang/bigintegration.py",
@@ -245,7 +247,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 53,
-      "remaining": "Runtime constructors, contextual literals, direct copies/assignments, components, call consumers, optional/multiple results and global initialization are ported. Finish constant bindings, remaining generic/call integrations and whole-language acceptance."
+      "remaining": "Runtime direct ownership, source constant/read-only bindings, exact folding and constructor f-string consumer cleanup are connected. Finish numeric builtin/generic component/runtime selection integration, logical fn/#run/cache reconstruction and whole-language acceptance."
     },
     {
       "python": "thorlang/bigoperators.py",
@@ -256,7 +258,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 10,
-      "remaining": "Runtime dispatch and canonical constant arithmetic are ported. Connect source constant operators and complete remaining interactions and acceptance."
+      "remaining": "Runtime dispatch and exact source constant arithmetic are connected. Complete remaining generic/builtin interactions and whole-language acceptance."
     },
     {
       "python": "thorlang/bigvalues.py",

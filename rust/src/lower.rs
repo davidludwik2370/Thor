@@ -8,6 +8,8 @@ use crate::{
 };
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
+#[path = "bigconstants.rs"]
+mod bigconstants;
 #[path = "bignumbers.rs"]
 mod bignumbers;
 #[path = "bigownership.rs"]
@@ -1019,6 +1021,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
+        if !constant && self.querying == 0 && !self.fstring_busy.contains(&id) {
+            if let Some(targets) = self.fstring_plans.get(&id).cloned() {
+                return self.fstring_expression(id, expected, targets);
+            }
+        }
         if let Some(code) = self.big_expression(id, expected.clone(), constant)? { return Ok(code); }
         if self.source.thor {
             if let Some(code) = self.temporary_expression(id, constant)? { return Ok(code); }
@@ -1057,11 +1064,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             let code = self.render(id, expected, constant);
             self.fstring_frames = frames;
             return code;
-        }
-        if !constant && self.querying == 0 && !self.fstring_busy.contains(&id) {
-            if let Some(targets) = self.fstring_plans.get(&id).cloned() {
-                return self.fstring_expression(id, expected, targets);
-            }
         }
         if kind == "Call" && self.checked_mode && self.querying == 0 {
             if let Some(code) = self.checked_call(id, constant)? {
@@ -2589,6 +2591,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     }
                     if callee
                         .is_some_and(|callee| self.resolver.denotes_type(self.reference(callee)))
+                        && self.big_constructor_type(parent).is_none()
                     {
                         continue;
                     }
@@ -2652,7 +2655,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         expected: Option<Hint>,
         targets: HashSet<NodeId>,
     ) -> Result<Code> {
-        let statement = self
+        let statement = !self.temporary_discarding.contains(&id) && self
             .source
             .node(id)
             .parent
@@ -2669,12 +2672,13 @@ impl<'a, 'r> Lower<'a, 'r> {
                 self.resolver.signature(self.reference(callee))
             };
         }
+        let logical_optional=self.big_constructor_type(id).is_some()&&self.source.group(id,"args").iter().any(|arg|self.typ(self.source.role(*arg,"value").unwrap_or(*arg)).is_string());
         let count = if statement {
             0
         } else {
             signature
                 .map(|signature| self.resolver.fields(signature, "results").len())
-                .unwrap_or(1)
+                .unwrap_or(if logical_optional{2}else{1})
         };
         let optional = signature
             .map(|signature| {
@@ -2689,7 +2693,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 } else {
                     "fstring_optional_ok"
                 }
-            });
+            }).or_else(||(!statement&&logical_optional).then_some("fstring_optional_ok"));
         self.fstring_busy.insert(id);
         self.querying += 1;
         let query = if count == 0 {

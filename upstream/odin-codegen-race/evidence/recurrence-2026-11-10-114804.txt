@@ -1,0 +1,31 @@
+Stock Odin compiler crash during the source logical-constant parity gate.
+Personal filesystem paths are omitted. This is an extracted summary, not a raw dump.
+
+Report basename: odin-2026-11-10-114804.ips
+Capture time: 2026-11-10 11:48:04.4435 -0500
+Compiler: odin version dev-2026-10:8169255b9
+Process: Odin compilation for the Python reference
+Signal: SIGSEGV
+Exception: KERN_INVALID_ADDRESS at 0x0000000000000000
+Faulting thread: 9
+
+Faulting stack:
+  alloc_cstring(gbAllocator, String) +896
+  lb_type_internal(lbModule*, Type*) +680
+  lb_type(lbModule*, Type*) +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*) +636
+
+Saved source string registers:
+  x20 = 0 (source pointer)
+  x19 = 24 (source length)
+
+Acceptance fixture: tests.test_rust_compiler.RustCompilerTests.
+  test_compile_switch_multi_constants_and_lazy_statement_selection
+
+The Python reference terminated with status 139. Rust succeeded and printed
+3 local 2. Independent isolated debug and release comparisons both passed.
+The 211-test combined gate had no other failure. The first three stack offsets
+and null-source/nonzero-length string match earlier evidence. The report does
+not identify the accessed Entity or prove which concurrent write caused it.
+No Odin compiler change or automatic retry behavior was introduced.

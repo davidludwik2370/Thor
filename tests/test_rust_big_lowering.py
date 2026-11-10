@@ -191,4 +191,16 @@ make_record::proc($T:typeid)->T{return T{value=1}}
 '''))
 
 
+    def test_fstring_constructor_inputs_release_only_their_temporary_strings(self):
+        self.tracked(self.numeric('''a,ok:=Integer(f"12{3}");if !ok{panic("parse")};expect(a,"123");delete(a)
+b,b_ok:=Rational(f"1.{25}");if !b_ok{panic("rational")};expect(b,"5/4");delete(b)
+for flag in [false,true]{
+ c:=Integer(flag?f"{7}":"8") or_else 0;expect(c,flag?"7":"8");delete(c)
+}
+d,d_ok:=Rational(f"{22}",f"{13}");if !d_ok{panic("pair")};expect(d,"22/13");delete(d)
+Integer(f"{7}")
+text:=f!"{42}";defer delete(text);e:=Integer(text) or_else 0;expect(e,"42");delete(e)
+'''))
+
+
 if __name__=='__main__':unittest.main()

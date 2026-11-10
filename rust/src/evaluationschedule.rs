@@ -105,7 +105,7 @@ impl<'p> Scheduler<'p> {
                     node: NodeId(index),
                 };
                 let request = ast.kind == "Run"
-                    || ast.kind == "Binary" && ast.op == "**"
+                    || self.numeric_power(node)
                     || ast.kind == "Comprehension" && self.constant_context(node)
                     || ast.kind == "Call"
                         && crate::extremaplan::plan(&self.resolver, node).is_some()
@@ -411,12 +411,26 @@ impl<'p> Scheduler<'p> {
         }
         false
     }
+    fn numeric_power(&mut self,node:Ref)->bool{
+        let source=self.source(node);
+        if !source.thor||self.kind(node)!="Binary"||source.node(node.node).op!="**"{return false;}
+        if self.resolver.logical_enabled(node.file){
+            if self.resolver.logical_operator(node,None){return false;}
+            for ancestor in source.ancestors(node.node){
+                let at=Ref{file:node.file,node:ancestor};let n=source.node(ancestor);
+                if n.kind=="Call"{if let Some(callee)=source.role(ancestor,"callee").map(|node|Ref{file:at.file,node}){if self.resolver.denotes_type(callee)&&self.resolver.type_of(callee).big_name().is_some(){return false;}}}
+                if n.kind=="Declaration"&&source.role(ancestor,"type").is_some_and(|node|self.resolver.type_of(Ref{file:at.file,node}).big_name().is_some()){return false;}
+                if n.kind=="Binary"&&self.resolver.logical_operator(at,None){return false;}
+            }
+        }
+        true
+    }
     pub fn automatic(&mut self, node: Ref) -> bool {
         if self.kind(node) == "Comprehension" {
             return self.constant_context(node);
         }
         if self.kind(node) == "Binary" && self.source(node).node(node.node).op == "**" {
-            return !self.queried(node);
+            return self.numeric_power(node)&&!self.queried(node);
         }
         if self.kind(node) != "Call"
             || self
@@ -734,7 +748,7 @@ impl<'p> Scheduler<'p> {
                     }
                 }
                 let ready = self.known_seen(right, &mut seen.clone())?;
-                if ready && ast.op == "**" {
+                if ready && self.numeric_power(node) {
                     self.evaluate(node)?;
                 }
                 return Ok(ready);

@@ -170,6 +170,38 @@ This remains checkpoint 6. Read-only constant folding/static source bindings,
 numeric builtins/generic components, and logical-number pure execution and cache
 reconstruction still need integration. Python remains the supported default.
 
+### Source logical constants and lazy selection
+
+The Rust constant lowerer now follows source bindings and exact numeric operators,
+including nested numeric builtins, Rational components, conditions and lazy
+compile-time switch arms. It validates exact ranges and overlap, and preserves
+source diagnostics at file scope. Numeric membership constants retain the
+reference's exact comparison and short-circuit behavior.
+
+Numeric constants use shared read-only limb backing. Reading them does not
+allocate; direct runtime copies remain independent owners. Mutation, address-taking
+and deletion are rejected, including qualified imports. Text parsing and other
+procedure-based construction still require explicit compile-time execution.
+Logical constant type facts remain separate from native execution results.
+
+Native power scheduling excludes logical-number operators and their constructor
+or annotated contexts, matching the Python decision order. F-string cleanup
+scopes also precede numeric constructors, so anonymous parse strings are released
+without freeing named strings or changing optional result arity.
+
+This remains checkpoint 6. Runtime numeric builtins, generic components,
+selection and logical-number fn/#run/cache reconstruction are the next work.
+Python remains the supported default.
+
+The combined compiler/runtime/constants/resolution/generic/temporary/formatting/
+execution/cache/reference/hygiene gate ran 211 tests: 210 passed. The remaining
+Python-reference Odin compilation crashed with SIGSEGV; Rust printed the expected
+`3 local 2`. Isolated debug and release comparisons both passed. The null-source
+`alloc_cstring`/`lb_type_internal` stack matches the existing upstream evidence;
+see `upstream/odin-codegen-race/evidence/recurrence-2026-11-10-114804.txt`. This is
+recorded as an external gate failure, not a clean full-suite pass. All 29 Rust
+unit tests passed in debug and release, and Clippy passed with warnings denied.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

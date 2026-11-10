@@ -172,6 +172,7 @@ impl Lower<'_, '_> {
         Ok(None)
     }
     fn compile_case_problem(&mut self, id: NodeId) -> Result<Option<String>> {
+        if let Some(problem)=self.big_compile_case_problem(id){return Ok(Some(problem));}
         let mut keys = HashSet::new();
         let mut intervals: Vec<(i128, i128)> = vec![];
         for case in self.cases(id)? {
@@ -285,6 +286,7 @@ impl Lower<'_, '_> {
         }
     }
     fn switch_validation(&mut self, id: NodeId) -> Result<Code> {
+        if self.source.role(id,"selector").is_some_and(|selector|self.typ(selector).big_name().is_some()){return Ok(self.g("true",id));}
         let mut operands = vec![];
         for case in self.cases(id)? {
             for operand in case.matches {
@@ -374,6 +376,7 @@ impl Lower<'_, '_> {
         Ok(Code::concat(code))
     }
     fn case_condition(&mut self, id: NodeId, case: &Case) -> Result<Code> {
+        if let Some(selected)=self.big_compile_case(id,&case.matches){return Ok(self.g(if selected{"true"}else{"false"},id));}
         if case.matches.is_empty() {
             return Ok(self.g("true", id));
         }
@@ -1138,7 +1141,8 @@ impl Lower<'_, '_> {
             return Ok(Some(self.error_token(id,"break in a switch expression requires an ordinary = assignment to existing destinations.")));
         }
         if let Some(problem) = self.switch_problem(id, hints.len())? {
-            return Ok(Some(problem));
+            let global=s.node(owner).kind=="Declaration"&&!s.ancestors(owner).any(|ancestor|s.node(ancestor).kind=="Procedure");
+            return Ok(Some(if global{self.g(format!("#panic({})",json!(problem.finish().text)),id)}else{problem}));
         }
         if s.node(id).kind == "CompileSwitchExpr" && (hints.len() > 1 || skip) {
             let header = s.node(owner).parent.is_some_and(|parent| {

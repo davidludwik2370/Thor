@@ -4,6 +4,8 @@ use crate::ast::{NodeId, Source};
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+#[path = "logicalfacts.rs"]
+mod logicalfacts;
 #[path = "calls.rs"]
 mod calls;
 #[path = "conditions.rs"]
@@ -188,6 +190,8 @@ pub struct Resolver<'a> {
     pub conditional_immutables: HashSet<Ref>,
     pub flags: Vec<String>,
     pub evaluated: BTreeMap<Ref, serde_json::Value>,
+    pub logical_constants: BTreeMap<Ref,serde_json::Value>,
+    logical_activation: std::cell::OnceCell<bool>,
     pub bound_types: BTreeMap<(Ref, String), Type>,
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
@@ -241,6 +245,14 @@ impl<'a> Resolver<'a> {
         self.parameter_witnesses.clear();
         self.prepare_contexts();
     }
+    pub(crate) fn remember_logical_constant(&mut self,node:Ref,value:serde_json::Value){
+        self.logical_constants.insert(node,value);self.types.clear();
+    }
+    pub(crate) fn logical_constant_type(&self,node:Ref)->Option<Type>{
+        match self.logical_constants.get(&node)?["kind"].as_str()?{
+            "big_integer"=>Some(Type::BigInteger),"big_rational"=>Some(Type::BigRational),_=>None,
+        }
+    }
     pub fn remember_evaluation(&mut self, node: Ref, value: serde_json::Value) {
         self.evaluated.insert(node, value);
         self.types.clear();
@@ -262,6 +274,8 @@ impl<'a> Resolver<'a> {
             conditional_immutables: HashSet::new(),
             flags: flags.to_vec(),
             evaluated: BTreeMap::new(),
+            logical_constants: BTreeMap::new(),
+            logical_activation: std::cell::OnceCell::new(),
             bound_types: BTreeMap::new(),
             bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
@@ -806,6 +820,10 @@ impl<'a> Resolver<'a> {
         }
     }
     pub(crate) fn logical_result(&mut self, r: Ref, index: usize) -> Option<Type> {
+        if let Some(typ)=self.logical_numeric_result(r){
+            if index==0{return Some(typ);}
+            if index==1&&crate::extremaplan::plan(self,r).is_some_and(|plan|plan.optional){return Some(Type::scalar("bool"));}
+        }
         let source = &self.sources[r.file];
         if source.node(r.node).kind != "Call" {
             return None;
@@ -1085,6 +1103,7 @@ impl<'a> Resolver<'a> {
         typ
     }
     fn infer(&mut self, r: Ref) -> Type {
+        if let Some(typ)=self.logical_constant_type(r){return typ;}
         if let Some(typ) = self.logical_type(r) {
             return typ;
         }
@@ -1400,6 +1419,7 @@ impl<'a> Resolver<'a> {
                 self.result_type(r, 0, &mut HashSet::new())
             }
             "Call" => {
+                if let Some(typ)=self.logical_numeric_result(r){return typ;}
                 let Some(callee) = child("callee") else {
                     return Type::Unknown;
                 };
@@ -1769,7 +1789,7 @@ impl<'a> Resolver<'a> {
         }
         let s = &self.sources[r.file];
         let n = s.node(r.node);
-        if self.evaluated.contains_key(&r)
+        if self.logical_constants.contains_key(&r) || self.evaluated.contains_key(&r)
             || matches!(n.kind.as_str(), "Run" | "Literal")
             || n.kind.ends_with("Type")
         {
