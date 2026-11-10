@@ -4,6 +4,7 @@ use super::*;
 pub(super) struct State {
     pub enabled: Option<bool>,
     pub busy: HashSet<NodeId>,
+    pub integration_busy: HashSet<NodeId>,
     pub owning: HashSet<NodeId>,
     pub replacements: HashMap<NodeId, Code>,
     pub globalizing: usize,
@@ -402,13 +403,13 @@ impl Lower<'_, '_> {
             "Binary" | "Unary" if self.big_handles(id, None) => {
                 !matches!(node.op.as_str(), "==" | "!=" | "<" | "<=" | ">" | ">=")
             }
-            "Selector" => self.big_property(id).is_some(),
+            "Selector" => self.big_property(id).is_some() || self.big_dynamic_property(id),
             "Compound" => typ.big_name().is_some(),
             "OrElse" | "OrReturn" | "OrBranch" | "OrPanic" | "Run" => {
                 typ.big_name().is_some() || matches!(typ, Type::Generic)
             }
             "Call" if !self.resolver.denotes_type(self.reference(id)) => {
-                if typ.big_name().is_some() {
+                if typ.big_name().is_some() || self.resolver.logical_numeric_result(self.reference(id)).is_some() {
                     return true;
                 }
                 let Some(callee) = self.source.role(id, "callee") else {
@@ -699,6 +700,9 @@ impl Lower<'_, '_> {
         let rhs = self.source.group(id, "rhs").to_vec();
         if self.source.node(id).op != "=" {
             return Ok(None);
+        }
+        if rhs.len()==1 && matches!(self.source.node(self.unparen(rhs[0])).kind.as_str(),"SwitchExpr"|"CompileSwitchExpr") {
+            if let Some(code)=self.switch_statement(id,false)? {return Ok(Some(code));}
         }
         let multiple =
             rhs.len() == 1 && lhs.len() > 1 && self.big_numeric_results(rhs[0], lhs.len());
@@ -1170,6 +1174,7 @@ impl Lower<'_, '_> {
                 }
             }
         }
+        if let Some(code)=self.big_integration(id,hint.clone(),constant)? { return Ok(Some(code)); }
         if node.kind == "Declaration" && node.mutable {
             if let Some(code) = self.big_multi_declaration(id)? {
                 return Ok(Some(code));

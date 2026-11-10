@@ -8,6 +8,8 @@ use crate::{
 };
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
+#[path = "bigintegration.rs"]
+mod bigintegration;
 #[path = "bigconstants.rs"]
 mod bigconstants;
 #[path = "bignumbers.rs"]
@@ -1688,7 +1690,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             ] {
                 let name = format!("{helper}_{suffix}");
                 names.push(name.clone());
-                parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values: {signature}, value:E)->bool {{ for element in values {{if element==value {{return true}}}}; return false }}\n"));
+                let equality=if self.big_enabled(){format!("{}.compiler_equal(element,value)",self.module("big"))}else{"element==value".into()};
+                parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values: {signature}, value:E)->bool {{ for element in values {{if {equality} {{return true}}}}; return false }}\n"));
             }
             for (suffix, signature, element) in [("map", "$C/map[$K]$V", "K"), ("bits", "$C/bit_set[$E]", "E")] {
                 let name=format!("{helper}_{suffix}");
@@ -1792,9 +1795,6 @@ impl<'a, 'r> Lower<'a, 'r> {
             let a = self.render(left, None, constant)?;
             let b = self.render(right, None, constant)?;
             return Ok(Code::concat([a, self.g(format!(" {op} "), id), b]));
-        }
-        if !typ.is_sequence() && !self.is_array(sequence) {
-            return Err(self.unsupported(id, "generic/bit-set/set membership dispatch"));
         }
         let helper = self.membership_helper(id);
         let a = self.render(left, None, constant)?;

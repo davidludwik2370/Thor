@@ -562,11 +562,11 @@ impl Lower<'_, '_> {
                 if i > 0 {
                     code.push(self.g(", ", arm));
                 }
-                code.push(self.render(*value, hints.get(i).cloned().flatten(), constant)?);
+                code.push(self.big_owned(*value, hints.get(i).cloned().flatten(), constant)?);
             }
             Ok(Code::concat(code))
         } else {
-            self.render(arm, hints.first().cloned().flatten(), constant)
+            self.big_owned(arm, hints.first().cloned().flatten(), constant)
         }
     }
     fn compile_arm(&mut self, arm: NodeId, hints: &[Option<Hint>], constant: bool) -> Result<Code> {
@@ -650,6 +650,27 @@ impl Lower<'_, '_> {
         } else {
             vec![arm]
         };
+        if self.big_enabled() && (self.big_numeric_results(arm,hints.len()) || hints.iter().flatten().any(|hint|hint.semantic.as_ref().is_some_and(|typ|typ.big_name().is_some()||matches!(typ,Type::Generic)))) {
+            let mut code=vec![];
+            let names=(0..hints.len()).map(|_|self.temporary_name("big_switch")).collect::<Vec<_>>();
+            if values.len()==hints.len(){
+                for((name,value),hint)in names.iter().zip(&values).zip(hints){
+                    code.push(self.g(name,*value));
+                    code.push(self.g(if hint.is_some(){":"}else{":="},*value));
+                    if let Some(hint)=hint{code.extend([hint.code.clone(),self.g("=",*value)]);}
+                    code.extend([self.big_owned(*value,hint.clone(),false)?,self.g("\n",*value)]);
+                }
+            }else{code.extend([self.g(format!("{}:=",names.join(",")),arm),self.render(arm,None,false)?,self.g("\n",arm)]);}
+            if let Some(targets)=targets{
+                let targets=targets.iter().cloned().map(|code|code.finish().text).collect::<Vec<_>>();
+                self.big_commit(id,&targets,&names,&mut code);
+            }else{
+                let module=self.module("big");
+                for(blank,name)in blanks.iter().zip(&names){if *blank{code.push(self.g(format!("{module}.compiler_destroy(&{name})\n"),arm));}}
+                code.push(self.g(format!("return {}",names.join(",")),arm));
+            }
+            return Ok(Code::concat(code));
+        }
         let cleanup = values.len() == hints.len()
             && values
                 .iter()
@@ -719,7 +740,14 @@ impl Lower<'_, '_> {
         let selector = self.source.role(id, "selector");
         let missing = !cases.iter().any(|case| case.matches.is_empty());
         let mut code = vec![];
-        let selector_code = if let Some(selector) = selector {
+        let logical_selector=selector.map(|node|self.typ(node)).filter(|typ|typ.big_name().is_some());
+        let selector_code = if let (Some(selector),Some(_))=(selector,logical_selector.as_ref()) {
+            if let Some(problem)=self.big_compile_case_problem(id){return Ok(self.error_token(id,&problem));}
+            let module=self.module("big");
+            let name=format!("{}switch_selector_{}",self.prefix,self.source.node(id).span.start);
+            code.extend([self.g(format!("{name}:="),selector),self.big_owned(selector,None,false)?,self.g(format!("\ndefer {module}.compiler_destroy(&{name})\n"),selector)]);
+            self.g(name,selector)
+        } else if let Some(selector) = selector {
             self.render(selector, None, false)?
         } else {
             self.g("", id)
@@ -747,14 +775,23 @@ impl Lower<'_, '_> {
             },
             id,
         ));
-        code.extend([selector_code, self.g(" {\n", id)]);
+        code.extend([if logical_selector.is_some(){self.g("",id)}else{selector_code.clone()}, self.g(" {\n", id)]);
         for case in cases {
             code.push(self.g("case ", case.result));
             for (i, operand) in case.matches.iter().enumerate() {
                 if i > 0 {
                     code.push(self.g(", ", *operand));
                 }
-                code.push(self.render(*operand, None, false)?);
+                if let Some(typ)=logical_selector.as_ref(){
+                    let module=self.module("big");
+                    let hint=Hint{code:self.g(format!("{module}.{}",typ.big_name().unwrap()),*operand),semantic:Some(typ.clone()),element_only:false,plain_array:false};
+                    let node=self.source.node(*operand);
+                    let value=if node.kind=="Binary"&&matches!(node.op.as_str(),".."|"..<"|"..="){
+                        let low=self.role(*operand,"left")?;let high=self.role(*operand,"right")?;
+                        Code::concat([self.g(format!("{module}.compiler_switch_range("),*operand),selector_code.clone(),self.g(",",*operand),self.big_owned(low,Some(hint.clone()),false)?,self.g(",",*operand),self.big_owned(high,Some(hint),false)?,self.g(format!(",{})",node.op=="..="),*operand)])
+                    }else{Code::concat([self.g(format!("{module}.compiler_switch_case("),*operand),selector_code.clone(),self.g(",",*operand),self.big_owned(*operand,Some(hint),false)?,self.g(")",*operand)])};
+                    code.push(self.gen(value.finish().text,self.source.node(*operand).span,"debug-capture"));
+                }else{code.push(self.render(*operand, None, false)?);}
             }
             code.push(self.g(": ", case.result));
             if missing && targets.is_some() {

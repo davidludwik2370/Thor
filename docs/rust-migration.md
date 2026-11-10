@@ -202,6 +202,34 @@ see `upstream/odin-codegen-race/evidence/recurrence-2026-11-10-114804.txt`. This
 recorded as an external gate failure, not a clean full-suite pass. All 29 Rust
 unit tests passed in debug and release, and Clippy passed with warnings denied.
 
+### Runtime logical selection and generic components
+
+The runtime integration now follows numeric `abs`, `min`, `max` and `clamp`,
+including array expansion, optional slice expansion, empty inputs, anonymous
+operand cleanup and ordinary native generic instantiations. Selected results own
+independent storage. Generic Rational component reads also return owned numeric
+values while ordinary record fields retain their native behavior; write guards
+reject the logical properties only for Rational receivers.
+
+Logical membership compares numeric contents. Named collections stay borrowed;
+constructed scalar operands are evaluated once and released. Generic collection
+membership uses native dispatch for arrays, slices, maps and bit sets, with
+logical equality only for exact numeric instantiations.
+
+Runtime numeric switches own a stable selector snapshot and consume owned case
+operands. All result slots are evaluated before destination replacement, blank
+slots are destroyed, and `case: break` leaves existing destinations untouched.
+Case comparisons retain source mapping and the debugger capture classification.
+
+This remains checkpoint 6. Logical-number pure execution, native result/cache
+reconstruction and remaining whole-language acceptance are still outstanding.
+Python remains the supported default.
+
+All 162 integration/constants/runtime/compiler/generic/temporary/formatting and
+assertion-hygiene tests passed. The twelve new focused comparisons run with
+allocation tracking in checked and unchecked builds. All 29 Rust unit tests
+passed in debug and release, and Clippy passed with warnings denied.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

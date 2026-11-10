@@ -9,7 +9,7 @@ pub(super) struct Temporary {
     dependencies: Vec<Temporary>,
 }
 impl Lower<'_, '_> {
-    fn temporary_name(&mut self, label: &str) -> String {
+    pub(super) fn temporary_name(&mut self, label: &str) -> String {
         self.temporary_serial += 1;
         format!("{}owned_{label}_{}", self.prefix, self.temporary_serial)
     }
@@ -74,7 +74,7 @@ impl Lower<'_, '_> {
                 .role(id, "expr")
                 .is_some_and(|expr| self.temporary_view(expr));
         }
-        if self.big_enabled()&&self.big_property(id).is_some(){return false;}
+        if self.big_enabled()&&(self.big_property(id).is_some()||self.big_dynamic_property(id)){return false;}
         matches!(node.kind.as_str(), "Slice" | "Selector")
             && self
                 .source

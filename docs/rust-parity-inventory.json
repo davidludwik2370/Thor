@@ -227,11 +227,16 @@
     },
     {
       "python": "thorlang/bigintegration.py",
-      "rust": [],
+      "rust": [
+        "rust/src/bigintegration.rs",
+        "rust/src/logicalfacts.rs",
+        "rust/src/switches.rs",
+        "rust/src/lower.rs"
+      ],
       "checkpoint": 6,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 12,
-      "remaining": "Port logical-number integration."
+      "remaining": "Numeric builtins, expanded extrema, generic components/read-only guards, content membership, generic native collection dispatch and owned runtime switch selection are ported. Complete pure/evaluation interactions and whole-language acceptance."
     },
     {
       "python": "thorlang/bignumbers.py",
@@ -247,7 +252,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 53,
-      "remaining": "Runtime direct ownership, source constant/read-only bindings, exact folding and constructor f-string consumer cleanup are connected. Finish numeric builtin/generic component/runtime selection integration, logical fn/#run/cache reconstruction and whole-language acceptance."
+      "remaining": "Direct runtime ownership, exact source constants, anonymous constructor inputs, numeric builtins/generic components and owned runtime switch selection are connected. Complete logical fn/#run/cache reconstruction and whole-language acceptance."
     },
     {
       "python": "thorlang/bigoperators.py",
@@ -380,7 +385,7 @@
       "checkpoint": 6,
       "status": "partial",
       "reference_functions": 26,
-      "remaining": "Strings, Sets and logical-number producer/destructor lifetimes are integrated with known consumers, selected arms and discarded results. Finish logical generic/builtin/constant interactions and whole-language acceptance."
+      "remaining": "Strings, Sets and logical numeric producers/destructors are integrated with known consumers, selected arms, result-slot discards, builtins, membership and generic components. Complete logical pure/evaluation interactions and whole-language acceptance."
     },
     {
       "python": "thorlang/repetition.py",
