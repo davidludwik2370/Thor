@@ -61,6 +61,38 @@ impl Resolver<'_> {
             }
             if let Some(index) = self.symbol(r) {
                 let symbol = &self.symbols[index];
+                if let Some((typ, value)) = self
+                    .bound_constants
+                    .get(&(symbol.reference, symbol.name.clone()))
+                {
+                    match value["kind"].as_str()? {
+                        "integer" => {
+                            let value = value["value"].as_str()?.parse().ok()?;
+                            let mut typ = typ;
+                            while let Type::Nominal(_, inner) = typ {
+                                typ = inner;
+                            }
+                            return Some(if let Type::Enum(owner) = typ {
+                                Constant::Enum(*owner, value)
+                            } else {
+                                Constant::Integer(value)
+                            });
+                        }
+                        "bool" => return value["value"].as_bool().map(Constant::Boolean),
+                        "string" => {
+                            let text = value["bytes"].as_str()?;
+                            let bytes = text
+                                .as_bytes()
+                                .chunks_exact(2)
+                                .map(|pair| {
+                                    u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()
+                                })
+                                .collect::<Option<Vec<_>>>()?;
+                            return String::from_utf8(bytes).ok().map(Constant::Text);
+                        }
+                        _ => {}
+                    }
+                }
                 if symbol.constant {
                     if let Some(value) = symbol.value {
                         return self.constant_value_seen(

@@ -202,6 +202,18 @@ pub struct Saved {
     frames: Vec<(Ref, Bindings)>,
 }
 impl Specializations {
+    pub fn apply(&self, r: &mut Resolver<'_>) {
+        let mut types = BTreeMap::new();
+        let mut constants = BTreeMap::new();
+        for (key, binding) in &self.bindings {
+            if let Some(value) = &binding.value {
+                constants.insert(key.clone(), (binding.typ.clone(), value.clone()));
+            } else {
+                types.insert(key.clone(), binding.typ.clone());
+            }
+        }
+        r.set_lexical_bindings(types, constants);
+    }
     pub fn relevant(&self, at: Ref, r: &Resolver<'_>) -> Bindings {
         let owners = r.sources[at.file]
             .ancestors(at.node)
@@ -286,7 +298,7 @@ impl Specializations {
         r: &Resolver<'_>,
     ) -> Result<String> {
         let mut lines = vec![];
-        for binding in bindings.values() {
+        for ((_, name), binding) in bindings {
             let typ = context.render(&binding.typ, r)?;
             let value = if let Some(value) = &binding.value {
                 values::expression(
@@ -298,7 +310,7 @@ impl Specializations {
             } else {
                 typ
             };
-            lines.push(format!("{} :: {value}", r.symbols[binding.symbol].name));
+            lines.push(format!("{name} :: {value}"));
         }
         Ok(lines.join("\n") + "\n")
     }
@@ -309,8 +321,7 @@ impl Specializations {
     ) -> Result<String> {
         let mut predicates = vec![];
         let meta = format!("{}meta", r.sources[context.file].prefix);
-        for binding in bindings.values() {
-            let name = &r.symbols[binding.symbol].name;
+        for ((_, name), binding) in bindings {
             let typ = match context.render(&binding.typ, r) {
                 Ok(typ) => typ,
                 Err(error) => {

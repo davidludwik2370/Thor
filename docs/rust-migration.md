@@ -345,6 +345,16 @@ identity probes are still pending. The scheduling/reconstruction harness does
 not enable evaluation in the normal Rust command. Contents caching, logical
 numbers and final command/editor integration retain their later checkpoints.
 
+The next generic-frame foundation connects `Specializations` to the resolver's
+declaration-keyed type and constant environments. Entering/restoring a binding
+environment clears dependent type/context facts; an empty environment retains
+the ordinary lookup path. Local record types capture the generic types and
+dimensions they use, so those facts survive after the active frame is cleared.
+The 37-test lexical-binding/specialization/type-parameter/generic-branch gate
+passes, including nested shadowing and boolean, UTF-8 string and enum constants.
+Clippy passes with warnings denied. The scheduler has not yet adopted these
+environments or emitted per-specialization result cases.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

@@ -157,7 +157,10 @@ impl Resolver<'_> {
     pub fn specialized_type(&mut self, r: Ref, bindings: &Substitutions) -> Type {
         self.specialize(r, bindings, &mut HashSet::new())
     }
-    pub fn bound_type<'b>(&self, r: Ref, bindings: &'b Substitutions) -> Option<&'b Type> {
+    pub fn bound_type<'b>(&'b self, r: Ref, bindings: &'b Substitutions) -> Option<&'b Type> {
+        if bindings.is_empty() && self.bound_types.is_empty() && self.bound_constants.is_empty() {
+            return None;
+        }
         let s = &self.sources[r.file];
         let n = s.node(r.node);
         let name = if n.kind == "PolyType" {
@@ -179,15 +182,22 @@ impl Resolver<'_> {
                 return Some(typ);
             }
         }
-        let typ = bindings.get(name)?;
         let Some(index) = self.symbol(r) else {
-            return (n.kind == "PolyType").then_some(typ);
+            return bindings.get(name).filter(|_| n.kind == "PolyType");
         };
         let symbol = &self.symbols[index];
         let owner = &self.sources[symbol.reference.file];
-        (owner.node(symbol.name_node).kind == "PolyType"
-            || symbol.parameter && owner.node(symbol.scope).kind == "StructType")
-            .then_some(typ)
+        if owner.node(symbol.name_node).kind == "PolyType"
+            || symbol.parameter && owner.node(symbol.scope).kind == "StructType"
+        {
+            if let Some(typ) = bindings.get(name) {
+                return Some(typ);
+            }
+        }
+        let key = (symbol.reference, symbol.name.clone());
+        self.bound_types
+            .get(&key)
+            .or_else(|| self.bound_constants.get(&key).map(|(typ, _)| typ))
     }
     pub(super) fn enum_binding_key(owner: Ref, name: &str) -> String {
         format!("#enum:{}:{}:{name}", owner.file, owner.node.0)
@@ -399,8 +409,12 @@ impl Resolver<'_> {
                         if names.iter().any(|parameter| parameter == name) {
                             return None;
                         }
-                        let typ = bindings.get(name)?;
-                        let symbol = &self.symbols[self.symbol(Ref { file: r.file, node })?];
+                        let reference = Ref { file: r.file, node };
+                        let typ = self
+                            .constant_value(reference, bindings, None)
+                            .map(Type::Constant)
+                            .or_else(|| self.bound_type(reference, bindings).cloned())?;
+                        let symbol = &self.symbols[self.symbol(reference)?];
                         let owner = &self.sources[symbol.reference.file];
                         (owner.node(symbol.name_node).kind == "PolyType"
                             && (symbol.reference.file != r.file

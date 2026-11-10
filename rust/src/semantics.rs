@@ -172,6 +172,8 @@ pub struct Resolver<'a> {
     pub conditional_immutables: HashSet<Ref>,
     pub flags: Vec<String>,
     pub evaluated: BTreeMap<Ref, serde_json::Value>,
+    pub bound_types: BTreeMap<(Ref, String), Type>,
+    pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
 }
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
@@ -208,6 +210,21 @@ pub fn scope(source: &Source, id: NodeId) -> NodeId {
         .unwrap_or(NodeId(0))
 }
 impl<'a> Resolver<'a> {
+    pub fn set_lexical_bindings(
+        &mut self,
+        types: BTreeMap<(Ref, String), Type>,
+        constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
+    ) {
+        if self.bound_types == types && self.bound_constants == constants {
+            return;
+        }
+        self.bound_types = types;
+        self.bound_constants = constants;
+        self.types.clear();
+        self.context_hints.clear();
+        self.parameter_witnesses.clear();
+        self.prepare_contexts();
+    }
     pub fn remember_evaluation(&mut self, node: Ref, value: serde_json::Value) {
         self.evaluated.insert(node, value);
         self.types.clear();
@@ -229,6 +246,8 @@ impl<'a> Resolver<'a> {
             conditional_immutables: HashSet::new(),
             flags: flags.to_vec(),
             evaluated: BTreeMap::new(),
+            bound_types: BTreeMap::new(),
+            bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
         };
         for (file, source) in sources.iter().enumerate() {
@@ -975,6 +994,19 @@ impl<'a> Resolver<'a> {
         }
     }
     pub fn type_of(&mut self, reference: Ref) -> Type {
+        if (!self.bound_types.is_empty() || !self.bound_constants.is_empty())
+            && matches!(
+                self.sources[reference.file]
+                    .node(reference.node)
+                    .kind
+                    .as_str(),
+                "Ident" | "PolyType"
+            )
+        {
+            if let Some(typ) = self.bound_type(reference, &Default::default()) {
+                return typ.clone();
+            }
+        }
         if let Some(typ) = self.types.get(&reference) {
             return typ.clone();
         }
@@ -1410,6 +1442,19 @@ impl<'a> Resolver<'a> {
         self.integer(r, &mut HashSet::new())
     }
     fn integer(&self, r: Ref, seen: &mut HashSet<Ref>) -> Option<i128> {
+        if let Some(symbol) = (!self.bound_constants.is_empty())
+            .then(|| self.symbol(r))
+            .flatten()
+            .map(|index| &self.symbols[index])
+        {
+            if let Some((_, value)) = self
+                .bound_constants
+                .get(&(symbol.reference, symbol.name.clone()))
+                .filter(|(_, value)| value["kind"] == "integer")
+            {
+                return value["value"].as_str()?.parse().ok();
+            }
+        }
         if let Some(value) = self
             .evaluated
             .get(&r)
