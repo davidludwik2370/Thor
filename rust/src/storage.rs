@@ -298,7 +298,7 @@ impl Lower<'_, '_> {
         } else {
             if matches!(
                 typ,
-                Type::Slice(_) | Type::Dynamic(_) | Type::Pointer(_) | Type::String { .. }
+                Type::Slice(_) | Type::Dynamic(_) | Type::Fixed{..} | Type::Pointer(_) | Type::String { .. }
             ) {
                 return Ok(None);
             }
@@ -467,6 +467,7 @@ impl Lower<'_, '_> {
                         typ,
                         Type::Slice(_)
                             | Type::Dynamic(_)
+                            | Type::Fixed{..}
                             | Type::Map { .. }
                             | Type::Pointer(_)
                             | Type::String { .. }

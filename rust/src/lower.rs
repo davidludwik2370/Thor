@@ -2248,6 +2248,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             {
                 continue;
             }
+            if sym.annotation.is_some_and(|annotation|source.node(annotation).kind=="TypeidType"){continue;}
             if sym.parameter
                 && source
                     .group(sym.reference.node, "names")
@@ -2264,15 +2265,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         let mut args = vec![];
         let mut aliases = HashMap::new();
         for (i, (symbol, child)) in variables.iter().enumerate() {
-            let sym = &self.resolver.symbols[*symbol];
-            let declaration = self.source.node(sym.reference.node);
-            let byref = if declaration.kind == "Field" {
-                sym.result
-            } else if matches!(declaration.kind.as_str(), "Range" | "TypeSwitch") {
-                self.source.node(sym.name_node).kind == "Unary"
-            } else {
-                true
-            };
+            let byref=self.reference_capture(*symbol);
             let parameter = format!("{}capture_{i}", self.prefix);
             params.push(format!(
                 "{parameter}: {}${}Capture_{i}",

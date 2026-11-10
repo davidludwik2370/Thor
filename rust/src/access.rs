@@ -2,6 +2,24 @@
 use super::*;
 
 impl Lower<'_, '_> {
+    /// Reference Expressions.reference_capture follows projected storage owners.
+    pub(super) fn reference_capture(&mut self,index:usize)->bool{
+        let mut index=index;let mut seen=HashSet::new();
+        while seen.insert(index){
+            let symbol=self.resolver.symbols[index].clone();
+            if let Some(projection)=symbol.projection{
+                if self.resolver.projection_indirect(&projection){return true;}
+                let Some(owner)=self.resolver.symbol(projection.owner)else{return false;};index=owner;continue;
+            }
+            let source=&self.resolver.sources[symbol.reference.file];
+            return match source.node(symbol.reference.node).kind.as_str(){
+                "Field"=>symbol.result,
+                "Range"|"TypeSwitch"=>source.node(symbol.name_node).kind=="Unary"&&source.node(symbol.name_node).op=="&",
+                _=>true,
+            };
+        }
+        false
+    }
     fn needs_bound(&mut self, mut id: NodeId) -> bool {
         while self.source.node(id).kind == "Paren" {
             let Some(expr) = self.source.role(id, "expr") else {
@@ -56,6 +74,9 @@ impl Lower<'_, '_> {
             let node = self.source.node(parent);
             match node.kind.as_str() {
                 "Assignment" => {
+                    if let Some(switch)=self.source.node(parent).parent.filter(|owner|self.source.node(*owner).kind=="TypeSwitch"){
+                        return self.source.group(switch,"names").iter().any(|name|self.source.node(*name).kind=="Unary"&&self.source.node(*name).op=="&");
+                    }
                     return self.source.group(parent, "lhs").iter().any(|lhs| {
                         self.source
                             .node(*lhs)
@@ -91,8 +112,8 @@ impl Lower<'_, '_> {
         }
         if matches!(node.kind.as_str(), "Ident" | "Selector") {
             if let Some(symbol) = self.resolver.symbol(self.reference(id)) {
-                let symbol = &self.resolver.symbols[symbol];
-                return Ok((!symbol.constant && (!symbol.parameter || symbol.result)).to_string());
+                let constant=self.resolver.symbols[symbol].constant;
+                return Ok((!constant&&self.reference_capture(symbol)).to_string());
             }
         }
         if node.kind == "Ident" {
@@ -110,12 +131,12 @@ impl Lower<'_, '_> {
         if matches!(typ, Type::Pointer(_)) {
             return Ok("true".into());
         }
-        if matches!(typ, Type::Slice(_)) && node.kind == "Index" {
+        if matches!(typ, Type::Slice(_)|Type::Dynamic(_)) && node.kind == "Index" {
             return Ok("true".into());
         }
-        if !typ.is_unknown() && !matches!(typ, Type::Dynamic(_)) {
+        if !typ.is_unknown() {
             return Ok(
-                if node.kind == "Selector" || matches!(typ, Type::Array { .. }) {
+                if node.kind == "Selector" || matches!(typ, Type::Array { .. }|Type::Fixed {..}) {
                     inherited
                 } else {
                     "false".into()

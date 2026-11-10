@@ -450,6 +450,25 @@ both debug and release, and Clippy passed with warnings denied. These changes
 address the interval mismatches found in project-copy acceptance; helper capture
 addressability and fixed-capacity storage cases are the next work.
 
+### Capture addressability and fixed-capacity data
+
+Generated helper captures now follow projected storage owners, including pointer
+paths, value parameters, range bindings and type-switch bindings. Runtime indexed
+reads can copy readonly inline values while writes preserve real pointer-backed
+storage. Reference type switches request an address for their indexed selector;
+value switches retain readonly behavior. Fixed-capacity dynamic-array element
+access follows the reference's header/data distinction while ordinary immutable
+slices retain their data restrictions.
+
+All six new focused comparisons and all 283 combined reference/storage/using/
+editor/debug-map/conditional-binding/assertion-hygiene tests passed. Checked and
+unchecked runtime cases verify original storage, independent copies and rejected
+writes. All 34 Rust unit tests passed in debug and release; Clippy passed with
+warnings denied. The copied-project recheck now builds 15_puzzle, Ascending Primes,
+Othello, Poker, Sketch, Tetris and Triangle Solver. Sudoku's further union-copy
+permission mismatch remains under investigation. Original project sources were
+verified unchanged. Broader acceptance and remaining guards continue.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical
