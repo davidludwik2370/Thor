@@ -54,6 +54,10 @@ pub(crate) struct Captured {
     pub(crate) timed_out: bool,
     pub(crate) oversized: bool,
 }
+pub(crate) struct Executed {
+    pub(crate) value: Value,
+    pub(crate) target: Option<String>,
+}
 fn drain(mut pipe: impl Read, limit: usize) -> std::io::Result<(Vec<u8>, bool)> {
     let mut bytes = vec![];
     let mut chunk = [0; 8192];
@@ -272,6 +276,7 @@ impl Project {
             &crate::evaluation::Context::default(),
             crate::evaluation::Mode::Value,
         )
+        .map(|executed| executed.value)
     }
     pub(crate) fn execute_evaluation_with_context(
         &self,
@@ -279,7 +284,7 @@ impl Project {
         timeout: Duration,
         context: &crate::evaluation::Context<'_>,
         mode: crate::evaluation::Mode,
-    ) -> Result<Value> {
+    ) -> Result<Executed> {
         let source = &self.sources[expression.file];
         let site = source
             .node(expression.node)
@@ -333,13 +338,40 @@ impl Project {
         )?;
         helper.specialized = cases;
         let target = helper.lower()?;
+        let flags = helper.native_flags();
+        let mut cache = context.cache.map(|cache| cache.borrow_mut());
+        let generated = if cache.as_ref().is_some_and(|cache| cache.enabled) {
+            helper
+                .outputs
+                .iter()
+                .map(|(path, (_, emitted))| (path.clone(), emitted.text.as_bytes().to_vec()))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
+        let key = cache.as_mut().and_then(|cache| {
+            cache.key(
+                &self.sources,
+                crate::evaluationcache::HelperCode {
+                    destination: &helper.destination,
+                    flags: &flags,
+                    target: &target,
+                    generated: &generated,
+                },
+                &helper.frontend.odin,
+                &self.options.root,
+            )
+        });
+        if let Some(value) = cache.as_mut().and_then(|cache| cache.get(key.as_deref())) {
+            return Ok(Executed { value, target: key });
+        }
         let executable = work.0.join(format!("helper{}", env::consts::EXE_SUFFIX));
         let mut command = Command::new(&helper.frontend.odin);
         command
             .envs(&helper.native_environment)
             .arg("build")
             .arg(&target)
-            .args(helper.native_flags())
+            .args(&flags)
             .arg(format!("-out:{}", executable.display()))
             .arg("-json-errors");
         let built =
@@ -458,7 +490,26 @@ impl Project {
             crate::values::decode(&result.stdout).map_err(|error| fail(error.to_string()))?;
         crate::values::expression(&value, "__result_type", "__result_meta")
             .map_err(|error| fail(error.to_string()))?;
-        Ok(value)
+        if let Some(cache) = &mut cache {
+            if key.is_some() {
+                let current = cache.key(
+                    &self.sources,
+                    crate::evaluationcache::HelperCode {
+                        destination: &helper.destination,
+                        flags: &flags,
+                        target: &target,
+                        generated: &generated,
+                    },
+                    &helper.frontend.odin,
+                    &self.options.root,
+                );
+                if current != key {
+                    return Err(fail("#run resource inputs changed during evaluation; compile again with stable inputs.".into()));
+                }
+            }
+            cache.put(key.as_deref(), &value);
+        }
+        Ok(Executed { value, target: key })
     }
     fn evaluation_failure_origin(&self, stderr: &str) -> Option<crate::emit::Origin> {
         for line in stderr.lines() {

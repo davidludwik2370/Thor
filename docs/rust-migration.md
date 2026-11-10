@@ -627,6 +627,25 @@ for stable reuse and required invalidation.
 All 29 Rust units pass in debug and release, Clippy passes with warnings denied,
 and all seven assertion-hygiene checks pass.
 
+### Native contents-cache integration
+
+The independent scheduler now passes its optional contents cache into helper
+execution. Helpers retain their extraction, purity and source checks before key
+lookup. Valid hits return decoded contents before launching the helper compiler;
+cold successful executions publish only validated value packets. A resource-key
+change during execution retains the reference stable-input diagnostic. Failed
+evaluations never publish a value, and unavailable/bypassed storage preserves
+ordinary compilation behavior.
+
+The scheduling harness exposes cache counters for comparisons. Native tests
+verify warm hits, changed bodies and flags, corruption recovery, new purity
+violations, nested requests, caller-local type specializations and independent
+owned reconstruction. Checked/unchecked output checks and allocation tracking
+validate replayed storage; a compiler wrapper verifies that a warm hit launches
+no helper compiler. The full key/dependency/storage/cached-execution group passes
+all 57 tests. Normal Rust commands still do not enable the scheduler; prepared
+and scalar-site reuse and command adoption remain outstanding.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

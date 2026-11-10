@@ -30,11 +30,26 @@ pub struct Scheduler<'p> {
     schedule_generics: bool,
     work_sources: Option<BTreeSet<usize>>,
     timeout: Duration,
+    cache: std::cell::RefCell<crate::evaluationcache::EvaluationCache>,
+    evaluation_targets: BTreeMap<Ref, String>,
 }
 impl<'p> Scheduler<'p> {
     pub fn new(project: &'p Project, timeout: Duration) -> Self {
         let mut resolver = Resolver::with_flags(&project.sources, &project.options.flags);
         resolver.prepare_contexts();
+        let cache_directory = project
+            .frontend
+            .cache_dir
+            .clone()
+            .or_else(|| project.options.cache.clone())
+            .unwrap_or_else(|| {
+                let entry = &project.options.entry;
+                if entry.is_file() {
+                    entry.parent().unwrap().join(".thor-cache")
+                } else {
+                    entry.join(".thor-cache")
+                }
+            });
         let mut this = Self {
             project,
             resolver,
@@ -56,9 +71,18 @@ impl<'p> Scheduler<'p> {
             schedule_generics: false,
             work_sources: None,
             timeout,
+            cache: std::cell::RefCell::new(crate::evaluationcache::EvaluationCache::new(
+                &cache_directory,
+                !project.options.no_cache,
+            )),
+            evaluation_targets: BTreeMap::new(),
         };
         this.prepare_work_sources();
         this
+    }
+    pub fn cache_report(&self) -> Value {
+        let cache = self.cache.borrow();
+        serde_json::json!({"stats":cache.stats,"prepared_hits":cache.prepared_hits})
     }
     fn prepare_work_sources(&mut self) {
         self.schedule_generics = self.has_pure;
@@ -782,7 +806,7 @@ impl<'p> Scheduler<'p> {
             .iter()
             .map(|node| (*node, self.unchecked.contains(node)))
             .collect();
-        let mut value = self.project.execute_evaluation_with_context(
+        let executed = self.project.execute_evaluation_with_context(
             node,
             self.timeout,
             &Context {
@@ -791,9 +815,16 @@ impl<'p> Scheduler<'p> {
                 cases: &self.cases,
                 bindings: &self.specializations.bindings,
                 frames: &self.specializations.frames,
+                cache: Some(&self.cache),
             },
             mode,
         )?;
+        if matches!(mode, Mode::Value) {
+            if let Some(target) = executed.target {
+                self.evaluation_targets.insert(node, target);
+            }
+        }
+        let mut value = executed.value;
         if value["kind"] == "specialized" {
             let names = value["types"]
                 .as_array()

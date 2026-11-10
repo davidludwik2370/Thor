@@ -18,11 +18,14 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         command: "check".into(),
         entry: entry.into(),
         output: None,
-        cache: None,
+        cache: arguments
+            .iter()
+            .find_map(|arg| arg.strip_prefix("cache="))
+            .map(Into::into),
         odin: std::env::var("THOR_ODIN").unwrap_or_else(|_| "odin".into()),
         flags,
         args: vec![],
-        no_cache: true,
+        no_cache: !arguments.iter().any(|arg| arg.starts_with("cache=")),
         json: true,
         root: root.into(),
         maps: false,
@@ -33,6 +36,7 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
     project.inspect_sources()?;
     let mut scheduler = Scheduler::new(&project, Duration::from_secs(5));
     scheduler.evaluate_all()?;
+    let cache_report = scheduler.cache_report();
     let results = scheduler
         .results
         .iter()
@@ -69,7 +73,7 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         .map(|node| (*node, scheduler.unchecked.contains(node)))
         .collect();
     drop(scheduler);
-    let mut packet = json!({"results":results,"specialized":specialized});
+    let mut packet = json!({"results":results,"specialized":specialized,"cache":cache_report});
     if let Some(destination) = arguments.iter().find_map(|arg| arg.strip_prefix("emit=")) {
         project.evaluated = values;
         project.specialized = cases;

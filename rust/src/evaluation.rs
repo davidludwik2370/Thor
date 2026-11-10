@@ -30,6 +30,7 @@ pub struct Context<'a> {
     pub cases: &'a crate::specialization::Cases,
     pub bindings: &'a crate::specialization::Bindings,
     pub frames: &'a [(Ref, crate::specialization::Bindings)],
+    pub cache: Option<&'a std::cell::RefCell<crate::evaluationcache::EvaluationCache>>,
 }
 static EMPTY_RESULTS: BTreeMap<Ref, serde_json::Value> = BTreeMap::new();
 static EMPTY_SKIPS: BTreeMap<Ref, bool> = BTreeMap::new();
@@ -43,6 +44,7 @@ impl Default for Context<'_> {
             cases: &EMPTY_CASES,
             bindings: &EMPTY_BINDINGS,
             frames: &[],
+            cache: None,
         }
     }
 }
