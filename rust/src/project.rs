@@ -302,9 +302,15 @@ impl Project {
         }
         Ok(())
     }
-    pub fn lower(&mut self) -> Result<PathBuf> {
+    /// Load the same source/type facts used by lowering, without generating or
+    /// compiling output. The differential analysis harness uses this entry.
+    pub fn inspect_sources(&mut self) -> Result<()> {
         self.discover_type_facts()?;
         self.discover_call_facts()?;
+        Ok(())
+    }
+    pub fn lower(&mut self) -> Result<PathBuf> {
+        self.inspect_sources()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         resolver.prepare_contexts();
@@ -957,13 +963,18 @@ impl Project {
                 error["pos"]=json!({"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column,"end_line":end_line,"end_column":end_column});
                 error["stage"]=json!("thor");
                 error["msgs"]=json!([primary,format!("While checking {description}")]);
-                self.pure_type_context(&mut error,*site);
+                self.pure_type_context(&mut error,*site,false);
             }
-            if let Some(site)=pure_site { self.pure_type_context(&mut error,site); }
+            if let Some(site)=pure_site { self.pure_type_context(&mut error,site,true); }
             error
         }).collect()
     }
-    fn pure_type_context(&self, error: &mut Value, site: crate::semantics::Ref) {
+    fn pure_type_context(
+        &self,
+        error: &mut Value,
+        site: crate::semantics::Ref,
+        select_active: bool,
+    ) {
         use crate::semantics::Ref;
         let source = &self.sources[site.file];
         let Some(proc) = source
@@ -981,12 +992,44 @@ impl Project {
         }) else {
             return;
         };
-        let paths = paths
+        let mut paths = paths
             .iter()
             .filter(|(_, via)| !via.is_empty())
             .collect::<Vec<_>>();
         if paths.is_empty() {
             return;
+        }
+        if select_active {
+            // Follow the reference call_contexts decision order: an outer fn
+            // call in native instantiation notes wins; otherwise retain the
+            // best matching inner paths, including ties when evidence is absent.
+            let hints = self.instantiation_locations(error);
+            let covered = |call: Ref| {
+                let source = &self.sources[call.file];
+                let span = source.node(call.node).span;
+                hints.iter().any(|(file, offset)| {
+                    *file == call.file && span.start <= *offset && *offset < span.end
+                })
+            };
+            let active = paths
+                .iter()
+                .filter(|(_, via)| covered(via[0]))
+                .copied()
+                .collect::<Vec<_>>();
+            if !active.is_empty() {
+                paths = active;
+            } else {
+                let scores = paths
+                    .iter()
+                    .map(|(_, via)| via.iter().filter(|call| covered(**call)).count())
+                    .collect::<Vec<_>>();
+                let best = scores.iter().copied().max().unwrap_or(0);
+                paths = paths
+                    .into_iter()
+                    .zip(scores)
+                    .filter_map(|(path, score)| (score == best).then_some(path))
+                    .collect();
+            }
         }
         let position = |reference: Ref| {
             let s = &self.sources[reference.file];
@@ -1050,6 +1093,63 @@ impl Project {
         }
         error["related"] = json!(notes);
     }
+    fn instantiation_locations(&self, error: &Value) -> Vec<(usize, usize)> {
+        let mut result = vec![];
+        for text in error["msgs"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter(|message| message.contains("instantiated as"))
+        {
+            for (file, source) in self.sources.iter().enumerate() {
+                let pattern = format!("{}(", source.path.display());
+                for (_, tail) in text
+                    .match_indices(&pattern)
+                    .map(|(offset, _)| (offset, &text[offset + pattern.len()..]))
+                {
+                    let Some(coordinates) = tail.split(')').next() else {
+                        continue;
+                    };
+                    let Some((line, column)) = coordinates
+                        .split_once(':')
+                        .or_else(|| coordinates.split_once(','))
+                    else {
+                        continue;
+                    };
+                    let (Ok(line), Ok(column)) =
+                        (line.trim().parse::<usize>(), column.trim().parse::<usize>())
+                    else {
+                        continue;
+                    };
+                    if line == 0 || column == 0 {
+                        continue;
+                    }
+                    let Some(row) = source.raw.split_inclusive('\n').nth(line - 1) else {
+                        continue;
+                    };
+                    let base = source
+                        .raw
+                        .split_inclusive('\n')
+                        .take(line - 1)
+                        .map(str::len)
+                        .sum::<usize>();
+                    let mut units = 0;
+                    for (offset, ch) in row.char_indices() {
+                        if units == column - 1 {
+                            result.push((file, base + offset));
+                            break;
+                        }
+                        units += ch.len_utf16();
+                        if ch == '\n' || units >= column {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        result
+    }
     fn remap_references(&self, text: &str) -> String {
         let mut text = text.to_string();
         for (path, (file, emitted)) in &self.outputs {
@@ -1074,13 +1174,28 @@ impl Project {
                     cursor = end + 1;
                     continue;
                 };
+                // Odin's textual instantiation notes count Unicode scalars;
+                // source-map spans use UTF-8 bytes. Primary JSON positions
+                // already include their byte offset and take another path.
+                let row = emitted
+                    .text
+                    .split_inclusive('\n')
+                    .nth(line.saturating_sub(1));
+                let Some(row) = row else {
+                    cursor = end + 1;
+                    continue;
+                };
                 let offset = emitted
                     .text
                     .split_inclusive('\n')
                     .take(line.saturating_sub(1))
                     .map(str::len)
                     .sum::<usize>()
-                    + column.saturating_sub(1);
+                    + row
+                        .chars()
+                        .take(column.saturating_sub(1))
+                        .map(char::len_utf8)
+                        .sum::<usize>();
                 if let Some(origin) = emitted.lookup(offset, 1) {
                     let (line, column) = self.sources[*file].position(origin.span.start);
                     let replacement = format!("{}({line}:{column})", origin.file);

@@ -6,6 +6,7 @@ use thor_compiler::{
     borrowprogram::Model,
     frontend::{self, Frontend},
     permissions::{Access, Aspect, Permission, Step, Trait},
+    project::{Options, Project},
     purity::Purity,
     semantics::{Ref, Resolver},
 };
@@ -16,12 +17,17 @@ fn step(step: &Step) -> Value {
         Step::Deref => json!(["deref"]),
     }
 }
+fn location(node: Ref, resolver: &Resolver<'_>) -> Value {
+    let source = &resolver.sources[node.file];
+    if resolver.sources.len() == 1 {
+        json!(source.node(node.node).span.start)
+    } else {
+        json!([source.path, source.node(node.node).span.start])
+    }
+}
 fn access(value: &Access, resolver: &Resolver<'_>) -> Value {
     json!([
-        resolver.sources[value.procedure.file]
-            .node(value.procedure.node)
-            .span
-            .start,
+        location(value.procedure, resolver),
         value.index,
         value.path.iter().map(step).collect::<Vec<_>>(),
         match value.aspect {
@@ -36,7 +42,7 @@ fn permission(value: &Permission, resolver: &Resolver<'_>) -> Value {
         Permission::Access(value) => json!(["access", access(value, resolver)]),
         Permission::Type(trait_, node) => {
             let span = resolver.sources[node.file].node(node.node).span;
-            json!([
+            let mut value = json!([
                 "type",
                 match trait_ {
                     Trait::Big => "big",
@@ -46,7 +52,14 @@ fn permission(value: &Permission, resolver: &Resolver<'_>) -> Value {
                 },
                 span.start,
                 span.end
-            ])
+            ]);
+            if resolver.sources.len() > 1 {
+                value
+                    .as_array_mut()
+                    .unwrap()
+                    .insert(2, json!(resolver.sources[node.file].path));
+            }
+            value
         }
         Permission::And(a, b) => json!(["and", permission(a, resolver), permission(b, resolver)]),
         Permission::Or(values) => json!([
@@ -76,7 +89,28 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         target: None,
         project_name: String::new(),
     };
-    let sources = vec![frontend.parse(Path::new(&entry), false)?];
+    let sources = if std::env::args().any(|arg| arg == "--project") {
+        let mut project = Project::new(Options {
+            command: "check".into(),
+            entry: entry.clone().into(),
+            output: None,
+            cache: None,
+            odin: frontend.odin.to_string_lossy().into_owned(),
+            flags: vec!["-debug".into()],
+            args: vec![],
+            no_cache: true,
+            json: false,
+            root: root.into(),
+            maps: false,
+            tracking: "off".into(),
+            no_sanitize: true,
+            overlays: Default::default(),
+        })?;
+        project.inspect_sources()?;
+        project.sources
+    } else {
+        vec![frontend.parse(Path::new(&entry), false)?]
+    };
     let mut resolver = Resolver::new(&sources);
     resolver.prepare_contexts();
     let facts = Purity::analyze(&mut resolver);
@@ -84,12 +118,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut checks = BTreeMap::new();
     for (node, value) in &model.checks {
         checks.insert(
-            sources[node.file].node(node.node).span.start,
+            if sources.len() == 1 {
+                sources[node.file].node(node.node).span.start.to_string()
+            } else {
+                format!(
+                    "{}:{}",
+                    sources[node.file].path.display(),
+                    sources[node.file].node(node.node).span.start
+                )
+            },
             permission(value, &resolver),
         );
     }
     let mut profiles = vec![];
-    for (node, targets) in facts.targets {
+    for (node, targets) in model.targets.clone() {
         let owner = sources[node.file]
             .ancestors(node.node)
             .find(|id| sources[node.file].node(*id).kind == "Procedure")
@@ -118,8 +160,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ]));
             }
             profiles.push(json!([
-                sources[node.file].node(node.node).span.start,
-                sources[target.file].node(target.node).span.start,
+                location(node, eval.resolver),
+                location(target, eval.resolver),
                 fields
             ]));
         }
@@ -127,12 +169,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mutates = model
         .mutates
         .iter()
-        .map(|node| sources[node.file].node(node.node).span.start)
+        .map(|node| location(*node, &resolver))
         .collect::<Vec<_>>();
     let escapes = model
         .escapes
         .iter()
-        .map(|(node, message)| json!([sources[node.file].node(node.node).span.start, message]))
+        .map(|(node, message)| json!([location(*node, &resolver), message]))
         .collect::<Vec<_>>();
     println!(
         "{}",

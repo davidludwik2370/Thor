@@ -71,11 +71,12 @@ impl Lower<'_, '_> {
             .filter(|target| target.file == self.file)
             .collect::<std::collections::BTreeSet<_>>();
         for target in targets {
-            let Some(declaration) = self
-                .source
-                .node(target.node)
-                .parent
-                .filter(|node| self.source.node(*node).kind == "Declaration")
+            let mut parent = self.source.node(target.node).parent;
+            while parent.is_some_and(|node| self.source.node(node).kind == "Paren") {
+                parent = parent.and_then(|node| self.source.node(node).parent);
+            }
+            let Some(declaration) =
+                parent.filter(|node| self.source.node(*node).kind == "Declaration")
             else {
                 return Err(self.unsupported(target.node, "named checked procedure bodies"));
             };

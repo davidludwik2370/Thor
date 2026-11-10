@@ -189,6 +189,40 @@ This is not yet whole-suite acceptance. Remaining checkpoint 3 work includes SDK
 helper profiles, comprehension bindings and incomplete diagnostic selection among
 multiple fn callers. Compile-time execution/result caching remain unported.
 
+### SDK graphs, comprehensions and source errors
+
+The ownership graph now inspects the reference's full helper closure, including
+installed SDK bodies and inactive source branches, while native checked-call
+selection still determines which contracts are required. Reviewed clone and I/O
+contracts retain their special reference treatment. `#assert` and `#config` are
+recognized as directives rather than unresolved calls. Comprehension iteration
+bindings and flattened results preserve the difference between inline copies and
+borrowed reference elements.
+
+Definite missing-callee and argument errors remain native source errors instead
+of migration failures. An anonymous procedure call gets the reference purity
+error. A parenthesized named helper is inspectable and receives a checked variant.
+This last case is a third explicit reference exception: the frozen Python
+procedure-candidate lookup does not unwrap that initializer and rejects the valid
+call. `test_rust_pure_call_errors.py` records both outcomes without changing Python.
+
+Permission diagnostics select the failing fn caller using native instantiation
+notes when a shared helper also has valid callers. Odin's textual note columns
+count Unicode scalars; Rust converts them to UTF-8 map offsets before producing
+the original source's UTF-16 editor coordinates. Both ASCII and emoji-prefixed
+caller tests cover this path. Type-schema diagnostics retain their existing
+conservative caller notes until the integration checkpoint.
+
+The expanded real-AST ownership-model comparison passes all 22 cases, including
+SDK inspection. One resolved `slice.clone` input needs a constant type predicate
+where Python leaves an equivalent native sequence predicate; that exact precision
+difference is checked explicitly. The ten graph-edge tests, 66-test conversion/
+checked-call/conditional gate, four source-error tests and two caller-diagnostic
+tests pass. Checked and unchecked tracked runtime configurations are included.
+All 24 Rust units pass in both profiles. A fresh broad native run is still in
+progress, so this is not recorded as whole-suite acceptance. Checkpoint 3 continues
+with nonconvergence handling and remaining eligibility gaps; execution is unported.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

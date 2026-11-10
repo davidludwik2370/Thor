@@ -580,7 +580,17 @@ impl<'a, 'r> Purity<'a, 'r> {
                     "Pure code cannot invoke an indirect procedure value.",
                 );
             } else if plans.is_empty() {
-                self.gap(root, call);
+                let source = &self.r.sources[callee.file];
+                let missing_name = self.kind(callee) == "Ident"
+                    && self.r.symbol(callee).is_none()
+                    && source.selections.is_empty()
+                    && !source
+                        .nodes
+                        .iter()
+                        .any(|node| node.kind == "Using" || node.data["using_field"] == true);
+                if !missing_name && !self.native_argument_error(call, callee, bindings) {
+                    self.gap(root, call);
+                }
             } else {
                 let mut selected = 0;
                 for plan in plans {
@@ -597,6 +607,16 @@ impl<'a, 'r> Purity<'a, 'r> {
                             via,
                             "Pure code cannot call foreign or bodyless procedures.",
                         );
+                        continue;
+                    }
+                    let owner = &self.r.sources[candidate.file];
+                    let mut declaration = owner.node(candidate.node).parent;
+                    while declaration.is_some_and(|id| owner.node(id).kind == "Paren") {
+                        declaration = declaration.and_then(|id| owner.node(id).parent);
+                    }
+                    if !declaration.is_some_and(|id| owner.node(id).kind == "Declaration") {
+                        self.fault(root,call,via,"Pure code requires a resolved direct call to an eligible procedure; indirect, foreign and unknown calls are forbidden.");
+                        selected += 1;
                         continue;
                     }
                     let owner = &self.r.sources[candidate.file];
@@ -669,6 +689,57 @@ impl<'a, 'r> Purity<'a, 'r> {
         for arg in args {
             self.walk(root, proc, arg, bindings, via);
         }
+    }
+    /// Leave definite source argument errors to Odin's original call checker.
+    /// Unknown generic shapes/spreads still require an inspectable checked plan.
+    fn native_argument_error(&mut self, call: Ref, callee: Ref, bindings: &Substitutions) -> bool {
+        let candidates = self.r.candidates(callee);
+        let [target] = candidates.as_slice() else {
+            return false;
+        };
+        let Some(signature) = self.role(*target, "type") else {
+            return false;
+        };
+        let args = self.r.sources[call.file]
+            .group(call.node, "args")
+            .iter()
+            .map(|node| Ref {
+                file: call.file,
+                node: *node,
+            })
+            .collect::<Vec<_>>();
+        if args.iter().any(|arg| {
+            self.kind(*arg) == "Unary" && self.r.sources[arg.file].node(arg.node).op == "**"
+        }) || self.kind(callee) == "Selector"
+            && self.r.sources[callee.file].node(callee.node).op == "->"
+        {
+            return false;
+        }
+        let Some(groups) = self.r.arrange_arguments(signature, &args) else {
+            return true;
+        };
+        for ((_, annotation), group) in self.r.fields(signature, "params").into_iter().zip(groups) {
+            let Some(annotation) = annotation else {
+                continue;
+            };
+            let expected = self.r.specialized_type(annotation, bindings);
+            for arg in group {
+                if self.kind(arg) == "AutoCast" {
+                    continue;
+                }
+                let actual = self.r.specialized_type(arg, bindings);
+                if matches!(expected, Type::String { .. }) && actual.numeric()
+                    || expected.numeric() && matches!(actual, Type::String { .. })
+                    || matches!(
+                        (&expected, &actual),
+                        (Type::Scalar { .. }, Type::Scalar { .. })
+                    )
+                {
+                    return true;
+                }
+            }
+        }
+        false
     }
     fn forbidden_conversion(typ: &Type) -> bool {
         match typ {
@@ -787,7 +858,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         }
     }
 }
-const IO: &[&str] = &[
+pub(crate) const IO: &[&str] = &[
     "print",
     "println",
     "printf",

@@ -80,13 +80,68 @@ impl Evaluator<'_, '_, '_> {
         self.resolver.sources[node.file].text(node.node)
     }
     pub fn builtin(&self, call: Ref) -> Option<String> {
-        self.builtin_inner(self.role(call, "callee")?, &mut HashSet::new())
+        let callee = self.role(call, "callee")?;
+        if self.kind(callee) == "Directive" {
+            let name = self.resolver.sources[callee.file]
+                .names
+                .get(self.resolver.sources[callee.file].node(callee.node).name);
+            if ["assert", "config"].contains(&name) {
+                return Some(format!("#{name}"));
+            }
+        }
+        self.builtin_inner(callee, &mut HashSet::new())
     }
     pub fn clone_library(&self, call: Ref) -> Option<&'static str> {
         let callee = self.role(call, "callee")?;
         ["core:slice", "core:strings"].into_iter().find(|path| {
             self.resolver.library_alias_member(callee, path).as_deref() == Some("clone")
         })
+    }
+    pub fn io_call(&self, call: Ref) -> bool {
+        self.role(call, "callee")
+            .is_some_and(|callee| self.io_callee(callee, &mut HashSet::new()))
+    }
+    fn io_callee(&self, callee: Ref, seen: &mut HashSet<Ref>) -> bool {
+        if !seen.insert(callee) {
+            return false;
+        }
+        if self
+            .resolver
+            .library_alias_member(callee, "core:fmt")
+            .is_some_and(|name| crate::purity::IO.contains(&name.as_str()))
+        {
+            return true;
+        }
+        if self.kind(callee) == "Paren" {
+            return self
+                .role(callee, "expr")
+                .is_some_and(|value| self.io_callee(value, seen));
+        }
+        let Some(index) = self.resolver.symbol(callee) else {
+            return false;
+        };
+        let symbol = &self.resolver.symbols[index];
+        if !symbol.constant || symbol.immutable {
+            return false;
+        }
+        let source = &self.resolver.sources[symbol.reference.file];
+        let basic = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("runtime/basic");
+        if source.path.parent() == Some(basic.as_path())
+            && ["print", "input", "read", "write"].contains(&symbol.name.as_str())
+        {
+            return true;
+        }
+        symbol
+            .value
+            .map(|node| Ref {
+                file: symbol.reference.file,
+                node,
+            })
+            .filter(|value| matches!(self.kind(*value), "Ident" | "Selector" | "Paren"))
+            .is_some_and(|value| self.io_callee(value, seen))
     }
     fn builtin_inner(&self, callee: Ref, seen: &mut HashSet<Ref>) -> Option<String> {
         if !seen.insert(callee) {

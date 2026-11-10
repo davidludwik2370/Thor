@@ -187,5 +187,41 @@ work::fn(input:$T)->int{return copy(input)}
                 self.compare(text.replace('work(values)!=9','work(values[:])!=9'),files=files,
                              command='check',fail='borrowed from an input')
 
+    def test_sdk_reverse_checks_its_transitive_helper_permissions(self):
+        self.run_profiles(self.program('n:=3;if work(n)!=4{panic("SDK reverse")}', '''
+import "core:slice"
+work::fn(n:int)->int{values:=[n,n+1];slice.reverse(values[:]);return values[0]}
+'''))
+        self.compare(self.program('values:=[1,2];_=work(values[:])','''
+import "core:slice"
+work::fn(input:[]int)->int{slice.reverse(input);return input[0]}
+'''),command='check',fail='borrowed from an input')
+
+    def test_shared_helper_diagnostic_selects_the_actual_failing_fn(self):
+        for prefix in ('','text:="😀";_=text;'):
+            with self.subTest(prefix=prefix):
+                self.check_shared_helper_diagnostic(prefix)
+
+    def check_shared_helper_diagnostic(self,prefix):
+        text=self.program('values:=[1,2];_=good(values);_=bad(values[:])','''
+helper::proc(input:$T)->int{local:=input;local[0]=9;return local[0]}
+good::fn(input:[2]int)->int{return helper(input)}
+bad::fn(input:[]int)->int{'''+prefix+'''return helper(input)}
+''')
+        self.source.write_text(text)
+        result=self.invoke('rust',command='check',flags=['-debug','-json-errors'])
+        self.assertEqual(result.returncode,1,result.stderr)
+        errors=json.loads(result.stderr)['errors']
+        failures=[error for error in errors if 'borrowed from an input' in str(error)]
+        self.assertTrue(failures,errors)
+        for error in failures:
+            offset=text.index('helper(input)',text.index('bad::'))
+            self.assertEqual(error['pos']['offset'],len(text[:offset].encode()))
+            column=len(text[:offset].rsplit('\n',1)[-1].encode('utf-16-le'))//2+1
+            self.assertEqual(error['pos']['column'],column)
+            self.assertIn("Pure function 'bad'",error['msgs'][0])
+            self.assertNotIn("fn 'good'",json.dumps(error))
+            self.assertNotIn('good -> helper',json.dumps(error))
+
 
 if __name__=='__main__':unittest.main()

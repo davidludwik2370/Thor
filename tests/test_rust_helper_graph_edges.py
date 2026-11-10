@@ -107,5 +107,37 @@ work::fn(n:int)->int{return change(n,n+1)}
                     'work::fn(input:'+annotation+')->int{'+call+';return 0}\n'),
                     command='check',fail='borrowed from an input')
 
+    def test_comprehension_construction_copies_inline_arrays(self):
+        source=self.program('input:=[2][2]int{{1,2},{3,4}};if work(input)!=9||input[0][0]!=1{panic("comprehension copy")}', '''
+work::fn(input:[2][2]int)->int{rows:=[row for row in input];rows[0][0]=9;return rows[0][0]}
+''')
+        for flags in (['-debug'],native.UNCHECKED+['--track-allocations=basic']):
+            with self.subTest(flags=flags):
+                result=self.compare(source,flags=flags)
+                self.assertEqual(result.stderr,'')
+
+    def test_comprehension_reference_elements_keep_their_borrowed_storage(self):
+        for builder in ('[row for row in input]','[..group for group in [][][]int{input}]'):
+            with self.subTest(builder=builder):
+                self.compare(self.program('first:=[1,2];input:=[first[:]];_=work(input[:])',
+                    'work::fn(input:[][]int)->int{rows:='+builder+';rows[0][0]=9;return 0}\n'),
+                    command='check',fail='borrowed from an input')
+
+    def test_checked_comprehension_helpers_receive_iterator_permissions(self):
+        self.compare(self.program('first:=[1,2];input:=[first[:]];_=work(input[:])','''
+change::proc(row:[]int)->int{row[0]=9;return row[0]}
+build::proc(input:[][]int)->[]int{return [change(row) for row in input]}
+work::fn(input:[][]int)->int{rows:=build(input);return rows[0]}
+'''),command='check',fail='borrowed from an input')
+        source=self.program('n:=3;if work(n)!=3{panic("comprehension helper")}', '''
+length::proc(row:[]int)->int{return len(row)}
+build::proc(input:[][]int)->[]int{return [length(row) for row in input]}
+work::fn(n:int)->int{row:=make([]int,n);input:=[row];rows:=build(input[:]);return rows[0]}
+''')
+        for flags in (['-debug'],native.UNCHECKED+['--track-allocations=basic']):
+            with self.subTest(flags=flags):
+                result=self.compare(source,flags=flags)
+                self.assertEqual(result.stderr,'')
+
 
 if __name__=='__main__':unittest.main()

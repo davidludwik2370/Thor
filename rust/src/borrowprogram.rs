@@ -19,6 +19,7 @@ pub struct Model {
     pub arena: Arena,
     pub environments: BTreeMap<Ref, Environment>,
     pub nodes: BTreeMap<Ref, Vec<Ref>>,
+    pub targets: BTreeMap<Ref, BTreeSet<Ref>>,
     pub stores: BTreeMap<Ref, BTreeMap<Access, Store>>,
     pub requirements: BTreeMap<Ref, BTreeSet<Access>>,
     pub checks: BTreeMap<Ref, Permission>,
@@ -124,16 +125,9 @@ impl Model {
                 resolver,
                 arena: &mut self.arena,
             };
-            let source = &eval.resolver.sources[proc.file];
-            if source.shared_native {
-                continue;
-            }
             let supported = nodes.iter().all(|node| {
                 if eval.queried(*node) {
                     return true;
-                }
-                if eval.kind(*node) == "Comprehension" {
-                    return false;
                 }
                 if eval.kind(*node) != "Call" {
                     return true;
@@ -143,7 +137,7 @@ impl Model {
                     || eval
                         .role(*node, "callee")
                         .is_some_and(|callee| eval.resolver.denotes_type(callee))
-                    || purity
+                    || self
                         .targets
                         .get(node)
                         .is_some_and(|targets| !targets.is_empty())
@@ -208,11 +202,16 @@ impl Model {
     }
     pub fn prepare(resolver: &mut Resolver<'_>, purity: &purity::Facts) -> Self {
         let mut model = Self::default();
-        for proc in &purity.checked {
+        let mut queue = purity.checked.iter().copied().collect::<Vec<_>>();
+        while let Some(proc) = queue.pop() {
+            if model.nodes.contains_key(&proc) {
+                continue;
+            }
             let eval = Evaluator {
                 resolver,
                 arena: &mut model.arena,
             };
+            let proc = &proc;
             let Some(body) = eval.role(*proc, "body") else {
                 continue;
             };
@@ -262,6 +261,37 @@ impl Model {
                 }
             }
             model.environments.insert(*proc, env);
+            for node in &nodes {
+                if eval.kind(*node) != "Call"
+                    || eval.queried(*node)
+                    || eval.builtin(*node).is_some()
+                    || eval.clone_library(*node).is_some()
+                    || eval.io_call(*node)
+                    || eval
+                        .role(*node, "callee")
+                        .is_some_and(|callee| eval.resolver.denotes_type(callee))
+                {
+                    continue;
+                }
+                let Some(callee) = eval.role(*node, "callee") else {
+                    continue;
+                };
+                let plans = eval.resolver.call_plans(*node, &Default::default());
+                let targets = if plans.is_empty() {
+                    eval.resolver.candidates(callee)
+                } else {
+                    plans.into_iter().map(|plan| plan.procedure).collect()
+                };
+                let mut targets = targets
+                    .into_iter()
+                    .filter(|target| {
+                        eval.kind(*target) == "Procedure" && eval.role(*target, "body").is_some()
+                    })
+                    .collect::<BTreeSet<_>>();
+                targets.extend(purity.targets.get(node).into_iter().flatten().copied());
+                queue.extend(targets.iter().copied());
+                model.targets.insert(*node, targets);
+            }
             model.nodes.insert(*proc, nodes);
             model.stores.insert(*proc, BTreeMap::new());
             model.requirements.insert(*proc, BTreeSet::new());
@@ -270,7 +300,7 @@ impl Model {
         for _ in 0..limit {
             let mut changed = false;
             for proc in model.nodes.keys().copied().collect::<Vec<_>>() {
-                changed |= model.pass(proc, resolver, purity);
+                changed |= model.pass(proc, resolver);
             }
             if !changed {
                 model.converged = true;
@@ -278,11 +308,11 @@ impl Model {
             }
         }
         if model.converged {
-            model.finish(resolver, purity);
+            model.finish(resolver);
         }
         model
     }
-    fn pass(&mut self, proc: Ref, resolver: &mut Resolver<'_>, purity: &purity::Facts) -> bool {
+    fn pass(&mut self, proc: Ref, resolver: &mut Resolver<'_>) -> bool {
         let mut changed = false;
         let mut env = self.environments.remove(&proc).unwrap_or_default();
         let mut eval = Evaluator {
@@ -562,7 +592,7 @@ impl Model {
                             &mut self.escapes,
                         );
                     }
-                } else if let Some(targets) = purity.targets.get(&node) {
+                } else if let Some(targets) = self.targets.get(&node) {
                     for target in targets {
                         let Some(stores) = self
                             .stores
@@ -635,7 +665,7 @@ impl Model {
         self.environments.insert(proc, env);
         changed
     }
-    fn finish(&mut self, resolver: &mut Resolver<'_>, purity: &purity::Facts) {
+    fn finish(&mut self, resolver: &mut Resolver<'_>) {
         for (proc, nodes) in &self.nodes {
             let env = self.environments.get_mut(proc).unwrap();
             let mut eval = Evaluator {
@@ -698,7 +728,7 @@ impl Model {
                     if eval.queried(*node) {
                         continue;
                     }
-                    let Some(targets) = purity.targets.get(node) else {
+                    let Some(targets) = self.targets.get(node) else {
                         continue;
                     };
                     for target in targets {
