@@ -1788,7 +1788,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     if self.s(r).node(r.node).immutable {
                         v = self.freeze(v, name)
                     } else if self.s(r).node(r.node).mutable {
-                        if reference_data(&self.values[v].typ) {
+                        if writable_alias(&self.values[v].typ) {
                             self.require(
                                 self.values[v].data.clone(),
                                 name,
@@ -1864,7 +1864,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .r
                         .symbol(site)
                         .is_some_and(|symbol| self.contexts[c].named.contains(&Some(symbol)));
-                    if reference_data(&self.values[target].typ) && !named {
+                    if writable_alias(&self.values[target].typ) && !named {
                         self.require(
                             self.values[v].data.clone(),
                             site,
@@ -3110,6 +3110,11 @@ fn base_type(typ: &Type) -> &Type {
     } else {
         typ
     }
+}
+// Union payload provenance survives copies, but copying a union value is not
+// itself a writable slice alias. Narrowing checks the selected payload later.
+fn writable_alias(typ:&Type)->bool{
+    matches!(base_type(typ),Type::Slice(_)|Type::Soa(_)|Type::Unknown|Type::Generic)
 }
 fn reference_data(typ: &Type) -> bool {
     matches!(

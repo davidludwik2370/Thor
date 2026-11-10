@@ -469,6 +469,22 @@ Othello, Poker, Sketch, Tetris and Triangle Solver. Sudoku's further union-copy
 permission mismatch remains under investigation. Original project sources were
 verified unchanged. Broader acceptance and remaining guards continue.
 
+### Union value copies retain payload permissions
+
+The native permission checker now follows the reference's distinction between
+copying a union value and creating a writable slice alias. Copies and stores of
+inline union payloads remain independent values. A copied union that contains a
+readonly slice retains that payload's permissions when narrowed, including
+copies from readonly containers and calls through ordinary helpers.
+
+All 336 combined union/reference/slice/borrow-model/local-ownership/editor/
+assertion-hygiene tests passed. All 34 Rust unit tests passed in debug and release;
+Clippy passed with warnings denied. Sudoku's copied project now builds with zero
+diagnostics, clearing the final mismatch from the initial 19-project sweep.
+A final uniform project/suite acceptance run remains required after the further
+array-constant context mismatch is corrected. No original project sources were
+changed.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical
