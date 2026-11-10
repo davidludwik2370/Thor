@@ -1,12 +1,14 @@
 //! Differential harness for contents-cache records, independent of scheduling.
 use serde_json::{json, Value};
 use std::{
+    collections::BTreeMap,
     io::{self, BufRead},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use thor_compiler::{
     digest::sha256,
-    evaluationcache::{canonical, EvaluationCache},
+    evaluationcache::{canonical, EvaluationCache, HelperCode},
+    frontend::Frontend,
 };
 fn run(request: &Value) -> Value {
     if let Some(value) = request.get("canonical") {
@@ -20,11 +22,82 @@ fn run(request: &Value) -> Value {
         Path::new(directory),
         request["enabled"].as_bool().unwrap_or(true),
     );
+    let mut sources = vec![];
+    if let Some(paths) = request["sources"].as_array() {
+        let frontend = Frontend {
+            executable: request["frontend"].as_str().unwrap().into(),
+            fingerprint: String::new(),
+            odin: "odin".into(),
+            cache_dir: None,
+            test: false,
+            target: None,
+            project_name: "cache".into(),
+        };
+        for path in paths.iter().filter_map(Value::as_str) {
+            match frontend.parse(Path::new(path), false) {
+                Ok(mut source) => {
+                    source.collection_roots = request["collections"]
+                        .as_object()
+                        .map(|values| {
+                            values
+                                .iter()
+                                .filter_map(|(name, value)| {
+                                    value
+                                        .as_str()
+                                        .map(|path| (name.clone(), PathBuf::from(path)))
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    sources.push(source);
+                }
+                Err(error) => return json!({"error":error.message}),
+            }
+        }
+    }
     let mut answers = vec![];
     for operation in request["operations"].as_array().into_iter().flatten() {
         let key = operation["key"].as_str();
         let namespace = operation["namespace"].as_str().unwrap_or("prepared-v1");
         let answer = match operation["op"].as_str().unwrap_or("") {
+            "identity" => json!(cache.identity(
+                Path::new(operation["odin"].as_str().unwrap()),
+                Path::new(operation["root"].as_str().unwrap())
+            )),
+            "resources" => json!(EvaluationCache::resources(&sources)),
+            "key" => {
+                let generated = operation["generated"]
+                    .as_object()
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(|(path, value)| {
+                                value
+                                    .as_str()
+                                    .map(|text| (PathBuf::from(path), text.as_bytes().to_vec()))
+                            })
+                            .collect::<BTreeMap<_, _>>()
+                    })
+                    .unwrap_or_default();
+                let flags = operation["flags"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>();
+                json!(cache.key(
+                    &sources,
+                    HelperCode {
+                        destination: Path::new(operation["destination"].as_str().unwrap()),
+                        flags: &flags,
+                        target: Path::new(operation["target"].as_str().unwrap()),
+                        generated: &generated
+                    },
+                    Path::new(operation["odin"].as_str().unwrap()),
+                    Path::new(operation["root"].as_str().unwrap()),
+                ))
+            }
             "put" => {
                 cache.put(key, &operation["value"]);
                 Value::Null

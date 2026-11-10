@@ -47,12 +47,12 @@ impl Drop for Temporary {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-struct Captured {
-    status: std::process::ExitStatus,
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
-    timed_out: bool,
-    oversized: bool,
+pub(crate) struct Captured {
+    pub(crate) status: std::process::ExitStatus,
+    pub(crate) stdout: Vec<u8>,
+    pub(crate) stderr: Vec<u8>,
+    pub(crate) timed_out: bool,
+    pub(crate) oversized: bool,
 }
 fn drain(mut pipe: impl Read, limit: usize) -> std::io::Result<(Vec<u8>, bool)> {
     let mut bytes = vec![];
@@ -69,7 +69,7 @@ fn drain(mut pipe: impl Read, limit: usize) -> std::io::Result<(Vec<u8>, bool)> 
     }
     Ok((bytes, oversized))
 }
-fn capture(command: &mut Command, timeout: Duration) -> Result<Captured> {
+pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captured> {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

@@ -17,6 +17,7 @@ use std::{
 };
 #[path = "evaluationexec.rs"]
 mod evaluationexec;
+pub(crate) use evaluationexec::capture as capture_command;
 #[path = "nativefacts.rs"]
 mod nativefacts;
 #[path = "runtimeview.rs"]

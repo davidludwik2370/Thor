@@ -598,6 +598,35 @@ checks. A mutable reference snapshot in the initial differential-test harness
 was corrected to copy its input, so one engine cannot update the other engine's
 starting observations.
 
+### Toolchain and emitted-result keys
+
+`evaluationcachekey.rs` ports lazy toolchain identities, validated identity
+records, resource hashes and keys for emitted Odin dependencies. Helper output
+directories are normalized; target, flags, emitted Odin contents and resource
+contents remain part of the key. Dynamic/unresolvable resources, disabled caches
+and failed toolchain queries produce optional bypasses. The existing bounded
+command capture is shared with identity queries; helper execution behavior is
+unchanged.
+
+Rust identities use an engine tag and the running compiler binary, plus the
+frontend, runtime, Rust source and installed SDK. Editable `.thor` library sources
+are included alongside `.odin` support sources. This deliberately covers the
+plain-text basic library and keeps identities specific to the compiler engine.
+Unrelated file extensions can change the metadata stamp without changing the
+content identity. Metadata-record corruption recomputes the identity.
+
+These keys remain independently tested APIs. The scheduler does not yet read or
+publish result packets through them; scalar/prepared reuse and normal command
+adoption are the next parts of checkpoint 5.
+
+The combined key/dependency/storage gate passes all 46 tests. The two neighboring
+native helper checks for successful execution and timeout handling also pass.
+The 14 key tests pass through the debug Rust harness; resource hashes are
+compared directly with Python, while engine-specific identity keys are checked
+for stable reuse and required invalidation.
+All 29 Rust units pass in debug and release, Clippy passes with warnings denied,
+and all seven assertion-hygiene checks pass.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

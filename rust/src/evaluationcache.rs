@@ -14,6 +14,9 @@ use std::{
 pub const MAX_PACKET: usize = 16 * 1024 * 1024;
 const SCHEMA: u64 = 1;
 static SERIAL: AtomicU64 = AtomicU64::new(0);
+#[path = "evaluationcachekey.rs"]
+mod key;
+pub use key::HelperCode;
 
 /// Python's sorted, ASCII JSON representation, including its float notation.
 pub fn canonical(value: &Value) -> Vec<u8> {
@@ -124,6 +127,7 @@ pub struct EvaluationCache {
     pub enabled: bool,
     pub stats: Stats,
     pub prepared_hits: u64,
+    identities: std::collections::BTreeMap<PathBuf, String>,
 }
 fn key_valid(key: &str) -> bool {
     key.len() == 64
@@ -187,6 +191,7 @@ impl EvaluationCache {
             enabled,
             stats: Stats::default(),
             prepared_hits: 0,
+            identities: std::collections::BTreeMap::new(),
         }
     }
     pub fn clear(&self) {
