@@ -54,6 +54,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                     })
             })
             .collect::<Vec<_>>();
+        Self::analyze_from(r, &roots)
+    }
+    /// The evaluator verifies its retained entry roots, not unrelated fn
+    /// declarations that will be absent from the isolated helper.
+    pub fn analyze_from(r: &'r mut Resolver<'a>, roots: &[Ref]) -> Facts {
         let mut this = Self {
             r,
             facts: Facts::default(),
@@ -62,7 +67,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             speculative: vec![],
             walk_stack: vec![],
         };
-        for root in roots {
+        for root in roots.iter().copied() {
             if this.r.active_definition(root) {
                 this.visiting.clear();
                 this.visit(root, root, Substitutions::new(), vec![]);
@@ -861,7 +866,7 @@ pub(crate) const IO: &[&str] = &[
     "wprintf",
     "wprintfln",
 ];
-const BUILTINS: &[&str] = &[
+pub(crate) const BUILTINS: &[&str] = &[
     "len",
     "cap",
     "size_of",

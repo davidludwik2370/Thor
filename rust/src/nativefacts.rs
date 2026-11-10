@@ -3,18 +3,68 @@ use super::*;
 
 impl Project {
     pub(super) fn discover_call_facts(&mut self) -> Result<()> {
-        if !self
-            .sources
-            .iter()
-            .any(|source| source.nodes.iter().any(|node| node.data["pure"] == true))
-        {
+        if !self.sources.iter().any(|source| {
+            source
+                .nodes
+                .iter()
+                .any(|node| node.data["pure"] == true || node.kind == "Run")
+        }) {
             return Ok(());
         }
         let mut inspected = HashSet::new();
         loop {
             let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
-            let purity = crate::purity::Purity::analyze(&mut resolver);
+            let mut roots = vec![];
+            let mut requests = vec![];
+            for (file, source) in resolver.sources.iter().enumerate() {
+                for (index, node) in source.nodes.iter().enumerate() {
+                    if node.data["pure"] == true {
+                        roots.push(crate::semantics::Ref {
+                            file,
+                            node: crate::ast::NodeId(index),
+                        });
+                    }
+                    if node.kind == "Run" {
+                        requests.extend(
+                            source
+                                .descendants(crate::ast::NodeId(index))
+                                .filter(|id| source.node(*id).kind == "Call")
+                                .map(|node| crate::semantics::Ref { file, node }),
+                        );
+                    }
+                }
+            }
+            for request in &requests {
+                let plans = resolver.call_plans(*request, &Default::default());
+                if plans.is_empty() {
+                    if let Some(callee) =
+                        resolver.sources[request.file].role(request.node, "callee")
+                    {
+                        roots.extend(resolver.candidates(crate::semantics::Ref {
+                            file: request.file,
+                            node: callee,
+                        }));
+                    }
+                } else {
+                    roots.extend(plans.into_iter().map(|plan| plan.procedure));
+                }
+            }
+            roots.retain(|root| resolver.sources[root.file].node(root.node).kind == "Procedure");
+            let purity = crate::purity::Purity::analyze_from(&mut resolver, &roots);
             let mut packages = BTreeSet::new();
+            for request in requests {
+                if let Some(callee) = resolver.sources[request.file].role(request.node, "callee") {
+                    Self::callee_packages(
+                        &resolver,
+                        crate::semantics::Ref {
+                            file: request.file,
+                            node: callee,
+                        },
+                        &mut HashSet::new(),
+                        &mut packages,
+                    )?;
+                }
+            }
             for proc in &purity.checked {
                 let source = &self.sources[proc.file];
                 for node in source

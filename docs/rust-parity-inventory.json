@@ -129,11 +129,13 @@
     },
     {
       "python": "thorlang/evaluation.py",
-      "rust": [],
+      "rust": [
+        "rust/src/evaluation.rs"
+      ],
       "checkpoint": 4,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 35,
-      "remaining": "Port known/active/evaluate/closure/execute scheduling and helper generation in that order."
+      "remaining": "Lexical helper closure extraction is ported and compared, including installed SDK bodies and type-query pruning. Complete known/active scheduling, helper generation, bounded execution and evaluation-mode integration."
     },
     {
       "python": "thorlang/native.py",
@@ -144,15 +146,17 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 7,
-      "remaining": "Complete demand-loaded SDK access and extraction behavior."
+      "remaining": "Demand-loaded SDK access includes explicit #run call roots and transitive bodies. Complete evaluator attachment and extraction bridge behavior."
     },
     {
       "python": "thorlang/specialization.py",
-      "rust": [],
+      "rust": [
+        "rust/src/specialization.rs"
+      ],
       "checkpoint": 4,
-      "status": "not_ported",
+      "status": "partial",
       "reference_functions": 11,
-      "remaining": "Port lexical Binding contexts and specialization scheduling."
+      "remaining": "Bindings, lexical relevance, fingerprints, caller-frame save/restore, type spelling, declarations and predicates are ported. Complete process scheduling and native local-type/caller bridges."
     },
     {
       "python": "thorlang/cache.py",

@@ -631,7 +631,7 @@ impl Project {
         if !self.sources.iter().any(|s| {
             s.nodes
                 .iter()
-                .any(|n| n.immutable || n.data["pure"] == true)
+                .any(|n| n.immutable || n.data["pure"] == true || n.kind == "Run")
                 || s.selections.iter().any(|selection| selection.wildcard)
                 || s.info["mut_parameters"]
                     .as_array()

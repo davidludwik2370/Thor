@@ -252,6 +252,33 @@ Evaluation-mode signatures and specialization scheduling are the next porting
 work. Big-number integration and complete diagnostic/editor parity retain their
 later checkpoints.
 
+### Execution foundations (checkpoint 4 in progress)
+
+`specialization.rs` ports lexical bindings, relevant-binding selection, stable
+fingerprints, saved caller frames, helper type spelling, reconstructed binding
+declarations and specialization predicates. Local types require their original
+lexical scope. Cross-package types use helper-only imports and preserve nominal
+identity; generated import identifier spelling is normalized in comparisons.
+
+`evaluation.rs` now extracts declaration/procedure dependency closures with the
+reference decision order. Selected overloads retain their implementation rather
+than unused overload bodies. Type queries retain their type definitions without
+copying runtime operands; runtime globals and unrelated package init/fini bodies
+are excluded. Selected aliases, conditional definitions, local constants, reviewed
+clone contracts and invalid deferred/using contracts have differential fixtures.
+Explicit `#run` requests also trigger SDK body inspection, including transitively
+reached packages. The purity analyzer has an entry point for an explicit retained
+root set, so later helper compilation can exclude unrelated fn declarations.
+
+The 26-test execution-foundation gate passes, including installed `math.sqrt`
+extraction, wildcard import handling, lexical specialization comparisons, and
+the existing no-fallback/unsupported-feature checks. All 24 Rust units pass in
+both profiles, and Clippy passes with warnings denied. These analysis modules
+are not a completed evaluator: helper generation, bounded execution, generic
+scheduling and result installation/cache integration are still pending. The
+normal Rust command continues to reject unported `#run` programs explicitly;
+Python remains the supported default.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

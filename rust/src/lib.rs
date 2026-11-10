@@ -9,6 +9,7 @@ pub mod borrowprogram;
 pub mod diagnostic;
 pub mod digest;
 pub mod emit;
+pub mod evaluation;
 pub mod formatting;
 pub mod frontend;
 pub mod kind;
@@ -19,6 +20,7 @@ pub mod privileges;
 pub mod project;
 pub mod purity;
 pub mod semantics;
+pub mod specialization;
 pub mod values;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
