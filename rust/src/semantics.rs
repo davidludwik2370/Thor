@@ -1192,7 +1192,9 @@ impl<'a> Resolver<'a> {
             "StructType" => Type::Struct(r),
             "UnionType" => Type::Union(r),
             "EnumType" => Type::Enum(r),
-            "PolyType" => Type::Generic,
+            "PolyType" => child("specialization")
+                .map(|target| self.type_of(target))
+                .unwrap_or(Type::Generic),
             "TypeidType" => Type::Scalar {
                 name: "typeid".into(),
                 untyped: false,

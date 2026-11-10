@@ -1939,6 +1939,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         result
     }
     fn local_header(&self, r: Ref, c: C) -> bool {
+        if let Some(projection) = self.r.projection(r) {
+            return self.local_header(projection.owner, c);
+        }
         if self.kind(r) == "Ident" {
             return self.r.symbol(r).is_some_and(|symbol| {
                 self.r.symbols[symbol].scope != NodeId(0)
@@ -1954,6 +1957,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         false
     }
     fn header_root(&self, r: Ref) -> Option<usize> {
+        if let Some(projection) = self.r.projection(r) {
+            return self.header_root(projection.owner);
+        }
         if self.kind(r) == "Ident" {
             return self.r.symbol(r);
         }

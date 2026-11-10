@@ -199,8 +199,12 @@ impl<'a, 'r> Purity<'a, 'r> {
         }
         if let Some(params) = self.role(sig, "params") {
             for field in self.children(params) {
-                if self.r.sources[field.file].node(field.node).data["using_field"] == true {
-                    self.gap(root, field);
+                if self.r.sources[field.file].node(field.node).data["using_field"] == true
+                    && self
+                        .role(field, "type")
+                        .is_some_and(|typ| self.r.type_of(typ).is_unknown())
+                {
+                    self.fault(root,field,&via,"Pure using parameters require a resolved record schema; access members explicitly for unconstrained generic inputs.");
                 }
             }
         }
@@ -269,9 +273,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             "Using" => {
                 for value in source.group(node.node,"values").to_vec() {
                     let value=Ref{file:node.file,node:value};
-                    let mut typ=self.r.specialized_type(value,bindings);
-                    while let Type::Pointer(elem)=typ {typ = *elem;}
-                    if matches!(typ,Type::Struct(_)|Type::Record(..)|Type::Anonymous(_)) {self.gap(root,value);}
+                    let typ=self.r.specialized_type(value,bindings);
                     if typ.is_unknown() {
                         self.fault(root,node,via,"Pure using requires a resolved record schema; unverified namespaces and unconstrained generic projections are not eligible.");
                     }
@@ -334,7 +336,10 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if types.iter().any(|typ|self.unsafe_storage(typ,&mut HashSet::new())) {
                     self.fault(root,node,via,"Pure local storage cannot contain raw pointers, any, procedure values, maps, sets or raw unions.");
                 }
-                if source.node(node.node).data["using_field"]==true {self.gap(root,node);}
+                if source.node(node.node).data["using_field"]==true
+                    && source.group(node.node,"names").iter().any(|name| self.r.specialized_type(Ref{file:node.file,node:*name},bindings).is_unknown()) {
+                    self.fault(root,node,via,"Pure using requires a resolved record schema; unverified namespaces and unconstrained generic projections are not eligible.");
+                }
             }
             "Cast" => {
                 let target=self.role(node,"type").map(|r|if self.kind(r)=="TypeidType" {Type::scalar("typeid")}else{self.r.specialized_type(r,bindings)}).unwrap_or(Type::Unknown);

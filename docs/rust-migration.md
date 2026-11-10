@@ -64,6 +64,24 @@ parameter-addressability test passed separately. All 15 Rust unit tests pass in
 debug and release, and Clippy passes with warnings denied. Pure `using` projection handling is
 the next permission/purity gap; compile-time execution remains unported.
 
+### Pure projections
+
+Resolved record projections now participate in pure-body checks. This includes
+`using` parameters, standalone statements and local declarations, with the same
+borrowed storage and owned-result behavior as explicit selectors. Helpers may
+mutate or replace headers in records created by the surrounding `fn`; assigning
+a borrowed slice to a promoted field does not make it owned. Returned borrowed
+views are copied by the existing pure-result promotion path.
+
+The resolver also retains the declared specialization of a constrained type
+slot (`$T/Record`) before call instantiation, following Python's `type_node`.
+An unconstrained pure `using` parameter remains a source error with the reference
+message, rather than an unported-feature exit. This is another portion of
+checkpoint 3; native-selected conditional effects still need completion. The
+pure-projection, generic-branch, record, storage and resolution gate passed all
+83 tests, including checked and unchecked tracked runtime cases. Clippy passes
+with warnings denied.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

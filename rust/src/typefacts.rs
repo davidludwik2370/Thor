@@ -226,6 +226,11 @@ impl Resolver<'_> {
             if let Some(typ) = self.bound_type(r, bindings) {
                 return typ.clone();
             }
+            if n.kind == "PolyType" {
+                return child("specialization")
+                    .map(|target| self.specialize(target, bindings, seen))
+                    .unwrap_or(Type::Generic);
+            }
             if let Some(symbol) = self.symbol(r) {
                 let symbol = self.symbols[symbol].clone();
                 if let Some(projection) = symbol.projection {
