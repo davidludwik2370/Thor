@@ -167,6 +167,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
         Self::analyze_editor(r, flags, false)
     }
     pub fn analyze_editor(r: &'r mut Resolver<'a>, flags: &[String], editor: bool) -> Facts {
+        Self::analyze_project(r, flags, editor, None)
+    }
+    pub(crate) fn analyze_project(
+        r: &'r mut Resolver<'a>,
+        flags: &[String],
+        editor: bool,
+        evaluation: Option<&crate::evaluation::Plan>,
+    ) -> Facts {
         let enabled = editor
             || r.sources.iter().any(|s| {
                 s.nodes
@@ -214,6 +222,15 @@ impl<'a, 'r> Privileges<'a, 'r> {
             })
             .collect::<Vec<_>>();
         for proc in procedures {
+            let source = this.s(proc);
+            if evaluation.is_some_and(|plan| {
+                !plan.emits(source, proc.node)
+                    && !plan.requests.iter().any(|request| {
+                        request.file == proc.file && source.is_descendant(proc.node, request.node)
+                    })
+            }) {
+                continue;
+            }
             if !this.r.active_definition(proc) {
                 continue;
             }

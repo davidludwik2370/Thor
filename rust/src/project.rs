@@ -402,7 +402,7 @@ impl Project {
     /// compiling output. The differential analysis harness uses this entry.
     pub fn inspect_sources(&mut self) -> Result<()> {
         self.discover_type_facts()?;
-        self.discover_membership_facts()?;
+        self.discover_expression_facts()?;
         self.discover_call_facts()?;
         Ok(())
     }
@@ -417,10 +417,11 @@ impl Project {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
         }
         crate::lower::prime_logical_constants(&mut resolver);
-        let mut privileges = crate::privileges::Privileges::analyze_editor(
+        let mut privileges = crate::privileges::Privileges::analyze_project(
             &mut resolver,
             &self.options.flags,
             self.options.editor_info,
+            self.evaluation.as_ref(),
         );
         self.editor_info = privileges.editor_info.clone();
         let purity = if let Some(plan) = &self.evaluation {

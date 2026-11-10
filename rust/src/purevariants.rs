@@ -111,7 +111,7 @@ impl Lower<'_, '_> {
             .filter(|(call, _)| call.file == self.file)
             .map(|(call, targets)| (call.node, targets.iter().copied().collect()))
             .collect();
-        let targets = facts
+        let mut targets = facts
             .targets
             .values()
             .filter(|targets| {
@@ -122,7 +122,14 @@ impl Lower<'_, '_> {
             .flat_map(|targets| targets.iter())
             .copied()
             .filter(|target| target.file == self.file)
-            .collect::<std::collections::BTreeSet<_>>();
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        // A checked outer body copies its local declarations together with
+        // their checked variants. Prepare those local variants first.
+        targets.sort_by_key(|target| {
+            std::cmp::Reverse(self.source.ancestors(target.node).count())
+        });
         for target in targets {
             let mut parent = self.source.node(target.node).parent;
             while parent.is_some_and(|node| self.source.node(node).kind == "Paren") {
@@ -283,6 +290,9 @@ impl Lower<'_, '_> {
                 Code::concat([self.g(if args.is_empty() { "" } else { "," }, id), profile]);
             inserts.push((offset, profile));
         }
-        Ok(Some(self.splice(id, replacements, inserts)?))
+        Ok(Some(
+            self.splice(id, replacements, inserts)?
+                .expansion(&self.source.path, self.source.node(id).span),
+        ))
     }
 }

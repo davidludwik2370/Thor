@@ -762,8 +762,9 @@ impl<'a> Resolver<'a> {
                         None
                     };
                 }
-                let a = self.constant_int(a)?;
-                let b = self.constant_int(b)?;
+                let bindings = Substitutions::new();
+                let a = self.context_integer(a, &bindings)?;
+                let b = self.context_integer(b, &bindings)?;
                 match n.op.as_str() {
                     "==" => Some(a == b),
                     "!=" => Some(a != b),

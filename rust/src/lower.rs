@@ -1477,6 +1477,17 @@ impl<'a, 'r> Lower<'a, 'r> {
                         }
                     }
                 }
+                if self.querying > 0 && self.big_enabled() {
+                    if let Some(signature) = self.resolver.signature(self.reference(callee)) {
+                        for (arg, hint) in args.iter().zip(self.big_call_hints(id, signature, false)?) {
+                            if hint.as_ref().and_then(|hint| hint.semantic.as_ref())
+                                .and_then(Type::big_name).is_some()
+                            {
+                                overrides.insert(*arg, (hint, constant));
+                            }
+                        }
+                    }
+                }
                 if matches!(self.source.text(callee), "#assert" | "#config") {
                     for arg in args {
                         overrides.entry(*arg).or_insert((None, true)).1 = true;

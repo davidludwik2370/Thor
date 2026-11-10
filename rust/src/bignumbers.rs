@@ -768,7 +768,7 @@ impl Lower<'_, '_> {
     }
 }
 impl Lower<'_, '_> {
-    fn big_call_hints(
+    pub(super) fn big_call_hints(
         &mut self,
         id: NodeId,
         signature: Ref,
@@ -1174,6 +1174,11 @@ impl Lower<'_, '_> {
             node.kind.as_str(),
             "OrElse" | "OrReturn" | "OrBranch"
         ) {
+            if node.kind == "OrElse" && self.querying == 0 {
+                if let Some(code) = self.temporary_discard(id)? {
+                    return Ok(Some(code));
+                }
+            }
             if let Some(code) = self.big_optional(id)? {
                 return Ok(Some(code));
             }

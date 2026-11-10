@@ -600,6 +600,7 @@ impl Lower<'_, '_> {
         match node.kind.as_str(){
             "Unary" if node.op=="&" => {
                 let expr=self.unparen(self.role(id,"expr")?);
+                if self.big_enabled() && self.big_property(expr).is_some() {return Ok(None);}
                 let base=if self.source.node(expr).kind=="Index"{self.role(expr,"expr")?}else{expr};
                 if self.temporary_producer(base)||self.temporary_view(base){return Ok(Some(self.error_token(id,"An address into an anonymous allocation needs a named owner; bind the allocation before taking its address.")));}
             }

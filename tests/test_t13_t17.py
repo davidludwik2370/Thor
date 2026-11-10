@@ -464,6 +464,7 @@ empty::proc "contextless"(a:$T)->bool{return nil==a}
     def test_set_library_type_and_syntax_interoperate(self):
         self.invoke(self.program('''
 a:sets.Set(int);a+=1;b:=set[int]{2};c:=a|b
+if type_of(a) != type_of(b) || type_of(c) != sets.Set(int) { panic("different Set types") }
 assert(len(c)==2&&1 in c);delete(a);delete(b);delete(c)
 ''','import sets "thor:sets"\n'))
 

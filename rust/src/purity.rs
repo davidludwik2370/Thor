@@ -358,8 +358,10 @@ impl<'a, 'r> Purity<'a, 'r> {
             for (_, annotation) in self.r.fields(sig, "results") {
                 if let Some(annotation) = annotation {
                     let typ = self.r.specialized_type(annotation, &bindings);
-                    if Self::owned_sequence(&typ) {
-                        self.fault(root,annotation,&via,"Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc.");
+                    if let Some(sequence) = Self::owned_sequence(&typ) {
+                        self.fault(root, annotation, &via, format!(
+                            "Contextless compile-time procedures cannot return {sequence}; use fn or a contextful proc."
+                        ));
                     }
                 }
             }
@@ -766,7 +768,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                             root,
                             callee,
                             via,
-                            "Pure code cannot call foreign or bodyless procedures.",
+                            "Pure code requires a resolved direct call to an eligible procedure; foreign or bodyless procedures are forbidden.",
                         );
                         continue;
                     }
@@ -915,8 +917,14 @@ impl<'a, 'r> Purity<'a, 'r> {
                     continue;
                 }
                 let actual = self.r.specialized_type(arg, bindings);
-                if matches!(expected, Type::Scalar { .. } | Type::String { .. })
-                    && matches!(actual, Type::Scalar { .. } | Type::String { .. })
+                let (expected_leaf, actual_leaf) = match (&expected, &actual) {
+                    (Type::Pointer(expected), Type::Pointer(actual)) => {
+                        (expected.as_ref(), actual.as_ref())
+                    }
+                    (expected, actual) => (expected, actual),
+                };
+                if matches!(expected_leaf, Type::Scalar { .. } | Type::String { .. })
+                    && matches!(actual_leaf, Type::Scalar { .. } | Type::String { .. })
                     && self.r.shape_score(annotation, &actual, bindings).is_none()
                 {
                     return true;
@@ -947,13 +955,14 @@ impl<'a, 'r> Purity<'a, 'r> {
             _ => Some(false),
         }
     }
-    fn owned_sequence(typ: &Type) -> bool {
+    fn owned_sequence(typ: &Type) -> Option<&'static str> {
         match typ {
-            Type::String { .. } | Type::Slice(_) | Type::Dynamic(_) => true,
+            Type::String { .. } | Type::Slice(_) => Some("strings/slices"),
+            Type::Dynamic(_) => Some("dynamic arrays"),
             Type::Nominal(_, base)
             | Type::Array { elem: base, .. }
             | Type::Fixed { elem: base, .. } => Self::owned_sequence(base),
-            _ => false,
+            _ => None,
         }
     }
     fn raw_union(&self, typ: &Type) -> bool {

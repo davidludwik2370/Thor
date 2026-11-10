@@ -23,6 +23,18 @@ impl Lower<'_, '_> {
         if let Some(expected) = expected.filter(|hint| !hint.element_only) {
             return Ok(expected.code);
         }
+        if let Some(annotation) = s.comprehension_annotation(id) {
+            let typ = self.typ(annotation);
+            if matches!(typ, Type::Array { .. } | Type::Slice(_)) {
+                self.meta = true;
+                let annotation = self.render(annotation, None, true)?;
+                return Ok(Code::concat([
+                    self.g(format!("[]{}meta.type_elem_type(", self.prefix), id),
+                    annotation,
+                    self.g(")", id),
+                ]));
+            }
+        }
         let source = self.role(id, "expr")?;
         let loop_ = self.role(id, "loop")?;
         let output = self.role(id, "output")?;

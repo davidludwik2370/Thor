@@ -209,6 +209,30 @@ unchecked builds. The private contextual type and unrelated `#run` regression
 passed with both compilers. The native formatting, source identity and context
 macro fixtures also passed.
 
+### Isolated helpers, generic calls and walkthrough coverage
+
+Isolated compile-time helpers seed slice permission analysis from retained
+procedures. Call analysis can still follow a retained procedure into its
+dependencies. This avoids repeating the enclosing project's unrelated
+analysis for each helper. The main demo completed all 23 sections with the
+release compiler. Both engines built all 19 copied Thor projects, and the
+original sources were verified against their initial hashes.
+
+The allocation-tracked walkthrough also passes with the native compiler.
+Set type comparisons retain native type semantics. Logical numeric arguments
+keep their declared parameter types in unevaluated queries, and formatting
+releases anonymous numeric operands while preserving named values. The
+original numeric method and variadic cases run with allocation tracking in
+debug and assertion-disabled release builds.
+
+Checked calls follow integer build defines, retain overload candidates when a
+generic argument's type is unknown, and include checked nested helpers inside
+the copied outer body. Diagnostics restore the original call, preserve Odin's
+candidate list for invalid pointer arguments, and identify unsupported
+contextless dynamic results at their type annotations. Compile-time
+comprehensions retain declared element types and their dependencies. Length
+and iteration over imported enum types keep Odin's native semantics.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

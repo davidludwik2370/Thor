@@ -960,11 +960,11 @@ impl Resolver<'_> {
                         .kind
                         == "PolyType"
                 });
-                if generic || bindings.contains_key(name) {
-                    let binding = bindings.entry(name.into()).or_insert(Type::Unknown);
-                    if binding.is_unknown() {
-                        *binding = actual.clone();
-                    }
+                if generic {
+                    // A plain reference to an already introduced type parameter
+                    // constrains the argument. It cannot replace an unresolved
+                    // binding from an explicitly polymorphic parameter.
+                    bindings.entry(name.into()).or_insert_with(|| actual.clone());
                 }
             }
             "MapType" => {

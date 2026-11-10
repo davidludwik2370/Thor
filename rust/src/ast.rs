@@ -452,6 +452,12 @@ impl Source {
     pub fn ancestors(&self, id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
         std::iter::successors(self.node(id).parent, move |id| self.node(*id).parent)
     }
+    pub fn comprehension_annotation(&self, id: NodeId) -> Option<NodeId> {
+        self.ancestors(id)
+            .find(|ancestor| matches!(self.node(*ancestor).kind.as_str(), "Declaration" | "Procedure"))
+            .filter(|declaration| self.node(*declaration).kind == "Declaration")
+            .and_then(|declaration| self.role(declaration, "type"))
+    }
     pub fn is_descendant(&self, id: NodeId, parent: NodeId) -> bool {
         let (start, end) = self.subtree[parent.0];
         let child = self.subtree[id.0].0;

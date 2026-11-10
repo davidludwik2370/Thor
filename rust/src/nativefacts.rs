@@ -2,10 +2,10 @@
 use super::*;
 
 impl Project {
-    pub(super) fn discover_membership_facts(&mut self) -> Result<()> {
+    pub(super) fn discover_expression_facts(&mut self) -> Result<()> {
         use crate::{ast::NodeId, semantics::Ref};
 
-        let needles = self
+        let operands = self
             .sources
             .iter()
             .enumerate()
@@ -15,13 +15,26 @@ impl Project {
                     .iter()
                     .enumerate()
                     .filter_map(move |(index, node)| {
-                        if !source.thor
-                            || node.kind != "Binary"
-                            || !matches!(node.op.as_str(), "in" | "not_in")
-                        {
+                        if !source.thor {
                             return None;
                         }
-                        let mut container = source.role(NodeId(index), "right")?;
+                        let id = NodeId(index);
+                        if node.kind == "Range" {
+                            let node = source.role(id, "expr")?;
+                            return matches!(source.node(node).kind.as_str(), "Ident" | "Selector" | "Paren")
+                                .then_some(Ref { file, node });
+                        }
+                        if node.kind == "Call" && source.text(source.role(id, "callee")?) == "len" {
+                            let [node] = source.group(id, "args") else {
+                                return None;
+                            };
+                            return matches!(source.node(*node).kind.as_str(), "Ident" | "Selector" | "Paren")
+                                .then_some(Ref { file, node: *node });
+                        }
+                        if node.kind != "Binary" || !matches!(node.op.as_str(), "in" | "not_in") {
+                            return None;
+                        }
+                        let mut container = source.role(id, "right")?;
                         while source.node(container).kind == "Paren" {
                             container = source.role(container, "expr")?;
                         }
@@ -35,19 +48,52 @@ impl Project {
                             return None;
                         }
                         source
-                            .role(NodeId(index), "left")
+                            .role(id, "left")
                             .map(|node| Ref { file, node })
                     })
             })
             .collect::<Vec<_>>();
-        if needles.is_empty() {
+        let logical = self.sources.iter().any(|source| {
+            source.thor
+                && source.nodes.iter().enumerate().any(|(index, node)| {
+                    node.kind == "Ident"
+                        && matches!(source.text(NodeId(index)), "Integer" | "Rational")
+                        || node.kind == "Import"
+                            && unquote(&node.op).ok().as_deref() == Some("thor:big")
+                })
+        });
+        if operands.is_empty() && !logical {
             return Ok(());
         }
-        let resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         let mut packages = BTreeSet::new();
         let mut seen = HashSet::new();
-        for needle in needles {
-            Self::referenced_packages(&resolver, needle, &mut seen, &mut packages)?;
+        for operand in operands {
+            Self::referenced_packages(&resolver, operand, &mut seen, &mut packages)?;
+        }
+        if logical {
+            for (file, source) in resolver.sources.iter().enumerate() {
+                if !resolver.logical_enabled(file) || source.shared_native {
+                    continue;
+                }
+                for (index, call) in source.nodes.iter().enumerate() {
+                    if call.kind != "Call" {
+                        continue;
+                    }
+                    let id = NodeId(index);
+                    let Some(callee) = source.role(id, "callee").map(|node| Ref { file, node })
+                    else {
+                        continue;
+                    };
+                    if source.group(id, "args").iter().any(|arg| {
+                        let node = source.role(*arg, "value").unwrap_or(*arg);
+                        resolver.type_of(Ref { file, node }).big_name().is_some()
+                    }) && resolver.signature(callee).is_none()
+                    {
+                        Self::referenced_packages(&resolver, callee, &mut seen, &mut packages)?;
+                    }
+                }
+            }
         }
         packages.retain(|directory| {
             !self
@@ -264,7 +310,7 @@ impl Project {
         Ok(())
     }
     fn referenced_directory(source: &Source, path: &str) -> Option<PathBuf> {
-        if matches!(path, "base:intrinsics" | "base:builtin" | "base:runtime") {
+        if matches!(path, "base:intrinsics" | "base:builtin") {
             return None;
         }
         let directory = if let Some((name, suffix)) = path.split_once(':') {

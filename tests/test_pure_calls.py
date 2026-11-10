@@ -117,7 +117,7 @@ work::fn(n:int)->[]int{return leaf(n,n+1,scale=3)}
 ''')
 
     def test_generics_overloads_aliases_and_named_defaults(self):
-        self.invoke(self.program('x:=3;y:=f64(4);assert(work(x)==9&&work(y)==16&&DEFAULT==25)', '''
+        self.invoke(self.program('x:=3;y:=f64(4);if work(x)!=9||work(y)!=16||DEFAULT!=25{panic("wrong overload")}', '''
 integer::proc(value:int)->int{return value*value}
 floating::proc(value:f64)->f64{return value*value}
 square::proc{integer,floating}
@@ -241,7 +241,7 @@ else{leaf::proc(value:int)->int{return value+2}}
 work::fn(value:int)->int{return leaf(value)}
 '''
         for mode in [1,2]:
-            self.invoke(self.program(f'x:=3;assert(work(x)=={3+mode})',prefix),flags=[f'-define:MODE={mode}'])
+            self.invoke(self.program(f'x:=3;if work(x)!={3+mode}{{panic("wrong implementation")}}',prefix),flags=[f'-define:MODE={mode}'])
 
     def test_standard_library_math_at_runtime_and_compile_time(self):
         self.invoke(self.program('x:=9.0;assert(work(x)==3&&VALUE==4&&plain(x)==3)', '''

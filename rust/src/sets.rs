@@ -81,6 +81,11 @@ impl Lower<'_, '_> {
         if node.kind == "Binary" {
             let a = self.role(id, "left")?;
             let b = self.role(id, "right")?;
+            if self.resolver.denotes_type(self.reference(a))
+                || self.resolver.denotes_type(self.reference(b))
+            {
+                return Ok(None);
+            }
             let at = self.typ(a);
             let bt = self.typ(b);
             let op = match node.op.as_str() {
@@ -96,8 +101,6 @@ impl Lower<'_, '_> {
                 let generic = at.is_unknown()
                     && bt.is_unknown()
                     && !constant
-                    && !self.resolver.denotes_type(self.reference(a))
-                    && !self.resolver.denotes_type(self.reference(b))
                     && s.text(a) != "nil"
                     && s.text(b) != "nil";
                 if set || generic {

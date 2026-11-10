@@ -14,7 +14,7 @@ class BigLanguageTests(base.unittest.TestCase):
 expect :: proc(value: $T, text: string) {
     actual := big.to_string(value)
     defer delete(actual)
-    assert(actual == text)
+    if actual != text { panic("Unexpected logical numeric value") }
 }
 '''+prefix.replace('#+feature dynamic-literals\n',''))
         result=self.invoke('#+feature dynamic-literals\n'+source,flags=kwargs.pop('flags',('--track-allocations=basic',)),**kwargs)

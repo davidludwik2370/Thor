@@ -405,7 +405,13 @@ pub(crate) fn request_roots(source: &crate::ast::Source, expression: Ref, mode: 
         }));
         roots
     } else {
-        vec![expression]
+        let mut roots = vec![expression];
+        if source.node(expression.node).kind == "Comprehension" {
+            if let Some(node) = source.comprehension_annotation(expression.node) {
+                roots.push(Ref { node, ..expression });
+            }
+        }
+        roots
     }
 }
 pub(crate) fn dependency_path(source: &crate::ast::Source, directory: &std::path::Path) -> String {

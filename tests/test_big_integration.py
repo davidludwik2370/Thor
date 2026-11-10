@@ -56,10 +56,11 @@ delete(a);delete(r)
 ''','import "thor:basic"\nimport "thor:format"\nimport "core:fmt"\n')
 
     def test_variadic_numeric_arguments_coerce_literals_and_release_temporaries(self):
-        self.run_big('''
+        body='''
 a:=total(Integer(1),2,3);expect(a,"6");delete(a)
 b:=generic_total(Integer(4),5);expect(b,"9");delete(b)
-''','''total::proc(values:..Integer)->Integer{
+'''
+        declarations='''total::proc(values:..Integer)->Integer{
 result:Integer
 defer delete(result)
 for value in values {result+=value}
@@ -71,11 +72,23 @@ defer when T==Integer || T==Rational {delete(result)}
 for value in values {result+=value}
 return result
 }
-''')
+'''
+        for flags in [
+            ['-debug'],
+            ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic'],
+        ]:
+            with self.subTest(flags=flags):
+                self.run_big(body,declarations,flags=flags)
 
     def test_method_argument_literals_adopt_numeric_parameter_type(self):
-        self.run_big('record:=Record{apply};value:=record->apply(2);expect(value,"3");delete(value)',
-            'Record::struct{apply:proc(self:^Record,value:Integer)->Integer}\napply::proc(self:^Record,value:Integer)->Integer{return value+1}\n')
+        for flags in [
+            ['-debug'],
+            ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic'],
+        ]:
+            with self.subTest(flags=flags):
+                self.run_big('record:=Record{apply};value:=record->apply(2);expect(value,"3");delete(value)',
+                    'Record::struct{apply:proc(self:^Record,value:Integer)->Integer}\napply::proc(self:^Record,value:Integer)->Integer{return value+1}\n',
+                    flags=flags)
 
     def test_inline_and_named_membership_owns_only_anonymous_elements(self):
         self.run_big('''
