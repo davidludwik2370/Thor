@@ -40,6 +40,13 @@ null source pointer and length 29. Its isolated retry and clean full rerun
 passed. The extracted record is `evidence/recurrence-2026-11-09.txt`; it does not
 independently identify the particular concurrent write.
 
+A November 10 parity gate encountered the same initial stack offsets in the
+Python reference's Odin backend invocation, with a null source pointer and length
+35. The Rust comparison succeeded, and four subsequent isolated comparisons
+passed on both engines. The extracted record is
+`evidence/recurrence-2026-11-10.txt`; it does not identify the accessed entity or
+independently prove which concurrent write caused this recurrence.
+
 ## Steps to reproduce
 
 1. In a separate Odin checkout at the commit above, build the compiler with C++

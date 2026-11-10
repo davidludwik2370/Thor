@@ -1,0 +1,35 @@
+Stock Odin compiler crash during the temporary-ownership parity gate.
+Personal filesystem paths are omitted. This is an extracted summary, not a raw dump.
+
+Report basename: odin-2026-11-10-082241.ips
+Capture time: 2026-11-10 08:22:41.1676 -0500
+Compiler: odin version dev-2026-10:8169255b9
+Process: odin (Python reference backend compilation, not generated program execution)
+Signal: SIGSEGV
+Exception: KERN_INVALID_ADDRESS at 0x0000000000000000
+Faulting thread: 10
+Compiler threads in report: 11
+
+Faulting stack:
+  alloc_cstring(gbAllocator, String) +896
+  lb_type_internal(lbModule*, Type*) +680
+  lb_type(lbModule*, Type*) +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*) +636
+
+Saved source string registers (matching the existing compiler disassembly):
+  x20 = 0 (source pointer)
+  x19 = 35 (source length)
+  x0 != 0 (destination allocation)
+
+Acceptance fixture: tests.test_rust_compiler.RustCompilerTests.
+  test_typed_numeric_loops_bounds_order_and_do_bodies
+
+The Python reference Odin compilation terminated with status 139. The independent
+Rust build succeeded and its program printed the expected 262. An isolated
+comparison and three additional independent comparisons passed on both engines.
+The first three function offsets and null-source/nonzero-length string match
+earlier evidence. This record does not identify the accessed Entity or prove
+which concurrent write caused this recurrence. No Odin compiler changes or
+automatic retry behavior were introduced. The corrected clean gate passed all
+156 tests.
