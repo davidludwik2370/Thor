@@ -25,6 +25,22 @@ pub struct Access {
     pub aspect: Aspect,
 }
 impl Access {
+    pub fn key(&self, resolver: &crate::semantics::Resolver<'_>) -> String {
+        let source = &resolver.sources[self.procedure.file];
+        let identity = format!(
+            "{:?}:{}:{}:{:?}:{:?}",
+            source.path,
+            source.node(self.procedure.node).span.start,
+            self.index,
+            self.path,
+            self.aspect
+        );
+        format!(
+            "p{}_{}",
+            self.index,
+            &crate::digest::sha256(identity.as_bytes())[..16]
+        )
+    }
     pub fn step(&self, step: Step, aspect: Option<Aspect>) -> Self {
         let mut result = self.clone();
         result.path.push(step);

@@ -11,6 +11,44 @@ pub struct CallPlan {
 }
 
 impl Resolver<'_> {
+    fn spread_types(&mut self, arg: Ref, context: &Substitutions) -> Option<Vec<Type>> {
+        let source = &self.sources[arg.file];
+        if source.node(arg.node).kind != "Unary" || source.node(arg.node).op != "**" {
+            return None;
+        }
+        let node = source.role(arg.node, "expr")?;
+        let typ = self.specialized_type(
+            Ref {
+                file: arg.file,
+                node,
+            },
+            context,
+        );
+        let mut base = &typ;
+        while let Type::Nominal(_, inner) = base {
+            base = inner;
+        }
+        if let Type::Array { elem, .. } = base {
+            return Some(vec![*elem.clone()]);
+        }
+        let fields = self.record_fields(&typ);
+        Some(if fields.is_empty() {
+            vec![Type::Unknown]
+        } else {
+            fields.into_iter().map(|(_, typ)| typ).collect()
+        })
+    }
+    fn packed_variadic(&self, call: Ref, arg: Ref) -> bool {
+        let source = &self.sources[call.file];
+        source
+            .node(call.node)
+            .spans
+            .get("ellipsis")
+            .is_some_and(|span| self.sources[arg.file].node(arg.node).span.start >= span.end)
+            || source.group(call.node, "args").iter().any(|id| {
+                source.node(*id).kind == "FieldValue" && source.role(*id, "value") == Some(arg.node)
+            })
+    }
     fn contextual_cast_argument(&self, mut actual: Ref) -> bool {
         while self.sources[actual.file].node(actual.node).kind == "Paren" {
             let Some(node) = self.sources[actual.file].role(actual.node, "expr") else {
@@ -97,7 +135,23 @@ impl Resolver<'_> {
                                     untyped: false,
                                 }
                             } else {
-                                self.specialized_type(*arg, context)
+                                let typ = self.specialized_type(*arg, context);
+                                if annotation.is_some_and(|annotation| {
+                                    self.sources[annotation.file].node(annotation.node).kind
+                                        == "Ellipsis"
+                                }) {
+                                    if let Some(types) = self.spread_types(*arg, context) {
+                                        Type::Slice(Box::new(
+                                            types.into_iter().next().unwrap_or(Type::Unknown),
+                                        ))
+                                    } else if self.packed_variadic(call, *arg) {
+                                        typ
+                                    } else {
+                                        Type::Slice(Box::new(typ))
+                                    }
+                                } else {
+                                    typ
+                                }
                             }
                         })
                         .unwrap_or(Type::Unknown)
@@ -116,19 +170,23 @@ impl Resolver<'_> {
                 if let Some(annotation) = annotation {
                     let formal = &self.sources[annotation.file];
                     let variadic = formal.node(annotation.node).kind == "Ellipsis";
-                    let annotation =
-                        if variadic && !source.node(call.node).spans.contains_key("ellipsis") {
-                            formal
-                                .role(annotation.node, "expr")
-                                .map(|node| Ref {
-                                    file: annotation.file,
-                                    node,
-                                })
-                                .unwrap_or(*annotation)
+                    let element = if variadic {
+                        formal
+                            .role(annotation.node, "expr")
+                            .map(|node| Ref {
+                                file: annotation.file,
+                                node,
+                            })
+                            .unwrap_or(*annotation)
+                    } else {
+                        *annotation
+                    };
+                    for arg in group.iter().filter(|arg| supplied.contains(arg)) {
+                        let annotation = if variadic && !self.packed_variadic(call, *arg) {
+                            element
                         } else {
                             *annotation
                         };
-                    for arg in group.iter().filter(|arg| supplied.contains(arg)) {
                         let type_operand = self.denotes_type(*arg);
                         if self.sources[annotation.file].node(annotation.node).kind == "TypeidType"
                         {
@@ -143,11 +201,19 @@ impl Resolver<'_> {
                         } else {
                             self.specialized_type(*arg, context)
                         };
-                        if let Some(amount) = self.shape_score(annotation, &typ, &bindings) {
-                            score += amount;
-                        } else if !self.contextual_cast_argument(*arg) {
-                            valid = false;
-                            break;
+                        let types = if variadic {
+                            self.spread_types(*arg, context)
+                                .unwrap_or_else(|| vec![typ])
+                        } else {
+                            vec![typ]
+                        };
+                        for typ in types {
+                            if let Some(amount) = self.shape_score(annotation, &typ, &bindings) {
+                                score += amount;
+                            } else if !self.contextual_cast_argument(*arg) {
+                                valid = false;
+                                break;
+                            }
                         }
                     }
                 }

@@ -549,6 +549,23 @@ impl<'a, 'r> Purity<'a, 'r> {
                     );
                 }
             }
+        } else if ["core:slice", "core:strings"]
+            .iter()
+            .any(|path| self.r.library_alias_member(callee, path).as_deref() == Some("clone"))
+        {
+            let allocator = args.iter().any(|arg| {
+                self.kind(*arg) == "FieldValue"
+                    && self
+                        .role(*arg, "field")
+                        .is_some_and(|field| self.text(field) == "allocator")
+            }) || args
+                .iter()
+                .filter(|arg| self.kind(**arg) != "FieldValue")
+                .count()
+                > 1;
+            if allocator {
+                self.fault(root, call, via, "Pure code cannot select an allocator.");
+            }
         } else {
             let plans = self.r.call_plans(call, bindings);
             let indirect = self.r.symbol(callee).is_some_and(|i| {

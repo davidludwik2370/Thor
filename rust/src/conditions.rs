@@ -161,4 +161,52 @@ impl Resolver<'_> {
         }
         None
     }
+    /// Follow constant aliases and namespace imports without trusting a local
+    /// procedure merely because it has an SDK procedure's name.
+    pub fn library_alias_member(&self, r: Ref, path: &str) -> Option<String> {
+        self.library_alias_seen(r, path, &mut std::collections::HashSet::new())
+    }
+    fn library_alias_seen(
+        &self,
+        r: Ref,
+        path: &str,
+        seen: &mut std::collections::HashSet<Ref>,
+    ) -> Option<String> {
+        if !seen.insert(r) {
+            return None;
+        }
+        if let Some(name) = self.library_member(r, path) {
+            return Some(name);
+        }
+        let source = &self.sources[r.file];
+        if source.node(r.node).kind == "Paren" {
+            return source
+                .role(r.node, "expr")
+                .and_then(|node| self.library_alias_seen(Ref { file: r.file, node }, path, seen));
+        }
+        let symbol = &self.symbols[self.symbol(r)?];
+        if !symbol.constant || symbol.immutable {
+            return None;
+        }
+        let owner = &self.sources[symbol.reference.file];
+        if self.standard_library(r, path) {
+            let (collection, suffix) = path.split_once(':')?;
+            let expected = std::path::Path::new(source.info["odin_root"].as_str()?)
+                .join(collection)
+                .join(suffix);
+            if owner.path.parent() == Some(expected.as_path()) {
+                return Some(symbol.name.clone());
+            }
+        }
+        let value = Ref {
+            file: symbol.reference.file,
+            node: symbol.value?,
+        };
+        matches!(
+            owner.node(value.node).kind.as_str(),
+            "Ident" | "Selector" | "Paren"
+        )
+        .then(|| self.library_alias_seen(value, path, seen))
+        .flatten()
+    }
 }

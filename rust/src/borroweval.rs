@@ -82,6 +82,12 @@ impl Evaluator<'_, '_, '_> {
     pub fn builtin(&self, call: Ref) -> Option<String> {
         self.builtin_inner(self.role(call, "callee")?, &mut HashSet::new())
     }
+    pub fn clone_library(&self, call: Ref) -> Option<&'static str> {
+        let callee = self.role(call, "callee")?;
+        ["core:slice", "core:strings"].into_iter().find(|path| {
+            self.resolver.library_alias_member(callee, path).as_deref() == Some("clone")
+        })
+    }
     fn builtin_inner(&self, callee: Ref, seen: &mut HashSet<Ref>) -> Option<String> {
         if !seen.insert(callee) {
             return None;
@@ -338,6 +344,16 @@ impl Evaluator<'_, '_, '_> {
                         return self
                             .arena
                             .header_copy(value, typ, Some(node), None, self.resolver);
+                    }
+                }
+                if self.clone_library(node) == Some("core:slice") {
+                    if let Some(source) = self.argument(node, "a", 0) {
+                        let value = self.flow(source, env);
+                        let element = self.arena.item(value);
+                        return self.arena.add(Flow {
+                            element: Some(element),
+                            ..Flow::default()
+                        });
                     }
                 }
                 self.empty() // Checked callees promote independent result storage.

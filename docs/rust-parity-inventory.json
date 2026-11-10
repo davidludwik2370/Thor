@@ -72,23 +72,25 @@
         "rust/src/borroweval.rs",
         "rust/src/borrowlocals.rs",
         "rust/src/borrowbind.rs",
-        "rust/src/borrowprogram.rs"
+        "rust/src/borrowprogram.rs",
+        "rust/src/ownershiplower.rs"
       ],
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 24,
-      "remaining": "The reference flow evaluator now enforces direct generic fn writes, with binding/store/requirement propagation independently compared against Python. Connect helper ownership argument emission and cover the broader iterator/callee effects before removing remaining migration gaps."
+      "remaining": "Reference symbolic helper profiles are connected for regular and variadic helpers, iterators, type switches and stored aliases. Complete SDK/helper/comprehension coverage and nonconvergence diagnostics before removing all remaining migration checks."
     },
     {
       "python": "thorlang/purecalls.py",
       "rust": [
         "rust/src/purevariants.rs",
-        "rust/src/purelower.rs"
+        "rust/src/purelower.rs",
+        "rust/src/ownershiplower.rs"
       ],
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 16,
-      "remaining": "Finish checked-callee contexts and return lifetimes."
+      "remaining": "Zero-sized ownership profiles, lazy checked variants and surrounding mutator lifetimes are connected. Finish SDK adaptation and evaluation-mode checked-call behavior."
     },
     {
       "python": "thorlang/purediagnostics.py",
@@ -99,7 +101,7 @@
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 4,
-      "remaining": "Complete pure-call error grouping and related locations."
+      "remaining": "Native permission errors retain fn call chains and original Thor locations. Complete active-instantiation selection when a helper has multiple fn callers."
     },
     {
       "python": "thorlang/purity.py",

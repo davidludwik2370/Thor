@@ -18,6 +18,8 @@ mod contextlower;
 mod defaults;
 #[path = "extrema.rs"]
 mod extrema;
+#[path = "ownershiplower.rs"]
+mod ownershiplower;
 #[path = "purelower.rs"]
 mod purelower;
 #[path = "pureproofs.rs"]
@@ -64,6 +66,7 @@ pub struct Lower<'a, 'r> {
     builtin: bool,
     pub errors: HashMap<String, String>,
     pub type_sites: HashMap<String, (Ref, String)>,
+    pub pure_error_sites: HashMap<String, Ref>,
     blocked: HashMap<NodeId, String>,
     storage_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
     storage_block_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
@@ -84,10 +87,17 @@ pub struct Lower<'a, 'r> {
     pure_local_busy: HashSet<NodeId>,
     pure_ignored: HashMap<NodeId, String>,
     pure_conditional: HashMap<NodeId, String>,
+    borrowing: crate::borrowprogram::Emission,
+    borrow_marker: String,
+    ownership_wrapping: HashSet<NodeId>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
         let source = &resolver.sources[file];
+        let borrow_marker = format!(
+            "{}checked_call",
+            resolver.sources.first().unwrap_or(source).prefix
+        );
         let mut this = Self {
             source,
             file,
@@ -111,6 +121,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             builtin: false,
             errors: HashMap::new(),
             type_sites: HashMap::new(),
+            pure_error_sites: HashMap::new(),
             blocked: HashMap::new(),
             storage_guards: BTreeMap::new(),
             storage_block_guards: BTreeMap::new(),
@@ -131,6 +142,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             pure_local_busy: HashSet::new(),
             pure_ignored: HashMap::new(),
             pure_conditional: HashMap::new(),
+            borrowing: crate::borrowprogram::Emission::default(),
+            borrow_marker,
+            ownership_wrapping: HashSet::new(),
         };
         for edit in &source.edits {
             this.edits
@@ -869,6 +883,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Block" {
+            if let Some(code) = self.ownership_body(id)? {
+                return Ok(code);
+            }
             if let Some(owner) = node
                 .parent
                 .filter(|owner| self.pure_owned.contains(owner) && !self.pure_busy.contains(owner))
@@ -876,6 +893,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 if self.source.role(owner, "body") == Some(id) {
                     return self.pure_body(owner, id);
                 }
+            }
+        }
+        if kind == "ProcedureType" {
+            if let Some(code) = self.ownership_signature(id)? {
+                return Ok(code);
             }
         }
         if matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {

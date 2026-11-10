@@ -27,6 +27,27 @@ pub struct Model {
     pub converged: bool,
     instances: HashMap<(Ref, Ref), HashMap<Id, Id>>,
 }
+#[derive(Clone, Default)]
+pub struct Emission {
+    pub procedures: BTreeSet<Ref>,
+    pub checks: BTreeMap<Ref, Permission>,
+    pub profiles: BTreeMap<Ref, Vec<(Access, Permission)>>,
+    pub mutates: BTreeSet<Ref>,
+    pub escapes: BTreeMap<Ref, String>,
+}
+impl Emission {
+    pub fn covers(&self, resolver: &Resolver<'_>, site: Ref) -> bool {
+        resolver.sources[site.file]
+            .ancestors(site.node)
+            .find(|id| resolver.sources[site.file].node(*id).kind == "Procedure")
+            .is_some_and(|node| {
+                self.procedures.contains(&Ref {
+                    file: site.file,
+                    node,
+                })
+            })
+    }
+}
 fn kind(typ: &Type) -> Kind {
     match typ {
         Type::Nominal(_, inner) => kind(inner),
@@ -91,6 +112,100 @@ fn store(
     changed
 }
 impl Model {
+    /// Connect only the reference domains already supported by native emission.
+    /// Other paths retain their prior explicit migration checks.
+    pub fn emission(&mut self, resolver: &mut Resolver<'_>, purity: &purity::Facts) -> Emission {
+        if !self.converged {
+            return Emission::default();
+        }
+        let mut result = Emission::default();
+        for (proc, nodes) in &self.nodes {
+            let eval = Evaluator {
+                resolver,
+                arena: &mut self.arena,
+            };
+            let source = &eval.resolver.sources[proc.file];
+            if source.shared_native {
+                continue;
+            }
+            let supported = nodes.iter().all(|node| {
+                if eval.queried(*node) {
+                    return true;
+                }
+                if eval.kind(*node) == "Comprehension" {
+                    return false;
+                }
+                if eval.kind(*node) != "Call" {
+                    return true;
+                }
+                eval.builtin(*node).is_some()
+                    || eval.clone_library(*node).is_some()
+                    || eval
+                        .role(*node, "callee")
+                        .is_some_and(|callee| eval.resolver.denotes_type(callee))
+                    || purity
+                        .targets
+                        .get(node)
+                        .is_some_and(|targets| !targets.is_empty())
+            });
+            if supported {
+                result.procedures.insert(*proc);
+            }
+        }
+        loop {
+            let rejected = result
+                .procedures
+                .iter()
+                .filter(|proc| {
+                    self.nodes[proc].iter().any(|node| {
+                        purity.targets.get(node).is_some_and(|targets| {
+                            targets
+                                .iter()
+                                .any(|target| !result.procedures.contains(target))
+                        })
+                    })
+                })
+                .copied()
+                .collect::<Vec<_>>();
+            if rejected.is_empty() {
+                break;
+            }
+            for proc in rejected {
+                result.procedures.remove(&proc);
+            }
+        }
+        for proc in &result.procedures {
+            let env = self.environments.get_mut(proc).unwrap();
+            let mut eval = Evaluator {
+                resolver,
+                arena: &mut self.arena,
+            };
+            for node in &self.nodes[proc] {
+                if let Some(check) = self.checks.get(node) {
+                    result.checks.insert(*node, check.clone());
+                }
+                if let Some(message) = self.escapes.get(node) {
+                    result.escapes.insert(*node, message.clone());
+                }
+                if let Some(targets) = purity.targets.get(node) {
+                    let mut profile = BTreeMap::new();
+                    for target in targets {
+                        let bindings = eval.bindings(*node, *target, env);
+                        for access in &self.requirements[target] {
+                            profile.insert(access.clone(), eval.resolve_access(&bindings, access));
+                        }
+                    }
+                    result.profiles.insert(*node, profile.into_iter().collect());
+                }
+            }
+        }
+        result.mutates = self
+            .mutates
+            .intersection(&result.procedures)
+            .copied()
+            .collect();
+        result
+    }
     pub fn prepare(resolver: &mut Resolver<'_>, purity: &purity::Facts) -> Self {
         let mut model = Self::default();
         for proc in &purity.checked {

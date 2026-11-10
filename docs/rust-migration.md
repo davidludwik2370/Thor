@@ -149,6 +149,46 @@ run is not recorded as a clean full-suite acceptance run. Checkpoint 3 continues
 with checked-helper ownership arguments; execution and result caching remain
 unported.
 
+### Checked helper ownership profiles
+
+`ownershiplower.rs` connects the reference symbolic requirements to checked
+procedure variants using zero-sized native type metadata. The original proc
+signatures and ordinary shallow ownership stay intact. Checked calls carry their
+caller's permissions; stored aliases, array/record copies, pointer redirection,
+value/reference iteration, type-switch views, append/pop and copy operations keep
+their reference provenance. Helpers that modify caller-owned storage use the
+surrounding scratch lifetime rather than freeing their output allocations on exit.
+
+Checked variants remain lazy, including empty parameter lists and mixed fn/proc
+overload groups. Metadata is supplied to every checked member of such a group.
+Ported pure paths use the reference native guards instead of eager concrete-summary
+rejection. Their diagnostics retain Thor source locations and identify the fn call
+that imposed purity, with the implementation as a related location.
+
+Variadic binding preserves the distinction between individual arguments, packed
+slice arguments and `**` array/record spreads. The reviewed installed
+`core:slice.clone` and `core:strings.clone` contracts follow the reference, including
+constant aliases and selected imports. Slice cloning owns the outer buffer while
+reference-containing elements keep their borrowed provenance. Same-named local
+procedures receive no SDK trust; explicit allocator selection remains ineligible.
+
+A second explicit reference exception is recorded by
+`test_constant_string_clone_records_a_reference_evaluator_false_positive`.
+Python automatic evaluation incorrectly adds `checked_call_ownership=struct{}{}`
+to a reviewed `strings.clone(input)` call without that native parameter. Rust
+accepts the valid call. Runtime-argument clone calls are also compared normally
+in checked and unchecked builds. The Python snapshot remains unchanged.
+
+The 67-test checked-call/purity/helper/branch gate and the separate 41-test
+resolution/type-parameter/variadic gate pass. The 17-case real-AST helper-model
+comparison passes, including the reference nonconvergence rejection. The graph
+edge tests include all 24 append/pop combinations and ten stack-escape forms.
+The full native run is still in progress at this checkpoint; it found the mixed
+overload regression before the fix, which the 67-test gate subsequently verifies.
+This is not yet whole-suite acceptance. Remaining checkpoint 3 work includes SDK
+helper profiles, comprehension bindings and incomplete diagnostic selection among
+multiple fn callers. Compile-time execution/result caching remain unported.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first

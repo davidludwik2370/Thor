@@ -47,6 +47,7 @@ pub struct Project {
     pub errors: HashMap<String, String>,
     related: HashMap<String, Vec<Value>>,
     type_sites: HashMap<String, (crate::semantics::Ref, String)>,
+    pure_error_sites: HashMap<String, crate::semantics::Ref>,
     pure_call_paths: BTreeMap<
         crate::semantics::Ref,
         BTreeSet<(crate::semantics::Ref, Vec<crate::semantics::Ref>)>,
@@ -203,6 +204,7 @@ impl Project {
             errors: HashMap::new(),
             related: HashMap::new(),
             type_sites: HashMap::new(),
+            pure_error_sites: HashMap::new(),
             pure_call_paths: BTreeMap::new(),
             native_environment: BTreeMap::new(),
             backend_runtime: PathBuf::new(),
@@ -309,10 +311,21 @@ impl Project {
         let mut privileges =
             crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
         let purity = crate::purity::Purity::analyze(&mut resolver);
-        let local_borrowing = crate::borrowlocals::Facts::analyze(&mut resolver, &purity);
+        let mut local_borrowing = crate::borrowlocals::Facts::analyze(&mut resolver, &purity);
+        let borrowing = crate::borrowprogram::Model::prepare(&mut resolver, &purity)
+            .emission(&mut resolver, &purity);
+        local_borrowing
+            .checks
+            .retain(|site, _| !borrowing.covers(&resolver, *site));
+        // In the ported domain, native checked variants enforce the reference
+        // symbolic guards at the selected call. The earlier concrete summary
+        // must not reject a generic/inactive path before those guards run.
         privileges
-            .unresolved
-            .retain(|site, _| !local_borrowing.covers(&resolver, *site));
+            .pure_faults
+            .retain(|root, _| !borrowing.procedures.contains(root));
+        privileges.unresolved.retain(|site, _| {
+            !local_borrowing.covers(&resolver, *site) && !borrowing.covers(&resolver, *site)
+        });
         self.pure_call_paths = purity.call_paths.clone();
         for (site, fault) in &purity.conditional {
             let source = &self.sources[site.file];
@@ -461,6 +474,7 @@ impl Project {
             lower.remap_imports(import_paths);
             lower.apply_privileges(&privileges);
             lower.apply_local_borrowing(&local_borrowing);
+            lower.apply_borrowing(&borrowing);
             lower.apply_purity(&purity)?;
             lower.instrument_memory(
                 &self.memory,
@@ -475,6 +489,8 @@ impl Project {
             let (emitted, errors) = lower.finish()?;
             self.type_sites
                 .extend(std::mem::take(&mut lower.type_sites));
+            self.pure_error_sites
+                .extend(std::mem::take(&mut lower.pure_error_sites));
             self.errors.extend(errors);
             planned.push((self.destination.join(relative), (file, emitted)));
         }
@@ -908,6 +924,8 @@ impl Project {
     pub fn translate(&self, errors: &[Value]) -> Vec<Value> {
         errors.iter().map(|error|{
             let mut error=error.clone();
+            let pure_site=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
+                .find_map(|message|self.pure_error_sites.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,site)|*site));
             let related=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.related.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,notes)|notes.clone()));
             if let Some(notes)=related {error["related"]=json!(notes);}
@@ -941,6 +959,7 @@ impl Project {
                 error["msgs"]=json!([primary,format!("While checking {description}")]);
                 self.pure_type_context(&mut error,*site);
             }
+            if let Some(site)=pure_site { self.pure_type_context(&mut error,site); }
             error
         }).collect()
     }

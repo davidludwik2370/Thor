@@ -16,6 +16,7 @@ pub(super) struct Guard {
     predicates: Vec<Predicate>,
     origin: NodeId,
     message: String,
+    checked_only: bool,
 }
 struct Protection {
     name: String,
@@ -32,6 +33,37 @@ fn storage_type(mut typ: Type) -> Type {
     typ
 }
 impl Lower<'_, '_> {
+    pub fn apply_borrowing(&mut self, facts: &crate::borrowprogram::Emission) {
+        self.borrowing = facts.clone();
+        for (site, permission) in &facts.checks {
+            if site.file == self.file {
+                self.place_storage_guard(
+                    site.node,
+                    Guard {
+                        predicates: vec![Predicate::Permission(permission.clone())],
+                        origin: site.node,
+                        message:
+                            "Pure code cannot mutate or delete storage borrowed from an input."
+                                .into(),
+                        checked_only: true,
+                    },
+                );
+            }
+        }
+        for (site, message) in &facts.escapes {
+            if site.file == self.file {
+                self.place_storage_guard(
+                    site.node,
+                    Guard {
+                        predicates: vec![Predicate::Permission(crate::permissions::READONLY)],
+                        origin: site.node,
+                        message: message.clone(),
+                        checked_only: true,
+                    },
+                );
+            }
+        }
+    }
     pub fn apply_local_borrowing(&mut self, facts: &crate::borrowlocals::Facts) {
         for (site, permission) in &facts.checks {
             if site.file == self.file {
@@ -43,12 +75,13 @@ impl Lower<'_, '_> {
                         message:
                             "Pure code cannot mutate or delete storage borrowed from an input."
                                 .into(),
+                        checked_only: true,
                     },
                 );
             }
         }
     }
-    fn permission_query(
+    pub(super) fn permission_query(
         &mut self,
         permission: &crate::permissions::Permission,
         site: NodeId,
@@ -56,6 +89,14 @@ impl Lower<'_, '_> {
         use crate::permissions::{Permission, Trait};
         let meta = format!("{}meta", self.prefix);
         match permission {
+            Permission::Access(access) => {
+                self.meta = true;
+                let key = json!(access.key(self.resolver));
+                let ownership_type = format!("{}_ownership_Type", self.borrow_marker);
+                Ok(format!(
+                    "({meta}.type_field_type({ownership_type},{key})==[0]bool)"
+                ))
+            }
             Permission::Constant(value) => Ok(value.to_string()),
             Permission::Type(trait_, node) if node.file == self.file => {
                 let query = self.storage_query(node.node)?;
@@ -264,6 +305,9 @@ impl Lower<'_, '_> {
         Ok(Some(protected))
     }
     pub(super) fn render_storage_guard(&mut self, guard: Guard) -> Result<Code> {
+        if guard.checked_only && !self.checked_mode {
+            return Ok(Code::concat([]));
+        }
         // Resolve reference expressions in the current capture environment.
         // A lowered helper may name the original local through a parameter.
         self.meta = true;
@@ -296,6 +340,10 @@ impl Lower<'_, '_> {
         }
         let condition = parts.join(" && ");
         let token = self.error_token(guard.origin, &guard.message).finish().text;
+        if guard.checked_only {
+            self.pure_error_sites
+                .insert(token.clone(), self.reference(guard.origin));
+        }
         // These are compile-time inspection predicates. No operand of type_of
         // is executed, including with assertions disabled in the final program.
         Ok(self.g(
@@ -433,6 +481,7 @@ impl Lower<'_, '_> {
                     predicates: protected.predicates,
                     origin,
                     message,
+                    checked_only: false,
                 };
                 self.place_storage_guard(id, guard);
             }

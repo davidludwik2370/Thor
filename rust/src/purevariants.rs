@@ -200,6 +200,17 @@ impl Lower<'_, '_> {
                 self.render(argument, hint, constant)?
             }));
         }
-        Ok(Some(self.splice(id, replacements, vec![])?))
+        let mut inserts = vec![];
+        if let Some(profile) = self.ownership_argument(id)? {
+            let args = self.source.group(id, "args");
+            let offset = args
+                .last()
+                .map(|arg| self.source.node(*arg).span.end)
+                .unwrap_or(self.source.node(id).span.end - 1);
+            let profile =
+                Code::concat([self.g(if args.is_empty() { "" } else { "," }, id), profile]);
+            inserts.push((offset, profile));
+        }
+        Ok(Some(self.splice(id, replacements, inserts)?))
     }
 }

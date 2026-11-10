@@ -138,11 +138,15 @@ impl Lower<'_, '_> {
             }
         }
         let mutates = internal
-            && self.source.role(signature, "params").is_some_and(|params| {
-                self.source
-                    .descendants(params)
-                    .any(|name| self.mutating_params.contains(&name))
-            });
+            && if self.borrowing.procedures.contains(&root) {
+                self.borrowing.mutates.contains(&root)
+            } else {
+                self.source.role(signature, "params").is_some_and(|params| {
+                    self.source
+                        .descendants(params)
+                        .any(|name| self.mutating_params.contains(&name))
+                })
+            };
         if contextual && !mutates {
             let scratch = format!(
                 "{}pure_scratch_{}",

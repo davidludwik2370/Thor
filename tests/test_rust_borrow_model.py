@@ -59,6 +59,7 @@ class RustBorrowModelTests(unittest.TestCase):
                 checks[str(node.start)]=permission(value)
             profiles=[]
             for call in (node for nodes in pure.borrowing.nodes.values() for node in nodes if node.kind=='Call'):
+                if pure.calls.queried(call):continue
                 targets=pure.targets(call)
                 for target in targets:
                     bound=pure.borrowing.bindings(call,target,pure.borrowing.environment(pure.owner(call)))
@@ -112,9 +113,36 @@ class RustBorrowModelTests(unittest.TestCase):
         self.compare_model('write::proc(values:[]int,n:int){values[0]=n}',
                            'write(n=2,values=input);return input[0]','input:[]int')
 
+    def test_value_iteration_preserves_reference_elements(self):
+        self.compare_model('', 'for row in input{local:=row;local[0]=9};return 0','input:[2][]int')
+
+    def test_reference_iteration_preserves_local_element_locations(self):
+        self.compare_model('set::proc(value:^int){value^=9}',
+                           'values:=[1,2];for &value in values{set(&value)};return values[0]')
+
+    def test_type_switch_bindings_preserve_borrowed_storage(self):
+        self.compare_model('Input::union{[2]int,[]int}',
+                           'switch value in input{case []int:value[0]=9};return 0','input:Input')
+
+    def test_type_queries_do_not_mutate_or_propagate_runtime_aliases(self):
+        self.compare_model('set::proc(value:^int)->int{value^=9;return value^}',
+                           'x:=n;_=type_of(set(&x));return x')
+
     def test_variadic_alias_graph_retains_reference_nonconvergence_rejection(self):
         self.compare_model('write::proc(values:[]int,n:int){values[0]=n}\nforward::proc(n:int,values:..[]int){write(n=n,values=values[0])}',
                            'forward(2,input);return input[0]','input:[]int',converged=False)
+
+    def test_direct_variadic_reference_elements_preserve_permissions(self):
+        self.compare_model('change::proc(rows:..[]int){rows[0][0]=9}',
+                           'change(input);return 0','input:[]int')
+
+    def test_variadic_slice_spread_resolves_element_permissions(self):
+        self.compare_model('change::proc(rows:..[]int){rows[0][0]=9}',
+                           'change(..input);return 0','input:[][]int')
+
+    def test_variadic_array_spread_resolves_element_permissions(self):
+        self.compare_model('change::proc(rows:..[]int){rows[0][0]=9}',
+                           'change(**input);return 0','input:[1][]int')
 
 
 if __name__=='__main__':unittest.main()
