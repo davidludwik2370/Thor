@@ -178,7 +178,7 @@
       "checkpoint": 5,
       "status": "partial",
       "reference_functions": 13,
-      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links and selective clearing are independently compared with Python. Toolchain identities, resource hashes and normalized emitted-result keys are ported and connected to native helper execution through the independent scheduler. Complete prepared/scalar-site reuse and normal command adoption."
+      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links and selective clearing are independently compared with Python. Toolchain identities, resource hashes, normalized emitted-result keys and prepared scalar keys are ported and connected through the independent scheduler. Complete scalar-site reuse and normal command adoption."
     },
     {
       "python": "thorlang/dependencies.py",

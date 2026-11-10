@@ -9,6 +9,8 @@ use std::time::Duration;
 mod call;
 #[path = "evaluationinteger.rs"]
 mod integer;
+#[path = "evaluationprepared.rs"]
+mod prepared;
 #[path = "evaluationspecialize.rs"]
 mod specialize;
 
@@ -796,9 +798,19 @@ impl<'p> Scheduler<'p> {
     fn execute(&mut self, node: Ref, mode: Mode) -> Result<Value> {
         let roots = request_roots(self.source(node), node, mode);
         let graph = Extraction::build(&mut self.resolver, &roots)?;
-        for nested in graph.nested_runs {
-            if self.value(nested).is_none() && !self.cases.contains_key(&nested) {
-                self.evaluate(nested)?;
+        for nested in &graph.nested_runs {
+            if self.value(*nested).is_none() && !self.cases.contains_key(nested) {
+                self.evaluate(*nested)?;
+            }
+        }
+        let prepared = self.prepared_key(node, &roots, &graph, mode);
+        if let Some(key) = &prepared {
+            let (value, target) = self.cache.borrow_mut().prepared(Some(key), None);
+            if let Some(value) = value {
+                if let Some(target) = target {
+                    self.evaluation_targets.insert(node, target);
+                }
+                return Ok(value);
             }
         }
         let skips = self
@@ -820,6 +832,9 @@ impl<'p> Scheduler<'p> {
             mode,
         )?;
         if matches!(mode, Mode::Value) {
+            self.cache
+                .borrow()
+                .remember(prepared.as_deref(), executed.target.as_deref());
             if let Some(target) = executed.target {
                 self.evaluation_targets.insert(node, target);
             }

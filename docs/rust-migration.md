@@ -663,6 +663,24 @@ struct/enum/union/distinct matrix passed separately, in checked and unchecked
 builds. The structural-sequence test also passed. Debug units, assertion hygiene
 and Clippy with warnings denied pass.
 
+### Prepared scalar result keys
+
+The scheduler now ports the reference's early scalar lookup after dependency
+extraction. Keys retain file-level syntax and declaration headers, selected
+dependency bodies, prior nested results, query witnesses, native/support source
+contents, enclosing signatures, flags, toolchain identity and resource inputs.
+Unrelated runtime procedure bodies may change without regenerating a helper.
+Generic, aggregate and source-procedure-dependent requests retain emitted keys.
+Corrupt metadata or missing contents fall back to ordinary verified execution.
+
+All 12 prepared-cache tests pass, including checked/unchecked replay, body/header
+and resource edits, new impurity, imported dependencies and cache bypass. The
+neighboring 11 contents-cache tests pass. A first resource fixture put `#load`
+inside a pure body, which is ineligible under the reference rules; the corrected
+fixture tests conservative resource invalidation without changing those rules.
+Debug units, assertion hygiene and Clippy pass. Scalar-site reuse and normal
+command adoption are still pending; Python remains the supported default.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
