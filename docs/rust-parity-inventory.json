@@ -130,12 +130,14 @@
     {
       "python": "thorlang/evaluation.py",
       "rust": [
-        "rust/src/evaluation.rs"
+        "rust/src/evaluation.rs",
+        "rust/src/evaluationlower.rs",
+        "rust/src/evaluationexec.rs"
       ],
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 35,
-      "remaining": "Lexical helper closure extraction is ported and compared, including installed SDK bodies and type-query pruning. Complete known/active scheduling, helper generation, bounded execution and evaluation-mode integration."
+      "remaining": "Dependency extraction and isolated native helper rendering/execution are connected through an independent harness. Complete known/active and generic scheduling, command integration and result installation/cache policy."
     },
     {
       "python": "thorlang/native.py",
@@ -146,7 +148,7 @@
       "checkpoint": 4,
       "status": "partial",
       "reference_functions": 7,
-      "remaining": "Demand-loaded SDK access includes explicit #run call roots and transitive bodies. Complete evaluator attachment and extraction bridge behavior."
+      "remaining": "Explicit #run roots and transitive SDK bodies participate in helper extraction, with private bridges and isolated renamed native packages. Complete generic specialization attachment and canonical type-name remapping."
     },
     {
       "python": "thorlang/specialization.py",

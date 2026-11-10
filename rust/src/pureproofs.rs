@@ -595,7 +595,7 @@ impl Lower<'_, '_> {
         code.push(self.g("))", id));
         Ok(Code::concat(code))
     }
-    fn queried_pure_expression(&self, id: NodeId) -> bool {
+    fn queried_pure_expression(&mut self, id: NodeId) -> bool {
         if let Some(proc) = self
             .source
             .ancestors(id)
@@ -623,10 +623,15 @@ impl Lower<'_, '_> {
         }
         self.source.ancestors(id).any(|ancestor| {
             self.source.node(ancestor).kind == "Call"
-                && self.source.role(ancestor, "callee").is_some_and(|callee| {
-                    ["type_of", "size_of", "align_of", "offset_of"]
-                        .iter()
-                        .any(|name| self.resolver.native_builtin(self.reference(callee), name))
+                && crate::purity::builtin_call(
+                    self.resolver,
+                    Ref {
+                        file: self.file,
+                        node: ancestor,
+                    },
+                )
+                .is_some_and(|name| {
+                    ["type_of", "size_of", "align_of", "offset_of"].contains(&name.as_str())
                 })
         })
     }
@@ -689,9 +694,8 @@ impl Lower<'_, '_> {
                 let callee = self.role(id, "callee")?;
                 if self.resolver.denotes_type(self.reference(callee)) {
                     operands.extend(self.source.group(id, "args").first().copied());
-                } else if ["min", "max", "clamp"]
-                    .iter()
-                    .any(|name| self.resolver.native_builtin(self.reference(callee), name))
+                } else if crate::purity::builtin_call(self.resolver, self.reference(id))
+                    .is_some_and(|name| ["min", "max", "clamp"].contains(&name.as_str()))
                 {
                     operands.extend(self.source.group(id, "args").iter().copied());
                 }

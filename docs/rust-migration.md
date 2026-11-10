@@ -279,6 +279,36 @@ scheduling and result installation/cache integration are still pending. The
 normal Rust command continues to reject unported `#run` programs explicitly;
 Python remains the supported default.
 
+### Isolated native execution (checkpoint 4 in progress)
+
+`evaluationlower.rs` renders a pruned helper using the original AST identities
+and source fragments. Local declarations return to their original lexical
+scopes; selected targets and private re-exports get compiler-only access paths.
+`evaluationexec.rs` constructs the helper from the selected source snapshot,
+compiles it with a bounded subprocess, executes it with a timeout, validates the
+contents-only result packet and removes the temporary project. It does not
+rediscover unrelated files in a file-entry build. Scratch allocation and result
+promotion follow the reference, and entry arguments remain read-only.
+
+Inspected SDK packages use isolated package names, preserving the evaluator
+runtime's original SDK dependencies. Compiler-owned base namespaces stay
+external. Original test/build context and file selection are frozen before the
+helper is made executable; test sources get normal executable-source filenames.
+Compile errors and runtime failures map to original sources, with underlying
+failure notes. Generated scratch defers no longer invalidate a diverging panic.
+Qualified builtin aliases retain their native purity/type-query identity, and
+literal coercibility no longer changes native typeid comparisons.
+
+The 53-test extraction/specialization/execution gate passes, covering checked
+and unchecked execution, SDK calls, generic branches, owned results, local and
+cross-package declarations, optional status, build context, panics, bounds
+errors and timeouts. A separate 66-test purity/ownership/assertion-hygiene gate
+passes; its run predates the final typeid normalization. Rust's 24 units pass in
+both profiles and Clippy passes with warnings denied. The independent execution
+harness is not command integration: known/active and generic scheduling, nested
+requests, result installation and cache policy remain. Normal Rust commands
+still explicitly reject unported `#run` rather than invoking Python.
+
 ## Build and compare
 
 Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
@@ -301,7 +331,7 @@ python3 -m unittest tests.test_assertion_hygiene
 
 `rust/target/release/thor-rust` runs directly without Cargo's startup check. Use
 that binary when measuring the compiler itself. No whole-project build cache or
-parallel lowering has been added. Threads only deliver/drain the native parser's
+parallel lowering has been added. Threads only deliver/drain native subprocess
 pipes; they do not run compiler analyses concurrently.
 
 Both compilers accept separate `--output-dir` and `--cache-dir` paths. Rust's

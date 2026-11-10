@@ -19,9 +19,10 @@ impl SdkMirror {
         collections: &mut BTreeMap<String, PathBuf>,
         destination: &Path,
         overlays: &BTreeMap<PathBuf, String>,
-        runtime: &Path,
-        backend_runtime: &Path,
+        runtime_paths: (&Path, &Path),
+        evaluation: Option<&crate::evaluation::Plan>,
     ) -> Result<Self> {
+        let (runtime, backend_runtime) = runtime_paths;
         let mut changed = facts
             .targets
             .values()
@@ -31,6 +32,37 @@ impl SdkMirror {
                 source.shared_native.then(|| source.path.clone())
             })
             .collect::<BTreeSet<_>>();
+        if let Some(plan) = evaluation {
+            changed.extend(
+                sources
+                    .iter()
+                    .filter(|source| {
+                        source.shared_native
+                            && !source.path.starts_with(runtime)
+                            && plan
+                                .files
+                                .get(&source.path)
+                                .is_some_and(|view| !view.keep.is_empty())
+                    })
+                    .map(|source| source.path.clone()),
+            );
+            let packages = changed
+                .iter()
+                .filter_map(|path| path.parent().map(Path::to_path_buf))
+                .collect::<BTreeSet<_>>();
+            changed.extend(
+                sources
+                    .iter()
+                    .filter(|source| {
+                        source.shared_native
+                            && source
+                                .path
+                                .parent()
+                                .is_some_and(|path| packages.contains(path))
+                    })
+                    .map(|source| source.path.clone()),
+            );
+        }
         if changed.is_empty() {
             return Ok(Self::default());
         }
@@ -85,7 +117,9 @@ impl SdkMirror {
             };
             this.roots.insert(root.clone(), output.clone());
             if native {
-                this.environment.insert("ODIN_ROOT".into(), output);
+                if evaluation.is_none() {
+                    this.environment.insert("ODIN_ROOT".into(), output);
+                }
                 for name in ["base", "core", "vendor", "shared", "bin", "lib"] {
                     let path = root.join(name);
                     if path.exists() {
@@ -104,7 +138,7 @@ impl SdkMirror {
                 this.replacements.insert(output, raw.as_bytes().to_vec());
             }
         }
-        for root in collections.values_mut() {
+        for root in collections.values_mut().filter(|_| evaluation.is_none()) {
             if let Ok(canonical) = fs::canonicalize(&root) {
                 if let Some(output) = this.output(&canonical) {
                     *root = output;

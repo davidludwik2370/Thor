@@ -16,6 +16,8 @@ mod comprehensions;
 mod contextlower;
 #[path = "defaults.rs"]
 mod defaults;
+#[path = "evaluationlower.rs"]
+mod evaluationlower;
 #[path = "extrema.rs"]
 mod extrema;
 #[path = "ownershiplower.rs"]
@@ -83,6 +85,7 @@ pub struct Lower<'a, 'r> {
     pure_busy: HashSet<NodeId>,
     pure_conversion_busy: HashSet<NodeId>,
     pure_operand_busy: HashSet<NodeId>,
+    pure_panic_busy: HashSet<NodeId>,
     pure_defaults: HashSet<NodeId>,
     pure_local_busy: HashSet<NodeId>,
     pure_ignored: HashMap<NodeId, String>,
@@ -90,9 +93,17 @@ pub struct Lower<'a, 'r> {
     borrowing: crate::borrowprogram::Emission,
     borrow_marker: String,
     ownership_wrapping: HashSet<NodeId>,
+    evaluation: Option<crate::evaluation::FileView>,
 }
 impl<'a, 'r> Lower<'a, 'r> {
     pub fn new(file: usize, resolver: &'r mut Resolver<'a>) -> Result<Self> {
+        Self::new_with_view(file, resolver, None)
+    }
+    pub(crate) fn new_with_view(
+        file: usize,
+        resolver: &'r mut Resolver<'a>,
+        evaluation: Option<crate::evaluation::FileView>,
+    ) -> Result<Self> {
         let source = &resolver.sources[file];
         let borrow_marker = format!(
             "{}checked_call",
@@ -138,6 +149,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             pure_busy: HashSet::new(),
             pure_conversion_busy: HashSet::new(),
             pure_operand_busy: HashSet::new(),
+            pure_panic_busy: HashSet::new(),
             pure_defaults: HashSet::new(),
             pure_local_busy: HashSet::new(),
             pure_ignored: HashMap::new(),
@@ -145,6 +157,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             borrowing: crate::borrowprogram::Emission::default(),
             borrow_marker,
             ownership_wrapping: HashSet::new(),
+            evaluation,
         };
         for edit in &source.edits {
             this.edits
@@ -158,6 +171,18 @@ impl<'a, 'r> Lower<'a, 'r> {
             this.prepare_defaults()?;
         }
         this.storage()?;
+        if let Some(view) = this.evaluation.clone() {
+            this.modules.extend(view.imports);
+            for (node, code) in view.values {
+                this.switch_replacements.insert(node, this.g(code, node));
+            }
+            for bridge in view.bridges {
+                this.helpers.insert(
+                    (bridge.scope, this.prefix.clone(), bridge.name),
+                    this.g(bridge.code, bridge.origin),
+                );
+            }
+        }
         Ok(this)
     }
     pub fn instrument_memory(
@@ -172,6 +197,13 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         for (i, node) in self.source.nodes.iter().enumerate() {
             let id = NodeId(i);
+            if self
+                .evaluation
+                .as_ref()
+                .is_some_and(|view| !view.retains(self.source, id))
+            {
+                continue;
+            }
             if node.kind != "Procedure" {
                 continue;
             }
@@ -360,6 +392,15 @@ impl<'a, 'r> Lower<'a, 'r> {
         self.g(token, id)
     }
     pub fn finish(&mut self) -> Result<(Emitted, HashMap<String, String>)> {
+        let request = self
+            .evaluation
+            .as_ref()
+            .and_then(|view| view.request.clone());
+        let main = if let Some(request) = request {
+            Some(self.evaluation_main(request)?)
+        } else {
+            None
+        };
         if self.source.excluded {
             return Ok((
                 self.copy(Span::new(0, self.source.raw.len())).finish(),
@@ -368,6 +409,24 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         if !self.source.thor {
             let storage = self.native_storage()?;
+            let mut replacements = storage.replacements;
+            if let Some(view) = &self.evaluation {
+                for (id, value) in &view.values {
+                    if view.retains(self.source, *id) {
+                        replacements.push((self.source.node(*id).span, self.g(value, *id)));
+                    }
+                }
+                for (index, node) in self.source.nodes.iter().enumerate() {
+                    let id = NodeId(index);
+                    if !view.retains(self.source, id)
+                        && node
+                            .parent
+                            .is_some_and(|parent| view.retains(self.source, parent))
+                    {
+                        replacements.push((node.span, self.g("", id)));
+                    }
+                }
+            }
             let mut inserts: Vec<_> = self
                 .body_prologues
                 .iter()
@@ -385,7 +444,8 @@ impl<'a, 'r> Lower<'a, 'r> {
                     Code::concat(parts.iter().cloned()),
                 ));
             }
-            let mut code = vec![self.splice(NodeId(0), storage.replacements, inserts)?];
+            let mut code = vec![self.splice(NodeId(0), replacements, inserts)?];
+            code.extend(main);
             code.extend(
                 self.helpers
                     .iter()
@@ -423,6 +483,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         self.preflight()?;
         let mut code = vec![self.render(NodeId(0), None, false)?];
+        code.extend(main);
         let helpers = self
             .helpers
             .range(
@@ -474,6 +535,13 @@ impl<'a, 'r> Lower<'a, 'r> {
             .collect::<HashSet<_>>();
         for (i, node) in self.source.nodes.iter().enumerate() {
             let id = NodeId(i);
+            if self
+                .evaluation
+                .as_ref()
+                .is_some_and(|view| !view.retains(self.source, id))
+            {
+                continue;
+            }
             let set_temporary = (node.kind == "Compound" && matches!(self.typ(id), Type::Set(_)))
                 || (node.kind == "Binary"
                     && matches!(node.op.as_str(), "|" | "&" | "-" | "~")
@@ -576,7 +644,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         let s = self.source;
         for selection in &s.selections {
             let path = unquote(&selection.path)?;
-            let names = if selection.wildcard {
+            let mut names = if selection.wildcard {
                 let directory = if let Some((collection, suffix)) = path.split_once(':') {
                     s.collection_roots
                         .get(collection)
@@ -619,6 +687,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             } else {
                 selection.names.clone()
             };
+            if let Some(view) = &self.evaluation {
+                names.retain(|name| view.aliases.contains(name));
+            }
             let mut namespace = if selection.package_name.is_empty() {
                 path.rsplit(['/', ':']).next().unwrap_or("").to_string()
             } else {
@@ -799,6 +870,13 @@ impl<'a, 'r> Lower<'a, 'r> {
         Ok(Code::concat(parts))
     }
     pub fn render(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
+        if self
+            .evaluation
+            .as_ref()
+            .is_some_and(|view| !view.retains(self.source, id))
+        {
+            return Ok(self.g("", id));
+        }
         let old = self.checked_mode;
         if self.source.node(id).kind == "Procedure" {
             self.checked_mode =
@@ -835,6 +913,33 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if self.checked_mode
+            && kind == "ExpressionStatement"
+            && !self.pure_panic_busy.contains(&id)
+            && node
+                .parent
+                .is_some_and(|parent| self.source.node(parent).kind == "Block")
+            && self.source.role(id, "expr").is_some_and(|call| {
+                self.source.node(call).kind == "Call"
+                    && crate::purity::builtin_call(
+                        self.resolver,
+                        Ref {
+                            file: self.file,
+                            node: call,
+                        },
+                    )
+                    .as_deref()
+                        == Some("panic")
+            })
+        {
+            self.pure_panic_busy.insert(id);
+            if let Some(parent) = node.parent {
+                self.convert_do(parent);
+            }
+            let statement = self.render_inner(id, expected, constant);
+            self.pure_panic_busy.remove(&id);
+            return Ok(Code::concat([self.g("{", id), statement?, self.g("}", id)]));
+        }
         if self.checked_mode && self.querying == 0 {
             if kind == "Block" && self.pure_conditional.contains_key(&id) {
                 if let Some(code) = self.ownership_body(id)? {

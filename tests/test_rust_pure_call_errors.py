@@ -65,6 +65,13 @@ work::fn(n:int)->int{return '''+expression+'}\n'),command='check',fail='pick')
             'work::fn(n:int)->int{return (proc(v:int)->int{return v})(n)}\n'),
             command='check',fail='resolved direct call')
 
+    def test_scratch_defers_do_not_make_a_diverging_panic_invalid(self):
+        for definition in ('work::fn(n:int)->int{panic("expected pure panic")}',
+                           'leaf::proc(n:int)->int{panic("expected pure panic")}\nwork::fn(n:int)->int{return leaf(n)}'):
+            for flags in (['-debug'],native.UNCHECKED):
+                with self.subTest(definition=definition,flags=flags):
+                    self.compare(self.program('n:=3;if n==0{_=work(n)}',definition),flags=flags)
+
     def test_parenthesized_named_helper_records_a_reference_false_positive(self):
         source=self.program('n:=3;if work(n)!=4{panic("named helper")}', '''
 helper::(proc(n:int)->int{return n+1})

@@ -150,6 +150,9 @@ impl Evaluator<'_, '_, '_> {
         if self.kind(callee) == "Paren" {
             return self.builtin_inner(self.role(callee, "expr")?, seen);
         }
+        if let Some(name) = self.resolver.library_alias_member(callee, "base:builtin") {
+            return Some(name);
+        }
         if let Some(id) = self.resolver.symbol(callee) {
             let symbol = &self.resolver.symbols[id];
             return (symbol.constant && !symbol.immutable)

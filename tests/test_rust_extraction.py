@@ -173,6 +173,19 @@ work::proc(n:int)->int{return n+BASE}
     def test_standard_library_scalar_calls_use_inspected_bodies(self):
         self.compare('import "core:math"', 'math.sqrt(f64(4))')
 
+    def test_qualified_builtin_aliases_keep_native_identity(self):
+        self.compare('''
+import b "base:builtin"
+LENGTH::b.len
+work::proc(values:[3]int)->int{return LENGTH(values)}
+''', 'work([3]int{1,2,3})')
+
+    def test_native_type_alias_keeps_compiler_runtime_external(self):
+        self.compare('''
+import "core:mem"
+work::proc()->(int,mem.Allocator_Error) #optional_allocator_error {return 7,nil}
+''', 'work()')
+
     def test_conditional_declarations_keep_their_selection_inputs(self):
         self.compare('''
 ENABLED::true

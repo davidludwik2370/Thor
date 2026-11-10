@@ -26,6 +26,7 @@ pub struct Facts {
     pub call_paths: BTreeMap<Ref, BTreeSet<(Ref, Vec<Ref>)>>,
     /// Native `when` selection decides whether these body checks are reached.
     pub conditional: BTreeMap<Ref, Fault>,
+    pub entry_roots: BTreeSet<Ref>,
 }
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
@@ -36,6 +37,16 @@ pub struct Purity<'a, 'r> {
     walk_stack: Vec<Ref>,
 }
 type VisitKey = (Ref, Vec<(String, Type)>, Option<Ref>);
+pub(crate) fn builtin_call(r: &mut Resolver<'_>, call: Ref) -> Option<String> {
+    crate::borroweval::Evaluator {
+        resolver: r,
+        arena: &mut crate::borrowflow::Arena::default(),
+    }
+    .builtin(call)
+    .filter(|name| {
+        BUILTINS.contains(&name.as_str()) || ["#assert", "#config"].contains(&name.as_str())
+    })
+}
 impl<'a, 'r> Purity<'a, 'r> {
     pub fn analyze(r: &'r mut Resolver<'a>) -> Facts {
         let roots = r
@@ -59,9 +70,19 @@ impl<'a, 'r> Purity<'a, 'r> {
     /// The evaluator verifies its retained entry roots, not unrelated fn
     /// declarations that will be absent from the isolated helper.
     pub fn analyze_from(r: &'r mut Resolver<'a>, roots: &[Ref]) -> Facts {
+        Self::analyze_entries(r, roots, &BTreeSet::new())
+    }
+    pub fn analyze_entries(
+        r: &'r mut Resolver<'a>,
+        roots: &[Ref],
+        entries: &BTreeSet<Ref>,
+    ) -> Facts {
         let mut this = Self {
             r,
-            facts: Facts::default(),
+            facts: Facts {
+                entry_roots: entries.clone(),
+                ..Facts::default()
+            },
             visiting: HashSet::new(),
             constants: HashSet::new(),
             speculative: vec![],
@@ -71,6 +92,23 @@ impl<'a, 'r> Purity<'a, 'r> {
             if this.r.active_definition(root) {
                 this.visiting.clear();
                 this.visit(root, root, Substitutions::new(), vec![]);
+            }
+        }
+        this.facts
+    }
+    pub fn analyze_calls(r: &'r mut Resolver<'a>, calls: &[Ref]) -> Facts {
+        let mut this = Self {
+            r,
+            facts: Facts::default(),
+            visiting: HashSet::new(),
+            constants: HashSet::new(),
+            speculative: vec![],
+            walk_stack: vec![],
+        };
+        for call in calls.iter().copied() {
+            this.call(call, call, call, &Substitutions::new(), &[]);
+            if let Some(targets) = this.facts.targets.get(&call) {
+                this.facts.entry_roots.extend(targets.iter().copied());
             }
         }
         this.facts
@@ -477,6 +515,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 node: *node,
             })
             .collect::<Vec<_>>();
+        let builtin = builtin_call(self.r, call);
         if self.kind(callee) == "Directive"
             && ["assert", "config"].contains(
                 &self.r.sources[callee.file]
@@ -514,17 +553,14 @@ impl<'a, 'r> Purity<'a, 'r> {
             if Self::forbidden_conversion(&target_type) {
                 self.fault(root,call,via,"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.");
             }
-        } else if let Some(name) = BUILTINS
-            .iter()
-            .find(|name| self.r.native_builtin(callee, name))
-        {
-            if ["type_of", "size_of", "align_of", "offset_of"].contains(name) {
+        } else if let Some(name) = builtin.as_deref() {
+            if ["type_of", "size_of", "align_of", "offset_of"].contains(&name) {
                 return;
             }
-            if *name == "delete" && args.len() > 1 {
+            if name == "delete" && args.len() > 1 {
                 self.fault(root, call, via, "Pure code cannot select an allocator.");
             }
-            if *name == "make" {
+            if name == "make" {
                 let typ = args
                     .first()
                     .map(|r| self.r.specialized_type(*r, bindings))

@@ -136,9 +136,10 @@ impl Lower<'_, '_> {
             let old_prologue = self.body_prologues.remove(&body);
             let old_owned = self.pure_owned.contains(&target.node);
             let edit_count = self.edits.len();
+            let evaluation = self.evaluation.take();
             self.emitting_variants.insert(target.node);
             let result: Result<Code> = (|| {
-                self.prepare_pure(target, true)?;
+                self.prepare_pure(target, !facts.entry_roots.contains(&target))?;
                 let name = self.checked_name(target);
                 let procedure = self.render(target.node, None, false)?;
                 let mut attrs = vec![];
@@ -184,6 +185,7 @@ impl Lower<'_, '_> {
                     .or_insert(code);
             }
             self.emitting_variants.remove(&target.node);
+            self.evaluation = evaluation;
             // A checked body can convert a `do` block into braces. Its source
             // edits belong to the rendered variant, never the original proc.
             self.edits.truncate(edit_count);

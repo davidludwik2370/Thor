@@ -14,6 +14,263 @@ use std::{
     path::PathBuf,
 };
 
+#[derive(Clone, Default)]
+pub struct FileView {
+    pub keep: BTreeSet<NodeId>,
+    pub values: BTreeMap<NodeId, String>,
+    pub aliases: BTreeSet<String>,
+    pub imports: BTreeMap<String, String>,
+    pub bridges: Vec<Bridge>,
+    pub request: Option<Request>,
+}
+#[derive(Clone)]
+pub struct Bridge {
+    pub scope: NodeId,
+    pub origin: NodeId,
+    pub name: String,
+    pub code: String,
+}
+#[derive(Clone)]
+pub struct Request {
+    pub expression: NodeId,
+    pub locals: BTreeMap<NodeId, Vec<NodeId>>,
+}
+impl FileView {
+    pub fn retains(&self, source: &crate::ast::Source, node: NodeId) -> bool {
+        node == NodeId(0)
+            || source.role(NodeId(0), "package") == Some(node)
+            || self.keep.iter().any(|kept| {
+                *kept == node
+                    || source.is_descendant(node, *kept)
+                    || source.is_descendant(*kept, node)
+            })
+    }
+}
+#[derive(Clone, Default)]
+pub struct Plan {
+    pub files: BTreeMap<PathBuf, FileView>,
+    pub roots: Vec<Ref>,
+    pub entries: BTreeSet<Ref>,
+    pub requests: Vec<Ref>,
+}
+impl Plan {
+    /// Isolate one request using original node identities. Local declarations
+    /// from the surrounding runtime body are reintroduced by the helper main.
+    pub fn build(r: &mut Resolver<'_>, expression: Ref) -> Result<Self> {
+        let graph = Extraction::build(r, &[expression])?;
+        if let Some(nested) = graph.nested_runs.iter().next() {
+            let source = &r.sources[nested.file];
+            return Err(Error::unsupported(
+                source,
+                source.node(nested.node).span,
+                "nested compile-time evaluation scheduling",
+            ));
+        }
+        let mut plan = Self::default();
+        for source in r.sources {
+            plan.files.insert(source.path.clone(), FileView::default());
+        }
+        let mut locals: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
+        for kept in &graph.keep {
+            let source = &r.sources[kept.file];
+            let owner = source
+                .ancestors(kept.node)
+                .find(|id| source.node(*id).kind == "Procedure")
+                .map(|node| Ref {
+                    file: kept.file,
+                    node,
+                });
+            if owner.is_none_or(|owner| graph.procedures.contains(&owner)) {
+                plan.files
+                    .get_mut(&source.path)
+                    .unwrap()
+                    .keep
+                    .insert(kept.node);
+            } else if kept.file == expression.file && source.node(kept.node).kind == "Declaration" {
+                locals
+                    .entry(scope(source, kept.node))
+                    .or_default()
+                    .push(kept.node);
+            }
+        }
+        for declarations in locals.values_mut() {
+            declarations.sort_by_key(|id| r.sources[expression.file].node(*id).span.start);
+        }
+        for import in &graph.imports {
+            plan.files
+                .get_mut(&r.sources[import.file].path)
+                .unwrap()
+                .keep
+                .insert(import.node);
+        }
+        for (file, alias) in &graph.aliases {
+            plan.files
+                .get_mut(&r.sources[*file].path)
+                .unwrap()
+                .aliases
+                .insert(alias.clone());
+        }
+        for (query, code) in &graph.queries {
+            plan.files
+                .get_mut(&r.sources[query.file].path)
+                .unwrap()
+                .values
+                .insert(query.node, code.clone());
+        }
+        for ((file, alias), directory) in &graph.helper_imports {
+            let source = &r.sources[*file];
+            let path = dependency_path(source, directory);
+            plan.files
+                .get_mut(&source.path)
+                .unwrap()
+                .imports
+                .insert(alias.clone(), path);
+        }
+        for (callee, target) in &graph.calls {
+            let caller = &r.sources[callee.file];
+            let code = match target {
+                CallTarget::Builtin(name) if name.starts_with('#') => name.clone(),
+                CallTarget::Builtin(name) => {
+                    let alias = format!("{}evaluation_builtin", caller.prefix);
+                    plan.files
+                        .get_mut(&caller.path)
+                        .unwrap()
+                        .imports
+                        .insert(alias.clone(), "base:builtin".into());
+                    format!("{alias}.{name}")
+                }
+                CallTarget::Procedure(target) => {
+                    let source = &r.sources[target.file];
+                    let declaration = source
+                        .ancestors(target.node)
+                        .find(|id| source.node(*id).kind == "Declaration")
+                        .ok_or_else(|| {
+                            Error::at(
+                                source,
+                                source.node(target.node).span,
+                                "Compile-time execution requires a named direct procedure call.",
+                            )
+                        })?;
+                    let name = source
+                        .group(declaration, "names")
+                        .first()
+                        .map(|id| source.text(*id))
+                        .ok_or_else(|| Error::new("evaluation target omitted its name"))?;
+                    if source.path.parent() == caller.path.parent() {
+                        name.into()
+                    } else {
+                        let bridge = format!(
+                            "{}run_target_{}",
+                            source.prefix,
+                            source.node(declaration).span.start
+                        );
+                        let view = plan.files.get_mut(&source.path).unwrap();
+                        if !view.bridges.iter().any(|item| item.name == bridge) {
+                            view.bridges.push(Bridge {
+                                scope: scope(source, declaration),
+                                origin: declaration,
+                                name: bridge.clone(),
+                                code: format!("\n{bridge} :: proc{{{name}}}\n"),
+                            });
+                        }
+                        let alias =
+                            format!("{}evaluation_dependency_{}", caller.prefix, target.file);
+                        let path = dependency_path(caller, source.path.parent().unwrap());
+                        plan.files
+                            .get_mut(&caller.path)
+                            .unwrap()
+                            .imports
+                            .insert(alias.clone(), path);
+                        format!("{alias}.{bridge}")
+                    }
+                }
+            };
+            plan.files
+                .get_mut(&caller.path)
+                .unwrap()
+                .values
+                .insert(callee.node, code);
+        }
+        for (callee, (path, name)) in &graph.external {
+            let source = &r.sources[callee.file];
+            let alias = format!(
+                "{}original_library_{}",
+                source.prefix,
+                source.node(callee.node).span.start
+            );
+            let view = plan.files.get_mut(&source.path).unwrap();
+            view.imports.insert(alias.clone(), path.clone());
+            view.values.insert(callee.node, format!("{alias}.{name}"));
+        }
+        let source = &r.sources[expression.file];
+        plan.files.get_mut(&source.path).unwrap().request = Some(Request {
+            expression: expression.node,
+            locals,
+        });
+        plan.requests = std::iter::once(expression.node)
+            .chain(source.descendants(expression.node))
+            .filter(|node| source.node(*node).kind == "Call")
+            .filter(|node| {
+                !source
+                    .ancestors(*node)
+                    .take_while(|parent| *parent != expression.node)
+                    .any(|parent| {
+                        graph.queries.contains_key(&Ref {
+                            file: expression.file,
+                            node: parent,
+                        })
+                    })
+            })
+            .map(|node| Ref {
+                file: expression.file,
+                node,
+            })
+            .collect();
+        Ok(plan)
+    }
+}
+pub(crate) fn dependency_path(source: &crate::ast::Source, directory: &std::path::Path) -> String {
+    if let Some((_, path)) = source
+        .collection_roots
+        .iter()
+        .filter_map(|(name, root)| {
+            directory.strip_prefix(root).ok().map(|suffix| {
+                (
+                    root.components().count(),
+                    format!("{name}:{}", suffix.to_string_lossy().replace('\\', "/")),
+                )
+            })
+        })
+        .max_by_key(|(depth, _)| *depth)
+    {
+        return path;
+    }
+    let caller = source
+        .path
+        .parent()
+        .unwrap()
+        .components()
+        .collect::<Vec<_>>();
+    let target = directory.components().collect::<Vec<_>>();
+    let common = caller
+        .iter()
+        .zip(&target)
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut relative = PathBuf::new();
+    for _ in common..caller.len() {
+        relative.push("..");
+    }
+    for part in &target[common..] {
+        relative.push(part.as_os_str());
+    }
+    if relative.as_os_str().is_empty() {
+        ".".into()
+    } else {
+        relative.to_string_lossy().replace('\\', "/")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CallTarget {
     Builtin(String),
@@ -99,15 +356,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
             })
     }
     fn builtin(&mut self, node: Ref) -> Option<String> {
-        FlowEvaluator {
-            resolver: self.r,
-            arena: &mut Arena::default(),
-        }
-        .builtin(node)
-        .filter(|name| {
-            crate::purity::BUILTINS.contains(&name.as_str())
-                || ["#assert", "#config"].contains(&name.as_str())
-        })
+        crate::purity::builtin_call(self.r, node)
     }
     fn io_call(&mut self, node: Ref) -> bool {
         FlowEvaluator {
@@ -266,6 +515,9 @@ impl<'a, 'r> Extraction<'a, 'r> {
     }
     fn declaration(&mut self, node: Ref) -> Result<()> {
         let source = &self.r.sources[node.file];
+        if compiler_support(source) {
+            return Ok(());
+        }
         let data = source.node(node.node);
         if data.kind == "Declaration"
             && (data.mutable || data.immutable)
@@ -570,4 +822,13 @@ impl<'a, 'r> Extraction<'a, 'r> {
         }
         Ok(())
     }
+}
+pub(crate) fn compiler_support(source: &crate::ast::Source) -> bool {
+    source.info["odin_root"].as_str().is_some_and(|root| {
+        ["runtime", "builtin", "intrinsics"].iter().any(|package| {
+            source
+                .path
+                .starts_with(std::path::Path::new(root).join("base").join(package))
+        })
+    })
 }

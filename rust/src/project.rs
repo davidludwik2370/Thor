@@ -15,6 +15,8 @@ use std::{
     path::{Component, Path, PathBuf},
     process::{Command, Stdio},
 };
+#[path = "evaluationexec.rs"]
+mod evaluationexec;
 #[path = "nativefacts.rs"]
 mod nativefacts;
 #[path = "runtimeview.rs"]
@@ -58,6 +60,7 @@ pub struct Project {
     memory: crate::memory::Memory,
     native_environment: BTreeMap<String, PathBuf>,
     backend_runtime: PathBuf,
+    evaluation: Option<crate::evaluation::Plan>,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -208,6 +211,7 @@ impl Project {
             pure_call_paths: BTreeMap::new(),
             native_environment: BTreeMap::new(),
             backend_runtime: PathBuf::new(),
+            evaluation: None,
             collections,
             common,
             file_entry,
@@ -316,7 +320,30 @@ impl Project {
         resolver.prepare_contexts();
         let mut privileges =
             crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
-        let purity = crate::purity::Purity::analyze(&mut resolver);
+        let purity = if let Some(plan) = &self.evaluation {
+            if plan.requests.is_empty() {
+                crate::purity::Purity::analyze_entries(&mut resolver, &plan.roots, &plan.entries)
+            } else {
+                crate::purity::Purity::analyze_calls(&mut resolver, &plan.requests)
+            }
+        } else {
+            crate::purity::Purity::analyze(&mut resolver)
+        };
+        if let Some(plan) = &self.evaluation {
+            for request in &plan.requests {
+                purity.validate(&resolver, *request)?;
+            }
+        }
+        if let Some(plan) = &self.evaluation {
+            privileges
+                .pure_faults
+                .retain(|root, _| purity.checked.contains(root));
+            privileges.unresolved.retain(|site, _| {
+                plan.files
+                    .get(&self.sources[site.file].path)
+                    .is_none_or(|view| view.retains(&self.sources[site.file], site.node))
+            });
+        }
         let mut local_borrowing = crate::borrowlocals::Facts::analyze(&mut resolver, &purity);
         let borrowing = crate::borrowprogram::Model::prepare(&mut resolver, &purity)
             .emission(&mut resolver, &purity);
@@ -354,8 +381,8 @@ impl Project {
             &mut self.collections,
             &self.destination,
             &self.options.overlays,
-            &self.options.root.join("runtime"),
-            &self.backend_runtime,
+            (&self.options.root.join("runtime"), &self.backend_runtime),
+            self.evaluation.as_ref(),
         )?;
         self.native_environment = sdk.environment.clone();
         for (root, faults) in &privileges.pure_faults {
@@ -425,7 +452,7 @@ impl Project {
             if source.shared_native && !sdk.adapts(&source.path) {
                 continue;
             }
-            let relative = if source.shared_native {
+            let mut relative = if source.shared_native {
                 sdk.output(&source.path)
                     .and_then(|path| {
                         path.strip_prefix(&self.destination)
@@ -440,19 +467,43 @@ impl Project {
                     .map_err(|_| Error::new("source outside project root"))?
                     .with_extension("odin")
             };
+            if self.evaluation.is_some()
+                && relative
+                    .file_name()
+                    .is_some_and(|name| name.to_string_lossy().ends_with("_test.odin"))
+            {
+                relative.set_file_name(format!(
+                    "thor_evaluation_{}_source.odin",
+                    source.prefix.trim_matches('_')
+                ));
+            }
             if !paths.insert(relative.clone()) {
                 return Err(Error::new(format!(
                     "generated filename collision: {}",
                     relative.display()
                 )));
             }
-            let mut lower = Lower::new(file, &mut resolver)?;
+            let view = self
+                .evaluation
+                .as_ref()
+                .and_then(|plan| plan.files.get(&source.path))
+                .cloned();
+            let mut lower = Lower::new_with_view(file, &mut resolver, view)?;
             let mut import_paths = BTreeMap::new();
-            for node in &source.nodes {
-                if node.kind != "Import" {
-                    continue;
-                }
-                let path = unquote(&node.op)?;
+            let mut imports = source
+                .nodes
+                .iter()
+                .filter(|node| node.kind == "Import")
+                .map(|node| unquote(&node.op))
+                .collect::<Result<Vec<_>>>()?;
+            if let Some(view) = self
+                .evaluation
+                .as_ref()
+                .and_then(|plan| plan.files.get(&source.path))
+            {
+                imports.extend(view.imports.values().cloned());
+            }
+            for path in imports {
                 let directory = if let Some((collection, suffix)) = path.split_once(':') {
                     source
                         .collection_roots
@@ -475,6 +526,34 @@ impl Project {
                         };
                         import_paths.insert(path, format!("{project_collection}:{suffix}"));
                     }
+                }
+            }
+            if self.evaluation.is_some() {
+                for dependency in &self.sources {
+                    if dependency.shared_native && !sdk.adapts(&dependency.path) {
+                        continue;
+                    }
+                    let directory = dependency.path.parent().unwrap();
+                    let generated = if dependency.shared_native {
+                        sdk.output(directory)
+                            .ok_or_else(|| Error::new("evaluation SDK package has no output"))?
+                    } else {
+                        self.destination
+                            .join(directory.strip_prefix(&self.common).map_err(|_| {
+                                Error::new("evaluation dependency outside project root")
+                            })?)
+                    };
+                    let suffix = generated
+                        .strip_prefix(&self.destination)
+                        .map_err(|_| Error::new("evaluation import outside generated tree"))?;
+                    let path = crate::evaluation::dependency_path(source, directory);
+                    import_paths.insert(
+                        path,
+                        format!(
+                            "{project_collection}:{}",
+                            suffix.to_string_lossy().replace('\\', "/")
+                        ),
+                    );
                 }
             }
             lower.remap_imports(import_paths);
@@ -623,6 +702,9 @@ impl Project {
                 .map(|(path, _)| path.parent().unwrap().to_path_buf())
                 .ok_or_else(|| Error::new("entry package excluded by target"))
         }
+    }
+    pub fn set_evaluation(&mut self, plan: crate::evaluation::Plan) {
+        self.evaluation = Some(plan);
     }
     fn discover_type_facts(&mut self) -> Result<()> {
         self.discover_type_facts_from(BTreeSet::new())

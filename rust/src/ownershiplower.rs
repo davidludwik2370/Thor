@@ -7,6 +7,7 @@ impl Lower<'_, '_> {
             self.source.node(*proc).kind == "Procedure"
                 && self.emitting_variants.contains(proc)
                 && self.borrowing.procedures.contains(&self.reference(*proc))
+                && !self.borrowing.entries.contains(&self.reference(*proc))
         }) else {
             return Ok(None);
         };
@@ -49,6 +50,7 @@ impl Lower<'_, '_> {
             self.source.node(*proc).kind == "Procedure"
                 && self.emitting_variants.contains(proc)
                 && self.borrowing.procedures.contains(&self.reference(*proc))
+                && !self.borrowing.entries.contains(&self.reference(*proc))
         }) else {
             return Ok(None);
         };
@@ -64,6 +66,13 @@ impl Lower<'_, '_> {
         ])))
     }
     pub(super) fn ownership_argument(&mut self, call: NodeId) -> Result<Option<Code>> {
+        if self.checked_targets.get(&call).is_some_and(|targets| {
+            targets
+                .iter()
+                .all(|target| self.borrowing.entries.contains(target))
+        }) {
+            return Ok(None);
+        }
         let Some(fields) = self.borrowing.profiles.get(&self.reference(call)).cloned() else {
             return Ok(None);
         };

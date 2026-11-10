@@ -1,5 +1,38 @@
 //! Selected native branches share contextual type and constant substitutions.
 use super::*;
+// Literal coercibility is an expression property, not part of native typeid
+// identity. A generic inferred from `3` still has type `int`.
+fn type_identity(typ: Type) -> Type {
+    match typ {
+        Type::Scalar { name, .. } => Type::Scalar {
+            name,
+            untyped: false,
+        },
+        Type::String { name, .. } => Type::String {
+            name,
+            untyped: false,
+        },
+        Type::Array { elem, length } => Type::Array {
+            elem: Box::new(type_identity(*elem)),
+            length,
+        },
+        Type::Fixed { elem, length } => Type::Fixed {
+            elem: Box::new(type_identity(*elem)),
+            length,
+        },
+        Type::Slice(elem) => Type::Slice(Box::new(type_identity(*elem))),
+        Type::Dynamic(elem) => Type::Dynamic(Box::new(type_identity(*elem))),
+        Type::Pointer(elem) => Type::Pointer(Box::new(type_identity(*elem))),
+        Type::Nominal(owner, elem) => Type::Nominal(owner, Box::new(type_identity(*elem))),
+        Type::Record(owner, args) => Type::Record(
+            owner,
+            args.into_iter()
+                .map(|(name, typ)| (name, type_identity(typ)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
 impl Resolver<'_> {
     pub fn context_condition(&mut self, r: Ref, bindings: &Substitutions) -> Option<bool> {
         self.context_condition_seen(r, bindings, &mut HashSet::new())
@@ -64,7 +97,7 @@ impl Resolver<'_> {
                     let a = self.specialized_type(left, bindings);
                     let b = self.specialized_type(right, bindings);
                     if a.resolved() && b.resolved() {
-                        return Some((a == b) == (op == "=="));
+                        return Some((type_identity(a) == type_identity(b)) == (op == "=="));
                     }
                 }
             }

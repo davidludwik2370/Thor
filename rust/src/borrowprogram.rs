@@ -31,6 +31,7 @@ pub struct Model {
 #[derive(Clone, Default)]
 pub struct Emission {
     pub procedures: BTreeSet<Ref>,
+    pub entries: BTreeSet<Ref>,
     pub checks: BTreeMap<Ref, Permission>,
     pub profiles: BTreeMap<Ref, Vec<(Access, Permission)>>,
     pub mutates: BTreeSet<Ref>,
@@ -122,6 +123,7 @@ impl Model {
             // graph. Keep it inside the native checked body: unused generic
             // helpers and ordinary proc calls must remain lazy/unchanged.
             return Emission {
+                entries: purity.entry_roots.clone(),
                 procedures: self.nodes.keys().copied().collect(),
                 contracts: self.nodes.keys().copied().map(|proc| (proc,
                     "Pure storage provenance did not converge; simplify the reference graph.".into())).collect(),
@@ -129,7 +131,10 @@ impl Model {
                 ..Emission::default()
             };
         }
-        let mut result = Emission::default();
+        let mut result = Emission {
+            entries: purity.entry_roots.clone(),
+            ..Emission::default()
+        };
         for (proc, nodes) in &self.nodes {
             let eval = Evaluator {
                 resolver,
@@ -228,7 +233,8 @@ impl Model {
             let Some(body) = eval.role(*proc, "body") else {
                 continue;
             };
-            let internal = eval.resolver.sources[proc.file].node(proc.node).data["pure"] != true;
+            let internal = eval.resolver.sources[proc.file].node(proc.node).data["pure"] != true
+                && !purity.entry_roots.contains(proc);
             let mut env = Environment::default();
             for (index, (name, field)) in eval.parameters(*proc).into_iter().enumerate() {
                 if let Some(symbol) = eval.resolver.symbol(name) {

@@ -15,7 +15,7 @@ use std::{
 pub struct NodeId(pub usize);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NameId(pub u32);
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Names {
     values: Vec<String>,
     ids: HashMap<String, NameId>,
@@ -94,7 +94,7 @@ pub struct Selection {
     pub positions: Vec<Value>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Source {
     pub path: PathBuf,
     pub raw: String,

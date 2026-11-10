@@ -80,6 +80,28 @@ work::fn(n:int)->int{return bridge.value(n)}
                     'bridge/main.thor':'package bridge\nimport leaf "../leaf_'+extension+'"\nvalue::leaf.value\n',
                     'leaf_'+extension+'/main.'+extension:'package leaf\nvalue::proc(n:int)->int{return n+1}\n'})
 
+    def test_qualified_builtin_and_constant_aliases_keep_pure_contracts(self):
+        self.tracked(self.program('values:=[1,2,3];if work(values[:])!=3{panic("builtin alias")}','''
+import b "base:builtin"
+LENGTH::b.len
+work::fn(values:[]int)->int{return LENGTH(values)}
+'''))
+        self.compare(self.program('values:=[1,2,3];_=work(values[:])','''
+import b "base:builtin"
+RELEASE::b.delete
+work::fn(values:[]int)->int{RELEASE(values);return 0}
+'''),command='check',fail='borrowed from an input')
+
+    def test_qualified_type_query_alias_does_not_check_unevaluated_conversions(self):
+        self.tracked(self.program('n:=3;if outer(^int,n)!=3{panic("query alias")}','''
+import b "base:builtin"
+QUERY::b.type_of
+outer::proc($T:typeid,n:int)->int{
+    inner::fn(value:int)->int{_=QUERY(cast(T)uintptr(value));return value}
+    return inner(n)
+}
+'''))
+
     def test_owned_checked_results_and_ordinary_shallow_aliases(self):
         self.tracked(self.program('''n:=3
 if work(n)!=3{panic("checked helper result must be independent")}
