@@ -75,6 +75,7 @@ pub struct Facts {
     pub invalid: HashMap<Ref, String>,
     pub pure_faults: BTreeMap<Ref, Vec<Issue>>,
     pub unresolved: BTreeMap<Ref, Ref>,
+    pub editor_info: Vec<serde_json::Value>,
 }
 #[derive(Clone, PartialEq, Eq)]
 struct Effect {
@@ -159,14 +160,18 @@ struct SummaryKey {
 }
 impl<'a, 'r> Privileges<'a, 'r> {
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
-        let enabled = r.sources.iter().any(|s| {
-            s.nodes
-                .iter()
-                .any(|n| n.immutable || n.data["pure"] == true)
-                || s.info["mut_parameters"]
-                    .as_array()
-                    .is_some_and(|x| !x.is_empty())
-        });
+        Self::analyze_editor(r, flags, false)
+    }
+    pub fn analyze_editor(r: &'r mut Resolver<'a>, flags: &[String], editor: bool) -> Facts {
+        let enabled = editor
+            || r.sources.iter().any(|s| {
+                s.nodes
+                    .iter()
+                    .any(|n| n.immutable || n.data["pure"] == true)
+                    || s.info["mut_parameters"]
+                        .as_array()
+                        .is_some_and(|x| !x.is_empty())
+            });
         if !enabled {
             return Facts::default();
         }
@@ -227,7 +232,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .descendants(sig.node)
                     .any(|id| this.s(sig).node(id).kind == "PolyType")
             });
-            if !generic || this.s(proc).node(proc.node).data["pure"] == true {
+            if editor || !generic || this.s(proc).node(proc.node).data["pure"] == true {
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
                 this.summary(proc, Substitutions::new());
                 this.pure_depth = 0;
@@ -301,7 +306,113 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
             }
         }
+        if editor {
+            this.facts.editor_info = this.editor_info();
+        }
         this.facts
+    }
+    fn editor_info(&mut self) -> Vec<serde_json::Value> {
+        use serde_json::json;
+        let mut parameters = self
+            .explicit
+            .iter()
+            .map(|reference| (*reference, true))
+            .collect::<BTreeMap<_, _>>();
+        let mut files = self
+            .explicit
+            .iter()
+            .map(|r| r.file)
+            .collect::<BTreeSet<_>>();
+        for c in 0..self.contexts.len() {
+            let Some(proc) = self.contexts[c].proc else {
+                continue;
+            };
+            files.insert(proc.file);
+            let signature = self.role(proc, "type").unwrap_or(proc);
+            let params = self.params(signature);
+            let bindings = self.contexts[c].bindings.clone();
+            let mut ready = true;
+            for (name, field) in &params {
+                let typ = self
+                    .r
+                    .symbol(*name)
+                    .and_then(|symbol| self.contexts[c].env.get(&symbol))
+                    .map(|v| self.values[*v].typ.clone())
+                    .unwrap_or(Type::Unknown);
+                if self.unresolved_value_type(&typ, &mut HashSet::new()) {
+                    ready = false;
+                }
+                if self
+                    .group(*field, "names")
+                    .iter()
+                    .any(|n| self.kind(*n) == "PolyType")
+                {
+                    let key = self.text(*name).trim_start_matches('$').to_string();
+                    if bindings
+                        .get(&key)
+                        .is_none_or(|typ| matches!(typ, Type::Unknown | Type::Generic))
+                    {
+                        ready = false;
+                    }
+                }
+            }
+            let mut views = Vec::new();
+            for (name, field) in &params {
+                let typ = self
+                    .role(*field, "type")
+                    .map(|r| self.r.specialized_type(r, &bindings))
+                    .or_else(|| {
+                        self.r
+                            .symbol(*name)
+                            .and_then(|symbol| self.contexts[c].env.get(&symbol))
+                            .map(|v| self.values[*v].typ.clone())
+                    })
+                    .unwrap_or(Type::Unknown);
+                let value = self.value(typ);
+                views.push(self.freeze(value, *name));
+            }
+            for (origin, effect) in self.contexts[c].effects.clone() {
+                let Some((name, field)) = params.get(origin.path.index) else {
+                    continue;
+                };
+                let typ = self
+                    .role(*field, "type")
+                    .map(|r| self.r.specialized_type(r, &bindings))
+                    .unwrap_or(Type::Unknown);
+                if !matches!(base_type(&typ), Type::Slice(_)) {
+                    continue;
+                }
+                if !ready {
+                    if !origin.path.steps.is_empty() || origin.aspect != Aspect::Data {
+                        continue;
+                    }
+                    let operation = effect.operation;
+                    let direct_write = effect.reason == "modify slice elements"
+                        && self.kind(operation) == "Index"
+                        && self.role(operation, "expr").is_some_and(|expr| {
+                            matches!(base_type(&self.typ(expr, c)), Type::Slice(_))
+                        });
+                    let direct_alias = effect.reason.starts_with("create a writable slice alias")
+                        && matches!(base_type(&self.typ(operation, c)), Type::Slice(_));
+                    if !direct_write && !direct_alias {
+                        continue;
+                    }
+                }
+                if self.resolve(&origin, &views).is_empty() {
+                    continue;
+                }
+                parameters.insert(*name, self.explicit.contains(name));
+            }
+        }
+        self.r.sources.iter().enumerate().filter(|(file,source)| source.thor || files.contains(file))
+            .map(|(file, source)| {
+                let hash=source.raw.as_bytes().iter().fold(14695981039346656037u64,|h,b|(h^u64::from(*b)).wrapping_mul(1099511628211));
+                let rows=parameters.iter().filter(|(r,_)|r.file==file).map(|(r,explicit)| {
+                    let node=source.node(r.node);json!({"file":source.path,"offset":node.span.start,"end":node.span.end,"name":source.text(r.node),"explicit":explicit})
+                }).collect::<Vec<_>>();
+                let readonly=self.facts.readonly.iter().filter(|r|r.file==file).map(|r|source.node(r.node).span.start).collect::<BTreeSet<_>>();
+                json!({"file":source.path,"source_hash":hash,"parameters":rows,"readonly_access":readonly})
+            }).collect()
     }
     fn s(&self, r: Ref) -> &'a crate::ast::Source {
         &self.r.sources[r.file]

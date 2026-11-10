@@ -94,6 +94,7 @@ impl Project {
             destination,
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
+            editor_info: vec![],
             evaluated: results.clone(),
             evaluation_skips: skips.clone(),
             evaluation_witnesses: self.evaluation_witnesses.clone(),

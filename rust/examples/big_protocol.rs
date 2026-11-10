@@ -49,6 +49,7 @@ fn resolve(request: &Value) -> bigvalues::Result<Value> {
         tracking: "off".into(),
         no_sanitize: true,
         overlays: BTreeMap::new(),
+        editor_info: false,
     })
     .map_err(|error| error.to_string())?;
     project

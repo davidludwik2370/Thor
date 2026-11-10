@@ -32,6 +32,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         tracking: "off".into(),
         no_sanitize: true,
         overlays: BTreeMap::new(),
+        editor_info: false,
     })?;
     project.inspect_sources()?;
     let mut resolver = Resolver::new(&project.sources);

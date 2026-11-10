@@ -32,6 +32,7 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         tracking: "off".into(),
         no_sanitize: true,
         overlays: BTreeMap::new(),
+        editor_info: false,
     })?;
     project.inspect_sources()?;
     let mut scheduler = Scheduler::new(&project, Duration::from_secs(5));

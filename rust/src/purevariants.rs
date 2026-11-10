@@ -167,7 +167,19 @@ impl Lower<'_, '_> {
                     self.g(format!("\n{name} :: "), target.node),
                     procedure,
                     self.g("\n", target.node),
-                ]))
+                ])
+                .region(
+                    &self.source.path,
+                    self.source.node(target.node).span,
+                    &format!(
+                        "pure-procedure|{}|{name}",
+                        self.source
+                            .group(declaration, "names")
+                            .first()
+                            .map(|id| self.source.text(*id))
+                            .unwrap_or("anonymous procedure")
+                    ),
+                ))
             })();
             if self.meta {
                 self.modules

@@ -43,6 +43,7 @@ pub struct Options {
     pub tracking: String,
     pub no_sanitize: bool,
     pub overlays: BTreeMap<PathBuf, String>,
+    pub editor_info: bool,
 }
 pub struct Project {
     pub options: Options,
@@ -51,6 +52,7 @@ pub struct Project {
     pub destination: PathBuf,
     pub outputs: BTreeMap<PathBuf, (usize, Emitted)>,
     pub errors: HashMap<String, String>,
+    pub editor_info: Vec<Value>,
     pub evaluated: BTreeMap<crate::semantics::Ref, Value>,
     pub specialized: crate::specialization::Cases,
     pub evaluation_scheduled: bool,
@@ -216,6 +218,7 @@ impl Project {
             destination,
             outputs: BTreeMap::new(),
             errors: HashMap::new(),
+            editor_info: vec![],
             evaluated: BTreeMap::new(),
             specialized: BTreeMap::new(),
             evaluation_scheduled: false,
@@ -343,7 +346,8 @@ impl Project {
         }
         crate::lower::prime_logical_constants(&mut resolver);
         let mut privileges =
-            crate::privileges::Privileges::analyze(&mut resolver, &self.options.flags);
+            crate::privileges::Privileges::analyze_editor(&mut resolver, &self.options.flags, self.options.editor_info);
+        self.editor_info = privileges.editor_info.clone();
         let purity = if let Some(plan) = &self.evaluation {
             if plan.requests.is_empty() {
                 crate::purity::Purity::analyze_entries(&mut resolver, &plan.roots, &plan.entries)
@@ -718,6 +722,13 @@ impl Project {
             .collect();
         let mut manifest = json!({"thor_version":VERSION,"engine":"rust","migration_complete":false,"entry":self.options.entry,"source_map_version":1,"debug_map_version":1,
             "generated":generated,"odin_flags":self.native_flags(),"odin_environment":self.native_environment,"debug_roots":[],"shared_maps":[]});
+        if self.options.flags.iter().any(|flag|flag=="-debug") {
+            let mut roots = vec![self.options.root.join("runtime")];
+            if let Some(root) = self.sources.iter().find_map(|source| source.info["odin_root"].as_str()) {
+                roots.extend(["base","core","vendor"].map(|name|Path::new(root).join(name)));
+            }
+            manifest["debug_roots"] = json!(roots);
+        }
         if self.memory.enabled() {
             manifest["memory_debug"] = json!({"tracking":self.memory.tracking,"address_sanitizer":self.memory.address,"source_map_version":1,"llvm_symbolizer":self.memory.symbolizer});
         }
@@ -1044,6 +1055,13 @@ impl Project {
         if !output.status.success() {
             return Ok(output.status.code().unwrap_or(1));
         }
+        if matches!(action, "build" | "run" | "test")
+            && self.options.flags.iter().any(|flag|flag=="-debug") && binary.is_file() {
+            let path = self.destination.join("thor-manifest.json");
+            let mut manifest: Value = serde_json::from_slice(&fs::read(&path)?)?;
+            manifest["debug_program"] = json!({"path":binary,"sha256":sha256(&fs::read(&binary)?)});
+            atomic_write(&path, &serde_json::to_vec_pretty(&manifest)?)?;
+        }
         if action == "run" || action == "test" {
             let status = Command::new(&binary)
                 .args(&self.options.args)
@@ -1358,10 +1376,9 @@ impl Project {
     fn report(&self, errors: &[Value]) {
         let errors = self.translate(errors);
         if self.options.json {
-            eprintln!(
-                "{}",
-                json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors})
-            );
+            let mut packet = json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors});
+            if self.options.editor_info { packet["slice_access"] = json!(self.editor_info); }
+            eprintln!("{packet}");
         } else {
             for error in errors {
                 print_diagnostic(&error);

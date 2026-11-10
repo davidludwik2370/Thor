@@ -16,6 +16,8 @@ enum Fragment {
     Text(String, Origin),
     Concat(Vec<Code>),
     Expansion(Code, Origin),
+    Region(Code, Origin),
+    Annotation(Code, String),
 }
 #[derive(Clone, Debug)]
 pub struct Code(Rc<Fragment>);
@@ -56,6 +58,20 @@ impl Code {
             },
         )))
     }
+    pub fn annotated(self, kind: &str) -> Self {
+        Self(Rc::new(Fragment::Annotation(self, kind.into())))
+    }
+    pub fn region(self, path: &Path, span: Span, kind: &str) -> Self {
+        Self(Rc::new(Fragment::Region(
+            self,
+            Origin {
+                file: path.to_string_lossy().into_owned(),
+                span,
+                kind: kind.into(),
+                exact: false,
+            },
+        )))
+    }
     pub fn finish(&self) -> Emitted {
         let mut out = Emitted::default();
         self.append(&mut out);
@@ -69,6 +85,13 @@ impl Code {
                 }
                 let start = out.text.len();
                 out.text.push_str(text);
+                if matches!(
+                    origin.kind.as_str(),
+                    "expression-helper" | "debug-capture" | "source-call-target"
+                ) || origin.kind.starts_with("pure-procedure|")
+                {
+                    out.regions.push((start, out.text.len(), origin.clone()));
+                }
                 if let Some(last) = out.segments.last_mut() {
                     if origin.exact
                         && last.origin.exact
@@ -91,6 +114,29 @@ impl Code {
             Fragment::Concat(parts) => {
                 for part in parts {
                     part.append(out);
+                }
+            }
+            Fragment::Annotation(code, kind) => {
+                let first = out.segments.len();
+                code.append(out);
+                for segment in &mut out.segments[first..] {
+                    if segment.origin.kind == "generated" {
+                        segment.origin.kind = kind.clone();
+                    }
+                }
+            }
+            Fragment::Region(code, origin) => {
+                let start = out.text.len();
+                let first = out.segments.len();
+                code.append(out);
+                for segment in &mut out.segments[first..] {
+                    if segment.origin.kind == "generated" {
+                        segment.origin.kind =
+                            origin.kind.split('|').next().unwrap_or_default().into();
+                    }
+                }
+                if out.text.len() > start {
+                    out.regions.push((start, out.text.len(), origin.clone()));
                 }
             }
             Fragment::Expansion(code, origin) => {
@@ -122,6 +168,7 @@ pub struct Emitted {
     pub text: String,
     pub segments: Vec<Segment>,
     pub expansions: Vec<(usize, usize, Origin)>,
+    pub regions: Vec<(usize, usize, Origin)>,
 }
 impl Emitted {
     pub fn lookup(&self, offset: usize, length: usize) -> Option<Origin> {
@@ -166,14 +213,70 @@ impl Emitted {
             .filter(|(path, _)| self.segments.iter().any(|s| &s.origin.file == path))
             .map(|(p, s)| (p.clone(), Value::String(s.clone())))
             .collect();
+        let regions: Vec<_> = self
+            .regions
+            .iter()
+            .map(|(start, end, origin)| {
+                let mut parts = origin.kind.split('|');
+                let kind = parts.next().unwrap_or_default();
+                let mut row = vec![
+                    json!(start),
+                    json!(end),
+                    json!(kind),
+                    json!(origin.file),
+                    json!(origin.span.start),
+                    json!(origin.span.end),
+                ];
+                if kind == "pure-procedure" {
+                    row.extend(parts.map(|part| json!(part)));
+                }
+                Value::Array(row)
+            })
+            .collect();
         json!({"version":1,"encoding":"utf-8","generated":generated,"sources":sources,
-            "segments":segments,"expansions":expansions,"regions":[]})
+            "segments":segments,"expansions":expansions,"regions":regions})
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nested_debug_regions_preserve_capture_spans_and_checked_identity() {
+        let path = Path::new("/original.thor");
+        let body = Code::concat([
+            Code::generated("helper(", path, Span::new(0, 9), "support"),
+            Code::source("value", path, Span::new(2, 7)).region(
+                path,
+                Span::new(2, 7),
+                "debug-capture",
+            ),
+            Code::generated(")", path, Span::new(0, 9), "support"),
+        ])
+        .region(path, Span::new(0, 9), "expression-helper")
+        .region(path, Span::new(0, 9), "pure-procedure|work|checked_work");
+        let emitted = body.finish();
+        let packet = emitted.map_json(Path::new("/generated.odin"), &[]);
+        assert_eq!(emitted.text, "helper(value)");
+        assert_eq!(emitted.lookup(8, 1).unwrap().span, Span::new(3, 4));
+        assert_eq!(
+            packet["regions"],
+            json!([
+                [7, 12, "debug-capture", "/original.thor", 2, 7],
+                [0, 13, "expression-helper", "/original.thor", 0, 9],
+                [
+                    0,
+                    13,
+                    "pure-procedure",
+                    "/original.thor",
+                    0,
+                    9,
+                    "work",
+                    "checked_work"
+                ],
+            ])
+        );
+    }
     #[test]
     fn fragments_map_reordered_and_repeated_unicode() {
         let path = Path::new("/source.thor");

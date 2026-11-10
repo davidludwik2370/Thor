@@ -105,6 +105,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             tracking: "off".into(),
             no_sanitize: true,
             overlays: Default::default(),
+            editor_info: false,
         })?;
         project.inspect_sources()?;
         project.sources

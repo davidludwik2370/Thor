@@ -302,6 +302,35 @@ factory/CLI comparisons also passed. All 29 Rust debug unit tests and Clippy wit
 warnings denied passed. This is part of checkpoint 7; publishing, vet, complete
 TLS/debugger integration and whole-language acceptance are still outstanding.
 
+### TLS permissions and debugger map integration
+
+The native CLI now supports the existing hidden `--editor-info` protocol. It
+returns per-file UTF-8 snapshot hashes, explicit/inferred slice mutation
+parameters and readonly member-access offsets with mapped JSON diagnostics.
+Editors can request contracts for unused and generic declarations; ordinary
+builds retain the existing demand-driven analysis. Unsaved overlays use their
+own hashes, and a later saved-source check restores the saved snapshot metadata.
+
+Source maps now retain expression-helper, capture, source-call-target and checked
+procedure regions. Generated identifier replacements retain their AST kinds so
+the existing debug adapter can translate helper conditions and variable names.
+Debug manifests include SDK/runtime roots and the successful executable's hash;
+a subsequent check invalidates that executable identity. Generated editor tasks
+and TLS still use the supported Python compiler by default.
+
+The combined gate passed all 118 tests, covering the real Node debug-map
+consumer, metadata comparisons, compiler and pure-call diagnostics, checked and
+unchecked numeric ownership and assertion hygiene. Five further generic,
+variadic and signature-only metadata comparisons passed. All 30 Rust unit tests
+passed in debug and release; Clippy passed with warnings denied.
+
+Live CodeLLDB stepping could not be validated in this environment: both the
+native build and an unchanged Python-reference test timed out while waiting for
+`configurationDone`. The initial sandbox loopback restriction was removed for
+that comparison, and stalled test processes were cleaned up. The source-map
+consumer checks pass, but they are not a substitute for completing live DAP
+acceptance. This remains part of checkpoint 7.
+
 ### Exact constant arithmetic foundation
 
 `bigconstantvalue` now performs logical-number arithmetic directly on canonical

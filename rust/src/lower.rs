@@ -849,7 +849,17 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let result = self.render_inner(id, expected, constant);
         self.checked_mode = old;
-        let code = result?;
+        let mut code = result?.annotated(self.source.node(id).kind.as_str());
+        if self.source.node(id).parent.is_some_and(|parent| {
+            self.source.node(parent).kind == "Call" && self.source.role(parent, "callee") == Some(id)
+        }) {
+            let field = self.source.role(id, "field").unwrap_or(id);
+            let name = self.source.text(field);
+            if matches!(name, "type_of" | "typeid_of" | "type_info_of" | "size_of" | "align_of" | "offset_of")
+                && !self.resolver.native_builtin(self.reference(id), name) {
+                code = code.region(&self.source.path, self.source.node(id).span, "source-call-target");
+            }
+        }
         if self.querying == 0 {
             if let Some(guards) = self.storage_guards.get(&id).cloned() {
                 let guards = guards
@@ -2261,11 +2271,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 self.prefix
             ));
             let argument = self.render(*child, None, false)?;
-            args.push(if byref {
+            args.push((if byref {
                 Code::concat([self.g("&(", id), argument, self.g(")", id)])
             } else {
                 argument
-            });
+            }).region(&self.source.path, span, "debug-capture"));
             aliases.insert(
                 *symbol,
                 self.g(
@@ -2419,7 +2429,8 @@ impl<'a, 'r> Lower<'a, 'r> {
                 id,
             );
             self.helpers
-                .insert(key, Code::concat([header, body, self.g("\n}\n", id)]));
+                .insert(key, Code::concat([header, body, self.g("\n}\n", id)])
+                    .region(&self.source.path, span, "expression-helper"));
         }
         Ok((name, args))
     }

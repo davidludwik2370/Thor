@@ -97,6 +97,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         tracking: "auto".into(),
         no_sanitize: false,
         overlays: Default::default(),
+        editor_info: false,
     };
     if let Some(root) = env::var_os("THOR_ROOT") {
         options.root = absolute(&PathBuf::from(root))?;
@@ -137,6 +138,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             }
             "--diagnostic-format=json" | "-json-errors" => options.json = true,
             "--source-maps" => options.maps = true,
+            "--editor-info" => options.editor_info = true,
             "--track-allocations" => {
                 options.tracking = args
                     .next()
@@ -182,7 +184,23 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         println!("{}", json!({"version":1,"sources":sources}));
         return Ok(0);
     }
-    let target = project.lower()?;
+    let target = match project.lower() {
+        Ok(target) => target,
+        Err(error) if project.options.editor_info && project.options.json => {
+            let unsupported = error.unsupported;
+            let errors = if error.diagnostics.is_empty() {
+                vec![json!({"type":"error","stage":"thor-rust","pos":null,"msgs":[error.message]})]
+            } else {
+                error.diagnostics
+            };
+            eprintln!(
+                "{}",
+                json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors,"slice_access":project.editor_info})
+            );
+            return Ok(if unsupported { 3 } else { 1 });
+        }
+        Err(error) => return Err(error),
+    };
     if project.options.command == "transpile" {
         println!("{}", target.display());
         Ok(0)

@@ -126,7 +126,7 @@
       "checkpoint": 3,
       "status": "partial",
       "reference_functions": 62,
-      "remaining": "Align outstanding slice permissions, copies, aliases and effect propagation with Python."
+      "remaining": "Concrete permissions and contextual summaries are connected, including editor-requested unused/generic contracts, explicit #mut and readonly access metadata. Complete broader interactions and whole-language acceptance."
     },
     {
       "python": "thorlang/evaluation.py",
@@ -439,7 +439,7 @@
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 46,
-      "remaining": "Retain source/AST/emission infrastructure; finish integration and editor information."
+      "remaining": "Native source/AST/emission infrastructure and TLS slice-access snapshot metadata are connected. Complete remaining invocation/diagnostic integrations and whole-language acceptance."
     },
     {
       "python": "thorlang/diagnostics.py",
@@ -528,7 +528,7 @@
       "checkpoint": 7,
       "status": "partial",
       "reference_functions": 11,
-      "remaining": "Finish regions/debugger metadata while retaining accepted wire format."
+      "remaining": "Structured maps include helper/capture/source-call-target/checked-procedure regions and generated AST kinds. The real Node consumer accepts native manifests, executable identities and capture conditions. Complete rewrite support, live DAP and whole-language acceptance."
     },
     {
       "python": "thorlang/symbolizer.py",
