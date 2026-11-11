@@ -278,6 +278,15 @@ switch bounds now keep their operand spans inside that region. All nine
 logical-number TLS tests passed, along with the live CodeLLDB numeric switch
 breakpoint test.
 
+### Deep pure call chains
+
+The native verifier walks pending procedures without recursing through every
+call on the Rust stack. Pending calls retain their original call paths, native
+branch context and any evaluated defaults. Cycles still terminate through
+specialization tracking. Both engines passed the 64-call regression at runtime
+and under `#run` in debug and unchecked release, and identify an impure leaf
+through the calling `fn`.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and
@@ -1536,6 +1545,7 @@ cargo build --release --locked --manifest-path rust/Cargo.toml
 ./thor-rust --capabilities
 
 python3 -m unittest discover -s tests -p 'test_rust_*.py'
+THOR_TEST_COMPILER="$PWD/thor-rust" python3 -m unittest discover -s tests -t .
 python3 -m unittest tests.test_compiler_comparison
 cargo test --locked --manifest-path rust/Cargo.toml
 cargo test --release --locked --manifest-path rust/Cargo.toml

@@ -91,6 +91,31 @@ work::fn(n:int)->int{local:=n;middle(&local,n);return local}
         errors=self.errors(text)
         self.assert_context(text,errors,'middle(&local,n)','work','state;')
 
+    def test_deep_pure_call_chain_works_at_runtime_and_compile_time(self):
+        depth = 64
+        chain = ''.join(f'helper_{i}::proc(n:int)->int{{return helper_{i+1}(n)+1}}\n'
+                        for i in range(depth))
+        definitions = chain + f'''helper_{depth}::proc(n:int)->int{{return n}}
+work::fn(n:int)->int{{return helper_0(n)}}
+VALUE::#run work(4)
+'''
+        text = self.program(f'n:=5;if work(n)!={depth+5}||VALUE!={depth+4}{{panic("wrong result")}}',
+                            definitions)
+        for flags in (['-debug'], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(text, flags=flags)
+
+    def test_deep_pure_call_chain_still_reports_an_impure_leaf(self):
+        depth = 64
+        chain = ''.join(f'helper_{i}::proc(n:int)->int{{return helper_{i+1}(n)}}\n'
+                        for i in range(depth))
+        text = self.program('n:=4;_=work(n)', chain + f'''state:int
+helper_{depth}::proc(n:int)->int{{return n+state}}
+work::fn(n:int)->int{{return helper_0(n)}}
+''')
+        errors = self.errors(text)
+        self.assert_context(text, errors, 'helper_0(n)', 'work', 'state}')
+
     def test_imported_helper_notes_retain_both_original_files(self):
         text=self.program('n:=7;_=work(n)', '''import "library"
 work::fn(n:int)->int{local:=n;library.reset(&local);return local}

@@ -6,7 +6,7 @@ use crate::{
     purediagnostics::{self, function_context, function_owner, procedure_name},
     semantics::{Ref, Resolver, Substitutions, Type},
 };
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 #[path = "pureintrinsics.rs"]
 mod pureintrinsics;
 pub(crate) use pureintrinsics::llvm_primitive;
@@ -37,11 +37,25 @@ pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
     facts: Facts,
     visiting: HashSet<VisitKey>,
-    constants: HashSet<(Ref, Ref)>,
+    constants: HashSet<(Ref, Ref, Option<Ref>)>,
     speculative: Vec<Ref>,
     walk_stack: Vec<Ref>,
+    pending: VecDeque<PendingCall>,
+    inherited_branch: Option<Branch>,
 }
 type VisitKey = (Ref, Vec<(String, Type)>, Option<Ref>);
+#[derive(Clone, Copy)]
+struct Branch {
+    owner: Ref,
+    site: Option<Ref>,
+}
+struct PendingCall {
+    procedure: Ref,
+    bindings: Substitutions,
+    via: Vec<Ref>,
+    branch: Option<Branch>,
+    defaults: Option<(Vec<Ref>, Substitutions)>,
+}
 pub(crate) fn builtin_call(r: &mut Resolver<'_>, call: Ref) -> Option<String> {
     if let Some(callee) = r.sources[call.file].role(call.node, "callee") {
         if let Some(name) = crate::extremaplan::name(
@@ -104,11 +118,14 @@ impl<'a, 'r> Purity<'a, 'r> {
             constants: HashSet::new(),
             speculative: vec![],
             walk_stack: vec![],
+            pending: VecDeque::new(),
+            inherited_branch: None,
         };
         for root in roots.iter().copied() {
             if this.r.active_definition(root) {
                 this.visiting.clear();
-                this.visit(root, root, Substitutions::new(), vec![]);
+                this.visit(root, root, Substitutions::new(), &[]);
+                this.visit_pending(root);
             }
         }
         this.facts
@@ -121,9 +138,13 @@ impl<'a, 'r> Purity<'a, 'r> {
             constants: HashSet::new(),
             speculative: vec![],
             walk_stack: vec![],
+            pending: VecDeque::new(),
+            inherited_branch: None,
         };
         for call in calls.iter().copied() {
+            this.visiting.clear();
             this.walk(call, call, call, &Substitutions::new(), &[]);
+            this.visit_pending(call);
             let source = &this.r.sources[call.file];
             for node in std::iter::once(call.node).chain(source.descendants(call.node)) {
                 if let Some(targets) = this.facts.targets.get(&Ref {
@@ -160,13 +181,18 @@ impl<'a, 'r> Purity<'a, 'r> {
     }
     fn conditional_reference(&self) -> Option<Ref> {
         let owner = self.speculative.last()?;
-        self.walk_stack.iter().rev().copied().find(|site| {
-            site.file == owner.file
-                && self.r.sources[owner.file]
-                    .node(owner.node)
-                    .span
-                    .contains(self.r.sources[site.file].node(site.node).span)
-        })
+        self.walk_stack
+            .iter()
+            .rev()
+            .copied()
+            .find(|site| {
+                site.file == owner.file
+                    && self.r.sources[owner.file]
+                        .node(owner.node)
+                        .span
+                        .contains(self.r.sources[site.file].node(site.node).span)
+            })
+            .or_else(|| self.inherited_branch.filter(|branch| branch.owner == *owner)?.site)
     }
     fn fault(&mut self, root: Ref, origin: Ref, via: &[Ref], message: impl Into<String>) {
         let message = message.into();
@@ -248,14 +274,32 @@ impl<'a, 'r> Purity<'a, 'r> {
     fn gap(&mut self, root: Ref, origin: Ref) {
         self.facts.gaps.entry(root).or_insert(origin);
     }
-    fn visit(&mut self, root: Ref, proc: Ref, bindings: Substitutions, via: Vec<Ref>) {
-        if via.len() <= 40 {
-            self.facts
-                .call_paths
-                .entry(proc)
-                .or_default()
-                .insert((root, via.clone()));
+    fn visit_pending(&mut self, root: Ref) {
+        // Keep procedure traversal off the Rust call stack. Each pending call
+        // carries the original call path and any unresolved native branch.
+        while let Some(call) = self.pending.pop_front() {
+            self.inherited_branch = call.branch;
+            if let Some(branch) = call.branch {
+                self.speculative.push(branch.owner);
+            }
+            self.visit(root, call.procedure, call.bindings, &call.via);
+            if let Some((defaults, bindings)) = call.defaults {
+                for default in defaults {
+                    self.walk(root, call.procedure, default, &bindings, &call.via);
+                }
+            }
+            if call.branch.is_some() {
+                self.speculative.pop();
+            }
         }
+        self.inherited_branch = None;
+    }
+    fn visit(&mut self, root: Ref, proc: Ref, bindings: Substitutions, via: &[Ref]) {
+        self.facts
+            .call_paths
+            .entry(proc)
+            .or_default()
+            .insert((root, via.to_vec()));
         let key = (
             proc,
             bindings
@@ -267,7 +311,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         if !self.visiting.insert(key) {
             return;
         }
-        if self.visiting.len() > 1024 || via.len() > 40 {
+        if self.visiting.len() > 1024 {
             self.gap(root, proc);
             return;
         }
@@ -277,7 +321,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             return;
         };
         let Some(body) = self.role(proc, "body") else {
-            self.fault(root,proc,&via,"Declared pure functions require an inspectable body; foreign or bodyless procedures are not eligible.");
+            self.fault(root,proc,via,"Declared pure functions require an inspectable body; foreign or bodyless procedures are not eligible.");
             return;
         };
         let convention = self.r.sources[sig.file].node(sig.node).data["calling_convention"]
@@ -289,7 +333,7 @@ impl<'a, 'r> Purity<'a, 'r> {
             self.fault(
                 root,
                 proc,
-                &via,
+                via,
                 "Declared pure functions require the Odin calling convention.",
             );
         }
@@ -304,10 +348,10 @@ impl<'a, 'r> Purity<'a, 'r> {
                     deferred |= name.starts_with("deferred_");
                 }
                 if lifecycle {
-                    self.fault(root, proc, &via, "Package initializers/finalizers are not eligible pure call targets.");
+                    self.fault(root, proc, via, "Package initializers/finalizers are not eligible pure call targets.");
                 }
                 if deferred {
-                    self.fault(root, Ref { node: attribute, ..proc }, &via,
+                    self.fault(root, Ref { node: attribute, ..proc }, via,
                         "Pure calls cannot use implicit deferred procedure callbacks; make eligible calls explicit in the body.");
                 }
             }
@@ -319,7 +363,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                         if self.unsafe_storage(typ, &mut HashSet::new()) {
                             let procedure = procedure_name(self.r.sources, proc);
                             let cause = self.unsupported_signature_type(typ);
-                            self.fault(root, annotation, &via, format!(
+                            self.fault(root, annotation, via, format!(
                                 "{cause}\nWhile checking type parameter '{name}' in pure call '{procedure}'."
                             ));
                         }
@@ -330,7 +374,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
                     let procedure = procedure_name(self.r.sources, proc);
                     let cause = self.unsupported_signature_type(&typ);
-                    self.fault(root, annotation, &via, format!(
+                    self.fault(root, annotation, via, format!(
                         "{cause}\nWhile checking parameter '{name}' in pure call '{procedure}'."
                     ));
                 }
@@ -342,7 +386,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if self.unsafe_storage(&typ, &mut HashSet::new()) {
                     let procedure = procedure_name(self.r.sources, proc);
                     let cause = self.unsupported_signature_type(&typ);
-                    self.fault(root, annotation, &via, format!(
+                    self.fault(root, annotation, via, format!(
                         "{cause}\nWhile checking a result in pure call '{procedure}'."
                     ));
                 }
@@ -355,7 +399,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                         .role(field, "type")
                         .is_some_and(|typ| self.r.type_of(typ).is_unknown())
                 {
-                    self.fault(root,field,&via,"Pure using parameters require a resolved record schema; access members explicitly for unconstrained generic inputs.");
+                    self.fault(root,field,via,"Pure using parameters require a resolved record schema; access members explicitly for unconstrained generic inputs.");
                 }
             }
         }
@@ -364,21 +408,21 @@ impl<'a, 'r> Purity<'a, 'r> {
                 if let Some(annotation) = annotation {
                     let typ = self.r.specialized_type(annotation, &bindings);
                     if let Some(sequence) = Self::owned_sequence(&typ) {
-                        self.fault(root, annotation, &via, format!(
+                        self.fault(root, annotation, via, format!(
                             "Contextless compile-time procedures cannot return {sequence}; use fn or a contextful proc."
                         ));
                     }
                 }
             }
         }
-        self.walk(root, proc, body, &bindings, &via);
+        self.walk(root, proc, body, &bindings, via);
         // Defaults are part of a declared fn's contract. Defaults on an
         // ordinary helper are visited only when the caller actually omits it.
         if proc == root {
             if let Some(params) = self.role(sig, "params") {
                 for field in self.children(params) {
                     if let Some(default) = self.role(field, "default") {
-                        self.walk(root, proc, default, &bindings, &via);
+                        self.walk(root, proc, default, &bindings, via);
                     }
                 }
             }
@@ -482,7 +526,9 @@ impl<'a, 'r> Purity<'a, 'r> {
                         if symbol.constant {
                             if let Some(value)=symbol.value {
                                 let value=Ref{file:symbol.reference.file,node:value};
-                                if !matches!(self.kind(value),"Procedure"|"ProcedureGroup") && self.constants.insert((root,value)) {
+                                if !matches!(self.kind(value),"Procedure"|"ProcedureGroup")
+                                    && self.constants.insert((root,value,self.conditional_reference()))
+                                {
                                     self.walk(root,proc,value,bindings,via);
                                 }
                             }
@@ -834,7 +880,11 @@ impl<'a, 'r> Purity<'a, 'r> {
                     if native_selection {
                         self.speculative.push(self.role(candidate, "body").unwrap());
                     }
-                    self.visit(root, candidate, contextual, chain.clone());
+                    let branch = self.speculative.last().copied().map(|owner| Branch {
+                        owner,
+                        site: self.conditional_reference(),
+                    });
+                    let mut defaults = Vec::new();
                     if let Some(params) = self.role(sig, "params") {
                         let mut position = 0;
                         for field in self.children(params) {
@@ -856,7 +906,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                             if omitted {
                                 self.facts.defaults.insert(field);
                                 if let Some(default) = self.role(field, "default") {
-                                    self.walk(root, candidate, default, bindings, &chain);
+                                    defaults.push(default);
                                 }
                             }
                         }
@@ -864,6 +914,13 @@ impl<'a, 'r> Purity<'a, 'r> {
                     if native_selection {
                         self.speculative.pop();
                     }
+                    self.pending.push_back(PendingCall {
+                        procedure: candidate,
+                        bindings: contextual,
+                        via: chain,
+                        branch,
+                        defaults: (!defaults.is_empty()).then(|| (defaults, bindings.clone())),
+                    });
                 }
                 if selected == 0 {
                     self.gap(root, call);
