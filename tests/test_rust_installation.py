@@ -1,7 +1,7 @@
 """Exercise a staged native toolchain with Python and Cargo unavailable.
 
-Keep the reference launcher intact. Installing the prebuilt Rust executable as
-`thor` lets existing project tasks use it without changing their command paths.
+The Python reference remains available as thor-python. Installing the prebuilt
+Rust executable as thor lets existing project tasks keep their command paths.
 """
 import json
 import os
@@ -126,22 +126,30 @@ works :: proc(t:^testing.T) { testing.expect(t, VALUE == 42) }
         self.assertFalse(self.log.exists())
 
     def test_native_launcher_uses_prebuilt_compiler_and_reports_missing_build(self):
-        launcher = self.toolchain/'thor-rust'
-        shutil.copy2(native.ROOT/'thor-rust', launcher)
+        launchers = [self.toolchain/'thor', self.toolchain/'thor-rust']
+        for launcher in launchers:
+            shutil.copy2(native.ROOT/launcher.name, launcher)
         binary = self.toolchain/'rust/target/release/thor-rust'
         binary.parent.mkdir(parents=True)
         shutil.copy2(native.RUST, binary)
-        for command in (['--version'], ['new', 'sample']):
-            result = subprocess.run([str(launcher), *command], env=self.environment,
-                                    cwd=self.root, capture_output=True, text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
-        self.assertEqual((self.app/'sample.thor').read_bytes(),
-                         (self.toolchain/'templates/main.thor').read_bytes())
+        for launcher in launchers:
+            name = 'sample-'+launcher.name
+            for command in (['--version'], ['new', name]):
+                result = subprocess.run([str(launcher), *command], env=self.environment,
+                                        cwd=self.root, capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+            self.assertEqual((self.root/name/(name+'.thor')).read_bytes(),
+                             (self.toolchain/'templates/main.thor').read_bytes())
+            help_result = subprocess.run([str(launcher), '--help'], env=self.environment,
+                                         cwd=self.root, capture_output=True, text=True, timeout=10)
+            self.assertEqual(help_result.returncode, 0, help_result.stderr)
+            self.assertIn('thor-python', help_result.stdout)
         binary.unlink()
-        missing = subprocess.run([str(launcher), '--version'], env=self.environment,
-                                 cwd=self.root, capture_output=True, text=True, timeout=10)
-        self.assertEqual(missing.returncode, 127, missing.stderr)
-        self.assertIn('cargo build --release', missing.stderr)
+        for launcher in launchers:
+            missing = subprocess.run([str(launcher), '--version'], env=self.environment,
+                                     cwd=self.root, capture_output=True, text=True, timeout=10)
+            self.assertEqual(missing.returncode, 127, missing.stderr)
+            self.assertIn('cargo build --release', missing.stderr)
         self.assertFalse(self.log.exists())
 
 

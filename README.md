@@ -1,12 +1,10 @@
 # Thor
 
-Both the Python `thor` launcher and the independent experimental `thor-rust`
-launcher are available. The Rust implementation passes the current macOS
-reference corpus. See the [migration status and comparison commands](docs/rust-migration.md).
-The [readiness audit and optimization plan](docs/rust-migration.md#readiness-audit-and-optimization-plan-2026-11-10)
-records the native installation checks and remaining performance work before cutover.
-The [structural optimization results](docs/rust-migration.md#structural-optimization-pass-2026-11-10)
-record the first five performance steps and the remaining one-second target.
+`thor` runs the prebuilt Rust compiler. `thor-rust` selects the same implementation,
+and `thor-python` keeps the Python reference available for comparisons. The current
+acceptance corpus is verified on macOS arm64. See the
+[migration status and comparison commands](docs/rust-migration.md) and the
+[latest performance measurements](docs/rust-migration.md#native-optimization-follow-up-2026-11-11).
 
 ![Thor](assets/branding/logo-slim.png)
 
@@ -37,14 +35,19 @@ with filtered compile-time fixed arrays and one-level `..` unpacking. See the
 
 ## Run the demo
 
-Requirements: Python 3.10+ and `odin` on `PATH`. The first invocation builds and
-caches the small Odin frontend automatically; no Python packages are required.
-Publishing PNG/ICO application icons additionally uses Pillow; see
-[application publishing](docs/publishing.md).
+Requirements are `odin` on `PATH` and a release compiler built with Rust 1.85+
+and Cargo. Build it once after checkout and rebuild after editing Rust compiler
+sources. The launcher executes the existing binary directly. The first invocation
+builds and caches the small Odin frontend automatically.
 
 ```sh
+cargo build --release --locked --manifest-path rust/Cargo.toml
 ./thor run demo
 ```
+
+Python 3.10+ is needed for the reference compiler and Python development tools.
+The reference publisher uses Pillow for PNG/ICO icons. See
+[application publishing](docs/publishing.md).
 
 [demo/main.thor](demo/main.thor) has a labeled section for every completed task,
 with assertions, ordinary Odin code, imported packages, and evaluation-order

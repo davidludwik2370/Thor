@@ -104,6 +104,8 @@ class ProjectTemplateTests(unittest.TestCase):
             project=root/'parent with spaces/custom'
             self.assertEqual((project/'custom.thor').read_bytes(),content)
             self.assertIn('/custom.exe',(project/'.gitignore').read_text())
+            self.assertIn('.thor-build/',(project/'.gitignore').read_text())
+            self.assertIn('.thor-rust-build/',(project/'.gitignore').read_text())
             for task in json.loads((project/'.vscode/tasks.json').read_text())['tasks']:
                 self.assertEqual(task['args'][-2:],['--odin',odin])
 

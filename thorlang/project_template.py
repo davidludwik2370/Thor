@@ -31,7 +31,7 @@ def project_files(name, starter, odin=None, *, gitignore=False):
             'cwd': '${workspaceFolder}', 'args': [], 'preLaunchTask': 'build-thor-debug'}]},
     }
     if gitignore:
-        files['.gitignore'] = (f'.vscode/bin/\n.thor-build/\n.thor-cache/\n*.dSYM/\n'
+        files['.gitignore'] = (f'.vscode/bin/\n.thor-build/\n.thor-rust-build/\n.thor-cache/\n*.dSYM/\n'
                                f'/{name}\n/{name}.exe\n/{name}.app/\n')
     return {path: content if isinstance(content, (str, bytes)) else json.dumps(content, indent=2) + '\n'
             for path, content in files.items()}

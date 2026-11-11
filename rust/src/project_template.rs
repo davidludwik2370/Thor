@@ -43,7 +43,7 @@ pub fn project_files(
         (PathBuf::from(".vscode/launch.json"), encode(&launch)),
     ]);
     if gitignore {
-        files.insert(PathBuf::from(".gitignore"),format!(".vscode/bin/\n.thor-build/\n.thor-cache/\n*.dSYM/\n/{name}\n/{name}.exe\n/{name}.app/\n").into_bytes());
+        files.insert(PathBuf::from(".gitignore"),format!(".vscode/bin/\n.thor-build/\n.thor-rust-build/\n.thor-cache/\n*.dSYM/\n/{name}\n/{name}.exe\n/{name}.app/\n").into_bytes());
     }
     files
 }

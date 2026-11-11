@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
-from thorlang.driver import main
-
-raise SystemExit(main())
+#!/bin/sh
+set -eu
+thor_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$thor_root/thor-rust" "$@"

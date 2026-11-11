@@ -8,15 +8,27 @@ checkout; there is one physical copy.
 
 ## Installation and projects
 
-The installation owns `thor`, `mkthor`, `thorlang/`, `frontend/`, `tls/`, library
+The installation owns `thor`, `thor-rust`, `thor-python`, `mkthor`, `thorlang/`, `frontend/`, `tls/`, library
 sources under `runtime/`, the editable starter under `templates/`, and common library output under `lib/`. The frontend
 binary and the toolchain's own parsing data live in its `.thor-cache/`.
 
+`thor` and `thor-rust` launch the release executable in
+`rust/target/release/thor-rust`. Build it after checkout and rebuild after editing
+Rust compiler sources.
+
+```sh
+cargo build --release --locked --manifest-path rust/Cargo.toml
+```
+
+The launchers run the prebuilt executable directly. `thor-python` selects the
+Python reference compiler. The current native acceptance corpus is verified on
+macOS arm64. See [migration status](docs/rust-migration.md).
+
 Each project owns its `.thor-cache/` (parser packets, compile-time results and
-dependency records), `.thor-build/` (generated application code), executable,
+dependency records), `.thor-rust-build/` (native generated application code), executable,
 and debug maps. `--cache-dir` and `THOR_CACHE_DIR` can override the project cache
 root explicitly. Ordinary project caching does not write into the toolchain's
-parser cache.
+parser cache. Python uses `.thor-build/` for generated application code.
 
 The shell PATH includes `~/Thor`. New project setup is:
 
@@ -39,9 +51,9 @@ executable: `.app` on macOS, `.zip` on Windows and `.tar.gz` on Linux. It discov
 `assets/icon.png` or `assets/icon.ico`, includes `assets/`, and accepts optional
 `[publish]` settings in `thor.toml`. GUI launch mode is the default; use
 `--app-type console` to request a terminal. PNG/ICO conversion uses the optional
-Pillow package (`python3 -m pip install Pillow`); Python 3.10 additionally needs
-`tomli` to read TOML. None of these packages are needed by ordinary compilation
-or by the published executable. See [publishing](docs/publishing.md) for native
+Pillow package (`python3 -m pip install Pillow`) when using `thor-python`.
+That reference compiler additionally needs `tomli` on Python 3.10 to read TOML.
+The Rust publisher reads TOML and converts icons directly. See [publishing](docs/publishing.md) for native
 tool requirements, extra resources, dependencies and resource lookup.
 
 ## Common libraries
@@ -51,11 +63,16 @@ they are not copied or regenerated per project. Imported runtime test files are
 excluded from the common view; the runtime's own native test commands still run
 them normally.
 
-`basic.thor` has a project-independent generic translation. Thor prepares it in
+The Python reference prepares a project-independent generic translation of
+`basic.thor` in
 a versioned `lib/runtime-…-basic/` directory and reuses the same output across
 projects. The version derives from compiler/frontend/library inputs, not user
 project sources. Ordinary native `when` conditions and generic procedures remain
 for Odin to specialize. The translation's common source map lives beside it.
+
+The native compiler links unchanged Odin runtime packages through a shared
+`lib/runtime-rust-…/` view. Imported Thor library sources and required checked SDK
+adaptations are lowered with the project into its generated tree.
 
 Thor evaluation, configuration-dependent source selection, edited library
 overlays and checked procedure variants are not treated as common output.
