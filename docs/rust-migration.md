@@ -296,6 +296,22 @@ specialization tracking. Both engines passed the 64-call regression at runtime
 and under `#run` in debug and unchecked release, and identify an impure leaf
 through the calling `fn`.
 
+### Original-suite replay
+
+The acceptance batches and corrected reruns account for all 1,854 current
+original test methods with passing results. This includes the 176-test final
+TLS group, all 41 live CodeLLDB cases, and Finder launching a published app
+with each engine. Both engines also built all 19 copied projects, with the
+original Thor source hashes unchanged. The initial runs exposed the diagnostic
+and structure-of-arrays metadata issues documented above, which passed their
+corrected focused and integration reruns.
+
+The reference fixture runner now selects Python explicitly, including when
+`THOR_TEST_COMPILER` selects Rust for the original suite. A harness regression
+checks both command paths. Rust-specific differential and protocol acceptance
+continues separately; these original-suite results are not a claim of complete
+migration acceptance.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

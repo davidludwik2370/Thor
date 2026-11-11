@@ -4,6 +4,31 @@ from tools.compare_compilers import Observation, canonical_diagnostics, classify
 
 
 class CompilerComparisonTests(unittest.TestCase):
+    def test_reference_fixtures_keep_python_when_the_original_suite_selects_rust(self):
+        from pathlib import Path
+        import subprocess
+        from unittest.mock import patch
+        from tests import test_rust_reference as reference
+
+        class BorrowedReferenceCase(unittest.TestCase):
+            invoke = reference.RustReferenceTests.invoke
+
+        case = BorrowedReferenceCase()
+        self.addCleanup(case.doCleanups)
+        calls = []
+
+        def run(arguments, **kwargs):
+            calls.append(arguments)
+            return subprocess.CompletedProcess(arguments, 0, '', '')
+
+        native = Path('/selected/native-compiler')
+        with patch.object(reference.base, 'THOR', native), \
+                patch.object(reference.rust, 'RUST', native), \
+                patch.object(reference.subprocess, 'run', side_effect=run):
+            case.invoke('package main\nmain::proc(){}\n')
+        self.assertEqual([call[0] for call in calls], [str(reference.rust.ROOT/'thor'), str(native)])
+        self.assertFalse(hasattr(case, 'compiler'))
+
     def observation(self, status=0, stdout='', diagnostics=None, stderr='', timeout=False, toolchain_failure=False):
         return Observation(status, stdout, diagnostics or [], stderr, 0.0, timeout,toolchain_failure)
 

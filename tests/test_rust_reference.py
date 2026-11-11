@@ -5,6 +5,7 @@ An unsupported status fails a selected fixture just like any other mismatch.
 """
 import subprocess
 import unittest
+from unittest.mock import patch
 
 from tests import test_thor as base
 from tests import test_rust_compiler as rust
@@ -26,9 +27,10 @@ class RustReferenceTests(unittest.TestCase):
 
     def invoke(self, source, *, files=None, command='run', fail=None, flags=(),
                args=(), expected=None, directory=False):
-        root, reference = base.ThorTests.invoke(self, source, files=files, command=command,
-                                                fail=fail, flags=flags, args=args,
-                                                expected=expected, directory=directory)
+        with patch.object(self, 'compiler', rust.ROOT/'thor', create=True):
+            root, reference = base.ThorTests.invoke(self, source, files=files, command=command,
+                                                   fail=fail, flags=flags, args=args,
+                                                   expected=expected, directory=directory)
         entry = root/'input/main.thor'
         before = {p:p.read_bytes() for p in (root/'input').rglob('*') if p.is_file()}
         argv = [str(rust.RUST), command, str(entry.parent if directory else entry),
