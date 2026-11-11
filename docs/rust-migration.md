@@ -2,24 +2,117 @@
 
 The independent Rust implementation now passes the current reference acceptance
 corpus on macOS arm64. Type resolution, purity, compile-time execution and result
-caching are connected to the normal commands. Both `thor` and `thor-rust` remain
-available, and Python is the supported default.
+caching are connected to the normal commands. `thor` now launches the prebuilt
+Rust compiler. `thor-rust` selects the same implementation, and `thor-python`
+retains the reference compiler.
 
 Rust remains experimental for inputs outside the verified corpus and native
 Windows/Linux hosts. Explicit migration guards still fail with exit status `3`.
-The readiness/performance audit below records the remaining cutover work.
+The measurements below record the remaining performance exception.
 
 The reference baseline is commit `ca2df99`, also tagged
 `rust-migration-baseline-2026-11-08`. The Python implementation remains in
-`thorlang/` and the `thor` launcher. The independent Rust crate is in `rust/`;
-`thor-rust` builds its release binary and launches it. It never runs the Python
-compiler, including for unsupported syntax.
+`thorlang/` and the `thor-python` launcher. The independent Rust crate is in
+`rust/`. Build its release binary explicitly before using the native launchers.
+Unsupported syntax produces a native diagnostic or migration guard.
+
+## Native optimization follow-up, 2026-11-11
+
+The remaining structural work covers parser-cache loading, repeated permission
+analysis and bounded independent work. The release launcher now executes the
+prebuilt compiler directly. Rebuild it after changes to Rust compiler sources.
+
+```sh
+cargo build --release --locked --offline --manifest-path rust/Cargo.toml
+./thor run .
+./thor-python run .
+```
+
+Parser cache validation hashes the stored JSON payload directly through
+`serde_json::RawValue`. Existing canonical v1 packets remain readable. The cache
+continues to store raw frontend output, with schema/checksum validation and
+reparsing on corruption. Normalization builds role/list indexes while borrowing
+node metadata, avoiding a deep copy of every row.
+
+Within a command, completed slice checks can be reused when the source views,
+collections, flags, editor mode, evaluated constants, generic bindings and
+contextual type witnesses match. Helpers analyze their own retained declarations.
+Discovery retries as soon as missing SDK metadata is encountered. Partial facts
+are discarded. Each analysis also caches fully resolved type/field metadata with
+its substitutions, independently of the mutable alias/provenance graph.
+
+The shared syntax indexes now include possible `using` owners and expression
+names. Library identity, primitive qualification and builtin-shadow checks use
+indexed imports. Filesystem canonicalization is cached within each resolver.
+Syntax-tag comparisons with literals use direct tag tests and retain unknown
+frontend tag spellings.
+
+Independent source parsing and source-map serialization use up to four workers
+by default. `THOR_JOBS=1` selects serial execution. Positive overrides are bounded
+at 32 workers. Results and diagnostics follow input order, and files are published
+after generation succeeds. Profile `worker_stages` accumulate worker durations.
+Overlapping work can make their sum exceed elapsed command time.
+
+The measured figures below are medians and nearest-rank p95 from 25 quiet, warm,
+unprofiled transpile subprocesses. Final Odin compilation is excluded. The
+separate instrumented invocation supplies counters and attribution. The previous
+column records the preceding structural pass. Full samples, source hashes,
+cache counters and compiler fingerprint are available in the
+[measurement record](rust-performance-native.json).
+
+| Project/mode | Previous median | Native median | Native p95 |
+| --- | ---: | ---: | ---: |
+| Minimal program | 0.020 s | 0.019 s | 0.020 s |
+| `double_bet` | 0.378 s | 0.219 s | 0.222 s |
+| `poker` | 1.697 s | 0.617 s | 0.640 s |
+| `hilo` | 0.709 s | 0.304 s | 0.311 s |
+| `Dijkstra` | 0.805 s | 0.304 s | 0.308 s |
+| `circles_on_dots` | 1.017 s | 0.425 s | 0.435 s |
+| `poker`, test mode | — | 1.174 s | 1.186 s |
+| `circles_on_dots`, test mode | — | 0.407 s | 0.414 s |
+
+The one-second goal is met by the six regular-build cases and the circles test
+case in this sample. Poker test mode includes four project sources and remains
+above target. Its remaining costs include permission analysis, SDK inspection,
+resolver setup and destruction of the parsed graph. A parallel source-destruction
+experiment increased elapsed time and was removed.
+
+The native launcher retains `.thor-rust-build/<source>` as its default generated
+directory. Python retains `.thor-build/<source>`. Both keep project caches local
+and use the current working directory's name/location for the executable.
+`--output-dir` overrides the generated directory. After Rust compiler edits, run
+the Cargo build above before invoking `thor`. A missing native executable produces
+the build command and exits with status 127.
+
+A runtime-only edit to a copied `circles_on_dots` source retained all three
+prepared evaluation results, with zero cache misses, writes or helper
+preparations. The original user projects were verified unchanged after building
+fresh copies of all 19 with each engine.
+
+The warm `--version` subprocess median is 0.0122 seconds, including the shell
+wrappers. Direct binary startup measures 0.0025 seconds. Each figure uses 25 samples. `new --gitignore`
+now includes both generated directories.
+
+The full 1,358-method Rust integration corpus was exercised in two groups. The
+initial run had one five-second evaluation-helper timeout and one skipped Finder
+launch test. The complete 27-method evaluation group passed a clean rerun, and
+the affected nested-call test passed 20 consecutive repetitions. The Finder test
+passed separately with LaunchServices enabled. The cause of the initial timeout
+remains unconfirmed, and the execution deadline remains unchanged.
+
+The gate also passed 39 reference installation/comparison/assertion-hygiene
+checks, 161 stdio TLS checks and all 41 live CodeLLDB checks. After the default
+launcher changed, 49 installation/template/permission/TLS checks and three
+app-launch/live-debugger checks passed. Both debug and release Rust unit runs
+passed all 44 checks, and all-target Clippy passed with warnings denied. Native
+CLI smoke checks exercised `new`, `transpile`, `check`, `build`, `run`, `test`,
+`vet` and `publish`, including checked and assertion/bounds/type-assert-disabled
+execution, current-directory executable naming and the Python reference.
 
 ## Structural optimization pass, 2026-11-10
 
-The first five steps of the structural performance work are implemented. This
-pass preserves the language and keeps Python as the default/reference compiler.
-It introduces no changes to the Odin compiler or to user-program ownership.
+This checkpoint completed the first five structural performance steps. Python
+served as the default/reference compiler at that time.
 
 1. **Measurements.** Setting `THOR_PROFILE` to a file path writes a separate JSON
    report with stage times and counters. Normal compiler output is unchanged.
@@ -1820,18 +1913,18 @@ Other temporary-producer and arbitrary-precision lowering paths remain pending.
 
 ## Build and compare
 
-Requirements: Rust 1.85+, Cargo, and the existing Odin installation. The first
+Requirements are Rust 1.85+, Cargo and the existing Odin installation. The first
 Cargo build may need to download the dependencies pinned by `rust/Cargo.lock`.
-Subsequent launcher builds use the local dependency cache.
+Use `--offline` once they are cached. Rebuild explicitly after Rust source edits.
 
 ```sh
 cargo build --release --locked --manifest-path rust/Cargo.toml
 ./thor run examples/rust_migration
-./thor-rust run examples/rust_migration
+./thor-python run examples/rust_migration
 ./thor-rust --capabilities
 
 python3 -m unittest discover -s tests -p 'test_rust_*.py'
-THOR_TEST_COMPILER="$PWD/thor-rust" python3 -m unittest discover -s tests -t .
+THOR_TEST_COMPILER="$PWD/thor" python3 -m unittest discover -s tests
 python3 -m unittest tests.test_compiler_comparison
 cargo test --locked --manifest-path rust/Cargo.toml
 cargo test --release --locked --manifest-path rust/Cargo.toml
@@ -1839,10 +1932,12 @@ cargo clippy --all-targets --manifest-path rust/Cargo.toml -- -D warnings
 python3 -m unittest tests.test_assertion_hygiene
 ```
 
-`rust/target/release/thor-rust` runs directly without Cargo's startup check. Use
-that binary when measuring the compiler itself. No whole-project build cache or
-parallel lowering has been added. Threads only deliver/drain native subprocess
-pipes; they do not run compiler analyses concurrently.
+`thor` and `thor-rust` execute `rust/target/release/thor-rust` without a Cargo
+startup check. Use that binary directly when measuring the compiler itself.
+Independent package parsing and artifact serialization use bounded workers.
+`THOR_JOBS=1` selects serial execution. Completed compatible slice analyses can
+be reused within the current command, and project compile-time results remain
+cached across commands.
 
 Both compilers accept separate `--output-dir` and `--cache-dir` paths. Rust's
 default generated directory is `.thor-rust-build/<source>`, so comparisons do not

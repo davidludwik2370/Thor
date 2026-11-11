@@ -1,0 +1,2312 @@
+{
+  "date": "2026-11-11",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "binary_sha256": "519c85e561cdfd3db46440a6c86ef2097203ac48a78f4b6b864b2dc03340eaf0",
+  "runs_per_case": 25,
+  "scope": "Quiet sequential direct release-executable transpiles, four workers. First invocation and separate profile run excluded from warm medians and nearest-rank p95. Final Odin backend excluded. Shared SDK parser cache retained.",
+  "source_revision": "4ca6c59",
+  "optimization_revision": "5a524a2",
+  "worker_limit": 4,
+  "cases": [
+    {
+      "case": "simple",
+      "project": "simple",
+      "flags": [],
+      "source_sha256": {
+        "main.thor": "eee7dfff7203726db74d53d43de3fe907696e18861dd7d26cd8ad5caddfa07c0"
+      },
+      "initial": {
+        "seconds": 0.04350937498384155,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.01898412499576807,
+      "p95_seconds": 0.019985374994575977,
+      "max_seconds": 0.023794040986103937,
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 9,
+          "parser.cache_hits": 1,
+          "parser.nodes": 24,
+          "parser.source_requests": 1,
+          "permissions.analyses": 1,
+          "resolver.constructions": 2,
+          "resolver.index_builds": 1,
+          "resolver.index_reuses": 1
+        },
+        "elapsed_seconds": 0.015898583,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.75e-06,
+            "self_seconds": 1.75e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 5.83e-07,
+            "self_seconds": 5.83e-07
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 1.084e-06,
+            "self_seconds": 1.084e-06
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 2.042e-06,
+            "self_seconds": 2.042e-06
+          },
+          "analysis.discover_types": {
+            "calls": 1,
+            "inclusive_seconds": 1.708e-06,
+            "self_seconds": 1.708e-06
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 6.083e-06,
+            "self_seconds": 1.2490000000000002e-06
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 6.67e-07,
+            "self_seconds": 6.67e-07
+          },
+          "analysis.purity": {
+            "calls": 1,
+            "inclusive_seconds": 2.08e-07,
+            "self_seconds": 2.08e-07
+          },
+          "analysis.resolver_setup": {
+            "calls": 2,
+            "inclusive_seconds": 1.1792e-05,
+            "self_seconds": 1.1626e-05
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 2.333e-06,
+            "self_seconds": 2.333e-06
+          },
+          "analysis.using_projections": {
+            "calls": 2,
+            "inclusive_seconds": 1.66e-07,
+            "self_seconds": 1.66e-07
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.015897083,
+            "self_seconds": 7.445799999999947e-05
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.000103416,
+            "self_seconds": 0.000103416
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.000582291,
+            "self_seconds": 0.000565374
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 1.6917e-05,
+            "self_seconds": 1.6917e-05
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 5.25e-05,
+            "self_seconds": 4.0708000000000004e-05
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.001171375,
+            "self_seconds": 0.00042154400000000015
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.01138025,
+            "self_seconds": 0.01138025
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 9.2791e-05,
+            "self_seconds": 4.4291e-05
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 4.85e-05,
+            "self_seconds": 4.85e-05
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 2.8959e-05,
+            "self_seconds": 2.8959e-05
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.000163208,
+            "self_seconds": 4.1457999999999995e-05
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.01465125,
+            "self_seconds": 0.003107792
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {}
+      },
+      "previous_native_median_seconds": 0.019785875017987564,
+      "warm_seconds": [
+        0.023794040986103937,
+        0.019985374994575977,
+        0.019616459001554176,
+        0.019272125005954877,
+        0.019102332997135818,
+        0.018854708003345877,
+        0.01905295898905024,
+        0.01884070798405446,
+        0.018778041994664818,
+        0.01896145800128579,
+        0.01898412499576807,
+        0.01897433298290707,
+        0.018868416984332725,
+        0.0190292080224026,
+        0.019008917006431147,
+        0.018945832998724654,
+        0.01923708399408497,
+        0.01922716700937599,
+        0.019193957996321842,
+        0.01889041601680219,
+        0.018898958020145074,
+        0.018877374997828156,
+        0.018954333994770423,
+        0.01961437499267049,
+        0.01889166602632031
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "double_bet",
+      "project": "double_bet",
+      "flags": [],
+      "source_sha256": {
+        "double_bet.thor": "34a3fbcc53eec6723da8a2d226937a4d71ba7455d6685efc40f748210b291c1c"
+      },
+      "initial": {
+        "seconds": 0.22571391699602827,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.2187870829948224,
+      "p95_seconds": 0.22214999998686835,
+      "max_seconds": 0.22293754201382399,
+      "profile": {
+        "counters": {
+          "emit.files": 2,
+          "lookup.calls": 58579,
+          "lookup.canonical_path_resolutions": 4,
+          "lookup.import_directory_resolutions": 35,
+          "parallel.batches": 6,
+          "parallel.tasks": 25,
+          "parallel.workers": 18,
+          "parser.cache_hits": 27,
+          "parser.nodes": 35683,
+          "parser.source_requests": 27,
+          "permissions.analyses": 1,
+          "permissions.field_hits": 1,
+          "permissions.member_hits": 15,
+          "permissions.reuses": 1,
+          "permissions.type_hits": 44,
+          "resolver.constructions": 4,
+          "resolver.index_builds": 1,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.214365416,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.708e-06,
+            "self_seconds": 1.708e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 4.3417e-05,
+            "self_seconds": 4.3417e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.011291209,
+            "self_seconds": 0.010399084
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.007806334,
+            "self_seconds": 0.0016798339999999998
+          },
+          "analysis.discover_types": {
+            "calls": 1,
+            "inclusive_seconds": 0.007891042,
+            "self_seconds": 6.891699999999994e-05
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.026997083,
+            "self_seconds": 8.498000000002615e-06
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.166e-06,
+            "self_seconds": 1.166e-06
+          },
+          "analysis.purity": {
+            "calls": 2,
+            "inclusive_seconds": 9.17e-07,
+            "self_seconds": 9.17e-07
+          },
+          "analysis.resolver_setup": {
+            "calls": 4,
+            "inclusive_seconds": 0.0061292510000000005,
+            "self_seconds": 0.006128458999999999
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 0.000890916,
+            "self_seconds": 0.000890916
+          },
+          "analysis.using_projections": {
+            "calls": 4,
+            "inclusive_seconds": 7.92e-07,
+            "self_seconds": 7.92e-07
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.214361958,
+            "self_seconds": 0.051335082000000004
+          },
+          "emit.file": {
+            "calls": 2,
+            "inclusive_seconds": 0.031005292,
+            "self_seconds": 0.031005292
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.004137708,
+            "self_seconds": 0.004137708
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.010342375,
+            "self_seconds": 0.010315290999999999
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.073484584,
+            "self_seconds": 0.0009804600000000024
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011635792,
+            "self_seconds": 0.011635792
+          },
+          "parser.cache_validation": {
+            "calls": 4,
+            "inclusive_seconds": 0.024435666,
+            "self_seconds": 0.012485290999999999
+          },
+          "parser.decode": {
+            "calls": 4,
+            "inclusive_seconds": 0.011950375000000001,
+            "self_seconds": 0.011950375000000001
+          },
+          "parser.normalize": {
+            "calls": 4,
+            "inclusive_seconds": 0.004087835,
+            "self_seconds": 0.004087835
+          },
+          "parser.source": {
+            "calls": 4,
+            "inclusive_seconds": 0.029357875,
+            "self_seconds": 0.0008343740000000001
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.089542292,
+            "self_seconds": 0.05637075
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "emit.serialize": {
+            "calls": 2,
+            "inclusive_seconds": 0.002757041,
+            "self_seconds": 0.002757041
+          },
+          "parser.cache_validation": {
+            "calls": 23,
+            "inclusive_seconds": 0.084617709,
+            "self_seconds": 0.043499792
+          },
+          "parser.decode": {
+            "calls": 23,
+            "inclusive_seconds": 0.041117917000000004,
+            "self_seconds": 0.041117917000000004
+          },
+          "parser.normalize": {
+            "calls": 23,
+            "inclusive_seconds": 0.014261917000000002,
+            "self_seconds": 0.014261917000000002
+          },
+          "parser.source": {
+            "calls": 23,
+            "inclusive_seconds": 0.10198995500000002,
+            "self_seconds": 0.0031103289999999985
+          }
+        }
+      },
+      "previous_native_median_seconds": 0.37773391700466163,
+      "warm_seconds": [
+        0.2205170409870334,
+        0.22214999998686835,
+        0.2205969580099918,
+        0.2180834169848822,
+        0.2196421250118874,
+        0.2172727920114994,
+        0.21663020801497623,
+        0.2190460000128951,
+        0.21691891600494273,
+        0.21822137502022088,
+        0.217625457997201,
+        0.21905095898546278,
+        0.21579637497779913,
+        0.21725008398061618,
+        0.21898166701430455,
+        0.21910579199902713,
+        0.21907408299739473,
+        0.2200682090187911,
+        0.2187870829948224,
+        0.22293754201382399,
+        0.22040491699590348,
+        0.2173970419971738,
+        0.21765408301143907,
+        0.21524991700425744,
+        0.21734958299202845
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "poker",
+      "project": "poker",
+      "flags": [],
+      "source_sha256": {
+        "poker_test.thor": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255",
+        "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+        "simulation_test.thor": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50",
+        "poker.thor": "5cf074eafb7786ba7f2f15656079398f10d31a08bcea8989ede9490a2c49c269"
+      },
+      "initial": {
+        "seconds": 0.6329965000040829,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.6173170000256505,
+      "p95_seconds": 0.6396483330172487,
+      "max_seconds": 0.6437807499896735,
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 143969,
+          "lookup.canonical_path_resolutions": 12,
+          "lookup.import_directory_resolutions": 43,
+          "parallel.batches": 3,
+          "parallel.tasks": 354,
+          "parallel.workers": 12,
+          "parser.cache_hits": 355,
+          "parser.nodes": 120238,
+          "parser.source_requests": 355,
+          "permissions.analyses": 3,
+          "permissions.dependency_retries": 2,
+          "permissions.field_hits": 1044,
+          "permissions.member_hits": 599,
+          "permissions.reuses": 1,
+          "permissions.type_hits": 3541,
+          "resolver.constructions": 6,
+          "resolver.index_builds": 3,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.613279958,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.666e-06,
+            "self_seconds": 1.666e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 4.4166e-05,
+            "self_seconds": 4.4166e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.266334042,
+            "self_seconds": 0.09250570999999999
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.012710583,
+            "self_seconds": 0.00014483299999999873
+          },
+          "analysis.discover_types": {
+            "calls": 3,
+            "inclusive_seconds": 0.145380166,
+            "self_seconds": 0.145380166
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.352963791,
+            "self_seconds": 3.9500000000025626e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.042e-06,
+            "self_seconds": 1.042e-06
+          },
+          "analysis.purity": {
+            "calls": 4,
+            "inclusive_seconds": 1.751e-06,
+            "self_seconds": 1.751e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 6,
+            "inclusive_seconds": 0.061890792,
+            "self_seconds": 0.061814876
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.053039999000000004,
+            "self_seconds": 0.053039999000000004
+          },
+          "analysis.using_projections": {
+            "calls": 6,
+            "inclusive_seconds": 7.5916e-05,
+            "self_seconds": 7.5916e-05
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.613276709,
+            "self_seconds": 0.180870875
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.009240458,
+            "self_seconds": 0.009240458
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.003890541,
+            "self_seconds": 0.002659916
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 0.001230625,
+            "self_seconds": 0.001230625
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.036950875,
+            "self_seconds": 0.036915083
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.405809,
+            "self_seconds": 0.00271329299999995
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.014936583,
+            "self_seconds": 0.014936583
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.006978166,
+            "self_seconds": 0.0035300410000000003
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.003448125,
+            "self_seconds": 0.003448125
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.001288625,
+            "self_seconds": 0.001288625
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.008486042,
+            "self_seconds": 0.00021925099999999843
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.026596834,
+            "self_seconds": 0.0031742090000000008
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 354,
+            "inclusive_seconds": 0.373778209,
+            "self_seconds": 0.190690168
+          },
+          "parser.decode": {
+            "calls": 354,
+            "inclusive_seconds": 0.18308804100000003,
+            "self_seconds": 0.18308804100000003
+          },
+          "parser.normalize": {
+            "calls": 354,
+            "inclusive_seconds": 0.068849412,
+            "self_seconds": 0.068849412
+          },
+          "parser.source": {
+            "calls": 354,
+            "inclusive_seconds": 0.47783087,
+            "self_seconds": 0.035203249
+          }
+        }
+      },
+      "previous_native_median_seconds": 1.6971705830073915,
+      "warm_seconds": [
+        0.6215725000074599,
+        0.6184856669860892,
+        0.6168022910133004,
+        0.6180804159957916,
+        0.6127998750016559,
+        0.6150602090056054,
+        0.6118956659920514,
+        0.612617415987188,
+        0.6437807499896735,
+        0.6396483330172487,
+        0.6224192089866847,
+        0.6253891669912264,
+        0.6288134169881232,
+        0.6165858750173356,
+        0.6155869170033839,
+        0.6254649999900721,
+        0.6203998750133906,
+        0.6136384999845177,
+        0.614550792000955,
+        0.6127508750068955,
+        0.6152119580074213,
+        0.6144567090086639,
+        0.6244750419864431,
+        0.6271015410020482,
+        0.6173170000256505
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "hilo",
+      "project": "hilo",
+      "flags": [],
+      "source_sha256": {
+        "hilo.thor": "eab70c077b373ebf856b35fdc72b35bcab2a699e1516bfa127049865405f8504"
+      },
+      "initial": {
+        "seconds": 0.31236658402485773,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.30409650001092814,
+      "p95_seconds": 0.3105647499905899,
+      "max_seconds": 0.31185087500489317,
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 17942,
+          "lookup.canonical_path_resolutions": 18,
+          "lookup.import_directory_resolutions": 21,
+          "parallel.batches": 2,
+          "parallel.tasks": 104,
+          "parallel.workers": 8,
+          "parser.cache_hits": 105,
+          "parser.nodes": 73128,
+          "parser.source_requests": 105,
+          "permissions.analyses": 1,
+          "permissions.field_hits": 1,
+          "permissions.member_hits": 12,
+          "permissions.reuses": 1,
+          "permissions.type_hits": 175,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.298057583,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 0.000364625,
+            "self_seconds": 0.000364625
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 7.75e-06,
+            "self_seconds": 7.75e-06
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.084398875,
+            "self_seconds": 0.03785479099999999
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.0103185,
+            "self_seconds": 6.633300000000002e-05
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.09612875,
+            "self_seconds": 0.09612875
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.160925792,
+            "self_seconds": 1.3459000000021204e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 6.5e-06,
+            "self_seconds": 6.5e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 0.000923084,
+            "self_seconds": 0.000923084
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.022726541,
+            "self_seconds": 0.022718916
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 0.003502084,
+            "self_seconds": 0.003502084
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 7.625000000000001e-06,
+            "self_seconds": 7.625000000000001e-06
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.298054541,
+            "self_seconds": 0.109664499
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.004126042,
+            "self_seconds": 0.004126042
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.002879291,
+            "self_seconds": 0.0015635409999999999
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 0.00131575,
+            "self_seconds": 0.00131575
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.001102125,
+            "self_seconds": 0.001095626
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.171405875,
+            "self_seconds": 0.0017109989999999908
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011628708,
+            "self_seconds": 0.011628708
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.001822917,
+            "self_seconds": 0.0009480840000000001
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.000874833,
+            "self_seconds": 0.000874833
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.000352583,
+            "self_seconds": 0.000352583
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.002268583,
+            "self_seconds": 9.308299999999988e-05
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.016984167,
+            "self_seconds": 0.0030868760000000023
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 104,
+            "inclusive_seconds": 0.228314994,
+            "self_seconds": 0.11670578599999998
+          },
+          "parser.decode": {
+            "calls": 104,
+            "inclusive_seconds": 0.111609208,
+            "self_seconds": 0.111609208
+          },
+          "parser.normalize": {
+            "calls": 104,
+            "inclusive_seconds": 0.04568254100000001,
+            "self_seconds": 0.04568254100000001
+          },
+          "parser.source": {
+            "calls": 104,
+            "inclusive_seconds": 0.28747987399999997,
+            "self_seconds": 0.013482339000000017
+          }
+        }
+      },
+      "previous_native_median_seconds": 0.7086880409915466,
+      "warm_seconds": [
+        0.29980745899956673,
+        0.3046405839850195,
+        0.3035668749944307,
+        0.30608554198988713,
+        0.3086651250196155,
+        0.3052906670200173,
+        0.30730037498869933,
+        0.3010925840062555,
+        0.30409650001092814,
+        0.31185087500489317,
+        0.3075789579888806,
+        0.30204650000086986,
+        0.3038632500101812,
+        0.3027214169851504,
+        0.30188637500396,
+        0.30030508298659697,
+        0.3060972910025157,
+        0.30735820799600333,
+        0.30734679198940285,
+        0.3105647499905899,
+        0.30351645799237303,
+        0.303734249988338,
+        0.30377450000378303,
+        0.30429699999513105,
+        0.3026306669926271
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "Dijkstra",
+      "project": "Dijkstra",
+      "flags": [],
+      "source_sha256": {
+        "Dijkstra.thor": "0bb9a403fdacb02d8957f11356a09eaf403b57868e8ff9dca57d34d61a5590e5"
+      },
+      "initial": {
+        "seconds": 0.3103067500051111,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.3037514169991482,
+      "p95_seconds": 0.3075304160011001,
+      "max_seconds": 0.3123195410007611,
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 163091,
+          "lookup.canonical_path_resolutions": 4,
+          "lookup.import_directory_resolutions": 16,
+          "lookup.using_candidates": 234718,
+          "parallel.batches": 2,
+          "parallel.tasks": 19,
+          "parallel.workers": 7,
+          "parser.cache_hits": 20,
+          "parser.nodes": 47452,
+          "parser.source_requests": 20,
+          "permissions.analyses": 1,
+          "permissions.field_hits": 83,
+          "permissions.member_hits": 681,
+          "permissions.reuses": 1,
+          "permissions.type_hits": 735,
+          "projection.reference_visits": 3100,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.303149,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.625e-06,
+            "self_seconds": 1.625e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 2.6126e-05,
+            "self_seconds": 2.6126e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.09037375,
+            "self_seconds": 0.041178166
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.01188875,
+            "self_seconds": 0.0002169159999999993
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.067865125,
+            "self_seconds": 0.067865125
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.166489625,
+            "self_seconds": 6.833000000011635e-06
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.042e-06,
+            "self_seconds": 1.042e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 1.125e-06,
+            "self_seconds": 1.125e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.03038846,
+            "self_seconds": 0.018063834
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 0.031744,
+            "self_seconds": 0.031744
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.012324626000000002,
+            "self_seconds": 0.012324626000000002
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.303145208,
+            "self_seconds": 0.06987870799999998
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.017883292,
+            "self_seconds": 0.017883292
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.005928583,
+            "self_seconds": 0.0015163750000000004
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 0.004412208,
+            "self_seconds": 0.004412208
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.016413291,
+            "self_seconds": 0.013988541
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.210703875,
+            "self_seconds": 0.0014740410000000093
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011751375,
+            "self_seconds": 0.011751375
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.006343458,
+            "self_seconds": 0.003252083
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.003091375,
+            "self_seconds": 0.003091375
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.001173333,
+            "self_seconds": 0.001173333
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.007696958,
+            "self_seconds": 0.00018016700000000017
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.022562625,
+            "self_seconds": 0.003114292000000001
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 19,
+            "inclusive_seconds": 0.14149108400000004,
+            "self_seconds": 0.073710292
+          },
+          "parser.decode": {
+            "calls": 19,
+            "inclusive_seconds": 0.06778079200000002,
+            "self_seconds": 0.06778079200000002
+          },
+          "parser.normalize": {
+            "calls": 19,
+            "inclusive_seconds": 0.030734208999999995,
+            "self_seconds": 0.030734208999999995
+          },
+          "parser.source": {
+            "calls": 19,
+            "inclusive_seconds": 0.17817570800000002,
+            "self_seconds": 0.005950414999999999
+          }
+        }
+      },
+      "previous_native_median_seconds": 0.8049518750049174,
+      "warm_seconds": [
+        0.3025212500069756,
+        0.30177575000561774,
+        0.3051313750038389,
+        0.30411425000056624,
+        0.30353308300254866,
+        0.3037514169991482,
+        0.3123195410007611,
+        0.3036589580005966,
+        0.30471791699528694,
+        0.30167224997421727,
+        0.3025582919945009,
+        0.29997116699814796,
+        0.3065272080129944,
+        0.30535325000528246,
+        0.30231854200246744,
+        0.3036868330091238,
+        0.30531258301925845,
+        0.30723279202356935,
+        0.3057048339978792,
+        0.3059718750009779,
+        0.30043033297988586,
+        0.30146054198849015,
+        0.3075304160011001,
+        0.3062846660031937,
+        0.3036815839877818
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "circles_on_dots",
+      "project": "circles_on_dots",
+      "flags": [],
+      "source_sha256": {
+        "cricles_on_dots.thor": "50b916158b50716793daee02d2d5dcc82aa34891788340c8fe31403c188cd8b5"
+      },
+      "initial": {
+        "seconds": 2.1811559579800814,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 3,
+            "writes": 3
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.425371792021906,
+      "p95_seconds": 0.43483974999981,
+      "max_seconds": 0.4608296249934938,
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 133902,
+          "lookup.canonical_path_resolutions": 35,
+          "lookup.import_directory_resolutions": 24,
+          "lookup.using_candidates": 34820,
+          "parallel.batches": 2,
+          "parallel.tasks": 29,
+          "parallel.workers": 8,
+          "parser.cache_hits": 30,
+          "parser.nodes": 68150,
+          "parser.source_requests": 30,
+          "permissions.analyses": 2,
+          "permissions.field_hits": 120,
+          "permissions.member_hits": 220,
+          "permissions.type_hits": 1768,
+          "projection.reference_visits": 3740,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.431747459,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 0.000136,
+            "self_seconds": 0.000136
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 2.4291999999999997e-05,
+            "self_seconds": 2.4291999999999997e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.091547375,
+            "self_seconds": 0.048425624
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.016492417,
+            "self_seconds": 8.308299999999769e-05
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.086892792,
+            "self_seconds": 0.086892792
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.190979792,
+            "self_seconds": 1.0833000000015636e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 4.166e-06,
+            "self_seconds": 4.166e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 0.001268292,
+            "self_seconds": 0.001268292
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.040137418,
+            "self_seconds": 0.027622293000000003
+          },
+          "analysis.slice_permissions": {
+            "calls": 2,
+            "inclusive_seconds": 0.041627583999999995,
+            "self_seconds": 0.041627583999999995
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.012515125,
+            "self_seconds": 0.012515125
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.431743708,
+            "self_seconds": 0.10338837499999998
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.007024916,
+            "self_seconds": 0.007024916
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.003081542,
+            "self_seconds": 0.001678459
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 0.001403083,
+            "self_seconds": 0.001403083
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.080447834,
+            "self_seconds": 0.077916667
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.308639875,
+            "self_seconds": 0.0020066659999999348
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011458458,
+            "self_seconds": 0.011458458
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.004261958,
+            "self_seconds": 0.002191958
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.00207,
+            "self_seconds": 0.00207
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.000727125,
+            "self_seconds": 0.000727125
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.005142208,
+            "self_seconds": 0.00015312499999999962
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.019715458,
+            "self_seconds": 0.0031147920000000016
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 29,
+            "inclusive_seconds": 0.21145204100000003,
+            "self_seconds": 0.108710624
+          },
+          "parser.decode": {
+            "calls": 29,
+            "inclusive_seconds": 0.10274141700000002,
+            "self_seconds": 0.10274141700000002
+          },
+          "parser.normalize": {
+            "calls": 29,
+            "inclusive_seconds": 0.04512938,
+            "self_seconds": 0.04512938
+          },
+          "parser.source": {
+            "calls": 29,
+            "inclusive_seconds": 0.2654678770000001,
+            "self_seconds": 0.008886455999999996
+          }
+        }
+      },
+      "previous_native_median_seconds": 1.0173400420171674,
+      "warm_seconds": [
+        0.4262232080218382,
+        0.4168415419990197,
+        0.42554162500891834,
+        0.42314079200150445,
+        0.43071091701858677,
+        0.42660962502122857,
+        0.43483974999981,
+        0.4608296249934938,
+        0.43089458299800754,
+        0.4178692909772508,
+        0.4200657500186935,
+        0.42328820799593814,
+        0.42335491700214334,
+        0.42496587499044836,
+        0.4210664170095697,
+        0.4345397500146646,
+        0.4274864159815479,
+        0.42056245799176395,
+        0.425371792021906,
+        0.4231109580141492,
+        0.42809991698595695,
+        0.4254492499749176,
+        0.42636104198754765,
+        0.4204708749894053,
+        0.4229717080015689
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 3,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 3
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "poker-test",
+      "project": "poker",
+      "flags": [
+        "-build-mode:test"
+      ],
+      "source_sha256": {
+        "poker_test.thor": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255",
+        "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+        "simulation_test.thor": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50",
+        "poker.thor": "5cf074eafb7786ba7f2f15656079398f10d31a08bcea8989ede9490a2c49c269"
+      },
+      "initial": {
+        "seconds": 1.1949686669977382,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 1.1739781250071246,
+      "p95_seconds": 1.1863236250064801,
+      "max_seconds": 1.1906414589902852,
+      "profile": {
+        "counters": {
+          "emit.files": 4,
+          "lookup.calls": 1520572,
+          "lookup.canonical_path_resolutions": 12,
+          "lookup.import_directory_resolutions": 104,
+          "parallel.batches": 6,
+          "parallel.tasks": 460,
+          "parallel.workers": 24,
+          "parser.cache_hits": 456,
+          "parser.nodes": 152185,
+          "parser.source_requests": 456,
+          "permissions.analyses": 3,
+          "permissions.dependency_retries": 2,
+          "permissions.field_hits": 3606,
+          "permissions.member_hits": 1738,
+          "permissions.reuses": 1,
+          "permissions.type_hits": 12015,
+          "resolver.constructions": 7,
+          "resolver.index_builds": 4,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 1.188205416,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.75e-06,
+            "self_seconds": 1.75e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 0.00033237399999999997,
+            "self_seconds": 0.00033237399999999997
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.691082709,
+            "self_seconds": 0.23162812700000002
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.0226675,
+            "self_seconds": 0.0007624999999999993
+          },
+          "analysis.discover_types": {
+            "calls": 4,
+            "inclusive_seconds": 0.177349332,
+            "self_seconds": 0.177349332
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.822203125,
+            "self_seconds": 5.004100000005618e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.167e-06,
+            "self_seconds": 1.167e-06
+          },
+          "analysis.purity": {
+            "calls": 5,
+            "inclusive_seconds": 2.2490000000000004e-06,
+            "self_seconds": 2.2490000000000004e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 7,
+            "inclusive_seconds": 0.101835959,
+            "self_seconds": 0.10176183600000001
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.310611708,
+            "self_seconds": 0.310611708
+          },
+          "analysis.using_projections": {
+            "calls": 7,
+            "inclusive_seconds": 7.412300000000001e-05,
+            "self_seconds": 7.412300000000001e-05
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 1.1882025,
+            "self_seconds": 0.2212326670000001
+          },
+          "emit.file": {
+            "calls": 4,
+            "inclusive_seconds": 0.06134904100000001,
+            "self_seconds": 0.06134904100000001
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.008964791,
+            "self_seconds": 0.008964791
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.033307083,
+            "self_seconds": 0.033105959000000004
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.929707208,
+            "self_seconds": 0.0037122099999998825
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011647167,
+            "self_seconds": 0.011647167
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.037262625,
+            "self_seconds": 0.025615458
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "emit.serialize": {
+            "calls": 4,
+            "inclusive_seconds": 0.009044334,
+            "self_seconds": 0.009044334
+          },
+          "parser.cache_validation": {
+            "calls": 456,
+            "inclusive_seconds": 0.487102085,
+            "self_seconds": 0.24600708
+          },
+          "parser.decode": {
+            "calls": 456,
+            "inclusive_seconds": 0.24109500499999997,
+            "self_seconds": 0.24109500499999997
+          },
+          "parser.normalize": {
+            "calls": 456,
+            "inclusive_seconds": 0.090936612,
+            "self_seconds": 0.090936612
+          },
+          "parser.source": {
+            "calls": 456,
+            "inclusive_seconds": 0.624423424,
+            "self_seconds": 0.046384727
+          }
+        }
+      },
+      "previous_native_median_seconds": null,
+      "warm_seconds": [
+        1.1676933329727035,
+        1.1652257919777185,
+        1.1854422079923097,
+        1.16901283399784,
+        1.1766889160207938,
+        1.179263166995952,
+        1.1682528330129571,
+        1.1680557499930728,
+        1.1729627499880735,
+        1.1788019170053303,
+        1.1640786250063684,
+        1.1731942089973018,
+        1.1752036249963567,
+        1.1745339589833748,
+        1.1619706670171581,
+        1.1729880420025438,
+        1.178995374997612,
+        1.1863236250064801,
+        1.1811368339986075,
+        1.1906414589902852,
+        1.1739781250071246,
+        1.1736716669984162,
+        1.1828732080175541,
+        1.1753909580002073,
+        1.16755195800215
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    },
+    {
+      "case": "circles_on_dots-test",
+      "project": "circles_on_dots",
+      "flags": [
+        "-build-mode:test"
+      ],
+      "source_sha256": {
+        "cricles_on_dots.thor": "50b916158b50716793daee02d2d5dcc82aa34891788340c8fe31403c188cd8b5"
+      },
+      "initial": {
+        "seconds": 2.192218874988612,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 0,
+            "misses": 3,
+            "writes": 3
+          },
+          "thor_prepared_hits": 0
+        }
+      },
+      "median_seconds": 0.4067170839989558,
+      "p95_seconds": 0.41441291698720306,
+      "max_seconds": 0.4147258329903707,
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 133902,
+          "lookup.canonical_path_resolutions": 35,
+          "lookup.import_directory_resolutions": 24,
+          "lookup.using_candidates": 34820,
+          "parallel.batches": 2,
+          "parallel.tasks": 29,
+          "parallel.workers": 8,
+          "parser.cache_hits": 30,
+          "parser.nodes": 68150,
+          "parser.source_requests": 30,
+          "permissions.analyses": 2,
+          "permissions.field_hits": 120,
+          "permissions.member_hits": 220,
+          "permissions.type_hits": 1768,
+          "projection.reference_visits": 3740,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.424726917,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 0.000130917,
+            "self_seconds": 0.000130917
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 3.1708e-05,
+            "self_seconds": 3.1708e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.079184958,
+            "self_seconds": 0.036173876
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.015997917,
+            "self_seconds": 8.404199999999945e-05
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.08806937399999999,
+            "self_seconds": 0.08806937399999999
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.179291333,
+            "self_seconds": 1.3499999999999623e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 4.042e-06,
+            "self_seconds": 4.042e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 0.00132125,
+            "self_seconds": 0.00132125
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.039353457999999994,
+            "self_seconds": 0.026415625
+          },
+          "analysis.slice_permissions": {
+            "calls": 2,
+            "inclusive_seconds": 0.043084291,
+            "self_seconds": 0.043084291
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.012937833000000003,
+            "self_seconds": 0.012937833000000003
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.424723958,
+            "self_seconds": 0.09332466700000003
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.007361292,
+            "self_seconds": 0.007361292
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.004797292,
+            "self_seconds": 0.0034837509999999998
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 0.001313541,
+            "self_seconds": 0.001313541
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.09032375,
+            "self_seconds": 0.08758604199999999
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.3103855,
+            "self_seconds": 0.0023744159999999903
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.012371541,
+            "self_seconds": 0.012371541
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.004544917,
+            "self_seconds": 0.002256334
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.002288583,
+            "self_seconds": 0.002288583
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.000751917,
+            "self_seconds": 0.000751917
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.005455292,
+            "self_seconds": 0.00015845799999999934
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.021013791,
+            "self_seconds": 0.003186958
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 29,
+            "inclusive_seconds": 0.21731691499999997,
+            "self_seconds": 0.110139375
+          },
+          "parser.decode": {
+            "calls": 29,
+            "inclusive_seconds": 0.10717754,
+            "self_seconds": 0.10717754
+          },
+          "parser.normalize": {
+            "calls": 29,
+            "inclusive_seconds": 0.04812733499999999,
+            "self_seconds": 0.04812733499999999
+          },
+          "parser.source": {
+            "calls": 29,
+            "inclusive_seconds": 0.27467424900000004,
+            "self_seconds": 0.009229999000000006
+          }
+        }
+      },
+      "previous_native_median_seconds": null,
+      "warm_seconds": [
+        0.4067170839989558,
+        0.39849654099089094,
+        0.401196249993518,
+        0.4039491250005085,
+        0.4147258329903707,
+        0.40734762500505894,
+        0.4092488749884069,
+        0.40659812500234693,
+        0.3985954579839017,
+        0.4058853329916019,
+        0.40192274999571964,
+        0.41193337499862537,
+        0.4072537909960374,
+        0.4098559170088265,
+        0.41441291698720306,
+        0.4139209589920938,
+        0.4113845840038266,
+        0.4050866669858806,
+        0.4086049999750685,
+        0.4140085410035681,
+        0.4043322920042556,
+        0.4042961670202203,
+        0.40427533400361426,
+        0.4046159579884261,
+        0.41297229201882146
+      ],
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 3,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 3
+      },
+      "all_warm_evaluation_cache_misses_zero": true,
+      "all_warm_evaluation_cache_writes_zero": true
+    }
+  ],
+  "runtime_only_edit": {
+    "case": "circles_on_dots runtime-only local added to main",
+    "cache": {
+      "thor_cache": {
+        "bypasses": 0,
+        "corrupt": 0,
+        "hits": 3,
+        "misses": 0,
+        "writes": 0
+      },
+      "thor_prepared_hits": 3
+    },
+    "first_edit_seconds": 0.47232495798380114,
+    "first_edit_cache": {
+      "thor_cache": {
+        "bypasses": 0,
+        "corrupt": 0,
+        "hits": 3,
+        "misses": 0,
+        "writes": 0
+      },
+      "thor_prepared_hits": 3
+    },
+    "helper_preparations": 0,
+    "original_copy_sha256": "50b916158b50716793daee02d2d5dcc82aa34891788340c8fe31403c188cd8b5",
+    "profile": {
+      "counters": {
+        "emit.files": 1,
+        "lookup.calls": 134011,
+        "lookup.canonical_path_resolutions": 35,
+        "lookup.import_directory_resolutions": 24,
+        "lookup.using_candidates": 34898,
+        "parallel.batches": 2,
+        "parallel.tasks": 29,
+        "parallel.workers": 8,
+        "parser.cache_hits": 30,
+        "parser.nodes": 68156,
+        "parser.source_requests": 30,
+        "permissions.analyses": 2,
+        "permissions.field_hits": 120,
+        "permissions.member_hits": 220,
+        "permissions.type_hits": 1770,
+        "projection.reference_visits": 3760,
+        "resolver.constructions": 5,
+        "resolver.index_builds": 2,
+        "resolver.index_reuses": 3
+      },
+      "elapsed_seconds": 0.436596166,
+      "engine": "rust",
+      "schema": 1,
+      "stages": {
+        "analysis.borrow_model": {
+          "calls": 1,
+          "inclusive_seconds": 0.00012925,
+          "self_seconds": 0.00012925
+        },
+        "analysis.contexts": {
+          "calls": 2,
+          "inclusive_seconds": 2.8542e-05,
+          "self_seconds": 2.8542e-05
+        },
+        "analysis.discover_calls": {
+          "calls": 1,
+          "inclusive_seconds": 0.093622916,
+          "self_seconds": 0.048434582000000004
+        },
+        "analysis.discover_expressions": {
+          "calls": 1,
+          "inclusive_seconds": 0.01649,
+          "self_seconds": 0.0001284170000000022
+        },
+        "analysis.discover_types": {
+          "calls": 2,
+          "inclusive_seconds": 0.08627291699999999,
+          "self_seconds": 0.08627291699999999
+        },
+        "analysis.inspect_sources": {
+          "calls": 1,
+          "inclusive_seconds": 0.19247325,
+          "self_seconds": 9.83400000001411e-06
+        },
+        "analysis.local_borrowing": {
+          "calls": 1,
+          "inclusive_seconds": 4.083e-06,
+          "self_seconds": 4.083e-06
+        },
+        "analysis.purity": {
+          "calls": 3,
+          "inclusive_seconds": 0.001401834,
+          "self_seconds": 0.001401834
+        },
+        "analysis.resolver_setup": {
+          "calls": 5,
+          "inclusive_seconds": 0.040982916999999994,
+          "self_seconds": 0.028356415999999995
+        },
+        "analysis.slice_permissions": {
+          "calls": 2,
+          "inclusive_seconds": 0.043967624999999996,
+          "self_seconds": 0.043967624999999996
+        },
+        "analysis.using_projections": {
+          "calls": 5,
+          "inclusive_seconds": 0.012626501000000002,
+          "self_seconds": 0.012626501000000002
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 0.436593333,
+          "self_seconds": 0.10233412599999997
+        },
+        "emit.file": {
+          "calls": 1,
+          "inclusive_seconds": 0.007674625,
+          "self_seconds": 0.007674625
+        },
+        "emit.publish": {
+          "calls": 1,
+          "inclusive_seconds": 0.003029709,
+          "self_seconds": 0.0017054589999999999
+        },
+        "emit.serialize": {
+          "calls": 1,
+          "inclusive_seconds": 0.00132425,
+          "self_seconds": 0.00132425
+        },
+        "evaluation.schedule": {
+          "calls": 1,
+          "inclusive_seconds": 0.082057958,
+          "self_seconds": 0.07960629
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.314092041,
+          "self_seconds": 0.002421415999999954
+        },
+        "parser.bootstrap": {
+          "calls": 1,
+          "inclusive_seconds": 0.011839708,
+          "self_seconds": 0.011839708
+        },
+        "parser.cache_validation": {
+          "calls": 1,
+          "inclusive_seconds": 0.004356875,
+          "self_seconds": 0.0021961669999999997
+        },
+        "parser.decode": {
+          "calls": 1,
+          "inclusive_seconds": 0.002160708,
+          "self_seconds": 0.002160708
+        },
+        "parser.normalize": {
+          "calls": 1,
+          "inclusive_seconds": 0.000763458,
+          "self_seconds": 0.000763458
+        },
+        "parser.source": {
+          "calls": 1,
+          "inclusive_seconds": 0.005263625,
+          "self_seconds": 0.0001432920000000006
+        },
+        "project.load": {
+          "calls": 1,
+          "inclusive_seconds": 0.020167166,
+          "self_seconds": 0.003063833000000002
+        }
+      },
+      "thor_version": "0.41.6",
+      "worker_stages": {
+        "parser.cache_validation": {
+          "calls": 29,
+          "inclusive_seconds": 0.21196954399999998,
+          "self_seconds": 0.10864446
+        },
+        "parser.decode": {
+          "calls": 29,
+          "inclusive_seconds": 0.103325084,
+          "self_seconds": 0.103325084
+        },
+        "parser.normalize": {
+          "calls": 29,
+          "inclusive_seconds": 0.04387724999999999,
+          "self_seconds": 0.04387724999999999
+        },
+        "parser.source": {
+          "calls": 29,
+          "inclusive_seconds": 0.264620203,
+          "self_seconds": 0.008773409000000003
+        }
+      }
+    }
+  },
+  "launcher_startup": {
+    "direct": {
+      "samples_seconds": [
+        0.002794041996821761,
+        0.002685499988729134,
+        0.002543249982409179,
+        0.0025057499879039824,
+        0.0025417500000912696,
+        0.002555749990278855,
+        0.0025532089930493385,
+        0.0026333330024499446,
+        0.0026351669803261757,
+        0.0024711249861866236,
+        0.0026514170167502016,
+        0.0026988750032614917,
+        0.0025101669889409095,
+        0.0025204999838024378,
+        0.0024587910156697035,
+        0.00243237498216331,
+        0.0023999999975785613,
+        0.002441040996927768,
+        0.002405667008133605,
+        0.002408041007583961,
+        0.0025020420143846422,
+        0.002395707997493446,
+        0.0029274169937707484,
+        0.0031561249925289303,
+        0.006536875007441267
+      ],
+      "median_seconds": 0.0025417500000912696
+    },
+    "canonical_launcher": {
+      "samples_seconds": [
+        0.013036124990321696,
+        0.011997749999864027,
+        0.012335084000369534,
+        0.011958374991081655,
+        0.011824582994449884,
+        0.012292792001971975,
+        0.011924250022275373,
+        0.011791208002250642,
+        0.012251208012457937,
+        0.012011957995127887,
+        0.01722054200945422,
+        0.014795040973694995,
+        0.012293208012124524,
+        0.012242917000548914,
+        0.012037000007694587,
+        0.012200541998026893,
+        0.012098500010324642,
+        0.011879291996592656,
+        0.012322750000748783,
+        0.012313084007473662,
+        0.012434542004484683,
+        0.01213704198016785,
+        0.011835084005724639,
+        0.011903041013283655,
+        0.012353915983112529
+      ],
+      "median_seconds": 0.012200541998026893
+    }
+  },
+  "validation": {
+    "rust_integration_methods": 1358,
+    "initial_groups": [
+      {
+        "methods": 718,
+        "failures": 0,
+        "skipped": 0
+      },
+      {
+        "methods": 679,
+        "failures": 1,
+        "skipped": 1
+      }
+    ],
+    "additional_reference_installation_comparison_hygiene_methods": 39,
+    "clean_evaluation_group_rerun": {
+      "methods": 27,
+      "passed": true
+    },
+    "repeated_nested_evaluation_rerun": {
+      "repetitions": 20,
+      "passed": true
+    },
+    "finder_launch_services_rerun": {
+      "methods": 1,
+      "passed": true
+    },
+    "tls": {
+      "methods": 161,
+      "passed": true
+    },
+    "live_debugger": {
+      "methods": 41,
+      "passed": true
+    },
+    "final_default_launcher_integration": {
+      "methods": 49,
+      "passed": true
+    },
+    "final_native_app_launch_and_live_debugger": {
+      "methods": 3,
+      "passed": true
+    },
+    "rust_units_debug": {
+      "methods": 44,
+      "passed": true
+    },
+    "rust_units_release": {
+      "methods": 44,
+      "passed": true
+    },
+    "clippy_all_targets_warnings_denied": true,
+    "canonical_cli": {
+      "commands": [
+        {
+          "arguments": [
+            "new",
+            "sample",
+            "--gitignore"
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "transpile",
+            "."
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "check",
+            "."
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "build",
+            "."
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "run",
+            ".",
+            "-debug"
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "run",
+            ".",
+            "-o:speed",
+            "-disable-assert",
+            "-no-bounds-check",
+            "-no-type-assert"
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "test",
+            "."
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "vet",
+            "."
+          ],
+          "status": 0
+        },
+        {
+          "arguments": [
+            "publish",
+            ".",
+            "--app-type",
+            "console"
+          ],
+          "status": 0
+        }
+      ],
+      "engine": "rust",
+      "python_reference_passed": true,
+      "checked_and_unchecked_passed": true,
+      "default_executable_location_and_name_verified": true
+    },
+    "user_projects": {
+      "count": 19,
+      "engines": [
+        "python",
+        "rust"
+      ],
+      "original_source_hashes_unchanged": true,
+      "results": [
+        {
+          "name": "15_puzzle",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "Dijkstra",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "ascending_primes",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "big_num_demo",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "bin_tree",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "circles_on_dots",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "double_bet",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "hilo",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "life",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "md5",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "othello",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "poker",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "pythagorean_tripples",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "react_time",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "sandbox",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "sketch",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "sudoku",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "tetris",
+          "python_status": 0,
+          "rust_status": 0
+        },
+        {
+          "name": "triangle_solver",
+          "python_status": 0,
+          "rust_status": 0
+        }
+      ]
+    },
+    "unresolved_observations": [
+      "During simultaneous integration groups, one nested evaluation helper exceeded its default five-second execution deadline. The cause is unconfirmed. Its isolated 20 repetitions and the complete 27-method evaluation-group rerun passed. The deadline remains unchanged."
+    ],
+    "native_host_scope": "macOS arm64; Windows/Linux native hosts remain unverified"
+  },
+  "target_exceptions": [
+    {
+      "case": "poker-test",
+      "median_seconds": 1.1739781250071246,
+      "p95_seconds": 1.1863236250064801
+    }
+  ]
+}
