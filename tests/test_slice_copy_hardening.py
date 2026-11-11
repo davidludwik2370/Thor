@@ -229,6 +229,15 @@ read::proc(values:[]$T){copy:=values[0].value;_=copy}
         self.check('a :> []int{1};b:=[]int{2};write(soa_zip(a=a,b=b))',prefix)
         self.check('a :> []int{1};b:=[]int{2};write(soa_zip(a=b,b=a))',prefix,writable=False)
 
+    def test_explicit_mut_accepts_structure_of_arrays_slice_parameters(self):
+        prefix='write::proc(#mut values:#soa[]$T){values.a[0]=9}\n'
+        text=self.program('a:=[]int{1};write(soa_zip(a=a));if a[0]!=9{panic("write did not reach the column")}',prefix)
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):self.invoke(text,flags=flags)
+        self.check('a :> []int{1};write(soa_zip(a=a))',prefix,writable=False)
+        prefix='inspect::proc(#mut values:#soa[]$T){_=len(values)}\n'
+        self.check('a:=[]int{1};view :> soa_zip(a=a);inspect(view)',prefix,writable=False)
+
     def test_copies_and_clones_are_independent_at_runtime_with_assertions_disabled(self):
         prefix='''import "core:slice"
 import "thor:basic"

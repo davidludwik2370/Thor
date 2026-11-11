@@ -414,7 +414,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .role(*field, "type")
                     .map(|r| self.r.specialized_type(r, &bindings))
                     .unwrap_or(Type::Unknown);
-                if !matches!(base_type(&typ), Type::Slice(_)) {
+                if !matches!(base_type(&typ), Type::Slice(_) | Type::Soa(_)) {
                     continue;
                 }
                 if !ready {
@@ -425,10 +425,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     let direct_write = effect.reason == "modify slice elements"
                         && self.kind(operation) == "Index"
                         && self.role(operation, "expr").is_some_and(|expr| {
-                            matches!(base_type(&self.typ(expr, c)), Type::Slice(_))
+                            matches!(base_type(&self.typ(expr, c)), Type::Slice(_) | Type::Soa(_))
                         });
                     let direct_alias = effect.reason.starts_with("create a writable slice alias")
-                        && matches!(base_type(&self.typ(operation, c)), Type::Slice(_));
+                        && matches!(base_type(&self.typ(operation, c)), Type::Slice(_) | Type::Soa(_));
                     if !direct_write && !direct_alias {
                         continue;
                     }
@@ -1189,7 +1189,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         if !valid
                             || !matches!(
                                 base_type(&typ),
-                                Type::Slice(_) | Type::Unknown | Type::Generic
+                                Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic
                             )
                         {
                             self.facts
@@ -2707,7 +2707,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 if self.explicit.contains(name) {
                     if !matches!(
                         base_type(&self.values[v].typ),
-                        Type::Slice(_) | Type::Unknown | Type::Generic
+                        Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic
                     ) {
                         self.facts.invalid.insert(
                             r,

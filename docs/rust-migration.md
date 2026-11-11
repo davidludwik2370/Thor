@@ -282,6 +282,11 @@ Dynamic-width validation reports the width contract and its exact source span.
 The width diagnostic fixture now uses the selected compiler and passes for both
 engines. The native stdio test also covers an invalid unsaved width and recovery.
 
+Structure-of-arrays slice parameters now receive inferred `#mut` hints based on
+the affected column, and explicit `#mut` accepts those slice parameters. The
+fixtures check read-only and writable columns, unsaved recovery, and the
+explicit contract on both engines in debug and unchecked release.
+
 ### Deep pure call chains
 
 The native verifier walks pending procedures without recursing through every
