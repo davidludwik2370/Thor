@@ -48,11 +48,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut resolver = Resolver::new(&project.sources);
     let mut types = BTreeMap::new();
     let mut type_imports = BTreeMap::new();
-    for symbol in resolver
-        .symbols
-        .clone()
-        .into_iter()
+    let symbols = resolver.symbols.clone();
+    for symbol in symbols.iter()
         .filter(|symbol| symbol.name.starts_with("sample_"))
+        .cloned()
     {
         let source = &resolver.sources[symbol.reference.file];
         let at = Ref {

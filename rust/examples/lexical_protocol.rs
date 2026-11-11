@@ -95,7 +95,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .transpose()?
         .unwrap_or_else(|| json!({"kind":"integer","value":"7"}));
     let mut state = Specializations::default();
-    for (index, symbol) in resolver.symbols.clone().into_iter().enumerate() {
+    let symbols = resolver.symbols.clone();
+    for (index, symbol) in symbols.iter().cloned().enumerate() {
         let source = &resolver.sources[symbol.reference.file];
         if !source.node(symbol.scope).parent.is_some_and(|decl| {
             source

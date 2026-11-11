@@ -41,7 +41,7 @@ pub struct Scheduler<'p> {
 }
 impl<'p> Scheduler<'p> {
     pub fn new(project: &'p Project, timeout: Duration) -> Self {
-        let mut resolver = Resolver::with_flags(&project.sources, &project.options.flags);
+        let mut resolver = project.resolver();
         resolver.prepare_contexts();
         crate::lower::prime_logical_constants(&mut resolver);
         let cache_directory = project

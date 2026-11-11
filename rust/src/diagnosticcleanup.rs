@@ -287,7 +287,7 @@ pub(crate) fn clean(
         .map(|(text, original)| (text, tokens(text), original))
         .collect::<Vec<_>>();
     let mut resolver =
-        crate::semantics::Resolver::with_flags(&project.sources, &project.options.flags);
+        project.resolver();
     let runtime = project.options.root.join("runtime");
     let mut items = vec![];
     for (mut error, origin, purity_cause) in errors {

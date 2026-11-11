@@ -650,7 +650,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 };
                 let directory = directory.and_then(|path| std::fs::canonicalize(path).ok());
                 let mut names = std::collections::BTreeSet::new();
-                for symbol in &self.resolver.symbols {
+                for symbol in self.resolver.symbols.iter() {
                     if symbol.scope != NodeId(0) {
                         continue;
                     }

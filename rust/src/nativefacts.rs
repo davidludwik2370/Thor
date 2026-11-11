@@ -66,7 +66,7 @@ impl Project {
         if operands.is_empty() && !logical {
             return Ok(());
         }
-        let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        let mut resolver = self.resolver();
         let mut packages = BTreeSet::new();
         let mut seen = HashSet::new();
         for operand in operands {
@@ -119,7 +119,7 @@ impl Project {
         }) { return Ok(()); }
         let mut inspected = HashSet::new();
         loop {
-            let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+            let mut resolver = self.resolver();
             // Resolve the project's actual names. This follows type aliases and
             // selected signatures without traversing unrelated SDK bodies.
             for (file, source) in self.sources.iter().enumerate().filter(|(_, source)| {

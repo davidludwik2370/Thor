@@ -65,6 +65,11 @@ struct SourceFacts {
     sources: Vec<Source>,
     flags: Vec<String>,
 }
+#[derive(Clone)]
+struct IndexedSources {
+    sources: Vec<Source>,
+    index: crate::semantics::ResolverIndex,
+}
 pub struct Project {
     pub publish_layout: Option<String>,
     pub native_override: Option<Vec<String>>,
@@ -98,6 +103,7 @@ pub struct Project {
     type_probes: BTreeMap<crate::semantics::Ref, Vec<String>>,
     type_probe_imports: BTreeMap<usize, BTreeMap<String, String>>,
     source_facts: Option<SourceFacts>,
+    resolver_index: std::cell::RefCell<Option<IndexedSources>>,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -303,6 +309,7 @@ impl Project {
             type_probes: BTreeMap::new(),
             type_probe_imports: BTreeMap::new(),
             source_facts: None,
+            resolver_index: std::cell::RefCell::new(None),
             collections,
             common,
             file_entry,
@@ -422,6 +429,27 @@ impl Project {
         });
         Ok(())
     }
+    pub(crate) fn resolver(&self) -> Resolver<'_> {
+        Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index)
+    }
+    fn resolver_for<'a>(sources: &'a [Source], flags: &[String], index: &std::cell::RefCell<Option<IndexedSources>>) -> Resolver<'a> {
+        let cached = index.borrow();
+        if let Some(cached) = cached.as_ref().filter(|cached| {
+            cached.sources.len() == sources.len()
+                && cached.sources.iter().zip(sources).all(|(old, current)| {
+                    old.shares_syntax(current) && old.shared_native == current.shared_native
+                        && old.collection_roots == current.collection_roots
+                })
+        }) {
+            return Resolver::with_index(sources, flags, Some(&cached.index));
+        }
+        drop(cached);
+        let resolver = Resolver::with_flags(sources, flags);
+        *index.borrow_mut() = Some(IndexedSources {
+            sources:sources.to_vec(), index:resolver.syntax_index(),
+        });
+        resolver
+    }
     pub fn lower(&mut self) -> Result<PathBuf> {
         let _phase = crate::profile::span("lowering.total");
         let ready = self.source_facts.as_ref().is_some_and(|facts| {
@@ -438,7 +466,7 @@ impl Project {
         }
         self.schedule_evaluations()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
-        let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        let mut resolver = Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index);
         resolver.evaluated = self.evaluated.clone();
         resolver.prepare_contexts();
         if let Some(plan) = &self.evaluation {

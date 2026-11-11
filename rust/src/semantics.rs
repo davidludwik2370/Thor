@@ -4,6 +4,7 @@ use crate::ast::{NodeId, Source};
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 #[path = "logicalfacts.rs"]
 mod logicalfacts;
 #[path = "calls.rs"]
@@ -179,11 +180,22 @@ pub struct Symbol {
     pub result: bool,
     pub projection: Option<Projection>,
 }
+type ScopeTable = HashMap<(usize, NodeId), HashMap<String, Vec<usize>>>;
+/// Syntax-only state. Project snapshots may share this across flags and generic
+/// frames; evaluated types, conditions and using projections stay per resolver.
+#[derive(Clone)]
+pub(crate) struct ResolverIndex {
+    symbols: Arc<Vec<Symbol>>,
+    scopes: Arc<ScopeTable>,
+    names: Arc<namescope::NameIndex>,
+    markers: Arc<BTreeMap<(Ref, String), String>>,
+}
 pub struct Resolver<'a> {
     pub sources: &'a [Source],
-    pub symbols: Vec<Symbol>,
-    scopes: HashMap<(usize, NodeId), HashMap<String, Vec<usize>>>,
-    index: namescope::NameIndex,
+    pub symbols: Arc<Vec<Symbol>>,
+    scopes: Arc<ScopeTable>,
+    index: Arc<namescope::NameIndex>,
+    base: Option<ResolverIndex>,
     import_packages: RefCell<HashMap<(usize, String), Option<usize>>>,
     missing_packages: RefCell<BTreeSet<std::path::PathBuf>>,
     types: HashMap<Ref, Type>,
@@ -192,7 +204,7 @@ pub struct Resolver<'a> {
     conditions: RefCell<HashSet<Ref>>,
     pub context_hints: HashMap<Ref, ContextHint>,
     pub parameter_witnesses: BTreeMap<Ref, ParameterWitness>,
-    pub immutable_markers: BTreeMap<(Ref,String),String>,
+    pub immutable_markers: Arc<BTreeMap<(Ref,String),String>>,
     pub flags: Vec<String>,
     pub evaluated: BTreeMap<Ref, serde_json::Value>,
     pub logical_constants: BTreeMap<Ref,serde_json::Value>,
@@ -266,13 +278,20 @@ impl<'a> Resolver<'a> {
         Self::with_flags(sources, &[])
     }
     pub fn with_flags(sources: &'a [Source], flags: &[String]) -> Self {
+        Self::with_index(sources, flags, None)
+    }
+    pub(crate) fn syntax_index(&self) -> ResolverIndex {
+        self.base.as_ref().expect("prepared syntax index").clone()
+    }
+    pub(crate) fn with_index(sources: &'a [Source], flags: &[String], base: Option<&ResolverIndex>) -> Self {
         let _phase = crate::profile::span("analysis.resolver_setup");
         crate::profile::count("resolver.constructions", 1);
         let mut this = Self {
             sources,
-            symbols: vec![],
-            scopes: HashMap::new(),
-            index: namescope::NameIndex::new(sources),
+            symbols: base.map(|base| base.symbols.clone()).unwrap_or_default(),
+            scopes: base.map(|base| base.scopes.clone()).unwrap_or_default(),
+            index: base.map(|base| base.names.clone()).unwrap_or_else(|| Arc::new(namescope::NameIndex::new(sources))),
+            base: None,
             import_packages: RefCell::new(HashMap::new()),
             missing_packages: RefCell::new(BTreeSet::new()),
             types: HashMap::new(),
@@ -281,7 +300,7 @@ impl<'a> Resolver<'a> {
             conditions: RefCell::new(HashSet::new()),
             context_hints: HashMap::new(),
             parameter_witnesses: BTreeMap::new(),
-            immutable_markers: BTreeMap::new(),
+            immutable_markers: base.map(|base| base.markers.clone()).unwrap_or_default(),
             flags: flags.to_vec(),
             evaluated: BTreeMap::new(),
             logical_constants: BTreeMap::new(),
@@ -290,6 +309,8 @@ impl<'a> Resolver<'a> {
             bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
         };
+        if base.is_none() {
+        crate::profile::count("resolver.index_builds", 1);
         for (file, source) in sources.iter().enumerate() {
             if source.excluded {
                 continue;
@@ -395,17 +416,18 @@ impl<'a> Resolver<'a> {
                         result,
                         projection: None,
                     };
-                    this.scopes
+                    Arc::get_mut(&mut this.scopes).expect("fresh scope index")
                         .entry((file, owner))
                         .or_default()
                         .entry(name)
                         .or_default()
                         .push(this.symbols.len());
                     if owner == NodeId(0) {
-                        this.index.package_symbols[this.index.package_for[file]]
+                        let package = this.index.package_for[file];
+                        Arc::get_mut(&mut this.index).expect("fresh name index").package_symbols[package]
                             .entry(symbol.name.clone()).or_default().push(this.symbols.len());
                     }
-                    this.symbols.push(symbol);
+                    Arc::get_mut(&mut this.symbols).expect("fresh symbol index").push(symbol);
                 }
             }
         }
@@ -431,8 +453,11 @@ impl<'a> Resolver<'a> {
             let first=&this.symbols[ids[0]];let source=&sources[first.reference.file];
             let key=crate::digest::sha256(format!("{}{}",first.name,source.node(first.scope).span.start).as_bytes());
             let marker=format!("{}immutable_{}",source.prefix,&key[..12]);
-            for id in ids{let symbol=&this.symbols[*id];this.immutable_markers.insert((symbol.reference,symbol.name.clone()),marker.clone());}
+            for id in ids{let symbol=&this.symbols[*id];Arc::get_mut(&mut this.immutable_markers).expect("fresh marker index").insert((symbol.reference,symbol.name.clone()),marker.clone());}
         }
+        } else { crate::profile::count("resolver.index_reuses", 1); }
+        this.base = Some(ResolverIndex {symbols:this.symbols.clone(), scopes:this.scopes.clone(),
+            names:this.index.clone(), markers:this.immutable_markers.clone()});
         this.prepare_projections();
         this
     }
@@ -572,23 +597,9 @@ impl<'a> Resolver<'a> {
                     return None;
                 }
                 let field = source.role(reference.node, "field")?;
-                source
-                    .nodes
-                    .iter()
-                    .filter(|node| node.kind == "Import")
-                    .find_map(|node| {
-                        let path = crate::lower::unquote(&node.op).ok()?;
-                        let explicit = source.names.get(node.name);
-                        let name = if explicit.is_empty() {
-                            path.rsplit(['/', ':']).next().unwrap_or("")
-                        } else {
-                            explicit
-                        };
-                        if name == source.text(base) {
-                            self.package_symbol(reference.file, &path, source.text(field))
-                        } else {
-                            None
-                        }
+                self.index.imports[reference.file].get(source.text(base))
+                    .into_iter().flatten().find_map(|path| {
+                        self.package_symbol(reference.file, path, source.text(field))
                     })
             }
             "Paren" => self.symbol(Ref {
@@ -1861,5 +1872,46 @@ impl<'a> Resolver<'a> {
                 &mut seen.clone(),
             )
         })
+    }
+}
+
+#[cfg(test)]
+mod index_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn shared_indexes_do_not_cache_flag_selected_definitions() {
+        let raw = "when ODIN_DEBUG {N::1}else{N::2};N";
+        let a = raw.find("N::1").unwrap();
+        let b = raw.find("N::2").unwrap();
+        let end = raw.len();
+        let source = Source::from_frontend("/example.thor".into(), raw.into(), json!({
+            "nodes":[
+                {"kind":"File","start":0,"end":end,"parent":-1},
+                {"kind":"When","start":0,"end":end-2,"parent":0,
+                 "roles":{"cond":[5,15],"body":[a-1,a+5],"else":[b-1,b+5]}},
+                {"kind":"Ident","name":"ODIN_DEBUG","start":5,"end":15,"parent":1},
+                {"kind":"Block","start":a-1,"end":a+5,"parent":1},
+                {"kind":"Declaration","mutable":false,"start":a,"end":a+4,"parent":3,
+                 "lists":{"names":[[a,a+1]],"values":[[a+3,a+4]]}},
+                {"kind":"Ident","name":"N","start":a,"end":a+1,"parent":4},
+                {"kind":"Literal","op":"integer","start":a+3,"end":a+4,"parent":4},
+                {"kind":"Block","start":b-1,"end":b+5,"parent":1},
+                {"kind":"Declaration","mutable":false,"start":b,"end":b+4,"parent":7,
+                 "lists":{"names":[[b,b+1]],"values":[[b+3,b+4]]}},
+                {"kind":"Ident","name":"N","start":b,"end":b+1,"parent":8},
+                {"kind":"Literal","op":"integer","start":b+3,"end":b+4,"parent":8},
+                {"kind":"Ident","name":"N","start":end-1,"end":end,"parent":0}
+            ],"features":[],"edits":[],"selections":[]
+        }), true).expect("valid conditional syntax");
+        let sources = vec![source];
+        let site = Ref { file:0, node:NodeId(11) };
+        let flags = vec!["-debug".into()];
+        let debug = Resolver::with_flags(&sources, &flags);
+        let index = debug.syntax_index();
+        let release = Resolver::with_index(&sources, &[], Some(&index));
+        let restored = Resolver::with_index(&sources, &flags, Some(&index));
+        let values = (debug.constant_int(site), release.constant_int(site), restored.constant_int(site));
+        if values != (Some(1), Some(2), Some(1)) { panic!("shared index selected stale declarations: {values:?}"); }
     }
 }

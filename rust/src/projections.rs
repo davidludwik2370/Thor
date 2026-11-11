@@ -178,7 +178,7 @@ impl Resolver<'_> {
                             *symbol
                         } else {
                             let symbol = self.symbols.len();
-                            self.symbols.push(Symbol {
+                            Arc::make_mut(&mut self.symbols).push(Symbol {
                                 name: name.clone(),
                                 reference: entry.declaration,
                                 name_node: entry.owner.node,

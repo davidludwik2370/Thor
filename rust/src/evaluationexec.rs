@@ -192,7 +192,7 @@ impl Project {
         context: &crate::evaluation::Context<'_>,
         mode: crate::evaluation::Mode,
     ) -> Result<Self> {
-        let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+        let mut resolver = self.resolver();
         resolver.evaluated = context.results.clone();
         resolver.prepare_contexts();
         crate::specialization::Specializations::apply_bindings(context.bindings, &mut resolver);
@@ -356,6 +356,7 @@ impl Project {
             type_probes: BTreeMap::new(),
             type_probe_imports: BTreeMap::new(),
             source_facts: self.source_facts.clone(),
+            resolver_index: self.resolver_index.clone(),
         })
     }
     pub fn execute_evaluation(&self, expression: Ref, timeout: Duration) -> Result<Value> {
