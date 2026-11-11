@@ -34,7 +34,7 @@ struct ParsePacket<'a> {
     payload: &'a RawValue,
 }
 
-fn cached_payload(data: &[u8]) -> Option<Value> {
+fn cached_payload(data: &[u8]) -> Option<&[u8]> {
     let _phase = crate::profile::span("parser.cache_validation");
     let packet: ParsePacket<'_> = serde_json::from_slice(data).ok()?;
     if packet.version != 1
@@ -43,7 +43,7 @@ fn cached_payload(data: &[u8]) -> Option<Value> {
     {
         return None;
     }
-    decode(packet.payload.get().as_bytes()).ok()
+    Some(packet.payload.get().as_bytes())
 }
 
 fn decode(bytes: &[u8]) -> serde_json::Result<Value> {
@@ -212,8 +212,8 @@ impl Frontend {
         });
         if let Some(cache) = &cache {
             if let Ok(data) = fs::read(cache) {
-                if let Some(info) = cached_payload(&data) {
-                    if let Ok(source) = Source::from_frontend(path.clone(), raw.into(), info, thor)
+                if let Some(packet) = cached_payload(&data) {
+                    if let Ok(source) = Source::from_frontend_bytes(path.clone(), raw.into(), packet, thor)
                     {
                         crate::profile::count("parser.cache_hits", 1);
                         crate::profile::count("parser.nodes", source.nodes.len() as u64);
@@ -225,6 +225,7 @@ impl Frontend {
         let raw = raw.to_owned();
         crate::profile::count("parser.processes", 1);
         let (status, stdout, stderr) = self.run(&args, bytes)?;
+        if !status.success() {
         let info = decode(&stdout).map_err(|_| {
             Error::new(format!(
                 "invalid frontend output for {}: {}",
@@ -232,7 +233,6 @@ impl Frontend {
                 String::from_utf8_lossy(&stderr)
             ))
         })?;
-        if !status.success() {
             let mut errors = info["errors"].as_array().cloned().unwrap_or_default();
             for error in &mut errors {
                 if error["pos"]["file"].as_str() != path.to_str() {
@@ -284,7 +284,7 @@ impl Frontend {
                 exit_status: 1,
             });
         }
-        let source = Source::from_frontend(path, raw, info, thor)?;
+        let source = Source::from_frontend_bytes(path, raw, &stdout, thor)?;
         crate::profile::count("parser.nodes", source.nodes.len() as u64);
         if let Some(cache) = cache {
             // Persist only parser output. Normalization and semantic facts must
@@ -380,7 +380,7 @@ mod tests {
         let formatted = serde_json::to_string_pretty(&payload).unwrap();
         for raw in [canonical, formatted] {
             let stored = packet(&raw);
-            let restored = cached_payload(&stored);
+            let restored = cached_payload(&stored).and_then(|raw| serde_json::from_slice::<Value>(raw).ok());
             if restored != Some(payload.clone()) {
                 panic!("valid parser cache was rejected");
             }

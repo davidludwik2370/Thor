@@ -1,5 +1,6 @@
 //! Compact syntax tags; unknown future native tags preserve their spelling.
 use std::ops::Deref;
+use serde::{Deserialize, Deserializer};
 macro_rules! kinds {
     ($($kind:ident),* $(,)?) => {
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
@@ -46,6 +47,21 @@ impl Deref for Kind {
 impl std::fmt::Display for Kind {
     fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         out.write_str(self.as_str())
+    }
+}
+impl<'de> Deserialize<'de> for Kind {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct SyntaxKind;
+        impl serde::de::Visitor<'_> for SyntaxKind {
+            type Value = Kind;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a syntax kind name")
+            }
+            fn visit_str<E: serde::de::Error>(self, name: &str) -> Result<Kind, E> {
+                Ok(Kind::from(name))
+            }
+        }
+        deserializer.deserialize_str(SyntaxKind)
     }
 }
 

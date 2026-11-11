@@ -85,7 +85,34 @@ pub struct Node {
     pub name: NameId,
     pub mutable: bool,
     pub immutable: bool,
+    /// Extension metadata. Core syntax identity is stored in typed fields.
     pub data: Value,
+}
+
+#[derive(Default, Deserialize)]
+struct WireNode {
+    kind: Option<Kind>,
+    start: Option<usize>,
+    end: Option<usize>,
+    parent: Option<i64>,
+    op: Option<String>,
+    name: Option<String>,
+    mutable: Option<bool>,
+    roles: Option<Value>,
+    lists: Option<Value>,
+    #[serde(flatten)]
+    data: serde_json::Map<String, Value>,
+}
+#[derive(Deserialize)]
+struct WireSource {
+    nodes: Option<Vec<WireNode>>,
+    #[serde(flatten)]
+    info: serde_json::Map<String, Value>,
+}
+#[derive(Debug)]
+struct WireOverrides {
+    roles: Option<Value>,
+    lists: Option<Value>,
 }
 
 #[derive(Clone, Debug)]
@@ -125,6 +152,8 @@ pub struct SourceSyntax {
     pub prefix: String,
     pub excluded: bool,
     pub thor: bool,
+    protocol: Arc<[u8]>,
+    protocol_overrides: HashMap<NodeId, WireOverrides>,
     line_starts: Vec<usize>,
     by_span: HashMap<Span, Vec<NodeId>>,
     traversal: Vec<NodeId>,
@@ -138,35 +167,51 @@ impl Source {
     pub(crate) fn shares_syntax(&self, other: &Source) -> bool {
         Arc::ptr_eq(&self.syntax, &other.syntax)
     }
-    pub fn from_frontend(path: PathBuf, raw: String, mut info: Value, thor: bool) -> Result<Self> {
+    pub fn from_frontend(path: PathBuf, raw: String, info: Value, thor: bool) -> Result<Self> {
+        Self::from_frontend_bytes(path, raw, &serde_json::to_vec(&info)?, thor)
+    }
+    pub(crate) fn from_frontend_bytes(
+        path: PathBuf, raw: String, packet: &[u8], thor: bool,
+    ) -> Result<Self> {
+        let wire: WireSource = {
+            let _phase = crate::profile::span("parser.decode");
+            serde_json::from_slice(packet)?
+        };
         let _phase = crate::profile::span("parser.normalize");
-        let rows = info["nodes"]
-            .as_array_mut()
+        let mut info = Value::Object(wire.info);
+        let mut rows = wire.nodes
             .ok_or_else(|| Error::new("frontend omitted nodes"))?;
         if rows.is_empty() {
-            rows.push(serde_json::json!({"kind":"File","start":0,"end":raw.len(),"parent":-1}));
+            rows.push(WireNode {
+                kind: Some(Kind::File), start: Some(0), end: Some(raw.len()), parent: Some(-1),
+                ..WireNode::default()
+            });
         }
         let mut names = Names::default();
         let mut nodes = Vec::with_capacity(rows.len());
         let mut by_span: HashMap<Span, Vec<NodeId>> = HashMap::new();
-        for (i, row) in rows.iter_mut().enumerate() {
-            let start = row["start"]
-                .as_u64()
-                .ok_or_else(|| Error::new("invalid AST start"))? as usize;
-            let end = row["end"]
-                .as_u64()
-                .ok_or_else(|| Error::new("invalid AST end"))? as usize;
+        for (i, mut row) in rows.into_iter().enumerate() {
+            let start = row.start.ok_or_else(|| Error::new("invalid AST start"))?;
+            let end = row.end.ok_or_else(|| Error::new("invalid AST end"))?;
             let span = Span::new(start, end);
             if !span.is_valid_for(&raw) {
                 return Err(Error::new(format!("invalid AST byte span {start}..{end}")));
             }
-            let parent = row["parent"].as_i64().unwrap_or(-1);
+            let parent = row.parent.unwrap_or(-1);
             if parent >= i as i64 {
                 return Err(Error::new("invalid AST parent order"));
             }
             by_span.entry(span).or_default().push(NodeId(i));
+            for (key, value) in [("roles", row.roles.take()), ("lists", row.lists.take())] {
+                if let Some(value) = value {
+                    if !value.is_object() && !value.is_null() {
+                        return Err(Error::new(format!("invalid AST {key}")));
+                    }
+                    row.data.insert(key.into(), value);
+                }
+            }
             nodes.push(Node {
-                kind: row["kind"].as_str().unwrap_or("Other").into(),
+                kind: row.kind.unwrap_or(Kind::Other),
                 span,
                 parent: if parent < 0 {
                     None
@@ -177,11 +222,11 @@ impl Source {
                 roles: NodeFields::default(),
                 spans: NodeFields::default(),
                 lists: NodeFields::default(),
-                op: row["op"].as_str().unwrap_or("").into(),
-                name: names.intern(row["name"].as_str().unwrap_or("")),
-                mutable: row["mutable"].as_bool().unwrap_or(false),
+                op: row.op.unwrap_or_default(),
+                name: names.intern(row.name.as_deref().unwrap_or("")),
+                mutable: row.mutable.unwrap_or(false),
                 immutable: false,
-                data: std::mem::take(row),
+                data: Value::Object(row.data),
             });
         }
         for i in 1..nodes.len() {
@@ -189,6 +234,8 @@ impl Source {
                 nodes[parent.0].children.push(NodeId(i));
             }
         }
+        let mut changed_roles = vec![false; nodes.len()];
+        let mut changed_lists = vec![false; nodes.len()];
         for feature in info["features"].as_array().into_iter().flatten() {
             let start = feature["start"].as_u64().unwrap_or(0) as usize;
             let end = feature["end"].as_u64().unwrap_or(0) as usize;
@@ -209,6 +256,13 @@ impl Source {
                     nodes[id.0].data["pure"] = Value::Bool(true);
                 } else {
                     for (key, value) in feature.as_object().into_iter().flatten() {
+                        if matches!(key.as_str(), "roles" | "lists") {
+                            if !value.is_object() && !value.is_null() {
+                                return Err(Error::new(format!("invalid AST feature {key}")));
+                            }
+                            if key == "roles" { changed_roles[id.0] = true; }
+                            else { changed_lists[id.0] = true; }
+                        }
                         nodes[id.0].data[key] = value.clone();
                     }
                     nodes[id.0].kind = kind.into();
@@ -219,10 +273,12 @@ impl Source {
                             .cloned()
                         {
                             nodes[id.0].data["roles"]["expr"] = expr;
+                            changed_roles[id.0] = true;
                         }
                     }
                     if matches!(kind, "SwitchExpr" | "CompileSwitchExpr" | "CompileSwitch") {
                         nodes[id.0].data["roles"]["selector"] = feature["selector"].clone();
+                        changed_roles[id.0] = true;
                     }
                 }
             }
@@ -240,7 +296,7 @@ impl Source {
             .flatten()
             .filter_map(|row| Some((row[0].as_u64()?, [row[1].as_u64()?, row[2].as_u64()?])))
             .collect();
-        for node in &mut nodes {
+        for (index, node) in nodes.iter_mut().enumerate() {
             if node.kind == "Declaration" {
                 node.immutable = immutables.contains(&node.span.start);
                 node.data["immutable"] = Value::Bool(node.immutable);
@@ -252,6 +308,7 @@ impl Source {
                     .unwrap_or(node.span.start);
                 if let Some(separator) = separators.get(&(first as u64)) {
                     node.data["roles"]["separator"] = serde_json::json!(separator);
+                    changed_roles[index] = true;
                 }
             }
         }
@@ -373,8 +430,20 @@ impl Source {
                 .collect::<BTreeMap<_, _>>());
             nodes[loop_id.0].data["comprehension"] = serde_json::json!(id.0);
         }
-        // Keep one copy of node metadata during normal compilation. Rebuild the
-        // normalized protocol only when the explicit `ast` command requests it.
+        let mut protocol_overrides = HashMap::new();
+        for (index, node) in nodes.iter_mut().enumerate() {
+            let data = node.data.as_object_mut().expect("node extension metadata");
+            let roles = data.remove("roles");
+            let lists = data.remove("lists");
+            if changed_roles[index] || changed_lists[index] {
+                protocol_overrides.insert(NodeId(index), WireOverrides {
+                    roles: changed_roles[index].then_some(roles).flatten(),
+                    lists: changed_lists[index].then_some(lists).flatten(),
+                });
+            }
+        }
+        // Keep core wire fields as compact bytes for explicit protocol output.
+        // Semantic passes use the typed identity and extension metadata above.
         info["nodes"] = Value::Null;
         let mut edits = vec![];
         for value in info["edits"].as_array().into_iter().flatten() {
@@ -443,6 +512,8 @@ impl Source {
             prefix,
             excluded,
             thor,
+            protocol: Arc::from(packet),
+            protocol_overrides,
             line_starts,
             by_span,
             traversal,
@@ -458,7 +529,23 @@ impl Source {
     }
     pub fn frontend_info(&self) -> Value {
         let mut info = self.info.clone();
-        info["nodes"] = Value::Array(self.nodes.iter().map(|node| node.data.clone()).collect());
+        let mut protocol: Value = serde_json::from_slice(&self.protocol)
+            .expect("validated frontend protocol");
+        let mut rows = protocol["nodes"].as_array_mut()
+            .map(std::mem::take).expect("validated frontend node rows");
+        if rows.is_empty() {
+            rows.push(serde_json::json!({"kind":"File","start":0,"end":self.raw.len(),"parent":-1}));
+        }
+        for (index, (row, node)) in rows.iter_mut().zip(&self.nodes).enumerate() {
+            for (name, value) in node.data.as_object().into_iter().flatten() {
+                row[name] = value.clone();
+            }
+            if let Some(overrides) = self.protocol_overrides.get(&NodeId(index)) {
+                if let Some(roles) = &overrides.roles { row["roles"] = roles.clone(); }
+                if let Some(lists) = &overrides.lists { row["lists"] = lists.clone(); }
+            }
+        }
+        info["nodes"] = Value::Array(rows);
         info
     }
     pub fn text(&self, id: NodeId) -> &str {
@@ -659,7 +746,7 @@ mod tests {
     #[test]
     fn unknown_role_keys_and_metadata_keep_the_frontend_protocol() {
         let row = json!({"kind":"File","start":0,"end":2,"parent":-1,
-            "roles":{"future_role":[0,2]},"lists":{"future_list":[[0,2]]},
+            "roles":{"future_role":[0,2,77]},"lists":{"future_list":[[0,2,99],"extension"]},
             "future_metadata":{"label":"é","values":[3,null]}});
         let source = parsed("é", json!([
             row,
@@ -670,6 +757,61 @@ mod tests {
         let info = source.frontend_info();
         if roles != Some(NodeId(1)) || list != [NodeId(1)] || info["nodes"][0] != row {
             panic!("unknown frontend metadata was changed");
+        }
+    }
+    #[test]
+    fn typed_nodes_reconstruct_core_fields_and_feature_overlays_for_protocol_output() {
+        let payload = json!({"nodes":[
+            {"kind":"File","start":0,"end":3,"parent":-1},
+            {"kind":"Procedure","start":0,"end":3,"parent":0,"name":"outer"},
+            {"kind":"Call","start":2,"end":3,"parent":1,"op":"x","name":"call_name",
+             "mutable":false,"lists":{"args":[[2,3]]}},
+            {"kind":"Ident","start":2,"end":3,"parent":2,"name":"a"}
+        ],"features":[
+            {"kind":"PureFunction","start":0,"end":3},
+            {"kind":"Run","start":2,"end":3,"custom":"kept",
+             "roles":{"future_role":[2,3,77]},
+             "lists":{"args":[[2,3]],"future_list":[[2,3,99],"extension"]}}
+        ],"edits":[],"selections":[]});
+        let packet = serde_json::to_vec(&payload).expect("wire packet");
+        let source = Source::from_frontend_bytes("/example.thor".into(), "éa".into(), &packet, true)
+            .expect("valid typed protocol");
+        let restored = source.frontend_info();
+        let call = &restored["nodes"][2];
+        if source.node(NodeId(2)).kind != "Run" || source.node(NodeId(2)).op != "x"
+            || source.names.get(source.node(NodeId(2)).name) != "call_name"
+            || source.role(NodeId(2), "expr") != Some(NodeId(3))
+            || restored["nodes"][1]["pure"] != true || call["kind"] != "Run"
+            || call["op"] != "x" || call["name"] != "call_name" || call["mutable"] != false
+            || call["roles"]["expr"] != json!([2,3]) || call["custom"] != "kept"
+            || call["roles"]["future_role"] != json!([2,3,77])
+            || call["lists"]["future_list"] != json!([[2,3,99],"extension"]) {
+            panic!("typed node decoding changed the frontend protocol");
+        }
+        let empty = parsed("", json!([])).expect("empty frontend node list");
+        if empty.frontend_info()["nodes"] != json!([
+            {"kind":"File","start":0,"end":0,"parent":-1}
+        ]) {
+            panic!("empty frontend packet lost its synthesized file node");
+        }
+    }
+    #[test]
+    fn malformed_link_tables_are_errors_instead_of_panics_during_feature_merging() {
+        for key in ["roles", "lists"] {
+            let mut row = json!({"kind":"Call","start":0,"end":1,"parent":0});
+            row[key] = json!(7);
+            let result = parsed("x", json!([
+                {"kind":"File","start":0,"end":1,"parent":-1},row
+            ]));
+            if result.is_ok() { panic!("invalid core link table accepted"); }
+            let mut feature = json!({"kind":"Run","start":0,"end":1});
+            feature[key] = json!(7);
+            let result = Source::from_frontend("/example.thor".into(), "x".into(), json!({
+                "nodes":[{"kind":"File","start":0,"end":1,"parent":-1},
+                         {"kind":"Call","start":0,"end":1,"parent":0}],
+                "features":[feature],"edits":[],"selections":[]
+            }),true);
+            if result.is_ok() { panic!("invalid feature link table accepted"); }
         }
     }
     #[test]

@@ -275,7 +275,7 @@ impl Scheduler<'_> {
             || std::iter::once(&call).chain(&keep).any(|root| {
                 self.children(*root).iter().any(|node| {
                     self.kind(*node) == "Directive"
-                        && self.source(*node).node(node.node).data["name"] == "procedure"
+                        && self.source(*node).names.get(self.source(*node).node(node.node).name) == "procedure"
                 })
             })
         {
