@@ -113,6 +113,49 @@ pub(crate) struct Executed {
     pub(crate) value: Value,
     pub(crate) target: Option<String>,
 }
+
+struct HelperProcess {
+    child: std::process::Child,
+    stopped: bool,
+}
+impl HelperProcess {
+    fn spawn(command: &mut Command) -> std::io::Result<Self> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        Ok(Self {
+            child: command.spawn()?,
+            stopped: false,
+        })
+    }
+    fn stop(&mut self) {
+        if self.stopped {
+            return;
+        }
+        self.stopped = true;
+        #[cfg(unix)]
+        {
+            // Compiler descendants inherit the helper's isolated group and pipes.
+            // Terminate them before joining the output readers, including when
+            // the group leader has already exited. Keep the library safe Rust.
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", "--", &format!("-{}", self.child.id())])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+impl Drop for HelperProcess {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
 fn drain(mut pipe: impl Read, limit: usize) -> std::io::Result<(Vec<u8>, bool)> {
     let mut bytes = vec![];
     let mut chunk = [0; 8192];
@@ -128,13 +171,41 @@ fn drain(mut pipe: impl Read, limit: usize) -> std::io::Result<(Vec<u8>, bool)> 
     }
     Ok((bytes, oversized))
 }
+
+#[cfg(all(test, unix))]
+mod process_tests {
+    use super::*;
+
+    #[test]
+    fn inherited_pipes_do_not_extend_a_helper_deadline_or_keep_children_alive() {
+        for script in ["sleep 2 & wait", "sleep 2 & exit 0"] {
+            let started = Instant::now();
+            let result = capture(
+                Command::new("/bin/sh").args(["-c", script]),
+                Duration::from_millis(100),
+            )
+            .expect("capture helper process");
+            let elapsed = started.elapsed();
+            if elapsed >= Duration::from_millis(900) {
+                panic!("inherited helper pipes delayed cleanup for {elapsed:?}: {script}");
+            }
+            if script.ends_with("wait") != result.timed_out {
+                panic!("helper deadline changed its result: {script}");
+            }
+        }
+    }
+}
+
 pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captured> {
-    check_cancellation()?;
-    let mut child = command
+    // Toolchain identity queries can run before a helper directory is created.
+    // Their children need the same signal-driven cleanup as evaluation itself.
+    let _active = ActiveEvaluation::enter()?;
+    command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
+    let mut process = HelperProcess::spawn(command)?;
+    let child = &mut process.child;
     let stdout = child
         .stdout
         .take()
@@ -159,6 +230,7 @@ pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captur
         }
         thread::sleep(Duration::from_millis(10));
     };
+    process.stop();
     let (stdout, large_out) = output
         .join()
         .map_err(|_| Error::new("helper stdout reader failed"))??;

@@ -61,6 +61,12 @@ impl Span {
     pub fn is_empty(self) -> bool {
         self.start == self.end
     }
+    fn is_valid_for(self, raw: &str) -> bool {
+        self.start <= self.end
+            && self.end <= raw.len()
+            && raw.is_char_boundary(self.start)
+            && raw.is_char_boundary(self.end)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -147,18 +153,14 @@ impl Source {
             let end = row["end"]
                 .as_u64()
                 .ok_or_else(|| Error::new("invalid AST end"))? as usize;
-            if start > end
-                || end > raw.len()
-                || !raw.is_char_boundary(start)
-                || !raw.is_char_boundary(end)
-            {
+            let span = Span::new(start, end);
+            if !span.is_valid_for(&raw) {
                 return Err(Error::new(format!("invalid AST byte span {start}..{end}")));
             }
             let parent = row["parent"].as_i64().unwrap_or(-1);
             if parent >= i as i64 {
                 return Err(Error::new("invalid AST parent order"));
             }
-            let span = Span::new(start, end);
             by_span.entry(span).or_default().push(NodeId(i));
             nodes.push(Node {
                 kind: row["kind"].as_str().unwrap_or("Other").into(),
@@ -260,11 +262,7 @@ impl Source {
             if let Some(roles) = row["roles"].as_object() {
                 for (name, value) in roles {
                     if let Some(span) = Span::from_wire(value) {
-                        if span.start > span.end
-                            || span.end > raw.len()
-                            || !raw.is_char_boundary(span.start)
-                            || !raw.is_char_boundary(span.end)
-                        {
+                        if !span.is_valid_for(&raw) {
                             return Err(Error::new("invalid AST role span"));
                         }
                         role_spans.insert(name.clone(), span);
@@ -279,6 +277,9 @@ impl Source {
                     let mut ids = vec![];
                     for value in value.as_array().into_iter().flatten() {
                         if let Some(span) = Span::from_wire(value) {
+                            if !span.is_valid_for(&raw) {
+                                return Err(Error::new("invalid AST list span"));
+                            }
                             if let Some(id) = resolve_span(&nodes, &by_span, span, NodeId(i)) {
                                 ids.push(id);
                             }
@@ -375,11 +376,7 @@ impl Source {
             let end = value["end"]
                 .as_u64()
                 .ok_or_else(|| Error::new("invalid edit end"))? as usize;
-            if start > end
-                || end > raw.len()
-                || !raw.is_char_boundary(start)
-                || !raw.is_char_boundary(end)
-            {
+            if !Span::new(start, end).is_valid_for(&raw) {
                 return Err(Error::new("invalid edit span"));
             }
             edits.push(Edit {
@@ -629,6 +626,34 @@ mod tests {
         ] {
             let result = parsed("é", json!([row]));
             assert!(result.is_err());
+        }
+    }
+    #[test]
+    fn list_spans_receive_the_same_byte_and_utf8_validation_as_roles() {
+        for span in [json!([0, 3]), json!([1, 2]), json!([2, 0])] {
+            let result = parsed("é", json!([
+                {"kind":"File","start":0,"end":2,"parent":-1,"lists":{"elems":[span]}},
+                {"kind":"Ident","start":0,"end":2,"parent":0,"name":"é"}
+            ]));
+            if result.is_ok() {
+                panic!("invalid list span was accepted");
+            }
+        }
+    }
+    #[test]
+    fn unknown_role_keys_and_metadata_keep_the_frontend_protocol() {
+        let row = json!({"kind":"File","start":0,"end":2,"parent":-1,
+            "roles":{"future_role":[0,2]},"lists":{"future_list":[[0,2]]},
+            "future_metadata":{"label":"é","values":[3,null]}});
+        let source = parsed("é", json!([
+            row,
+            {"kind":"Ident","start":0,"end":2,"parent":0,"name":"é"}
+        ])).expect("valid extension metadata");
+        let roles = source.role(NodeId(0), "future_role");
+        let list = source.group(NodeId(0), "future_list");
+        let info = source.frontend_info();
+        if roles != Some(NodeId(1)) || list != [NodeId(1)] || info["nodes"][0] != row {
+            panic!("unknown frontend metadata was changed");
         }
     }
     #[test]
