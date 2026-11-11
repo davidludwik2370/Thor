@@ -14,6 +14,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
+THOR = Path(os.environ.get('THOR_TEST_COMPILER', ROOT / 'thor'))
 
 
 class Client:
@@ -40,7 +41,7 @@ class Client:
                             'completion': {'completionItem': {'snippetSupport': True}},
                             'semanticTokens': {'requests': {'full': True}}}},
             'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
-                'odin_command': odin, 'thor_command': str(compiler_command or ROOT / 'thor') if compiler else '',
+                'odin_command': odin, 'thor_command': str(compiler_command or THOR) if compiler else '',
                 'enable_parser_errors': True, 'enable_semantic_tokens': True,
                 'enable_unused_imports_reporting': unused_imports,
                 'enable_unused_imports_on_change': unused_imports, 'enable_auto_import': False,

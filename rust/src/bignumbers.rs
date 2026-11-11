@@ -594,7 +594,7 @@ impl Lower<'_, '_> {
                 self.g("{\n", id),
                 build(self)?,
                 self.g("\n}", id),
-            ]));
+            ]).region(&self.source.path, self.source.node(id).span, "support"));
         }
         let post = self
             .source
@@ -640,13 +640,19 @@ impl Lower<'_, '_> {
                 index
             );
             let root = self.unparen(*target);
+            let capture_start = self.g(format!("{name}:=&("), *target)
+                .annotated(if targets.iter().all(|name| name == "_") {
+                    "Assignment"
+                } else {
+                    "debug-capture"
+                });
             if self.source.node(root).kind == "Index"
                 && matches!(self.typ(self.role(root, "expr")?), Type::Map { .. })
             {
                 let base = self.role(root, "expr")?;
                 let key = self.role(root, "index")?;
                 code.extend([
-                    self.g(format!("{name}:=&("), *target),
+                    capture_start,
                     self.render_address(base)?,
                     self.g(")\n", *target),
                 ]);
@@ -662,7 +668,7 @@ impl Lower<'_, '_> {
                 targets.push(format!("{name}^[{name}_key]"));
             } else {
                 code.extend([
-                    self.g(format!("{name}:=&("), *target),
+                    capture_start,
                     self.render_address(*target)?,
                     self.g(")\n", *target),
                 ]);

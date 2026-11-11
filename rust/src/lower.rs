@@ -1194,7 +1194,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             if let Some(symbol) = self.capture_variable(id) {
                 for captures in self.captures.iter().rev() {
                     if let Some(code) = captures.get(&symbol) {
-                        return Ok(code.clone());
+                        return Ok(code.at_use(&self.source.path, node.span));
                     }
                 }
             }

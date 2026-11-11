@@ -61,6 +61,14 @@ impl Code {
     pub fn annotated(self, kind: &str) -> Self {
         Self(Rc::new(Fragment::Annotation(self, kind.into())))
     }
+    pub fn at_use(&self, path: &Path, span: Span) -> Self {
+        match self.0.as_ref() {
+            Fragment::Text(text, origin) if !origin.exact => {
+                Self::generated(text.clone(), path, span, &origin.kind)
+            }
+            _ => self.clone(),
+        }
+    }
     pub fn region(self, path: &Path, span: Span, kind: &str) -> Self {
         Self(Rc::new(Fragment::Region(
             self,

@@ -114,9 +114,13 @@ impl Lower<'_, '_> {
                         element_only: false,
                         plain_array: false,
                     };
-                    code.extend([
+                    let operand = Code::concat([
                         this.g(format!("{name}: {typ_text} = "), *value),
                         this.big_owned(*value, Some(expected), false)?,
+                    ])
+                    .region(&this.source.path, this.source.node(*value).span, "debug-capture");
+                    code.extend([
+                        operand,
                         this.g(
                             format!("\ndefer {module}.compiler_destroy(&{name})\n"),
                             *value,
@@ -142,7 +146,10 @@ impl Lower<'_, '_> {
                 this.logical.busy.insert(id);
                 let native = this.render(id, hint.clone(), false);
                 this.logical.busy.remove(&id);
-                code.extend([native?, this.g("}", id)]);
+                code.extend([
+                    native?.region(&this.source.path, this.source.node(id).span, "debug-capture"),
+                    this.g("}", id),
+                ]);
                 Ok(Code::concat(code))
             },
         )?;
@@ -171,9 +178,11 @@ impl Lower<'_, '_> {
         self.big_statement(id,|this|{
             let module=this.module("big");let mut code=vec![];let targets=this.big_capture_targets(id,&lhs,&mut code)?;let target=&targets[0];let typ=this.native_type(lhs[0])?;let text=typ.clone().finish().text;
             let old=format!("{}big_update_old_{}",this.prefix,this.source.node(id).span.start);let right=format!("{old}_rhs");let result=format!("{old}_result");
-            code.push(this.g(format!("when {text}=={module}.Integer || {text}=={module}.Rational {{\n{old}:={module}.compiler_clone({target})\ndefer {module}.compiler_destroy(&{old})\n{right}:{text}="),id));
+            code.push(this.g(format!("when {text}=={module}.Integer || {text}=={module}.Rational {{\n{old}:={module}.compiler_clone({target})\ndefer {module}.compiler_destroy(&{old})\n"),id));
             let hint=Hint{constant_literal:false,code:typ,semantic:Some(Type::Generic),element_only:false,plain_array:false};
-            code.extend([this.big_owned(rhs[0],Some(hint),false)?,this.g(format!("\ndefer {module}.compiler_destroy(&{right})\n{result}:={module}.binary({old},{right},{})\n",json!(op)),id)]);
+            let operand=Code::concat([this.g(format!("{right}:{text}="),rhs[0]),this.big_owned(rhs[0],Some(hint),false)?])
+                .region(&this.source.path,this.source.node(rhs[0]).span,"debug-capture");
+            code.extend([operand,this.g(format!("\ndefer {module}.compiler_destroy(&{right})\n{result}:={module}.binary({old},{right},{})\n",json!(op)),id)]);
             this.big_commit(id,&targets,&[result],&mut code);
             this.logical.busy.insert(id);let native=this.render(id,None,false);this.logical.busy.remove(&id);
             code.extend([this.g("} else {",id),native?,this.g("}",id)]);Ok(Code::concat(code))

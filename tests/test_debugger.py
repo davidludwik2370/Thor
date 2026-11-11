@@ -12,6 +12,7 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+THOR = Path(os.environ.get('THOR_TEST_COMPILER', ROOT / 'thor'))
 
 
 def backend_path():
@@ -971,9 +972,9 @@ main::proc(){
             file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text(content)
         if vet:
-            corrected=subprocess.run([str(ROOT/'thor'),'vet',str(directory),'--apply'],capture_output=True,text=True,timeout=90)
+            corrected=subprocess.run([str(THOR),'vet',str(directory),'--apply'],capture_output=True,text=True,timeout=90)
             self.assertEqual(corrected.returncode,0,corrected.stdout+corrected.stderr)
-        build = subprocess.run([str(ROOT/'thor'),'build',str(directory),'-debug','-o:none',
+        build = subprocess.run([str(THOR),'build',str(directory),'-debug','-o:none',
             '--output-dir',str(directory/'generated'),'-out:'+str(directory/'program')],capture_output=True,text=True,timeout=90)
         self.assertEqual(build.returncode,0,build.stdout+build.stderr)
         return directory,source

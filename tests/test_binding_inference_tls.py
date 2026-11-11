@@ -14,7 +14,7 @@ class BindingInferenceTLSTests(unittest.TestCase):
     semantic_spans = base.TLSTests.semantic_spans
 
     def check_project(self, path):
-        result = subprocess.run([str(base.ROOT / 'thor'), 'check', str(path),
+        result = subprocess.run([str(base.THOR), 'check', str(path),
                                  '--output-dir', str(path.parent / 'checked')],
                                 capture_output=True, text=True, timeout=40)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

@@ -1226,7 +1226,7 @@ impl Lower<'_, '_> {
                     code.push(self.render(*operand, None, false)?);
                 }
             }
-            code.push(self.g(": ", case.result));
+            code.push(self.g(if logical_selector.is_some() { ":\n" } else { ": " }, case.result));
             if missing && targets.is_some() {
                 code.push(self.g(format!("{}matched=true; ", self.prefix), case.result));
             }

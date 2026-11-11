@@ -245,10 +245,21 @@ reports Odin's original constant-expression diagnostic.
 
 The 286-test cross-feature gate passed, as did the exact comparisons for the
 eight checked-in rejection fixtures. Both demos passed after the generic
-context and builtin qualification fixes. The live CodeLLDB breakpoint and
-step-over comparison also passed on both engines, with six further Rust
-debugger cases passing for checked calls, switches, f-strings, comprehensions,
-unused declarations and vet corrections.
+context and builtin qualification fixes.
+
+### Live debugger acceptance on macOS
+
+The CodeLLDB breakpoint and step-over comparison passed on both engines.
+The full Rust debugger rerun passed all 41 cases. Breakpoint selection now
+excludes complete type queries, including their names, so a switch result's
+executable code wins over its type witness. Captured identifiers map to each
+original use. Big-number lowering marks synthetic operand setup and cleanup
+so one breakpoint on an update stops once. The editor's 141 Node tests and
+13 source-map and TLS metadata tests also passed.
+
+The debugger and stdio TLS fixtures accept `THOR_TEST_COMPILER`. Use the
+root `thor-rust` launcher for TLS so its default collection discovery finds
+the sibling runtime directory.
 
 ### Anonymous producer ownership
 

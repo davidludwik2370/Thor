@@ -85,6 +85,23 @@ main::proc(){
         self.assertIn('checked_',checked['location']['checkedVariant'])
 
     @unittest.skipUnless(shutil.which('node'), 'Node is required for the real map consumer')
+    def test_switch_arm_breakpoints_prefer_executable_code_to_type_witnesses(self):
+        source='''package main
+main::proc(){
+    values:=[3,6,9]
+    result:=switch values[-1] {
+        case 9: values[0]+1
+        case: 0
+    }
+    if result!=4{panic("result")}
+}
+'''
+        manifest,_,binary=self.build(source)
+        info=self.inspect(manifest,binary,5)
+        self.assertTrue(info['candidates'],info)
+        self.assertTrue(all(entry['helper'] for entry in info['candidates']),info)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node is required for the real map consumer')
     def test_shadowed_type_query_is_a_real_user_call_in_debug_maps(self):
         source='''package main
 import native "base:builtin"

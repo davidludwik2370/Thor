@@ -67,8 +67,16 @@ function typeQueryRanges(bytes, regions = []) {
         }
         const word = /^[A-Za-z_][A-Za-z_0-9]*/.exec(code.slice(i));
         if (word) { previous = word[0]; previousStart = i; i += word[0].length; continue; }
-        if (code[i] === '(') stack.push({start: i, query: ['type_of','typeid_of','type_info_of','size_of','align_of','offset_of'].includes(previous)
-            && !regions.some(([a,b,kind])=>kind==='source-call-target' && a<=previousStart && previousStart<b)});
+        if (code[i] === '(') {
+            const query = ['type_of','typeid_of','type_info_of','size_of','align_of','offset_of'].includes(previous)
+                && !regions.some(([a,b,kind])=>kind==='source-call-target' && a<=previousStart && previousStart<b);
+            let start = query ? previousStart : i;
+            if (query && code[start-1] === '.') {
+                start--;
+                while (start > 0 && /[A-Za-z_0-9]/.test(code[start-1])) start--;
+            }
+            stack.push({start, query});
+        }
         if (code[i] === ')' && stack.length) {
             const opened = stack.pop();
             if (opened.query) ranges.push([opened.start, i + 1]);
