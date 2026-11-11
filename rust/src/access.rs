@@ -315,18 +315,30 @@ impl Lower<'_, '_> {
                 let array=format!("({meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}) || {meta}.type_is_fixed_capacity_dynamic_array({source_type}))");
                 let trait_=this.sequence_trait(base)?;
                 let len=this.native("len");
-                let mut branch = |byref: bool| -> Result<Code> {
+                let readonly_array_capture = index && !pointer
+                    && this.source.node(base).kind == "Ident"
+                    && this.resolver.symbol(this.reference(base))
+                        .is_some_and(|symbol| !this.reference_capture(symbol));
+                let native_array = format!("({meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}))");
+                let borrowed_open = this.g(format!("when {native_array} {{"), id);
+                let borrowed_else = this.g("} else {", id);
+                let borrowed_close = this.g("}", id);
+                let mut branch = |byref: bool, reuse_array: bool| -> Result<Code> {
                     let original = if byref{this.render_address(base)?}else{this.render(base,None,false)?};
                     let value = format!("{p}base");
-                    let v = format!("{value}{}", if byref { "^" } else { "" });
-                    let mut code = vec![
+                    let v = if reuse_array {
+                        format!("({})", original.clone().finish().text)
+                    } else {
+                        format!("{value}{}", if byref { "^" } else { "" })
+                    };
+                    let mut code = if reuse_array { vec![] } else { vec![
                         this.g(
                             format!("{value} := {}", if byref { "&(" } else { "" }),
                             base,
                         ),
                         original,
                         this.g(if byref { ")\n" } else { "\n" }, base),
-                    ];
+                    ] };
                     for (i, bound) in bounds.iter().enumerate() {
                         if let Some(bound) = bound {
                             let rendered = this.render(*bound, None, false)?;
@@ -363,7 +375,17 @@ impl Lower<'_, '_> {
                     ]);
                     Ok(Code::concat(code))
                 };
-                let value = branch(false)?;
+                let value = branch(false, false)?;
+                // A readonly capture already provides native array storage.
+                // Copying it into another local adds work and changes Odin's
+                // aliasing through large immutable value parameters. Slice
+                // headers and side-effectful bases still need a saved value.
+                let value = if readonly_array_capture {
+                    let borrowed = branch(false, true)?;
+                    Code::concat([
+                        borrowed_open, borrowed, borrowed_else, value, borrowed_close,
+                    ])
+                } else { value };
                 if addr == "false" {
                     if pointer {
                         let error = this.error_token(
@@ -380,7 +402,7 @@ impl Lower<'_, '_> {
                     }
                     return Ok(value);
                 }
-                let referenced = branch(true)?;
+                let referenced = branch(true, false)?;
                 let referenced = if addr == "true" {
                     referenced
                 } else {

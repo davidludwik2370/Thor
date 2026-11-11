@@ -12,11 +12,11 @@ Scratch :: struct {
     allocations: map[rawptr]Scratch_Entry,
 }
 Scratch_Entry :: struct {size,alignment:int}
-scratch_init :: proc(s:^Scratch) {
+scratch_init :: #force_inline proc(s:^Scratch) {
     s.backing=context.allocator
     s.allocations.allocator=s.backing
 }
-scratch_allocator :: proc(s:^Scratch)->runtime.Allocator {return {procedure=scratch_allocate,data=s}}
+scratch_allocator :: #force_inline proc(s:^Scratch)->runtime.Allocator {return {procedure=scratch_allocate,data=s}}
 scratch_allocate :: proc(data:rawptr,mode:runtime.Allocator_Mode,size,alignment:int,
                          old_memory:rawptr,old_size:int,loc:=#caller_location)->([]byte,runtime.Allocator_Error) {
     s:=cast(^Scratch)data
@@ -51,7 +51,11 @@ scratch_allocate :: proc(data:rawptr,mode:runtime.Allocator_Mode,size,alignment:
     }
     return result,err
 }
-scratch_destroy :: proc(s:^Scratch) {
+scratch_destroy :: #force_inline proc(s:^Scratch) {
+    // No map storage exists until the first tracked allocation. Avoid the
+    // generic map destructor on allocation-free pure calls. A zero length with
+    // retained capacity still needs the normal cleanup below.
+    if cap(s.allocations)==0 {s^={};return}
     for pointer in s.allocations {runtime.mem_free(pointer,s.backing)}
     delete(s.allocations)
     s^={}

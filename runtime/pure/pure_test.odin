@@ -138,7 +138,8 @@ scratch_resize_query_and_free_all_preserve_the_backing_allocator :: proc(t:^test
     _,query_err:=allocator.procedure(allocator.data,.Query_Info,0,0,&query,0)
     testing.expect(t,query_err==.None&&query.pointer==nil&&query.size==129&&query.alignment==32)
     _=make([]int,7,allocator)
-    testing.expect(t,mem.free_all(allocator)==.None&&len(scratch.allocations)==0)
+    free_all_err:=mem.free_all(allocator)
+    testing.expect(t,free_all_err==.None&&len(scratch.allocations)==0)
     untouched[0]=9
     testing.expect(t,untouched[0]==9)
     _=make([]byte,5,allocator)
@@ -155,5 +156,27 @@ no_nil_unions_clone_and_destroy_each_active_payload :: proc(t:^testing.T) {
         if text,ok:=result.(string);ok {testing.expect(t,text=="hello")}
         if rows,ok:=result.([]string);ok {testing.expect(t,rows[1]=="second")}
         destroy(result)
+    }
+}
+
+@(test)
+scratch_empty_and_empty_after_free_have_distinct_cleanup_paths :: proc(t:^testing.T) {
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,context.allocator,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracker)
+    backing:=mem.tracking_allocator(&tracker)
+    context.allocator=backing
+    for allocate in ([2]bool{false,true}) {
+        scratch:Scratch
+        scratch_init(&scratch)
+        if allocate {
+            allocator:=scratch_allocator(&scratch)
+            values:=make([]int,3,allocator)
+            delete(values,allocator)
+            // The entries are gone, but the tracking map still owns storage.
+            if len(scratch.allocations)!=0||cap(scratch.allocations)==0 {panic("retained tracking capacity")}
+        } else if cap(scratch.allocations)!=0 {panic("unexpected scratch allocation")}
+        scratch_destroy(&scratch)
+        if len(tracker.allocation_map)!=0||len(tracker.bad_free_array)!=0 {panic("scratch cleanup")}
     }
 }
