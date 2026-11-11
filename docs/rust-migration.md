@@ -312,6 +312,13 @@ checks both command paths. Rust-specific differential and protocol acceptance
 continues separately; these original-suite results are not a claim of complete
 migration acceptance.
 
+The supplemental comparisons also check the full source span of incompatible
+Integer/Rational constructor values in switch cases. Invalid command lines,
+including a missing command, now use the reference's usage-error exit status
+`2`. The capability fixture recognizes the implemented logical-number
+compile-time results. These focused comparisons passed before resuming the
+remaining supplemental batches.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

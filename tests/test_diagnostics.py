@@ -175,8 +175,11 @@ main::proc(){
     def test_big_switch_case_type_errors_keep_original_positions(self):
         for selector,case in [('Integer(3)','i64(3)'),('Integer(3)','Rational(3)'),
                               ('Rational(1,3)','f64(0.5)')]:
-            source='// original 😀 header\npackage main\nmain::proc(){value:=switch '+selector+' {case '+case+':1;case:0};_=value}\n'
-            self.at(source,case,message='Cannot')
+            with self.subTest(selector=selector,case=case):
+                source='// original 😀 header\npackage main\nmain::proc(){value:=switch '+selector+' {case '+case+':1;case:0};_=value}\n'
+                errors=self.at(source,case,message='Cannot')
+                pos=errors[0]['pos']
+                self.assertEqual(pos['end_offset']-pos['offset'],len(case.encode()))
 
     def test_big_literals_properties_and_copy_errors_keep_original_unicode_positions(self):
         for body,needle,message in [

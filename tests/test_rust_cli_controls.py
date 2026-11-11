@@ -13,6 +13,15 @@ class RustCliControlTests(unittest.TestCase):
     invoke=native.RustCompilerTests.invoke
     program=native.RustCompilerTests.program
 
+    def test_missing_and_unknown_commands_are_usage_errors(self):
+        for arguments in ([], ['unknown-command'], ['--unknown-option']):
+            for compiler in (native.ROOT/'thor', native.RUST):
+                with self.subTest(arguments=arguments, compiler=compiler):
+                    result=subprocess.run([str(compiler), *arguments],capture_output=True,text=True,timeout=20)
+                    self.assertEqual(result.returncode,2,result.stderr)
+                    self.assertIn('usage:',result.stderr.lower())
+                    self.assertNotIn('has not been ported',result.stderr)
+
     def write(self,body='fmt.println(VALUE)',prefix='work::proc(n:int)->int{return n+3}\nVALUE::#run work(4)'):
         self.source.write_text(self.program(body,'import "core:fmt"\n'+prefix+'\n'))
 

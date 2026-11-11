@@ -103,8 +103,10 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         );
         return Ok(0);
     }
-    if args.is_empty()
-        || args
+    if args.is_empty() {
+        return Err(Error::usage("expected a command and source file or package directory"));
+    }
+    if args
             .iter()
             .take_while(|arg| arg.as_str() != "--")
             .any(|arg| arg == "--help" || arg == "-h")
@@ -117,9 +119,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         command.as_str(),
         "transpile" | "check" | "build" | "run" | "test" | "vet" | "publish" | "ast"
     ) {
-        return Err(Error::new(format!(
-            "Rust migration: command '{command}' has not been ported yet"
-        )));
+        return Err(Error::usage(format!("unknown command '{command}'")));
     }
     if args.is_empty() {
         return Err(Error::usage("expected a source file or package directory"));

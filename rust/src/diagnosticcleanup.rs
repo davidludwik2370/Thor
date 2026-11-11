@@ -367,6 +367,27 @@ pub(crate) fn clean(
                 }
             }
         }
+        if !exact && msgs.first().is_some_and(|message| {
+            (message.starts_with("Cannot assign value ") || message.starts_with("Cannot convert "))
+                && (message.contains(".literal_integer(") || message.contains(".literal_rational("))
+        }) {
+            let constructor = location.as_ref().and_then(|(path, at)| {
+                let (file, source) = project.sources.iter().enumerate()
+                    .find(|(_, source)| source.path == Path::new(path))?;
+                source.nodes.iter().enumerate()
+                    .filter(|(_, node)| node.kind == "Call" && node.span.contains(*at))
+                    .filter(|(index, _)| resolver.logical_constructor(Ref {
+                        file,
+                        node: NodeId(*index),
+                    }).is_some())
+                    .min_by_key(|(_, node)| node.span.len())
+                    .map(|(_, node)| (source, node.span))
+            });
+            if let Some((source, at)) = constructor {
+                error["pos"] = position(source, at);
+                location = span(&error);
+            }
+        }
         if let Some((file, at)) = &location {
             if let Some(source) = project
                 .sources

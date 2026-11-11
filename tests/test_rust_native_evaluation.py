@@ -77,7 +77,7 @@ class RustNativeEvaluationTests(unittest.TestCase):
         packet=json.loads(result.stdout)
         self.assertTrue(packet['evaluation']['isolated_native_helpers'])
         self.assertTrue(packet['evaluation']['contents_cache'])
-        self.assertFalse(packet['evaluation']['big_number_results'])
+        self.assertTrue(packet['evaluation']['big_number_results'])
         self.assertFalse(packet['complete'])
         self.assertFalse(packet['python_fallback'])
 
