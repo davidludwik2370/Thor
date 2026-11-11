@@ -319,6 +319,12 @@ including a missing command, now use the reference's usage-error exit status
 compile-time results. These focused comparisons passed before resuming the
 remaining supplemental batches.
 
+The supplemental runtime-witness fixture now reuses the original exact source
+and map checks. Its older override assumed the sets file could remain entirely
+shared, predating generated native parameter witnesses. The current fixture
+verifies the required local adaptation, every original source byte in its map,
+and unchanged installed runtime bytes. It passed in checked and unchecked builds.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and
