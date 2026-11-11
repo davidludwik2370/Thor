@@ -940,22 +940,32 @@ impl<'a> Resolver<'a> {
         source.node(reference.node).kind == "Ident"
             && source.text(reference.node) == name
             && self.symbol(reference).is_none()
-            && !source
-                .selections
-                .iter()
-                .any(|selection| selection.names.iter().any(|selected| selected == name))
-            && !source
-                .nodes
-                .iter()
-                .filter(|node| node.kind == "Import")
-                .any(|node| {
-                    let explicit = source.names.get(node.name);
-                    explicit == name
-                        || explicit.is_empty()
-                            && crate::lower::unquote(&node.op)
-                                .ok()
-                                .is_some_and(|path| path.rsplit(['/', ':']).next() == Some(name))
-                })
+            && !Self::import_shadows_builtin(source, name)
+    }
+    fn import_shadows_builtin(source: &Source, name: &str) -> bool {
+        source.selections.iter().any(|selection| {
+            selection.names.iter().any(|selected| selected == name)
+        }) || source.nodes.iter().filter(|node| node.kind == "Import").any(|node| {
+            let explicit = source.names.get(node.name);
+            explicit == name
+                || explicit.is_empty()
+                    && crate::lower::unquote(&node.op)
+                        .ok()
+                        .is_some_and(|path| path.rsplit(['/', ':']).next() == Some(name))
+        })
+    }
+    pub(crate) fn generated_builtin_shadowed(&self, file: usize, name: &str) -> bool {
+        let source = &self.sources[file];
+        // A generated helper can move between lexical scopes within this file.
+        // Keep qualification if any of those scopes might supply the name.
+        self.symbols.iter().any(|symbol| {
+            symbol.name == name
+                && (symbol.reference.file == file
+                    || symbol.scope == NodeId(0)
+                        && self.sources[symbol.reference.file].path.parent() == source.path.parent())
+        }) || Self::import_shadows_builtin(source, name)
+            || source.selections.iter().any(|selection| selection.wildcard)
+            || source.nodes.iter().any(|node| node.kind == "Using" || node.data["using_field"] == true)
     }
     pub fn fields(&self, reference: Ref, role: &str) -> Vec<(String, Option<Ref>)> {
         let source = &self.sources[reference.file];

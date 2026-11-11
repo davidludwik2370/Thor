@@ -266,12 +266,14 @@ impl Lower<'_, '_> {
                     if self.needs_bound(*bound)
                         && !matches!(typ,Type::Scalar{name,..} if name.starts_with('u'))
                     {
+                        let len = self.native("len");
+                        let i128 = self.native("i128");
                         code.extend([
-                            self.g(format!("(i128(len({base_text}))+i128("), *bound),
+                            self.g(format!("({i128}({len}({base_text}))+{i128}("), *bound),
                             value.clone(),
-                            self.g(") when i128(", *bound),
+                            self.g(format!(") when {i128}("), *bound),
                             value.clone(),
-                            self.g(")<0 else i128(", *bound),
+                            self.g(format!(")<0 else {i128}("), *bound),
                             value,
                             self.g("))", *bound),
                         ]);
@@ -312,6 +314,7 @@ impl Lower<'_, '_> {
                 this.meta=true;let meta=format!("{}meta",this.source.prefix);
                 let array=format!("({meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}) || {meta}.type_is_fixed_capacity_dynamic_array({source_type}))");
                 let trait_=this.sequence_trait(base)?;
+                let len=this.native("len");
                 let mut branch = |byref: bool| -> Result<Code> {
                     let original = if byref{this.render_address(base)?}else{this.render(base,None,false)?};
                     let value = format!("{p}base");
@@ -343,7 +346,7 @@ impl Lower<'_, '_> {
                         }
                         if let Some(bound) = bound {
                             normalized.push(this.gen(
-                                format!("{module}.normalize(len({v}),{p}bound_{i},{})",this.source_location(*bound)),
+                                format!("{module}.normalize({len}({v}),{p}bound_{i},{})",this.source_location(*bound)),
                                 this.source.node(*bound).span,
                                 "sequence-bound",
                             ));

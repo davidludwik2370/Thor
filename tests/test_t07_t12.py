@@ -385,7 +385,16 @@ g::proc($T:typeid, values:[2]T)->T{return values[1]}
 
     def test_generic_element_type_from_another_argument(self):
         prefix='Color::enum{Red,Blue}\nf::proc(values:[2]$T,hint:T)->T{return values[1]}\n'
-        self.invoke(self.program('assert(f([.Red,.Blue],Color.Red)==.Blue)',prefix))
+        source=self.program('''
+if f([.Red,.Blue],Color.Red)!=.Blue { panic("positional enum context") }
+if f(hint=Color.Red,values=[.Blue,.Red])!=.Red { panic("named enum context") }
+''',prefix)
+        for flags in [
+            ['-debug'],
+            ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert'],
+        ]:
+            with self.subTest(flags=flags):
+                self.invoke(source,flags=flags)
 
     def test_generic_context_from_call_result_preserves_shadowed_type_and_evaluation(self):
         prefix='''Color::enum{A,B}

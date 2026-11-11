@@ -9,6 +9,7 @@ from thorlang.sourcemap import SourceMap
 
 
 class UsingDefaultTests(unittest.TestCase):
+    compiler = base.THOR
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 

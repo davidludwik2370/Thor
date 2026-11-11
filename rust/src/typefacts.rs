@@ -961,10 +961,13 @@ impl Resolver<'_> {
                         == "PolyType"
                 });
                 if generic {
-                    // A plain reference to an already introduced type parameter
-                    // constrains the argument. It cannot replace an unresolved
-                    // binding from an explicitly polymorphic parameter.
-                    bindings.entry(name.into()).or_insert_with(|| actual.clone());
+                    let binding = bindings.entry(name.into()).or_insert(Type::Unknown);
+                    // A typed argument can supply context for a preceding
+                    // literal. Untyped defaults must not select an overload
+                    // while the explicit polymorphic argument is unresolved.
+                    if binding.is_unknown() && !actual.untyped() {
+                        *binding = actual.clone();
+                    }
                 }
             }
             "MapType" => {

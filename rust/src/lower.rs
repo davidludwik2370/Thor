@@ -94,6 +94,7 @@ pub struct Lower<'a, 'r> {
     default: bool,
     meta: bool,
     builtin: bool,
+    native_qualification: HashMap<String, bool>,
     pub errors: HashMap<String, String>,
     pub type_sites: HashMap<String, (Ref, String)>,
     pub pure_error_sites: HashMap<String, Ref>,
@@ -166,6 +167,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             default: false,
             meta: false,
             builtin: false,
+            native_qualification: HashMap::new(),
             errors: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
@@ -427,8 +429,15 @@ impl<'a, 'r> Lower<'a, 'r> {
         alias
     }
     fn native(&mut self, name: &str) -> String {
-        self.builtin = true;
-        format!("{}builtin.{name}", self.prefix)
+        let qualify = *self.native_qualification.entry(name.into()).or_insert_with(|| {
+            self.resolver.generated_builtin_shadowed(self.file, name)
+        });
+        if qualify {
+            self.builtin = true;
+            format!("{}builtin.{name}", self.prefix)
+        } else {
+            name.into()
+        }
     }
     fn unsupported(&self, id: NodeId, name: &str) -> Error {
         Error::unsupported(self.source, self.source.node(id).span, name)

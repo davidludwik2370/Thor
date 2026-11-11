@@ -371,7 +371,8 @@ impl Lower<'_, '_> {
             let sets=this.module("sets");
             let zero=format!("({typ}){{}}");
             let test=this.set_value_trait(&zero);
-            let elem=format!("#type (type_of({sets}.element_witness({zero})) when {test} else (type_of({sets}.key_witness({zero})) when {}meta.type_is_map({typ}) else {}meta.type_elem_type({typ})))",this.prefix,this.prefix);
+            let type_of=this.native("type_of");
+            let elem=format!("#type ({type_of}({sets}.element_witness({zero})) when {test} else ({type_of}({sets}.key_witness({zero})) when {}meta.type_is_map({typ}) else {}meta.type_elem_type({typ})))",this.prefix,this.prefix);
             let hint=this.temporary_hint(this.g(elem,left));
             let a=this.temporary_evaluate(left,&mut code,Some(hint))?;
             let b=this.temporary_evaluate(right,&mut code,None)?;
@@ -389,16 +390,17 @@ impl Lower<'_, '_> {
             let value = this.temporary_evaluate(arg, &mut code, None)?;
             let result = this.temporary_name("query");
             let typ = this.typ(arg);
+            let len = this.native("len");
             let expr = if matches!(typ, Type::Set(_)) {
                 format!("{}.count({})", this.module("sets"), value.value)
             } else if typ.is_unknown() {
                 let test = this.set_value_trait(&value.value);
                 format!(
-                    "(len(({}).table) when {test} else len({}))",
+                    "({len}(({}).table) when {test} else {len}({}))",
                     value.value, value.value
                 )
             } else {
-                format!("len({})", value.value)
+                format!("{len}({})", value.value)
             };
             code.push(this.g(format!("{result} := {expr}\n"), id));
             this.temporary_release(&value, &mut code, false)?;
@@ -482,8 +484,9 @@ impl Lower<'_, '_> {
         }
         let sequence = self.module("sequence");
         let typ = self.native_type(base)?;
+        let type_of = self.native("type_of");
         let result_type = Code::concat([
-            self.g(format!("type_of({sequence}.element(("), id),
+            self.g(format!("{type_of}({sequence}.element(("), id),
             typ,
             self.g("){}))", id),
         ]);
@@ -494,7 +497,8 @@ impl Lower<'_, '_> {
             code.extend([this.g(format!("{index} := "),id),this.render(this.role(id,"index")?,None,false)?,this.g("\n",id)]);
             let result=this.temporary_name("element");
             let test=this.sequence_trait(base)?;
-            code.push(this.g(format!("{result}: {}Result\nwhen {test} {{{result}=({})[{sequence}.normalize(len({}),{index})]}} else {{{result}=({})[{index}]}}\n",this.prefix,value.value,value.value,value.value),id));
+            let len=this.native("len");
+            code.push(this.g(format!("{result}: {}Result\nwhen {test} {{{result}=({})[{sequence}.normalize({len}({}),{index})]}} else {{{result}=({})[{index}]}}\n",this.prefix,value.value,value.value,value.value),id));
             this.temporary_release(&value,&mut code,false)?;
             code.push(this.g(format!("return {result}"),id));Ok(Code::concat(code))
         })?;

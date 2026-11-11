@@ -203,6 +203,13 @@ bad::fn(input:[]int)->int{
 }
 '''),command='check',fail='borrowed')
 
+    def test_runtime_switch_requires_a_runtime_value_context(self):
+        expression='switch 1 { case 1: 2; case: 3 }'
+        _, result = self.invoke(self.program('_=VALUE','VALUE::'+expression+'\n'),
+            command='check',fail='is not a compile-time known constant')
+        self.assertIn(expression,result.stderr)
+        self.assertNotIn('Thor expression',result.stderr)
+
     def test_compile_switch_results_retain_untyped_string_constants(self):
         self.invoke(self.program('take(PAD+TITLE);#assert(PAD+TITLE=="   hello")', '''
 PAD,TITLE::#switch{case true:" "*3,"hello";case:undefined}

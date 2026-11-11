@@ -229,11 +229,26 @@ Checked calls follow integer, Boolean and text build defines, retain overload
 candidates when a generic argument's type is unknown, and include checked
 nested helpers inside the copied outer body. Alternatives in one native
 `when` share a checked procedure name, so layout-dependent selection works
-in ordinary execution and in isolated helpers. Diagnostics restore the original call, preserve Odin's
-candidate list for invalid pointer arguments, and identify unsupported
+in ordinary execution and in isolated helpers. Diagnostics restore the
+original call, preserve Odin's candidate list for invalid pointer arguments,
+and identify unsupported
 contextless dynamic results at their type annotations. Compile-time
 comprehensions retain declared element types and their dependencies. Length
 and iteration over imported enum types keep Odin's native semantics.
+
+Generic array calls still use typed arguments to resolve contextual literals.
+An untyped default leaves a polymorphic caller's overload set open. Sequence
+helpers qualify generated builtin references when source declarations can
+shadow them. The source-map regression now runs the CRLF and BOM cases
+against the selected compiler. A runtime switch in a constant declaration
+reports Odin's original constant-expression diagnostic.
+
+The 286-test cross-feature gate passed, as did the exact comparisons for the
+eight checked-in rejection fixtures. Both demos passed after the generic
+context and builtin qualification fixes. The live CodeLLDB breakpoint and
+step-over comparison also passed on both engines, with six further Rust
+debugger cases passing for checked calls, switches, f-strings, comprehensions,
+unused declarations and vet corrections.
 
 ### Anonymous producer ownership
 

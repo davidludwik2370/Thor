@@ -1356,9 +1356,6 @@ impl Lower<'_, '_> {
                 self.g(")", id),
             ]));
         }
-        if constant {
-            return Err(self.unsupported(id, "runtime switch expression in constant context"));
-        }
         let types = self.switch_types(id, &hints)?;
         let generic = (0..hints.len())
             .map(|i| {
