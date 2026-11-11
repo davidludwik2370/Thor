@@ -1,4 +1,4 @@
-"""Prepared scalar reuse keeps reference invalidation boundaries intact."""
+"""Prepared value reuse keeps dependency and ownership boundaries intact."""
 import unittest
 import shutil
 from tests import test_rust_cached_execution as cached
@@ -87,9 +87,39 @@ class RustPreparedExecutionTests(unittest.TestCase):
         self.assertEqual(warm['cache']['prepared_hits'],0)
         self.assertGreater(warm['cache']['stats']['hits'],0)
 
-    def test_aggregate_results_keep_the_emitted_helper_policy(self):
+    def test_plain_array_results_use_the_prepared_policy(self):
         self.write(body='fmt.println(VALUE)',prefix='work::proc()->[2]int{return {2,4}}\nVALUE::#run work()')
         self.invoke();warm=self.invoke(output='[2, 4]\n')
+        self.assertGreater(warm['cache']['prepared_hits'],0)
+        self.assertGreater(warm['cache']['stats']['hits'],0)
+
+    def test_nested_owned_sequences_reuse_results_without_aliasing(self):
+        prefix='''Pos::[2]int
+work::proc()->[dynamic]Pos{values:[dynamic]Pos;append(&values,Pos{2,4});return values}
+'''
+        for flags in (['-debug'], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.write(prefix=prefix,body='a:=#run work();fmt.println(a[0][0]);delete(a)')
+                self.invoke(flags=flags)
+                self.write(prefix=prefix, body='''unused:=17;_=unused
+a:=#run work();b:=#run work();a[0][0]=9
+fmt.println(a[0][0],b[0][0]);delete(a);delete(b)''')
+                warm=self.invoke(flags=flags,output='9 2\n')
+                self.assertGreater(warm['cache']['prepared_hits'],0)
+                self.assertEqual(warm['cache']['stats']['writes'],0)
+
+    def test_owned_sequence_dependency_edits_invalidate_prepared_values(self):
+        prefix='work::proc()->[]int{values:=make([]int,2);values[0]=2;values[1]=4;return values}'
+        body='values:=#run work();fmt.println(values);delete(values)'
+        self.write(prefix=prefix,body=body);self.invoke(output='[2, 4]\n')
+        self.write(prefix=prefix.replace('values[0]=2','values[0]=3'),body=body)
+        changed=self.invoke(output='[3, 4]\n')
+        self.assertEqual(changed['cache']['prepared_hits'],0)
+        self.assertGreater(changed['cache']['stats']['writes'],0)
+
+    def test_nominal_record_results_keep_the_emitted_helper_policy(self):
+        self.write(body='fmt.println(VALUE.x)',prefix='Row::struct{x:int}\nwork::proc()->Row{return {4}}\nVALUE::#run work()')
+        self.invoke();warm=self.invoke(output='4\n')
         self.assertEqual(warm['cache']['prepared_hits'],0)
         self.assertGreater(warm['cache']['stats']['hits'],0)
 
@@ -98,6 +128,20 @@ class RustPreparedExecutionTests(unittest.TestCase):
         self.invoke();warm=self.invoke()
         self.assertEqual(warm['cache']['prepared_hits'],0)
         self.assertGreater(warm['cache']['stats']['hits'],0)
+
+    def test_string_procedure_directive_keeps_full_validation_after_body_edits(self):
+        text='''package main
+import "core:fmt"
+main::proc(){fmt.println(#run work())}
+work::proc()->string{return #procedure}
+'''
+        self.source.write_text(text)
+        self.invoke()
+        self.source.write_text(text.replace('main::proc(){', 'main::proc(){\nunused:=17;_=unused;\n'))
+        warm=self.invoke()
+        fresh=self.invoke(enabled=False)
+        self.assertEqual(warm['cache']['prepared_hits'],0)
+        self.assertEqual(warm['results'],fresh['results'])
 
     def test_disabled_cache_writes_no_prepared_record(self):
         self.write();packet=self.invoke(enabled=False,output='6\n')

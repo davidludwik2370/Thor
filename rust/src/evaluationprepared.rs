@@ -1,4 +1,4 @@
-//! Early scalar lookup after dependency extraction, following prepared_key.
+//! Early value lookup after dependency extraction, following prepared_key.
 //! Interfaces retain all file syntax except unrelated procedure bodies.
 use super::*;
 use crate::{
@@ -61,6 +61,18 @@ pub(crate) fn headers(project: &Project) -> Value {
     }
     Value::Array(result)
 }
+// These packets contain values rather than helper-local type identities.
+// Generic frames, records/unions and opaque values keep the emitted-helper key.
+fn prepared_value_type(typ: &Type) -> bool {
+    match typ {
+        Type::Scalar {name, ..} => !["any", "typeid", "rawptr", "cstring"].contains(&name.as_str()),
+        Type::String {name, ..} => name == "string",
+        Type::BigInteger | Type::BigRational => true,
+        Type::Nominal(_, inner) | Type::Array {elem:inner, ..}
+        | Type::Slice(inner) | Type::Dynamic(inner) => prepared_value_type(inner),
+        _ => false,
+    }
+}
 impl Scheduler<'_> {
     pub(super) fn prepared_key(
         &mut self,
@@ -78,19 +90,20 @@ impl Scheduler<'_> {
         {
             return None;
         }
-        let name=match self.resolver.type_of(node){Type::Scalar{name,..}=>name,Type::BigInteger=>"Integer".into(),Type::BigRational=>"Rational".into(),_=>return None};
-        if ["any", "typeid", "rawptr", "cstring"].contains(&name.as_str())
+        if !prepared_value_type(&self.resolver.type_of(node))
             || graph.procedures.iter().any(|procedure| {
                 !crate::specialization::parameters(*procedure, &self.resolver).is_empty()
             })
         {
             return None;
         }
+        // Directives can observe the original call/declaration location. Body
+        // edits deliberately disappear from headers, so preserve the emitted
+        // helper's validation for these calls instead of reusing a stale value.
         if roots.iter().chain(&graph.keep).any(|root| {
-            self.children(*root).iter().any(|node| {
-                self.kind(*node) == "Directive"
-                    && self.source(*node).node(node.node).data["name"] == "procedure"
-            })
+            let source = self.source(*root);
+            std::iter::once(root.node).chain(source.descendants(root.node))
+                .any(|node| source.node(node).kind == "Directive")
         }) {
             return None;
         }
@@ -163,7 +176,7 @@ impl Scheduler<'_> {
             .borrow_mut()
             .identity(&self.project.frontend.odin, &self.project.options.root)?;
         Some(sha256(&canonical(
-            &json!({"schema":1,"identity":identity,"entry":self.project.options.entry,
+            &json!({"schema":2,"identity":identity,"entry":self.project.options.entry,
             "flags":self.project.options.flags,"test":self.project.frontend.test,"expression":source.text(node.node),
             "headers":headers(self.project),"dependencies":dependencies,"native":native,"support":support_sources,
             "previous":previous,"queries":queries,"scopes":scopes,"resources":resources}),

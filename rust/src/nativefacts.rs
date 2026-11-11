@@ -120,12 +120,13 @@ impl Project {
         let mut inspected = HashSet::new();
         loop {
             let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
-            resolver.prepare_contexts();
             // Resolve the project's actual names. This follows type aliases and
             // selected signatures without traversing unrelated SDK bodies.
-            for (file, source) in self.sources.iter().enumerate().filter(|(_, source)| !source.shared_native) {
+            for (file, source) in self.sources.iter().enumerate().filter(|(_, source)| {
+                !source.shared_native && !source.path.starts_with(self.options.root.join("runtime"))
+            }) {
                 for (index, node) in source.nodes.iter().enumerate() {
-                    if matches!(node.kind.as_str(), "Ident" | "Selector") {
+                    if matches!(node.kind.as_str(), "Ident" | "Selector" | "Call") {
                         resolver.type_of(crate::semantics::Ref {file, node: crate::ast::NodeId(index)});
                     }
                 }

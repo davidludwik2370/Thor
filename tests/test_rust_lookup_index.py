@@ -50,6 +50,23 @@ work::fn(n:int)->int {return n+1}
         self.assertEqual(error['pos']['offset'], text.index('missing_name'))
         self.assertIn('command', report['stages'])
 
+    def test_cached_owned_values_skip_helper_preparation_after_runtime_edit(self):
+        text = self.program('''values:=#run work();defer delete(values)
+if values[0][0]!=2 {panic("cached contents")}''',
+                            'work::proc()->[][2]int{values:=make([][2]int,1);values[0]={2,3};return values}\n')
+        self.source.write_text(text)
+        cold, report = self.profile('transpile', ['--cache-report'])
+        self.assertEqual(cold.returncode, 0, cold.stderr)
+        self.assertGreater(report['counters']['evaluation.helper_preparations'], 0)
+        self.assertGreater(report['counters']['analysis.inherited_source_facts'], 0)
+        self.source.write_text(text.replace('main :: proc() {', 'main :: proc() {\nunused:=17;_=unused;', 1))
+        warm, report = self.profile('transpile', ['--cache-report'])
+        self.assertEqual(warm.returncode, 0, warm.stderr)
+        cache = json.loads(warm.stdout.splitlines()[0])
+        self.assertGreater(cache['thor_prepared_hits'], 0)
+        self.assertEqual(cache['thor_cache']['writes'], 0)
+        self.assertEqual(report['counters'].get('evaluation.helper_preparations', 0), 0)
+
     def test_unrelated_scopes_do_not_multiply_promoted_field_queries(self):
         self.source.write_text(self.program('if library.read({7})!=7 {panic("using")}',
                                             'import "library"\n'))
