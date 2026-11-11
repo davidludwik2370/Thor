@@ -153,8 +153,8 @@ fn reference_coordinates(suffix: &str) -> Option<(usize, usize, usize)> {
     (line > 0 && column > 0).then_some((line, column, length))
 }
 
-fn package_files(entry: &Path, test: bool) -> Result<Vec<PathBuf>> {
-    if entry.is_file() {
+fn package_files(entry: &Path, test: bool, overlays: &BTreeMap<PathBuf, String>) -> Result<Vec<PathBuf>> {
+    if entry.is_file() || overlays.contains_key(entry) {
         return Ok(vec![entry.to_path_buf()]);
     }
     let mut files = vec![];
@@ -174,20 +174,32 @@ fn package_files(entry: &Path, test: bool) -> Result<Vec<PathBuf>> {
         }
         files.push(fs::canonicalize(path)?);
     }
+    for path in overlays.keys() {
+        if path.parent() != Some(entry)
+            || !path.extension().is_some_and(|ext| ext == "thor" || ext == "odin") {
+            continue;
+        }
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        if !test && (name.ends_with("_test.thor") || name.ends_with("_test.odin")) {
+            continue;
+        }
+        files.push(path.clone());
+    }
     files.sort();
+    files.dedup();
     Ok(files)
 }
 impl Project {
     pub fn new(mut options: Options) -> Result<Self> {
         let _phase = crate::profile::span("project.load");
-        if !options.entry.exists() {
+        options.entry = absolute(&options.entry)?;
+        if !options.entry.exists() && !options.overlays.contains_key(&options.entry) {
             return Err(Error::new(format!(
                 "source does not exist: {}",
                 options.entry.display()
             )));
         }
-        options.entry = fs::canonicalize(&options.entry)?;
-        let file_entry = options.entry.is_file();
+        let file_entry = options.entry.is_file() || options.overlays.contains_key(&options.entry);
         if file_entry
             && !options
                 .entry
@@ -351,7 +363,7 @@ impl Project {
         Ok(project)
     }
     fn discover(&mut self, entry: &Path, visited: &mut HashSet<PathBuf>) -> Result<()> {
-        let entry = fs::canonicalize(entry)?;
+        let entry = absolute(entry)?;
         if !visited.insert(entry.clone()) {
             return Ok(());
         }
@@ -365,7 +377,7 @@ impl Project {
         }
         let support_library =
             entry.starts_with(self.options.root.join("runtime")) && entry != self.options.entry;
-        let files = package_files(&entry, self.frontend.test && !support_library)?;
+        let files = package_files(&entry, self.frontend.test && !support_library, &self.options.overlays)?;
         let mut shared_frontend = self.frontend.clone();
         if shared_frontend.cache_dir.is_some() {
             shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
@@ -1006,7 +1018,7 @@ impl Project {
             } else {
                 // The imported SDK is a library even when the project's entry
                 // package is being tested. Its own *_test files are not inputs.
-                package_files(&package, false)?
+                package_files(&package, false, &self.options.overlays)?
             };
             pending.extend(files.into_iter().filter(|path| seen.insert(path.clone())));
         }
