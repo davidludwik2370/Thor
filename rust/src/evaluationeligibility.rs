@@ -99,7 +99,7 @@ fn library_seen(
         .join("runtime")
         .join(suffix);
     let actual = source.collection_roots.get("thor")?.join(suffix);
-    if std::fs::canonicalize(actual).ok()? != std::fs::canonicalize(&expected).ok()? {
+    if r.canonical_path(&actual)? != r.canonical_path(&expected)? {
         return None;
     }
     let node = source.node(callee.node);
@@ -115,21 +115,9 @@ fn library_seen(
                 source.text(base),
             )
             .is_none()
+            && r.namespace_imports(callee.file, source.text(base)).iter().any(|import| import == path)
         {
-            for import in source.nodes.iter().filter(|node| node.kind == "Import") {
-                if unquote(&import.op).ok().as_deref() != Some(path) {
-                    continue;
-                }
-                let alias = source.names.get(import.name);
-                let alias = if alias.is_empty() {
-                    suffix.rsplit('/').next()?
-                } else {
-                    alias
-                };
-                if alias == source.text(base) {
-                    return Some(source.text(field).into());
-                }
-            }
+            return Some(source.text(field).into());
         }
     }
     if node.kind == "Paren" {

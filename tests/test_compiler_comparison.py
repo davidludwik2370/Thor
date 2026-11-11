@@ -26,7 +26,7 @@ class CompilerComparisonTests(unittest.TestCase):
                 patch.object(reference.rust, 'RUST', native), \
                 patch.object(reference.subprocess, 'run', side_effect=run):
             case.invoke('package main\nmain::proc(){}\n')
-        self.assertEqual([call[0] for call in calls], [str(reference.rust.ROOT/'thor'), str(native)])
+        self.assertEqual([call[0] for call in calls], [str(reference.rust.PYTHON), str(native)])
         self.assertFalse(hasattr(case, 'compiler'))
 
     def observation(self, status=0, stdout='', diagnostics=None, stderr='', timeout=False, toolchain_failure=False):

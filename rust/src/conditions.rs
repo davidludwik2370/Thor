@@ -167,19 +167,8 @@ impl Resolver<'_> {
                 return None;
             }
             let field = s.role(r.node, "field")?;
-            for import in s.nodes.iter().filter(|n| n.kind == "Import") {
-                if crate::lower::unquote(&import.op).ok().as_deref() != Some(path) {
-                    continue;
-                }
-                let explicit = s.names.get(import.name);
-                let alias = if explicit.is_empty() {
-                    path.rsplit(['/', ':']).next()?
-                } else {
-                    explicit
-                };
-                if alias == s.text(base) {
-                    return Some(s.text(field).into());
-                }
+            if self.namespace_imports(r.file, s.text(base)).iter().any(|import| import == path) {
+                return Some(s.text(field).into());
             }
         }
         if n.kind == "Ident"

@@ -19,6 +19,7 @@ struct Timing {
 #[derive(Default)]
 struct Report {
     stages: BTreeMap<&'static str, Timing>,
+    worker_stages: BTreeMap<&'static str, Timing>,
     counters: BTreeMap<&'static str, u64>,
     children: Vec<f64>,
 }
@@ -47,7 +48,7 @@ impl Drop for Session {
             let report = report.borrow();
             serde_json::json!({"schema":1,"engine":"rust","thor_version":crate::VERSION,
                 "elapsed_seconds":started.elapsed().as_secs_f64(),
-                "stages":report.stages,"counters":report.counters})
+                "stages":report.stages,"worker_stages":report.worker_stages,"counters":report.counters})
         });
         let result = serde_json::to_vec_pretty(&packet)
             .map_err(crate::diagnostic::Error::from)
@@ -89,4 +90,34 @@ pub fn count(name: &'static str, amount: u64) {
     if ENABLED.load(Ordering::Relaxed) {
         REPORT.with(|report| *report.borrow_mut().counters.entry(name).or_default() += amount);
     }
+}
+
+pub(crate) struct WorkerReport(Report);
+
+pub(crate) fn worker<T>(action: impl FnOnce() -> T) -> (T, Option<WorkerReport>) {
+    if !ENABLED.load(Ordering::Relaxed) {
+        return (action(), None);
+    }
+    REPORT.with(|report| *report.borrow_mut() = Report::default());
+    let result = action();
+    let report = REPORT.with(|report| std::mem::take(&mut *report.borrow_mut()));
+    (result, Some(WorkerReport(report)))
+}
+
+pub(crate) fn merge_worker(worker: Option<WorkerReport>) {
+    let Some(WorkerReport(worker)) = worker else { return };
+    REPORT.with(|report| {
+        let mut report = report.borrow_mut();
+        for (name, count) in worker.counters {
+            *report.counters.entry(name).or_default() += count;
+        }
+        // Worker spans overlap in wall time. Keep their accumulated durations
+        // separate from the parent thread's inclusive/self-time stack.
+        for (name, timing) in worker.stages.into_iter().chain(worker.worker_stages) {
+            let combined = report.worker_stages.entry(name).or_default();
+            combined.calls += timing.calls;
+            combined.inclusive_seconds += timing.inclusive_seconds;
+            combined.self_seconds += timing.self_seconds;
+        }
+    });
 }

@@ -16,7 +16,7 @@ path = "src/main.rs"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.150", features = ["float_roundtrip"] }
+serde_json = { version = "1.0.150", features = ["float_roundtrip", "raw_value"] }
 unicode-ident = "1.0.24"
 image = { version = "=0.25.5", default-features = false, features = ["png", "ico"] }
 toml = "=0.8.23"

@@ -197,6 +197,7 @@ pub struct Resolver<'a> {
     index: Arc<namescope::NameIndex>,
     base: Option<ResolverIndex>,
     import_packages: RefCell<HashMap<(usize, String), Option<usize>>>,
+    canonical_paths: RefCell<HashMap<std::path::PathBuf, Option<std::path::PathBuf>>>,
     missing_packages: RefCell<BTreeSet<std::path::PathBuf>>,
     types: HashMap<Ref, Type>,
     active: HashSet<Ref>,
@@ -293,6 +294,7 @@ impl<'a> Resolver<'a> {
             index: base.map(|base| base.names.clone()).unwrap_or_else(|| Arc::new(namescope::NameIndex::new(sources))),
             base: None,
             import_packages: RefCell::new(HashMap::new()),
+            canonical_paths: RefCell::new(HashMap::new()),
             missing_packages: RefCell::new(BTreeSet::new()),
             types: HashMap::new(),
             active: HashSet::new(),
@@ -639,6 +641,9 @@ impl<'a> Resolver<'a> {
     pub(crate) fn demanded_packages(&self) -> BTreeSet<std::path::PathBuf> {
         self.missing_packages.borrow().clone()
     }
+    pub(crate) fn has_demanded_packages(&self) -> bool {
+        !self.missing_packages.borrow().is_empty()
+    }
     pub fn active_definition(&self, r: Ref) -> bool {
         let source = &self.sources[r.file];
         let span = source.node(r.node).span;
@@ -858,15 +863,8 @@ impl<'a> Resolver<'a> {
             {
                 return None;
             }
-            let native = source.nodes.iter().any(|node| {
-                node.kind == "Import"
-                    && crate::lower::unquote(&node.op).is_ok_and(|path| {
-                        path == "base:builtin" && {
-                            let alias = source.names.get(node.name);
-                            source.text(owner) == if alias.is_empty() { "builtin" } else { alias }
-                        }
-                    })
-            });
+            let native = self.namespace_imports(r.file, source.text(owner)).iter()
+                .any(|path| path == "base:builtin");
             if !native {
                 return None;
             }
@@ -942,32 +940,41 @@ impl<'a> Resolver<'a> {
                 .map(|root| root.join(suffix))
                 .unwrap_or_else(|| expected.clone());
             match (
-                std::fs::canonicalize(actual),
-                std::fs::canonicalize(expected),
+                self.canonical_path(&actual),
+                self.canonical_path(&expected),
             ) {
-                (Ok(actual), Ok(expected)) => actual == expected,
+                (Some(actual), Some(expected)) => actual == expected,
                 _ => false,
             }
         })
+    }
+    pub(crate) fn canonical_path(&self, path: &std::path::Path) -> Option<std::path::PathBuf> {
+        if let Some(cached) = self.canonical_paths.borrow().get(path) {
+            return cached.clone();
+        }
+        crate::profile::count("lookup.canonical_path_resolutions", 1);
+        let canonical = std::fs::canonicalize(path).ok();
+        self.canonical_paths.borrow_mut().insert(path.to_path_buf(), canonical.clone());
+        canonical
+    }
+    pub(crate) fn namespace_imports(&self, file: usize, name: &str) -> &[String] {
+        self.index.imports[file].get(name).map(Vec::as_slice).unwrap_or_default()
+    }
+    pub(crate) fn expression_reference(&self, reference: Ref) -> bool {
+        self.index.expression_names[reference.file].binary_search(&reference.node).is_ok()
     }
     pub fn native_builtin(&self, reference: Ref, name: &str) -> bool {
         let source = &self.sources[reference.file];
         source.node(reference.node).kind == "Ident"
             && source.text(reference.node) == name
             && self.symbol(reference).is_none()
-            && !Self::import_shadows_builtin(source, name)
+            && !self.import_shadows_builtin(reference.file, name)
     }
-    fn import_shadows_builtin(source: &Source, name: &str) -> bool {
+    fn import_shadows_builtin(&self, file: usize, name: &str) -> bool {
+        let source = &self.sources[file];
         source.selections.iter().any(|selection| {
             selection.names.iter().any(|selected| selected == name)
-        }) || source.nodes.iter().filter(|node| node.kind == "Import").any(|node| {
-            let explicit = source.names.get(node.name);
-            explicit == name
-                || explicit.is_empty()
-                    && crate::lower::unquote(&node.op)
-                        .ok()
-                        .is_some_and(|path| path.rsplit(['/', ':']).next() == Some(name))
-        })
+        }) || self.index.imports[file].contains_key(name)
     }
     pub(crate) fn generated_builtin_shadowed(&self, file: usize, name: &str) -> bool {
         let source = &self.sources[file];
@@ -978,7 +985,7 @@ impl<'a> Resolver<'a> {
                 && (symbol.reference.file == file
                     || symbol.scope == NodeId(0)
                         && self.sources[symbol.reference.file].path.parent() == source.path.parent())
-        }) || Self::import_shadows_builtin(source, name)
+        }) || self.import_shadows_builtin(file, name)
             || source.selections.iter().any(|selection| selection.wildcard)
             || source.nodes.iter().any(|node| node.kind == "Using" || node.data["using_field"] == true)
     }

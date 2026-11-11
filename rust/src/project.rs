@@ -104,6 +104,7 @@ pub struct Project {
     type_probe_imports: BTreeMap<usize, BTreeMap<String, String>>,
     source_facts: Option<SourceFacts>,
     resolver_index: std::cell::RefCell<Option<IndexedSources>>,
+    permission_cache: std::cell::RefCell<crate::permissioncache::Cache>,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -310,6 +311,7 @@ impl Project {
             type_probe_imports: BTreeMap::new(),
             source_facts: None,
             resolver_index: std::cell::RefCell::new(None),
+            permission_cache: std::cell::RefCell::default(),
             collections,
             common,
             file_entry,
@@ -368,11 +370,9 @@ impl Project {
         if shared_frontend.cache_dir.is_some() {
             shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
         }
-        let mut imports = vec![];
-        for path in files {
-            if self.sources.iter().any(|s| s.path == path) {
-                continue;
-            }
+        let files = files.into_iter().filter(|path| !self.sources.iter().any(|s| s.path == *path))
+            .collect::<Vec<_>>();
+        let parsed = crate::parallel::map(&files, |path| {
             let frontend = if path.starts_with(self.options.root.join("runtime"))
                 && path.extension().is_some_and(|ext| ext == "odin")
             {
@@ -380,11 +380,15 @@ impl Project {
             } else {
                 &self.frontend
             };
-            let mut source = frontend.parse_overlay(
-                &path,
+            frontend.parse_overlay(
+                path,
                 entry.is_dir(),
-                self.options.overlays.get(&path).map(String::as_str),
-            )?;
+                self.options.overlays.get(path).map(String::as_str),
+            )
+        });
+        let mut imports = vec![];
+        for (path, source) in files.into_iter().zip(parsed) {
+            let mut source = source?;
             source.shared_native = path.extension().is_some_and(|ext| ext == "odin")
                 && path.starts_with(self.options.root.join("runtime"))
                 && path != self.options.entry
@@ -473,7 +477,7 @@ impl Project {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
         }
         crate::lower::prime_logical_constants(&mut resolver);
-        let mut privileges = crate::privileges::Privileges::analyze_project(
+        let mut privileges = self.permission_cache.borrow_mut().analyze(
             &mut resolver,
             &self.options.flags,
             self.options.editor_info,
@@ -831,19 +835,24 @@ impl Project {
             .collect();
         let mut files: BTreeMap<PathBuf, Vec<u8>> = BTreeMap::new();
         files.extend(sdk.replacements);
-        for (path, (_, emitted)) in &self.outputs {
-            files.insert(path.clone(), emitted.text.as_bytes().to_vec());
-            if self.options.maps
-                || self.options.command == "transpile"
-                || self.options.flags.iter().any(|flag| flag == "-debug")
-            {
+        let maps = self.options.maps || self.options.command == "transpile"
+            || self.options.flags.iter().any(|flag| flag == "-debug");
+        let outputs = self.outputs.iter().collect::<Vec<_>>();
+        let artifacts = crate::parallel::map(&outputs, |(path, (_, emitted))| -> Result<_> {
+            let _phase = crate::profile::span("emit.serialize");
+            let mut artifacts = vec![((*path).clone(), emitted.text.as_bytes().to_vec())];
+            if maps {
                 let mut map = emitted.map_json(path, &raw_sources);
                 map["generated_sha256"] = json!(sha256(emitted.text.as_bytes()));
-                files.insert(
+                artifacts.push((
                     PathBuf::from(format!("{}.map.json", path.display())),
                     serde_json::to_vec(&map)?,
-                );
+                ));
             }
+            Ok(artifacts)
+        });
+        for artifacts in artifacts {
+            files.extend(artifacts?);
         }
         let generated: Vec<_> = files
             .keys()
@@ -983,11 +992,9 @@ impl Project {
                 }
             }
         }
-        let mut inspected = HashSet::new();
-        while let Some(package) = packages.pop_first() {
-            if !inspected.insert(package.clone()) {
-                continue;
-            }
+        let mut pending = Vec::new();
+        let mut seen = self.sources.iter().map(|source| source.path.clone()).collect::<HashSet<_>>();
+        for package in packages {
             if !package.is_dir() {
                 continue;
             }
@@ -1001,25 +1008,20 @@ impl Project {
                 // package is being tested. Its own *_test files are not inputs.
                 package_files(&package, false)?
             };
-            for path in files {
-                if self.sources.iter().any(|s| s.path == path) {
-                    continue;
-                }
-                let mut source = frontend.parse_overlay(
-                    &path,
-                    true,
-                    self.options.overlays.get(&path).map(String::as_str),
-                )?;
-                if source.excluded {
-                    continue;
-                }
-                // Dependencies of unused SDK bodies and declarations are not
-                // project inputs. Resolver queries request missing packages
-                // while inspecting signatures, types and selected call effects.
-                source.shared_native = true;
-                source.collection_roots = roots.clone();
-                self.sources.push(source);
+            pending.extend(files.into_iter().filter(|path| seen.insert(path.clone())));
+        }
+        let parsed = crate::parallel::map(&pending, |path| {
+            frontend.parse_overlay(path, true, self.options.overlays.get(path).map(String::as_str))
+        });
+        for source in parsed {
+            let mut source = source?;
+            if source.excluded {
+                continue;
             }
+            // Dependencies of unused SDK bodies are discovered when selected.
+            source.shared_native = true;
+            source.collection_roots = roots.clone();
+            self.sources.push(source);
         }
         for source in &mut self.sources {
             source.collection_roots = roots.clone();

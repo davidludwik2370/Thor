@@ -83,7 +83,7 @@ class ProjectTemplateTests(unittest.TestCase):
     def test_new_creates_in_current_directory_without_odin_or_extra_files(self):
         with tempfile.TemporaryDirectory(prefix='thor-new-') as temporary:
             root=Path(temporary)
-            result=subprocess.run([sys.executable,str(ROOT/'thor'),'new','my-project'],cwd=root,
+            result=subprocess.run([sys.executable,str(ROOT/'thor-python'),'new','my-project'],cwd=root,
                 env={**os.environ,'PATH':str(root/'no-tools')},capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             project=root/'my-project'

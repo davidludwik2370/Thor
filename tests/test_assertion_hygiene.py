@@ -191,7 +191,7 @@ main::proc(){
 ''')
             for options in [[], ['-O']]:
                 with self.subTest(python_options=options):
-                    result = subprocess.run([sys.executable, *options, str(ROOT/'thor'), 'run', str(source),
+                    result = subprocess.run([sys.executable, *options, str(ROOT/'thor-python'), 'run', str(source),
                                              '--output-dir', str(root/('optimized' if options else 'normal')),
                                              '-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert'],
                                             capture_output=True, text=True, timeout=60)

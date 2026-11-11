@@ -1,7 +1,12 @@
 #!/bin/sh
-# Build the separate native compiler, then hand all arguments to it unchanged.
-# No Python compiler fallback is permitted in this migration entry point.
+# Run the release compiler built with the documented Cargo build command.
 set -eu
 thor_rust_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-cargo build --quiet --offline --release --locked --manifest-path "$thor_rust_root/rust/Cargo.toml"
-exec "$thor_rust_root/rust/target/release/thor-rust" "$@"
+thor_rust_binary="$thor_rust_root/rust/target/release/thor-rust"
+if [ ! -x "$thor_rust_binary" ]; then
+    printf 'Thor native executable is missing. Run the build command below.\n  cargo build --release --locked --offline --manifest-path "%s/rust/Cargo.toml"\n' "$thor_rust_root" >&2
+    exit 127
+fi
+THOR_ROOT=${THOR_ROOT:-$thor_rust_root}
+export THOR_ROOT
+exec "$thor_rust_binary" "$@"

@@ -15,7 +15,7 @@ class RustCliControlTests(unittest.TestCase):
 
     def test_missing_and_unknown_commands_are_usage_errors(self):
         for arguments in ([], ['unknown-command'], ['--unknown-option']):
-            for compiler in (native.ROOT/'thor', native.RUST):
+            for compiler in (native.PYTHON, native.RUST):
                 with self.subTest(arguments=arguments, compiler=compiler):
                     result=subprocess.run([str(compiler), *arguments],capture_output=True,text=True,timeout=20)
                     self.assertEqual(result.returncode,2,result.stderr)
@@ -97,7 +97,7 @@ class RustCliControlTests(unittest.TestCase):
         for engine in ['python','rust']:
             with self.subTest(engine=engine):
                 output=self.root/(engine+'-explicit-output')
-                result=subprocess.run([str(native.ROOT/'thor' if engine=='python' else native.RUST),
+                result=subprocess.run([str(native.PYTHON if engine=='python' else native.RUST),
                     'run',str(self.source),'--output-dir='+str(output),'--cache-dir='+str(self.root/'cache'),
                     '--diagnostic-format=json','--track-allocations=off','--','argument'],
                     cwd=self.root,capture_output=True,text=True,timeout=60)

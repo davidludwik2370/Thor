@@ -120,7 +120,7 @@ def main(argv=None):
         parser.error('--procedures, --runs and --timeout must be positive finite values')
     if options.profile_dir and not options.project:
         parser.error('--profile-dir requires --project')
-    engines = {'python': ROOT/'thor', 'rust': ROOT/'rust/target/release/thor-rust'}
+    engines = {'python': ROOT/'thor-python', 'rust': ROOT/'rust/target/release/thor-rust'}
     for entry in options.engine:
         if '=' not in entry:
             parser.error('--engine requires NAME=EXECUTABLE')

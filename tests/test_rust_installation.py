@@ -125,6 +125,25 @@ works :: proc(t:^testing.T) { testing.expect(t, VALUE == 42) }
                          (self.toolchain/'templates/main.thor').read_bytes())
         self.assertFalse(self.log.exists())
 
+    def test_native_launcher_uses_prebuilt_compiler_and_reports_missing_build(self):
+        launcher = self.toolchain/'thor-rust'
+        shutil.copy2(native.ROOT/'thor-rust', launcher)
+        binary = self.toolchain/'rust/target/release/thor-rust'
+        binary.parent.mkdir(parents=True)
+        shutil.copy2(native.RUST, binary)
+        for command in (['--version'], ['new', 'sample']):
+            result = subprocess.run([str(launcher), *command], env=self.environment,
+                                    cwd=self.root, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual((self.app/'sample.thor').read_bytes(),
+                         (self.toolchain/'templates/main.thor').read_bytes())
+        binary.unlink()
+        missing = subprocess.run([str(launcher), '--version'], env=self.environment,
+                                 cwd=self.root, capture_output=True, text=True, timeout=10)
+        self.assertEqual(missing.returncode, 127, missing.stderr)
+        self.assertIn('cargo build --release', missing.stderr)
+        self.assertFalse(self.log.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

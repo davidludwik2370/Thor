@@ -10,6 +10,8 @@ pub(super) struct NameIndex {
     pub package_symbols: Vec<HashMap<String, Vec<usize>>>,
     pub imports: Vec<HashMap<String, Vec<String>>>,
     pub using: Vec<Vec<NodeId>>,
+    pub promotions: Vec<Vec<NodeId>>,
+    pub expression_names: Vec<Vec<NodeId>>,
     heads: Vec<Vec<NodeId>>,
     parents: Vec<Vec<NodeId>>,
 }
@@ -22,6 +24,8 @@ impl NameIndex {
             package_symbols: vec![],
             imports: vec![],
             using: vec![],
+            promotions: vec![],
+            expression_names: vec![],
             heads: vec![],
             parents: vec![],
         };
@@ -39,13 +43,23 @@ impl NameIndex {
             let mut parents = Vec::with_capacity(source.nodes.len());
             let mut imports: HashMap<String, Vec<String>> = HashMap::new();
             let mut using = vec![];
+            let mut promotions = vec![];
+            let mut expression_names = vec![];
             for (n, node) in source.nodes.iter().enumerate() {
                 let id = NodeId(n);
                 let parent = node.parent.map(|p| heads[p.0]).unwrap_or(NodeId(0));
                 heads.push(if is_scope(source, id) { id } else { parent });
                 parents.push(parent);
+                if expression_name(source, id) {
+                    expression_names.push(id);
+                }
                 if node.kind == "Using" {
                     using.push(id);
+                    promotions.push(id);
+                } else if matches!(node.kind.as_str(), "Declaration" | "Field")
+                    && node.data["using_field"] == true
+                {
+                    promotions.push(id);
                 }
                 if node.kind == "Import" {
                     if let Ok(path) = crate::lower::unquote(&node.op) {
@@ -63,6 +77,8 @@ impl NameIndex {
             index.parents.push(parents);
             index.imports.push(imports);
             index.using.push(using);
+            index.promotions.push(promotions);
+            index.expression_names.push(expression_names);
         }
         index
     }
@@ -72,4 +88,33 @@ impl NameIndex {
             move |id| (id.0 != 0).then(|| self.parents[reference.file][id.0]),
         )
     }
+}
+
+fn expression_name(s: &Source, node: NodeId) -> bool {
+    let n = s.node(node);
+    if n.kind != "Ident" {
+        return false;
+    }
+    if let Some(parent) = n.parent {
+        let p = s.node(parent);
+        if matches!(
+            p.kind.as_str(),
+            "Declaration" | "Field" | "Range" | "TypeSwitch"
+        ) && s.group(parent, "names").contains(&node)
+        {
+            return false;
+        }
+        if matches!(p.kind.as_str(), "Selector" | "FieldValue")
+            && s.role(parent, "field") == Some(node)
+        {
+            return false;
+        }
+        if matches!(
+            p.kind.as_str(),
+            "ImplicitSelector" | "EnumType" | "PolyType"
+        ) {
+            return false;
+        }
+    }
+    true
 }

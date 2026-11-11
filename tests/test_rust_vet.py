@@ -28,7 +28,7 @@ class RustVetTests(unittest.TestCase):
     def test_fix_payload_matches_reference_byte_offsets_and_hash(self):
         text='// 😀\npackage main\nget::proc(x:int)->int{return x+1}\nmain::proc(){x/*comment*/:=get(1);_=x}\n'
         self.write(text)
-        python=subprocess.run([str(native.ROOT/'thor'),'vet',str(self.app),'-json-errors',
+        python=subprocess.run([str(native.PYTHON),'vet',str(self.app),'-json-errors',
             '--output-dir',str(self.root/'python')],capture_output=True,text=True,cwd=self.root,timeout=90)
         rust=self.invoke('-json-errors','--editor-info')
         self.assertEqual(python.returncode,0,python.stdout+python.stderr)

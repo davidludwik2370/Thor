@@ -3,7 +3,8 @@ use crate::{
     diagnostic::{Error, Result},
     digest::sha256,
 };
-use serde_json::Value;
+use serde::Deserialize;
+use serde_json::{value::RawValue, Value};
 use std::{
     env, fs,
     io::{Read, Write},
@@ -22,6 +23,32 @@ pub struct Frontend {
     pub test: bool,
     pub target: Option<(String, String)>,
     pub project_name: String,
+}
+
+#[derive(Deserialize)]
+struct ParsePacket<'a> {
+    version: u32,
+    schema: &'a str,
+    sha256: &'a str,
+    #[serde(borrow)]
+    payload: &'a RawValue,
+}
+
+fn cached_payload(data: &[u8]) -> Option<Value> {
+    let _phase = crate::profile::span("parser.cache_validation");
+    let packet: ParsePacket<'_> = serde_json::from_slice(data).ok()?;
+    if packet.version != 1
+        || packet.schema != "odin-frontend-raw-v1"
+        || packet.sha256 != sha256(packet.payload.get().as_bytes())
+    {
+        return None;
+    }
+    decode(packet.payload.get().as_bytes()).ok()
+}
+
+fn decode(bytes: &[u8]) -> serde_json::Result<Value> {
+    let _phase = crate::profile::span("parser.decode");
+    serde_json::from_slice(bytes)
 }
 pub fn executable(name: &str) -> Result<PathBuf> {
     let path = PathBuf::from(name);
@@ -105,12 +132,16 @@ pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf)> {
     }
     Ok((binary, odin))
 }
-fn unique() -> u128 {
-    std::time::SystemTime::now()
+fn unique() -> String {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_nanos()
+        .as_nanos();
+    format!("{time}-{sequence}")
 }
+
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let parent = path
         .parent()
@@ -153,7 +184,7 @@ impl Frontend {
         } else {
             fs::read(&path)?
         };
-        let raw = String::from_utf8(bytes.clone())
+        let raw = std::str::from_utf8(&bytes)
             .map_err(|_| Error::new(format!("source is not UTF-8: {}", path.display())))?;
         let thor = path.extension().is_some_and(|ext| ext == "thor");
         let mut args = vec![path.to_string_lossy().into_owned()];
@@ -181,28 +212,20 @@ impl Frontend {
         });
         if let Some(cache) = &cache {
             if let Ok(data) = fs::read(cache) {
-                if let Ok(mut packet) = serde_json::from_slice::<Value>(&data) {
-                    let info = &packet["payload"];
-                    let digest = sha256(&serde_json::to_vec(info)?);
-                    if packet["version"] == 1
-                        && packet["schema"] == "odin-frontend-raw-v1"
-                        && packet["sha256"].as_str() == Some(digest.as_str())
+                if let Some(info) = cached_payload(&data) {
+                    if let Ok(source) = Source::from_frontend(path.clone(), raw.into(), info, thor)
                     {
-                        let info = std::mem::take(&mut packet["payload"]);
-                        if let Ok(source) =
-                            Source::from_frontend(path.clone(), raw.clone(), info, thor)
-                        {
-                            crate::profile::count("parser.cache_hits", 1);
-                            crate::profile::count("parser.nodes", source.nodes.len() as u64);
-                            return Ok(source);
-                        }
+                        crate::profile::count("parser.cache_hits", 1);
+                        crate::profile::count("parser.nodes", source.nodes.len() as u64);
+                        return Ok(source);
                     }
                 }
             }
         }
+        let raw = raw.to_owned();
         crate::profile::count("parser.processes", 1);
         let (status, stdout, stderr) = self.run(&args, bytes)?;
-        let info: Value = serde_json::from_slice(&stdout).map_err(|_| {
+        let info = decode(&stdout).map_err(|_| {
             Error::new(format!(
                 "invalid frontend output for {}: {}",
                 path.display(),
@@ -261,19 +284,18 @@ impl Frontend {
                 exit_status: 1,
             });
         }
-        let cache_payload = if cache.is_some() {
-            Some(serde_json::to_vec(&info)?)
-        } else {
-            None
-        };
         let source = Source::from_frontend(path, raw, info, thor)?;
         crate::profile::count("parser.nodes", source.nodes.len() as u64);
-        if let (Some(cache), Some(payload)) = (cache, cache_payload) {
+        if let Some(cache) = cache {
             // Persist only parser output. Normalization and semantic facts must
             // be rebuilt by the current compiler even if its implementation changes.
-            let digest = sha256(&payload);
+            let payload = std::str::from_utf8(&stdout)
+                .map_err(|_| Error::new("frontend JSON is not UTF-8"))?
+                .trim()
+                .as_bytes();
+            let digest = sha256(payload);
             let mut packet=format!("{{\"version\":1,\"schema\":\"odin-frontend-raw-v1\",\"sha256\":\"{digest}\",\"payload\":").into_bytes();
-            packet.extend_from_slice(&payload);
+            packet.extend_from_slice(payload);
             packet.push(b'}');
             let _ = atomic_write(&cache, &packet);
         }
@@ -342,5 +364,63 @@ impl Frontend {
             written?;
         }
         Ok((status, stdout, stderr))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn packet(payload: &str) -> Vec<u8> {
+        format!("{{\"version\":1,\"schema\":\"odin-frontend-raw-v1\",\"sha256\":\"{}\",\"payload\":{payload}}}", sha256(payload.as_bytes())).into_bytes()
+    }
+    #[test]
+    fn cache_checks_stored_bytes_and_accepts_existing_canonical_packets() {
+        let payload = serde_json::json!({"nodes":[],"text":"é 😀","excluded":false});
+        let canonical = serde_json::to_string(&payload).unwrap();
+        let formatted = serde_json::to_string_pretty(&payload).unwrap();
+        for raw in [canonical, formatted] {
+            let stored = packet(&raw);
+            let restored = cached_payload(&stored);
+            if restored != Some(payload.clone()) {
+                panic!("valid parser cache was rejected");
+            }
+            for replacement in [
+                String::from_utf8(stored.clone()).unwrap().replace("é", "e"),
+                String::from_utf8(stored.clone())
+                    .unwrap()
+                    .replace("\"version\":1", "\"version\":2"),
+                String::from_utf8(stored.clone())
+                    .unwrap()
+                    .replace("raw-v1", "raw-v2"),
+            ] {
+                if cached_payload(replacement.as_bytes()).is_some() {
+                    panic!("changed parser packet was accepted");
+                }
+            }
+        }
+        for invalid in [b"{broken".as_slice(), b"{}", b"null", b"[]"] {
+            if cached_payload(invalid).is_some() {
+                panic!("invalid cache was accepted");
+            }
+        }
+    }
+    #[test]
+    fn concurrent_cache_writes_publish_complete_packets_and_leave_no_temporary_files() {
+        let directory =
+            std::env::temp_dir().join(format!("thor-atomic-{}-{}", std::process::id(), unique()));
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("cache.json");
+        let jobs = (0..48).collect::<Vec<_>>();
+        let results = crate::parallel::map(&jobs, |number| {
+            let payload = format!("{{\"number\":{number}}}");
+            atomic_write(&path, &packet(&payload))
+        });
+        let published = fs::read(&path).unwrap();
+        let entries = fs::read_dir(&directory).unwrap().count();
+        let valid = cached_payload(&published).is_some();
+        fs::remove_dir_all(&directory).unwrap();
+        if results.iter().any(Result::is_err) || entries != 1 || !valid {
+            panic!("concurrent cache publication failed");
+        }
     }
 }

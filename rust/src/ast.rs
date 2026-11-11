@@ -130,6 +130,7 @@ impl Source {
         Arc::ptr_eq(&self.syntax, &other.syntax)
     }
     pub fn from_frontend(path: PathBuf, raw: String, mut info: Value, thor: bool) -> Result<Self> {
+        let _phase = crate::profile::span("parser.normalize");
         let rows = info["nodes"]
             .as_array_mut()
             .ok_or_else(|| Error::new("frontend omitted nodes"))?;
@@ -252,7 +253,10 @@ impl Source {
         // Features can replace roles/lists. Resolve them only after merging,
         // distinguishing same-span wrappers using native ancestry.
         for i in 0..nodes.len() {
-            let row = nodes[i].data.clone();
+            let row = &nodes[i].data;
+            let mut resolved_roles = BTreeMap::new();
+            let mut role_spans = BTreeMap::new();
+            let mut resolved_lists = BTreeMap::new();
             if let Some(roles) = row["roles"].as_object() {
                 for (name, value) in roles {
                     if let Some(span) = Span::from_wire(value) {
@@ -263,9 +267,9 @@ impl Source {
                         {
                             return Err(Error::new("invalid AST role span"));
                         }
-                        nodes[i].spans.insert(name.clone(), span);
+                        role_spans.insert(name.clone(), span);
                         if let Some(id) = resolve_span(&nodes, &by_span, span, NodeId(i)) {
-                            nodes[i].roles.insert(name.clone(), id);
+                            resolved_roles.insert(name.clone(), id);
                         }
                     }
                 }
@@ -280,9 +284,12 @@ impl Source {
                             }
                         }
                     }
-                    nodes[i].lists.insert(name.clone(), ids);
+                    resolved_lists.insert(name.clone(), ids);
                 }
             }
+            nodes[i].roles = resolved_roles;
+            nodes[i].spans = role_spans;
+            nodes[i].lists = resolved_lists;
         }
         for feature in info["features"]
             .as_array()

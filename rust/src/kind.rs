@@ -5,7 +5,20 @@ macro_rules! kinds {
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
         pub enum Kind {$($kind,)* Unknown(Box<str>)}
         impl Kind {
+            #[inline]
             pub fn as_str(&self)->&str {match self {$(Self::$kind=>stringify!($kind),)*Self::Unknown(name)=>name}}
+        }
+        impl PartialEq<&str> for Kind {
+            #[inline]
+            fn eq(&self, other: &&str) -> bool {
+                if let Self::Unknown(name) = self {
+                    return name.as_ref() == *other;
+                }
+                match *other {
+                    $(stringify!($kind) => matches!(self, Self::$kind),)*
+                    _ => false,
+                }
+            }
         }
         impl From<&str> for Kind {
             fn from(name:&str)->Self{match name {$(stringify!($kind)=>Self::$kind,)*_=>Self::Unknown(name.into())}}
@@ -35,8 +48,29 @@ impl std::fmt::Display for Kind {
         out.write_str(self.as_str())
     }
 }
-impl PartialEq<&str> for Kind {
-    fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn string_comparisons_preserve_known_and_future_tag_spellings() {
+        let tags = [
+            "Ident",
+            "Call",
+            "Field",
+            "File",
+            "UnknownFutureTag",
+            "",
+            "call",
+        ];
+        for spelling in tags {
+            for kind in [Kind::from(spelling), Kind::Unknown(spelling.into())] {
+                for other in tags {
+                    if (kind == other) != (spelling == other) || kind.as_str() != spelling {
+                        panic!("syntax kind comparison changed for {spelling:?} and {other:?}");
+                    }
+                }
+            }
+        }
     }
 }

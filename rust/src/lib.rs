@@ -23,6 +23,8 @@ pub mod kind;
 pub mod lower;
 pub mod memory;
 pub mod permissions;
+mod permissioncache;
+mod parallel;
 pub mod profile;
 pub mod privileges;
 pub mod project;

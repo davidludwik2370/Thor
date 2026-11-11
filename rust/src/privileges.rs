@@ -67,7 +67,7 @@ pub struct Issue {
     pub message: String,
     pub related: Vec<Ref>,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Facts {
     pub issues: HashMap<Ref, Issue>,
     pub mutating: BTreeSet<Ref>,
@@ -154,6 +154,11 @@ pub struct Privileges<'a, 'r> {
     pure_depth: usize,
     uncertain: Option<Ref>,
     deleting: bool,
+    discovering: bool,
+    library_names: std::cell::RefCell<HashMap<Ref, Option<(String, String)>>>,
+    specialized_types: HashMap<(Ref, Substitutions), Type>,
+    field_types: HashMap<Type, Vec<(String, Type)>>,
+    member_types: HashMap<(Type, String), Type>,
 }
 #[derive(PartialEq, Eq, Hash)]
 struct SummaryKey {
@@ -174,6 +179,18 @@ impl<'a, 'r> Privileges<'a, 'r> {
         flags: &[String],
         editor: bool,
         evaluation: Option<&crate::evaluation::Plan>,
+    ) -> Facts {
+        Self::analyze_with_dependencies(r, flags, editor, evaluation, false)
+    }
+    pub(crate) fn discover(
+        r: &'r mut Resolver<'a>, flags: &[String], editor: bool,
+        evaluation: Option<&crate::evaluation::Plan>,
+    ) -> Facts {
+        Self::analyze_with_dependencies(r, flags, editor, evaluation, true)
+    }
+    fn analyze_with_dependencies(
+        r: &'r mut Resolver<'a>, flags: &[String], editor: bool,
+        evaluation: Option<&crate::evaluation::Plan>, discovering: bool,
     ) -> Facts {
         let _phase = crate::profile::span("analysis.slice_permissions");
         let enabled = editor
@@ -204,6 +221,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
             pure_depth: 0,
             uncertain: None,
             deleting: false,
+            discovering,
+            library_names: std::cell::RefCell::new(HashMap::new()),
+            specialized_types: HashMap::new(),
+            field_types: HashMap::new(),
+            member_types: HashMap::new(),
         };
         this.annotations();
         let procedures = this
@@ -223,6 +245,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
             })
             .collect::<Vec<_>>();
         for proc in procedures {
+            if discovering && this.r.has_demanded_packages() {
+                crate::profile::count("permissions.dependency_retries", 1);
+                return Facts::default();
+            }
             let source = this.s(proc);
             if evaluation.is_some_and(|plan| {
                 !plan.emits(source, proc.node)
@@ -260,6 +286,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 this.summary(proc, Substitutions::new(), None, editor);
                 this.pure_depth = 0;
             }
+        }
+        if discovering && this.r.has_demanded_packages() {
+            crate::profile::count("permissions.dependency_retries", 1);
+            return Facts::default();
         }
         // Only incomplete recursive callees can invalidate an already
         // completed caller. Match the reference work queue instead of
@@ -396,7 +426,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             for (name, field) in &params {
                 let typ = self
                     .role(*field, "type")
-                    .map(|r| self.r.specialized_type(r, &bindings))
+                    .map(|r| self.specialized_type(r, &bindings))
                     .or_else(|| {
                         self.r
                             .symbol(*name)
@@ -413,7 +443,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 };
                 let typ = self
                     .role(*field, "type")
-                    .map(|r| self.r.specialized_type(r, &bindings))
+                    .map(|r| self.specialized_type(r, &bindings))
                     .unwrap_or(Type::Unknown);
                 if !matches!(base_type(&typ), Type::Slice(_) | Type::Soa(_)) {
                     continue;
@@ -684,7 +714,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let child = if let Some(child) = self.values[v].fields.get(name).copied() {
                 child
             } else {
-                let typ = self.r.member_type(&self.values[v].typ.clone(), name);
+                let typ = self.member_type(&self.values[v].typ.clone(), name);
                 let path = self.values[v].path.clone().map(|mut p| {
                     p.steps.push(Step::Field(name.into()));
                     p
@@ -698,7 +728,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if let Some(child) = self.values[v].fields.get(name) {
             return *child;
         }
-        let typ = self.r.member_type(&self.values[v].typ.clone(), name);
+        let typ = self.member_type(&self.values[v].typ.clone(), name);
         let path = self.values[v].path.clone().map(|mut p| {
             p.steps.push(Step::Field(name.into()));
             p
@@ -718,7 +748,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 result
             } else {
                 let result = self.value(*elem.clone());
-                for (name, _) in self.r.record_fields(&elem) {
+                for (name, _) in self.record_fields(&elem) {
                     let column = self.member(v, &name);
                     let item = self.item(column);
                     self.values[result].fields.insert(name, item);
@@ -821,7 +851,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         match base_type(&old.typ) {
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
-                let fields = self.r.record_fields(&old.typ);
+                let fields = self.record_fields(&old.typ);
                 for (name, _) in fields {
                     let child = self.member(v, &name);
                     let copy = self.copy_seen(child, seen);
@@ -872,7 +902,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     aspect: Aspect::Inline,
                     ..origin
                 });
-                let fields = self.r.record_fields(&self.values[v].typ.clone());
+                let fields = self.record_fields(&self.values[v].typ.clone());
                 for (name, _) in fields {
                     let child = self.member(v, &name);
                     self.freeze_seen(child, seed, seen);
@@ -914,7 +944,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         {
             match base_type(&self.values[v].typ).clone() {
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
-                    let fields = self.r.record_fields(&self.values[v].typ.clone());
+                    let fields = self.record_fields(&self.values[v].typ.clone());
                     for (name, _) in fields {
                         self.member(v, &name);
                     }
@@ -931,7 +961,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.deref(v);
                 }
                 Type::Soa(elem) => {
-                    for (name, _) in self.r.record_fields(&elem) {
+                    for (name, _) in self.record_fields(&elem) {
                         self.member(v, &name);
                     }
                 }
@@ -961,15 +991,13 @@ impl<'a, 'r> Privileges<'a, 'r> {
             | Type::Dynamic(elem)
             | Type::Set(elem)
             | Type::Map { value: elem, .. } => self.contains_slice(elem, seen),
-            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
-                .r
-                .record_fields(typ)
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self.record_fields(typ)
                 .into_iter()
                 .any(|(_, typ)| self.contains_slice(&typ, seen)),
             Type::Union(owner) => {
                 let variants = self.group(*owner, "variants");
                 variants.into_iter().any(|r| {
-                    let typ = self.r.specialized_type(r, &Substitutions::new());
+                    let typ = self.specialized_type(r, &Substitutions::new());
                     self.contains_slice(&typ, seen)
                 })
             }
@@ -989,9 +1017,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             | Type::Soa(base)
             | Type::Array { elem: base, .. }
             | Type::Fixed { elem: base, .. } => self.unresolved_value_type(base, seen),
-            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
-                .r
-                .record_fields(typ)
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self.record_fields(typ)
                 .iter()
                 .any(|(_, typ)| self.unresolved_value_type(typ, seen)),
             Type::Union(owner) => self
@@ -1156,7 +1182,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
         result
     }
     fn annotations(&mut self) {
-        for (file, s) in self.r.sources.iter().enumerate() {
+        let sources = self.r.sources;
+        for (file, s) in sources.iter().enumerate() {
             for row in s.info["mut_parameters"].as_array().into_iter().flatten() {
                 let offset = row[0].as_u64().unwrap_or(u64::MAX) as usize;
                 let field = s
@@ -1183,8 +1210,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         let typ = s
                             .role(field, "type")
                             .map(|node| {
-                                self.r
-                                    .specialized_type(Ref { file, node }, &Substitutions::new())
+                                self.specialized_type(Ref { file, node }, &Substitutions::new())
                             })
                             .unwrap_or(Type::Unknown);
                         if !valid
@@ -1239,7 +1265,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         for (index, (name, field)) in self.params(sig).into_iter().enumerate() {
             let typ = self
                 .role(field, "type")
-                .map(|r| self.r.specialized_type(r, &bindings))
+                .map(|r| self.specialized_type(r, &bindings))
                 .unwrap_or_else(|| {
                     self.role(field, "default")
                         .map(|default| self.typ(default, c).defaulted())
@@ -1280,7 +1306,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 let typ = self
                     .role(field, "type")
-                    .map(|r| self.r.specialized_type(r, &bindings))
+                    .map(|r| self.specialized_type(r, &bindings))
                     .unwrap_or(Type::Unknown);
                 let names = self.group(field, "names");
                 for name in if names.is_empty() {
@@ -1365,6 +1391,45 @@ impl<'a, 'r> Privileges<'a, 'r> {
             );
         }
     }
+    // Resolver inputs stay fixed during this analysis. Keep resolved metadata
+    // separate from the mutable value/alias graph held in `values` and `contexts`.
+    fn specialized_type(&mut self, reference: Ref, bindings: &Substitutions) -> Type {
+        let key = (reference, bindings.clone());
+        if let Some(typ) = self.specialized_types.get(&key) {
+            crate::profile::count("permissions.type_hits", 1);
+            return typ.clone();
+        }
+        let typ = self.r.specialized_type(reference, bindings);
+        if typ.resolved() && !self.r.has_demanded_packages() {
+            self.specialized_types.insert(key, typ.clone());
+        }
+        typ
+    }
+    fn record_fields(&mut self, typ: &Type) -> Vec<(String, Type)> {
+        if let Some(fields) = self.field_types.get(typ) {
+            crate::profile::count("permissions.field_hits", 1);
+            return fields.clone();
+        }
+        let fields = self.r.record_fields(typ);
+        if typ.resolved() && fields.iter().all(|(_, typ)| typ.resolved())
+            && !self.r.has_demanded_packages()
+        {
+            self.field_types.insert(typ.clone(), fields.clone());
+        }
+        fields
+    }
+    fn member_type(&mut self, typ: &Type, name: &str) -> Type {
+        let key = (typ.clone(), name.to_string());
+        if let Some(member) = self.member_types.get(&key) {
+            crate::profile::count("permissions.member_hits", 1);
+            return member.clone();
+        }
+        let member = self.r.member_type(typ, name);
+        if member.resolved() && !self.r.has_demanded_packages() {
+            self.member_types.insert(key, member.clone());
+        }
+        member
+    }
     fn typ(&mut self, r: Ref, c: C) -> Type {
         if let Some(symbol) = self.r.symbol(r) {
             if let Some(v) = self.contexts[c]
@@ -1379,7 +1444,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             "Selector" if self.r.symbol(r).is_none() => {
                 if let (Some(base), Some(field)) = (self.role(r, "expr"), self.role(r, "field")) {
                     let typ = self.typ(base, c);
-                    return self.r.member_type(&typ, &self.text(field));
+                    return self.member_type(&typ, &self.text(field));
                 }
             }
             "Index" | "Deref" => {
@@ -1393,9 +1458,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
             "Compound" => {
                 if let Some(annotation) = self.role(r, "type") {
-                    return self
-                        .r
-                        .specialized_type(annotation, &self.contexts[c].bindings.clone());
+                    return self.specialized_type(annotation, &self.contexts[c].bindings.clone());
                 }
                 if self
                     .s(r)
@@ -1419,7 +1482,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         if self.kind(parent) == "Compound" {
                             let typ = self.typ(parent, c);
                             if let Some(field) = field {
-                                return self.r.member_type(&typ, &field);
+                                return self.member_type(&typ, &field);
                             }
                             if matches!(base_type(&typ), Type::Struct(_) | Type::Record(..)) {
                                 let index = self
@@ -1427,9 +1490,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                                     .iter()
                                     .position(|child| child.node == r.node)
                                     .unwrap_or(0);
-                                return self
-                                    .r
-                                    .record_fields(&typ)
+                                return self.record_fields(&typ)
                                     .get(index)
                                     .map(|(_, typ)| typ.clone())
                                     .unwrap_or(Type::Unknown);
@@ -1438,7 +1499,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         }
                         if self.kind(parent) == "Declaration" {
                             if let Some(annotation) = self.role(parent, "type") {
-                                return self.r.specialized_type(
+                                return self.specialized_type(
                                     annotation,
                                     &self.contexts[c].bindings.clone(),
                                 );
@@ -1450,7 +1511,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             _ => {}
         }
         let bindings = self.contexts[c].bindings.clone();
-        self.r.specialized_type(r, &bindings)
+        self.specialized_type(r, &bindings)
     }
     fn expression_results(&mut self, r: Ref, c: C, count: usize) -> Vec<V> {
         let first = self.eval(r, c);
@@ -1661,7 +1722,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
             "Compound" => {
                 let id = self.value(typ.clone());
-                let fields = self.r.record_fields(&typ);
+                let fields = self.record_fields(&typ);
                 for (index, element) in self.group(r, "elems").into_iter().enumerate() {
                     if matches!(base_type(&typ), Type::Map { .. })
                         && self.kind(element) == "FieldValue"
@@ -1852,6 +1913,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn statement(&mut self, r: Ref, c: C) {
+        if self.discovering && self.r.has_demanded_packages() {
+            return;
+        }
         match self.kind(r).to_string().as_str() {
             "Procedure" | "ProcedureType" | "StructType" | "EnumType" | "UnionType" => {}
             "Declaration" => {
@@ -1878,7 +1942,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     let mut v = self.copied(v);
                     if let Some(annotation) = self.role(r, "type") {
                         let bindings = self.contexts[c].bindings.clone();
-                        self.values[v].typ = self.r.specialized_type(annotation, &bindings);
+                        self.values[v].typ = self.specialized_type(annotation, &bindings);
                     }
                     if self.s(r).node(r.node).immutable {
                         v = self.freeze(v, name)
@@ -2077,8 +2141,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         }
                         let variants = self.group(case, "types");
                         let typ = if variants.len() == 1 {
-                            self.r
-                                .specialized_type(variants[0], &self.contexts[c].bindings.clone())
+                            self.specialized_type(variants[0], &self.contexts[c].bindings.clone())
                         } else {
                             self.values[original].typ.clone()
                         };
@@ -2401,9 +2464,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .element()
                         .cloned()
                         .unwrap_or(Type::Unknown);
-                    let names = self
-                        .r
-                        .record_fields(&typ)
+                    let names = self.record_fields(&typ)
                         .into_iter()
                         .map(|(name, _)| name)
                         .collect::<Vec<_>>();
@@ -2440,7 +2501,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     return result;
                 }
                 "expand_values" if !values.is_empty() => {
-                    let fields = self.r.record_fields(&self.values[values[0]].typ.clone());
+                    let fields = self.record_fields(&self.values[values[0]].typ.clone());
                     let expanded = if !fields.is_empty() {
                         fields
                             .into_iter()
@@ -2728,7 +2789,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 let formal = self
                     .role(*field, "type")
-                    .map(|r| self.r.specialized_type(r, &substitutions))
+                    .map(|r| self.specialized_type(r, &substitutions))
                     .unwrap_or(Type::Unknown);
                 let opaque_formal = if self.s(*field).node(field.node).data["variadic"] == true {
                     formal.element().unwrap_or(&formal)
@@ -2761,7 +2822,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.r.fields(sig, "results").into_iter().enumerate()
                 {
                     let typ = annotation
-                        .map(|r| self.r.specialized_type(r, &substitutions))
+                        .map(|r| self.specialized_type(r, &substitutions))
                         .unwrap_or(Type::Unknown);
                     let output = self.opaque_result(typ, r, &mut HashMap::new());
                     if let Some(old) = results.get(index).copied() {
@@ -2776,7 +2837,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let result_fields = self.r.fields(sig, "results");
             let result_references = result_fields.iter().any(|(_, annotation)| {
                 annotation.is_none_or(|r| {
-                    let typ = self.r.specialized_type(r, &substitutions);
+                    let typ = self.specialized_type(r, &substitutions);
                     self.contains_slice(&typ, &mut HashSet::new())
                 })
             });
@@ -2796,7 +2857,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if !has_references && !result_references && !local_checks {
                 for (index, (_, annotation)) in result_fields.into_iter().enumerate() {
                     let typ = annotation
-                        .map(|r| self.r.specialized_type(r, &substitutions))
+                        .map(|r| self.specialized_type(r, &substitutions))
                         .unwrap_or(Type::Unknown);
                     let result = self.value(typ);
                     if let Some(old) = results.get(index).copied() {
@@ -2895,7 +2956,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 continue;
             }
             if self.kind(arg) == "Unary" && self.op(arg) == "**" {
-                let fields = self.r.record_fields(&self.values[v].typ.clone());
+                let fields = self.record_fields(&self.values[v].typ.clone());
                 if !fields.is_empty() {
                     for (name, _) in fields {
                         let child = self.member(v, &name);
@@ -2959,7 +3020,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.values[id].element = Some(child);
             }
             Type::Struct(_) | Type::Record(..) => {
-                for (name, typ) in self.r.record_fields(&typ) {
+                for (name, typ) in self.record_fields(&typ) {
                     let child = self.opaque_result(typ, seed, seen);
                     self.values[id].fields.insert(name, child);
                 }
@@ -3033,10 +3094,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .map(|root| root.join(suffix))
                 .is_some_and(|actual| {
                     match (
-                        std::fs::canonicalize(actual),
-                        std::fs::canonicalize(expected),
+                        self.r.canonical_path(&actual),
+                        self.r.canonical_path(&expected),
                     ) {
-                        (Ok(actual), Ok(expected)) => actual == expected,
+                        (Some(actual), Some(expected)) => actual == expected,
                         _ => false,
                     }
                 });
@@ -3044,6 +3105,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.r.standard_library(reference, path)
     }
     fn library(&self, callee: Ref) -> Option<(String, String)> {
+        if let Some(cached) = self.library_names.borrow().get(&callee) {
+            return cached.clone();
+        }
+        let library = self.library_uncached(callee);
+        self.library_names.borrow_mut().insert(callee, library.clone());
+        library
+    }
+    fn library_uncached(&self, callee: Ref) -> Option<(String, String)> {
         for path in ["core:fmt", "thor:basic", "thor:graph", "core:slice"] {
             if let Some(name) = crate::evaluation::library_member(self.r, callee, path) {
                 return Some((path.into(), name));
@@ -3055,20 +3124,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if self.r.lookup(owner, &self.text(owner)).is_some() {
                 return None;
             }
-            for node in &self.s(callee).nodes {
-                if node.kind != "Import" {
-                    continue;
-                }
-                let path = crate::lower::unquote(&node.op).ok()?;
-                let alias = self.s(callee).names.get(node.name);
-                let alias = if alias.is_empty() {
-                    path.rsplit(['/', ':']).next().unwrap_or("")
-                } else {
-                    alias
-                };
-                if alias == self.text(owner) {
-                    return Some((path, self.text(field)));
-                }
+            if let Some(path) = self.r.namespace_imports(callee.file, &self.text(owner)).first() {
+                return Some((path.clone(), self.text(field)));
             }
         }
         if self.kind(callee) == "Ident" && self.r.lookup(callee, &self.text(callee)).is_none() {
@@ -3210,8 +3267,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     }
                     "==" | "!=" => {
                         let bindings = self.contexts[c].bindings.clone();
-                        let a = self.r.specialized_type(left, &bindings);
-                        let b = self.r.specialized_type(right, &bindings);
+                        let a = self.specialized_type(left, &bindings);
+                        let b = self.specialized_type(right, &bindings);
                         if a.resolved()
                             && b.resolved()
                             && (self.denotes_type(left) || bindings.contains_key(&self.text(left)))

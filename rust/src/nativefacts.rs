@@ -126,8 +126,11 @@ impl Project {
                 !source.shared_native && !source.path.starts_with(self.options.root.join("runtime"))
             }) {
                 for (index, node) in source.nodes.iter().enumerate() {
-                    if matches!(node.kind.as_str(), "Ident" | "Selector" | "Call") {
-                        resolver.type_of(crate::semantics::Ref {file, node: crate::ast::NodeId(index)});
+                    let reference = crate::semantics::Ref {file, node: crate::ast::NodeId(index)};
+                    if matches!(node.kind.as_str(), "Selector" | "Call")
+                        || node.kind == "Ident" && resolver.expression_reference(reference)
+                    {
+                        resolver.type_of(reference);
                     }
                 }
             }
@@ -201,19 +204,24 @@ impl Project {
                     }
                 }
             }
-            // Slice-effect inspection also follows only demanded callees.
-            // Retry discovery before the final diagnostic/ownership pass when
-            // a selected implementation needs another native package.
-            let _effects = crate::privileges::Privileges::analyze_project(
-                &mut resolver, &self.options.flags, self.options.editor_info, self.evaluation.as_ref());
             packages.extend(resolver.demanded_packages());
-            packages.retain(|directory| {
+            let needs_load = |directory: &PathBuf| {
                 !inspected.contains(directory)
                     && !self
                         .sources
                         .iter()
                         .any(|source| source.path.parent() == Some(directory))
-            });
+            };
+            packages.retain(&needs_load);
+            if packages.is_empty() {
+                // Complete known signature/type dependencies before inspecting
+                // slice effects. An incomplete graph would require a repeat.
+                let _effects = self.permission_cache.borrow_mut().discover(
+                    &mut resolver, &self.options.flags, self.options.editor_info,
+                    self.evaluation.as_ref());
+                packages.extend(resolver.demanded_packages());
+                packages.retain(needs_load);
+            }
             if packages.is_empty() {
                 break;
             }

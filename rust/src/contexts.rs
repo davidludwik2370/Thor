@@ -1,12 +1,12 @@
 //! Contextual literals use type witnesses emitted in the declaration's scope.
 use super::*;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ParameterWitness {
     pub declaration: Ref,
     pub annotation: Ref,
     pub used: Vec<(String, String)>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ContextHint {
     pub annotation: Ref,
     pub values: Vec<Type>,

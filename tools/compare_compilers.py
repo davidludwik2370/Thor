@@ -133,7 +133,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('sources', nargs='*', type=Path,
                         help='files/packages to compare; defaults to regression fixtures')
-    parser.add_argument('--python', type=Path, default=ROOT/'thor')
+    parser.add_argument('--python', type=Path, default=ROOT/'thor-python')
     parser.add_argument('--rust', type=Path, default=ROOT/'rust/target/release/thor-rust')
     parser.add_argument('--timeout', type=float, default=45)
     parser.add_argument('--command', choices=['check', 'run'], default='check')

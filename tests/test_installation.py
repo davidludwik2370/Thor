@@ -68,7 +68,7 @@ work::fn(n:int)->int{return basic.sum([]int{n,n+1,n+2})}
 VALUE::work(3)
 main::proc(){n:=4;assert(work(n)==15&&VALUE==12)}
 ''')
-        result=subprocess.run([str(ROOT/'thor'),'build','.'],cwd=project,capture_output=True,text=True,timeout=40)
+        result=subprocess.run([str(ROOT/'thor-python'),'build','.'],cwd=project,capture_output=True,text=True,timeout=40)
         self.assertEqual(result.returncode,0,result.stderr)
         output=project/'.thor-build/checked'
         self.assertTrue((output/'.thor-runtime/basic/basic.odin').is_file())

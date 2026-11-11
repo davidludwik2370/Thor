@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+PYTHON = ROOT / 'thor-python'
 RUST = ROOT / 'rust/target/release/thor-rust'
 UNCHECKED = ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']
 
@@ -36,7 +37,7 @@ class RustCompilerTests(unittest.TestCase):
         self.source = self.app/'main.thor'
 
     def invoke(self, engine, command='run', flags=(), directory=False, args=(), env=None):
-        compiler = ROOT/'thor' if engine == 'python' else RUST
+        compiler = PYTHON if engine == 'python' else RUST
         argv = [str(compiler), command, str(self.app if directory else self.source),
                 '--output-dir', str(self.root/engine), '--cache-dir', str(self.root/'cache'),
                 *flags]

@@ -23,7 +23,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         self.template.write_bytes(self.starter)
 
     def invoke(self, engine, args, *, cwd=None, env=None):
-        command = [str(native.RUST)] if engine == 'rust' else [sys.executable, str(ROOT/'thor')]
+        command = [str(native.RUST)] if engine == 'rust' else [sys.executable, str(native.PYTHON)]
         return subprocess.run([*command, 'new', *args], cwd=cwd or self.root,
                               env=env, capture_output=True, text=True, timeout=30)
 
@@ -145,7 +145,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         result = self.invoke('rust', ['runnable', '--template', str(self.template)])
         self.assertEqual(result.returncode, 0, result.stderr)
         project = self.root/'runnable'
-        for compiler in [ROOT/'thor', native.RUST]:
+        for compiler in [native.PYTHON, native.RUST]:
             result = subprocess.run([str(compiler), 'run', str(project)], cwd=project,
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)

@@ -15,48 +15,13 @@ struct UsingOwner {
     scope: NodeId,
 }
 impl Resolver<'_> {
-    fn expression_name(&self, r: Ref) -> bool {
-        let s = &self.sources[r.file];
-        let n = s.node(r.node);
-        if n.kind != "Ident" {
-            return false;
-        }
-        if let Some(parent) = n.parent {
-            let p = s.node(parent);
-            if matches!(
-                p.kind.as_str(),
-                "Declaration" | "Field" | "Range" | "TypeSwitch"
-            ) && s.group(parent, "names").contains(&r.node)
-            {
-                return false;
-            }
-            if matches!(p.kind.as_str(), "Selector" | "FieldValue")
-                && s.role(parent, "field") == Some(r.node)
-            {
-                return false;
-            }
-            if matches!(
-                p.kind.as_str(),
-                "ImplicitSelector" | "EnumType" | "PolyType"
-            ) {
-                return false;
-            }
-        }
-        true
-    }
     pub(super) fn prepare_projections(&mut self) {
         let _phase = crate::profile::span("analysis.using_projections");
         let mut using: HashMap<(usize, NodeId), Vec<UsingOwner>> = HashMap::new();
-        let mut references = vec![];
         for (file, s) in self.sources.iter().enumerate() {
-            for (index, n) in s.nodes.iter().enumerate() {
-                let r = Ref {
-                    file,
-                    node: NodeId(index),
-                };
-                if self.expression_name(r) {
-                    references.push(r);
-                }
+            for node in &self.index.promotions[file] {
+                let r = Ref { file, node: *node };
+                let n = s.node(*node);
                 let owners = if n.kind == "Using" {
                     s.group(r.node, "values").to_vec()
                 } else if n.data["using_field"] == true
@@ -100,18 +65,43 @@ impl Resolver<'_> {
         }
         // A using declaration in an unrelated SDK file cannot affect this
         // reference. Group package owners once, preserving source-file order.
-        let package_using = self.index.members.iter().map(|members| {
-            members.iter().flat_map(|file| using.get(&(*file, NodeId(0)))
-                .into_iter().flatten().cloned()).collect::<Vec<_>>()
-        }).collect::<Vec<_>>();
-        let references = references.into_iter().filter_map(|reference| {
-            let scopes = self.index.scopes(reference).collect::<Vec<_>>();
-            scopes.iter().any(|scope| {
-                if *scope == NodeId(0) {
-                    !package_using[self.index.package_for[reference.file]].is_empty()
-                } else { using.contains_key(&(reference.file, *scope)) }
-            }).then_some((reference, scopes))
-        }).collect::<Vec<_>>();
+        let package_using = self
+            .index
+            .members
+            .iter()
+            .map(|members| {
+                members
+                    .iter()
+                    .flat_map(|file| {
+                        using
+                            .get(&(*file, NodeId(0)))
+                            .into_iter()
+                            .flatten()
+                            .cloned()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let references = self
+            .index
+            .expression_names
+            .iter()
+            .enumerate()
+            .flat_map(|(file, nodes)| nodes.iter().map(move |node| Ref { file, node: *node }))
+            .filter_map(|reference| {
+                let scopes = self.index.scopes(reference).collect::<Vec<_>>();
+                scopes
+                    .iter()
+                    .any(|scope| {
+                        if *scope == NodeId(0) {
+                            !package_using[self.index.package_for[reference.file]].is_empty()
+                        } else {
+                            using.contains_key(&(reference.file, *scope))
+                        }
+                    })
+                    .then_some((reference, scopes))
+            })
+            .collect::<Vec<_>>();
         let mut projected: HashMap<(Ref, String), usize> = HashMap::new();
         // A later `using inner` can refer to an earlier promoted record field.
         // Resolve those aliases with the same field/type lookup until stable.

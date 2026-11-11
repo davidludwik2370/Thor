@@ -118,6 +118,7 @@ impl Project {
             type_probe_imports: BTreeMap::new(),
             source_facts: self.source_facts.clone(),
             resolver_index: self.resolver_index.clone(),
+            permission_cache: std::cell::RefCell::default(),
         })
     }
     pub(crate) fn resolve_evaluation_identities(

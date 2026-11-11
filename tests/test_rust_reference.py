@@ -27,7 +27,7 @@ class RustReferenceTests(unittest.TestCase):
 
     def invoke(self, source, *, files=None, command='run', fail=None, flags=(),
                args=(), expected=None, directory=False):
-        with patch.object(self, 'compiler', rust.ROOT/'thor', create=True):
+        with patch.object(self, 'compiler', rust.PYTHON, create=True):
             root, reference = base.ThorTests.invoke(self, source, files=files, command=command,
                                                    fail=fail, flags=flags, args=args,
                                                    expected=expected, directory=directory)

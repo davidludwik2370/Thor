@@ -10,7 +10,7 @@ class RustEditorInfoTests(unittest.TestCase):
     setUp = native.RustCompilerTests.setUp
 
     def invoke(self, engine, overlay=None):
-        compiler = native.ROOT/'thor' if engine == 'python' else native.RUST
+        compiler = native.PYTHON if engine == 'python' else native.RUST
         args = [str(compiler), 'check', str(self.source), '--output-dir', str(self.root/engine),
                 '--cache-dir', str(self.root/'cache'), '--editor-info', '-json-errors']
         if overlay:
