@@ -325,6 +325,13 @@ shared, predating generated native parameter witnesses. The current fixture
 verifies the required local adaptation, every original source byte in its map,
 and unchanged installed runtime bytes. It passed in checked and unchecked builds.
 
+Direct calls to type-name intrinsics now use the reference's ineligible-intrinsic
+diagnostic. The ten intrinsic comparisons passed after the correction. The
+collection-override fixture checks the generated checked implementation without
+asking Odin to redefine its reserved `base` collection. Its executable
+comparison uses a supported custom collection with the same alias and procedure
+name, and confirms the global-state diagnostic through both engines.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and

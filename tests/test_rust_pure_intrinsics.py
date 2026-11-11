@@ -1,4 +1,5 @@
 """Only installed deterministic native intrinsics bypass body inspection."""
+import json
 import unittest
 from tests import test_rust_checked_calls as checked
 
@@ -81,12 +82,20 @@ work::fn(n:f64)->f64{return intrinsics.sqrt(n)}
 '''))
         for name,content in files.items():
             path=self.app/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content)
-        # This deliberately incomplete base override must be rejected during
-        # purity analysis, before a backend can encounter its missing runtime.
-        result=self.invoke('rust',flags=['-collection:base='+str(fake)],command='check')
-        self.assertEqual(result.returncode,1,result.stderr)
-        self.assertIn('outside the function',result.stderr)
-        self.assertNotIn('does not exist',result.stderr)
+        # Odin reserves the base collection. Inspect Thor's checked body without
+        # asking Odin to accept a replacement of that built-in collection.
+        result=self.invoke('rust',flags=['-collection:base='+str(fake)],command='transpile')
+        self.assertEqual(result.returncode,0,result.stderr)
+        output=self.root/'rust'
+        manifest=json.loads((output/'thor-manifest.json').read_text())
+        helper=next(output/name for name in manifest['generated']
+                    if name.endswith('fake-base/intrinsics/main.odin'))
+        self.assertIn('conditional_pure_error_',helper.read_text())
+        # A supported user collection provides the same full source diagnostic
+        # through both compilers, even with the intrinsics alias and member name.
+        self.compare(self.source.read_text().replace('"base:intrinsics"','"custom:intrinsics"'),
+                     command='check',flags=['-collection:custom='+str(fake)],
+                     fail='outside the function')
 
     def test_sdk_math_wrappers_keep_native_llvm_primitives(self):
         self.tracked(self.program('n:=f64(0);if work(n)!=1{panic("math wrappers")}', '''
