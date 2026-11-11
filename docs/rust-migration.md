@@ -15,7 +15,108 @@ The reference baseline is commit `ca2df99`, also tagged
 `thor-rust` builds its release binary and launches it. It never runs the Python
 compiler, including for unsupported syntax.
 
+## Structural optimization pass, 2026-11-10
+
+The first five steps of the structural performance work are implemented. This
+pass preserves the language and keeps Python as the default/reference compiler.
+It introduces no changes to the Odin compiler or to user-program ownership.
+
+1. **Measurements.** Setting `THOR_PROFILE` to a file path writes a separate JSON
+   report with stage times and counters. Normal compiler output is unchanged.
+   Timings include command startup, parser/bootstrap work, source inspection,
+   resolver preparation, purity/slice analysis, evaluation helpers and emission.
+   Stages report inclusive and self time; do not sum inclusive times. Counters
+   distinguish resolver/index construction and reuse, parser requests, projected
+   references, helper preparation and actual helper compilation.
+2. **Indexed lookup.** Package membership, package symbols, lexical scope links,
+   import aliases and `using` statements are indexed. Qualified imports use the
+   alias index too. Projection preparation excludes scopes without a visible
+   `using`; unrelated SDK references no longer multiply projection queries.
+3. **Shared immutable analysis inputs.** Sources share immutable syntax through
+   `Arc`, with independent edits and collection views for helpers. Resolver
+   instances share immutable name/scope/symbol indexes for the same source graph.
+   Projection symbols use copy-on-write storage. Flags, active conditions,
+   evaluated values, generic bindings and type caches remain per resolver. A
+   source/collection change invalidates the index; changed helper flags prevent
+   inappropriate reuse of completed discovery. The indexes are rebuilt as needed
+   when demand-driven loading extends the graph, rather than once per stage.
+4. **Demand-driven SDK dependencies.** Imported package declarations are available
+   for lookup, but dependencies in unrelated SDK implementations no longer expand
+   the project eagerly. Project type queries and selected purity/slice-effect
+   calls request missing packages until discovery stabilizes. Unused `thor:basic`
+   implementation bodies are not used as metadata-discovery roots.
+5. **Early sequence-result reuse.** Prepared keys now cover plain strings, arrays,
+   slices and dynamic arrays of supported value types, including nominal array
+   aliases. A warm hit avoids helper-project preparation and lowering. Generic
+   frames, records/unions, opaque values and directive-sensitive closures retain
+   the emitted-helper policy. Toolchain identity, dependencies, headers, flags,
+   resource inputs and packet validation remain part of cache validation. The
+   prepared-key schema changed so older records cannot bypass the new policy.
+
+The [recorded results](rust-performance-structural.json) compare quiet, direct
+release-executable runs with the original readiness baseline. These are warm
+transpile medians; final Odin compilation and the development Cargo launcher are
+excluded. The new medians have three samples per project, not p95 acceptance.
+
+| Project | Before Rust | After structural changes |
+| --- | ---: | ---: |
+| Minimal program | 0.021 s | 0.020 s |
+| `double_bet` | 1.053 s | 0.378 s |
+| `poker` | 3.518 s | 1.697 s |
+| `hilo` | 2.144 s | 0.709 s |
+| `Dijkstra` | 12.984 s | 0.805 s |
+| `circles_on_dots` | 47.174 s | 1.017 s |
+
+For the warmed `circles_on_dots` run, source-parser requests fell from 277 at the
+indexed checkpoint to 30. There is one emitted source instead of three, three
+result hits and no helper preparations. Its five resolver instances build two
+indexes as the SDK graph grows, then reuse them three times. An independent
+regression checks that a runtime-body edit retains an owned sequence result while
+avoiding helper preparation. Allocation/independence checks cover checked and
+assertion/bounds/type-assert-disabled execution.
+
+A separate edit to the copied real project also retained all three prepared
+results, with zero cache misses/writes. Its first transpile after adding a local
+to `main` took 1.235 seconds; the three unprofiled edited-source runs had a
+1.043-second median. The separate instrumented run prepared no helpers. Original
+project files were not modified.
+
+The one-second target is **not yet met for every project**. The remaining measured
+costs are concentrated: `poker` spends about 0.61 seconds in warm parser/cache
+loading and 0.53 seconds in slice-effect analysis across discovery and final
+validation. Warm parser loading currently decodes JSON, serializes its payload
+again for checksum validation and rebuilds the arena. The next pass should make
+that path cheaper and eliminate compatible repeated permission analysis, with
+explicit invalidation for context/binding changes. Parallelism remains a later
+step. Removing Cargo from the production launcher is still required at cutover.
+
+The compatibility checkpoint passed 547 language/integration checks, 161 stdio
+TLS checks, all 41 live CodeLLDB checks, debug/release Rust units and all-target
+Clippy. Both engines built all 19 copied projects; original sources were verified
+unchanged. The final shared-index refinement adds a flag-selection isolation unit
+and passed 200 focused language/integration tests, 161 TLS tests, all 41 live
+CodeLLDB tests, all 19 copied project builds, 37 Rust units in each of debug and
+release, and all-target Clippy with warnings denied. Assertion hygiene is included
+in the focused gate. Tests also cover
+corrupt/missing cache entries, dependency/resource changes, directive-sensitive
+fallback, independently owned reconstructed sequences and private/conditional
+bindings. This supplements the earlier acceptance corpus rather than rerunning
+every original Python-only API test.
+
+```sh
+THOR_PROFILE=/tmp/thor-profile.json ./rust/target/release/thor-rust transpile .
+python3 tools/benchmark_lowering.py --project /path/to/project --runs 5 \
+  --profile-dir /tmp/thor-profiles --report /tmp/thor-timings.json
+```
+
+Profiling is opt-in and adds bookkeeping overhead. Use unprofiled, quiet runs for
+performance comparisons; use the separate reports to attribute the work.
+
 ## Readiness audit and optimization plan, 2026-11-10
+
+This is the pre-optimization audit, retained as baseline evidence. The completed
+structural pass and current measurements are recorded above; the sequence below
+was the initial, broader plan.
 
 The native compiler can serve as the installed `thor` on the verified macOS arm64
 host. The added installation gate copies the release executable into a separate

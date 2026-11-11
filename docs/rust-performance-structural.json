@@ -1,0 +1,1097 @@
+{
+  "date": "2026-11-10",
+  "base_revision": "f415b69",
+  "implementation_checkpoints": [
+    "d7c92f6",
+    "551dc51",
+    "b4f41a5",
+    "102958a"
+  ],
+  "scope": "Direct release executable, sequential quiet transpile runs. First invocation and separately instrumented fifth invocation excluded from medians. Final Odin compilation excluded. Results are three-sample medians, not a p95 acceptance result. Same project copies/caches as readiness audit; circles_on_dots includes unrelated audit-only main-body/local and procedure edits.",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "executable_sha256": "c10ee73a3fae099b224297882ddb8b0c9ecb8b3aa6e3e1286381fd627cf72480",
+  "projects": [
+    {
+      "project": "simple",
+      "before_rust_median_seconds": 0.020692958511062898,
+      "python_reference_median_seconds": 0.1079698125104187,
+      "after_rust_warm_seconds": [
+        0.0203108329733368,
+        0.019397708005271852,
+        0.019785875017987564
+      ],
+      "after_rust_median_seconds": 0.019785875017987564,
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 9,
+          "parser.cache_hits": 1,
+          "parser.nodes": 24,
+          "parser.source_requests": 1,
+          "resolver.constructions": 2,
+          "resolver.index_builds": 1,
+          "resolver.index_reuses": 1
+        },
+        "elapsed_seconds": 0.016136042,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.959e-06,
+            "self_seconds": 1.959e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 7.5e-07,
+            "self_seconds": 7.5e-07
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 9.16e-07,
+            "self_seconds": 9.16e-07
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 2.292e-06,
+            "self_seconds": 2.292e-06
+          },
+          "analysis.discover_types": {
+            "calls": 1,
+            "inclusive_seconds": 1.125e-06,
+            "self_seconds": 1.125e-06
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 6.875e-06,
+            "self_seconds": 2.5420000000000004e-06
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 8.33e-07,
+            "self_seconds": 8.33e-07
+          },
+          "analysis.purity": {
+            "calls": 1,
+            "inclusive_seconds": 4.16e-07,
+            "self_seconds": 4.16e-07
+          },
+          "analysis.resolver_setup": {
+            "calls": 2,
+            "inclusive_seconds": 1.6375e-05,
+            "self_seconds": 1.2625000000000002e-05
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 2.542e-06,
+            "self_seconds": 2.542e-06
+          },
+          "analysis.using_projections": {
+            "calls": 2,
+            "inclusive_seconds": 3.7499999999999997e-06,
+            "self_seconds": 3.7499999999999997e-06
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.016134541,
+            "self_seconds": 7.88329999999969e-05
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.000124125,
+            "self_seconds": 0.000124125
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.000614542,
+            "self_seconds": 0.000614542
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 6.0125e-05,
+            "self_seconds": 4.475e-05
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.00127425,
+            "self_seconds": 0.00046108299999999994
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011465,
+            "self_seconds": 0.011465
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.00020825,
+            "self_seconds": 0.00020825
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.014781458,
+            "self_seconds": 0.003108208000000001
+          }
+        },
+        "thor_version": "0.41.6"
+      },
+      "after_rust_initial_seconds": 0.2187368750164751,
+      "initial_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      }
+    },
+    {
+      "project": "double_bet",
+      "before_rust_median_seconds": 1.053328854002757,
+      "python_reference_median_seconds": 1.0402585419942625,
+      "after_rust_warm_seconds": [
+        0.37773391700466163,
+        0.4000188329955563,
+        0.3763587080175057
+      ],
+      "after_rust_median_seconds": 0.37773391700466163,
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "profile": {
+        "counters": {
+          "emit.files": 2,
+          "lookup.calls": 60076,
+          "lookup.import_directory_resolutions": 35,
+          "parser.cache_hits": 27,
+          "parser.nodes": 35683,
+          "parser.source_requests": 27,
+          "resolver.constructions": 4,
+          "resolver.index_builds": 1,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.367969291,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.625e-06,
+            "self_seconds": 1.625e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 0.000106209,
+            "self_seconds": 0.000106209
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.0220655,
+            "self_seconds": 0.009793332999999998
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.016915542,
+            "self_seconds": 0.002650458999999999
+          },
+          "analysis.discover_types": {
+            "calls": 1,
+            "inclusive_seconds": 0.010534583,
+            "self_seconds": 7.50830000000001e-05
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.049529375,
+            "self_seconds": 1.3750000000006812e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.25e-06,
+            "self_seconds": 1.25e-06
+          },
+          "analysis.purity": {
+            "calls": 2,
+            "inclusive_seconds": 7.08e-07,
+            "self_seconds": 7.08e-07
+          },
+          "analysis.resolver_setup": {
+            "calls": 4,
+            "inclusive_seconds": 0.044437624,
+            "self_seconds": 0.004086125999999997
+          },
+          "analysis.slice_permissions": {
+            "calls": 2,
+            "inclusive_seconds": 0.004186708000000001,
+            "self_seconds": 0.004186708000000001
+          },
+          "analysis.using_projections": {
+            "calls": 4,
+            "inclusive_seconds": 0.040351498,
+            "self_seconds": 0.040351498
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.367966375,
+            "self_seconds": 0.05132104100000001
+          },
+          "emit.file": {
+            "calls": 2,
+            "inclusive_seconds": 0.050607417,
+            "self_seconds": 0.050607417
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.004462208,
+            "self_seconds": 0.004462208
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.0206585,
+            "self_seconds": 0.010655292
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.138538125,
+            "self_seconds": 0.0010869590000000262
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.0115545,
+            "self_seconds": 0.0115545
+          },
+          "parser.source": {
+            "calls": 27,
+            "inclusive_seconds": 0.172281667,
+            "self_seconds": 0.172281667
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.178107209,
+            "self_seconds": 0.004730542000000032
+          }
+        },
+        "thor_version": "0.41.6"
+      },
+      "after_rust_initial_seconds": 0.3912483330059331,
+      "initial_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      }
+    },
+    {
+      "project": "poker",
+      "before_rust_median_seconds": 3.518078583481838,
+      "python_reference_median_seconds": 1.6680625625012908,
+      "after_rust_warm_seconds": [
+        1.7047662920085713,
+        1.694890957995085,
+        1.6971705830073915
+      ],
+      "after_rust_median_seconds": 1.6971705830073915,
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 400760,
+          "lookup.import_directory_resolutions": 58,
+          "parser.cache_hits": 355,
+          "parser.nodes": 120238,
+          "parser.source_requests": 355,
+          "resolver.constructions": 6,
+          "resolver.index_builds": 3,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 1.729833542,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.833e-06,
+            "self_seconds": 1.833e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 8.8042e-05,
+            "self_seconds": 8.8042e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.904014792,
+            "self_seconds": 0.09959775100000001
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.028192916,
+            "self_seconds": 0.00021470799999999748
+          },
+          "analysis.discover_types": {
+            "calls": 3,
+            "inclusive_seconds": 0.6069710839999999,
+            "self_seconds": 0.011507753000000176
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 1.2575334169999999,
+            "self_seconds": 6.154199999985899e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.25e-06,
+            "self_seconds": 1.25e-06
+          },
+          "analysis.purity": {
+            "calls": 4,
+            "inclusive_seconds": 2.749e-06,
+            "self_seconds": 2.749e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 6,
+            "inclusive_seconds": 0.225823624,
+            "self_seconds": 0.04178216500000001
+          },
+          "analysis.slice_permissions": {
+            "calls": 4,
+            "inclusive_seconds": 0.526919916,
+            "self_seconds": 0.526919916
+          },
+          "analysis.using_projections": {
+            "calls": 6,
+            "inclusive_seconds": 0.184041459,
+            "self_seconds": 0.184041459
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 1.7298303339999999,
+            "self_seconds": 0.188604875
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.01031,
+            "self_seconds": 0.01031
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.004265542,
+            "self_seconds": 0.004265542
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.071051125,
+            "self_seconds": 0.03668479200000001
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 1.514329584,
+            "self_seconds": 0.0033867510000000767
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.012594583,
+            "self_seconds": 0.012594583
+          },
+          "parser.source": {
+            "calls": 355,
+            "inclusive_seconds": 0.6065535810000003,
+            "self_seconds": 0.6065535810000003
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.026895875,
+            "self_seconds": 0.0032110420000000008
+          }
+        },
+        "thor_version": "0.41.6"
+      },
+      "after_rust_initial_seconds": 1.794660332991043,
+      "initial_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      }
+    },
+    {
+      "project": "hilo",
+      "before_rust_median_seconds": 2.143858312498196,
+      "python_reference_median_seconds": 0.5335900835052598,
+      "after_rust_warm_seconds": [
+        0.7252367500041146,
+        0.7064655829744879,
+        0.7086880409915466
+      ],
+      "after_rust_median_seconds": 0.7086880409915466,
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 42063,
+          "lookup.import_directory_resolutions": 21,
+          "parser.cache_hits": 105,
+          "parser.nodes": 73128,
+          "parser.source_requests": 105,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.708367708,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 0.002958083,
+            "self_seconds": 0.002958083
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 2.6417e-05,
+            "self_seconds": 2.6417e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.186312,
+            "self_seconds": 0.03847962499999999
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.025490625,
+            "self_seconds": 0.00011112500000000011
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.364995125,
+            "self_seconds": 0.003305872000000168
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.506071458,
+            "self_seconds": 1.7874999999945018e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 6.958e-06,
+            "self_seconds": 6.958e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 0.002561458,
+            "self_seconds": 0.002561458
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.11283908299999999,
+            "self_seconds": 0.016192332
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.043783917,
+            "self_seconds": 0.043783917
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.096646751,
+            "self_seconds": 0.096646751
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.708364375,
+            "self_seconds": 0.1126495420000001
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.005578917,
+            "self_seconds": 0.005578917
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.002876583,
+            "self_seconds": 0.002876583
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.022192583,
+            "self_seconds": 0.0015291659999999985
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.578499916,
+            "self_seconds": 0.0027355839999999576
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.0110385,
+            "self_seconds": 0.0110385
+          },
+          "parser.source": {
+            "calls": 105,
+            "inclusive_seconds": 0.3647980860000001,
+            "self_seconds": 0.3647980860000001
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.017214917,
+            "self_seconds": 0.003067584
+          }
+        },
+        "thor_version": "0.41.6"
+      },
+      "after_rust_initial_seconds": 0.7659048339992296,
+      "initial_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      }
+    },
+    {
+      "project": "Dijkstra",
+      "before_rust_median_seconds": 12.983996416485752,
+      "python_reference_median_seconds": 1.5347015834850026,
+      "after_rust_warm_seconds": [
+        0.8049518750049174,
+        0.8048928330244962,
+        0.8054635410080664
+      ],
+      "after_rust_median_seconds": 0.8049518750049174,
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      },
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 524863,
+          "lookup.import_directory_resolutions": 16,
+          "lookup.using_candidates": 768937,
+          "parser.cache_hits": 20,
+          "parser.nodes": 47452,
+          "parser.source_requests": 20,
+          "projection.reference_visits": 3100,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 0.805291416,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.833e-06,
+            "self_seconds": 1.833e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 6.1418e-05,
+            "self_seconds": 6.1418e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.290301667,
+            "self_seconds": 0.04433841699999999
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.023071333,
+            "self_seconds": 0.00020504099999999956
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.223922291,
+            "self_seconds": 0.0010768320000000284
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.532679042,
+            "self_seconds": 9.542000000029027e-06
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.125e-06,
+            "self_seconds": 1.125e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 1.375e-06,
+            "self_seconds": 1.375e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.093193585,
+            "self_seconds": 0.013003458999999998
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.30693025,
+            "self_seconds": 0.30693025
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.080190126,
+            "self_seconds": 0.080190126
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 0.805288917,
+            "self_seconds": 0.07186037500000009
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.018183458,
+            "self_seconds": 0.018183458
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.00592,
+            "self_seconds": 0.00592
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.030536792,
+            "self_seconds": 0.014481416
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.709181208,
+            "self_seconds": 0.0019314569999996367
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.010825542,
+            "self_seconds": 0.010825542
+          },
+          "parser.source": {
+            "calls": 20,
+            "inclusive_seconds": 0.233090376,
+            "self_seconds": 0.233090376
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.024247334,
+            "self_seconds": 0.003176874999999999
+          }
+        },
+        "thor_version": "0.41.6"
+      },
+      "after_rust_initial_seconds": 0.8140082079917192,
+      "initial_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 0
+      }
+    },
+    {
+      "project": "circles_on_dots",
+      "before_rust_median_seconds": 47.17446787501103,
+      "python_reference_median_seconds": 2.528598624994629,
+      "after_rust_warm_seconds": [
+        1.0173400420171674,
+        1.0219532499904744,
+        1.0043785839807242
+      ],
+      "after_rust_median_seconds": 1.0173400420171674,
+      "warm_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 3,
+          "misses": 0,
+          "writes": 0
+        },
+        "thor_prepared_hits": 3
+      },
+      "profile": {
+        "counters": {
+          "emit.files": 1,
+          "lookup.calls": 253164,
+          "lookup.import_directory_resolutions": 24,
+          "lookup.using_candidates": 61842,
+          "parser.cache_hits": 30,
+          "parser.nodes": 68150,
+          "parser.source_requests": 30,
+          "projection.reference_visits": 3740,
+          "resolver.constructions": 5,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3
+        },
+        "elapsed_seconds": 1.006445667,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 0.000973166,
+            "self_seconds": 0.000973166
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 5.0957999999999996e-05,
+            "self_seconds": 5.0957999999999996e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.29260075,
+            "self_seconds": 0.05076062400000003
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.031937625,
+            "self_seconds": 9.870799999999597e-05
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.329473833,
+            "self_seconds": 0.0014723319999999955
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.648965625,
+            "self_seconds": 2.2833000000055392e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 8.166e-06,
+            "self_seconds": 8.166e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 0.004119166,
+            "self_seconds": 0.004119166
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.130159792,
+            "self_seconds": 0.017863458
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.270522168,
+            "self_seconds": 0.270522168
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.11229633400000003,
+            "self_seconds": 0.11229633400000003
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 1.006441833,
+            "self_seconds": 0.10537508300000009
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.008506625,
+            "self_seconds": 0.008506625
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.002903708,
+            "self_seconds": 0.002903708
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.101607083,
+            "self_seconds": 0.079411375
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.879411875,
+            "self_seconds": 0.0024007530000000887
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011626458,
+            "self_seconds": 0.011626458
+          },
+          "parser.source": {
+            "calls": 30,
+            "inclusive_seconds": 0.334880168,
+            "self_seconds": 0.334880168
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.021654875,
+            "self_seconds": 0.0031497500000000032
+          }
+        },
+        "thor_version": "0.41.6"
+      },
+      "after_rust_initial_seconds": 3.4355553750065155,
+      "initial_cache": {
+        "thor_cache": {
+          "bypasses": 0,
+          "corrupt": 0,
+          "hits": 0,
+          "misses": 3,
+          "writes": 3
+        },
+        "thor_prepared_hits": 0
+      }
+    }
+  ],
+  "source_revision": "102958a",
+  "runtime_body_edit": {
+    "project": "circles_on_dots",
+    "edit": "Added an unrelated local to main in a copied project; source restored afterwards.",
+    "runs": [
+      {
+        "seconds": 1.2351965000270866,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 3,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 3
+        },
+        "profiled": false
+      },
+      {
+        "seconds": 1.0430541249806993,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 3,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 3
+        },
+        "profiled": false
+      },
+      {
+        "seconds": 1.0327042500139214,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 3,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 3
+        },
+        "profiled": false
+      },
+      {
+        "seconds": 1.0094327080005314,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 3,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 3
+        },
+        "profiled": true
+      }
+    ],
+    "unprofiled_median_seconds": 1.0430541249806993,
+    "profile": {
+      "counters": {
+        "emit.files": 1,
+        "lookup.calls": 253299,
+        "lookup.import_directory_resolutions": 24,
+        "lookup.using_candidates": 61934,
+        "parser.cache_hits": 30,
+        "parser.nodes": 68156,
+        "parser.source_requests": 30,
+        "projection.reference_visits": 3760,
+        "resolver.constructions": 5,
+        "resolver.index_builds": 2,
+        "resolver.index_reuses": 3
+      },
+      "elapsed_seconds": 1.001320917,
+      "engine": "rust",
+      "schema": 1,
+      "stages": {
+        "analysis.borrow_model": {
+          "calls": 1,
+          "inclusive_seconds": 0.000926375,
+          "self_seconds": 0.000926375
+        },
+        "analysis.contexts": {
+          "calls": 2,
+          "inclusive_seconds": 5e-05,
+          "self_seconds": 5e-05
+        },
+        "analysis.discover_calls": {
+          "calls": 1,
+          "inclusive_seconds": 0.292354208,
+          "self_seconds": 0.05035699800000004
+        },
+        "analysis.discover_expressions": {
+          "calls": 1,
+          "inclusive_seconds": 0.030616291,
+          "self_seconds": 9.766599999999973e-05
+        },
+        "analysis.discover_types": {
+          "calls": 2,
+          "inclusive_seconds": 0.327811625,
+          "self_seconds": 0.0017022939999999827
+        },
+        "analysis.inspect_sources": {
+          "calls": 1,
+          "inclusive_seconds": 0.645860834,
+          "self_seconds": 9.58500000003415e-06
+        },
+        "analysis.local_borrowing": {
+          "calls": 1,
+          "inclusive_seconds": 8.375e-06,
+          "self_seconds": 8.375e-06
+        },
+        "analysis.purity": {
+          "calls": 3,
+          "inclusive_seconds": 0.004079584,
+          "self_seconds": 0.004079584
+        },
+        "analysis.resolver_setup": {
+          "calls": 5,
+          "inclusive_seconds": 0.126464376,
+          "self_seconds": 0.016935919000000004
+        },
+        "analysis.slice_permissions": {
+          "calls": 3,
+          "inclusive_seconds": 0.27134470899999996,
+          "self_seconds": 0.27134470899999996
+        },
+        "analysis.using_projections": {
+          "calls": 5,
+          "inclusive_seconds": 0.109528457,
+          "self_seconds": 0.109528457
+        },
+        "command": {
+          "calls": 1,
+          "inclusive_seconds": 1.001317625,
+          "self_seconds": 0.104141916
+        },
+        "emit.file": {
+          "calls": 1,
+          "inclusive_seconds": 0.008298333,
+          "self_seconds": 0.008298333
+        },
+        "emit.publish": {
+          "calls": 1,
+          "inclusive_seconds": 0.003790292,
+          "self_seconds": 0.003790292
+        },
+        "evaluation.schedule": {
+          "calls": 1,
+          "inclusive_seconds": 0.102147166,
+          "self_seconds": 0.08031179
+        },
+        "lowering.total": {
+          "calls": 1,
+          "inclusive_seconds": 0.87591425,
+          "self_seconds": 0.002364542000000025
+        },
+        "parser.bootstrap": {
+          "calls": 1,
+          "inclusive_seconds": 0.011206917,
+          "self_seconds": 0.011206917
+        },
+        "parser.source": {
+          "calls": 30,
+          "inclusive_seconds": 0.333019081,
+          "self_seconds": 0.333019081
+        },
+        "project.load": {
+          "calls": 1,
+          "inclusive_seconds": 0.021261459,
+          "self_seconds": 0.0031447920000000004
+        }
+      },
+      "thor_version": "0.41.6"
+    },
+    "original_copy_sha256": "50b916158b50716793daee02d2d5dcc82aa34891788340c8fe31403c188cd8b5"
+  },
+  "verification": {
+    "compatibility_checkpoint": {
+      "revision": "b4f41a5",
+      "language_and_integration_tests": 547,
+      "tls_tests": 161,
+      "live_codelldb_tests": 41,
+      "copied_projects_built_with_both_engines": 19
+    },
+    "shared_index_refinement": {
+      "revision": "102958a",
+      "language_and_integration_tests": 200,
+      "tls_tests": 161,
+      "live_codelldb_tests": 41,
+      "copied_projects_built_with_rust": 19,
+      "rust_units_debug": 37,
+      "rust_units_release": 37,
+      "clippy": "all targets; warnings denied",
+      "assertion_hygiene": "included in focused language gate"
+    },
+    "configurations": "Native/runtime regression coverage includes checked and -o:speed -disable-assert -no-bounds-check -no-type-assert execution.",
+    "original_project_sources_unchanged": true
+  }
+}
