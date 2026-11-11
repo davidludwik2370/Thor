@@ -1,0 +1,29 @@
+--- a/Odin/poker/poker_test.thor
++++ b/Odin/poker/poker_test.thor
+@@ -260,7 +260,7 @@
+     straight := false
+     if unique_count == 5 {
+         straight = values[4] - values[0] == 4
+-        if poker_rules && values == ([5]int{2, 3, 4, 5, 14}) {
++        if poker_rules && values == ([2, 3, 4, 5, 14]) {
+             straight = true
+             values = {1, 2, 3, 4, 5}
+         }
+@@ -343,7 +343,7 @@
+ }
+ 
+ test_with_ace_value :: proc(hand: Hand, ace_value: int) -> Hand {
+-    assert(ace_value == 1 || ace_value == 14)
++    assert(ace_value in [1, 14])
+     result := hand
+     for &c in result {
+         if c.num == 1 || c.num == 14 do c.num = ace_value
+@@ -407,7 +407,7 @@
+     five: [5]Card
+     length_ok := len(best) == 5
+     if length_ok {
+-        wheel := poker_rules && (rank == .straight || rank == .straight_flush)
++        wheel := poker_rules && (rank in [.straight, .straight_flush])
+         for c in best {
+             value := test_poker_value(c.num)
+             wheel = wheel && (value == 14 || value >= 2 && value <= 5)

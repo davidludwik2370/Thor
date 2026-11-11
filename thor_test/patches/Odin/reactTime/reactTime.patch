@@ -1,0 +1,11 @@
+--- a/Odin/reactTime/reactTime.thor
++++ b/Odin/reactTime/reactTime.thor
+@@ -89,7 +89,7 @@
+             }
+         case .result:
+             ClearBackground(BLUE)
+-            resultMessage := fmt.caprintf("Your time: %.0f ms", duration_milliseconds(g.reactTime))
++            resultMessage :> fmt.caprintf("Your time: %.0f ms", duration_milliseconds(g.reactTime))
+             defer delete(resultMessage)
+             DrawText(resultMessage, centerX(resultMessage), 225, FONT_SIZE, WHITE)
+ 

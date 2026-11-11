@@ -1,0 +1,62 @@
+--- a/Odin/quicksort/quicksort.thor
++++ b/Odin/quicksort/quicksort.thor
+@@ -31,7 +31,7 @@
+     
+ }
+ 
+-verify_sorted :: proc(nums: []int) -> bool {
++verify_sorted :: fn(nums: []int) -> bool {
+ 	if len(nums) < 2 { return true }
+ 	
+ 	for i in 0..<len(nums)-1 {
+@@ -48,9 +48,9 @@
+ 	if ni >= ei { return }
+ 	
+ 	si := ni + 1
+-	n := nums[ni]
+-	init_ni := ni
+-	init_ei := ei
++	n :> nums[ni]
++	init_ni :> ni
++	init_ei :> ei
+ 	
+ 	for si <= ei {
+ 		if n < nums[si] {
+@@ -97,7 +97,7 @@
+ INT_MIN :: -INT_MAX - 1
+ str :: proc(x: $T) -> string { return fmt.tprintf("%v", x) }
+ type :: proc(x: $T) -> typeid { return typeid_of(T) }
+-intfs :: proc(s: string) -> (total: int) {
++intfs :: fn(s: string) -> (total: int) {
+     for r in s{
+         total *= 10 
+         total += int(r) - int('0')
+@@ -112,7 +112,7 @@
+ float :: proc(s: string) -> f64 {
+     return strconv.atof(s)
+ }
+-pow :: proc(a: int, b: int) -> int { 
++pow :: fn(a: int, b: int) -> int { 
+     total := 1
+     for i in 0..<b {
+         
+@@ -124,16 +124,16 @@
+ }
+ randint :: proc(a: int, b: int=0) -> int {
+     if b == 0 { return rand.int_max(a + 1) }
+-    range := a - b + 1
++    range :> a - b + 1
+     return rand.int_max(range) + a
+ }
+-all_true :: proc(arr: []bool) -> bool {
++all_true :: fn(arr: []bool) -> bool {
+     for b in arr {
+         if !b { return false }
+     }
+     return true
+ }
+-any_true :: proc(arr: []bool) -> bool {
++any_true :: fn(arr: []bool) -> bool {
+     for b in arr {
+         if b { return true }
+     }

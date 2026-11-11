@@ -1,0 +1,11 @@
+--- a/Odin/modulo/modulo.thor
++++ b/Odin/modulo/modulo.thor
+@@ -4,7 +4,7 @@
+ import sa "core:container/small_array"
+ 
+ main :: proc() {
+-    limit := 3
++    limit :> 3
+     m, r: int
+     for i in -limit..<limit {
+         for j in -limit..<limit {

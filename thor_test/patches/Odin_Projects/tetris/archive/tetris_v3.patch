@@ -1,0 +1,115 @@
+--- a/Odin_Projects/tetris/archive/tetris_v3.thor
++++ b/Odin_Projects/tetris/archive/tetris_v3.thor
+@@ -70,7 +70,7 @@
+ 
+ //create new piece
+ newPiece :: proc(piece: ^Piece) {
+-	type := PieceType(rl.GetRandomValue(1, 7))
++	type :> PieceType(rl.GetRandomValue(1, 7))
+ 	piece^ = {
+ 		type  = type,
+ 		head  = HeadSpawnPos[type],
+@@ -79,12 +79,12 @@
+ }
+ 
+ //check that position is valid
+-squareUnavailable :: proc(using piece: Piece, limb: int, g: Game) -> bool {
+-	x := head.x + limbs[limb].x
+-	y := head.y + limbs[limb].y + SPAWN_HEIGHT
++squareUnavailable :: fn(using piece: Piece, limb: int, g: Game) -> bool {
++	x :> head.x + limbs[limb].x
++	y :> head.y + limbs[limb].y + SPAWN_HEIGHT
+ 	return x<0 || x>=BOARD_WIDTH || y>=BOARD_HEIGHT+SPAWN_HEIGHT || g.board[x][y]!=.Empty
+ }
+-positionValid :: proc(piece: Piece, g: Game) -> bool {
++positionValid :: fn(piece: Piece, g: Game) -> bool {
+ 	for i in 0..<4 {
+ 		if squareUnavailable(piece, i, g) do return false
+ 	}
+@@ -96,7 +96,7 @@
+ 	return limbs != Shapes[type]
+ }
+ rotate :: proc(using piece: ^Piece, g: Game) {
+-	startPiece := piece^
++	startPiece :> piece^
+ 	canRotate  := true
+ 	if type in Types({.S, .Z}) && isRoatated(piece^) {
+ 		limbs = Shapes[type]
+@@ -126,7 +126,7 @@
+ }
+ 
+ //handle horizontal moves
+-canMoveHorizontal :: proc(piece: Piece, moveRight: bool, g: Game) -> bool {
++canMoveHorizontal :: fn(piece: Piece, moveRight: bool, g: Game) -> bool {
+ 	testPiece := piece
+ 	testPiece.head.x += moveRight ? 1 : -1
+ 	return positionValid(testPiece, g)
+@@ -135,8 +135,8 @@
+ //set pieces and clear rows / check gameover
+ setPiece :: proc(piece: ^Piece, g: ^Game) -> (pieceSet: bool) {
+ 	for i := 0; i < 4; i += 1 {
+-		x := piece.head.x + piece.limbs[i].x
+-		y := piece.head.y + piece.limbs[i].y
++		x :> piece.head.x + piece.limbs[i].x
++		y :> piece.head.y + piece.limbs[i].y
+ 		if pieceSet {
+ 			g.board[x][y+SPAWN_HEIGHT] = piece.type
+ 			if y == 0 do g.playState = .GameOver
+@@ -150,7 +150,7 @@
+ }
+ 
+ @rodata
+-RowsClearedScores := [5]int {0, 100, 300, 500, 800}
++RowsClearedScores := [0, 100, 300, 500, 800]
+ clearHorizontal :: proc(g: ^Game) -> int {
+ 	rowsCleared := 0
+ 	outer: for y:=BOARD_HEIGHT+SPAWN_HEIGHT-1; y>=SPAWN_HEIGHT; {
+@@ -205,7 +205,7 @@
+ 			//falling
+ 			g.fallTime -= fallTimeDecrement
+ 			g.scoreMultiplier += scoreMultiplierIncrement
+-			frameTime := GetFrameTime()
++			frameTime :> GetFrameTime()
+ 			g.secSinceLastDrop += frameTime
+ 			if g.secSinceLastDrop > g.fallTime {
+ 				g.secSinceLastDrop = 0
+@@ -220,8 +220,8 @@
+ 			else do g.fastFallAvail = true
+ 			
+ 			//horizontal movement
+-			moveLeft  := IsKeyDown(KeyboardKey.LEFT)
+-			moveRight := IsKeyDown(KeyboardKey.RIGHT)
++			moveLeft  :> IsKeyDown(KeyboardKey.LEFT)
++			moveRight :> IsKeyDown(KeyboardKey.RIGHT)
+ 			if moveLeft != moveRight && canMoveHorizontal(piece, moveRight, g) {
+ 				g.hMoveLockTimeLeft -= frameTime
+ 				if g.hMoveLockTimeLeft <= 0 {
+@@ -242,7 +242,7 @@
+ 			//setting a piece and update score/gamestate
+ 			if setPiece(&piece, &g) && g.playState == .Live {
+ 				detlaScore := clearHorizontal(&g)
+-				isTetris   := detlaScore == RowsClearedScores[4]
++				isTetris   :> detlaScore == RowsClearedScores[4]
+ 				if g.lastSetWasTetris do detlaScore *= 2
+ 				g.score += int(f32(detlaScore) * g.scoreMultiplier)
+ 				g.lastSetWasTetris = isTetris
+@@ -266,8 +266,8 @@
+ 		DrawText("Score", WINDOW_WIDTH-175, 30, 50, SKYBLUE)
+ 		scoreBuffer: [16]byte
+ 		fmt.bprintf(scoreBuffer[:], "%d", g.score)
+-		scoreStr   := cstring(&scoreBuffer[0])
+-		scoreWidth := MeasureText(scoreStr, 50)
++		scoreStr   :> cstring(&scoreBuffer[0])
++		scoreWidth :> MeasureText(scoreStr, 50)
+ 		DrawText(scoreStr, 577-scoreWidth, 85, 45, PINK)
+ 		
+ 		//Pause
+@@ -287,7 +287,7 @@
+ 		//Board
+ 		for x in 0..<i32(BOARD_WIDTH) {
+ 			for y in 0..<i32(BOARD_HEIGHT) {
+-				squareType := g.board[x][y+SPAWN_HEIGHT]
++				squareType :> g.board[x][y+SPAWN_HEIGHT]
+ 				if squareType != .Empty do DrawRectangle(x*GRID_SIZE+1, y*GRID_SIZE+1,
+ 														 GRID_SIZE, GRID_SIZE, 
+ 														 PieceColors[squareType])

@@ -1,0 +1,72 @@
+--- a/Odin_Projects/Connect_4/archive/conect_4_v1.thor
++++ b/Odin_Projects/Connect_4/archive/conect_4_v1.thor
+@@ -44,7 +44,7 @@
+ 
+ tryPlacingPiece :: proc(game: ^Game, move: int) -> (success := true) {
+ 	// verify move is legitimate
+-	y := game.nextFreePos[move]
++	y :> game.nextFreePos[move]
+ 	if y < 0 do return false
+ 	
+ 	// handle turn
+@@ -65,7 +65,7 @@
+ countPiecesInARow :: proc(game: ^Game, xDir, yDir: int) -> (piecesInARow: int) {
+ 	x := game.lastMove.x
+ 	y := game.lastMove.y
+-	pieceColor := game.board[x][y]
++	pieceColor :> game.board[x][y]
+ 	
+ 	for {
+ 		x += xDir
+@@ -84,7 +84,7 @@
+ 		{1, -1}, // bottom left to top right
+ 	}
+ 	for vDir in VDirs {
+-		piecesInARow := 1 + countPiecesInARow(game,  vDir.x,  vDir.y) \
++		piecesInARow :> 1 + countPiecesInARow(game,  vDir.x,  vDir.y) \
+ 						  + countPiecesInARow(game, -vDir.x, -vDir.y)
+ 		if piecesInARow < 4 do continue
+ 		switch game.turn {
+@@ -107,7 +107,7 @@
+ 	SetTargetFPS(SET_FPS)
+ 	
+ 	for !WindowShouldClose() {
+-		autopilot := IsKeyDown(KeyboardKey.A)
++		autopilot :> IsKeyDown(KeyboardKey.A)
+ 		
+ 		// handle inputs and calc new gamestate
+ 		if IsKeyDown(.R) do resetGame(&game)
+@@ -115,7 +115,7 @@
+ 			if IsKeyDown(.ENTER) do resetGame(&game)
+ 		}
+ 		else if autopilot || IsMouseButtonPressed(.LEFT) {
+-			move := int(autopilot ? GetRandomValue(0, COLUMNS-1) : GetMouseX()/GRID_SIZE)
++			move :> int(autopilot ? GetRandomValue(0, COLUMNS-1) : GetMouseX()/GRID_SIZE)
+ 			if tryPlacingPiece(&game, move) {
+ 				checkGameOver(&game)
+ 				switch game.turn {
+@@ -131,7 +131,7 @@
+ 		// render pieces
+ 		for x in 0..<COLUMNS {
+ 			for y in 0..<ROWS {
+-				center := Coord({
++				center :> Coord({
+ 					x*GRID_SIZE + GRID_SIZE/2,
+ 					y*GRID_SIZE + GRID_SIZE/2
+ 				})
+@@ -148,13 +148,13 @@
+ 		
+ 		// handle endgame screen
+ 		if game.outcome != .inGame {
+-			backboard := Rectangle({
++			backboard :> Rectangle({
+ 				x      = GRID_SIZE / 2,
+ 				y      = GRID_SIZE / 2,
+ 				width  = GRID_SIZE * 6,
+ 				height = GRID_SIZE * 3
+ 			})
+-			fadeLevel := f32(autopilot ? 0.65 : 0.92)
++			fadeLevel :> f32(autopilot ? 0.65 : 0.92)
+ 			DrawRectangleRounded(backboard, 0.25, 10, Fade(BLUE, fadeLevel))
+ 			
+ 			winningColor: Color

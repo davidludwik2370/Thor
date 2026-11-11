@@ -1,0 +1,65 @@
+--- a/Odin/huffman/huffman.thor
++++ b/Odin/huffman/huffman.thor
+@@ -55,7 +55,7 @@
+ }
+ 
+ main :: proc() {
+-    filePath := "dune.txt"
++    filePath :> "dune.txt"
+ 
+     data, err := os.read_entire_file(filePath, context.allocator)
+     defer delete(data)
+@@ -63,7 +63,7 @@
+         fmt.printfln("Failed to read file at path: \"%v\"", filePath)
+         return
+     }
+-    text := string(data)
++    text :> string(data)
+ 
+     freq := make(map[rune]int)
+     defer delete(freq)
+@@ -102,8 +102,8 @@
+     }
+ 
+     for len(nodeList) > 1 {
+-        left  := nodeList[0]
+-        right := nodeList[1]
++        left  :> nodeList[0]
++        right :> nodeList[1]
+ 
+         newNode := new(HuffmanNode)
+         newNode^ = {0, left.freq + right.freq, left, right}
+@@ -161,9 +161,9 @@
+     i := 0
+     for char in text {
+         assert(char in encodeDict)
+-        code := encodeDict[char]
++        code :> encodeDict[char]
+         for c in code {
+-            ok := bit_array.set(&encodedBits, i, c == '1')
++            ok :> bit_array.set(&encodedBits, i, c == '1')
+             assert(ok)
+             i += 1
+         }
+@@ -175,7 +175,7 @@
+ 
+     // Save the encoded bit array to a file
+     bit_count := u64(i) // save this too, otherwise you do not know how many bits are valid
+-    encodedData := slice.to_bytes(encodedBits.bits[:])
++    encodedData :> slice.to_bytes(encodedBits.bits[:])
+ 
+     out := make([dynamic]byte, 0, size_of(bit_count) + len(encodedData))
+     defer delete(out)
+@@ -194,10 +194,10 @@
+         strings.builder_reset(&key)
+         
+         for {
+-            bit := bit_array.get(&encodedBits, i)
++            bit :> bit_array.get(&encodedBits, i)
+             strings.write_byte(&key, bit ? '1' : '0' )
+ 
+-            keyStr := strings.to_string(key)
++            keyStr :> strings.to_string(key)
+ 
+             i += 1
+             if keyStr in decodeDict {

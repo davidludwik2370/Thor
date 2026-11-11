@@ -1,0 +1,31 @@
+--- a/Odin/tryingagain/Library.thor
++++ b/Odin/tryingagain/Library.thor
+@@ -16,7 +16,7 @@
+ INT_MIN :: min(int)
+ str :: proc(x: $T) -> string { return fmt.tprint(x) }
+ // type :: proc(x: $T) -> typeid { return typeid_of(T) }
+-intfs :: proc(s: string) -> (total: int) {
++intfs :: fn(s: string) -> (total: int) {
+     for r in s {
+         total *= 10 
+         total += int(r) - int('0')
+@@ -31,7 +31,7 @@
+ float :: proc(s: string) -> (value: f64, err: bool) {
+     return strconv.parse_f64(s)
+ }
+-pow :: proc(a: int, b: int) -> int { 
++pow :: fn(a: int, b: int) -> int { 
+     total := 1
+     for i in 0..<b {
+         
+@@ -45,8 +45,8 @@
+ comma_sep :: proc(n: int) -> string {
+     new_str: strings.Builder
+     
+-    s := str(n)
+-    end := len(s) - 1
++    s :> str(n)
++    end :> len(s) - 1
+     j := 2*len(s) % 3
+     
+     for r, i in s {

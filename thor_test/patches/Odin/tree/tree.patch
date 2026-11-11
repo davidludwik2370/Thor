@@ -1,0 +1,22 @@
+--- a/Odin/tree/tree.thor
++++ b/Odin/tree/tree.thor
+@@ -16,8 +16,8 @@
+ Side :: enum { either, left, right }
+ append_child :: proc(parent, child: ^node, side := Side.either) -> (ok: bool) {
+ 
+-    left_available  := parent.left  == nil && side != .right
+-    right_available := parent.right == nil && side != .left
++    left_available  :> parent.left  == nil && side != .right
++    right_available :> parent.right == nil && side != .left
+ 
+     switch {
+         case left_available:  parent.left  = child
+@@ -31,7 +31,7 @@
+ 
+ main :: proc() {
+ 
+-    root := node {
++    root :> node {
+         value = 10
+     }
+ 

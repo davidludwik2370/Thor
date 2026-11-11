@@ -1,0 +1,39 @@
+--- a/Odin/triangle_solver/triangle_solver.thor
++++ b/Odin/triangle_solver/triangle_solver.thor
+@@ -18,13 +18,13 @@
+ acos  :: proc(aoh:   f64) -> Deg {return Deg(DEG_PER_RAD * math.acos(aoh))}
+ round :: proc(n:  $T/f64) -> T {
+     n := f64(n)
+-    c := fmt.aprint(n)
++    c :> fmt.aprint(n)
+     defer delete(c)
+     
+     if len(c) < 16 do return T(n)
+     switch c[len(c)-10 : len(c)-3] {
+-        case "0000000": n = floor(n * 1e4) / 1e4
+-        case "9999999": n = ceil (n * 1e4) / 1e4
++        case ("0" * 7): n = floor(n * 1e4) / 1e4
++        case ("9" * 7): n = ceil (n * 1e4) / 1e4
+     }
+     return T(n)
+ }
+@@ -92,7 +92,7 @@
+     SAS(tri)
+ }
+ 
+-invalid :: proc(using tri: Triangle) -> bool {
++invalid :: fn(using tri: Triangle) -> bool {
+     return a  < 0 || b  < 0 || c  < 0 ||
+            aa < 0 || ab < 0 || ac < 0 ||
+            aa + ab + ac >= 180
+@@ -194,8 +194,8 @@
+         icr = c * tan(ab/2) * tan(aa/2) / (tan(aa/2)+tan(ab/2))
+         ica = icr * icr * PI
+         
+-        xc := c / 2
+-        yc := (a*cos(ab)-c)/(2*tan(ab)) + a*sin(ab)/2
++        xc :> c / 2
++        yc :> (a*cos(ab)-c)/(2*tan(ab)) + a*sin(ab)/2
+         ecr = sqrt(xc*xc + yc*yc)
+         eca = ecr * ecr * PI
+     }

@@ -1,0 +1,1017 @@
+--- a/Odin_Projects/Othello_pvai/othello.thor
++++ b/Odin_Projects/Othello_pvai/othello.thor
+@@ -153,11 +153,11 @@
+ sharedTranspositionTable: map[Search_State]TT_Entry
+ sharedTranspositionTableLock: sync.RW_Mutex
+ 
+-opponent :: proc(t: Turn) -> Turn {
++opponent :: fn(t: Turn) -> Turn {
+ 	return Turn(1) - t
+ }
+ 
+-inBounds :: proc(pos: Coord) -> bool {
++inBounds :: fn(pos: Coord) -> bool {
+ 	return pos.x >= 0 && pos.x < BOARD_WIDTH && pos.y >= 0 && pos.y < BOARD_HEIGHT
+ }
+ 
+@@ -171,7 +171,7 @@
+ 			}
+ 		}
+ 	}
+-	switch diff := int(g.pieceCounts[.black]) - int(g.pieceCounts[.white]); {
++	switch diff :> int(g.pieceCounts[.black]) - int(g.pieceCounts[.white]); {
+ 		case diff > 0: g.outcome = .blackWon
+ 		case diff < 0: g.outcome = .whiteWon
+ 		case:          g.outcome = .draw
+@@ -188,7 +188,7 @@
+ 
+ 	for opponentTest in ([2]bool{false, true}) {
+ 		seen: [BOARD_HEIGHT][BOARD_WIDTH]bool
+-		other: Slot = (g.turn == .black) ? .white : .black
++		other: Slot > (g.turn == .black) ? .white : .black
+ 
+ 		for y in 0..<i8(BOARD_HEIGHT) {
+ 			for x in 0..<i8(BOARD_WIDTH) {
+@@ -198,8 +198,8 @@
+ 					for xDir in -1..=i8(1) {
+ 						if yDir == 0 && xDir == 0 do continue
+ 
+-						move_x := x + xDir
+-						move_y := y + yDir
++						move_x :> x + xDir
++						move_y :> y + yDir
+ 						if move_x < 0 || move_x >= BOARD_WIDTH || move_y < 0 || move_y >= BOARD_HEIGHT do continue
+ 						if seen[move_y][move_x] || g.board[move_y][move_x] != .empty do continue
+ 
+@@ -221,11 +221,11 @@
+ 
+ tryPlacingPiece :: proc(g: ^Game, move: Coord, test := false) -> (success: bool) {
+ 	if !inBounds(move) || g.board[move.y][move.x] != .empty do return
+-	piece: Slot = (g.turn == .black) ? .black : .white
+-	other: Slot = (piece == .black) ? .white : .black
+-	limit_x := i8(BOARD_WIDTH)
+-	limit_y := i8(BOARD_HEIGHT)
+-	move_x, move_y := move.x, move.y
++	piece: Slot > (g.turn == .black) ? .black : .white
++	other: Slot > (piece == .black) ? .white : .black
++	limit_x :> i8(BOARD_WIDTH)
++	limit_y :> i8(BOARD_HEIGHT)
++	move_x, move_y :> move.x, move.y
+ 
+ 	for yDir in -1..=i8(1) {
+ 		for xDir in -1..=i8(1) {
+@@ -241,7 +241,7 @@
+ 				y += yDir
+ 				if x < 0 || x >= limit_x || y < 0 || y >= limit_y do break
+ 
+-				slot := g.board[y][x]
++				slot :> g.board[y][x]
+ 				if slot == other do continue
+ 				if slot == piece {
+ 					success = true
+@@ -265,23 +265,23 @@
+ }
+ 
+ play :: proc(g: ^Game, move: Coord) {
+-	ok := tryPlacingPiece(g, move)
++	ok :> tryPlacingPiece(g, move)
+ 	assert(ok)
+ 	sa.append(&g.moveHistory, indexFromCoord(move))
+ 	g.turn = opponent(g.turn)
+ 	updateValidMoves(g)
+ }
+ 
+-coordPriority :: proc(x, y: int) -> i16 {
+-	max_x := BOARD_WIDTH - 1
+-	max_y := BOARD_HEIGHT - 1
++coordPriority :: fn(x, y: int) -> i16 {
++	max_x :> BOARD_WIDTH - 1
++	max_y :> BOARD_HEIGHT - 1
+ 
+ 	if (x == 0 || x == max_x) && (y == 0 || y == max_y) do return 1000
+ 
+-	adjacent_x := x == 1 || x == max_x-1
+-	adjacent_y := y == 1 || y == max_y-1
+-	on_x_edge  := x == 0 || x == max_x
+-	on_y_edge  := y == 0 || y == max_y
++	adjacent_x :> x == 1 || x == max_x-1
++	adjacent_y :> y == 1 || y == max_y-1
++	on_x_edge  :> x == 0 || x == max_x
++	on_y_edge  :> y == 0 || y == max_y
+ 
+ 	if adjacent_x && adjacent_y do return -200
+ 	if (on_x_edge && adjacent_y) || (on_y_edge && adjacent_x) do return -150
+@@ -302,8 +302,8 @@
+ 
+ 	for y in 0..<BOARD_HEIGHT {
+ 		for x in 0..<BOARD_WIDTH {
+-			idx := y*BOARD_WIDTH + x
+-			bit := u64(1) << uint(idx)
++			idx :> y*BOARD_WIDTH + x
++			bit :> u64(1) << uint(idx)
+ 
+ 			if x != 0 do searchData.not_left_edge |= bit
+ 			if x != BOARD_WIDTH-1 do searchData.not_right_edge |= bit
+@@ -324,15 +324,15 @@
+ }
+ 
+ coordFromIndex :: #force_inline proc "contextless" (idx: u8) -> Coord {
+-	i := int(idx)
++	i :> int(idx)
+ 	return Coord{i8(i % BOARD_WIDTH), i8(i / BOARD_WIDTH)}
+ }
+ 
+-stateFromGame :: proc(g: Game) -> Search_State {
++stateFromGame :: fn(g: Game) -> Search_State {
+ 	state := Search_State{turn = g.turn}
+ 	for y in 0..<BOARD_HEIGHT {
+ 		for x in 0..<BOARD_WIDTH {
+-			bit := u64(1) << uint(y*BOARD_WIDTH + x)
++			bit :> u64(1) << uint(y*BOARD_WIDTH + x)
+ 			#partial switch g.board[y][x] {
+ 				case .black: state.black_bits |= bit
+ 				case .white: state.white_bits |= bit
+@@ -399,15 +399,15 @@
+ }
+ 
+ bookSupportedFirstMove :: #force_inline proc "contextless" (move_idx: u8) -> bool {
+-	return move_idx == 8 || move_idx == 13 || move_idx == 22 || move_idx == 27
++	return move_idx in [8, 13, 22, 27]
+ }
+ 
+ bookTransformMoveIndex :: #force_inline proc "contextless" (move_idx, first_move: u8) -> u8 {
+ 	if move_idx == BOOK_PASS_MOVE do return BOOK_PASS_MOVE
+ 
+-	coord := coordFromIndex(move_idx)
+-	x := int(coord.x)
+-	y := int(coord.y)
++	coord :> coordFromIndex(move_idx)
++	x :> int(coord.x)
++	y :> int(coord.y)
+ 
+ 	switch first_move {
+ 		case 8:
+@@ -437,7 +437,7 @@
+ 	}
+ }
+ 
+-openingLineKeyFromMoves :: proc(moves: []u8) -> (key: Opening_Line_Key) {
++openingLineKeyFromMoves :: fn(moves: []u8) -> (key: Opening_Line_Key) {
+ 	key.count = u8(len(moves))
+ 	for i in 0..<len(moves) {
+ 		key.moves[i] = moves[i]
+@@ -453,10 +453,10 @@
+ transformMoveIndexBySymmetry :: #force_inline proc "contextless" (move_idx: u8, symmetry: Board_Symmetry) -> u8 {
+ 	if move_idx == BOOK_PASS_MOVE do return BOOK_PASS_MOVE
+ 
+-	size := BOARD_WIDTH
+-	coord := coordFromIndex(move_idx)
+-	x := int(coord.x)
+-	y := int(coord.y)
++	size :> BOARD_WIDTH
++	coord :> coordFromIndex(move_idx)
++	x :> int(coord.x)
++	y :> int(coord.y)
+ 	tx, ty := x, y
+ 
+ 	switch symmetry {
+@@ -488,7 +488,7 @@
+ 		token = token[2:]
+ 	}
+ 
+-	if cut := strings.index_any(token, "([" ); cut >= 0 {
++	if cut :> strings.index_any(token, "([" ); cut >= 0 {
+ 		token = token[:cut]
+ 	}
+ 
+@@ -501,12 +501,12 @@
+ 	}
+ }
+ 
+-transformBitsBySymmetry :: proc(bits: u64, symmetry: Board_Symmetry) -> u64 {
++transformBitsBySymmetry :: fn(bits: u64, symmetry: Board_Symmetry) -> u64 {
+ 	if symmetry == .identity do return bits
+ 
+ 	result := u64(0)
+ 	for idx := u8(0); idx < u8(TOTAL_SLOTS); idx += 1 {
+-		bit := bitFromIndex(idx)
++		bit :> bitFromIndex(idx)
+ 		if bits&bit == 0 do continue
+ 		result |= bitFromIndex(transformMoveIndexBySymmetry(idx, symmetry))
+ 	}
+@@ -519,7 +519,7 @@
+ 	return int(a.turn) < int(b.turn)
+ }
+ 
+-canonicalizeSearchState :: proc(state: Search_State) -> (canonical: Search_State, symmetry: Board_Symmetry) {
++canonicalizeSearchState :: fn(state: Search_State) -> (canonical: Search_State, symmetry: Board_Symmetry) {
+ 	canonical = state
+ 	symmetry = .identity
+ 
+@@ -527,8 +527,8 @@
+ 	if BOARD_WIDTH == BOARD_HEIGHT do symmetry_count = len(Board_Symmetry)
+ 
+ 	for symmetry_index in 0..<symmetry_count {
+-		sym := Board_Symmetry(symmetry_index)
+-		transformed := Search_State{
++		sym :> Board_Symmetry(symmetry_index)
++		transformed :> Search_State{
+ 			black_bits = transformBitsBySymmetry(state.black_bits, sym),
+ 			white_bits = transformBitsBySymmetry(state.white_bits, sym),
+ 			turn       = state.turn,
+@@ -538,7 +538,7 @@
+ 			symmetry = sym
+ 		}
+ 
+-		swapped := Search_State{
++		swapped :> Search_State{
+ 			black_bits = transformed.white_bits,
+ 			white_bits = transformed.black_bits,
+ 			turn       = opponent(transformed.turn),
+@@ -557,7 +557,7 @@
+ 	token = sanitizeMoveToken(token)
+ 	if len(token) == 0 do return
+ 
+-	if token == "xx" || token == "XX" || token == "pass" || token == "PASS" || token == "Pass" {
++	if token in ["xx", "XX", "pass", "PASS", "Pass"] {
+ 		move_idx = BOOK_PASS_MOVE
+ 		ok = true
+ 		return
+@@ -565,7 +565,7 @@
+ 
+ 	if len(token) != 2 do return
+ 	file := token[0]
+-	rank := token[1]
++	rank :> token[1]
+ 
+ 	switch {
+ 		case file >= 'a' && file <= 'z':
+@@ -575,8 +575,8 @@
+ 	if file < 'A' || file >= byte('A' + BOARD_WIDTH) do return
+ 	if rank < '1' || rank >= byte('1' + BOARD_HEIGHT) do return
+ 
+-	x := int(file - 'A')
+-	y := int(rank - '1')
++	x :> int(file - 'A')
++	y :> int(rank - '1')
+ 	move_idx = u8(y*BOARD_WIDTH + x)
+ 	ok = true
+ 	return
+@@ -586,30 +586,30 @@
+ 	clear(&importedOpeningBook.entries)
+ 	importedOpeningBook.lines = 0
+ 
+-	data, ok := os.read_entire_file(path, context.allocator)
++	data, ok :> os.read_entire_file(path, context.allocator)
+ 	if ok != nil do return
+ 	defer delete(data)
+ 
+-	content := string(data)
++	content :> string(data)
+ 	line_start := 0
+ 	for line_start <= len(content) {
+ 		line_end := line_start
+ 		for line_end < len(content) && content[line_end] != '\n' do line_end += 1
+ 
+ 		line := strings.trim_space(content[line_start:line_end])
+-		if hash := strings.index_byte(line, '#'); hash >= 0 {
++		if hash :> strings.index_byte(line, '#'); hash >= 0 {
+ 			line = strings.trim_space(line[:hash])
+ 		}
+ 
+ 		if len(line) > 0 {
+-			tokens, err := strings.fields(line, context.temp_allocator)
++			tokens, err :> strings.fields(line, context.temp_allocator)
+ 			if err == nil && len(tokens) > 0 {
+ 				moves: [MAX_GAME_PLIES]u8
+ 				move_count := 0
+ 				valid := true
+ 
+ 				for token in tokens {
+-					move_idx, move_ok := parseMoveToken(token)
++					move_idx, move_ok :> parseMoveToken(token)
+ 					if !move_ok {
+ 						valid = false
+ 						break
+@@ -622,8 +622,8 @@
+ 				if valid && move_count > 1 && moves[0] != BOOK_PASS_MOVE {
+ 					state := initialStandardState()
+ 					for i in 0..<move_count {
+-						moves_mask := legalMoves(state)
+-						move_idx := moves[i]
++						moves_mask :> legalMoves(state)
++						move_idx :> moves[i]
+ 
+ 						if moves_mask == 0 {
+ 							if move_idx != BOOK_PASS_MOVE {
+@@ -650,9 +650,9 @@
+ 					}
+ 
+ 					if valid {
+-						symmetry_count := importedOpeningSymmetryCount()
++						symmetry_count :> importedOpeningSymmetryCount()
+ 						for symmetry_index in 0..<symmetry_count {
+-							symmetry := Board_Symmetry(symmetry_index)
++							symmetry :> Board_Symmetry(symmetry_index)
+ 							transformed_moves: [MAX_GAME_PLIES]u8
+ 							for i in 0..<move_count {
+ 								transformed_moves[i] = transformMoveIndexBySymmetry(moves[i], symmetry)
+@@ -701,7 +701,7 @@
+ 		return
+ 	}
+ 
+-	header_count := len(tree_bits) / 64
++	header_count :> len(tree_bits) / 64
+ 	headers := make([]Opening_Book_Header, header_count)
+ 
+ 	r1 := u64(0)
+@@ -710,7 +710,7 @@
+ 		small_block_ranks := u64(0)
+ 
+ 		for j in 0..<8 {
+-			n := intrinsics.count_ones(u64FromLeBytes(tree_bits[(i*64)+(j*8) : (i*64)+(j*8)+8]))
++			n :> intrinsics.count_ones(u64FromLeBytes(tree_bits[(i*64)+(j*8) : (i*64)+(j*8)+8]))
+ 			if j >= 1 do small_block_ranks |= u64(r2) << uint(9*(j-1))
+ 			r2 += u64(n)
+ 		}
+@@ -728,22 +728,22 @@
+ }
+ 
+ openingBookTestBit :: #force_inline proc "contextless" (book: ^Opening_Book, i: u64) -> bool {
+-	word := u64FromLeBytes(book.tree_bits[int(i/64)*8 : int(i/64)*8+8])
++	word :> u64FromLeBytes(book.tree_bits[int(i/64)*8 : int(i/64)*8+8])
+ 	return word & (u64(1) << uint(i%64)) != 0
+ }
+ 
+ openingBookRank1 :: #force_inline proc "contextless" (book: ^Opening_Book, i: u64) -> u64 {
+-	header := book.headers[int(i/512)]
+-	small_block_index := (i % 512) / 64
++	header :> book.headers[int(i/512)]
++	small_block_index :> (i % 512) / 64
+ 	small_rank := u64(0)
+ 	if small_block_index != 0 {
+ 		small_rank = (header.small_block_ranks >> uint(9*(small_block_index-1))) & 0x1ff
+ 	}
+ 
+-	bit_count := i % 64
++	bit_count :> i % 64
+ 	raw_rank := u64(0)
+ 	if bit_count != 0 {
+-		word := u64FromLeBytes(book.tree_bits[int(i/64)*8 : int(i/64)*8+8])
++		word :> u64FromLeBytes(book.tree_bits[int(i/64)*8 : int(i/64)*8+8])
+ 		raw_rank = u64(intrinsics.count_ones(word & ((u64(1) << uint(bit_count)) - 1)))
+ 	}
+ 
+@@ -759,7 +759,7 @@
+ 	r := u64(len(book.tree_bits)*8 - 1)
+ 
+ 	for l <= r {
+-		m := l + (r-l)/2
++		m :> l + (r-l)/2
+ 		if openingBookRank0(book, m) < target {
+ 			l = m + 1
+ 		} else {
+@@ -772,7 +772,7 @@
+ }
+ 
+ openingBookChildCount :: proc(book: ^Opening_Book, node_id: u64) -> u64 {
+-	i := openingBookSelect0(book, node_id)
++	i :> openingBookSelect0(book, node_id)
+ 	count := u64(0)
+ 	for openingBookTestBit(book, i+count) {
+ 		count += 1
+@@ -781,7 +781,7 @@
+ }
+ 
+ openingBookGetChildNode :: proc(book: ^Opening_Book, node_id, child: u64) -> u64 {
+-	i := openingBookSelect0(book, node_id) + 1
++	i :> openingBookSelect0(book, node_id) + 1
+ 	return openingBookRank1(book, i+child)
+ }
+ 
+@@ -796,13 +796,13 @@
+ lookupImportedOpeningBookMove :: proc(g: ^Game) -> (move_idx: u8, ok: bool) {
+ 	if len(importedOpeningBook.entries) == 0 do return
+ 
+-	history := sa.slice(&g.moveHistory)
+-	symmetry := openingNormalizeSymmetry(g.first)
++	history :> sa.slice(&g.moveHistory)
++	symmetry :> openingNormalizeSymmetry(g.first)
+ 	normalized_history: [MAX_GAME_PLIES]u8
+ 	transformMoveHistory(history, symmetry, &normalized_history)
+ 
+-	key := openingLineKeyFromMoves(normalized_history[:len(history)])
+-	normalized_move, found := importedOpeningBook.entries[key]
++	key :> openingLineKeyFromMoves(normalized_history[:len(history)])
++	normalized_move, found :> importedOpeningBook.entries[key]
+ 	if !found || normalized_move == BOOK_PASS_MOVE do return
+ 
+ 	move_idx = transformMoveIndexBySymmetry(normalized_move, openingDenormalizeSymmetry(g.first))
+@@ -818,15 +818,15 @@
+ 	if move_idx, ok = lookupImportedOpeningBookMove(g); ok do return
+ 	if !openingBook.enabled do return
+ 
+-	history := sa.slice(&g.moveHistory)
++	history :> sa.slice(&g.moveHistory)
+ 	if len(history) == 0 || len(history) > 15 do return
+ 
+-	normalize_symmetry := openingNormalizeSymmetry(g.first)
+-	denormalize_symmetry := openingDenormalizeSymmetry(g.first)
++	normalize_symmetry :> openingNormalizeSymmetry(g.first)
++	denormalize_symmetry :> openingDenormalizeSymmetry(g.first)
+ 	normalized_history: [MAX_GAME_PLIES]u8
+ 	transformMoveHistory(history, normalize_symmetry, &normalized_history)
+ 
+-	first_move := normalized_history[0]
++	first_move :> normalized_history[0]
+ 	if !bookSupportedFirstMove(first_move) do return
+ 
+ 	node_id := u64(1)
+@@ -834,27 +834,27 @@
+ 	i := 1
+ 
+ 	for i < len(normalized_history[:len(history)]) {
+-		expected_white := openingBookWhiteMove(&openingBook, node_id)
+-		actual_white := bookTransformMoveIndex(normalized_history[i], first_move)
++		expected_white :> openingBookWhiteMove(&openingBook, node_id)
++		actual_white :> bookTransformMoveIndex(normalized_history[i], first_move)
+ 		if expected_white != actual_white do return
+ 
+ 		state = applyMoveToState(state, expected_white)
+ 		i += 1
+ 		if i >= len(history) do break
+ 
+-		canonical_black := bookTransformMoveIndex(normalized_history[i], first_move)
+-		child_count := openingBookChildCount(&openingBook, node_id)
++		canonical_black :> bookTransformMoveIndex(normalized_history[i], first_move)
++		child_count :> openingBookChildCount(&openingBook, node_id)
+ 		child_index := u64(0)
+ 		found := false
+ 
+-		moves := legalMoves(state)
++		moves :> legalMoves(state)
+ 		if moves == 0 {
+ 			if child_count != 1 do return
+ 			if canonical_black != BOOK_PASS_MOVE do return
+ 			found = true
+ 		} else {
+ 			for scan := moves; scan != 0; {
+-				candidate := popLowestMoveIndex(&scan)
++				candidate :> popLowestMoveIndex(&scan)
+ 				if candidate == canonical_black {
+ 					found = true
+ 					break
+@@ -870,20 +870,20 @@
+ 	}
+ 
+ 	if state.turn == .black {
+-		moves := legalMoves(state)
++		moves :> legalMoves(state)
+ 		if moves == 0 do return
+ 
+ 		best_normalized_move := INVALID_MOVE_INDEX
+ 		best_white_value := i8(127)
+-		child_count := openingBookChildCount(&openingBook, node_id)
++		child_count :> openingBookChildCount(&openingBook, node_id)
+ 		child_index := u64(0)
+ 
+ 		for scan := moves; scan != 0; {
+-			candidate := popLowestMoveIndex(&scan)
++			candidate :> popLowestMoveIndex(&scan)
+ 			if child_index >= child_count do break
+ 
+-			child_node := openingBookGetChildNode(&openingBook, node_id, child_index)
+-			child_white_value := openingBookValue(&openingBook, child_node)
++			child_node :> openingBookGetChildNode(&openingBook, node_id, child_index)
++			child_white_value :> openingBookValue(&openingBook, child_node)
+ 			if best_normalized_move == INVALID_MOVE_INDEX || child_white_value < best_white_value {
+ 				best_normalized_move = candidate
+ 				best_white_value = child_white_value
+@@ -898,10 +898,10 @@
+ 		return
+ 	}
+ 
+-	canonical_white := openingBookWhiteMove(&openingBook, node_id)
++	canonical_white :> openingBookWhiteMove(&openingBook, node_id)
+ 	if canonical_white == BOOK_PASS_MOVE do return
+ 
+-	normalized_move := bookTransformMoveIndex(canonical_white, first_move)
++	normalized_move :> bookTransformMoveIndex(canonical_white, first_move)
+ 	move_idx = transformMoveIndexBySymmetry(normalized_move, denormalize_symmetry)
+ 	if legalMoves(stateFromGame(g^)) & bitFromIndex(move_idx) == 0 do return
+ 	ok = true
+@@ -912,7 +912,7 @@
+ 	if sa.len(g.moveHistory) != 0 do return
+ 	if sa.len(g.validMoveList) == 0 do return
+ 
+-	state := stateFromGame(g^)
++	state :> stateFromGame(g^)
+ 	if intrinsics.count_ones(state.black_bits | state.white_bits) != 4 do return
+ 
+ 	move = sa.slice(&g.validMoveList)[0]
+@@ -921,7 +921,7 @@
+ }
+ 
+ loadPersistentEndgameCache :: proc(path: string) {
+-	data, ok := os.read_entire_file(path, context.allocator)
++	data, ok :> os.read_entire_file(path, context.allocator)
+ 	if ok != nil do return
+ 	defer delete(data)
+ 
+@@ -929,12 +929,12 @@
+ 	if string(data[:8]) != ENDGAME_CACHE_MAGIC do return
+ 	if data[8] != byte(BOARD_WIDTH) || data[9] != byte(BOARD_HEIGHT) || data[10] != ENDGAME_CACHE_EMPTIES do return
+ 
+-	entry_count := int(u64FromLeBytes(data[12:20]))
++	entry_count :> int(u64FromLeBytes(data[12:20]))
+ 	if len(data) != ENDGAME_CACHE_HEADER_SIZE + entry_count*ENDGAME_CACHE_ENTRY_SIZE do return
+ 
+ 	for i in 0..<entry_count {
+-		offset := ENDGAME_CACHE_HEADER_SIZE + i*ENDGAME_CACHE_ENTRY_SIZE
+-		state := Search_State{
++		offset :> ENDGAME_CACHE_HEADER_SIZE + i*ENDGAME_CACHE_ENTRY_SIZE
++		state :> Search_State{
+ 			black_bits = u64FromLeBytes(data[offset : offset+8]),
+ 			white_bits = u64FromLeBytes(data[offset+8 : offset+16]),
+ 			turn       = Turn(data[offset+16]),
+@@ -949,8 +949,8 @@
+ 	if !endgameTableDirty do return
+ 
+ 	if !sync.rw_mutex_guard(&endgameTableLock) do return
+-	entry_count := len(endgameTable)
+-	data_len := ENDGAME_CACHE_HEADER_SIZE + entry_count*ENDGAME_CACHE_ENTRY_SIZE
++	entry_count :> len(endgameTable)
++	data_len :> ENDGAME_CACHE_HEADER_SIZE + entry_count*ENDGAME_CACHE_ENTRY_SIZE
+ 	data, alloc_ok := make([]byte, data_len)
+ 	if alloc_ok != nil do return
+ 	defer delete(data)
+@@ -978,7 +978,7 @@
+ }
+ 
+ endgameCacheLookup :: proc(state: Search_State) -> (score: i8, ok: bool) {
+-	canonical_state, _ := canonicalizeSearchState(state)
++	canonical_state, _ :> canonicalizeSearchState(state)
+ 	if sync.rw_mutex_shared_guard(&endgameTableLock) {
+ 		score, ok = endgameTable[canonical_state]
+ 	}
+@@ -986,9 +986,9 @@
+ }
+ 
+ endgameCacheStore :: proc(state: Search_State, score: i8) {
+-	canonical_state, _ := canonicalizeSearchState(state)
++	canonical_state, _ :> canonicalizeSearchState(state)
+ 	if sync.rw_mutex_guard(&endgameTableLock) {
+-		prev, ok := endgameTable[canonical_state]
++		prev, ok :> endgameTable[canonical_state]
+ 		if !ok || prev != score {
+ 			endgameTable[canonical_state] = score
+ 			endgameTableDirty = true
+@@ -997,7 +997,7 @@
+ }
+ 
+ sharedTTLookup :: proc(state: Search_State) -> (entry: TT_Entry, ok: bool) {
+-	canonical_state, _ := canonicalizeSearchState(state)
++	canonical_state, _ :> canonicalizeSearchState(state)
+ 	if sync.rw_mutex_shared_guard(&sharedTranspositionTableLock) {
+ 		entry, ok = sharedTranspositionTable[canonical_state]
+ 	}
+@@ -1005,9 +1005,9 @@
+ }
+ 
+ sharedTTStore :: proc(state: Search_State, entry: TT_Entry) {
+-	canonical_state, _ := canonicalizeSearchState(state)
++	canonical_state, _ :> canonicalizeSearchState(state)
+ 	if sync.rw_mutex_guard(&sharedTranspositionTableLock) {
+-		prev, ok := sharedTranspositionTable[canonical_state]
++		prev, ok :> sharedTranspositionTable[canonical_state]
+ 		if !ok || entry.bound == .exact || prev.bound != .exact {
+ 			sharedTranspositionTable[canonical_state] = entry
+ 		}
+@@ -1047,9 +1047,9 @@
+ }
+ 
+ legalMoves :: proc(state: Search_State) -> u64 {
+-	player        := (state.turn == .black) ? state.black_bits : state.white_bits
+-	opponent_bits := (state.turn == .black) ? state.white_bits : state.black_bits
+-	empty_bits    := searchData.board_mask & ~(state.black_bits | state.white_bits)
++	player        :> (state.turn == .black) ? state.black_bits : state.white_bits
++	opponent_bits :> (state.turn == .black) ? state.white_bits : state.black_bits
++	empty_bits    :> searchData.board_mask & ~(state.black_bits | state.white_bits)
+ 	moves         := u64(0)
+ 	line_steps    := BOARD_WIDTH
+ 	if BOARD_HEIGHT > line_steps do line_steps = BOARD_HEIGHT
+@@ -1089,10 +1089,10 @@
+ 	return moves
+ }
+ 
+-terminalScore :: proc(state: Search_State) -> i8 {
+-	black_count := int(intrinsics.count_ones(state.black_bits))
+-	white_count := int(intrinsics.count_ones(state.white_bits))
+-	diff := black_count - white_count
++terminalScore :: fn(state: Search_State) -> i8 {
++	black_count :> int(intrinsics.count_ones(state.black_bits))
++	white_count :> int(intrinsics.count_ones(state.white_bits))
++	diff :> black_count - white_count
+ 	if diff == 0 do return 0
+ 	if state.turn == .black do return (diff > 0) ? 1 : -1
+ 	return (diff < 0) ? 1 : -1
+@@ -1188,10 +1188,10 @@
+ 
+ applyMoveToState :: proc(state: Search_State, move_idx: u8) -> Search_State {
+ 	state := state
+-	move     := bitFromIndex(move_idx)
++	move     :> bitFromIndex(move_idx)
+ 	player   := (state.turn == .black) ? state.black_bits : state.white_bits
+ 	opponent_bits := (state.turn == .black) ? state.white_bits : state.black_bits
+-	flips    := captureEast(move, player, opponent_bits)      |
++	flips    :> captureEast(move, player, opponent_bits)      |
+ 	            captureWest(move, player, opponent_bits)      |
+ 	            captureSouth(move, player, opponent_bits)     |
+ 	            captureNorth(move, player, opponent_bits)     |
+@@ -1215,7 +1215,7 @@
+ }
+ 
+ popLowestMoveIndex :: #force_inline proc "contextless" (moves: ^u64) -> u8 {
+-	idx := u8(intrinsics.count_trailing_zeros(moves^))
++	idx :> u8(intrinsics.count_trailing_zeros(moves^))
+ 	moves^ &= moves^ - 1
+ 	return idx
+ }
+@@ -1223,7 +1223,7 @@
+ orderedMoveIndices :: proc(moves: u64, preferred_move: u8, move_buf: ^[TOTAL_SLOTS]u8) -> (count: int) {
+ 	moves := moves
+ 	if preferred_move != INVALID_MOVE_INDEX {
+-		preferred_bit := bitFromIndex(preferred_move)
++		preferred_bit :> bitFromIndex(preferred_move)
+ 		if moves & preferred_bit != 0 {
+ 			move_buf[count] = preferred_move
+ 			count += 1
+@@ -1243,7 +1243,7 @@
+ 		best_priority := searchData.square_priority[int(move_buf[i])]
+ 
+ 		for j in i+1..<count {
+-			priority := searchData.square_priority[int(move_buf[j])]
++			priority :> searchData.square_priority[int(move_buf[j])]
+ 			if priority > best_priority {
+ 				best_idx      = j
+ 				best_priority = priority
+@@ -1261,14 +1261,14 @@
+ 	alpha, beta := alpha, beta
+ 	ctx.stats.nodes += 1
+ 
+-	alpha_input := alpha
+-	beta_input  := beta
++	alpha_input :> alpha
++	beta_input  :> beta
+ 	preferred   := INVALID_MOVE_INDEX
+-	cache_eligible := emptyCount(state) <= ENDGAME_CACHE_EMPTIES
+-	canonical_state, canonical_symmetry := canonicalizeSearchState(state)
++	cache_eligible :> emptyCount(state) <= ENDGAME_CACHE_EMPTIES
++	canonical_state, canonical_symmetry :> canonicalizeSearchState(state)
+ 
+ 	if cache_eligible {
+-		if score, ok := endgameCacheLookup(state); ok {
++		if score, ok :> endgameCacheLookup(state); ok {
+ 			ctx.stats.endgame_hits += 1
+ 			return score
+ 		}
+@@ -1297,21 +1297,21 @@
+ 		}
+ 	}
+ 
+-	moves := legalMoves(state)
++	moves :> legalMoves(state)
+ 	if moves == 0 {
+ 		pass_state := state
+ 		pass_state.turn = opponent(pass_state.turn)
+ 		if legalMoves(pass_state) == 0 {
+-			score := terminalScore(state)
+-			entry := TT_Entry{score = score, bound = .exact, best_move = INVALID_MOVE_INDEX}
++			score :> terminalScore(state)
++			entry :> TT_Entry{score = score, bound = .exact, best_move = INVALID_MOVE_INDEX}
+ 			ctx.transposition_table[canonical_state] = entry
+ 			sharedTTStore(state, entry)
+ 			if cache_eligible do endgameCacheStore(state, score)
+ 			return score
+ 		}
+ 
+-		score := -negamax(ctx, pass_state, -beta, -alpha)
+-		entry := TT_Entry{score = score, bound = .exact, best_move = INVALID_MOVE_INDEX}
++		score :> -negamax(ctx, pass_state, -beta, -alpha)
++		entry :> TT_Entry{score = score, bound = .exact, best_move = INVALID_MOVE_INDEX}
+ 		ctx.transposition_table[canonical_state] = entry
+ 		sharedTTStore(state, entry)
+ 		if cache_eligible do endgameCacheStore(state, score)
+@@ -1319,14 +1319,14 @@
+ 	}
+ 
+ 	move_buf: [TOTAL_SLOTS]u8
+-	move_count := orderedMoveIndices(moves, preferred, &move_buf)
++	move_count :> orderedMoveIndices(moves, preferred, &move_buf)
+ 	best_move  := INVALID_MOVE_INDEX
+ 	best_score := i8(-2)
+ 
+ 	for i in 0..<move_count {
+-		move_idx := move_buf[i]
+-		child := applyMoveToState(state, move_idx)
+-		score := -negamax(ctx, child, -beta, -alpha)
++		move_idx :> move_buf[i]
++		child :> applyMoveToState(state, move_idx)
++		score :> -negamax(ctx, child, -beta, -alpha)
+ 
+ 		if score > best_score {
+ 			best_score = score
+@@ -1369,11 +1369,11 @@
+ }
+ 
+ searchBestMoveSequential :: proc(ctx: ^Search_Context, state: Search_State) -> (best_move: u8, best_score: i8) {
+-	moves := legalMoves(state)
++	moves :> legalMoves(state)
+ 	assert(moves != 0)
+ 
+ 	preferred := INVALID_MOVE_INDEX
+-	canonical_state, canonical_symmetry := canonicalizeSearchState(state)
++	canonical_state, canonical_symmetry :> canonicalizeSearchState(state)
+ 	entry, ok := ctx.transposition_table[canonical_state]
+ 	if !ok {
+ 		entry, ok = sharedTTLookup(state)
+@@ -1385,16 +1385,16 @@
+ 	}
+ 
+ 	move_buf: [TOTAL_SLOTS]u8
+-	move_count := orderedMoveIndices(moves, preferred, &move_buf)
++	move_count :> orderedMoveIndices(moves, preferred, &move_buf)
+ 	best_move  = move_buf[0]
+ 	best_score = i8(-2)
+ 	alpha      := i8(-1)
+-	beta       := i8(1)
++	beta       :> i8(1)
+ 
+ 	for i in 0..<move_count {
+-		move_idx := move_buf[i]
+-		child := applyMoveToState(state, move_idx)
+-		score := -negamax(ctx, child, -beta, -alpha)
++		move_idx :> move_buf[i]
++		child :> applyMoveToState(state, move_idx)
++		score :> -negamax(ctx, child, -beta, -alpha)
+ 
+ 		if score > best_score {
+ 			best_move  = move_idx
+@@ -1406,7 +1406,7 @@
+ 		}
+ 	}
+ 
+-	canonical_best_move := transformMoveIndexBySymmetry(best_move, canonical_symmetry)
++	canonical_best_move :> transformMoveIndexBySymmetry(best_move, canonical_symmetry)
+ 	entry = TT_Entry{score = best_score, bound = .exact, best_move = canonical_best_move}
+ 	ctx.transposition_table[canonical_state] = entry
+ 	sharedTTStore(state, entry)
+@@ -1424,11 +1424,11 @@
+ 
+ runRootSearchWorker :: proc(shared: ^Root_Search_Task_Group) {
+ 	for {
+-		index := int(sync.atomic_add(&shared.next_index, 1))
++		index :> int(sync.atomic_add(&shared.next_index, 1))
+ 		if index >= shared.move_count do break
+ 
+ 		ctx := makeSearchContext()
+-		child := applyMoveToState(shared.state, shared.move_buf[index])
++		child :> applyMoveToState(shared.state, shared.move_buf[index])
+ 		shared.scores[index] = -negamax(&ctx, child, -1, 1)
+ 		shared.stats[index] = ctx.stats
+ 		destroySearchContext(&ctx)
+@@ -1436,16 +1436,16 @@
+ }
+ 
+ rootSearchWorkerProc :: proc(t: ^thread.Thread) {
+-	shared := cast(^Root_Search_Task_Group)t.data
++	shared :> cast(^Root_Search_Task_Group)t.data
+ 	runRootSearchWorker(shared)
+ }
+ 
+ searchBestMoveState :: proc(state: Search_State) -> (best_move: u8, best_score: i8, stats: Search_Stats) {
+-	moves := legalMoves(state)
++	moves :> legalMoves(state)
+ 	assert(moves != 0)
+ 
+ 	move_buf: [TOTAL_SLOTS]u8
+-	move_count := orderedMoveIndices(moves, INVALID_MOVE_INDEX, &move_buf)
++	move_count :> orderedMoveIndices(moves, INVALID_MOVE_INDEX, &move_buf)
+ 
+ 	if move_count < ROOT_PARALLEL_MIN_MOVES || emptyCount(state) <= ENDGAME_CACHE_EMPTIES+2 {
+ 		ctx := makeSearchContext()
+@@ -1467,7 +1467,7 @@
+ 	worker_count := move_count
+ 	if worker_count > ROOT_THREAD_LIMIT do worker_count = ROOT_THREAD_LIMIT
+ 
+-	thread_count := worker_count - 1
++	thread_count :> worker_count - 1
+ 	threads := make([]^thread.Thread, thread_count)
+ 	for i in 0..<thread_count {
+ 		threads[i] = thread.create(rootSearchWorkerProc)
+@@ -1502,23 +1502,23 @@
+ bestMove :: proc(g: ^Game) -> Coord {
+ 	assert(g.outcome == .inGame)
+ 	assert(sa.len(g.validMoveList) > 0)
+-	t0 := time.now()
+-
+-	if move, ok := lookupEquivalentInitialMove(g); ok {
++	t0 :> time.now()
++
++	if move, ok :> lookupEquivalentInitialMove(g); ok {
+ 		fmt.println("Equivalent opening move:", move)
+ 		fmt.println("Search time:", time.duration_milliseconds(time.since(t0)), "ms\n")
+ 		return move
+ 	}
+ 
+-	if book_move_idx, ok := lookupOpeningBookMove(g); ok {
+-		best := coordFromIndex(book_move_idx)
++	if book_move_idx, ok :> lookupOpeningBookMove(g); ok {
++		best :> coordFromIndex(book_move_idx)
+ 		fmt.println("Opening book move:", best)
+ 		fmt.println("Search time:", time.duration_milliseconds(time.since(t0)), "ms\n")
+ 		return best
+ 	}
+ 
+-	best_idx, best_score, stats := searchBestMoveState(stateFromGame(g^))
+-	best := coordFromIndex(best_idx)
++	best_idx, best_score, stats :> searchBestMoveState(stateFromGame(g^))
++	best :> coordFromIndex(best_idx)
+ 
+ 	fmt.println(scoreLabel(best_score), "move:", best, "nodes:", stats.nodes, "tt hits:", stats.tt_hits, "endgame hits:", stats.endgame_hits)
+ 	fmt.println("Search time:", time.duration_milliseconds(time.since(t0)), "ms\n")
+@@ -1535,7 +1535,7 @@
+ }
+ 
+ parsePositivePerfValue :: proc(option_name, raw_value: string, fallback: int) -> int {
+-	value, ok := strconv.parse_int(raw_value)
++	value, ok :> strconv.parse_int(raw_value)
+ 	if !ok || value < 1 {
+ 		fmt.eprintln("Ignoring invalid value for", option_name, ":", raw_value)
+ 		return fallback
+@@ -1544,7 +1544,7 @@
+ }
+ 
+ parsePerfOptionValue :: proc(args: []string, index: ^int, option_name, colon_prefix, equals_prefix: string, current_value: int) -> int {
+-	arg := args[index^]
++	arg :> args[index^]
+ 	if strings.has_prefix(arg, colon_prefix) {
+ 		return parsePositivePerfValue(option_name, strings.trim_prefix(arg, colon_prefix), current_value)
+ 	}
+@@ -1563,7 +1563,7 @@
+ }
+ 
+ parseStringOptionValue :: proc(args: []string, index: ^int, option_name, colon_prefix, equals_prefix, current_value: string) -> string {
+-	arg := args[index^]
++	arg :> args[index^]
+ 	if strings.has_prefix(arg, colon_prefix) {
+ 		return strings.trim_prefix(arg, colon_prefix)
+ 	}
+@@ -1582,7 +1582,7 @@
+ }
+ 
+ parseTurnOptionValue :: proc(args: []string, index: ^int, option_name, colon_prefix, equals_prefix: string, current_value: Turn) -> Turn {
+-	raw := parseStringOptionValue(args, index, option_name, colon_prefix, equals_prefix, "")
++	raw :> parseStringOptionValue(args, index, option_name, colon_prefix, equals_prefix, "")
+ 	switch raw {
+ 		case "black", "BLACK", "Black":
+ 			return .black
+@@ -1604,7 +1604,7 @@
+ 	config = defaultRuntimeConfig()
+ 
+ 	for i := 1; i < len(args); i += 1 {
+-		arg := args[i]
++		arg :> args[i]
+ 		switch {
+ 			case arg == "--perf":
+ 				config.perf_mode = true
+@@ -1684,9 +1684,9 @@
+ 			play(&g, sa.slice(&g.validMoveList)[0])
+ 		}
+ 
+-		t0 := time.now()
+-		best_idx, best_score, stats := searchBestMoveState(stateFromGame(g))
+-		elapsed_ms := time.duration_milliseconds(time.since(t0))
++		t0 :> time.now()
++		best_idx, best_score, stats :> searchBestMoveState(stateFromGame(g))
++		elapsed_ms :> time.duration_milliseconds(time.since(t0))
+ 
+ 		total_time_ms += elapsed_ms
+ 		total_nodes   += stats.nodes
+@@ -1718,10 +1718,10 @@
+ 	for ply in 0..<ply_limit {
+ 		if g.outcome != .inGame do break
+ 
+-		t0 := time.now()
+-		best_idx, best_score, stats := searchBestMoveState(stateFromGame(g))
+-		elapsed_ms := time.duration_milliseconds(time.since(t0))
+-		move := coordFromIndex(best_idx)
++		t0 :> time.now()
++		best_idx, best_score, stats :> searchBestMoveState(stateFromGame(g))
++		elapsed_ms :> time.duration_milliseconds(time.since(t0))
++		move :> coordFromIndex(best_idx)
+ 
+ 		sequence_time_ms += elapsed_ms
+ 		sequence_nodes   += stats.nodes
+@@ -1744,7 +1744,7 @@
+ 	for ply in 0..<plies {
+ 		if g.outcome != .inGame || sa.len(g.validMoveList) == 0 do break
+ 
+-		move := bestMove(&g)
++		move :> bestMove(&g)
+ 		fmt.println("Sim ply", ply+1, "-", g.turn, "->", move)
+ 		play(&g, move)
+ 	}
+@@ -1761,7 +1761,7 @@
+ 	setStartingPlayer(&g, first)
+ 
+ 	if len(strings.trim_space(sequence)) > 0 {
+-		tokens, err := strings.fields(sequence, context.temp_allocator)
++		tokens, err :> strings.fields(sequence, context.temp_allocator)
+ 		if err != nil {
+ 			fmt.eprintln("Failed to parse sequence")
+ 			return
+@@ -1769,13 +1769,13 @@
+ 		defer delete(tokens, context.temp_allocator)
+ 
+ 		for token, i in tokens {
+-			move_idx, ok := parseMoveToken(token)
++			move_idx, ok :> parseMoveToken(token)
+ 			if !ok || move_idx == BOOK_PASS_MOVE {
+ 				fmt.eprintln("Invalid move token at ply", i+1, ":", token)
+ 				return
+ 			}
+ 
+-			move := coordFromIndex(move_idx)
++			move :> coordFromIndex(move_idx)
+ 			if !g.validMoves[move.y][move.x] {
+ 				fmt.eprintln("Illegal move at ply", i+1, ":", token, "=>", move)
+ 				return
+@@ -1796,23 +1796,23 @@
+ 	}
+ 	fmt.println()
+ 
+-	move := bestMove(&g)
++	move :> bestMove(&g)
+ 	fmt.println("Analyzed next move:", g.turn, "->", move)
+ }
+ 
+ drawPiece :: proc(x, y: i32, radius: f32, pieceColor: rl.Color) {
+-	centerX := x*GRID_SIZE + GRID_SIZE/2
+-	centerY := y*GRID_SIZE + GRID_SIZE/2
+-	outlineColor := (pieceColor == rl.BLACK) ? rl.WHITE : rl.BLACK
+-	innerRadius  := radius - ((pieceColor == rl.BLACK) ? 0 : 1)
++	centerX :> x*GRID_SIZE + GRID_SIZE/2
++	centerY :> y*GRID_SIZE + GRID_SIZE/2
++	outlineColor :> (pieceColor == rl.BLACK) ? rl.WHITE : rl.BLACK
++	innerRadius  :> radius - ((pieceColor == rl.BLACK) ? 0 : 1)
+ 	rl.DrawCircle(centerX, centerY, radius+1, outlineColor)
+ 	rl.DrawCircle(centerX, centerY, innerRadius, pieceColor)
+ }
+ 
+ resetGame :: proc(g: ^Game) {
+ 	g^ = {}
+-	center_x := BOARD_WIDTH / 2
+-	center_y := BOARD_HEIGHT / 2
++	center_x :> BOARD_WIDTH / 2
++	center_y :> BOARD_HEIGHT / 2
+ 	g.board[center_y][center_x]       = .white
+ 	g.board[center_y-1][center_x-1]   = .white
+ 	g.board[center_y-1][center_x]     = .black
+@@ -1831,7 +1831,7 @@
+ 	importedOpeningBook.entries, _ = make(map[Opening_Line_Key]u8, 256)
+ 	defer delete(importedOpeningBook.entries)
+ 
+-	runtime_config := parseRuntimeConfigFromArgs(os.args)
++	runtime_config :> parseRuntimeConfigFromArgs(os.args)
+ 	loadPersistentEndgameCache(runtime_config.endgame_cache_path)
+ 	defer savePersistentEndgameCache(runtime_config.endgame_cache_path)
+ 	openingBookInit(runtime_config.opening_tree_path, runtime_config.opening_data_path)
+@@ -1867,12 +1867,12 @@
+ 		else if IsKeyPressed(.R) do resetGame(&g)
+ 		else if IsKeyPressed(.F) do resetGame(&g)
+ 		else if g.outcome == .inGame && IsMouseButtonPressed(.LEFT) && g.turn == .black {
+-			move := Coord{i8(GetMouseX()/GRID_SIZE), i8(GetMouseY()/GRID_SIZE)}
++			move :> Coord{i8(GetMouseX()/GRID_SIZE), i8(GetMouseY()/GRID_SIZE)}
+ 			if g.validMoves[move.y][move.x] {
+ 				play(&g, move)
+ 			}
+ 		} else if g.outcome == .inGame && (IsKeyDown(.A) || IsKeyPressed(.SPACE) || g.turn == .white) {
+-			move := bestMove(&g)
++			move :> bestMove(&g)
+ 			play(&g, move)
+ 		}
+ 		
+@@ -1883,10 +1883,10 @@
+ 		for y in 0..<i32(BOARD_HEIGHT) {
+ 			for x in 0..<i32(BOARD_WIDTH) {
+ 				if g.validMoves[y][x] {
+-					pieceColor := (g.turn == .black) ? BLACK : WHITE
++					pieceColor :> (g.turn == .black) ? BLACK : WHITE
+ 					drawPiece(x, y, PIECE_RADIUS/4, pieceColor)
+ 				} else if g.board[y][x] != .empty {
+-					pieceColor := (g.board[y][x] == .black) ? BLACK : WHITE
++					pieceColor :> (g.board[y][x] == .black) ? BLACK : WHITE
+ 					drawPiece(x, y, PIECE_RADIUS, pieceColor)
+ 				}
+ 			}

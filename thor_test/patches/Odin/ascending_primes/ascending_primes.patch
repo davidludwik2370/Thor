@@ -1,0 +1,11 @@
+--- a/Odin/ascending_primes/ascending_primes.thor
++++ b/Odin/ascending_primes/ascending_primes.thor
+@@ -7,7 +7,7 @@
+ 
+ main :: proc() {
+     using math, strconv, fmt
+-    limit :u32 = 1_000_000
++    limit :u32 > 1_000_000
+ 
+ 	prime, ascending: bool 
+     i, j: u32

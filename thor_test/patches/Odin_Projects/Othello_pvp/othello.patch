@@ -1,0 +1,93 @@
+--- a/Odin_Projects/Othello_pvp/othello.thor
++++ b/Odin_Projects/Othello_pvp/othello.thor
+@@ -30,17 +30,17 @@
+ 	first:   Turn
+ }
+ 
+-opponent :: proc(t: Turn) -> Turn {
++opponent :: fn(t: Turn) -> Turn {
+ 	return Turn(1) - t
+ }
+ 
+-inBounds :: proc(pos: Coord) -> bool {
++inBounds :: fn(pos: Coord) -> bool {
+ 	return pos.x>=0 && pos.x<BOARD_SIZE && pos.y>=0 && pos.y<BOARD_SIZE
+ }
+ 
+ tryPlacingPiece :: proc(g: ^Game, move: Coord, test := false) -> (success: bool) {
+ 	if !inBounds(move) || g.board[move.y][move.x] != .empty do return
+-	piece: Slot = (g.turn == .black) ? .black : .white
++	piece: Slot > (g.turn == .black) ? .black : .white
+ 	for yDir in -1..=i8(1) {
+ 		for xDir in -1..=i8(1) {
+ 			if yDir == 0 && xDir == 0 do continue
+@@ -54,7 +54,7 @@
+ 					success = true
+ 					if test do return
+ 					for i in 0..=pieces {
+-						flipPos := move + i*Coord{xDir, yDir}
++						flipPos :> move + i*Coord{xDir, yDir}
+ 						g.board[flipPos.y][flipPos.x] = piece
+ 					}
+ 				}
+@@ -74,7 +74,7 @@
+ 			}
+ 		}
+ 	}
+-	switch diff := int(g.pieceCounts[.black]) - int(g.pieceCounts[.white]); {
++	switch diff :> int(g.pieceCounts[.black]) - int(g.pieceCounts[.white]); {
+ 		case diff > 0: g.outcome = .blackWon
+ 		case diff < 0: g.outcome = .whiteWon
+ 		case:          g.outcome = .draw
+@@ -99,16 +99,16 @@
+ }
+ 
+ drawPiece :: proc(x, y: i32, radius: f32, pieceColor: rl.Color) {
+-	centerX := x*GRID_SIZE + GRID_SIZE/2
+-	centerY := y*GRID_SIZE + GRID_SIZE/2
+-	outlineColor := (pieceColor == rl.BLACK) ? rl.WHITE : rl.BLACK
+-	innerRadius  := radius - ((pieceColor == rl.BLACK) ? 0 : 1)
++	centerX :> x*GRID_SIZE + GRID_SIZE/2
++	centerY :> y*GRID_SIZE + GRID_SIZE/2
++	outlineColor :> (pieceColor == rl.BLACK) ? rl.WHITE : rl.BLACK
++	innerRadius  :> radius - ((pieceColor == rl.BLACK) ? 0 : 1)
+ 	rl.DrawCircle(centerX, centerY, radius+1, outlineColor)
+ 	rl.DrawCircle(centerX, centerY, innerRadius, pieceColor)
+ }
+ 
+ resetGame :: proc(g: ^Game, switchFirst := true) {
+-	oldFirst := g.first
++	oldFirst :> g.first
+ 	g^ = {}
+ 	g.board[BOARD_SIZE/2][BOARD_SIZE/2]     = .white
+ 	g.board[BOARD_SIZE/2-1][BOARD_SIZE/2-1] = .white
+@@ -134,14 +134,14 @@
+ 		else if IsKeyPressed(.R) do resetGame(&g, switchFirst=false)
+ 		else if IsKeyPressed(.F) do resetGame(&g)
+ 		else if g.outcome == .inGame && IsMouseButtonPressed(.LEFT) {
+-			move := Coord{i8(GetMouseX()/GRID_SIZE), i8(GetMouseY()/GRID_SIZE)}
++			move :> Coord{i8(GetMouseX()/GRID_SIZE), i8(GetMouseY()/GRID_SIZE)}
+ 			if g.validMoves[move.y][move.x] {
+ 				tryPlacingPiece(&g, move)
+ 				g.turn = opponent(g.turn)
+ 				updateValidMoves(&g)
+ 			}
+ 		} else if g.outcome == .inGame && (IsKeyDown(.A) || IsKeyPressed(.SPACE)) {
+-			move := rand.choice(sa.slice(&g.validMoveList))
++			move :> rand.choice(sa.slice(&g.validMoveList))
+ 			tryPlacingPiece(&g, move)
+ 			g.turn = opponent(g.turn)
+ 			updateValidMoves(&g)
+@@ -154,10 +154,10 @@
+ 		for y in 0..<i32(BOARD_SIZE) {
+ 			for x in 0..<i32(BOARD_SIZE) {
+ 				if g.validMoves[y][x] {
+-					pieceColor := (g.turn == .black) ? BLACK : WHITE
++					pieceColor :> (g.turn == .black) ? BLACK : WHITE
+ 					drawPiece(x, y, PIECE_RADIUS/4, pieceColor)
+ 				} else if g.board[y][x] != .empty {
+-					pieceColor := (g.board[y][x] == .black) ? BLACK : WHITE
++					pieceColor :> (g.board[y][x] == .black) ? BLACK : WHITE
+ 					drawPiece(x, y, PIECE_RADIUS, pieceColor)
+ 				}
+ 			}

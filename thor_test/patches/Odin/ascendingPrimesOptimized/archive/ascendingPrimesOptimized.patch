@@ -1,0 +1,11 @@
+--- a/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.thor
++++ b/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.thor
+@@ -10,7 +10,7 @@
+         }
+         for sd in smallest..<(11-oom) {
+             for n in ascending(oom-1, sd+1) {
+-                pow10 := int(math.pow10(f64(oom-1)))
++                pow10 :> int(math.pow10(f64(oom-1)))
+                 append(&nums, sd*pow10 + n)
+             }
+         }

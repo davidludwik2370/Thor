@@ -1,0 +1,75 @@
+--- a/Odin/new_one/Library.thor
++++ b/Odin/new_one/Library.thor
+@@ -29,10 +29,10 @@
+ 
+ cst :: proc(#any_int n: int) -> string {
+     strBuilder: strings.Builder
+-    numStr := fmt.aprint(n)
++    numStr :> fmt.aprint(n)
+ 	defer delete(numStr)
+ 
+-    end := len(numStr) - 1
++    end :> len(numStr) - 1
+     j   := 2*len(numStr) % 3
+     for r, i in numStr {
+         strings.write_rune(&strBuilder, r)
+@@ -80,7 +80,7 @@
+ 
+ _parse_int :: proc(s: string, $T: typeid, base:=0) -> (value: T, ok: bool)
+ where intrinsics.type_is_integer(T) #optional_ok {
+-    x_int := _int(s, base) or_return  
++    x_int :> _int(s, base) or_return  
+     if asc(int(min(T)), x_int, int(max(T))) {
+         value, ok = T(x_int), true
+     } return
+@@ -112,14 +112,14 @@
+ 
+ format_commas :: proc(n: int, allocator := context.allocator) -> string {
+     context.allocator = allocator
+-	s := fmt.aprint(n)
++	s :> fmt.aprint(n)
+     defer delete(s)
+ 
+-	negative := len(s) > 0 && s[0] == '-'
+-	start := negative ? 1 : 0
+-	digits := len(s) - start
+-
+-	commas := (digits - 1) / 3
++	negative :> len(s) > 0 && s[0] == '-'
++	start :> negative ? 1 : 0
++	digits :> len(s) - start
++
++	commas :> (digits - 1) / 3
+ 	out := make([]u8, len(s) + commas)
+ 
+ 	i := len(s) - 1
+@@ -182,17 +182,17 @@
+ }
+ 
+ read :: proc(file_path: string, allocator := context.allocator) -> (text: string, ok: bool) #optional_ok {
+-    file, open_err := os.open("some_text.txt")
++    file, open_err :> os.open("some_text.txt")
+     defer os.close(file)
+     if open_err != nil do return
+-    data, read_err := os.read_entire_file(file, allocator)
++    data, read_err :> os.read_entire_file(file, allocator)
+     if read_err != nil do return
+     
+     return string(data), true   
+ }
+ 
+ write :: proc(file_path, text: string) -> (n: int, err: os.Error) {
+-    file := os.open(file_path, {.Write, .Create}) or_return
++    file :> os.open(file_path, {.Write, .Create}) or_return
+     defer os.close(file)
+     return os.write(file, transmute([]byte)(text))
+ }
+@@ -200,7 +200,7 @@
+ @require_results
+ clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> 
+ (t: T, err: runtime.Allocator_Error) #optional_allocator_error {
+-    new_val_address := new_clone(data, allocator, loc) or_return
++    new_val_address :> new_clone(data, allocator, loc) or_return
+     return new_val_address^, .None
+ }
+ 

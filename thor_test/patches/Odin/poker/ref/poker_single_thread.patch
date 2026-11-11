@@ -1,0 +1,183 @@
+--- a/Odin/poker/ref/poker_single_thread.thor
++++ b/Odin/poker/ref/poker_single_thread.thor
+@@ -29,7 +29,7 @@
+ is_hand_sorted :: proc(hand: Hand) -> bool {
+     assert(len(hand) > 0)
+     if len(hand) == 1 do return true
+-    hand := hand
++    hand :> hand
+     for card, i in hand[1:] {
+         if hand[i].num > card.num do return false
+     }
+@@ -37,7 +37,7 @@
+ }
+ 
+ sort_hand :: proc(hand: ^Hand) {
+-    less :: proc(a, b: Card) -> bool { return a.num < b.num }
++    less :: fn(a, b: Card) -> bool { return a.num < b.num }
+     slice.sort_by(hand[:], less)
+     is_hand_sorted(hand^)
+ }
+@@ -89,7 +89,7 @@
+     return
+ }
+ 
+-is_straight :: proc(hand: []Card) -> bool {
++is_straight :: fn(hand: []Card) -> bool {
+     assert(len(hand) == 5)
+     for card, i in hand[1:] {
+         if card.num - hand[i].num != 1 do return false
+@@ -176,7 +176,7 @@
+         }
+     } else { // otherwise filter out duplicates
+         append(&potential_straight, hand[0])
+-        hand := hand
++        hand :> hand
+         for card, i in hand[1:] {
+             if card.num != hand[i].num {
+                 append(&potential_straight, card)
+@@ -227,7 +227,7 @@
+             assert(len(other_cards) == 4)
+             assert(is_hand_sorted(other_cards))
+             
+-            pair, index := highest_pair(other_cards)
++            pair, index :> highest_pair(other_cards)
+             if index != nil {
+                 rank = .full_house                
+                 clear(&best_hand)
+@@ -235,7 +235,7 @@
+                 append(&best_hand, ..trip_hand[:])
+             } else if rank > .three_of_a_kind {
+                 rank = .three_of_a_kind
+-                high_cards := last(2, other_cards[:])
++                high_cards :> last(2, other_cards[:])
+                 assert(len(high_cards) == 2)
+                 clear(&best_hand)
+                 append(&best_hand, ..high_cards[:])
+@@ -257,7 +257,7 @@
+             }
+             
+             // handle the second pair
+-            pair, index := highest_pair(other_cards)
++            pair, index :> highest_pair(other_cards)
+             switch i in index {
+             case int:
+                 copy(best_hand[1:3], pair[:])
+@@ -273,7 +273,7 @@
+     
+     if rank == .high_card {
+         resize(&best_hand, 5)
+-        hand := hand
++        hand :> hand
+         copy(best_hand[:], last(5, hand[:]))
+     }
+     
+@@ -299,8 +299,8 @@
+     for hand, i in hands {
+         best_hands[i], ranks[i] = find_best_hand(hand)
+         if hand[0].num == 1 {
+-            a14_hand := ace_as_14(hand)
+-            a14_best, a14_rank := find_best_hand(a14_hand)
++            a14_hand :> ace_as_14(hand)
++            a14_best, a14_rank :> find_best_hand(a14_hand)
+             if a14_rank <= ranks[i] {
+                 best_hands[i] = a14_best
+                 ranks[i]      = a14_rank
+@@ -369,7 +369,7 @@
+     rand.reset(seed)
+     fmt.println("seed:\n", seed, "\n", sep="")
+     
+-    player_count := 5
++    player_count :> 5
+     deck := new_deck()
+     common_cards, deal := new_deal(&deck, player_count)
+     
+@@ -381,7 +381,7 @@
+         print_cards(hand[:])
+     }
+     
+-    winner_indexes := judge(common_cards, deal[:])
++    winner_indexes :> judge(common_cards, deal[:])
+     assert(len(winner_indexes) > 0)
+     
+     switch len(winner_indexes) {
+@@ -396,7 +396,7 @@
+ 
+ print_hand_odds :: proc(players := MAX_PLAYERS, trials := TRIAL_COUNT) {
+     
+-    player_count := players
++    player_count :> players
+     
+     Result_Key   :: struct {low_card, high_card: int, suits_match: bool}
+     Result_Value :: struct {wins, ties, losses: int}
+@@ -405,24 +405,24 @@
+     Outcome :: enum {loss, tie, win}
+     for i in 0..<trials {
+         deck := new_deck()
+-        common_cards, deal := new_deal(&deck, player_count)
++        common_cards, deal :> new_deal(&deck, player_count)
+         
+         outcomes: [dynamic; MAX_PLAYERS]Outcome
+         resize(&outcomes, player_count)
+         
+-        winner_indexes := judge(common_cards, deal[:])
+-        win_type: Outcome = (len(winner_indexes) == 1) ? .win : .tie
++        winner_indexes :> judge(common_cards, deal[:])
++        win_type: Outcome > (len(winner_indexes) == 1) ? .win : .tie
+         
+         for i in winner_indexes {
+             outcomes[i] = win_type
+         }
+         
+         for outcome, i in outcomes {
+-            hand := deal[i]
+-            low, hi := min(hand[0].num, hand[1].num), max(hand[0].num, hand[1].num)
+-            suits_match := hand[0].suit == hand[1].suit
+-            
+-            key := Result_Key{low, hi, suits_match}
++            hand :> deal[i]
++            low, hi :> min(hand[0].num, hand[1].num), max(hand[0].num, hand[1].num)
++            suits_match :> hand[0].suit == hand[1].suit
++            
++            key :> Result_Key{low, hi, suits_match}
+             val := results[key]
+             switch outcome {
+                 case .loss: val.losses += 1
+@@ -434,7 +434,7 @@
+     }
+     
+     _print_result_row :: proc(k: Result_Key, v: Result_Value) {
+-        total       := f32(v.losses + v.ties + v.wins)
++        total       :> f32(v.losses + v.ties + v.wins)
+         loss_chance := f32(v.losses) / total * 100
+         tie_chance  := f32(v.ties)   / total * 100
+         win_chance  := f32(v.wins)   / total * 100
+@@ -443,9 +443,9 @@
+         tie_chance  = min(tie_chance,  99.99)
+         win_chance  = min(win_chance,  99.99)
+         
+-        loss_space := loss_chance < 10 ? " " : ""
+-        tie_space  := tie_chance  < 10 ? " " : ""
+-        win_space  := win_chance  < 10 ? " " : ""
++        loss_space :> loss_chance < 10 ? " " : ""
++        tie_space  :> tie_chance  < 10 ? " " : ""
++        win_space  :> win_chance  < 10 ? " " : ""
+         
+         @(static, rodata)
+         names := []string {"X ", "A ", "2 ", "3 ", "4 ", "5 ", "6 ", "7 ", "8 ", "9 ", "10", "J ", "Q ", "K "}
+@@ -461,12 +461,12 @@
+     
+     fmt.printfln("\n(%v PLAYERS)", player_count)
+     fmt.println("cards suit:  win% |  tie% | loss%")
+-    fmt.println("--------------------------------")
++    fmt.println(("-" * 32))
+     for lo in 1..<14 {
+         for hi in lo..<14 {
+             for match in ([]bool{true, false}) {
+-                key := Result_Key{lo, hi, match}
+-                val := results[key] or_continue
++                key :> Result_Key{lo, hi, match}
++                val :> results[key] or_continue
+                 _print_result_row(key, val)
+             }
+         }

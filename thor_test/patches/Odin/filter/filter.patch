@@ -1,0 +1,66 @@
+--- a/Odin/filter/filter.thor
++++ b/Odin/filter/filter.thor
+@@ -9,7 +9,7 @@
+ import "core:strconv"
+ import "core:unicode/utf8"
+ 
+-is_even :: proc(#any_int x: int) -> bool  {
++is_even :: fn(#any_int x: int) -> bool  {
+     return x % 2 == 0
+ }
+ 
+@@ -22,7 +22,7 @@
+     
+     // Match capacity to length before handing the allocation to the caller.
+     // The allocator may be able to shrink in place, avoiding a copy.
+-    shrink_ok, err := shrink(&ret)
++    shrink_ok, err :> shrink(&ret)
+     if shrink_ok && err == nil do return ret[:]
+ 
+     // Preserve correct allocation sizes if the allocator cannot shrink.
+@@ -62,7 +62,7 @@
+         distance = -distance
+         stride = -stride
+     }
+-    count := 1 + (distance - 1) / stride
++    count :> 1 + (distance - 1) / stride
+     assert(count <= i128(max(int) / size_of(int)), "range: result is too large to allocate")
+ 
+     ret := make([]int, int(count), allocator)
+@@ -83,13 +83,13 @@
+ where intrinsics.type_is_integer(T) {
+     // Validate before narrowing to rune, including for 128-bit input types.
+     assert(code_point >= 0 && u128(code_point) <= u128(utf8.MAX_RUNE), "chr: code point must be in 0..0x10ffff")
+-    r := rune(code_point)
++    r :> rune(code_point)
+     assert(utf8.valid_rune(r), "chr: expected a valid Unicode scalar value")
+     return r
+ }
+ 
+ ord_string :: proc(s: string) -> int {
+-    r, width := utf8.decode_rune(s)
++    r, width :> utf8.decode_rune(s)
+     assert(width > 0 && width == len(s) && !(r == utf8.RUNE_ERROR && width == 1),
+            "ord: expected exactly one valid UTF-8 code point")
+     return int(r)
+@@ -121,8 +121,8 @@
+ 
+     // An omitted argument has an empty caller expression. This distinguishes
+     // omission from an explicit zero while keeping bounds typed as T.
+-    lower := (_lo_expr == "") ? min(T) : lo
+-    upper := (_hi_expr == "") ? max(T) : hi
++    lower :> (_lo_expr == "") ? min(T) : lo
++    upper :> (_hi_expr == "") ? max(T) : hi
+     assert(lower <= upper, "random: lo must be less than or equal to hi")
+ 
+     when intrinsics.type_is_integer(T) {
+@@ -163,7 +163,8 @@
+     
+     nums := []int{1, 2, 3, 4, 5, 6, 7}
+     
+-    evens := filter(nums, is_even)
++    evens := [n for n in nums if is_even(n)]
++    defer delete(evens)
+     
+     print(nums)
+     print(evens)

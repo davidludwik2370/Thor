@@ -1,0 +1,1170 @@
+{
+  "/Users/davidludwik/Code/Odin/.vscode/extensions.json": {
+    "size": 86,
+    "sha256": "92eaf7330cdf8f01c2347b30cc163e81d9eb2dd22b3f795b3fc03ceb8b01483b"
+  },
+  "/Users/davidludwik/Code/Odin/.vscode/settings.json": {
+    "size": 175,
+    "sha256": "6c8a62df3ac9b56c03947be45d0accecc117b902dec650b67a5c0a70962136cd"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/ascendingPrimes.txt": {
+    "size": 512,
+    "sha256": "cc1998be05f27fde62800ced19b89cf08845ced5f659e29073cb382934feddda"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/ascendingPrimesOptimized.odin": {
+    "size": 824,
+    "sha256": "64fdf026a6fd11a7462f105a7228394ab6e1a3838245dad9f6494e38e7c4a6e8"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/ascendingPrimes_ref.txt": {
+    "size": 512,
+    "sha256": "cc1998be05f27fde62800ced19b89cf08845ced5f659e29073cb382934feddda"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/test_results.sh": {
+    "size": 253,
+    "sha256": "5f4b825d20cf6e42668ab5aeefa2af19f0f0d192ea7af9b24b182410af0d566d"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/Library.odin": {
+    "size": 1451,
+    "sha256": "cd4b4ef82e173946a310c970301da302c2cfda305d449a694cf65ba30f1b4b8c"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized.odin": {
+    "size": 826,
+    "sha256": "fb6f4ba74bc65ea9847e9ff18e66efca5e512f19c1a0262b6260f101d6880b16"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.odin": {
+    "size": 1058,
+    "sha256": "e35a2f9a6ef9144495798b7917a33f1280b7f640e1755d737eae71eb7a2ea273"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/ascending_primes.py": {
+    "size": 484,
+    "sha256": "ab9e3e6dbed25f4792885ee620bd5a28d17b062209ad313bf521b0d35dc9e5fd"
+  },
+  "/Users/davidludwik/Code/Odin/ascendingPrimesOptimized/archive/ascending_primes_optimized.c": {
+    "size": 2162,
+    "sha256": "c6af958d3baefc6669e12a4590be4cdba8a60cfe83585ebdce4fd4419d277878"
+  },
+  "/Users/davidludwik/Code/Odin/ascending_primes/ascending_primes.odin": {
+    "size": 715,
+    "sha256": "a69893f005dcc07dac4780d33170e29b67800085e442e761183b42f309787bfc"
+  },
+  "/Users/davidludwik/Code/Odin/big_ref/Library.odin": {
+    "size": 2539,
+    "sha256": "b3834ceac8fd101f49b68c190c8dc86a83bbbd52cb7353536a0b7b5664c6895f"
+  },
+  "/Users/davidludwik/Code/Odin/big_ref/big_ref.odin": {
+    "size": 1991,
+    "sha256": "56b502a751324165f7d6f89c3bbd81b9014f0afe923004430d9d3618e9050f46"
+  },
+  "/Users/davidludwik/Code/Odin/big_ref/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/big_ref/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/brc/brc.odin": {
+    "size": 3196,
+    "sha256": "8c7e2f1e979e4c8e9b0e69bf4c71b4f1f7a0516aa60257250236354104597b17"
+  },
+  "/Users/davidludwik/Code/Odin/brc/test_weather_stations.csv": {
+    "size": 824199,
+    "sha256": "1a99ce0531586861df9bacb6ffc98d3929ab9ff973a69af0aea093b35a51cd6f"
+  },
+  "/Users/davidludwik/Code/Odin/brc/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/brc/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/.gitignore": {
+    "size": 25,
+    "sha256": "01ed0a190acd4cbef99f3f3c414472ed58f94181c038913939e63cea1479f033"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/LICENSE": {
+    "size": 1062,
+    "sha256": "a6b8f01a71ef8b05b24d7c7b4b90727527ab041152d77eb9f41256ba2cf4d5e3"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/README.md": {
+    "size": 287,
+    "sha256": "80c1a909f1779d1be98bdd0565963c282113567575d9754a285060a2cdac42d2"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/ball.png": {
+    "size": 187,
+    "sha256": "7442e0213770cb3413cd136dc73c3f6cbbf38437eb8215a0f054f2622da3ef74"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/breakout.odin": {
+    "size": 8815,
+    "sha256": "ae6714e3e8b182e3f57f093384695feb1f4f60b88ed191d2d33549c7a06fa60a"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/breakout.sublime-project": {
+    "size": 507,
+    "sha256": "a11f5f870c1f972c1de0a5215e8dda5866b859b278bbca39d118d39accd411d0"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/breakout_source_assets.zip": {
+    "size": 65856,
+    "sha256": "c581046765990a7db8cb6676487dc1640dcf51d11c51513073f402b1f7399626"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/game_over.wav": {
+    "size": 50668,
+    "sha256": "6376575f8debc9bdee4e7683aa9eaf14df556705d031f786f7071fb1f3fdd75f"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/game_won.mp3": {
+    "size": 321024,
+    "sha256": "9197526863898ad818df9f8ec2e7c327bb148b6d985982086a52e28d8c1904ed"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/hit_block.wav": {
+    "size": 300186,
+    "sha256": "afdd2fa6384f9e7dd4564046571f9422022356ea01e27b317084b7032be5b3fb"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/hit_paddle.wav": {
+    "size": 343920,
+    "sha256": "17b4fb6226ae6fde0c957bdf8a8efa1b191c965ad7a722a6c25c6e74661f67c7"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/paddle.png": {
+    "size": 166,
+    "sha256": "e57488e2dd8a53a18272fc691993588e5e7384843b0af94a26f3c5dd2ebecefa"
+  },
+  "/Users/davidludwik/Code/Odin/breakout/steps.odin": {
+    "size": 27584,
+    "sha256": "6a1bb90fec6ac55a6f69fb536459234dc208d6f4216093661c821ef67265459b"
+  },
+  "/Users/davidludwik/Code/Odin/cell_auto_all_rules/cell_auto_all_rules.odin": {
+    "size": 551,
+    "sha256": "0e1218b3cff4cbac941a9a4804e89aeaa586e7257420aa7a5c942433a3d29d30"
+  },
+  "/Users/davidludwik/Code/Odin/cell_auto_all_rules/cell_auto_all_rules.py": {
+    "size": 739,
+    "sha256": "f1501f902cab9135402404f7e75a2aaf5e10c0608f823d4f86b9ac9d14cad6aa"
+  },
+  "/Users/davidludwik/Code/Odin/cell_auto_all_rules/rules.txt": {
+    "size": 1799510,
+    "sha256": "d7a93409a4f7ae52f0022022b98f1e0055531b9ef242846e49ef7975f4a2e775"
+  },
+  "/Users/davidludwik/Code/Odin/cell_auto_all_rules/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/cell_auto_all_rules/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/collatz/collatz.odin": {
+    "size": 1095,
+    "sha256": "9e6e3bcdae06d6825c18006ae2a45058f6bf293a4017501794d516db8c08afd5"
+  },
+  "/Users/davidludwik/Code/Odin/collatz/largest_collatz_runs.txt": {
+    "size": 12421,
+    "sha256": "d26c81b700cfbf6672642e9c91f20766a764ad175913574983f013f6956c7fa7"
+  },
+  "/Users/davidludwik/Code/Odin/collatz/.vscode/settings.json": {
+    "size": 104,
+    "sha256": "416dc1ff217b03e835d56f22dd84dcf63a0b4cae79464ffcffbb32b87006e01b"
+  },
+  "/Users/davidludwik/Code/Odin/demo/demo.odin": {
+    "size": 63801,
+    "sha256": "c6531813aff66ceaf0a06eadd80182ddb977892589f00673e6d1c616bf845e35"
+  },
+  "/Users/davidludwik/Code/Odin/eq_parser/Library.odin": {
+    "size": 1724,
+    "sha256": "f7915127cfe0251fa435ab6ef507cd0ec992cea56fc66d848eb97d2705570411"
+  },
+  "/Users/davidludwik/Code/Odin/eq_parser/eq_parser.odin": {
+    "size": 8324,
+    "sha256": "a31b3d3056135a49c50656f30bf05cb354d2f850a856097d4598ddbd25e4aaf8"
+  },
+  "/Users/davidludwik/Code/Odin/eq_parser/eq_parser.py": {
+    "size": 3414,
+    "sha256": "6f05e990c4d96d9085b89c6c72e28df9e001787546891540e82aa30f70bed867"
+  },
+  "/Users/davidludwik/Code/Odin/eq_parser/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/eq_parser/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/factorial/factorial.odin": {
+    "size": 782,
+    "sha256": "9410e65819d227f6ac6720965015cdd841294fbe17acc3280590b223cc1e7c62"
+  },
+  "/Users/davidludwik/Code/Odin/fibbonacci/fibbonacci.odin": {
+    "size": 405,
+    "sha256": "9ebc2c73a1cf1735da8d667902e6c833c6d52b61f2063222a5c6033969de1978"
+  },
+  "/Users/davidludwik/Code/Odin/file_tests/goodbye.odin": {
+    "size": 75,
+    "sha256": "26f2355ce7f98a041edbe546003f5a25a0144df35b146d0a8285483cee11abce"
+  },
+  "/Users/davidludwik/Code/Odin/file_tests/hello.odin": {
+    "size": 79,
+    "sha256": "7108feb23ba43b4074076da57346a4cda34091db5eba150eb11af308c7648ac3"
+  },
+  "/Users/davidludwik/Code/Odin/filter/Library.odin": {
+    "size": 6619,
+    "sha256": "b3ccaab1a4faf36e5ddff4138b2db67cb16c52f6146adbd5424714c84b33e7b9"
+  },
+  "/Users/davidludwik/Code/Odin/filter/collections_test.odin": {
+    "size": 6195,
+    "sha256": "61829ae799d8d4aab5058d0f6bf98b53d7c7ea7ed64614cf91e9b6f875ebcc27"
+  },
+  "/Users/davidludwik/Code/Odin/filter/filter.odin": {
+    "size": 5570,
+    "sha256": "1308e63a5c27234c429cddaa1b6ab2b39dbbb33577ea4554021fc06f73c1a3fa"
+  },
+  "/Users/davidludwik/Code/Odin/filter/random_test.odin": {
+    "size": 4266,
+    "sha256": "eb0d4691a5f274bae5e50be2f66e3ea428ff21d14ecb2a266edde083799f03cd"
+  },
+  "/Users/davidludwik/Code/Odin/filter/unicode_test.odin": {
+    "size": 3307,
+    "sha256": "ef7ebecb56ac90c2e4c5f99fe9de0f4427d239e75538090aa49801fc84e86bec"
+  },
+  "/Users/davidludwik/Code/Odin/filter/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/filter/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/foreign_exp/main.odin": {
+    "size": 686,
+    "sha256": "7d64aaaebdd943c6c9e8d57afa003a1c8b874478f191d30d5b4847379c368627"
+  },
+  "/Users/davidludwik/Code/Odin/foreign_exp/my_lib/my_lib.c": {
+    "size": 685,
+    "sha256": "6b7398827c17eab2404da0234cac2fe35eebbf492540b13bca79a4e4946d4f4b"
+  },
+  "/Users/davidludwik/Code/Odin/foreign_exp/my_lib/my_lib.o": {
+    "size": 1256,
+    "sha256": "b934ead9e66113e73d8b9fe84a4229f242be8f6a0372f7fd65b3ee6a711ca519"
+  },
+  "/Users/davidludwik/Code/Odin/foreign_exp/my_lib/my_lib.odin": {
+    "size": 538,
+    "sha256": "31649c80e0ab75c4e951cc9448ce72a8e550acee4533249acff12b44b6ddf79b"
+  },
+  "/Users/davidludwik/Code/Odin/foreign_exp/my_lib/macos/my_lib.a": {
+    "size": 1480,
+    "sha256": "eb198efb7d9656ab3a8fc2274308799360c0f516c23a1b520b256861ad473367"
+  },
+  "/Users/davidludwik/Code/Odin/guess/guess.odin": {
+    "size": 1066,
+    "sha256": "961f1fe9f48add6cb296cce29cab16efd6bb8d8c658e8a344fc6a6848bed58d5"
+  },
+  "/Users/davidludwik/Code/Odin/guess/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/guess/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/hilo/hilo.odin": {
+    "size": 3802,
+    "sha256": "542f93bdd8baa6b6935773708ff5b9de23a5eaecf7a504e6e5c18ab78507146e"
+  },
+  "/Users/davidludwik/Code/Odin/hilo/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/hilo/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/hilo/original/hilo.odin": {
+    "size": 3062,
+    "sha256": "5c04451e72ee0429b49723487b03d87cd420158af59e7ed8631cfe9cbd238e0a"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/dune.txt": {
+    "size": 1159539,
+    "sha256": "6f58d31b2c7d095d8dc39312c31a5a8770fb429a5c6b5a916d7e3d1de3ebee52"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/dune.txt.xz": {
+    "size": 352208,
+    "sha256": "54f711d5bacc031c9c6a2611fa88de55f23b64a28a7dbddc0219d135d003aa47"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/dune.txt.zip": {
+    "size": 436503,
+    "sha256": "91ce648265051e639b23f9f3b7372b8897489ff8de6f6ad9869b3fb0987d0258"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/encoded.huff": {
+    "size": 659664,
+    "sha256": "d4bf3cb5c736761f5cd34e6a87d1eabd67ba41a80d1b1f11c8cfae6d1c0a2fd4"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/huffman.odin": {
+    "size": 5139,
+    "sha256": "f373cff80d5eb38fdcb6f8b0a39dc93f36ab407dfd3b8098996aa0007789e260"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/.vscode/settings.json": {
+    "size": 147,
+    "sha256": "97cd09a259b94ca8bb8fe44244df87d85d89996de321fca09718a1dec04fea36"
+  },
+  "/Users/davidludwik/Code/Odin/huffman/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/json_demo/README.md": {
+    "size": 810,
+    "sha256": "90ad242106394cccb685650274455478be58360871f7b5b8d35b5dae44102da5"
+  },
+  "/Users/davidludwik/Code/Odin/json_demo/json_demo.odin": {
+    "size": 2248,
+    "sha256": "516e0d462a70d19f37fa2057b805240d8622311c9984124142416e96defdc3c2"
+  },
+  "/Users/davidludwik/Code/Odin/json_demo/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/json_demo/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/kv/db.txt": {
+    "size": 15,
+    "sha256": "0407a4e1fc613d32e365020501423d007cf07db2745f70667cca079922a9ec08"
+  },
+  "/Users/davidludwik/Code/Odin/kv/kv.odin": {
+    "size": 2606,
+    "sha256": "c3603f56d88d158cb1d1102314c508af9e81a972267a371b4d73698eab762139"
+  },
+  "/Users/davidludwik/Code/Odin/kv/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/kv/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/linked_list/linked_list.odin": {
+    "size": 2732,
+    "sha256": "79f048d97472f3b0e491a60b5026bafdff225187255e57c98e8317c210ded2e2"
+  },
+  "/Users/davidludwik/Code/Odin/linked_list/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/linked_list/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/matrix_exp/Library.odin": {
+    "size": 1451,
+    "sha256": "cd4b4ef82e173946a310c970301da302c2cfda305d449a694cf65ba30f1b4b8c"
+  },
+  "/Users/davidludwik/Code/Odin/matrix_exp/matrix_exp.odin": {
+    "size": 886,
+    "sha256": "93521c3a5357702e678fa27cddec721d06378a2a8fffae0bfccc74462464d1ac"
+  },
+  "/Users/davidludwik/Code/Odin/md5/example.txt": {
+    "size": 43,
+    "sha256": "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
+  },
+  "/Users/davidludwik/Code/Odin/md5/md5.odin": {
+    "size": 4220,
+    "sha256": "d7712d1ae41345af7ee8f3cb5e1d30a2ac78ff2851ba65150d29ee86285d779b"
+  },
+  "/Users/davidludwik/Code/Odin/md5/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/md5/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/merge_sort/merge_sort.odin": {
+    "size": 1313,
+    "sha256": "02064f7029d4a1dad1e7d5f1418e686bfc31f305b83ca5481893da0a16e14608"
+  },
+  "/Users/davidludwik/Code/Odin/merge_sort/output.txt": {
+    "size": 117782,
+    "sha256": "8740d766fc37f8a11ef1b463e761021ee02b1637fe99d94c5431f049b27a1905"
+  },
+  "/Users/davidludwik/Code/Odin/merge_sort/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/merge_sort/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/modulo/Library.odin": {
+    "size": 1827,
+    "sha256": "3872348315ea9ad5da484dc7339d09474ef8711d5921c5fed1a15287ee20b26b"
+  },
+  "/Users/davidludwik/Code/Odin/modulo/modulo.odin": {
+    "size": 445,
+    "sha256": "93c30fc753ae824d7c461f961ec2502953b8be38ca73e3f532997528cef4f844"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/.gitignore": {
+    "size": 47,
+    "sha256": "fdd2912a48d462cf98c5b46fbacb7b2f798dff4eb641cffa179c0c8c63ce8d0c"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/README.md": {
+    "size": 755,
+    "sha256": "03f347d8ee4b646a14eb4966eda387e79e29a364a6b58ded2a868b43a6991637"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/main.thor": {
+    "size": 445,
+    "sha256": "2cf37bbb859f59f6cfe3c3a951140c304a03d06f326af78954ab55c0a062675b"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/.vscode/extensions.json": {
+    "size": 57,
+    "sha256": "538fadc8fbde5eb944c7c4763ed17a62a084a12fdd6e00228014cc587e7cf616"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/.vscode/launch.json": {
+    "size": 386,
+    "sha256": "70a0bb9927e575bcb1aac3475723893a8e20970da774a5d562edc7d01882bb65"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/.vscode/settings.json": {
+    "size": 273,
+    "sha256": "5f697fb7d74492bf758609d6a8d42ed4f1560025c7314306874437a2761db1e9"
+  },
+  "/Users/davidludwik/Code/Odin/my_project/.vscode/tasks.json": {
+    "size": 538,
+    "sha256": "1eb560f4a0a576a5e451fb3fb4a1b70067524b76e78dee0055b40e01e1e9a24f"
+  },
+  "/Users/davidludwik/Code/Odin/new_one/Library.odin": {
+    "size": 6610,
+    "sha256": "32783be08154e6e49a4a885e6029faaead5ac6669f44de5a05bbb9d758916df1"
+  },
+  "/Users/davidludwik/Code/Odin/new_one/new_one.odin": {
+    "size": 194,
+    "sha256": "b245a219d3f7c8353c3e3cc7ad1cfc592729ed92e56cf0fd61c5444ce9712242"
+  },
+  "/Users/davidludwik/Code/Odin/new_one/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/new_one/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/pallendrome/pallendrome.odin": {
+    "size": 3774,
+    "sha256": "1d32287c944f622d11094a58b8932efe3758c1e14e3e54712a80aa0d7d1c6a9f"
+  },
+  "/Users/davidludwik/Code/Odin/pallendrome/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/pallendrome/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/parallel_sum/parallel_sum.odin": {
+    "size": 1392,
+    "sha256": "f039a21d11e8690cc5882db691d3f3fcbc3606810c405b8aee288eabdb56258c"
+  },
+  "/Users/davidludwik/Code/Odin/parallel_sum_refactor/parallel_sum.odin": {
+    "size": 1874,
+    "sha256": "c825e389d7cfda53cf86206bd36cef5ce7096bd0e7061b1aa5fc3c2a10e0da2c"
+  },
+  "/Users/davidludwik/Code/Odin/pi/Library.odin": {
+    "size": 1825,
+    "sha256": "0029a0ec9a16544d0bee20b34d4c178cf2853c62f3e20d792c4053fa76fafc2f"
+  },
+  "/Users/davidludwik/Code/Odin/pi/pi.odin": {
+    "size": 417,
+    "sha256": "25df7031d068e7a418e61210bbff2d4acecb8a93d22aae3a136dc5990bdab412"
+  },
+  "/Users/davidludwik/Code/Odin/poker/judge_test.odin": {
+    "size": 57090,
+    "sha256": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662"
+  },
+  "/Users/davidludwik/Code/Odin/poker/poker.odin": {
+    "size": 15332,
+    "sha256": "2d733fd38732d1f09d83333adc33aa6b598a23d8f6ed3bef7e73cfd4ea33e267"
+  },
+  "/Users/davidludwik/Code/Odin/poker/poker.py": {
+    "size": 15906,
+    "sha256": "7e54ba279527f785a9664f238fbadcc4e33ba19cc8c17a7b6297dcb067c0aa06"
+  },
+  "/Users/davidludwik/Code/Odin/poker/poker_test.odin": {
+    "size": 39521,
+    "sha256": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255"
+  },
+  "/Users/davidludwik/Code/Odin/poker/results_100M.txt": {
+    "size": 52435,
+    "sha256": "bf07bc6b8298aa2605e9abe5d8924585950c489a011abc75578b4e5d2ccd01a8"
+  },
+  "/Users/davidludwik/Code/Odin/poker/results_parallel_100M.txt": {
+    "size": 50905,
+    "sha256": "7a6408a3bf2703a69450bfa66743cb621b702df57f21207c4dd7e5214108ac3d"
+  },
+  "/Users/davidludwik/Code/Odin/poker/simulation_test.odin": {
+    "size": 17782,
+    "sha256": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50"
+  },
+  "/Users/davidludwik/Code/Odin/poker/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/poker/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/poker/ref/poker_multi_v1.odin": {
+    "size": 15271,
+    "sha256": "e323e2582f07806e8f95987295315831d8f4b89b7a326dda717cde5a0271bd57"
+  },
+  "/Users/davidludwik/Code/Odin/poker/ref/poker_single_thread.odin": {
+    "size": 13917,
+    "sha256": "6de70a4bf635762bbaae579184a8e4fb33de9a3c371aee9ecbdf3d68b1c80dd6"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv/primeSiv.odin": {
+    "size": 848,
+    "sha256": "b04633bbe7622c03d2e405029e173929e0a7b3660d35e3056891402c2ed622be"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv/primesSiv2.py": {
+    "size": 697,
+    "sha256": "7fb9701eeb8fb32a76e8547805cda40ad76344dd762d94186742afce37d37173"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv/.vscode/settings.json": {
+    "size": 65,
+    "sha256": "3ca2cdb6bc19b0badb2bbe60fc20076a5a266c875c1cc5be035bc6eaf1e2aa96"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv_refactor/primeSiv.odin": {
+    "size": 1053,
+    "sha256": "8679118a33cf21708fc5fe6eebeea8146fd72df80f031241daff5432cee041a4"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv_refactor/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv_refactor/.vscode/settings.json": {
+    "size": 65,
+    "sha256": "3ca2cdb6bc19b0badb2bbe60fc20076a5a266c875c1cc5be035bc6eaf1e2aa96"
+  },
+  "/Users/davidludwik/Code/Odin/primeSiv_refactor/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/prime_factors/prime_factors.odin": {
+    "size": 456,
+    "sha256": "a29a08a54d8c2853e27cd55a4558fe4275b6cffadbed388cc884d92244b48e58"
+  },
+  "/Users/davidludwik/Code/Odin/prime_factors_cli/prime_factors_cli.odin": {
+    "size": 1088,
+    "sha256": "bc5349b4d4d819b48524ce8770da0ac1f0eabe70e8fc97b4fa911d14a272c9d7"
+  },
+  "/Users/davidludwik/Code/Odin/prime_factors_cli_refactor/prime_factors_cli.odin": {
+    "size": 1622,
+    "sha256": "6c90ad3f15c162479ecd3bd0a2ace3c185f46a3a8d38119fd7aa6e149d4767ce"
+  },
+  "/Users/davidludwik/Code/Odin/primes/higher_primes/Library.odin": {
+    "size": 1451,
+    "sha256": "cd4b4ef82e173946a310c970301da302c2cfda305d449a694cf65ba30f1b4b8c"
+  },
+  "/Users/davidludwik/Code/Odin/primes/higher_primes/primes.odin": {
+    "size": 1234,
+    "sha256": "a2ec91b1be68e971f3a0c84f0ec05d1de58d4e4db43f50d1e984ab5ef7f4a7b1"
+  },
+  "/Users/davidludwik/Code/Odin/primes/higher_primes/ref.py": {
+    "size": 475,
+    "sha256": "f78fa7f35c8e3d488b1a92c952703d07077a67e84eea3e9f435d771b2009f40e"
+  },
+  "/Users/davidludwik/Code/Odin/primes/limited_primes/Library.odin": {
+    "size": 1451,
+    "sha256": "cd4b4ef82e173946a310c970301da302c2cfda305d449a694cf65ba30f1b4b8c"
+  },
+  "/Users/davidludwik/Code/Odin/primes/limited_primes/primes.odin": {
+    "size": 619,
+    "sha256": "a89bbec66e79f419ceb72bf308dd33c4c3ace6ac807e1169ed4113aa9a56a16c"
+  },
+  "/Users/davidludwik/Code/Odin/primes/limited_primes/ref.py": {
+    "size": 475,
+    "sha256": "f78fa7f35c8e3d488b1a92c952703d07077a67e84eea3e9f435d771b2009f40e"
+  },
+  "/Users/davidludwik/Code/Odin/pythagorean_tripples/pythagorean_tripples.odin": {
+    "size": 687,
+    "sha256": "2c2929c627068e13d8f839ab2ccfa8498923cd83d60310766f363b0952b57cc0"
+  },
+  "/Users/davidludwik/Code/Odin/pythagorean_tripples_refactor/pythagorean_tripples.odin": {
+    "size": 695,
+    "sha256": "aa45454db45bd8dd0aebd352d3bb749c869fa80f93ab36fc3464b37ccb17574d"
+  },
+  "/Users/davidludwik/Code/Odin/quicksort/quicksort.odin": {
+    "size": 2431,
+    "sha256": "cf75134b65a0d2eec5fa7b3bc71fd5a06bad0c5e8405a60564e4011d3576b072"
+  },
+  "/Users/davidludwik/Code/Odin/rationalize/Library.odin": {
+    "size": 2063,
+    "sha256": "847af0a300515477910cf38d30c4d52f26aefbecdf4bfe93ac364afc49bfd657"
+  },
+  "/Users/davidludwik/Code/Odin/rationalize/rationalize.odin": {
+    "size": 342,
+    "sha256": "81994a63506167d8a36e5bc8da5a8fb8bf80f90a886fba5de994ccaa27629926"
+  },
+  "/Users/davidludwik/Code/Odin/rationalize/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/rationalize/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/reactTime/reactTime.exe": {
+    "size": 959488,
+    "sha256": "3e59e39daf9d0eab22a0b8cc257065cc15f6b91cf6c2e4ff63da33f88025afc6"
+  },
+  "/Users/davidludwik/Code/Odin/reactTime/reactTime.odin": {
+    "size": 2944,
+    "sha256": "8506bbe7cc2f82cccda486fe00bf6b655dbd35d29f85a28a885727ea92da6daf"
+  },
+  "/Users/davidludwik/Code/Odin/reactTime/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/reactTime/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/script_pg/Library.odin": {
+    "size": 6519,
+    "sha256": "262fc4793decba0f532221a0d2fff9c941353ba9af791724c6acfd9ced5c29b2"
+  },
+  "/Users/davidludwik/Code/Odin/script_pg/log.txt": {
+    "size": 15,
+    "sha256": "581b78c0f91faa5ae992288848b9d7604aeb18da1d7c83de28597ef11e8e1621"
+  },
+  "/Users/davidludwik/Code/Odin/script_pg/script_pg.odin": {
+    "size": 788,
+    "sha256": "b7cde4ec5dfa5d2426bf3ca73b9b6b7abd952641a95dc3aed1a8d871e273afd5"
+  },
+  "/Users/davidludwik/Code/Odin/script_pg/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/script_pg/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/simon/simon.odin": {
+    "size": 5903,
+    "sha256": "76a11116dc36870f418ad8f12893150a0ac06d81cee15142a070656f1ec90ad5"
+  },
+  "/Users/davidludwik/Code/Odin/simple_foreign/build.sh": {
+    "size": 100,
+    "sha256": "0e5da3efc7dc2a92f3d8401b58fa2a1b499177c089a4274d0c2c703439481987"
+  },
+  "/Users/davidludwik/Code/Odin/simple_foreign/simple_foreign.odin": {
+    "size": 74,
+    "sha256": "d6018b87bc27bd8c06cb7f7523c537c6f2a855d11d352305af1e3f0c76f4aa79"
+  },
+  "/Users/davidludwik/Code/Odin/simple_foreign/my_lib/my_lib.c": {
+    "size": 109,
+    "sha256": "f81fcaf9096e06c7771967aad2586c741280aa35c8fe37843f12a48cc0313f3c"
+  },
+  "/Users/davidludwik/Code/Odin/simple_foreign/my_lib/my_lib.o": {
+    "size": 768,
+    "sha256": "8b62d98d330db049605a7bbb8b58ea85616661a6d1d5ed05f303581e2bef51be"
+  },
+  "/Users/davidludwik/Code/Odin/simple_foreign/my_lib/my_lib.odin": {
+    "size": 129,
+    "sha256": "a492757664b049bf91185ee56ded2188c06411fe00f635e4426c8cdace4360d8"
+  },
+  "/Users/davidludwik/Code/Odin/simple_foreign/my_lib/macos/my_lib.a": {
+    "size": 952,
+    "sha256": "dfe01521c95cd2e940345f5ab1e0a4126c55c079fc9cacd50ea2201b31714306"
+  },
+  "/Users/davidludwik/Code/Odin/sudoku/dev.null": {
+    "size": 764,
+    "sha256": "e96bf9fce1845f765c3af1218a2b52752c330db797a8b7e634d3c58bcdd7860a"
+  },
+  "/Users/davidludwik/Code/Odin/sudoku/sudoku.odin": {
+    "size": 10946,
+    "sha256": "32217185b91a1e11241389e9c9757ec6e479f95ed3501ed515e227f56ca85517"
+  },
+  "/Users/davidludwik/Code/Odin/sudoku/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/sudoku/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/sum_squares/Library.odin": {
+    "size": 1827,
+    "sha256": "3872348315ea9ad5da484dc7339d09474ef8711d5921c5fed1a15287ee20b26b"
+  },
+  "/Users/davidludwik/Code/Odin/sum_squares/sum_squares.odin": {
+    "size": 325,
+    "sha256": "2b1185b02e89017229e274a2af65ef0c243a72f9b855ccef3ba64e86836875be"
+  },
+  "/Users/davidludwik/Code/Odin/test_area/test.odin": {
+    "size": 3129,
+    "sha256": "581240a9390b9c59384328869b2796d3265274a264667c89566806bc20245133"
+  },
+  "/Users/davidludwik/Code/Odin/test_area_2/Library.odin": {
+    "size": 1825,
+    "sha256": "0029a0ec9a16544d0bee20b34d4c178cf2853c62f3e20d792c4053fa76fafc2f"
+  },
+  "/Users/davidludwik/Code/Odin/test_area_2/test.odin": {
+    "size": 690,
+    "sha256": "cc4a50c68342f9ce0ac8efb25d9f059d38333b0a94ee8f56cb4355c5571c1c9e"
+  },
+  "/Users/davidludwik/Code/Odin/thread_test/Library.odin": {
+    "size": 1827,
+    "sha256": "3872348315ea9ad5da484dc7339d09474ef8711d5921c5fed1a15287ee20b26b"
+  },
+  "/Users/davidludwik/Code/Odin/thread_test/threads.odin": {
+    "size": 699,
+    "sha256": "bc99042cbb3efc64c64a79a79a285905ac520437045577f83af1487215eec5d4"
+  },
+  "/Users/davidludwik/Code/Odin/tic-tac-toe/tic-tac-toe.odin": {
+    "size": 6515,
+    "sha256": "6ea03cf39bce31fad753e202e84b1cb24a447c91e49e62b78184b96f534b940b"
+  },
+  "/Users/davidludwik/Code/Odin/tic-tac-toe/tic-tac-toe_test.odin": {
+    "size": 3756,
+    "sha256": "0fffd031ed44b7d663746eb52b861f136d91dd56aebcc50696804879c41f8863"
+  },
+  "/Users/davidludwik/Code/Odin/tic-tac-toe/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/tic-tac-toe/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/tree/Library.odin": {
+    "size": 2075,
+    "sha256": "99535545c26b343786726340995876c443e73cc263a99b5ca4499e2839a9af8a"
+  },
+  "/Users/davidludwik/Code/Odin/tree/tree.odin": {
+    "size": 752,
+    "sha256": "754c561eb7dc6548119f38a9878000d43279379ecd1344a1b5de3eb02a83b1e3"
+  },
+  "/Users/davidludwik/Code/Odin/tree/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/tree/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/triangle_solver/SolverFrame.java": {
+    "size": 36546,
+    "sha256": "94c2a389af715b804f1ff17110ebefdb048a29326889cf16d72daae18a137c22"
+  },
+  "/Users/davidludwik/Code/Odin/triangle_solver/triangle_solver.odin": {
+    "size": 7143,
+    "sha256": "8eaa82b042c7ba215a08cb7bf27617689ee2191ff6fda5e0847f390271923e12"
+  },
+  "/Users/davidludwik/Code/Odin/triangle_solver/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/triangle_solver/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/tryingagain/Library.odin": {
+    "size": 1433,
+    "sha256": "f84397d7d9dc35cf7055e76e28170d271e09a1f144ab2cd241d5ce9fdff4b187"
+  },
+  "/Users/davidludwik/Code/Odin/tryingagain/some_more_text.txt": {
+    "size": 22,
+    "sha256": "86070c543018ba417e5efcd82877538cfdf239ad91edb409e50a1f5d71e72da8"
+  },
+  "/Users/davidludwik/Code/Odin/tryingagain/some_text.txt": {
+    "size": 17,
+    "sha256": "837ea69644a4435aacb379c9b3b14087576d5cbeabe8442a35f592e71d42ca72"
+  },
+  "/Users/davidludwik/Code/Odin/tryingagain/tryingagain.odin": {
+    "size": 457,
+    "sha256": "16d7d831574e34b9bc06d504d329380cba200cf7dd2f13d3e46b7c082f734d31"
+  },
+  "/Users/davidludwik/Code/Odin/tyringout/Library.odin": {
+    "size": 1451,
+    "sha256": "cd4b4ef82e173946a310c970301da302c2cfda305d449a694cf65ba30f1b4b8c"
+  },
+  "/Users/davidludwik/Code/Odin/tyringout/fib_1M.txt": {
+    "size": 208989,
+    "sha256": "4910cacc5301426acb02007430c3fc38d210674f0bea972e8d354a831a4af73d"
+  },
+  "/Users/davidludwik/Code/Odin/tyringout/tyringout.odin": {
+    "size": 1855,
+    "sha256": "b5a54e4600e480dcd0e8d1f25caa62494e842918ba19263308914bce74e638e3"
+  },
+  "/Users/davidludwik/Code/Odin/ui_demo/ui_demo.odin": {
+    "size": 19581,
+    "sha256": "36db5aa84bfa525424112ba2eb2133f17cd91ddc45acdf72cf9e3e399e22f42f"
+  },
+  "/Users/davidludwik/Code/Odin/ui_demo/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin/ui_demo/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin/windowexp/Library.odin": {
+    "size": 1451,
+    "sha256": "cd4b4ef82e173946a310c970301da302c2cfda305d449a694cf65ba30f1b4b8c"
+  },
+  "/Users/davidludwik/Code/Odin/windowexp/windowexp.odin": {
+    "size": 202,
+    "sha256": "105d0717f103ddb9a778e82391b6cf2c8cd8804dea0c3ff3049f4d7a58284c2a"
+  },
+  "/Users/davidludwik/Code/Odin/zzz_refrence/build_params.txt": {
+    "size": 11736,
+    "sha256": "a760aeee9e708a35ef17de7ab7a9084ec1db1c40766938d2c5fb50d4c3e462f5"
+  },
+  "/Users/davidludwik/Code/Odin/zzz_refrence/git_commit_stable.txt": {
+    "size": 27,
+    "sha256": "cec41710f9f48581b8f4d07e78007c824eaaab1f30d0525c2692915ff906d2e8"
+  },
+  "/Users/davidludwik/Code/Odin/zzz_refrence/raylib_cheatsheet_v5.5.pdf": {
+    "size": 845168,
+    "sha256": "e5b4b5f2968609bdefedcd2b9317cc1d514aa5751b7b755dc10ec486adf4487a"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/15_puzzle/15_puzzle.odin": {
+    "size": 13665,
+    "sha256": "7779e360cb213bd262f90908965f32894d98b162bba6a4b6a6917175dc8c011e"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/15_puzzle/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/15_puzzle/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/conect_4.odin": {
+    "size": 3662,
+    "sha256": "8d057357c4a87166cfff6a13ee65972152f0dc7cf6c5636301b92c071136efb3"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v1.odin": {
+    "size": 4246,
+    "sha256": "4c0d2c1de5476b0f09b36e5d610e3fda7ac27698c008f0c63538d54f5692a28b"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v2.odin": {
+    "size": 3813,
+    "sha256": "ee0b1f851dd8ce59d3e281a44eb6a14ba4c826eb862428217155f52652efff72"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v3.odin": {
+    "size": 3777,
+    "sha256": "fbe0495d9d787b99db62c88df9e218592b4e73f521cd87308f1ba1a0f5b9f8d5"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v4.odin": {
+    "size": 3694,
+    "sha256": "56ec95c00ac81faa1d6942d9581dc92337ef11a61a3ef177a23bec235ed95bf2"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v5.odin": {
+    "size": 3725,
+    "sha256": "7923e8eab889c37405e4cd25955fa3122e26ecc7e73781340c9426f7b4886821"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v6.odin": {
+    "size": 3721,
+    "sha256": "f9bc448cddb264a118975341d6e33a329a55a7cc30f7fcb5f07202ea8eb9af7f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/archive/conect_4_v7.odin": {
+    "size": 3641,
+    "sha256": "d1cee81c5e44be32da4e6f3af44a2aa82c47f9c1c0c46dfb8a490a6641d68bfd"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Connect_4/ref/connect_4.c/connect_4.c": {
+    "size": 4576,
+    "sha256": "46f3b20befccebad860d202a05ab091d0f01a70da8045a5357852a04f8d6c659"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Cricles_on_dots/cricles_on_dots.odin": {
+    "size": 7624,
+    "sha256": "100e42b9dfb11f6174a246c58dd383a2b936a778bf23c25d690d2473e516776c"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Cricles_on_dots/ring.txt": {
+    "size": 353,
+    "sha256": "45c2bec54c0b53363896cd380f25731e0fc7ba80c87cc67876d866f2a29fcdf9"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Cricles_on_dots/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Cricles_on_dots/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Dijkstra_animated/Dijkstra.odin": {
+    "size": 8822,
+    "sha256": "91254b36a1c3d2936c22473e2dec4688fa7dbb5743be2087700bf238b525ed6d"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Dijkstra_animated/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Dijkstra_animated/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/othello.odin": {
+    "size": 56330,
+    "sha256": "97a508b2b7ffbc4789a17a3544ec3b35c503b39435d144ae90894bae49b5cbaa"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/data/endgame-cache.bin": {
+    "size": 5075192,
+    "sha256": "a4f1ed246b3cdff7ba724871bf5269893227ed4b7615c83393c130a59687633a"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/data/opening-data.dat": {
+    "size": 656600,
+    "sha256": "05700af9046fa97f7e5d0621ca6c6db2f90c9f515b6704e3e2462077ff786a03"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/data/opening-lines.txt": {
+    "size": 420,
+    "sha256": "acac842dc8755ae9326d3e89877bc8c57167520fa7fb983346fbb0b876f90fef"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvai/data/opening-tree.dat": {
+    "size": 82112,
+    "sha256": "ddd6a49aa51913050181890f42344afdd863ca636727efb5f740ce73c68d5205"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvp/othello.odin": {
+    "size": 5465,
+    "sha256": "a9444cf51ff9335725f2406101a69042f3adca0585a2726210d30982ce1ace2a"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvp/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/Othello_pvp/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/.gitignore": {
+    "size": 25,
+    "sha256": "01ed0a190acd4cbef99f3f3c414472ed58f94181c038913939e63cea1479f033"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/LICENSE": {
+    "size": 1062,
+    "sha256": "a6b8f01a71ef8b05b24d7c7b4b90727527ab041152d77eb9f41256ba2cf4d5e3"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/README.md": {
+    "size": 287,
+    "sha256": "80c1a909f1779d1be98bdd0565963c282113567575d9754a285060a2cdac42d2"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/ball.png": {
+    "size": 187,
+    "sha256": "7442e0213770cb3413cd136dc73c3f6cbbf38437eb8215a0f054f2622da3ef74"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/breakout.odin": {
+    "size": 8969,
+    "sha256": "47e6da8f95cddf70ba592e49cd24ada2417b932dbccab473622fda77017e1c4e"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/breakout.sublime-project": {
+    "size": 507,
+    "sha256": "a11f5f870c1f972c1de0a5215e8dda5866b859b278bbca39d118d39accd411d0"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/breakout_source_assets.zip": {
+    "size": 65856,
+    "sha256": "c581046765990a7db8cb6676487dc1640dcf51d11c51513073f402b1f7399626"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/game_over.wav": {
+    "size": 50668,
+    "sha256": "6376575f8debc9bdee4e7683aa9eaf14df556705d031f786f7071fb1f3fdd75f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/game_won.mp3": {
+    "size": 321024,
+    "sha256": "9197526863898ad818df9f8ec2e7c327bb148b6d985982086a52e28d8c1904ed"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/hit_block.wav": {
+    "size": 300186,
+    "sha256": "afdd2fa6384f9e7dd4564046571f9422022356ea01e27b317084b7032be5b3fb"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/hit_paddle.wav": {
+    "size": 343920,
+    "sha256": "17b4fb6226ae6fde0c957bdf8a8efa1b191c965ad7a722a6c25c6e74661f67c7"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/paddle.png": {
+    "size": 166,
+    "sha256": "e57488e2dd8a53a18272fc691993588e5e7384843b0af94a26f3c5dd2ebecefa"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/breakout/steps.odin": {
+    "size": 27584,
+    "sha256": "6a1bb90fec6ac55a6f69fb536459234dc208d6f4216093661c821ef67265459b"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/life/life.odin": {
+    "size": 6059,
+    "sha256": "df22fc68a7d85e08b17aab5be6f1e819ef889d16d47c15fbbee0eb4305427665"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/life/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/life/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/react_time/publish.sh": {
+    "size": 200,
+    "sha256": "692b9cb229d8a37e994a52ce17de174d40b56be4e7226ca923efa5c53568a154"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/react_time/react_time.odin": {
+    "size": 3609,
+    "sha256": "42e0b011e60d88e374cb271cd428e4e98979cc8bfc3f726ab81a1da28f6063e3"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/react_time/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/react_time/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/react_time/assets/icon.png": {
+    "size": 15051,
+    "sha256": "e416e4d6c8aef4ee1ad411fde9fdda2d66ce99943626309f8715c87797aca952"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/sketch/sketch.odin": {
+    "size": 10441,
+    "sha256": "f719a425bbc7fdbfbb582dcab1c06c513bea324bbbb359f5edc86e735b7d6b42"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/sketch/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/sketch/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/snek/publish": {
+    "size": 39,
+    "sha256": "a75a354596d8974a4f129f2932353025fa1793d68b14f42f65276dce0b999bb6"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/snek/snek.odin": {
+    "size": 6473,
+    "sha256": "4c978fb44e6f0aac261dca2b9337bfb40d13dc55e65e44133432d20ce7ef8dcb"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/snek/assets/icon.png": {
+    "size": 1703642,
+    "sha256": "4ed6bcdfc0a7d3f5b487637257130f8c673a09ba30ad5230b7412bdf7d69c423"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/sudoku_gui/sudoku.odin": {
+    "size": 18008,
+    "sha256": "d7ed8e9fb98c506422ee2e0bed28f9ab88f75ded42c093a9a9c3d8584b2b767b"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/sudoku_gui/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/sudoku_gui/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/tetris.c": {
+    "size": 8592,
+    "sha256": "fa84174bd9aa830479ec69e9839ecaa26791cdcd06d7ba6325a25bfc45d12951"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/tetris.odin": {
+    "size": 8416,
+    "sha256": "0363b7e055b5dfa059d9897ec04b0996ca85a1c103018e603b5e9a368cb4db9b"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/.vscode/launch.json": {
+    "size": 307,
+    "sha256": "7d4d2ddf5d7f87bae34939d6871fef57116ac96cc17373a7a2ac6ad6160bd760"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/.vscode/tasks.json": {
+    "size": 288,
+    "sha256": "8f896e3fc2e936adacca9f7122d221f46fa49232896bc20d53246c610e16b22c"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/archive/tetris_v1.odin": {
+    "size": 7945,
+    "sha256": "4c603c74f5dde792f64e9e8d154b7896d03754eef1e2751d178a3f889662b466"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/archive/tetris_v2.odin": {
+    "size": 7607,
+    "sha256": "81d0c44ea9cc165571d656e1b860a9d88017fd107c290faf8e624ecf633502e5"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tetris/archive/tetris_v3.odin": {
+    "size": 7608,
+    "sha256": "49e098f6582832824571d6ca4d04c35ab84bf91a87cb582c38d3817ccc342a5d"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tic-tac-toe_gui/tic-tac-toe.odin": {
+    "size": 6270,
+    "sha256": "cc8a2a95bf3157c8d0b8e9be9545d1612e57eb3fc9e767b75d6b43410672d0e0"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.odin": {
+    "size": 3756,
+    "sha256": "0fffd031ed44b7d663746eb52b861f136d91dd56aebcc50696804879c41f8863"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tic-tac-toe_gui/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/tic-tac-toe_gui/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Connect_4_refactor/conect_4.odin": {
+    "size": 4766,
+    "sha256": "dac07ed25555d2c38ff414f0cda509aa6db6fbb22d65c66a28800db9f636a272"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/cricles_on_dots.odin": {
+    "size": 8642,
+    "sha256": "caaa23f0bf9e92b0ca75fc7fd5577197d1cd8f630c5781774f0efce7d5932740"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/ring.txt": {
+    "size": 353,
+    "sha256": "45c2bec54c0b53363896cd380f25731e0fc7ba80c87cc67876d866f2a29fcdf9"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Othello_pvp_refactor/othello.odin": {
+    "size": 6163,
+    "sha256": "df5b4e580c471faf197e23e35202b8364a26bb71883dbb9149caf219864f82b1"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Othello_pvp_refactor/.vscode/launch.json": {
+    "size": 300,
+    "sha256": "f158da1e836ea70dba07b5c8f0271e025c7854078897297d0b2948c8fa8deb35"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/Othello_pvp_refactor/.vscode/tasks.json": {
+    "size": 281,
+    "sha256": "1a0757a7ab4e20acde56d7a7f76914a041afe58c92413834aa530b8e5c80b01f"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/snek_refactor/snek.odin": {
+    "size": 6414,
+    "sha256": "a9aab1eed7df8e8d3204160213534f0f4724f2071962e0974c35fbc4a2ee05fc"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/snek_refactor/.vscode/launch.json": {
+    "size": 305,
+    "sha256": "4a9e00a665eedf8c33d93eab57e845ccb8c7aa76d2aa4c0fac1f23ef7a9cf7b8"
+  },
+  "/Users/davidludwik/Code/Odin_Projects/zzz_refactors/snek_refactor/.vscode/tasks.json": {
+    "size": 286,
+    "sha256": "4f18d4f9c75ebdf5d07764fd9cc1cf822966579433ddc069f2510f26d381987f"
+  }
+}

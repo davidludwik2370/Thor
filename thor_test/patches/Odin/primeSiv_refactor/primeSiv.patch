@@ -1,0 +1,23 @@
+--- a/Odin/primeSiv_refactor/primeSiv.thor
++++ b/Odin/primeSiv_refactor/primeSiv.thor
+@@ -19,9 +19,9 @@
+ 
+     LIMIT :: 1_000
+ 
+-    lastIndex := int_sqrt(LIMIT)
++    lastIndex :> int_sqrt(LIMIT)
+     numPrimes := 0
+-    nums, _   := create(LIMIT+1, min_index=2)
++    nums, _   :> create(LIMIT+1, min_index=2)
+ 
+     unsafe_set(nums, 2)
+     for i:=3; i<=LIMIT; i+=2 {
+@@ -32,7 +32,7 @@
+     for i <= lastIndex {
+         if unsafe_get(nums, i) {
+             ni := i * i
+-            step := i * 2
++            step :> i * 2
+             for ni <= LIMIT {
+                 unsafe_unset(nums, ni)
+                 ni += step

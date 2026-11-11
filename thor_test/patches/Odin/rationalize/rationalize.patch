@@ -1,0 +1,11 @@
+--- a/Odin/rationalize/rationalize.thor
++++ b/Odin/rationalize/rationalize.thor
+@@ -10,7 +10,7 @@
+ 
+ main :: proc() {
+ 
+-    w, f := math.split_decimal(f64(123.456))
++    w, f :> math.split_decimal(f64(123.456))
+     fmt.println(w, f)
+ 
+     NUMS :: []int{1, 2, 3, 4, 5}

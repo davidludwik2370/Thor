@@ -1,0 +1,135 @@
+--- a/Odin/sudoku/sudoku.thor
++++ b/Odin/sudoku/sudoku.thor
+@@ -137,7 +137,7 @@
+     
+     if poss_ary {
+         for poss in poss_list {
+-            char := rune('a' + poss.x)
++            char :> rune('a' + poss.x)
+             fmt.print(char, poss.y+1, ": ", sep="")
+             fmt.print("[")
+             for i in 1..=9 {
+@@ -153,7 +153,7 @@
+ 
+ reduce :: proc(board: ^Board) {
+ 
+-    value_was_decided :: proc(poss_ary: Possibility_Ary) -> (value: int, decided: bool) {
++    value_was_decided :: fn(poss_ary: Possibility_Ary) -> (value: int, decided: bool) {
+         poss_count := 0
+         for i in 1..=9 {
+             if poss_ary[i] {
+@@ -178,7 +178,7 @@
+         // reduce Possibility_Ary cells based on known values
+         for &row, y in board {
+             for &cell, x in row {
+-                n, is_int := cell.(int)
++                n, is_int :> cell.(int)
+                 if !is_int do continue
+ 
+                 for k in 0..<9 {
+@@ -187,8 +187,8 @@
+                 }
+ 
+                 // block
+-                start_row := (y / 3) * 3
+-                start_col := (x / 3) * 3
++                start_row :> (y / 3) * 3
++                start_col :> (x / 3) * 3
+                 for yg in start_row..<start_row+3 {
+                     for xg in start_col..<start_col+3 {
+                         reduce_cell(board, n, yg, xg)
+@@ -250,8 +250,8 @@
+                 for block_x in 0..<3 {
+                     n_count := 0
+                     last_y, last_x := -1, -1
+-                    start_row := block_y * 3
+-                    start_col := block_x * 3
++                    start_row :> block_y * 3
++                    start_col :> block_x * 3
+                     for y in start_row..<start_row+3 { // loop every cell in block
+                         for x in start_col..<start_col+3 {
+                             switch v in board[y][x] {
+@@ -277,10 +277,10 @@
+         // check if any cells have been solved
+         for &row, y in board {
+             for &cell, x in row {
+-                poss_ary, is_poss_ary := cell.(Possibility_Ary)
++                poss_ary, is_poss_ary :> cell.(Possibility_Ary)
+                 if !is_poss_ary do continue
+ 
+-                val, was_decided := value_was_decided(poss_ary)
++                val, was_decided :> value_was_decided(poss_ary)
+                 if was_decided {
+                     board[y][x] = val
+                     new_cell_solved = true
+@@ -292,11 +292,11 @@
+     }
+ }
+ 
+-get_board_state :: proc(board: Board) -> Board_State {
++get_board_state :: fn(board: Board) -> Board_State {
+     board_state := Board_State.solved
+     for row, y in board {
+         for cell, x in row {
+-            _, is_int := cell.(int)
++            _, is_int :> cell.(int)
+             if !is_int {
+                 board_state = .unsolved
+                 continue
+@@ -310,8 +310,8 @@
+             }
+ 
+             // check block
+-            start_row := (y / 3) * 3
+-            start_col := (x / 3) * 3
++            start_row :> (y / 3) * 3
++            start_col :> (x / 3) * 3
+             for r in start_row..<start_row+3 {
+                 for c in start_col..<start_col+3 {
+                     if r == y && c == x    do continue
+@@ -323,12 +323,12 @@
+     return board_state
+ }
+ 
+-validate :: proc(finished, start: Board) -> bool {
++validate :: fn(finished, start: Board) -> bool {
+     if get_board_state(finished) != .solved do return false
+ 
+     for row, y in start {
+         for cell, x in row {
+-            n, is_int := cell.(int)
++            n, is_int :> cell.(int)
+             if !is_int             do continue
+             if finished[y][x] != n do return false
+         }
+@@ -337,7 +337,7 @@
+     return true
+ }
+ 
+-solve :: proc(board: Board) -> (solved: Board, possible: bool) {
++solve :: fn(board: Board) -> (solved: Board, possible: bool) {
+ 
+     // create local mutable copy of board and simplify it
+     solved = board
+@@ -371,7 +371,7 @@
+ 
+         solved[y][x] = i
+ 
+-        new_solved, new_possible := solve(solved)
++        new_solved, new_possible :> solve(solved)
+         if new_possible do return new_solved, true
+     }
+ 
+@@ -388,10 +388,10 @@
+         // TEST_BOARD_BLANK
+         // TEST_BOARD_INVALID
+ 
+-    board := replace_zeros(BOARD)
++    board :> replace_zeros(BOARD)
+     print_board(board)
+ 
+-    solved_board, possible := solve(board)
++    solved_board, possible :> solve(board)
+ 
+     if possible do print_board(solved_board)
+     else        do fmt.println("      INVALID BOARD\n")

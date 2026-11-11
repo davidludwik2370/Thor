@@ -1,0 +1,56 @@
+[
+  {
+    "file": "Odin/filter/filter.thor",
+    "reason": "Filtered slice comprehension with explicit ownership",
+    "before": "evens := filter(nums, is_even)",
+    "after": "evens := [n for n in nums if is_even(n)]\n    defer delete(evens)"
+  },
+  {
+    "file": "Odin/script_pg/script_pg.thor",
+    "reason": "Mapping comprehension with explicit ownership",
+    "before": "cube_nums :> fmap(nums, cube)",
+    "after": "cube_nums :> [cube(n) for n in nums]\n    defer delete(cube_nums)"
+  },
+  {
+    "file": "Odin_Projects/Cricles_on_dots/cricles_on_dots.thor",
+    "reason": "Dynamic-array comprehension preserves independent mutable result",
+    "before": "loadCircles :: proc() -> [dynamic]Pos {\n\tcircles: [dynamic]Pos\n\tfor circle in startingCircles {\n\t\tappend(&circles, circle)\n\t}\n\treturn circles\n}",
+    "after": "loadCircles :: proc() -> [dynamic]Pos {\n\treturn [dynamic]Pos{circle for circle in startingCircles}\n}"
+  },
+  {
+    "file": "Odin_Projects/Cricles_on_dots/cricles_on_dots.thor",
+    "reason": "Dynamic-array comprehension preserves independent mutable result",
+    "before": "loadPoints :: proc() -> [dynamic]Pos {\n\tpoints: [dynamic]Pos\n\tfor point in startingPoints {\n\t\tappend(&points, point)\n\t}\n\treturn points\n}",
+    "after": "loadPoints :: proc() -> [dynamic]Pos {\n\treturn [dynamic]Pos{point for point in startingPoints}\n}"
+  },
+  {
+    "file": "Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/cricles_on_dots.thor",
+    "reason": "Dynamic-array comprehension preserves independent mutable result",
+    "before": "load_circles :: proc() -> [dynamic]Pos {\n\tcircles: [dynamic]Pos\n\tfor circle in starting_circles {\n\t\tappend(&circles, circle)\n\t}\n\treturn circles\n}",
+    "after": "load_circles :: proc() -> [dynamic]Pos {\n\treturn [dynamic]Pos{circle for circle in starting_circles}\n}"
+  },
+  {
+    "file": "Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/cricles_on_dots.thor",
+    "reason": "Dynamic-array comprehension preserves independent mutable result",
+    "before": "load_points :: proc() -> [dynamic]Pos {\n\tpoints: [dynamic]Pos\n\tfor point in starting_points {\n\t\tappend(&points, point)\n\t}\n\treturn points\n}",
+    "after": "load_points :: proc() -> [dynamic]Pos {\n\treturn [dynamic]Pos{point for point in starting_points}\n}"
+  },
+  {
+    "file": "Odin_Projects/Cricles_on_dots/cricles_on_dots.thor",
+    "reason": "Immutable fixed array replaces read-only global annotation",
+    "before": "@rodata\nstartingCircles :=",
+    "after": "startingCircles :>"
+  },
+  {
+    "file": "Odin_Projects/Cricles_on_dots/cricles_on_dots.thor",
+    "reason": "Immutable fixed array replaces read-only global annotation",
+    "before": "@rodata\nstartingPoints :=",
+    "after": "startingPoints :>"
+  },
+  {
+    "file": "Odin/brc/brc.thor",
+    "reason": "Indexed comprehension of borrowed string chunks",
+    "before": "    str_chunks := make([]string, cores) \n    for start, i in start_positions {\n        end :> (i==len(start_positions)-1) ? len(text) : start_positions[i+1]\n        str_chunks[i] = text[start:end]\n    }",
+    "after": "    str_chunks :> [text[start:((i == len(start_positions)-1) ? len(text) : start_positions[i+1])] for start, i in start_positions]\n    defer delete(str_chunks)"
+  }
+]

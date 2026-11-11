@@ -1,0 +1,159 @@
+--- a/Odin/breakout/breakout.thor
++++ b/Odin/breakout/breakout.thor
+@@ -90,11 +90,11 @@
+ }
+ 
+ reflect :: proc(dir, normal: rl.Vector2) -> rl.Vector2 {
+-	new_direction := linalg.reflect(dir, linalg.normalize(normal))
++	new_direction :> linalg.reflect(dir, linalg.normalize(normal))
+ 	return linalg.normalize(new_direction)
+ }
+ 
+-calc_block_rect :: proc(x, y: int) -> rl.Rectangle {
++calc_block_rect :: fn(x, y: int) -> rl.Rectangle {
+ 	return {
+ 		f32(20 + x * BLOCK_WIDTH),
+ 		f32(40 + y * BLOCK_HEIGHT),
+@@ -118,12 +118,12 @@
+ 	rl.InitAudioDevice()
+ 	rl.SetTargetFPS(120)
+ 
+-	ball_texture     := rl.LoadTexture("ball.png")
+-	paddle_texture   := rl.LoadTexture("paddle.png")
+-	hit_block_sound  := rl.LoadSound("hit_block.wav")
+-	hit_paddle_sound := rl.LoadSound("hit_paddle.wav")
+-	game_over_sound  := rl.LoadSound("game_over.wav")
+-    game_won_sound   := rl.LoadSound("game_won.mp3")
++	ball_texture     :> rl.LoadTexture("ball.png")
++	paddle_texture   :> rl.LoadTexture("paddle.png")
++	hit_block_sound  :> rl.LoadSound("hit_block.wav")
++	hit_paddle_sound :> rl.LoadSound("hit_paddle.wav")
++	game_over_sound  :> rl.LoadSound("game_over.wav")
++    game_won_sound   :> rl.LoadSound("game_won.mp3")
+ 
+ 	restart()
+     // instant_win()
+@@ -140,8 +140,8 @@
+ 			previous_ball_pos = ball_pos
+ 
+ 			if rl.IsKeyPressed(.SPACE) {
+-				paddle_middle := rl.Vector2 { paddle_pos_x + PADDLE_WIDTH/2, PADDLE_POS_Y }
+-				ball_to_paddle := paddle_middle - ball_pos
++				paddle_middle :> rl.Vector2 { paddle_pos_x + PADDLE_WIDTH/2, PADDLE_POS_Y }
++				ball_to_paddle :> paddle_middle - ball_pos
+ 				ball_dir = linalg.normalize0(ball_to_paddle)
+ 				started = true
+ 			}
+@@ -200,7 +200,7 @@
+ 			paddle_pos_x += paddle_move_velocity * DT
+ 			paddle_pos_x = clamp(paddle_pos_x, 0, SCREEN_SIZE - PADDLE_WIDTH)
+ 
+-			paddle_rect := rl.Rectangle {
++			paddle_rect :> rl.Rectangle {
+ 				paddle_pos_x, PADDLE_POS_Y,
+ 				PADDLE_WIDTH, PADDLE_HEIGHT,
+ 			}
+@@ -239,7 +239,7 @@
+ 						continue
+ 					}
+ 
+-					block_rect := calc_block_rect(x, y)
++					block_rect :> calc_block_rect(x, y)
+ 
+ 					if rl.CheckCollisionCircleRec(ball_pos, BALL_RADIUS, block_rect) {
+ 						collision_normal: rl.Vector2
+@@ -273,7 +273,7 @@
+ 						}
+ 
+ 						blocks[x][y] = false
+-						row_color := row_colors[y]
++						row_color :> row_colors[y]
+ 						score += block_color_score[row_color]
+ 						rl.SetSoundPitch(hit_block_sound, rand.float32_range(0.8, 1.2))
+ 						rl.PlaySound(hit_block_sound)
+@@ -285,20 +285,20 @@
+ 			accumulated_time -= DT
+ 		}
+ 
+-		blend := accumulated_time / DT
+-		ball_render_pos := math.lerp(previous_ball_pos, ball_pos, blend)
+-		paddle_render_pos_x := math.lerp(previous_paddle_pos_x, paddle_pos_x, blend)
++		blend :> accumulated_time / DT
++		ball_render_pos :> math.lerp(previous_ball_pos, ball_pos, blend)
++		paddle_render_pos_x :> math.lerp(previous_paddle_pos_x, paddle_pos_x, blend)
+ 
+ 		rl.BeginDrawing()
+ 		rl.ClearBackground({ 150, 190, 220, 255 })
+ 
+-		camera := rl.Camera2D {
++		camera :> rl.Camera2D {
+ 			zoom = f32(rl.GetScreenHeight()/SCREEN_SIZE)
+ 		}
+ 
+ 		rl.BeginMode2D(camera)
+ 
+-        paddle_rect := rl.Rectangle {
++        paddle_rect :> rl.Rectangle {
+             paddle_pos_x, PADDLE_POS_Y,
+             PADDLE_WIDTH, PADDLE_HEIGHT,
+         }
+@@ -311,21 +311,21 @@
+ 					continue
+ 				}
+ 
+-				block_rect := calc_block_rect(x, y)
+-
+-				top_left := rl.Vector2 {
++				block_rect :> calc_block_rect(x, y)
++
++				top_left :> rl.Vector2 {
+ 					block_rect.x, block_rect.y
+ 				}
+ 
+-				top_right := rl.Vector2 {
++				top_right :> rl.Vector2 {
+ 					block_rect.x + block_rect.width, block_rect.y
+ 				}
+ 
+-				bottom_left := rl.Vector2 {
++				bottom_left :> rl.Vector2 {
+ 					block_rect.x, block_rect.y + block_rect.height
+ 				}
+ 
+-				bottom_right := rl.Vector2 {
++				bottom_right :> rl.Vector2 {
+ 					block_rect.x + block_rect.width, block_rect.y + block_rect.height
+ 				}
+ 
+@@ -337,24 +337,24 @@
+ 			}
+ 		}
+ 
+-		score_text := fmt.ctprint(score)
++		score_text :> fmt.ctprint(score)
+ 		rl.DrawText(score_text, 5, 5, 10, rl.WHITE)
+ 
+ 		if !started {
+-			start_text := fmt.ctprint("Start: SPACE")
+-			start_text_width := rl.MeasureText(start_text, 15)
++			start_text :> fmt.ctprint("Start: SPACE")
++			start_text_width :> rl.MeasureText(start_text, 15)
+ 			rl.DrawText(start_text, SCREEN_SIZE/2 - start_text_width/2, BALL_START_Y-30, 15, rl.WHITE)
+ 		}
+ 
+ 		if game_over {
+-			game_over_text := fmt.ctprintf("        GAME OVER\nScore: %v. Reset: SPACE", score)
+-			game_over_text_width := rl.MeasureText(game_over_text, 15)
++			game_over_text :> fmt.ctprintf("        GAME OVER\nScore: %v. Reset: SPACE", score)
++			game_over_text_width :> rl.MeasureText(game_over_text, 15)
+ 			rl.DrawText(game_over_text, SCREEN_SIZE/2 - game_over_text_width/2, BALL_START_Y-30, 15, rl.WHITE)
+ 		}
+ 
+         if game_won {
+-			game_won_text := fmt.ctprintf("            WINNER!\nScore: %v. Reset: SPACE", score)
+-            game_won_text_width := rl.MeasureText(game_won_text, 15)
++			game_won_text :> fmt.ctprintf("            WINNER!\nScore: %v. Reset: SPACE", score)
++            game_won_text_width :> rl.MeasureText(game_won_text, 15)
+ 			rl.DrawText(game_won_text, SCREEN_SIZE/2 - game_won_text_width/2, BALL_START_Y-30, 15, rl.WHITE)
+ 		}
+ 

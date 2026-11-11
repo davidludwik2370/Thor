@@ -1,0 +1,62 @@
+--- a/Odin/hilo/original/hilo.thor
++++ b/Odin/hilo/original/hilo.thor
+@@ -38,8 +38,8 @@
+     for topCard, i in board {
+         if topCard == 0 do continue
+         
+-        diff := MIDPOINT - topCard
+-        guessDist := math.abs(diff)
++        diff :> MIDPOINT - topCard
++        guessDist :> math.abs(diff)
+         if guessDist > bestGuessDist {
+             bestGuessIndex = i
+             bestGuessDist = guessDist
+@@ -52,13 +52,13 @@
+ }
+ 
+ findBestGuessCounting :: proc(board: Board) -> (bestGuessIndex: int, dir: Dir) {
+-    midpoint := 7.0
++    midpoint :> 7.0
+     bestGuessDist := -1.0
+     for topCard, i in board {
+         if topCard == 0 do continue
+         
+-        diff := midpoint - f64(topCard)
+-        guessDist := math.abs(diff)
++        diff :> midpoint - f64(topCard)
++        guessDist :> math.abs(diff)
+         if guessDist > bestGuessDist {
+             bestGuessIndex = i
+             bestGuessDist = guessDist
+@@ -87,10 +87,10 @@
+     liveStacks := NUM_STACKS
+     
+     for len(deck) > 0 {
+-        guessIndex, dir := findBestGuess(board)
+-        drawnCard := pop(deck)
++        guessIndex, dir :> findBestGuess(board)
++        drawnCard :> pop(deck)
+ 
+-        guessCorrect := dir == .over ? drawnCard > board[guessIndex] :
++        guessCorrect :> dir == .over ? drawnCard > board[guessIndex] :
+                                        drawnCard < board[guessIndex]
+ 
+         if guessCorrect {
+@@ -108,7 +108,7 @@
+ 
+ main :: proc() {
+ 
+-    current_seed := u64(time.to_unix_nanoseconds(time.now()))
++    current_seed :> u64(time.to_unix_nanoseconds(time.now()))
+     // current_seed = 1784101578308348000
+ 
+     // fmt.println("Seed: ", current_seed, '\n')
+@@ -126,7 +126,7 @@
+         }
+     }
+ 
+-    winRate := f64(wins) / f64(NUM_TRIALS)
++    winRate :> f64(wins) / f64(NUM_TRIALS)
+     fmt.println("Wins:", wins, "/", NUM_TRIALS)
+     fmt.printfln("Win rate: %.4f%%", winRate*100)
+ 

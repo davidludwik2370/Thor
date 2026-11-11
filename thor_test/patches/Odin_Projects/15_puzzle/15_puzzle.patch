@@ -1,0 +1,161 @@
+--- a/Odin_Projects/15_puzzle/15_puzzle.thor
++++ b/Odin_Projects/15_puzzle/15_puzzle.thor
+@@ -92,8 +92,8 @@
+ 			buffer: [8]byte
+ 			fmt.bprint(buffer[:], g[y][x])
+ 			TEXT_OFFSET :: GRID_SIZE/2 - PAD - 10
+-			textX := tilePos.x + TEXT_OFFSET + NUM_TEXT_X_CORRECTION[g[y][x]]
+-			textY := tilePos.y + TEXT_OFFSET
++			textX :> tilePos.x + TEXT_OFFSET + NUM_TEXT_X_CORRECTION[g[y][x]]
++			textY :> tilePos.y + TEXT_OFFSET
+ 			DrawText(cstring(&buffer[0]), textX, textY, FONT_SIZE, BLACK)
+ 		}
+ 	}
+@@ -106,13 +106,13 @@
+ 	// shuffle
+ 	DrawRectangle(PAD, BOARD_SIZE*GRID_SIZE+PAD, BUTTON_WIDTH, BUTTON_HEIGHT, ORANGE)
+ 	SHUFFLE_TEXT :: "Shuffle"
+-	shuffleTextX := PAD + BUTTON_WIDTH/2 - MeasureText(SHUFFLE_TEXT, FONT_SIZE)/2
++	shuffleTextX :> PAD + BUTTON_WIDTH/2 - MeasureText(SHUFFLE_TEXT, FONT_SIZE)/2
+ 	DrawText(SHUFFLE_TEXT, shuffleTextX, TEXT_Y, FONT_SIZE, BLACK)
+ 
+ 	// solve / stop
+ 	DrawRectangle(WINDOW_WIDTH/2+PAD/2, BOARD_SIZE*GRID_SIZE+PAD, BUTTON_WIDTH, BUTTON_HEIGHT, ORANGE)
+-	stopSolveText: cstring = solving ? "Stop" : "Solve"
+-	solveTextX := PAD/2 + WINDOW_WIDTH/2 + BUTTON_WIDTH/2 - MeasureText(stopSolveText, FONT_SIZE)/2
++	stopSolveText: cstring > solving ? "Stop" : "Solve"
++	solveTextX :> PAD/2 + WINDOW_WIDTH/2 + BUTTON_WIDTH/2 - MeasureText(stopSolveText, FONT_SIZE)/2
+ 	DrawText(stopSolveText, solveTextX, TEXT_Y, FONT_SIZE, BLACK)
+ 
+ 	EndDrawing()
+@@ -141,7 +141,7 @@
+ 	activeTiles := [3]i8{-1, -1, -1}
+ 	numTiles := 0
+ 	for ; empty != move; empty -= moveDir {
+-		tile := g[empty.y - moveDir.y][empty.x - moveDir.x]
++		tile :> g[empty.y - moveDir.y][empty.x - moveDir.x]
+ 		activeTiles[numTiles] = tile
+ 		numTiles += 1
+ 		g[empty.y][empty.x] = tile
+@@ -169,7 +169,7 @@
+ 	seen: [TOTAL_SLOTS]bool
+ 	for y in 0..<BOARD_SIZE {
+ 		for x in 0..<BOARD_SIZE {
+-			n := g[y][x]
++			n :> g[y][x]
+ 			if n < 0 || n >= TOTAL_SLOTS || seen[n] do return false
+ 			seen[n] = true
+ 		}
+@@ -182,7 +182,7 @@
+ 
+ 	randMove := findValue(g)
+ 	for _ in 0..<numMoves {
+-		randNum := randi8(1, TILES_PER_ROW)
++		randNum :> randi8(1, TILES_PER_ROW)
+ 
+ 		if rand.choice([]bool{true, false}) {
+ 			randMove.y = (randMove.y + randNum) % TILES_PER_ROW
+@@ -190,7 +190,7 @@
+ 			randMove.x = (randMove.x + randNum) % TILES_PER_ROW
+ 		}
+ 
+-		ok := move(g, randMove, animate=false)
++		ok :> move(g, randMove, animate=false)
+ 		assert(ok, "Random move should always be valid")
+ 	}
+ }
+@@ -223,13 +223,13 @@
+ 	9 11 15 12
+ 	0 10 13 14
+ 	`
+-	numSlice := strings.fields(TEST_BOARD)
++	numSlice :> strings.fields(TEST_BOARD)
+ 	defer delete(numSlice)
+ 
+ 	i := 0
+ 	for y in 0..<i8(BOARD_SIZE) {
+ 		for x in 0..<i8(BOARD_SIZE) {
+-			n, ok := strconv.parse_int(numSlice[i])
++			n, ok :> strconv.parse_int(numSlice[i])
+ 			fmt.assertf(ok, "Failed to parse number:", numSlice[i])
+ 			g[y][x] = i8(n)
+ 			i += 1
+@@ -250,7 +250,7 @@
+ 
+ 	if stopCmdActive do return
+ 		
+-	fCoords := FINAL_COORDS[activeTile]
++	fCoords :> FINAL_COORDS[activeTile]
+ 	xf, yf := fCoords.x, fCoords.y
+ 		
+ 	switch activeTile {
+@@ -313,7 +313,7 @@
+ 				move(g, {xf, ya})
+ 				y0 = ya
+ 			}
+-			d := i8(ya > 2 ? -1 : 1)
++			d :> i8(ya > 2 ? -1 : 1)
+ 			move(g, {xa  , ya  })
+ 			move(g, {xa  , ya+d})
+ 			move(g, {xa+1, ya+d})
+@@ -346,7 +346,7 @@
+ 			move(g, {xa, ya-1})
+ 			move(g, {xa, ya  })
+ 		case:
+-			d := i8(activeTile == 4 ? -1 : 1)
++			d :> i8(activeTile == 4 ? -1 : 1)
+ 			move(g, {x0+d, y0})
+ 		}
+ 		x0, y0, xa, ya = findZeroActive(g, activeTile)
+@@ -480,7 +480,7 @@
+ 	fmt.println("Current board state:")
+ 	for y in 0..<i8(BOARD_SIZE) {
+ 		for x in 0..<i8(BOARD_SIZE) {
+-			n := g[y][x]
++			n :> g[y][x]
+ 			fmt.print(n<10 ? " ":"", n)
+ 		}
+ 		fmt.println()
+@@ -490,10 +490,10 @@
+ 
+ commaSep :: proc(#any_int n: int) -> string {
+ 	strBuilder: strings.Builder
+-	numStr := fmt.aprint(n)
++	numStr :> fmt.aprint(n)
+ 	defer delete(numStr)
+ 
+-	end := len(numStr) - 1
++	end :> len(numStr) - 1
+ 	j := 2*len(numStr) % 3
+ 	for r, i in numStr {
+ 		strings.write_rune(&strBuilder, r)
+@@ -509,11 +509,11 @@
+ runTests :: proc(numTests := 1_000_000) {
+ 	g: Board
+ 	animateSolve = false
+-	initPrintLogs := printLogs
++	initPrintLogs :> printLogs
+ 	printLogs = false
+ 	testsFailed := 0
+-	numTestStr := commaSep(numTests)
+-	startTime := time.now()
++	numTestStr :> commaSep(numTests)
++	startTime :> time.now()
+ 	fmt.printfln("\nRunning %v tests...\n", numTestStr)
+ 	startState := SOLVED_BOARD
+ 	for i in 0..<numTests {
+@@ -587,11 +587,11 @@
+ 		pressAvail = true
+ 	} else if pressAvail {
+ 		pressAvail = false
+-		m1 := GetMousePosition()
+-		moveCoord := Coord{min(i8(m1.x/GRID_SIZE), BOARD_SIZE-1), i8(m1.y/GRID_SIZE)}
++		m1 :> GetMousePosition()
++		moveCoord :> Coord{min(i8(m1.x/GRID_SIZE), BOARD_SIZE-1), i8(m1.y/GRID_SIZE)}
+ 		if moveCoord.y < BOARD_SIZE {
+ 			if solving do return
+-			ok := move(g, moveCoord)
++			ok :> move(g, moveCoord)
+ 			if printLogs do fmt.println("Move:", moveCoord, "-", ok ? "Valid" : "Invalid")
+ 		} else if m1.x > WINDOW_WIDTH/2 {
+ 			handleSolveAndStop(g)

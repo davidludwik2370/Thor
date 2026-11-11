@@ -1,0 +1,11 @@
+--- a/Odin/foreign_exp/main.thor
++++ b/Odin/foreign_exp/main.thor
+@@ -28,7 +28,7 @@
+ 
+   my_lib.set_callback(my_callback)
+ 
+-  ts := my_lib.TestStruct {
++  ts :> my_lib.TestStruct {
+     num = 7,
+     flt_num = 23.12,
+   }

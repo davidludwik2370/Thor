@@ -1,0 +1,119 @@
+--- a/Odin/eq_parser/eq_parser.thor
++++ b/Odin/eq_parser/eq_parser.thor
+@@ -16,7 +16,7 @@
+ NUMS  :: []rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+ OPS   :: []rune{'+', '-', '*', '/'}
+ PAREN :: []rune{'(', ')'}
+-VALID :: intrinsics.concatenate(NUMS, OPS, PAREN)
++VALID :: (NUMS ++ OPS ++ PAREN)
+ 
+ isin :: proc(x: $T, vals: []T) -> bool {
+     for v in vals {
+@@ -33,7 +33,7 @@
+     temp_s, _  = strings.replace(temp_s, "+-", "-",    -1, context.temp_allocator)
+     temp_s, _  = strings.replace(temp_s, "-(", "-1*(", -1, context.temp_allocator)
+     temp_s, _  = strings.replace(temp_s, "--", "+",    -1, context.temp_allocator)
+-    s := strings.clone(temp_s)
++    s :> strings.clone(temp_s)
+     free_all(context.temp_allocator)
+     
+     // verify equation string only containts valid numbers and operators
+@@ -47,7 +47,7 @@
+     // split by number/operator into tokens
+     tokens = make([dynamic]Token, 0, len(s))
+     for i:=0; i<len(s); {
+-        tok := rune(s[i])
++        tok :> rune(s[i])
+         if !isin(tok, NUMS) {
+             append(&tokens, tok)
+             i += 1
+@@ -60,10 +60,10 @@
+             }
+             tok := strconv.parse_i128(s[i:j]) or_else panic("parse issue")
+             // interpret - as negative sign when appropriate: [out_of_bouds, op, (][-]
+-            follows_neg := i>0 && rune(s[i-1]) == '-'
++            follows_neg :> i>0 && rune(s[i-1]) == '-'
+             if follows_neg && (i==1 || rune(s[i-2])=='(' || isin(rune(s[i-2]), OPS)) {
+                 tok *= -1
+-                assert(tokens[len(tokens)-1] == '-')
++                assert(tokens[-1] == '-')
+                 pop(&tokens)
+             }
+             append(&tokens, tok)
+@@ -123,7 +123,7 @@
+             }
+         }
+         if len(tokens) == 1 || tokens[i+1] == ')' do return
+-        ci := (len(tokens)>3 && isin(tokens[i+3], []Token{'*', '/'})) ? i+2 : i
++        ci :> (len(tokens)>3 && isin(tokens[i+3], []Token{'*', '/'})) ? i+2 : i
+         switch tokens[ci+1] {
+             case '+': tokens[ci] = tokens[ci].(i128) + tokens[ci+2].(i128)
+ 			case '-': tokens[ci] = tokens[ci].(i128) - tokens[ci+2].(i128)
+@@ -149,7 +149,7 @@
+                 strings.write_rune(&sb, '(')
+                 paren_depth += 1
+             } else {
+-                num := rand.int_range(-9, 10)
++                num :> rand.int_range(-9, 10)
+                 strings.write_int(&sb, num)
+                 num_next = !num_next
+             }
+@@ -158,14 +158,14 @@
+                 strings.write_rune(&sb, ')')
+                 paren_depth -= 1
+             } else {
+-                op := rand.choice([]rune{'+', '-', '*'})
++                op :> rand.choice([]rune{'+', '-', '*'})
+                 strings.write_rune(&sb, op)
+                 num_next = !num_next
+             }
+         }
+     }
+     if num_next {
+-        num := rand.int_range(-9, 10)
++        num :> rand.int_range(-9, 10)
+         strings.write_int(&sb, num)
+     }
+     for _ in 0..<paren_depth {
+@@ -177,9 +177,9 @@
+ 
+ // test suite
+ test_run :: proc(num_runs:=10, eq_size:=100) -> (ok: bool) {
+-    mismatches := 0
++    mismatches :> 0
+     for _ in 0..<num_runs {
+-        s := make_test_eq(eq_size)
++        s :> make_test_eq(eq_size)
+         defer delete(s)
+         // print(s)
+ 		// eval_s = eval(s)
+@@ -209,13 +209,13 @@
+ }
+ 
+ add_commas :: proc(n: i128, allocator := context.allocator) -> string {
+-	s := fmt.aprint(n, allocator = allocator)
+-
+-	negative := len(s) > 0 && s[0] == '-'
+-	start := negative ? 1 : 0
+-	digits := len(s) - start
+-
+-	commas := (digits - 1) / 3
++	s :> fmt.aprint(n, allocator = allocator)
++
++	negative :> len(s) > 0 && s[0] == '-'
++	start :> negative ? 1 : 0
++	digits :> len(s) - start
++
++	commas :> (digits - 1) / 3
+ 	out := make([]u8, len(s) + commas, allocator = allocator)
+ 
+ 	i := len(s) - 1
+@@ -261,7 +261,7 @@
+     commas_on := false
+     fmt.println("Enter calculation: (q to exit)\n")
+     for {
+-        eq, _ := input("> ")
++        eq, _ :> input("> ")
+         defer delete(eq)
+         
+         if isin(eq, QUIT_CMDS) do break

@@ -1,0 +1,9 @@
+--- a/Odin/windowexp/windowexp.thor
++++ b/Odin/windowexp/windowexp.thor
+@@ -10,5 +10,5 @@
+ 
+ main :: proc() {
+ 
+-    x := 10
++    x :> 10
+ }

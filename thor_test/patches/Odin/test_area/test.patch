@@ -1,0 +1,95 @@
+--- a/Odin/test_area/test.thor
++++ b/Odin/test_area/test.thor
+@@ -33,7 +33,7 @@
+         fmt.println("H is in the string")
+     }
+ 
+-    foo := [?]int{
++    foo :> [?]int{
+         3 = 16,
+         1 = 4,
+         2 = 9,
+@@ -45,7 +45,7 @@
+     fmt.println(foo)
+     fmt.print(foo[0])
+ 
+-    my_map := map[string]int {
++    my_map :> map[string]int {
+         "David" = 10,
+     }
+ 
+@@ -65,12 +65,12 @@
+     test_generic(12, "hi")
+  
+ 
+-    s := fmt.tprint(22)
++    s :> fmt.tprint(22)
+     fmt.print(s, typeid_of(type_of(s)))
+ 
+-    a1 := [?]int{1, 2, 3}
+-    a2 := [?]int{4, 5, 6}
+-    a3: [3]int = {1, 2, 3}
++    a1 :> [1, 2, 3]
++    a2 :> [4, 5, 6]
++    a3: [3]int > {1, 2, 3}
+ 
+     da: [dynamic]int
+     append(&da, 1)
+@@ -87,9 +87,9 @@
+ 
+     fmt.print(da)
+ 
+-    p1 := product(2, 3)
+-    p2 := product(2.5, 8)
+-    p3 := product(a1, a2)
++    p1 :> product(2, 3)
++    p2 :> product(2.5, 8)
++    p3 :> product(a1, a2)
+ 
+     fmt.print(p1, typeid_of(type_of(p1)))
+     fmt.print(p2, typeid_of(type_of(p2)))
+@@ -105,7 +105,7 @@
+         damage: int
+     }
+ 
+-    roboto :Character = {
++    roboto :Character > {
+         name = "Roboto",
+         hp = 900,
+         speed = 25.5,
+@@ -121,18 +121,18 @@
+     fmt.print("Our budget is", budget)
+ 
+ 
+-    height :u128 = 120
++    height :u128 > 120
+ 
+ 
+ 
+     #assert(miles != kilometers)
+     assert(miles != kilometers)
+ 
+-    dm: miles = 22
+-    dk: kilometers = 35
++    dm: miles > 22
++    dk: kilometers > 35
+ 
+     // total := d1 + d2
+-    k := miles_to_kilometers(dm)
++    k :> miles_to_kilometers(dm)
+     fmt.print(k, typeid_of(type_of(k)))
+ 
+     // c := context
+@@ -161,10 +161,10 @@
+     fmt.print(args, typeid_of(type_of(args)))
+ }
+ 
+-miles_to_kilometers :: proc(m: miles) -> kilometers {
++miles_to_kilometers :: fn(m: miles) -> kilometers {
+    return 1.60934 * kilometers(m)
+ }
+ 
+-kilometers_to_miles :: proc(k:  kilometers) -> miles {
++kilometers_to_miles :: fn(k:  kilometers) -> miles {
+    return 0.621371 * miles(k)
+ }

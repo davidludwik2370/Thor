@@ -1,0 +1,79 @@
+--- a/Odin_Projects/Dijkstra_animated/Dijkstra.thor
++++ b/Odin_Projects/Dijkstra_animated/Dijkstra.thor
+@@ -62,7 +62,7 @@
+ 	return rand.int_max(max+1-min) + min
+ }
+ 
+-validCoord :: proc(c: Coord) -> bool {
++validCoord :: fn(c: Coord) -> bool {
+ 	return c.x >= 0 && c.y >= 0 && c.x < BOARD_WIDTH && c.y < BOARD_HEIGHT
+ }
+ 
+@@ -91,7 +91,7 @@
+ 			else if newWalls {
+ 				type = rand.float32()<NEW_WALL_ODDS ? .Wall : .Empty
+ 			}
+-			dist := type == .Start ? 0 : max(int)
++			dist :> type == .Start ? 0 : max(int)
+ 			g.board[y][x] = {nil, type, {x, y}, dist}
+ 		}
+ 	}
+@@ -107,16 +107,16 @@
+ }
+ 
+ drawPath :: proc(using node: Node, color: rl.Color) {
+-	center       := [2]i32{i32(pos.x*GRID_SIZE+GRID_SIZE/2), i32(pos.y*GRID_SIZE+GRID_SIZE/2)}
+-	parentCenter := [2]i32{i32(parent.pos.x*GRID_SIZE+GRID_SIZE/2), i32(parent.pos.y*GRID_SIZE+GRID_SIZE/2)}
++	center       :> [2]i32{i32(pos.x*GRID_SIZE+GRID_SIZE/2), i32(pos.y*GRID_SIZE+GRID_SIZE/2)}
++	parentCenter :> [2]i32{i32(parent.pos.x*GRID_SIZE+GRID_SIZE/2), i32(parent.pos.y*GRID_SIZE+GRID_SIZE/2)}
+ 	rl.DrawLine(center.x, center.y, parentCenter.x, parentCenter.y, color)
+ 	rl.DrawCircle(center.x, center.y, 2, color)
+ }
+ 
+ drawSquare :: proc(g: Game, node: Node, animate:=false) {
+ 	using rl
+-	type, x, y := node.type, node.pos.x, node.pos.y
+-	center := Vector2({f32(x*GRID_SIZE+GRID_SIZE/2+1), f32(y*GRID_SIZE+GRID_SIZE/2+1)})
++	type, x, y :> node.type, node.pos.x, node.pos.y
++	center :> Vector2({f32(x*GRID_SIZE+GRID_SIZE/2+1), f32(y*GRID_SIZE+GRID_SIZE/2+1)})
+ 	if type in Types({.Wall, .Start, .End}) {
+ 		if type == .Start && g.start == g.end {
+ 			DrawPoly(center, 8, GRID_SIZE/2+6, 22.5, colors[.End])
+@@ -191,7 +191,7 @@
+ }
+ 
+ findPath :: proc(g: ^Game, animate:=false) {
+-	size := 2 * min(BOARD_WIDTH, BOARD_HEIGHT)
++	size :> 2 * min(BOARD_WIDTH, BOARD_HEIGHT)
+ 	searchFront := make([dynamic]^Node, len=1, cap=size)
+ 	nextFront   := make([dynamic]^Node, len=0, cap=size)
+ 	defer delete(searchFront)
+@@ -202,7 +202,7 @@
+ 		for node in searchFront {
+ 			if animate do renderGame(g^)
+ 			for dir in searchDirs[:g.diagonal ? 8 : 4] {
+-				x, y := node.pos.x + dir.x, node.pos.y + dir.y
++				x, y :> node.pos.x + dir.x, node.pos.y + dir.y
+ 				if validCoord({x, y}) && 
+ 				   g.board[y][x].type in Types({.Empty, .End}) && 
+ 				   node.dist + 1 < g.board[y][x].dist {
+@@ -271,7 +271,7 @@
+ 				g.animate = true
+ 				calcPath(&g, animate=g.animate)
+ 			case .S: //turn pathfinding animation off
+-				pad :: "                              " //30
++				pad :: (" " * 30) //30
+ 				g.animate = false
+ 				SetWindowTitle(pad + TITLE + " (animation off)")
+ 			case .KEY_NULL: break keys
+@@ -280,8 +280,8 @@
+ 		
+ 		//add/remove walls and move start/end
+ 		mouse: if IsMouseButtonDown(.LEFT) {
+-			mousePos := GetMousePosition()
+-			x, y := int(mousePos.x)/GRID_SIZE, int(mousePos.y)/GRID_SIZE
++			mousePos :> GetMousePosition()
++			x, y :> int(mousePos.x)/GRID_SIZE, int(mousePos.y)/GRID_SIZE
+ 			if !validCoord({x, y}) do break mouse
+ 			if IsMouseButtonPressed(.LEFT) {
+ 				switch g.board[y][x].type {

@@ -1,0 +1,11 @@
+--- a/Odin/primes/limited_primes/primes.thor
++++ b/Odin/primes/limited_primes/primes.thor
+@@ -9,7 +9,7 @@
+ 	using math
+ 	// limit :u64 = 18446744073709551615
+ 	limit :: 100_000
+-	lastIndex := int(floor(sqrt(f64(limit))) + 4)
++	lastIndex :> int(floor(sqrt(f64(limit))) + 4)
+ 
+ 	i, ni, step_size: int
+ 

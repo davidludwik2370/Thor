@@ -1,0 +1,51 @@
+--- a/Odin/sum_squares/Library.thor
++++ b/Odin/sum_squares/Library.thor
+@@ -16,7 +16,7 @@
+ INT_MIN :: -INT_MAX - 1
+ str :: proc(x: $T) -> string { return fmt.tprint(x) }
+ type :: proc(x: $T) -> typeid { return typeid_of(T) }
+-intfs :: proc(s: string) -> (total: int) {
++intfs :: fn(s: string) -> (total: int) {
+     for r in s{
+         total *= 10 
+         total += int(r) - int('0')
+@@ -31,7 +31,7 @@
+ float :: proc(s: string) -> f64 {
+     return strconv.atof(s)
+ }
+-pow :: proc(a: int, b: int) -> int { 
++pow :: fn(a: int, b: int) -> int { 
+     total := 1
+     for i in 0..<b {
+         
+@@ -45,8 +45,8 @@
+ comma_sep :: proc(n: int) -> string {
+     new_str: strings.Builder
+     
+-    s := str(n)
+-    end := len(s) - 1
++    s :> str(n)
++    end :> len(s) - 1
+     j := 2*len(s) % 3
+     
+     for r, i in s {
+@@ -68,16 +68,16 @@
+ 
+ randint :: proc(a: int, b: int=0) -> int {
+     if b == 0 { return rand.int_max(a + 1) }
+-    range := a - b + 1
++    range :> a - b + 1
+     return rand.int_max(range) + a
+ }
+-all_true :: proc(arr: []bool) -> bool {
++all_true :: fn(arr: []bool) -> bool {
+     for b in arr {
+         if !b { return false }
+     }
+     return true
+ }
+-any_true :: proc(arr: []bool) -> bool {
++any_true :: fn(arr: []bool) -> bool {
+     for b in arr {
+         if b { return true }
+     }

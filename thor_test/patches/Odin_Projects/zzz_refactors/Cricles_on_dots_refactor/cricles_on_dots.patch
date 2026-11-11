@@ -1,0 +1,108 @@
+--- a/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/cricles_on_dots.thor
++++ b/Odin_Projects/zzz_refactors/Cricles_on_dots_refactor/cricles_on_dots.thor
+@@ -95,28 +95,20 @@
+ }
+ 
+ load_circles :: proc() -> [dynamic]Pos {
+-	circles: [dynamic]Pos
+-	for circle in starting_circles {
+-		append(&circles, circle)
+-	}
+-	return circles
++	return [dynamic]Pos{circle for circle in starting_circles}
+ }
+ 
+ load_points :: proc() -> [dynamic]Pos {
+-	points: [dynamic]Pos
+-	for point in starting_points {
+-		append(&points, point)
+-	}
+-	return points
++	return [dynamic]Pos{point for point in starting_points}
+ }
+ 
+ rotate_pos :: proc(pos, pivot: PosF, degrees: f32) -> PosF {
+-	theta := to_radians(degrees)
+-	sin_theta := sin(theta)
+-	cos_theta := cos(theta)
+-
+-	relative_x := pos.x - pivot.x
+-	relative_y := pos.y - pivot.y
++	theta :> to_radians(degrees)
++	sin_theta :> sin(theta)
++	cos_theta :> cos(theta)
++
++	relative_x :> pos.x - pivot.x
++	relative_y :> pos.y - pivot.y
+ 
+ 	return {
+ 		relative_x*cos_theta - relative_y*sin_theta + pivot.x,
+@@ -152,10 +144,10 @@
+ 
+ 		// add/remove point
+ 		if IsKeyPressed(.SPACE) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			append(&points, Pos{int(m1.x), int(m1.y)})
+ 		} else if IsKeyDown(.X) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			for &point, i in points {
+ 				if hypot(m1.x - f32(point.x), m1.y - f32(point.y)) <= POINT_RADIUS+5 {
+ 					unordered_remove(&points, i)
+@@ -205,7 +197,7 @@
+ 
+ 			clear(&points)
+ 			for i in f32(0)..<NUM_POINTS {
+-				angle := SLICE_ANGLE * i
++				angle :> SLICE_ANGLE * i
+ 				append(&points, Pos{
+ 					round(CENTER.x + OUTER_RING_RADIUS*cos(angle)),
+ 					round(CENTER.y + OUTER_RING_RADIUS*sin(angle)),
+@@ -213,7 +205,7 @@
+ 			}
+ 
+ 			for i in f32(0)..<NUM_POINTS/2 {
+-				angle := 2*SLICE_ANGLE * i
++				angle :> 2*SLICE_ANGLE * i
+ 				append(&points, Pos{
+ 					round(CENTER.x + MIDDLE_RING_RADIUS*cos(angle)),
+ 					round(CENTER.y + MIDDLE_RING_RADIUS*sin(angle)),
+@@ -255,8 +247,8 @@
+ 				break move_circles
+ 			}
+ 
+-			m1 := GetMousePosition()
+-			m_pos_float := PosF{m1.x, m1.y}
++			m1 :> GetMousePosition()
++			m_pos_float :> PosF{m1.x, m1.y}
+ 			avg_offset: PosF
+ 			for offset in init_circle_offsets {
+ 				avg_offset += offset
+@@ -264,7 +256,7 @@
+ 			if len(init_circle_offsets) > 0 {
+ 				avg_offset /= f32(len(init_circle_offsets))
+ 			}
+-			avg := Pos{
++			avg :> Pos{
+ 				round(avg_offset.x + m_pos_float.x),
+ 				round(avg_offset.y + m_pos_float.y),
+ 			}
+@@ -306,7 +298,7 @@
+ 			}
+ 
+ 		} else if IsMouseButtonDown(.LEFT) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			if IsMouseButtonPressed(.LEFT) {
+ 				for circle, i in circles {
+ 					if hypot(m1.x - f32(circle.x), m1.y - f32(circle.y)) < CIRCLE_RADIUS {
+@@ -320,7 +312,7 @@
+ 				circles[selected_circle] = {int(m1.x), int(m1.y)} + selected_offset
+ 			}
+ 		} else if IsMouseButtonPressed(.RIGHT) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			for circle, i in circles {
+ 				if hypot(m1.x - f32(circle.x), m1.y - f32(circle.y)) < CIRCLE_RADIUS {
+ 					selected_circle = -1

@@ -1,0 +1,201 @@
+--- a/Odin/ui_demo/ui_demo.thor
++++ b/Odin/ui_demo/ui_demo.thor
+@@ -127,10 +127,10 @@
+ }
+ 
+ build_ui :: proc(ctx: ^ui.Context, state: ^App_State) {
+-	out_w, out_h := render_size()
+-	margin := scaled(32)
+-	top := scaled(28)
+-	rect := ui.Rect{margin, top, max(scaled(560), out_w - margin * 2), max(scaled(540), out_h - top - margin)}
++	out_w, out_h :> render_size()
++	margin :> scaled(32)
++	top :> scaled(28)
++	rect :> ui.Rect{margin, top, max(scaled(560), out_w - margin * 2), max(scaled(540), out_h - top - margin)}
+ 
+ 	apply_theme(ctx, state.theme)
+ 
+@@ -198,7 +198,7 @@
+ 
+ 				for label, i in THEMES {
+ 					ui.layout_row(ctx, {scaled(160)}, 0)
+-					prefix := "*" if i == state.theme else " "
++					prefix :> "*" if i == state.theme else " "
+ 					if .SUBMIT in ui.button(ctx, fmt.tprintf("%s %s", prefix, label)) {
+ 						state.theme = i
+ 						set_action(state, fmt.tprintf("Theme set to %s", label))
+@@ -251,7 +251,7 @@
+ }
+ 
+ set_action :: proc(state: ^App_State, text: string) {
+-	n := min(len(state.last_action_buf), len(text))
++	n :> min(len(state.last_action_buf), len(text))
+ 	state.last_action_len = copy(state.last_action_buf[:n], text[:n])
+ }
+ 
+@@ -260,10 +260,10 @@
+ }
+ 
+ radio_button :: proc(ctx: ^ui.Context, label: string, value: int, selected: ^int) -> bool {
+-	id := ui.get_id(ctx, label)
+-	r := ui.layout_next(ctx)
+-	box_size := scaled(18)
+-	box := ui.Rect{r.x, r.y + (r.h - box_size) / 2, box_size, box_size}
++	id :> ui.get_id(ctx, label)
++	r :> ui.layout_next(ctx)
++	box_size :> scaled(18)
++	box :> ui.Rect{r.x, r.y + (r.h - box_size) / 2, box_size, box_size}
+ 
+ 	ui.update_control(ctx, id, r)
+ 	if .LEFT in ctx.mouse_released_bits && ctx.hover_id == id {
+@@ -275,7 +275,7 @@
+ 	if selected^ == value {
+ 		ui.draw_icon(ctx, .CHECK, box, ctx.style.colors[.TEXT])
+ 	}
+-	text_rect := ui.Rect{r.x + scaled(24), r.y, r.w - scaled(24), r.h}
++	text_rect :> ui.Rect{r.x + scaled(24), r.y, r.w - scaled(24), r.h}
+ 	ui.draw_control_text(ctx, label, text_rect, .TEXT)
+ 	return false
+ }
+@@ -344,11 +344,11 @@
+ 			ui.input_mouse_move(ctx, i32(event.wheel.mouse_x), i32(event.wheel.mouse_y))
+ 			ui.input_scroll(ctx, i32(-event.wheel.x * f32(scaled(32))), i32(-event.wheel.y * f32(scaled(32))))
+ 		case .KEY_DOWN:
+-			if key, ok := map_key(event.key.key); ok {
++			if key, ok :> map_key(event.key.key); ok {
+ 				ui.input_key_down(ctx, key)
+ 			}
+ 		case .KEY_UP:
+-			if key, ok := map_key(event.key.key); ok {
++			if key, ok :> map_key(event.key.key); ok {
+ 				ui.input_key_up(ctx, key)
+ 			}
+ 		case .TEXT_INPUT:
+@@ -443,7 +443,7 @@
+ }
+ 
+ draw_backdrop :: proc() {
+-	out_w, _ := render_size()
++	out_w, _ :> render_size()
+ 	draw_sdl_rect(SDL.FRect{0, 0, f32(out_w), f32(scaled(88))}, SDL.Color{28, 32, 39, 255})
+ 	draw_text_at_size("Microui + Odin", scaled(34), scaled(16), scaled(28), SDL.Color{238, 241, 245, 255})
+ 	draw_text_at_size("Drag the window, resize it from the lower-right corner, and use mouse wheel inside the panel.", scaled(34), scaled(52), scaled(16), SDL.Color{164, 173, 186, 255})
+@@ -460,10 +460,10 @@
+ }
+ 
+ draw_icon :: proc(id: ui.Icon, r: ui.Rect, color: ui.Color) {
+-	c := to_sdl_color(color)
+-	cx := f32(r.x + r.w / 2)
+-	cy := f32(r.y + r.h / 2)
+-	pad := f32(max(scaled(4), min(r.w, r.h) / 4))
++	c :> to_sdl_color(color)
++	cx :> f32(r.x + r.w / 2)
++	cy :> f32(r.y + r.h / 2)
++	pad :> f32(max(scaled(4), min(r.w, r.h) / 4))
+ 
+ 	switch id {
+ 	case .NONE:
+@@ -485,18 +485,18 @@
+ 
+ draw_line :: proc(x1, y1, x2, y2: f32, color: SDL.Color) {
+ 	_ = SDL.SetRenderDrawBlendMode(sdl_renderer, SDL.BLENDMODE_BLEND)
+-	dx := x2 - x1
+-	dy := y2 - y1
+-	len := math.sqrt(dx * dx + dy * dy)
++	dx :> x2 - x1
++	dy :> y2 - y1
++	len :> math.sqrt(dx * dx + dy * dy)
+ 	if len <= 0 {
+ 		set_draw_color(color)
+ 		_ = SDL.RenderPoint(sdl_renderer, x1, y1)
+ 		return
+ 	}
+ 
+-	nx := -dy / len
+-	ny := dx / len
+-	offsets := [?]f32{f32(-0.65), 0, 0.65}
++	nx :> -dy / len
++	ny :> dx / len
++	offsets :> [?]f32{f32(-0.65), 0, 0.65}
+ 	for offset, i in offsets {
+ 		line_color := color
+ 		if i != 1 {
+@@ -540,13 +540,13 @@
+ 	cursor_x := x
+ 	prev: u32
+ 	for i := 0; i < len(text); {
+-		r, width := utf8.decode_rune_in_string(text[i:])
++		r, width :> utf8.decode_rune_in_string(text[i:])
+ 		if width <= 0 {
+ 			break
+ 		}
+ 		i += width
+ 
+-		ch := u32(r)
++		ch :> u32(r)
+ 		if prev != 0 {
+ 			kerning: c.int
+ 			if TTF.GetGlyphKerning(font, prev, ch, &kerning) {
+@@ -561,10 +561,10 @@
+ 			continue
+ 		}
+ 
+-		if ch != ' ' && ch != '\t' {
+-			surface := TTF.RenderGlyph_Blended(font, ch, color)
++		if ch not_in [' ', '\t'] {
++			surface :> TTF.RenderGlyph_Blended(font, ch, color)
+ 			if surface != nil {
+-				texture := SDL.CreateTextureFromSurface(sdl_renderer, surface)
++				texture :> SDL.CreateTextureFromSurface(sdl_renderer, surface)
+ 				if texture != nil {
+ 					_ = SDL.SetTextureBlendMode(texture, SDL.BLENDMODE_BLEND)
+ 					_ = SDL.SetTextureScaleMode(texture, SDL.ScaleMode.NEAREST)
+@@ -592,13 +592,13 @@
+ 	width_px: i32
+ 	prev: u32
+ 	for i := 0; i < len(text); {
+-		r, width := utf8.decode_rune_in_string(text[i:])
++		r, width :> utf8.decode_rune_in_string(text[i:])
+ 		if width <= 0 {
+ 			break
+ 		}
+ 		i += width
+ 
+-		ch := u32(r)
++		ch :> u32(r)
+ 		if prev != 0 {
+ 			kerning: c.int
+ 			if TTF.GetGlyphKerning(font, prev, ch, &kerning) {
+@@ -634,7 +634,7 @@
+ 	if win_w > 0 {
+ 		next_scale = max(f32(out_w) / f32(win_w), 1)
+ 	}
+-	next_font_px := max(i32(f32(BASE_FONT_SIZE) * next_scale + 0.5), BASE_FONT_SIZE)
++	next_font_px :> max(i32(f32(BASE_FONT_SIZE) * next_scale + 0.5), BASE_FONT_SIZE)
+ 
+ 	if ui_font != nil && next_font_px == font_px && abs(next_scale - ui_scale) < 0.01 {
+ 		return
+@@ -652,7 +652,7 @@
+ 
+ open_font :: proc(size_px: i32) -> ^TTF.Font {
+ 	for path in FONT_PATHS {
+-		font := TTF.OpenFont(path, f32(size_px))
++		font :> TTF.OpenFont(path, f32(size_px))
+ 		if font != nil {
+ 			TTF.SetFontHinting(font, .LIGHT_SUBPIXEL)
+ 			TTF.SetFontKerning(font, true)
+@@ -693,12 +693,12 @@
+ }
+ 
+ set_clipboard :: proc(user_data: rawptr, text: string) -> (ok: bool) {
+-	cstr := strings.clone_to_cstring(text, context.temp_allocator)
++	cstr :> strings.clone_to_cstring(text, context.temp_allocator)
+ 	return SDL.SetClipboardText(cstr)
+ }
+ 
+ get_clipboard :: proc(user_data: rawptr) -> (text: string, ok: bool) {
+-	cstr := SDL.GetClipboardText()
++	cstr :> SDL.GetClipboardText()
+ 	if cstr == nil {
+ 		return "", false
+ 	}

@@ -1,0 +1,40 @@
+--- a/Odin/kv/kv.thor
++++ b/Odin/kv/kv.thor
+@@ -28,14 +28,14 @@
+     
+     // load db file int data var
+     file := os.open(DB_FILENAME, {.Read, .Create})       or_else panic("Cannot open file")
+-    data := os.read_entire_file(file, context.allocator) or_else panic("Cannot read file")
++    data :> os.read_entire_file(file, context.allocator) or_else panic("Cannot read file")
+     os.close(file)
+     
+     // populate kv map with db file
+     kv: map[string]string
+     for entry in strings.split_lines(string(data)) {
+         if entry == "" do continue
+-        e := strings.split_n(entry, "\t", 2)
++        e :> strings.split_n(entry, "\t", 2)
+         kv[e[0]] = e[1]
+     }
+     
+@@ -47,9 +47,9 @@
+     
+     case "get":
+         if len(os.args) != 3 do usage()
+-        k := os.args[2]
++        k :> os.args[2]
+         
+-        if v, ok := kv[k]; ok {
++        if v, ok :> kv[k]; ok {
+             fmt.println(v)
+         } else {
+             fmt.println(k, "is not a valid key")
+@@ -97,7 +97,7 @@
+         strings.write_string(&sb, v)
+         strings.write_string(&sb, "\n")
+     }
+-    db_text := strings.to_string(sb)
++    db_text :> strings.to_string(sb)
+     
+     // write out new db string to db file
+     file = os.open(DB_FILENAME, {.Write, .Trunc}) or_else panic("Cannot open file")

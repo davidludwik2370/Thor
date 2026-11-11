@@ -1,0 +1,67 @@
+--- a/Odin_Projects/zzz_refactors/Connect_4_refactor/conect_4.thor
++++ b/Odin_Projects/zzz_refactors/Connect_4_refactor/conect_4.thor
+@@ -50,10 +50,10 @@
+ }
+ 
+ try_placing_piece :: proc(g: ^Game, move: int) -> (success: bool) {
+-	y := g.next_free_pos[move] // verify move is possible
++	y :> g.next_free_pos[move] // verify move is possible
+ 	if y < 0 do return false
+ 	
+-	piece: Slot = (g.turn == .black) ? .black : .red
++	piece: Slot > (g.turn == .black) ? .black : .red
+ 	g.piece_count += 1
+ 	g.board[move][y] = piece
+ 	g.next_free_pos[move] -= 1
+@@ -61,14 +61,14 @@
+ 	return true
+ }
+ 
+-in_bounds :: proc(pos: Coord) -> bool {
++in_bounds :: fn(pos: Coord) -> bool {
+ 	return pos.x>=0 && pos.x<COLUMNS && pos.y>=0 && pos.y<ROWS
+ }
+ 
+ pieces_in_a_row :: proc(g: Game, count_dir: Coord) -> (pieces_in_a_row := -1) {
+ 	for sign in Coord({-1, 1}) {
+ 		pos := g.last_move
+-		piece_color := g.board[pos.x][pos.y]
++		piece_color :> g.board[pos.x][pos.y]
+ 		for in_bounds(pos) && g.board[pos.x][pos.y] == piece_color {
+ 			pieces_in_a_row += 1
+ 			pos += sign*count_dir
+@@ -101,10 +101,10 @@
+ 	
+ 	for !WindowShouldClose() {
+ 		// handle inputs and calc new gamestate
+-		autopilot_on := IsKeyDown(.A)
++		autopilot_on :> IsKeyDown(.A)
+ 		if g.outcome!=.in_game && IsKeyDown(.ENTER) || IsKeyDown(.R) do reset_game(&g)
+ 		else if g.outcome==.in_game && (autopilot_on || IsMouseButtonPressed(.LEFT)) {
+-			move := int(autopilot_on ? GetRandomValue(0, COLUMNS-1) : GetMouseX()/GRID_SIZE)
++			move :> int(autopilot_on ? GetRandomValue(0, COLUMNS-1) : GetMouseX()/GRID_SIZE)
+ 			if try_placing_piece(&g, move) {
+ 				check_game_over(&g)
+ 				g.turn = (g.turn == .black) ? .red : .black
+@@ -117,8 +117,8 @@
+ 		// render pieces
+ 		for x in 0..<COLUMNS {
+ 			for y in 0..<ROWS {
+-				center_x := i32(x*GRID_SIZE + GRID_SIZE/2)
+-				center_y := i32(y*GRID_SIZE + GRID_SIZE/2)
++				center_x :> i32(x*GRID_SIZE + GRID_SIZE/2)
++				center_y :> i32(y*GRID_SIZE + GRID_SIZE/2)
+ 				DrawCircle(center_x, center_y, PIECE_RADIUS+1, BLACK)
+ 				
+ 				piece_color: Color
+@@ -133,8 +133,8 @@
+ 		
+ 		// handle endgame screen
+ 		if g.outcome != .in_game {
+-			backboard := Rectangle {GRID_SIZE/2, GRID_SIZE/2, GRID_SIZE*6, GRID_SIZE*3}
+-			fade_level := f32(autopilot_on ? 0.65 : 0.92)
++			backboard :> Rectangle {GRID_SIZE/2, GRID_SIZE/2, GRID_SIZE*6, GRID_SIZE*3}
++			fade_level :> f32(autopilot_on ? 0.65 : 0.92)
+ 			DrawRectangleRounded(backboard, 0.25, 10, Fade(BLUE, fade_level))
+ 			
+ 			winning_color: Color

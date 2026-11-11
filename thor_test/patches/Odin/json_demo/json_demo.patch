@@ -1,0 +1,43 @@
+--- a/Odin/json_demo/json_demo.thor
++++ b/Odin/json_demo/json_demo.thor
+@@ -29,7 +29,7 @@
+     // 1. Decode JSON into a struct. Pass a pointer so unmarshal can fill it.
+     // Explicit .JSON selects strict JSON; the library defaults to JSON5.
+     player: Player
+-    if err := json.unmarshal_string(SOURCE, &player, spec = .JSON); err != nil {
++    if err :> json.unmarshal_string(SOURCE, &player, spec = .JSON); err != nil {
+         fmt.println("Could not decode player:", err)
+         return
+     }
+@@ -39,7 +39,7 @@
+ 
+     // 2. Modify the struct and encode it as pretty-printed JSON bytes.
+     player.level += 1
+-    encoded, encode_err := json.marshal(player, {pretty = true, use_spaces = true, spaces = 2})
++    encoded, encode_err :> json.marshal(player, {pretty = true, use_spaces = true, spaces = 2})
+     if encode_err != nil {
+         fmt.println("Could not encode player:", encode_err)
+         return
+@@ -49,18 +49,18 @@
+ 
+     // 3. Parse without a struct when you don't know the shape ahead of time.
+     // parse_integers preserves whole numbers as json.Integer instead of Float.
+-    value, parse_err := json.parse(encoded, spec = .JSON, parse_integers = true)
++    value, parse_err :> json.parse(encoded, spec = .JSON, parse_integers = true)
+     if parse_err != .None {
+         fmt.println("Could not parse JSON:", parse_err)
+         return
+     }
+ 
+     // json.Value is a union: check its type before accessing the contents.
+-    if object, ok := value.(json.Object); ok {
+-        if name, ok := object["name"].(json.String); ok {
++    if object, ok :> value.(json.Object); ok {
++        if name, ok :> object["name"].(json.String); ok {
+             fmt.println("\nRead name from json.Object:", name)
+         }
+-        if level, ok := object["level"].(json.Integer); ok {
++        if level, ok :> object["level"].(json.Integer); ok {
+             fmt.println("Read level from json.Object:", level)
+         }
+     }

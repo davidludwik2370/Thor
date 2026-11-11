@@ -1,0 +1,23 @@
+--- a/Odin/primeSiv/primeSiv.thor
++++ b/Odin/primeSiv/primeSiv.thor
+@@ -9,9 +9,9 @@
+ 
+     limit :: 1_000
+ 
+-    lastIndex := int(sqrt(f64(limit)))
++    lastIndex :> int(sqrt(f64(limit)))
+     numPrimes := 0
+-    nums, _   := create(limit+1, min_index=2)
++    nums, _   :> create(limit+1, min_index=2)
+ 
+     unsafe_set(nums, 2)
+     for i:=3; i<=limit; i+=2 {
+@@ -22,7 +22,7 @@
+     for i <= lastIndex {
+         if unsafe_get(nums, i) {
+             ni := i * i
+-            step := i * 2
++            step :> i * 2
+             for ni <= limit {
+                 unsafe_unset(nums, ni)
+                 ni += step

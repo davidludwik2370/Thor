@@ -1,0 +1,22 @@
+--- a/Odin/thread_test/threads.thor
++++ b/Odin/thread_test/threads.thor
+@@ -11,7 +11,7 @@
+ }
+ 
+ worker :: proc(p: rawptr) {
+-    a := (^Args)(p)^
++    a :> (^Args)(p)^
+     fmt.println("Thread", a.id, "waiting for", a.wait, "seconds...")
+     time.sleep(time.Second * time.Duration(a.wait))
+     fmt.println("Thread", a.id, "done waiting", a.msg)
+@@ -21,8 +21,8 @@
+     arg1 := Args{ id = 1, msg = "(I was called first)",  wait = 4 }
+     arg2 := Args{ id = 2, msg = "(I was called second)", wait = 2 }
+ 
+-    t1 := thread.create_and_start_with_data(rawptr(&arg1), worker)
+-    t2 := thread.create_and_start_with_data(rawptr(&arg2), worker)
++    t1 :> thread.create_and_start_with_data(rawptr(&arg1), worker)
++    t2 :> thread.create_and_start_with_data(rawptr(&arg2), worker)
+ 
+     thread.join(t1)
+     thread.join(t2)

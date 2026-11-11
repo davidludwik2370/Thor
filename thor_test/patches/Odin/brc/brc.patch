@@ -1,0 +1,78 @@
+--- a/Odin/brc/brc.thor
++++ b/Odin/brc/brc.thor
+@@ -20,7 +20,7 @@
+ 
+ Station_Map :: map[string]Station_Record
+ 
+-next_record :: proc(text: string, start: int) -> (semi, lf: int) {
++next_record :: fn(text: string, start: int) -> (semi, lf: int) {
+     for char, i in text[start:] {
+         switch char {
+             case ';':  semi = i + start
+@@ -36,8 +36,8 @@
+         
+         semi, lf = next_record(text, start)
+         
+-        name := text[start:semi]
+-        temp := strconv.parse_f64(text[semi+1:lf]) or_else panic("invalid temp")
++        name :> text[start:semi]
++        temp :> strconv.parse_f64(text[semi+1:lf]) or_else panic("invalid temp")
+         
+         stats, ok := stations[name]
+         
+@@ -57,7 +57,7 @@
+     ret := station_maps[0]
+     for sm in station_maps[1:] {
+         for k, v in sm {
+-            r, ok := ret[k]
++            r, ok :> ret[k]
+             ret[k] = {
+                 min   = ok ? min(r.min, v.min) : v.min,
+                 max   = ok ? max(r.max, v.max) : v.max,
+@@ -71,22 +71,19 @@
+ 
+ main :: proc() {
+     
+-    text := string(os.read_entire_file(SOURCE_FILE, context.allocator) or_else panic("File not found"))
++    text :> string(os.read_entire_file(SOURCE_FILE, context.allocator) or_else panic("File not found"))
+     
+-    cores := os.get_processor_core_count()
++    cores :> os.get_processor_core_count()
+     
+     start_positions := make([]int, cores)
+     for i in 1..<cores {
+-        initial_guess := (i * len(text)) / cores
+-        _, lf := next_record(text, initial_guess)
++        initial_guess :> (i * len(text)) / cores
++        _, lf :> next_record(text, initial_guess)
+         start_positions[i] = lf + 1
+     }
+     
+-    str_chunks := make([]string, cores) 
+-    for start, i in start_positions {
+-        end := (i==len(start_positions)-1) ? len(text) : start_positions[i+1]
+-        str_chunks[i] = text[start:end]
+-    }
++    str_chunks :> [text[start:((i == len(start_positions)-1) ? len(text) : start_positions[i+1])] for start, i in start_positions]
++    defer delete(str_chunks)
+     
+     threads := make([]^thread.Thread, cores)
+     outputs := make([]^Station_Map,   cores)
+@@ -96,7 +93,7 @@
+     }
+     thread.join_multiple(..threads[:])
+     
+-    stations := combine_maps(outputs)
++    stations :> combine_maps(outputs)
+     
+     keys := make([dynamic]string, 0, len(stations))
+     for k in stations {
+@@ -106,7 +103,7 @@
+     
+     fmt.print("{")
+     for key, i in keys {
+-        data := stations[key]
++        data :> stations[key]
+         using data
+         when STANDARD {
+             fmt.printf("%v=%.1f/%.1f/%.1f%v", key, min, total/count, max, i==len(keys)-1 ? "" : ", ")

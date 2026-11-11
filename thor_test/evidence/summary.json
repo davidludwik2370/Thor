@@ -1,0 +1,1126 @@
+{
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "odin_version": "/Users/davidludwik/odin/odin/odin version dev-2026-10:8169255b9",
+  "thor_version": "Thor 0.41.6 (experimental Rust compiler)",
+  "original_files_verified": 292,
+  "original_changes": [],
+  "build_cases": 102,
+  "raw_odin_success": 80,
+  "raw_thor_success": 91,
+  "prepared_success": {
+    "odin": 95,
+    "thor": 95,
+    "idiomatic": 95
+  },
+  "rewritten_source_files": 101,
+  "console_matches": 58,
+  "gui_startup_matches": 34,
+  "gui_input_matches": 34,
+  "original_asan_defect_confirmed": true,
+  "project_test_statuses": [
+    {
+      "label": "Odin/poker",
+      "odin": 0,
+      "thor": 0,
+      "idiomatic": 0
+    },
+    {
+      "label": "Odin/tic-tac-toe",
+      "odin": 0,
+      "thor": 0,
+      "idiomatic": 0
+    },
+    {
+      "label": "Odin_Projects/tic-tac-toe_gui",
+      "odin": 0,
+      "thor": 0,
+      "idiomatic": 0
+    },
+    {
+      "label": "Odin/filter",
+      "odin": 0,
+      "thor": 0,
+      "idiomatic": 0
+    }
+  ],
+  "compiler_revision": "ec273d3",
+  "bulk_timing_note": "855 builds before the final array-capture and empty-scratch fixes; final representative measurements are separate.",
+  "runtime_timings": [
+    {
+      "id": 23,
+      "label": "Odin/hilo",
+      "odin": {
+        "seconds": [
+          1.02255629200954,
+          1.0075610839994624,
+          1.0025487919920124,
+          1.0021853340149391,
+          1.0067057499836665
+        ],
+        "median_seconds": 1.0067057499836665
+      },
+      "thor": {
+        "seconds": [
+          1.1833080840006005,
+          1.0312831250193994,
+          1.0375019579951186,
+          1.0358161249896511,
+          1.030232207995141
+        ],
+        "median_seconds": 1.0358161249896511,
+        "ratio_to_odin": 1.0289164683984937
+      },
+      "idiomatic": {
+        "seconds": [
+          1.1921867500059307,
+          1.03205550002167,
+          1.0293988340126816,
+          1.033419999992475,
+          1.0293174170074053
+        ],
+        "median_seconds": 1.03205550002167,
+        "ratio_to_odin": 1.0251808932634137
+      }
+    },
+    {
+      "id": 24,
+      "label": "Odin/hilo/original",
+      "odin": {
+        "seconds": [
+          1.049537958984729,
+          1.0503804580075666,
+          1.0544469169981312,
+          1.0546730410133023,
+          1.057169082982
+        ],
+        "median_seconds": 1.0544469169981312
+      },
+      "thor": {
+        "seconds": [
+          1.2136132909799926,
+          1.053224292001687,
+          1.0511576659919228,
+          1.0550322080089245,
+          1.0573221659869887
+        ],
+        "median_seconds": 1.0550322080089245,
+        "ratio_to_odin": 1.0005550692039193
+      },
+      "idiomatic": {
+        "seconds": [
+          1.36648175001028,
+          1.06152691601892,
+          1.0510405419918243,
+          1.0488970830047037,
+          1.0679261660261545
+        ],
+        "median_seconds": 1.06152691601892,
+        "ratio_to_odin": 1.0067144195754725
+      }
+    },
+    {
+      "id": 38,
+      "label": "Odin/poker",
+      "odin": {
+        "seconds": [
+          0.21427716600010172,
+          0.2194537500035949,
+          0.21171591701568104,
+          0.21349816699512303,
+          0.21013866597786546
+        ],
+        "median_seconds": 0.21349816699512303
+      },
+      "thor": {
+        "seconds": [
+          0.3549492080055643,
+          0.22325537499273196,
+          0.2201570420002099,
+          0.21859533301903866,
+          0.2164097920176573
+        ],
+        "median_seconds": 0.2201570420002099,
+        "ratio_to_odin": 1.031189377870579
+      },
+      "idiomatic": {
+        "seconds": [
+          0.34879083299892955,
+          0.21936429099878296,
+          0.2182843330083415,
+          0.22248120798030868,
+          0.2162297919858247
+        ],
+        "median_seconds": 0.21936429099878296,
+        "ratio_to_odin": 1.0274762265466848
+      }
+    },
+    {
+      "id": 41,
+      "label": "Odin/poker/ref/poker_single_thread.odin",
+      "odin": {
+        "seconds": [
+          0.2086198329925537,
+          0.20697345799999312,
+          0.20717687500291504,
+          0.20735758400405757,
+          0.2156521670112852
+        ],
+        "median_seconds": 0.20735758400405757
+      },
+      "thor": {
+        "seconds": [
+          0.3567814999842085,
+          0.2169274580082856,
+          0.2161984590056818,
+          0.21516125000198372,
+          0.2171478340169415
+        ],
+        "median_seconds": 0.2169274580082856,
+        "ratio_to_odin": 1.0461515504735084
+      },
+      "idiomatic": {
+        "seconds": [
+          0.35784058397985063,
+          0.21785279200412333,
+          0.2147563749749679,
+          0.2153412910120096,
+          0.2158814999856986
+        ],
+        "median_seconds": 0.2158814999856986,
+        "ratio_to_odin": 1.0411073268555937
+      }
+    }
+  ],
+  "final_build_samples": [
+    {
+      "id": 12,
+      "label": "Odin/demo",
+      "odin": {
+        "median_seconds": 2.7114701249811333,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/demo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/odin/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 2.735929499991471,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/012-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/odin/012",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/demo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/odin/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 2.706600542005617,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/012-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/odin/012",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/demo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/odin/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 2.7114701249811333,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/012-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/odin/012",
+            "binary_exists": true
+          }
+        ]
+      },
+      "thor": {
+        "median_seconds": 3.216331916017225,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/012",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/012",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/thor/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.2192326250078622,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/012-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/thor/012",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/012",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/012",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/thor/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.172215458995197,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/012-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/thor/012",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/012",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/012",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/thor/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.216331916017225,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/012-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/thor/012",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.5048617910360917,
+        "ratio": 1.1861948565778886
+      },
+      "idiomatic": {
+        "median_seconds": 4.70727395900758,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/012",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/012",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/idiomatic/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 4.812935624999227,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/012-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/idiomatic/012",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/012",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/012",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/idiomatic/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 4.52266074999352,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/012-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/idiomatic/012",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/012",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/012",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/idiomatic/012",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 4.70727395900758,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/012-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/idiomatic/012",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 1.9958038340264466,
+        "ratio": 1.7360596805544128
+      }
+    },
+    {
+      "id": 23,
+      "label": "Odin/hilo",
+      "odin": {
+        "median_seconds": 1.2434260830050334,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/hilo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/odin/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.2434260830050334,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/023-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/odin/023",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/hilo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/odin/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.2319890419894364,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/023-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/odin/023",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/hilo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/odin/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.2462077910022344,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/023-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/odin/023",
+            "binary_exists": true
+          }
+        ]
+      },
+      "thor": {
+        "median_seconds": 1.258216583984904,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/hilo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/023",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/023",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/thor/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.2635572080034763,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/023-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/thor/023",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/hilo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/023",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/023",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/thor/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.2464284589805175,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/023-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/thor/023",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/hilo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/023",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/023",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/thor/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.258216583984904,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/023-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/thor/023",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.014790500979870558,
+        "ratio": 1.0118949579569103
+      },
+      "idiomatic": {
+        "median_seconds": 1.4777392919932026,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/hilo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/023",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/023",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/idiomatic/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.4777392919932026,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/023-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/idiomatic/023",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/hilo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/023",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/023",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/idiomatic/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.4874028749763966,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/023-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/idiomatic/023",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/hilo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/023",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/023",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/idiomatic/023",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.4650194169953465,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/023-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/idiomatic/023",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.2343132089881692,
+        "ratio": 1.188441606775608
+      }
+    },
+    {
+      "id": 38,
+      "label": "Odin/poker",
+      "odin": {
+        "median_seconds": 1.3619909579865634,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/poker",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/odin/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.3619909579865634,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/038-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/odin/038",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/poker",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/odin/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.3537980419932865,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/038-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/odin/038",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/poker",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/odin/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.3651885420258623,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/038-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/odin/038",
+            "binary_exists": true
+          }
+        ]
+      },
+      "thor": {
+        "median_seconds": 1.3823710840079002,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/poker",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/038",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/038",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/thor/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.3836446249915753,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/038-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/thor/038",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/poker",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/038",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/038",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/thor/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.3758661250176374,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/038-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/thor/038",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/poker",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/038",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/038",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/thor/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.3823710840079002,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/038-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/thor/038",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.020380126021336764,
+        "ratio": 1.0149634811463542
+      },
+      "idiomatic": {
+        "median_seconds": 1.828886750008678,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/038",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/038",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/idiomatic/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.828886750008678,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/038-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/idiomatic/038",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/038",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/038",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/idiomatic/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.8458735840104055,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/038-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/idiomatic/038",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/038",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/038",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/idiomatic/038",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.8192371250188444,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/038-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/idiomatic/038",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.4668957920221146,
+        "ratio": 1.342803885212519
+      }
+    },
+    {
+      "id": 68,
+      "label": "Odin/ui_demo",
+      "odin": {
+        "median_seconds": 1.6876082919770852,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/ui_demo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/odin/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.6529480000026524,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/068-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/odin/068",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/ui_demo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/odin/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.7297270830022171,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/068-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/odin/068",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin/ui_demo",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/odin/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.6876082919770852,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/068-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/odin/068",
+            "binary_exists": true
+          }
+        ]
+      },
+      "thor": {
+        "median_seconds": 1.7352721669885796,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/ui_demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/068",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/068",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/thor/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.7341325839806814,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/068-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/thor/068",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/ui_demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/068",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/068",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/thor/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.7352721669885796,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/068-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/thor/068",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin/ui_demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/068",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/068",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/thor/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.790198499977123,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/068-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/thor/068",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.04766387501149438,
+        "ratio": 1.0282434467986967
+      },
+      "idiomatic": {
+        "median_seconds": 3.521489874983672,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/ui_demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/068",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/068",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/idiomatic/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.521489874983672,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/068-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/idiomatic/068",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/ui_demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/068",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/068",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/idiomatic/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.5466199170041364,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/068-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/idiomatic/068",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/ui_demo",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/068",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/068",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/idiomatic/068",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.4889062920119613,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/068-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/idiomatic/068",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 1.8338815830065869,
+        "ratio": 2.086674906567411
+      }
+    },
+    {
+      "id": 82,
+      "label": "Odin_Projects/Othello_pvai",
+      "odin": {
+        "median_seconds": 1.7404341250075959,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin_Projects/Othello_pvai",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/odin/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.7404341250075959,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/082-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/odin/082",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin_Projects/Othello_pvai",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/odin/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.7363995829946361,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/082-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/odin/082",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/odin/odin/odin",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/odin/Odin_Projects/Othello_pvai",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/odin/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.7622907500190195,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/082-odin.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/odin/082",
+            "binary_exists": true
+          }
+        ]
+      },
+      "thor": {
+        "median_seconds": 1.9637418339843862,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin_Projects/Othello_pvai",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/082",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/082",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/thor/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 2.0117127080156934,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/082-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/thor/082",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin_Projects/Othello_pvai",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/082",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/082",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/thor/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.9529595829953905,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/082-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/thor/082",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/thor/Odin_Projects/Othello_pvai",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/thor/082",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/thor/082",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/thor/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 1.9637418339843862,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/082-thor.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/thor/082",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 0.2233077089767903,
+        "ratio": 1.1283057518628095
+      },
+      "idiomatic": {
+        "median_seconds": 3.5380920829775278,
+        "samples": [
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin_Projects/Othello_pvai",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/082",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/082",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-0/idiomatic/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.6106685000122525,
+            "log": "artifacts/logs/build-benchmarks-final-samples-0/082-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-0/idiomatic/082",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin_Projects/Othello_pvai",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/082",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/082",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-1/idiomatic/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.533239375014091,
+            "log": "artifacts/logs/build-benchmarks-final-samples-1/082-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-1/idiomatic/082",
+            "binary_exists": true
+          },
+          {
+            "command": [
+              "/Users/davidludwik/Thor/rust/target/release/thor-rust",
+              "build",
+              "/Users/davidludwik/Thor/thor_test/idiomatic/Odin_Projects/Othello_pvai",
+              "--output-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/generated/idiomatic/082",
+              "--cache-dir",
+              "/Users/davidludwik/Thor/thor_test/artifacts/cache/idiomatic/082",
+              "-out:/Users/davidludwik/Thor/thor_test/artifacts/bin/build-benchmarks-final-samples-2/idiomatic/082",
+              "-o:speed"
+            ],
+            "status": 0,
+            "timeout": false,
+            "seconds": 3.5380920829775278,
+            "log": "artifacts/logs/build-benchmarks-final-samples-2/082-idiomatic.log",
+            "binary": "artifacts/bin/build-benchmarks-final-samples-2/idiomatic/082",
+            "binary_exists": true
+          }
+        ],
+        "added_seconds": 1.7976579579699319,
+        "ratio": 2.0328790570927735
+      }
+    }
+  ],
+  "reproduction": {
+    "mismatched_source_files": []
+  },
+  "cli_scenarios": 17,
+  "build_timings": {
+    "odin": {
+      "median_seconds": 1.144216333021177,
+      "max_seconds": 3.004645333014196
+    },
+    "thor": {
+      "median_seconds": 1.177010874991538,
+      "max_seconds": 3.4137769160151947,
+      "median_added_seconds": 0.0340043339820113
+    },
+    "idiomatic": {
+      "median_seconds": 1.432511874998454,
+      "max_seconds": 4.7700449579861015,
+      "median_added_seconds": 0.2972144999948796
+    }
+  }
+}

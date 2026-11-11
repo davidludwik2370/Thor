@@ -1,0 +1,115 @@
+--- a/Odin/big_ref/big_ref.thor
++++ b/Odin/big_ref/big_ref.thor
+@@ -1,68 +1,54 @@
+ package main
+-import "core:fmt"
+-println  :: fmt.println
+-printfln :: fmt.printfln
++import "core:fmt" / println, printfln
+ 
+-import "core:math/big"
+-Int  :: big.Int
+-set  :: big.set
+-itoa :: big.itoa
+-copy :: big.copy
+-add  :: big.add
+-Rat  :: big.Rat
+-rat_set_frac       :: big.rat_set_frac
+-rat_set_frac_digit :: big.rat_set_frac_digit
+-rat_set_frac_int   :: big.rat_set_frac_int
+-rat_add_rat        :: big.rat_add_rat
+-rat_sub_rat        :: big.rat_sub_rat
+-rat_mul_rat        :: big.rat_mul_rat
+-rat_div_rat        :: big.rat_div_rat
+-
+-rat_to_string :: proc(rat: ^big.Rat, allocator := context.allocator) -> (res: string) {
+-    context.allocator = allocator
+-    num_str := big.int_to_string(&rat.a) or_else panic("Invalid Rat")
+-    den_str := big.int_to_string(&rat.b) or_else panic("Invalid Rat")
+-    defer delete(num_str)
+-    defer delete(den_str)
+-
+-    return fmt.aprintf("%v/%v", num_str, den_str)
++rat_to_string :: fn(value: Rational) -> string {
++    return f"{value.numerator}/{value.denominator}"
+ }
+ 
+ main :: proc() {
+-    
+     LIMIT :: 10
+-
+-    // Ints
+-    a, b, temp: Int
+-    set(&a, 0)
+-    set(&b, 1)
++    a, b: Integer = 0, 1
++    defer delete(a)
++    defer delete(b)
+     for i in 0..=LIMIT {
+-        println(i, ") ", itoa(&a) or_else "", sep="")
+-        copy(&temp, &b)
+-        add(&b, &a, &b)
+-        copy(&a, &temp)
++        println(f"{i}) {a}")
++        a, b = b, a + b
+     }
+     println()
+-    
+-    // set Ratios
+-    odds: Rat                             // create ratio
+-    set(&odds, 5.0)                       // set as a single number
+-    rat_set_frac_digit(&odds, 6, 3)   // or set as a fraction
+-    rat_set_frac_int(&odds, &a, &b)   // or with DIGIT, wich is a u64
+-    
+-    // do math on ratios
+-    x, y, sum, diff, prod, quot: Rat
+-    rat_set_frac(&x, 1, 2)
+-    rat_set_frac(&y, 2, 3)
+-    
+-    rat_add_rat(&sum, &x, &y)
+-    rat_sub_rat(&diff, &x, &y)
+-    rat_mul_rat(&prod, &x, &y)
+-    rat_div_rat(&quot, &x, &y)
+-    
+-    str_x, str_y := rat_to_string(&x), rat_to_string(&y)
+-    printfln("{}  +  {}  =  {}", str_x, str_y, rat_to_string(&sum))
+-    printfln("{}  -  {}  = {}",  str_x, str_y, rat_to_string(&diff))
+-    printfln("{}  *  {}  =  {}", str_x, str_y, rat_to_string(&prod))
+-    printfln("{}  /  {}  =  {}", str_x, str_y, rat_to_string(&quot))
++
++    odds: Rational = 5
++    defer delete(odds)
++    odds = Rational(6, 3)
++    odds = Rational(a, b)
++
++    x :> Rational(1, 2)
++    y :> Rational(2, 3)
++    defer delete(x)
++    defer delete(y)
++    sum  :> x + y
++    diff :> x - y
++    prod :> x * y
++    quot :> x / y
++    defer delete(sum)
++    defer delete(diff)
++    defer delete(prod)
++    defer delete(quot)
++
++    str_x :> rat_to_string(x)
++    str_y :> rat_to_string(y)
++    str_sum :> rat_to_string(sum)
++    str_diff :> rat_to_string(diff)
++    str_prod :> rat_to_string(prod)
++    str_quot :> rat_to_string(quot)
++    defer delete(str_x)
++    defer delete(str_y)
++    defer delete(str_sum)
++    defer delete(str_diff)
++    defer delete(str_prod)
++    defer delete(str_quot)
++    // Retain the original formatter and text, including its literal braces.
++    printfln("{}  +  {}  =  {}", str_x, str_y, str_sum)
++    printfln("{}  -  {}  = {}", str_x, str_y, str_diff)
++    printfln("{}  *  {}  =  {}", str_x, str_y, str_prod)
++    printfln("{}  /  {}  =  {}", str_x, str_y, str_quot)
+ }

@@ -1,0 +1,74 @@
+--- a/Odin/simon/simon.thor
++++ b/Odin/simon/simon.thor
+@@ -46,9 +46,9 @@
+ }
+ 
+ setup_board :: proc() {
+-	spacing := 10
+-	tile_width := SCREEN_X_DIM / BOARD_DIM - spacing
+-	tile_height := SCREEN_Y_DIM / BOARD_DIM - spacing
++	spacing :> 10
++	tile_width :> SCREEN_X_DIM / BOARD_DIM - spacing
++	tile_height :> SCREEN_Y_DIM / BOARD_DIM - spacing
+ 	for &row, y in board {
+ 		for &tile, x in row {
+ 			tile.x = f32(x * tile_width + spacing)
+@@ -97,11 +97,11 @@
+ 		//update
+         switch current_game_state {
+         case .SHOWING_SEQUENCE:
+-            position_to_show := int(
++            position_to_show :> int(
+                 (game_clock - sequence_started_showing_time) /
+                 AMOUNT_OF_TIME_TO_SHOW_SINGLE_TILE
+             )
+-            time_into_current_tile := math.mod_f32(
++            time_into_current_tile :> math.mod_f32(
+                 (game_clock - sequence_started_showing_time),
+                 AMOUNT_OF_TIME_TO_SHOW_SINGLE_TILE
+             )
+@@ -109,7 +109,7 @@
+             clear_tile_highlighting()
+             if position_to_show < len(sequence_to_show) {
+                 if time_into_current_tile > TIME_GAP_BETWEEN_TILES {
+-                    tile_to_show := sequence_to_show[position_to_show]
++                    tile_to_show :> sequence_to_show[position_to_show]
+                     board[tile_to_show.y][tile_to_show.x].is_highlighted = true
+                 }
+             } else {
+@@ -131,7 +131,7 @@
+             }
+ 
+             if len(player_entered_sequence) > 0 && 
+-            player_entered_sequence[len(player_entered_sequence) - 1] !=
++            player_entered_sequence[-1] !=
+             sequence_to_show[len(player_entered_sequence) - 1] {
+                 current_game_state = .WRONG_ANSWER
+                 delay_remaining_before_next_state = AMOUNT_OF_TIME_TO_SHOW_SINGLE_TILE
+@@ -163,11 +163,11 @@
+                 } else if current_game_state == .CORRECT_ANSWER {
+                     color_to_use = GREEN
+                 } else if tile.is_highlighted {
+-                    current_tile_position := BoardPosition{x, y}
++                    current_tile_position :> BoardPosition{x, y}
+                     if current_game_state == .SHOWING_SEQUENCE ||
+                     (
+                         current_tile_position == 
+-                    player_entered_sequence[len(player_entered_sequence) - 1] &&
++                    player_entered_sequence[-1] &&
+                      IsMouseButtonDown(.LEFT)) {
+                         color_to_use = BLUE
+                     }
+@@ -178,9 +178,9 @@
+ 		}
+ 
+         if current_game_state == .CORRECT_ANSWER {
+-            text_to_show := fmt.ctprint(len(sequence_to_show))
+-            font_size :f32 = 40
+-            text_dim := MeasureTextEx(GetFontDefault(), text_to_show, font_size, 40)
++            text_to_show :> fmt.ctprint(len(sequence_to_show))
++            font_size :f32 > 40
++            text_dim :> MeasureTextEx(GetFontDefault(), text_to_show, font_size, 40)
+             DrawText(
+                 text_to_show,
+                 i32(SCREEN_X_DIM / 2 - text_dim.x / 2),

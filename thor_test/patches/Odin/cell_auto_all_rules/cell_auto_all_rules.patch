@@ -1,0 +1,11 @@
+--- a/Odin/cell_auto_all_rules/cell_auto_all_rules.thor
++++ b/Odin/cell_auto_all_rules/cell_auto_all_rules.thor
+@@ -21,7 +21,7 @@
+ 			}
+ 			fmt.println()
+ 			for i in 1..<NUM_COLS+2 {
+-				ruleIndex := 4*u8(row[i-1]) + 2*u8(row[i]) + u8(row[i+1])
++				ruleIndex :> 4*u8(row[i-1]) + 2*u8(row[i]) + u8(row[i+1])
+ 				nextRow[i] = (rule & (1 << ruleIndex)) != 0
+ 			}
+ 			row = nextRow

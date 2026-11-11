@@ -1,0 +1,19 @@
+--- a/Odin/prime_factors_cli/prime_factors_cli.thor
++++ b/Odin/prime_factors_cli/prime_factors_cli.thor
+@@ -18,14 +18,14 @@
+ 	defer delete(primes)
+ 	for {
+ 		print("\nFactor: ")
+-		num_bytes, err := read(stdin, buf[:])
++		num_bytes, err :> read(stdin, buf[:])
+ 		if err != nil {
+ 			printfln("Error reading input: %v", err)
+ 			continue
+ 		}
+ 		input := string(buf[:num_bytes])
+ 		input = strings.trim_right(input, "\r\n")
+-		if input == "quit" || input == "exit" || input == "q" {
++		if input in ["quit", "exit", "q"] {
+ 			println("Goodbye")
+ 			break
+ 		}

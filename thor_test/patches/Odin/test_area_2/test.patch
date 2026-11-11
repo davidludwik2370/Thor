@@ -1,0 +1,13 @@
+--- a/Odin/test_area_2/test.thor
++++ b/Odin/test_area_2/test.thor
+@@ -29,8 +29,8 @@
+ 
+ 	print(z)
+ 
+-	a := myadd(12, 22)
+-	b := myadd(22.5, 22.1)
++	a :> myadd(12, 22)
++	b :> myadd(22.5, 22.1)
+ 
+ 	print(a, type(a))
+ 	print(b, type(b))

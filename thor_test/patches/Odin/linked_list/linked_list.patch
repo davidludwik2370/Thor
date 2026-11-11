@@ -1,0 +1,42 @@
+--- a/Odin/linked_list/linked_list.thor
++++ b/Odin/linked_list/linked_list.thor
+@@ -35,7 +35,7 @@
+ }
+ 
+ insert :: proc(after: ^Node, id: int) {
+-    next := after.next
++    next :> after.next
+     node := new(Node)
+     node.id = id
+     node.next = next
+@@ -94,7 +94,7 @@
+     new_head = head
+     prev: ^Node
+     for {
+-        next := new_head.next
++        next :> new_head.next
+         new_head.next = prev
+         if next == nil do return
+         prev = new_head
+@@ -113,18 +113,18 @@
+     head = reverse(head)
+     print(head)
+     
+-    three := find(head, 3)
++    three :> find(head, 3)
+     insert(three, 17)
+     print(head)
+     
+-    seventeen := three.next
++    seventeen :> three.next
+     remove(head, seventeen)
+     print(head)
+     
+     head = remove(head, head)
+     print(head)
+     
+-    last := tail(head)
++    last :> tail(head)
+     remove(head, last)
+     print(head)
+     

@@ -1,0 +1,28 @@
+--- a/Odin/filter/collections_test.thor
++++ b/Odin/filter/collections_test.thor
+@@ -82,21 +82,21 @@
+     old_memory: rawptr, old_size: int, loc := #caller_location,
+ ) -> ([]byte, mem.Allocator_Error) {
+     state := cast(^Filter_Test_Allocator)data
+-    if old_memory != nil && (mode == .Free || mode == .Resize || mode == .Resize_Non_Zeroed) {
++    if old_memory != nil && (mode in [.Free, .Resize, .Resize_Non_Zeroed]) {
+         expected, found := state.sizes[old_memory]
+         state.size_mismatch ||= !found || old_size != expected
+     }
+-    shrinking := old_memory != nil && size < old_size && (mode == .Resize || mode == .Resize_Non_Zeroed)
++    shrinking := old_memory != nil && size < old_size && (mode in [.Resize, .Resize_Non_Zeroed])
+     if shrinking && state.reject_shrink do return nil, .Out_Of_Memory
+     result, err := state.backing.procedure(state.backing.data, mode, size, alignment, old_memory, old_size, loc)
+     if err == .None {
+-        if mode == .Alloc || mode == .Alloc_Non_Zeroed do state.allocations += 1
++        if mode in [.Alloc, .Alloc_Non_Zeroed] do state.allocations += 1
+         if shrinking do state.shrunk_pointer = raw_data(result)
+         #partial switch mode {
+         case .Free, .Resize, .Resize_Non_Zeroed:
+             delete_key(&state.sizes, old_memory)
+         }
+-        if len(result) > 0 && (mode == .Alloc || mode == .Alloc_Non_Zeroed || mode == .Resize || mode == .Resize_Non_Zeroed) {
++        if len(result) > 0 && (mode in [.Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed]) {
+             state.sizes[raw_data(result)] = len(result)
+         }
+     }

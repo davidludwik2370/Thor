@@ -1,0 +1,52 @@
+--- a/Odin/pallendrome/pallendrome.thor
++++ b/Odin/pallendrome/pallendrome.thor
+@@ -11,14 +11,14 @@
+ ANSWER_KEY :: "wXyMyXw 1E8Yk6G6kY8E1 STSTUVUVWXWXYXWXWVUVUTSTS kCV858VCk asK0sD6Ds0Ksa u6EgyrjjrygE6u MLFLAZZALFLM 36HfrfH63 Q2j2fCmmCf2j2Q abaaaba betteretteb a 0LrqRqrL0 Qxy66yxQ a Q7ii7Q aa MvyU5Y5UyvM iZpMd3p3dMpZi mYtLQkkQLtYm Qx1xQ 27iI44hAh44Ii72 KiFaFiK 3nqrqn3 i2n2nZn2n2i Fkw2WqvqW2wkF gQfW6OccO6WfQg I1d6aa6d1I aaaaaabaaaaabaaaaaabaaaaaabaaaaaabaaaaabaaaaaa zKmVxmVkkVmxVmKz 1Z1 SQ17BsmllmsB71QS abcdccdcba ghghijijklklmlklkjijihghg cuq7n3Z3n7quc EjE QzxRsCFDFCsRxzQ MNMNOPOPQRQRSRQRQPOPONMNM aba GHGHIJIJKLKLMLKLKJIJIHGHG prB3Brp 1NIyDyIN1 abba fff w5tgzGSGzgt5w HYjOaddaOjYH r FRp3HH3pRF Voa0AuUQQUuA0aoV 85SLpESQSEpLS58 AUlUA TfcDyrryDcfT abcdcba yzyz01012323432321010zyzy aba aaaaaaa YVY iipity22ytipii 8FlXAVC11CVAXlF8 ABABCDCDEFEFGFEFEDCDCBABA e0IWf5ff5fWI0e sesphasesahpses pk1AHc2I2cHA1kp WuaMfHYRRYHfMauW YOdOY 12345654321 ababaababa abcacba t8eK6KK6Ke8t WW Lj80KLK08jL YaYXEIkkIEXYaY mississippississim ZVP1zg7x7gz1PVZ abcba d1svRjAAjRvs1d 8989a9898 ababcdcdefefgfefedcdcbaba i9ff7tjt7ff9i rbbr 8BdDDdB8 EZzxO9OxzZE KiRiK PalindromemordnilaP 4mFpXdXpFm4 mnmnopopqrqrsrqrqpoponmnm 9a2SiS2a9 flsPuVVuPslf OfxoYNYoxfO J9kaak9J nHw7GjXLXjG7wHn WX3qq3XW oq0qYYq0qo nqaeReaqn aW77Wa ujddju aAa z0GFs8sFG0z mPeF99FePm zKgCgKz YZYZ45456767876765454ZYZY lPkAwsCswAkPl Y00k66k00Y uBn216pxp612nBu w1OOluGSGulOO1w ststuvuvwxwxyxwxwvuvutsts"
+ ARGS :: "wXyMy 1E8Yk6G6kY STSTUVUVWXWXY kCV858V asK0sD6 u6EgyrjjrygE6u MLFLAZZA 36HfrfH6 Q2j2fCmmCf2j abaaaba better a 0LrqR Qxy66yxQ a Q7ii7Q aa MvyU5Y5U iZpMd3p3dMpZi mYtLQkkQLt Qx1 27iI44hAh44Ii KiFaFi 3nqr i2n2nZn Fkw2Wqv gQfW6Occ I1d6aa6 aaaaaabaaaaabaaaaaabaaaaaabaaaaaa zKmVxmVkkVmx 1Z SQ17BsmllmsB71QS abcdcc ghghijijklklm cuq7n3Z3n7qu EjE QzxRsCFDFCsRxzQ MNMNOPOPQRQRS ab GHGHIJIJKLKLM prB3Brp 1NIyDyIN1 abb fff w5tgzGSGz HYjOadd r FRp3HH3p Voa0AuUQQUuA0 85SLpESQ AUlUA TfcDyrryDcf abcdc yzyz010123234 aba aaaaaaa YV iipity22y 8FlXAVC11CVAXl ABABCDCDEFEFG e0IWf5ff5fWI0 sesphase pk1AHc2I2cHA WuaMfHYRRYHfMau YOdO 123456 ababaa abca t8eK6KK6K WW Lj80KLK08 YaYXEIkkIE mississippi ZVP1zg7x7g abc d1svRjAAjRv 8989a ababcdcdefefg i9ff7tjt7ff rbbr 8BdDD EZzxO9OxzZ KiR Palindrome 4mFpXd mnmnopopqrqrs 9a2SiS flsPuVVuPslf OfxoYNYoxfO J9kaak nHw7GjXLXjG WX3qq3X oq0qYY nqaeR aW77W ujdd aA z0GFs8 mPeF99FePm zKgC YZYZ454567678 lPkAwsCs Y00k66k00 uBn216pxp w1OOluGSGulOO1 ststuvuvwxwxy"
+ 
+-is_pallendrome :: proc(s: string) -> bool {
+-    size := len(s)
++is_pallendrome :: fn(s: string) -> bool {
++    size :> len(s)
+ 	if size == 1 do return true
+ 	
+-	mid := size / 2
++	mid :> size / 2
+ 	i, j := mid-1, mid
+ 	
+-	is_odd_size := size % 2 == 1
++	is_odd_size :> size % 2 == 1
+ 	if is_odd_size do j += 1
+ 		
+ 	for j < size {
+@@ -31,9 +31,9 @@
+ }
+ 
+ main :: proc() {
+-    answer_key := fields(ANSWER_KEY)
+-    args := fields(ARGS)
+-    arg_count := len(args)
++    answer_key :> fields(ANSWER_KEY)
++    args :> fields(ARGS)
++    arg_count :> len(args)
+     assert(len(answer_key) == arg_count)
+ 
+     solutions := make([]string, arg_count)
+@@ -41,7 +41,7 @@
+     for s, i in args {
+         for j in 0..<len(s) {
+             if is_pallendrome(s[j:]) {
+-                extra := reverse(s[:j])
++                extra :> reverse(s[:j])
+                 solutions[i] = concatenate({s, extra})
+                 assert(is_pallendrome(solutions[i]), "Solution should be a pallendrome")
+                 break
+@@ -52,7 +52,7 @@
+ 
+     num_correct := 0
+     for s, i in args {
+-        correct := solutions[i] == answer_key[i]
++        correct :> solutions[i] == answer_key[i]
+         if correct do num_correct += 1
+ 
+         printfln("%s (%s) %s %s %s", correct ? "✅" : "❌", s, solutions[i], correct ? "=" : "!=", answer_key[i])

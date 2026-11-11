@@ -1,0 +1,36 @@
+--- a/Odin/script_pg/script_pg.thor
++++ b/Odin/script_pg/script_pg.thor
+@@ -10,8 +10,8 @@
+ 
+ get_int :: proc(message := "integer: ") -> int {
+     for {
+-        n_str := input(message) or_else panic("")
+-        n, ok := _int(n_str)
++        n_str :> input(message) or_else panic("")
++        n, ok :> _int(n_str)
+         if !ok {
+             print(n_str, "is not a valid number")
+             continue
+@@ -24,16 +24,17 @@
+ 
+ main :: proc() {
+     
+-    a := get_int("a: ")
+-    b := get_int("b: ")
++    a :> get_int("a: ")
++    b :> get_int("b: ")
+  
+     print(a, "+", b, "=", format_commas(a+b))
+     
+-    nums := []int{1, 2, 3, 4, 5}
++    nums :> []int{1, 2, 3, 4, 5}
+     
+-    cube_nums := fmap(nums, cube)
++    cube_nums :> [cube(n) for n in nums]
++    defer delete(cube_nums)
+     
+-    ans := str(a, "+", b, "=", format_commas(a+b))
++    ans :> str(a, "+", b, "=", format_commas(a+b))
+     
+     print(ans)
+     

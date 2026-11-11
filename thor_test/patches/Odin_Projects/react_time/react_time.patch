@@ -1,0 +1,11 @@
+--- a/Odin_Projects/react_time/react_time.thor
++++ b/Odin_Projects/react_time/react_time.thor
+@@ -111,7 +111,7 @@
+ 
+         case .result:
+             ClearBackground(BLUE)
+-            resultMessage := caprintf("Your time: %.0f ms", duration_ms(g.react_time))
++            resultMessage :> caprintf("Your time: %.0f ms", duration_ms(g.react_time))
+             defer delete(resultMessage)
+             DrawText(resultMessage, center_x(resultMessage), 225, FONT_SIZE, WHITE)
+ 

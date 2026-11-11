@@ -1,0 +1,74 @@
+--- a/Odin/hilo/hilo.thor
++++ b/Odin/hilo/hilo.thor
+@@ -40,8 +40,8 @@
+     for top_card, i in board {
+         if top_card == 0 do continue
+         
+-        diff := MIDPOINT - top_card
+-        guess_dist := math.abs(diff)
++        diff :> MIDPOINT - top_card
++        guess_dist :> math.abs(diff)
+         if guess_dist > best_guess_dist {
+             best_guess_index = i
+             best_guess_dist = guess_dist
+@@ -54,13 +54,13 @@
+ }
+ 
+ find_best_guess_counting :: proc(board: Board) -> (best_guess_index: int, dir: Dir) {
+-    midpoint := 7.0
++    midpoint :> 7.0
+     best_guess_dist := -1.0
+     for top_card, i in board {
+         if top_card == 0 do continue
+         
+-        diff := midpoint - f64(top_card)
+-        guess_dist := math.abs(diff)
++        diff :> midpoint - f64(top_card)
++        guess_dist :> math.abs(diff)
+         if guess_dist > best_guess_dist {
+             best_guess_index = i
+             best_guess_dist = guess_dist
+@@ -90,10 +90,10 @@
+     live_stacks := NUM_STACKS
+ 
+     for len(deck) > 0 {
+-        guess_index, dir := find_best_guess(board)
+-        drawn_card := pop(&deck)
++        guess_index, dir :> find_best_guess(board)
++        drawn_card :> pop(&deck)
+ 
+-        guess_correct := (dir == .over) ? (drawn_card > board[guess_index]) :
++        guess_correct :> (dir == .over) ? (drawn_card > board[guess_index]) :
+                                           (drawn_card < board[guess_index])
+ 
+         if guess_correct {
+@@ -129,16 +129,16 @@
+ 
+     NUM_TRIALS :: 1_000_000
+ 
+-    _, core_count := info.cpu_core_count() or_else panic("Could not find core count")
+-    batch_count := core_count
++    _, core_count :> info.cpu_core_count() or_else panic("Could not find core count")
++    batch_count :> core_count
+     batches := make([]Batch, batch_count)
+ 
+     thread_pool: thread.Pool
+     thread.pool_init(&thread_pool, context.allocator, batch_count)
+     thread.pool_start(&thread_pool)
+ 
+-    trials_per_batch := NUM_TRIALS / batch_count
+-    extra_trials := NUM_TRIALS % batch_count
++    trials_per_batch :> NUM_TRIALS / batch_count
++    extra_trials :> NUM_TRIALS % batch_count
+     for &batch, i in batches {
+         batch.trial_count = trials_per_batch
+         if i < extra_trials do batch.trial_count += 1
+@@ -152,7 +152,7 @@
+         wins += batch.wins
+     }
+ 
+-    win_rate := f64(wins) / f64(NUM_TRIALS)
++    win_rate :> f64(wins) / f64(NUM_TRIALS)
+     fmt.println("Wins:", wins, "/", NUM_TRIALS)
+     fmt.printfln("Win rate: %.4f%%", win_rate*100)
+ 

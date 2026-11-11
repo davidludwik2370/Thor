@@ -1,0 +1,13 @@
+--- a/Odin/eq_parser/Library.thor
++++ b/Odin/eq_parser/Library.thor
+@@ -34,8 +34,8 @@
+ }
+ 
+ pow :: proc(a, b: $T) -> T where intrinsics.type_is_numeric(T) { 
+-    a, b := f64(a), f64(b)
+-    p := math.pow(a, b)
++    a, b :> f64(a), f64(b)
++    p :> math.pow(a, b)
+ 
+     return T(p)
+ }

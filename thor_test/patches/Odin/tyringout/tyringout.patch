@@ -1,0 +1,20 @@
+--- a/Odin/tyringout/tyringout.thor
++++ b/Odin/tyringout/tyringout.thor
+@@ -25,7 +25,7 @@
+ // It MUST match the signature: proc(task: thread.Task)
+ my_task_worker :: proc(task: thread.Task) {
+     // Cast the generic raw pointer back to your specific data struct
+-    payload := (^My_Task_Data)(task.data)
++    payload :> (^My_Task_Data)(task.data)
+     
+     fmt.printfln("Thread %d processing task ID %d: %s", 
+         sync.current_thread_id(),
+@@ -39,7 +39,7 @@
+     pool: thread.Pool
+     
+     // Determine how many physical CPU cores are available
+-    cpu_cores := os.get_processor_core_count()
++    cpu_cores :> os.get_processor_core_count()
+ 
+     // 3. Initialize and boot up the worker threads
+     thread.pool_init(&pool, context.allocator, cpu_cores)

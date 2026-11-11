@@ -1,0 +1,88 @@
+--- a/Odin_Projects/sketch/sketch.thor
++++ b/Odin_Projects/sketch/sketch.thor
+@@ -68,8 +68,8 @@
+ }
+ 
+ palette_rect :: proc(index: int, screen_width, screen_height: int) -> rl.Rectangle {
+-    segment_height := f32(screen_height)/f32(PALETTE_COLOR_COUNT)
+-    y := f32(index)*segment_height
++    segment_height :> f32(screen_height)/f32(PALETTE_COLOR_COUNT)
++    y :> f32(index)*segment_height
+     height := segment_height
+     if index == PALETTE_COLOR_COUNT-1 {
+         height = f32(screen_height) - y
+@@ -112,8 +112,8 @@
+ 
+ draw_palette :: proc(screen_width, screen_height: int, selected_color: rl.Color) {
+     for i := 0; i < PALETTE_COLOR_COUNT; i += 1 {
+-        rect := palette_rect(i, screen_width, screen_height)
+-        color := palette_color(i)
++        rect :> palette_rect(i, screen_width, screen_height)
++        color :> palette_color(i)
+         rl.DrawRectangleRec(rect, color)
+         rl.DrawLine(
+             i32(rect.x),
+@@ -179,7 +179,7 @@
+ main :: proc() {
+     using rl
+ 
+-    backgroundColor    := INIT_BACKGROUND_COLOR
++    backgroundColor    :> INIT_BACKGROUND_COLOR
+     normalPenColor     := LIGHTGRAY
+     penColor           := normalPenColor
+     penThickness: f32   = INIT_PEN_SIZE
+@@ -203,21 +203,21 @@
+     EndTextureMode()
+ 
+     for !WindowShouldClose() {
+-        screenWidth  := GetScreenWidth()
+-        screenHeight := GetScreenHeight()
+-        mouse := GetMousePosition()
+-        controlDown := IsKeyDown(.LEFT_CONTROL) || IsKeyDown(.RIGHT_CONTROL)
++        screenWidth  :> GetScreenWidth()
++        screenHeight :> GetScreenHeight()
++        mouse :> GetMousePosition()
++        controlDown :> IsKeyDown(.LEFT_CONTROL) || IsKeyDown(.RIGHT_CONTROL)
+         paletteMouseHit := false
+         if screenWidth > 0 && screenHeight > 0 &&
+            (screenWidth != canvas.texture.width || screenHeight != canvas.texture.height) {
+-            oldCanvas := canvas
++            oldCanvas :> canvas
+             canvas = LoadRenderTexture(screenWidth, screenHeight)
+             redraw_canvas(canvas, actions[:], backgroundColor)
+             UnloadRenderTexture(oldCanvas)
+         }
+ 
+         if controlDown {
+-            paletteColor, hit := palette_color_at_mouse(mouse, int(screenWidth), int(screenHeight))
++            paletteColor, hit :> palette_color_at_mouse(mouse, int(screenWidth), int(screenHeight))
+             paletteMouseHit = hit
+             if hit && IsMouseButtonPressed(MouseButton.LEFT) {
+                 normalPenColor = paletteColor
+@@ -236,7 +236,7 @@
+                 append(&stroke.points, mouse)
+                 append(&actions, Action{kind = .Stroke, stroke = stroke})
+             } else {
+-                append(&actions[len(actions)-1].stroke.points, mouse)
++                append(&actions[-1].stroke.points, mouse)
+             }
+ 
+             BeginTextureMode(canvas)
+@@ -263,7 +263,7 @@
+ 
+         if IsKeyPressed(.Z) {
+             if len(actions) > 0 {
+-                removed := pop(&actions)
++                removed :> pop(&actions)
+                 append(&redoActions, removed)
+                 redraw_canvas(canvas, actions[:], backgroundColor)
+                 mouseDownLastFrame = false
+@@ -272,7 +272,7 @@
+ 
+         if IsKeyPressed(.R) {
+             if len(redoActions) > 0 {
+-                restored := pop(&redoActions)
++                restored :> pop(&redoActions)
+                 append(&actions, restored)
+                 redraw_canvas(canvas, actions[:], backgroundColor)
+                 mouseDownLastFrame = false

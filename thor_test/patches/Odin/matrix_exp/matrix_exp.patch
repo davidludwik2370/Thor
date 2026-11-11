@@ -1,0 +1,38 @@
+--- a/Odin/matrix_exp/matrix_exp.thor
++++ b/Odin/matrix_exp/matrix_exp.thor
+@@ -41,27 +41,27 @@
+     if 2 > 1 do print("hello")
+     else     do print("Goodbye")
+ 
+-    a := false
+-    b := true
++    a :> false
++    b :> true
+ 
+     if a && b do print("both true") 
+     else do print("at least one is false")
+ 
+-    f :f32 = 237
+-    i := transmute(u32)f
++    f :f32 > 237
++    i :> transmute(u32)f
+ 
+     print(f, i)
+ 
+     U :: 22
+-    u := 22
++    u :> 22
+ 
+     fl := 22.2
+-    fu := 22.2
++    fu :> 22.2
+ 
+     fl += U
+    
+-    hex := 0x1f
+-    bin := 0b10
++    hex :> 0x1f
++    bin :> 0b10
+ 
+ 
+     print(hex, bin)

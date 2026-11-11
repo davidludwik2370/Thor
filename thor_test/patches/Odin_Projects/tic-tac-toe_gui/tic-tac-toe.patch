@@ -1,0 +1,60 @@
+--- a/Odin_Projects/tic-tac-toe_gui/tic-tac-toe.thor
++++ b/Odin_Projects/tic-tac-toe_gui/tic-tac-toe.thor
+@@ -35,7 +35,7 @@
+ 	}
+ }
+ 
+-validMove :: proc(g: Game, move: pos) -> bool {
++validMove :: fn(g: Game, move: pos) -> bool {
+ 	return move.x < 3 && move.y < 3 && g.board[move.y][move.x] == .E
+ }
+ 
+@@ -50,8 +50,8 @@
+ 		{{0, 0}, {1, 1}, {2, 2}},
+ 		{{0, 2}, {1, 1}, {2, 0}},
+ 	}
+-	b := g.board
+-	w := row{g.turn, g.turn, g.turn}
++	b :> g.board
++	w :> row{g.turn, g.turn, g.turn}
+ 
+ 	for c in rowCoords {
+ 		if (row{b[c[0].y][c[0].x], b[c[1].y][c[1].x], b[c[2].y][c[2].x]}) == w {
+@@ -126,7 +126,7 @@
+ 	if safeMoves[1][1] do return pos{1, 1}
+ 	// If you have the center, play opposite corner if opponent is in a corner
+ 	if g.moveCount == 2 && g.board[1][1] == g.turn {
+-		cornersDirs := [4][2]i8{{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}
++		cornersDirs :> [4][2]i8{{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}
+ 		for c in cornersDirs {
+ 			if g.board[1+c.y][1+c.x] == opponent(g.turn) {
+ 				return pos{u8(1-c.x), u8(1-c.y)}
+@@ -177,8 +177,8 @@
+ 		case .InGame:
+ 			if g.turn != player do play(&g, bestMove(g))
+ 			else if IsMouseButtonPressed(.LEFT) {
+-				moveInput := GetMousePosition()
+-				move := pos{u8(moveInput.x/GRID_SIZE), u8(moveInput.y/GRID_SIZE)}
++				moveInput :> GetMousePosition()
++				move :> pos{u8(moveInput.x/GRID_SIZE), u8(moveInput.y/GRID_SIZE)}
+ 				if validMove(g, move) do play(&g, move)
+ 			}
+ 		case .XWin, .OWin, .Draw:
+@@ -242,14 +242,14 @@
+ 		// win line
+ 		if g.state in States({.XWin, .OWin}) {
+ 			g.turn = (g.state == .XWin) ? .X : .O
+-			winRow, ok := g.winRow.?; assert(ok) 
++			winRow, ok :> g.winRow.?; assert(ok) 
+ 			DrawLineEx(Vector2{f32(winRow[0].x)*GRID_SIZE+GRID_SIZE/2, f32(winRow[0].y)*GRID_SIZE+GRID_SIZE/2},
+ 					   Vector2{f32(winRow[2].x)*GRID_SIZE+GRID_SIZE/2, f32(winRow[2].y)*GRID_SIZE+GRID_SIZE/2},
+ 					   10, RED)
+ 		}
+ 
+-		playerStr := cstring(player == Slot.X ? "Player: x" : "Player: o")
+-		firstStr  := cstring(first  == Slot.X ? "First:  x" : "First:  o")
++		playerStr :> cstring(player == Slot.X ? "Player: x" : "Player: o")
++		firstStr  :> cstring(first  == Slot.X ? "First:  x" : "First:  o")
+ 		DrawText(playerStr, 620, 120, 20, RAYWHITE)
+ 		DrawText(firstStr,  620, 140, 20, RAYWHITE)
+ 

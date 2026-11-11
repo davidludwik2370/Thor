@@ -1,0 +1,140 @@
+--- a/Odin_Projects/Cricles_on_dots/cricles_on_dots.thor
++++ b/Odin_Projects/Cricles_on_dots/cricles_on_dots.thor
+@@ -17,8 +17,7 @@
+ Pos  :: [2]int
+ PosF :: [2]f32
+ 
+-@rodata
+-startingCircles := [?]Pos {
++startingCircles :> [?]Pos {
+ 	{321, 555},
+ 	{240, 417},
+ 	{320, 277},
+@@ -28,8 +27,7 @@
+ 	{561, 416},
+ }
+ 
+-@rodata
+-startingPoints := [?]Pos {
++startingPoints :> [?]Pos {
+ 	{400, 417},
+ 	{473, 461},
+ 	{445, 343},
+@@ -58,19 +56,11 @@
+ }
+ 
+ loadCircles :: proc() -> [dynamic]Pos {
+-	circles: [dynamic]Pos
+-	for circle in startingCircles {
+-		append(&circles, circle)
+-	}
+-	return circles
++	return [dynamic]Pos{circle for circle in startingCircles}
+ }
+ 
+ loadPoints :: proc() -> [dynamic]Pos {
+-	points: [dynamic]Pos
+-	for point in startingPoints {
+-		append(&points, point)
+-	}
+-	return points
++	return [dynamic]Pos{point for point in startingPoints}
+ }
+ 
+ randInt :: proc(min, max: int) -> int {
+@@ -78,12 +68,12 @@
+ }
+ 
+ rotatePos :: proc(pos, pivot: PosF, degrees: f32) -> PosF {
+-	angle := math.to_radians(degrees)
+-	sinAngle := math.sin(angle)
+-	cosAngle := math.cos(angle)
+-
+-	relativeX := pos.x - pivot.x
+-	relativeY := pos.y - pivot.y
++	angle :> math.to_radians(degrees)
++	sinAngle :> math.sin(angle)
++	cosAngle :> math.cos(angle)
++
++	relativeX :> pos.x - pivot.x
++	relativeY :> pos.y - pivot.y
+ 
+ 	return {
+ 		relativeX*cosAngle - relativeY*sinAngle + pivot.x,
+@@ -119,10 +109,10 @@
+ 
+ 		// add/remove point
+ 		if IsKeyPressed(.SPACE) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			append(&points, Pos{int(m1.x), int(m1.y)})
+ 		} else if IsKeyDown(.X) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			for &point, i in points {
+ 				if math.hypot(m1.x - f32(point.x), m1.y - f32(point.y)) <= POINT_RADIUS+5 {
+ 					unordered_remove(&points, i)
+@@ -169,14 +159,14 @@
+ 			NUM_POINTS  :: 24
+ 			SLICE_ANGLE :: math.TAU / NUM_POINTS
+ 
+-			center := [2]f32 {
++			center :> [2]f32 {
+ 				WINDOW_SIZE/2, 
+ 				(3*GRID_SIZE*SLOPE)/2
+ 			}
+ 
+ 			clear(&points)
+ 			for i in f32(0)..<NUM_POINTS {
+-				angle := SLICE_ANGLE * i
++				angle :> SLICE_ANGLE * i
+ 				append(&points, Pos{
+ 					int(math.round(center.x + OUTER_RING_RADIUS*math.cos(angle))),
+ 					int(math.round(center.y + OUTER_RING_RADIUS*math.sin(angle))),
+@@ -184,7 +174,7 @@
+ 			}
+ 
+ 			for i in f32(0)..<NUM_POINTS/2 {
+-				angle := 2*SLICE_ANGLE * i
++				angle :> 2*SLICE_ANGLE * i
+ 				append(&points, Pos{
+ 					int(math.round(center.x + MIDDLE_RING_RADIUS*math.cos(angle))),
+ 					int(math.round(center.y + MIDDLE_RING_RADIUS*math.sin(angle))),
+@@ -226,8 +216,8 @@
+ 				break moveCircles
+ 			}
+ 
+-			m1 := GetMousePosition()
+-			mPosFloat := PosF{m1.x, m1.y}
++			m1 :> GetMousePosition()
++			mPosFloat :> PosF{m1.x, m1.y}
+ 			avgOffset: PosF
+ 			for offset in initCircleOffsets {
+ 				avgOffset += offset
+@@ -235,7 +225,7 @@
+ 			if len(initCircleOffsets) > 0 {
+ 				avgOffset /= f32(len(initCircleOffsets))
+ 			}
+-			avg := Pos{
++			avg :> Pos{
+ 				int(math.round(avgOffset.x + mPosFloat.x)),
+ 				int(math.round(avgOffset.y + mPosFloat.y)),
+ 			}
+@@ -277,7 +267,7 @@
+ 			}
+ 
+ 		} else if IsMouseButtonDown(.LEFT) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			if IsMouseButtonPressed(.LEFT) {
+ 				for circle, i in circles {
+ 					if math.hypot(m1.x - f32(circle.x), m1.y - f32(circle.y)) < CIRCLE_RADIUS {
+@@ -291,7 +281,7 @@
+ 				circles[selectedCircle] = {int(m1.x), int(m1.y)} + selectedOffset
+ 			}
+ 		} else if IsMouseButtonPressed(.RIGHT) {
+-			m1 := GetMousePosition()
++			m1 :> GetMousePosition()
+ 			for circle, i in circles {
+ 				if math.hypot(m1.x - f32(circle.x), m1.y - f32(circle.y)) < CIRCLE_RADIUS {
+ 					selectedCircle = -1

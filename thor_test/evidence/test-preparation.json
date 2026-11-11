@@ -1,0 +1,277 @@
+[
+  {
+    "file": "odin/Odin/ascending_primes/ascending_primes.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/ascending_primes/ascending_primes.odin\n+++ after/odin/Odin/ascending_primes/ascending_primes.odin\n@@ -7,7 +7,7 @@\n \n main :: proc() {\n     using math, strconv, fmt\n-    limit :u32 = 123_456_789\n+    limit :u32 = 1_000_000\n \n \tprime, ascending: bool \n     i, j: u32\n"
+  },
+  {
+    "file": "odin/Odin/factorial/factorial.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/factorial/factorial.odin\n+++ after/odin/Odin/factorial/factorial.odin\n@@ -6,7 +6,7 @@\n \n \n main :: proc() {\n-    limit := 100_000\n+    limit := 1_000\n     // limit := 100\n \n     n, fact: big.Int\n"
+  },
+  {
+    "file": "odin/Odin/factorial/factorial.odin",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/odin/Odin/factorial/factorial.odin\n+++ after/odin/Odin/factorial/factorial.odin\n@@ -29,7 +29,7 @@\n     // write_entire_file expects []byte, so we transmute the string\n     success := os.write_entire_file(\"factorial.txt\", transmute([]byte)fact_str)\n     \n-    if !success {\n+    if success != nil {\n         fmt.println(\"Error writing to file.\")\n     }\n \n"
+  },
+  {
+    "file": "odin/Odin/hilo/hilo.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/hilo/hilo.odin\n+++ after/odin/Odin/hilo/hilo.odin\n@@ -127,7 +127,7 @@\n \n main :: proc() {\n \n-    NUM_TRIALS :: 1_000_000_000\n+    NUM_TRIALS :: 1_000_000\n \n     _, core_count := info.cpu_core_count() or_else panic(\"Could not find core count\")\n     batch_count := core_count\n"
+  },
+  {
+    "file": "odin/Odin/hilo/original/hilo.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/hilo/original/hilo.odin\n+++ after/odin/Odin/hilo/original/hilo.odin\n@@ -114,7 +114,7 @@\n     // fmt.println(\"Seed: \", current_seed, '\\n')\n     rand.reset(current_seed)\n \n-    NUM_TRIALS :: 100_000_000\n+    NUM_TRIALS :: 1_000_000\n     wins: int\n \n     deck := make([dynamic]int, DECK_LEN)\n"
+  },
+  {
+    "file": "odin/Odin/pi/pi.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/pi/pi.odin\n+++ after/odin/Odin/pi/pi.odin\n@@ -8,7 +8,7 @@\n \n     x, y: f64\n     times_in: int\n-    NUM_TESTS :: 100_000_000\n+    NUM_TESTS :: 1_000_000\n \n     for _ in 0..<NUM_TESTS {\n         x = rand.float64_uniform(0, 1)\n"
+  },
+  {
+    "file": "odin/Odin/poker/poker.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/poker/poker.odin\n+++ after/odin/Odin/poker/poker.odin\n@@ -9,7 +9,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 1_000_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "odin/Odin/poker/ref/poker_multi_v1.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/poker/ref/poker_multi_v1.odin\n+++ after/odin/Odin/poker/ref/poker_multi_v1.odin\n@@ -9,7 +9,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 1_000_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "odin/Odin/poker/ref/poker_single_thread.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/poker/ref/poker_single_thread.odin\n+++ after/odin/Odin/poker/ref/poker_single_thread.odin\n@@ -7,7 +7,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 100_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "odin/Odin/poker/ref/poker_single_thread.odin",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/odin/Odin/poker/ref/poker_single_thread.odin\n+++ after/odin/Odin/poker/ref/poker_single_thread.odin\n@@ -1,6 +1,7 @@\n package main\n \n import \"core:fmt\"\n+print :: fmt.print\n import \"core:math/rand\"\n import \"core:slice\"\n import \"core:time\"\n"
+  },
+  {
+    "file": "odin/Odin/primes/higher_primes/primes.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/primes/higher_primes/primes.odin\n+++ after/odin/Odin/primes/higher_primes/primes.odin\n@@ -9,7 +9,7 @@\n main :: proc() {\n \tusing math\n \t// limit :u64 = 18446744073709551615\n-\tlimit :: 1_000_000_000\n+\tlimit :: 1_000_000\n \tlastIndex := int(sqrt(f64(limit)))\n \n \ti, ni, step_size: int\n@@ -50,7 +50,7 @@\n // main :: proc() {\n // \tusing math\n // \t// limit :u64 = 18446744073709551615\n-// \tlimit :: 100_000\n+// \tlimit :: 1_000_000\n // \tlastIndex := int(floor(sqrt(f64(limit))) + 4)\n \n // \ti, ni, step_size: int\n"
+  },
+  {
+    "file": "odin/Odin/quicksort/quicksort.odin",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/odin/Odin/quicksort/quicksort.odin\n+++ after/odin/Odin/quicksort/quicksort.odin\n@@ -9,7 +9,7 @@\n \n \n main :: proc() {\n-    num_tests :: 1_000_000\n+    num_tests :: 20\n \n     arry_size :: 10_000\n     num_limit :: 10_000\n"
+  },
+  {
+    "file": "odin/Odin/tyringout/tyringout.odin",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/odin/Odin/tyringout/tyringout.odin\n+++ after/odin/Odin/tyringout/tyringout.odin\n@@ -39,7 +39,7 @@\n     pool: thread.Pool\n     \n     // Determine how many physical CPU cores are available\n-    cpu_cores := os.processor_core_count()\n+    cpu_cores := os.get_processor_core_count()\n \n     // 3. Initialize and boot up the worker threads\n     thread.pool_init(&pool, context.allocator, cpu_cores)\n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v1.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v1.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v1.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v2.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v2.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v2.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import rl \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v3.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v3.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v3.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import rl \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v4.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v4.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v4.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import rl \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v5.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import rl \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v6.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import rl \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin\n+++ after/odin/Odin_Projects/Connect_4/archive/conect_4_v7.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import rl \"vendor:raylib\"\n \n"
+  },
+  {
+    "file": "odin/Odin_Projects/Othello_pvai/othello.odin",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/odin/Odin_Projects/Othello_pvai/othello.odin\n+++ after/odin/Odin_Projects/Othello_pvai/othello.odin\n@@ -587,7 +587,7 @@\n \timportedOpeningBook.lines = 0\n \n \tdata, ok := os.read_entire_file(path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \tdefer delete(data)\n \n \tcontent := string(data)\n@@ -687,10 +687,10 @@\n \tif BOARD_WIDTH != 6 || BOARD_HEIGHT != 6 do return\n \n \ttree_bits, ok := os.read_entire_file(tree_path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \n \tdata, ok_data := os.read_entire_file(data_path, context.allocator)\n-\tif !ok_data {\n+\tif ok_data != nil {\n \t\tdelete(tree_bits)\n \t\treturn\n \t}\n@@ -922,7 +922,7 @@\n \n loadPersistentEndgameCache :: proc(path: string) {\n \tdata, ok := os.read_entire_file(path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \tdefer delete(data)\n \n \tif len(data) < ENDGAME_CACHE_HEADER_SIZE do return\n@@ -971,7 +971,7 @@\n \t\toffset += ENDGAME_CACHE_ENTRY_SIZE\n \t}\n \n-\tif os.write_entire_file(path, data) {\n+\tif os.write_entire_file(path, data) == nil {\n \t\tendgameTableDirty = false\n \t\tfmt.println(\"Saved endgame cache entries:\", entry_count)\n \t}\n"
+  },
+  {
+    "file": "odin/Odin_Projects/tetris/archive/tetris_v1.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/tetris/archive/tetris_v1.odin\n+++ after/odin/Odin_Projects/tetris/archive/tetris_v1.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import \"base:intrinsics\"\n import \"core:fmt\"\n"
+  },
+  {
+    "file": "odin/Odin_Projects/tetris/archive/tetris_v2.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/tetris/archive/tetris_v2.odin\n+++ after/odin/Odin_Projects/tetris/archive/tetris_v2.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import \"base:intrinsics\"\n import \"core:fmt\"\n"
+  },
+  {
+    "file": "odin/Odin_Projects/tetris/archive/tetris_v3.odin",
+    "reason": "Enable legacy using syntax in the Odin reference",
+    "patch": "--- before/odin/Odin_Projects/tetris/archive/tetris_v3.odin\n+++ after/odin/Odin_Projects/tetris/archive/tetris_v3.odin\n@@ -1,3 +1,4 @@\n+#+feature using-stmt\n package main\n import \"core:fmt\"\n import rl \"vendor:raylib\"\n"
+  },
+  {
+    "file": "odin/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.odin",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/odin/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.odin\n+++ after/odin/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.odin\n@@ -1,6 +1,7 @@\n package main\n \n import \"core:testing\"\n+import \"core:fmt\"\n import \"core:math/rand\"\n \n BLANK       :: `  . . .\n@@ -138,3 +139,6 @@\n \texpect_forced_win(t, DRAW_FINISH, .X, pos{2, 2}, false, \"final move draws\")\n \texpect_forced_win(t, DRAW_FINISH, .O, pos{2, 2}, false, \"final move still does not give O a win\")\n }\n+\n+// Restore the archived test helper's missing board printer.\n+printBoard :: proc(g: Game) { fmt.println(g.board) }\n"
+  },
+  {
+    "file": "thor/Odin/ascending_primes/ascending_primes.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/ascending_primes/ascending_primes.thor\n+++ after/thor/Odin/ascending_primes/ascending_primes.thor\n@@ -7,7 +7,7 @@\n \n main :: proc() {\n     using math, strconv, fmt\n-    limit :u32 = 123_456_789\n+    limit :u32 = 1_000_000\n \n \tprime, ascending: bool \n     i, j: u32\n"
+  },
+  {
+    "file": "thor/Odin/factorial/factorial.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/factorial/factorial.thor\n+++ after/thor/Odin/factorial/factorial.thor\n@@ -6,7 +6,7 @@\n \n \n main :: proc() {\n-    limit := 100_000\n+    limit := 1_000\n     // limit := 100\n \n     n, fact: big.Int\n"
+  },
+  {
+    "file": "thor/Odin/factorial/factorial.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/thor/Odin/factorial/factorial.thor\n+++ after/thor/Odin/factorial/factorial.thor\n@@ -29,7 +29,7 @@\n     // write_entire_file expects []byte, so we transmute the string\n     success := os.write_entire_file(\"factorial.txt\", transmute([]byte)fact_str)\n     \n-    if !success {\n+    if success != nil {\n         fmt.println(\"Error writing to file.\")\n     }\n \n"
+  },
+  {
+    "file": "thor/Odin/hilo/hilo.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/hilo/hilo.thor\n+++ after/thor/Odin/hilo/hilo.thor\n@@ -127,7 +127,7 @@\n \n main :: proc() {\n \n-    NUM_TRIALS :: 1_000_000_000\n+    NUM_TRIALS :: 1_000_000\n \n     _, core_count := info.cpu_core_count() or_else panic(\"Could not find core count\")\n     batch_count := core_count\n"
+  },
+  {
+    "file": "thor/Odin/hilo/original/hilo.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/hilo/original/hilo.thor\n+++ after/thor/Odin/hilo/original/hilo.thor\n@@ -114,7 +114,7 @@\n     // fmt.println(\"Seed: \", current_seed, '\\n')\n     rand.reset(current_seed)\n \n-    NUM_TRIALS :: 100_000_000\n+    NUM_TRIALS :: 1_000_000\n     wins: int\n \n     deck := make([dynamic]int, DECK_LEN)\n"
+  },
+  {
+    "file": "thor/Odin/pi/pi.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/pi/pi.thor\n+++ after/thor/Odin/pi/pi.thor\n@@ -8,7 +8,7 @@\n \n     x, y: f64\n     times_in: int\n-    NUM_TESTS :: 100_000_000\n+    NUM_TESTS :: 1_000_000\n \n     for _ in 0..<NUM_TESTS {\n         x = rand.float64_uniform(0, 1)\n"
+  },
+  {
+    "file": "thor/Odin/poker/poker.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/poker/poker.thor\n+++ after/thor/Odin/poker/poker.thor\n@@ -9,7 +9,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 1_000_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "thor/Odin/poker/ref/poker_multi_v1.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/poker/ref/poker_multi_v1.thor\n+++ after/thor/Odin/poker/ref/poker_multi_v1.thor\n@@ -9,7 +9,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 1_000_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "thor/Odin/poker/ref/poker_single_thread.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/poker/ref/poker_single_thread.thor\n+++ after/thor/Odin/poker/ref/poker_single_thread.thor\n@@ -7,7 +7,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 100_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "thor/Odin/poker/ref/poker_single_thread.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/thor/Odin/poker/ref/poker_single_thread.thor\n+++ after/thor/Odin/poker/ref/poker_single_thread.thor\n@@ -1,6 +1,7 @@\n package main\n \n import \"core:fmt\"\n+print :: fmt.print\n import \"core:math/rand\"\n import \"core:slice\"\n import \"core:time\"\n"
+  },
+  {
+    "file": "thor/Odin/primes/higher_primes/primes.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/primes/higher_primes/primes.thor\n+++ after/thor/Odin/primes/higher_primes/primes.thor\n@@ -9,7 +9,7 @@\n main :: proc() {\n \tusing math\n \t// limit :u64 = 18446744073709551615\n-\tlimit :: 1_000_000_000\n+\tlimit :: 1_000_000\n \tlastIndex := int(sqrt(f64(limit)))\n \n \ti, ni, step_size: int\n@@ -50,7 +50,7 @@\n // main :: proc() {\n // \tusing math\n // \t// limit :u64 = 18446744073709551615\n-// \tlimit :: 100_000\n+// \tlimit :: 1_000_000\n // \tlastIndex := int(floor(sqrt(f64(limit))) + 4)\n \n // \ti, ni, step_size: int\n"
+  },
+  {
+    "file": "thor/Odin/quicksort/quicksort.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/thor/Odin/quicksort/quicksort.thor\n+++ after/thor/Odin/quicksort/quicksort.thor\n@@ -9,7 +9,7 @@\n \n \n main :: proc() {\n-    num_tests :: 1_000_000\n+    num_tests :: 20\n \n     arry_size :: 10_000\n     num_limit :: 10_000\n"
+  },
+  {
+    "file": "thor/Odin/tyringout/tyringout.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/thor/Odin/tyringout/tyringout.thor\n+++ after/thor/Odin/tyringout/tyringout.thor\n@@ -39,7 +39,7 @@\n     pool: thread.Pool\n     \n     // Determine how many physical CPU cores are available\n-    cpu_cores := os.processor_core_count()\n+    cpu_cores := os.get_processor_core_count()\n \n     // 3. Initialize and boot up the worker threads\n     thread.pool_init(&pool, context.allocator, cpu_cores)\n"
+  },
+  {
+    "file": "thor/Odin_Projects/Othello_pvai/othello.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/thor/Odin_Projects/Othello_pvai/othello.thor\n+++ after/thor/Odin_Projects/Othello_pvai/othello.thor\n@@ -587,7 +587,7 @@\n \timportedOpeningBook.lines = 0\n \n \tdata, ok := os.read_entire_file(path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \tdefer delete(data)\n \n \tcontent := string(data)\n@@ -687,10 +687,10 @@\n \tif BOARD_WIDTH != 6 || BOARD_HEIGHT != 6 do return\n \n \ttree_bits, ok := os.read_entire_file(tree_path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \n \tdata, ok_data := os.read_entire_file(data_path, context.allocator)\n-\tif !ok_data {\n+\tif ok_data != nil {\n \t\tdelete(tree_bits)\n \t\treturn\n \t}\n@@ -922,7 +922,7 @@\n \n loadPersistentEndgameCache :: proc(path: string) {\n \tdata, ok := os.read_entire_file(path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \tdefer delete(data)\n \n \tif len(data) < ENDGAME_CACHE_HEADER_SIZE do return\n@@ -971,7 +971,7 @@\n \t\toffset += ENDGAME_CACHE_ENTRY_SIZE\n \t}\n \n-\tif os.write_entire_file(path, data) {\n+\tif os.write_entire_file(path, data) == nil {\n \t\tendgameTableDirty = false\n \t\tfmt.println(\"Saved endgame cache entries:\", entry_count)\n \t}\n"
+  },
+  {
+    "file": "thor/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/thor/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.thor\n+++ after/thor/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.thor\n@@ -1,6 +1,7 @@\n package main\n \n import \"core:testing\"\n+import \"core:fmt\"\n import \"core:math/rand\"\n \n BLANK       :: `  . . .\n@@ -138,3 +139,6 @@\n \texpect_forced_win(t, DRAW_FINISH, .X, pos{2, 2}, false, \"final move draws\")\n \texpect_forced_win(t, DRAW_FINISH, .O, pos{2, 2}, false, \"final move still does not give O a win\")\n }\n+\n+// Restore the archived test helper's missing board printer.\n+printBoard :: proc(g: Game) { fmt.println(g.board) }\n"
+  },
+  {
+    "file": "idiomatic/Odin/ascending_primes/ascending_primes.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/ascending_primes/ascending_primes.thor\n+++ after/idiomatic/Odin/ascending_primes/ascending_primes.thor\n@@ -7,7 +7,7 @@\n \n main :: proc() {\n     using math, strconv, fmt\n-    limit :u32 > 123_456_789\n+    limit :u32 > 1_000_000\n \n \tprime, ascending: bool \n     i, j: u32\n"
+  },
+  {
+    "file": "idiomatic/Odin/factorial/factorial.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/factorial/factorial.thor\n+++ after/idiomatic/Odin/factorial/factorial.thor\n@@ -6,7 +6,7 @@\n \n \n main :: proc() {\n-    limit := 100_000\n+    limit := 1_000\n     // limit := 100\n \n     n, fact: big.Int\n"
+  },
+  {
+    "file": "idiomatic/Odin/factorial/factorial.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/idiomatic/Odin/factorial/factorial.thor\n+++ after/idiomatic/Odin/factorial/factorial.thor\n@@ -29,7 +29,7 @@\n     // write_entire_file expects []byte, so we transmute the string\n     success := os.write_entire_file(\"factorial.txt\", transmute([]byte)fact_str)\n     \n-    if !success {\n+    if success != nil {\n         fmt.println(\"Error writing to file.\")\n     }\n \n"
+  },
+  {
+    "file": "idiomatic/Odin/hilo/hilo.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/hilo/hilo.thor\n+++ after/idiomatic/Odin/hilo/hilo.thor\n@@ -127,7 +127,7 @@\n \n main :: proc() {\n \n-    NUM_TRIALS :: 1_000_000_000\n+    NUM_TRIALS :: 1_000_000\n \n     _, core_count :> info.cpu_core_count() or_else panic(\"Could not find core count\")\n     batch_count :> core_count\n"
+  },
+  {
+    "file": "idiomatic/Odin/hilo/original/hilo.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/hilo/original/hilo.thor\n+++ after/idiomatic/Odin/hilo/original/hilo.thor\n@@ -114,7 +114,7 @@\n     // fmt.println(\"Seed: \", current_seed, '\\n')\n     rand.reset(current_seed)\n \n-    NUM_TRIALS :: 100_000_000\n+    NUM_TRIALS :: 1_000_000\n     wins: int\n \n     deck := make([dynamic]int, DECK_LEN)\n"
+  },
+  {
+    "file": "idiomatic/Odin/pi/pi.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/pi/pi.thor\n+++ after/idiomatic/Odin/pi/pi.thor\n@@ -8,7 +8,7 @@\n \n     x, y: f64\n     times_in: int\n-    NUM_TESTS :: 100_000_000\n+    NUM_TESTS :: 1_000_000\n \n     for _ in 0..<NUM_TESTS {\n         x = rand.float64_uniform(0, 1)\n"
+  },
+  {
+    "file": "idiomatic/Odin/poker/poker.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/poker/poker.thor\n+++ after/idiomatic/Odin/poker/poker.thor\n@@ -9,7 +9,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 1_000_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "idiomatic/Odin/poker/ref/poker_multi_v1.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/poker/ref/poker_multi_v1.thor\n+++ after/idiomatic/Odin/poker/ref/poker_multi_v1.thor\n@@ -9,7 +9,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 1_000_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "idiomatic/Odin/poker/ref/poker_single_thread.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/poker/ref/poker_single_thread.thor\n+++ after/idiomatic/Odin/poker/ref/poker_single_thread.thor\n@@ -7,7 +7,7 @@\n \n DECK_LEN    :: 52\n MAX_PLAYERS :: 10\n-TRIAL_COUNT :: 100_000_000\n+TRIAL_COUNT :: 10_000\n \n Suit :: enum {club, diamond, heart, spade}\n Card :: struct {num: int, suit: Suit}\n"
+  },
+  {
+    "file": "idiomatic/Odin/poker/ref/poker_single_thread.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/idiomatic/Odin/poker/ref/poker_single_thread.thor\n+++ after/idiomatic/Odin/poker/ref/poker_single_thread.thor\n@@ -1,6 +1,7 @@\n package main\n \n import \"core:fmt\"\n+print :: fmt.print\n import \"core:math/rand\"\n import \"core:slice\"\n import \"core:time\"\n"
+  },
+  {
+    "file": "idiomatic/Odin/primes/higher_primes/primes.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/primes/higher_primes/primes.thor\n+++ after/idiomatic/Odin/primes/higher_primes/primes.thor\n@@ -9,7 +9,7 @@\n main :: proc() {\n \tusing math\n \t// limit :u64 = 18446744073709551615\n-\tlimit :: 1_000_000_000\n+\tlimit :: 1_000_000\n \tlastIndex :> int(sqrt(f64(limit)))\n \n \ti, ni, step_size: int\n@@ -50,7 +50,7 @@\n // main :: proc() {\n // \tusing math\n // \t// limit :u64 = 18446744073709551615\n-// \tlimit :: 100_000\n+// \tlimit :: 1_000_000\n // \tlastIndex := int(floor(sqrt(f64(limit))) + 4)\n \n // \ti, ni, step_size: int\n"
+  },
+  {
+    "file": "idiomatic/Odin/quicksort/quicksort.thor",
+    "reason": "Bound test work; same limits for Odin, renamed Thor and idiomatic Thor",
+    "patch": "--- before/idiomatic/Odin/quicksort/quicksort.thor\n+++ after/idiomatic/Odin/quicksort/quicksort.thor\n@@ -9,7 +9,7 @@\n \n \n main :: proc() {\n-    num_tests :: 1_000_000\n+    num_tests :: 20\n \n     arry_size :: 10_000\n     num_limit :: 10_000\n"
+  },
+  {
+    "file": "idiomatic/Odin/tyringout/tyringout.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/idiomatic/Odin/tyringout/tyringout.thor\n+++ after/idiomatic/Odin/tyringout/tyringout.thor\n@@ -39,7 +39,7 @@\n     pool: thread.Pool\n     \n     // Determine how many physical CPU cores are available\n-    cpu_cores := os.processor_core_count()\n+    cpu_cores := os.get_processor_core_count()\n \n     // 3. Initialize and boot up the worker threads\n     thread.pool_init(&pool, context.allocator, cpu_cores)\n"
+  },
+  {
+    "file": "idiomatic/Odin_Projects/Othello_pvai/othello.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/idiomatic/Odin_Projects/Othello_pvai/othello.thor\n+++ after/idiomatic/Odin_Projects/Othello_pvai/othello.thor\n@@ -587,7 +587,7 @@\n \timportedOpeningBook.lines = 0\n \n \tdata, ok := os.read_entire_file(path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \tdefer delete(data)\n \n \tcontent := string(data)\n@@ -687,10 +687,10 @@\n \tif BOARD_WIDTH != 6 || BOARD_HEIGHT != 6 do return\n \n \ttree_bits, ok := os.read_entire_file(tree_path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \n \tdata, ok_data := os.read_entire_file(data_path, context.allocator)\n-\tif !ok_data {\n+\tif ok_data != nil {\n \t\tdelete(tree_bits)\n \t\treturn\n \t}\n@@ -922,7 +922,7 @@\n \n loadPersistentEndgameCache :: proc(path: string) {\n \tdata, ok := os.read_entire_file(path, context.allocator)\n-\tif !ok do return\n+\tif ok != nil do return\n \tdefer delete(data)\n \n \tif len(data) < ENDGAME_CACHE_HEADER_SIZE do return\n@@ -971,7 +971,7 @@\n \t\toffset += ENDGAME_CACHE_ENTRY_SIZE\n \t}\n \n-\tif os.write_entire_file(path, data) {\n+\tif os.write_entire_file(path, data) == nil {\n \t\tendgameTableDirty = false\n \t\tfmt.println(\"Saved endgame cache entries:\", entry_count)\n \t}\n"
+  },
+  {
+    "file": "idiomatic/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.thor",
+    "reason": "Adapt copied legacy examples to the current Odin API / restore missing debug helper",
+    "patch": "--- before/idiomatic/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.thor\n+++ after/idiomatic/Odin_Projects/tic-tac-toe_gui/tic-tac-toe_test.thor\n@@ -1,6 +1,7 @@\n package main\n \n import \"core:testing\"\n+import \"core:fmt\"\n import \"core:math/rand\"\n \n BLANK       :: `  . . .\n@@ -138,3 +139,6 @@\n \texpect_forced_win(t, DRAW_FINISH, .X, pos{2, 2}, false, \"final move draws\")\n \texpect_forced_win(t, DRAW_FINISH, .O, pos{2, 2}, false, \"final move still does not give O a win\")\n }\n+\n+// Restore the archived test helper's missing board printer.\n+printBoard :: proc(g: Game) { fmt.println(g.board) }\n"
+  }
+]

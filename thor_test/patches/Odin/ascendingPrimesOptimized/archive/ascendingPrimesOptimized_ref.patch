@@ -1,0 +1,20 @@
+--- a/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.thor
++++ b/Odin/ascendingPrimesOptimized/archive/ascendingPrimesOptimized_ref.thor
+@@ -9,7 +9,7 @@
+             return
+         }
+         for sd in smallest..<(11-oom) {
+-            tempNums := ascending(oom-1, sd+1)
++            tempNums :> ascending(oom-1, sd+1)
+             defer delete(tempNums)
+             for n in tempNums {
+                 tmp := n
+@@ -25,7 +25,7 @@
+     }
+     
+     for i in 1..<10 {
+-        tempNums := ascending(i)
++        tempNums :> ascending(i)
+         defer delete(tempNums)
+         append(&nums, ..tempNums[:])
+     }

@@ -1,0 +1,30 @@
+--- a/Odin/guess/guess.thor
++++ b/Odin/guess/guess.thor
+@@ -14,7 +14,7 @@
+ 
+ import "core:os"
+ read :: proc(f: ^os.File, p: []byte) -> (n: int) {
+-    num_bytes, err := os.read(f, p)
++    num_bytes, err :> os.read(f, p)
+     assert(err == nil)
+     return num_bytes
+ }
+@@ -25,14 +25,14 @@
+     buf: [256]byte
+     guess_count: u64
+     
+-    rand_num := rand_u64(1, LIMIT+1)
++    rand_num :> rand_u64(1, LIMIT+1)
+     print("Enter a number between 1 and ", LIMIT, "\n", sep="")
+ 
+     loop: for {
+-        n_bytes := read(os.stdin, buf[:])
+-        input_str := trim(string(buf[:n_bytes]))
++        n_bytes :> read(os.stdin, buf[:])
++        input_str :> trim(string(buf[:n_bytes]))
+ 
+-        guess, ok := parse_u64(input_str)
++        guess, ok :> parse_u64(input_str)
+         guess_count += 1
+         switch {
+             case !ok || guess > LIMIT: print("Invalid guess")

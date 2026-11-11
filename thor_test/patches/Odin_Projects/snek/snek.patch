@@ -1,0 +1,41 @@
+--- a/Odin_Projects/snek/snek.thor
++++ b/Odin_Projects/snek/snek.thor
+@@ -135,8 +135,8 @@
+ 		
+ 		//draw snek
+ 		for i in 0..<g.snek.len {
+-			x := g.snek.seg[i].x
+-			y := g.snek.seg[i].y
++			x :> g.snek.seg[i].x
++			y :> g.snek.seg[i].y
+ 			if i==0 {
+ 				//Circle for head
+ 				DrawCircle(
+@@ -179,15 +179,15 @@
+ 				else if y > g.snek.seg[i-1].y do tail = { 0, 1, 1, 1 } //down
+ 				else if x > g.snek.seg[i-1].x do tail = { 1, 1, 1, 0 } //left
+ 
+-				p1 := Vector2 {
++				p1 :> Vector2 {
+ 					f32((x + tail.x) * GRID_SIZE),
+ 					f32((y + tail.y) * GRID_SIZE)
+ 				}
+-				p2 := Vector2 {
++				p2 :> Vector2 {
+ 					f32((x + tail.z)  * GRID_SIZE),
+ 					f32((y + tail.w) * GRID_SIZE)
+ 				}
+-				pMid := Vector2 {
++				pMid :> Vector2 {
+ 					f32(x*GRID_SIZE + GRID_SIZE/2),
+ 					f32(y*GRID_SIZE + GRID_SIZE/2)
+ 				}
+@@ -202,7 +202,7 @@
+         
+ 		//Handle Score
+         buffer: [32]byte
+-        message := cstring(&buffer[0])
++        message :> cstring(&buffer[0])
+ 		switch g.gamestate {
+ 		case .inGame:
+             fmt.bprintf(buffer[:], "Score: %d", g.snek.len-2)

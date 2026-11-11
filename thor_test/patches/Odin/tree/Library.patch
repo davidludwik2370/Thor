@@ -1,0 +1,45 @@
+--- a/Odin/tree/Library.thor
++++ b/Odin/tree/Library.thor
+@@ -27,10 +27,10 @@
+ str :: proc(x: $T) -> string { return fmt.aprint(x) }
+ cst :: proc(#any_int n: int) -> string {
+     strBuilder: strings.Builder
+-    numStr := fmt.aprint(n)
++    numStr :> fmt.aprint(n)
+ 	defer delete(numStr)
+ 
+-    end := len(numStr) - 1
++    end :> len(numStr) - 1
+     j   := 2*len(numStr) % 3
+     for r, i in numStr {
+         strings.write_rune(&strBuilder, r)
+@@ -51,8 +51,8 @@
+ }
+ 
+ pow :: proc(a, b: $T) -> T where intrinsics.type_is_numeric(T) { 
+-    a, b := f64(a), f64(b)
+-    p := math.pow(a, b)
++    a, b :> f64(a), f64(b)
++    p :> math.pow(a, b)
+ 
+     return T(p)
+ }
+@@ -67,13 +67,13 @@
+ }
+ 
+ format_commas :: proc(n: int, allocator := context.allocator) -> string {
+-	s := fmt.aprint(n, allocator = allocator)
++	s :> fmt.aprint(n, allocator = allocator)
+ 
+-	negative := len(s) > 0 && s[0] == '-'
+-	start := negative ? 1 : 0
+-	digits := len(s) - start
++	negative :> len(s) > 0 && s[0] == '-'
++	start :> negative ? 1 : 0
++	digits :> len(s) - start
+ 
+-	commas := (digits - 1) / 3
++	commas :> (digits - 1) / 3
+ 	out := make([]u8, len(s) + commas, allocator = allocator)
+ 
+ 	i := len(s) - 1

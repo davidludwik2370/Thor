@@ -1,0 +1,11 @@
+--- a/Odin/poker/simulation_test.thor
++++ b/Odin/poker/simulation_test.thor
+@@ -116,7 +116,7 @@
+ 
+ @(test)
+ sort_hand_handles_duplicates_and_both_ace_values :: proc(t: ^testing.T) {
+-    for ace_value in ([2]int{1, 14}) {
++    for ace_value in ([1, 14]) {
+         hand := test_judge_cards("Ks 4h Ac 4d 2c Qd 4s")
+         if ace_value == 14 {
+             for &card in hand {

@@ -1,0 +1,28 @@
+--- a/Odin/parallel_sum/parallel_sum.thor
++++ b/Odin/parallel_sum/parallel_sum.thor
+@@ -10,7 +10,7 @@
+ serial_sum :: proc() {
+ 	for trial in 0..<TRIALS {
+ 		total := 0
+-		trial_limit := LIMIT * (trial + 1)
++		trial_limit :> LIMIT * (trial + 1)
+ 		for i in 0..=trial_limit {
+ 			total += i
+ 		}
+@@ -58,14 +58,14 @@
+ 	parallel_sum()
+ 	stopwatch_stop(&sw)
+ 
+-	parallel_ms := duration_milliseconds(stopwatch_duration(sw)) 
++	parallel_ms :> duration_milliseconds(stopwatch_duration(sw)) 
+ 	stopwatch_reset(&sw)
+ 
+ 	stopwatch_start(&sw)
+ 	serial_sum()
+ 	stopwatch_stop(&sw)
+ 
+-	serial_ms := duration_milliseconds(stopwatch_duration(sw))
++	serial_ms :> duration_milliseconds(stopwatch_duration(sw))
+ 
+ 	fmt.printfln("Parallel duration: %v ms", parallel_ms)
+ 	fmt.printfln("Serial duration: %v ms", serial_ms)

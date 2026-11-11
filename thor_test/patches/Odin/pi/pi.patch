@@ -1,0 +1,11 @@
+--- a/Odin/pi/pi.thor
++++ b/Odin/pi/pi.thor
+@@ -19,7 +19,7 @@
+         }
+     }
+ 
+-    pie := 4 * f64(times_in) / f64(NUM_TESTS)
++    pie :> 4 * f64(times_in) / f64(NUM_TESTS)
+ 
+     
+ 	print(pie)

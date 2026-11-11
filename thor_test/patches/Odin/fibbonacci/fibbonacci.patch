@@ -1,0 +1,38 @@
+--- a/Odin/fibbonacci/fibbonacci.thor
++++ b/Odin/fibbonacci/fibbonacci.thor
+@@ -1,29 +1,15 @@
+ package main
+-
+-import "core:fmt"
+-println :: fmt.println
+-
+-import "core:math/big"
+-Int  :: big.Int
+-set  :: big.set
+-itoa :: big.itoa
+-copy :: big.copy
+-add  :: big.add
++import "core:fmt" / println
+ 
+ LIMIT :: 10
+ 
+ main :: proc() {
+-
+-    a, b, temp: Int
+-
+-    set(&a, 0)
+-    set(&b, 1)
++    a, b: Integer = 0, 1
++    defer delete(a)
++    defer delete(b)
+ 
+     for i in 0..=LIMIT {
+-        println(i, ") ", itoa(&a) or_else "", sep="")
+-        copy(&temp, &b)
+-        add(&b, &a, &b)
+-        copy(&a, &temp)
++        println(f"{i}) {a}")
++        a, b = b, a + b
+     }
+-
+ }

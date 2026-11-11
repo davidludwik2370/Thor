@@ -1,0 +1,38 @@
+--- a/Odin/md5/md5.thor
++++ b/Odin/md5/md5.thor
+@@ -35,7 +35,7 @@
+ read_all :: proc(f: ^os.File) -> (data: [dynamic]byte, err: os.Error) {
+     buffer: [16 * 1024]byte
+     for {
+-        n, err := os.read(f, buffer[:])
++        n, err :> os.read(f, buffer[:])
+         switch err {
+             case nil:  append(&data, ..buffer[:n])
+             case .EOF: return data, nil
+@@ -53,7 +53,7 @@
+ 
+     handle := os.stdin
+     if len(os.args) == 2 {
+-        open_handle, open_err := os.open(os.args[1])
++        open_handle, open_err :> os.open(os.args[1])
+         if open_err != nil {
+             fmt.eprintln("Error opening file:", open_err)
+             os.exit(1)
+@@ -66,7 +66,7 @@
+         fmt.eprintln("Error reading input:", read_err)
+         os.exit(1)
+     }
+-    original_bit_length := u64(len(data)) * 8
++    original_bit_length :> u64(len(data)) * 8
+ 
+     // set correct padding, length congruent to 56 mod 64
+     append(&data, 0b1000_0000)
+@@ -76,7 +76,7 @@
+     assert(len(data) % 64 == 56)
+ 
+     // append original bit length as 8 bytes le
+-    length_offset := len(data)
++    length_offset :> len(data)
+     resize(&data, length_offset + 8)
+     endian.unchecked_put_u64le(data[length_offset:], original_bit_length)
+     assert(len(data) % 64 == 0, "Data length is not a multiple of 64")
