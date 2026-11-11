@@ -1,0 +1,5446 @@
+{
+  "date": "2026-11-11",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "baseline_commit": "bf566d0",
+  "code_commit": "6db5edc5527c2c631027d0bda91529ea8ce69dfc",
+  "compiler_source_sha256": "7b180289db4046e147121613c7457e2b13b4cf5b1466e0550895d5336ee2f6d5",
+  "scope": "Remaining native migration guards, pure-result defaults, source diagnostics and capability metadata. No Odin changes or new language features.",
+  "validation": {
+    "compiler_methods": 759,
+    "groups": {
+      "focused-0": {
+        "methods": 411,
+        "seconds": 750.621,
+        "passed": true
+      },
+      "focused-1": {
+        "methods": 292,
+        "seconds": 792.451,
+        "passed": true
+      },
+      "final-guard-tests": {
+        "methods": 18,
+        "seconds": 258.697,
+        "passed": true
+      },
+      "final-big-regressions": {
+        "methods": 38,
+        "seconds": 377.687,
+        "passed": true
+      },
+      "final-tls": {
+        "methods": 170,
+        "seconds": 210.888,
+        "passed": true
+      },
+      "final-debugger": {
+        "methods": 42,
+        "seconds": 114.682,
+        "passed": true
+      },
+      "final-hygiene": {
+        "methods": 7,
+        "seconds": 13.757,
+        "passed": true
+      }
+    },
+    "rust_units": {
+      "debug": 53,
+      "release": 53
+    },
+    "clippy_all_targets_deny_warnings": true,
+    "language_module_groups": [
+      [
+        "tests.test_rust_compiler",
+        "tests.test_rust_pure_projections",
+        "tests.test_rust_call_eligibility",
+        "tests.test_rust_type_parameters",
+        "tests.test_rust_defaults_parity",
+        "tests.test_rust_local_ownership",
+        "tests.test_rust_helper_ownership",
+        "tests.test_rust_union_copies",
+        "tests.test_rust_evaluation",
+        "tests.test_rust_evaluation_cache",
+        "tests.test_rust_cached_execution",
+        "tests.test_rust_scalar_execution",
+        "tests.test_rust_local_evaluation",
+        "tests.test_rust_scheduling",
+        "tests.test_rust_diagnostics"
+      ],
+      [
+        "tests.test_rust_purity",
+        "tests.test_rust_generic_purity",
+        "tests.test_rust_generic_branches",
+        "tests.test_rust_conditional_purity",
+        "tests.test_rust_conditional_bindings",
+        "tests.test_rust_pure_call_errors",
+        "tests.test_rust_pure_records",
+        "tests.test_rust_pure_conversions",
+        "tests.test_rust_checked_calls",
+        "tests.test_rust_borrow_model",
+        "tests.test_rust_storage_parity",
+        "tests.test_rust_evaluation_inputs",
+        "tests.test_rust_evaluation_keys",
+        "tests.test_rust_native_evaluation",
+        "tests.test_rust_prepared_execution",
+        "tests.test_rust_numeric_evaluation",
+        "tests.test_rust_extrema_evaluation",
+        "tests.test_rust_specialization",
+        "tests.test_rust_helper_replay",
+        "tests.test_rust_helper_graph_edges",
+        "tests.test_rust_parallel"
+      ]
+    ],
+    "additional_big_modules": [
+      "tests.test_rust_big_purity",
+      "tests.test_rust_big_integration",
+      "tests.test_rust_big_values",
+      "tests.test_rust_big_execution"
+    ],
+    "projects": {
+      "count": 19,
+      "engines": [
+        "python",
+        "rust"
+      ],
+      "builds_passed": 38,
+      "original_thor_sources_unchanged": true,
+      "results": [
+        {
+          "project": "15_puzzle",
+          "python": {
+            "status": 0,
+            "elapsed": 3.007333583984291,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 1.093981915997574,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "Dijkstra",
+          "python": {
+            "status": 0,
+            "elapsed": 2.1180008329974953,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5937297499913257,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "ascending_primes",
+          "python": {
+            "status": 0,
+            "elapsed": 4.471357708011055,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 1.4481396669871174,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "big_num_demo",
+          "python": {
+            "status": 0,
+            "elapsed": 0.9732856249902397,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.43570474997977726,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "bin_tree",
+          "python": {
+            "status": 0,
+            "elapsed": 3.830000874993857,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5713750410068315,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "circles_on_dots",
+          "python": {
+            "status": 0,
+            "elapsed": 3.2003552080132067,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 2.3440553749969695,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "double_bet",
+          "python": {
+            "status": 0,
+            "elapsed": 1.467564541992033,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.6441211249912158,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "hilo",
+          "python": {
+            "status": 0,
+            "elapsed": 0.9361557909869589,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.619428792007966,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "life",
+          "python": {
+            "status": 0,
+            "elapsed": 1.3013455839827657,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5640027920017019,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "md5",
+          "python": {
+            "status": 0,
+            "elapsed": 1.394074209005339,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.613729125005193,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "othello",
+          "python": {
+            "status": 0,
+            "elapsed": 1.483670624991646,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5914093329920433,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "poker",
+          "python": {
+            "status": 0,
+            "elapsed": 2.1895562919962686,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.7215980410110205,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "pythagorean_tripples",
+          "python": {
+            "status": 0,
+            "elapsed": 3.2122963340079878,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5348010830057319,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "react_time",
+          "python": {
+            "status": 0,
+            "elapsed": 1.0406287079968024,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5387941249937285,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "sandbox",
+          "python": {
+            "status": 0,
+            "elapsed": 0.8748004160006531,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.48140533300465904,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "sketch",
+          "python": {
+            "status": 0,
+            "elapsed": 1.4689270420058165,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.6564142499992158,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "sudoku",
+          "python": {
+            "status": 0,
+            "elapsed": 1.424485417024698,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.542473790992517,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "tetris",
+          "python": {
+            "status": 0,
+            "elapsed": 1.617785125010414,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.5447717499919236,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        },
+        {
+          "project": "triangle_solver",
+          "python": {
+            "status": 0,
+            "elapsed": 6.167651875002775,
+            "stdout": "",
+            "stderr": "{\"error_count\": 0, \"errors\": []}\n"
+          },
+          "rust": {
+            "status": 0,
+            "elapsed": 0.48382887500338256,
+            "stdout": "",
+            "stderr": "{\"error_count\":0,\"errors\":[]}\n"
+          }
+        }
+      ]
+    }
+  },
+  "helper_stress": {
+    "cases": 64,
+    "parallel_processes": 4,
+    "default_execution_deadline_seconds": 5,
+    "results": [
+      {
+        "helper_compilations": 1,
+        "case": 0,
+        "seconds": 1.556651458988199,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 1,
+        "seconds": 8.560535208001966,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 2,
+        "seconds": 1.9787812499853317,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 3,
+        "seconds": 22.181012958986685,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 4,
+        "seconds": 1.2106114579946734,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 5,
+        "seconds": 8.410217249998823,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 6,
+        "seconds": 1.6128704579896294,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 7,
+        "seconds": 21.92409745801706,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 8,
+        "seconds": 1.1646305000176653,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 9,
+        "seconds": 8.04911754099885,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 10,
+        "seconds": 1.848483915993711,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 11,
+        "seconds": 21.522276958014118,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 12,
+        "seconds": 1.1220151250017807,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 13,
+        "seconds": 8.050714790995698,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 14,
+        "seconds": 1.6357854169909842,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 15,
+        "seconds": 21.267870874988148,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 16,
+        "seconds": 1.1443633750022855,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 17,
+        "seconds": 8.163523541996256,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 18,
+        "seconds": 1.6259307090076618,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 19,
+        "seconds": 21.464040209015366,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 20,
+        "seconds": 1.218139250006061,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 21,
+        "seconds": 7.875764916010667,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 22,
+        "seconds": 1.7043569160159677,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 23,
+        "seconds": 21.129029750009067,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 24,
+        "seconds": 1.1415529160003643,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 25,
+        "seconds": 7.974207874998683,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 26,
+        "seconds": 1.6777167500113137,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 27,
+        "seconds": 21.29426012499607,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 28,
+        "seconds": 1.2529277919966262,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 29,
+        "seconds": 8.031692374992417,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 30,
+        "seconds": 1.6876661659916863,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 31,
+        "seconds": 21.35212333299569,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 32,
+        "seconds": 1.1911322080122773,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 33,
+        "seconds": 7.736306957987836,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 34,
+        "seconds": 1.6152661250089295,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 35,
+        "seconds": 21.038343916996382,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 36,
+        "seconds": 1.1664025829813909,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 37,
+        "seconds": 7.785374459024752,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 38,
+        "seconds": 1.7248780409863684,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 39,
+        "seconds": 21.83301545798895,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 40,
+        "seconds": 1.3354302090010606,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 41,
+        "seconds": 8.87955900002271,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 42,
+        "seconds": 1.5916846669861116,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 43,
+        "seconds": 21.48340133301099,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 44,
+        "seconds": 1.309557250002399,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 45,
+        "seconds": 8.042204666999169,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 46,
+        "seconds": 1.5591594580037054,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 47,
+        "seconds": 21.220626249996712,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 48,
+        "seconds": 1.1919758330041077,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 49,
+        "seconds": 7.9356125830090605,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 50,
+        "seconds": 1.637248000013642,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 51,
+        "seconds": 21.325607499980833,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 52,
+        "seconds": 1.1881677499914076,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 53,
+        "seconds": 8.086946916009765,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 54,
+        "seconds": 1.6336795000243,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 55,
+        "seconds": 21.582593208993785,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 56,
+        "seconds": 1.3007681249873713,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 57,
+        "seconds": 7.864891750010429,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 58,
+        "seconds": 1.5933561669953633,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 59,
+        "seconds": 20.464973291993374,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 60,
+        "seconds": 1.1663432500208728,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 61,
+        "seconds": 7.73533970801509,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-debug"
+        ]
+      },
+      {
+        "helper_compilations": 1,
+        "case": 62,
+        "seconds": 1.6413669159810524,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      },
+      {
+        "helper_compilations": 15,
+        "case": 63,
+        "seconds": 19.42705254201428,
+        "status": 0,
+        "timeout": false,
+        "stdout": "",
+        "stderr": "{\"error_count\":0,\"errors\":[]}\n",
+        "flags": [
+          "-o:speed",
+          "-disable-assert",
+          "-no-bounds-check",
+          "-no-type-assert"
+        ]
+      }
+    ]
+  },
+  "performance": {
+    "date": "2026-11-11",
+    "platform": "macOS-15.6-arm64-arm-64bit",
+    "binary_sha256": {
+      "before": "787e69cc3d293f074b0760fc194cc1fbcc2c09c8f9f9631cf3d3ba6ce364694c",
+      "after": "f40f1e09f17dd22a486b476bc82df6b11ec200d273d99d83f33bac7ac931fd57"
+    },
+    "runs_per_case_per_binary": 9,
+    "scope": "Quiet sequential direct release-executable transpiles, four workers. Before/after samples paired in alternating order. Initial invocations and separate profiles excluded. Final Odin backend excluded. Shared SDK parser cache retained.",
+    "cases": [
+      {
+        "case": "simple",
+        "project": "simple",
+        "flags": [],
+        "source_sha256": {
+          "main.thor": "eee7dfff7203726db74d53d43de3fe907696e18861dd7d26cd8ad5caddfa07c0"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 0.03198420797707513,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.019453458982752636,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01925654200022109,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01919454100425355,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01908008399186656,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.018948917015222833,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01908229201217182,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.019196958979591727,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.019264291011495516,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.019181500014383346,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.01919454100425355,
+            "p95_seconds": 0.019453458982752636,
+            "max_seconds": 0.019453458982752636,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 9,
+                "parser.cache_hits": 1,
+                "parser.nodes": 24,
+                "parser.source_requests": 1,
+                "permissions.analyses": 1,
+                "resolver.constructions": 2,
+                "resolver.index_builds": 1,
+                "resolver.index_reuses": 1
+              },
+              "elapsed_seconds": 0.015776625,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.292e-06,
+                  "self_seconds": 1.292e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 5.41e-07,
+                  "self_seconds": 5.41e-07
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 8.75e-07,
+                  "self_seconds": 8.75e-07
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 2e-06,
+                  "self_seconds": 2e-06
+                },
+                "analysis.discover_types": {
+                  "calls": 1,
+                  "inclusive_seconds": 9.17e-07,
+                  "self_seconds": 9.17e-07
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 5.417e-06,
+                  "self_seconds": 1.6250000000000001e-06
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 7.5e-07,
+                  "self_seconds": 7.5e-07
+                },
+                "analysis.purity": {
+                  "calls": 1,
+                  "inclusive_seconds": 4.17e-07,
+                  "self_seconds": 4.17e-07
+                },
+                "analysis.resolver_setup": {
+                  "calls": 2,
+                  "inclusive_seconds": 1.0708e-05,
+                  "self_seconds": 1.0583999999999999e-05
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 2.25e-06,
+                  "self_seconds": 2.25e-06
+                },
+                "analysis.using_projections": {
+                  "calls": 2,
+                  "inclusive_seconds": 1.24e-07,
+                  "self_seconds": 1.24e-07
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.015775209,
+                  "self_seconds": 6.300100000000003e-05
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000115583,
+                  "self_seconds": 0.000115583
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000630792,
+                  "self_seconds": 0.000612834
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.7958e-05,
+                  "self_seconds": 1.7958e-05
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 5.6917e-05,
+                  "self_seconds": 4.6251e-05
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001240916,
+                  "self_seconds": 0.00042691499999999993
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011160208,
+                  "self_seconds": 0.011160208
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 4.5041e-05,
+                  "self_seconds": 4.5041e-05
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 5.0542e-05,
+                  "self_seconds": 5.0542e-05
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 4.0958e-05,
+                  "self_seconds": 4.0958e-05
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000184,
+                  "self_seconds": 4.7458999999999994e-05
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.014471292,
+                  "self_seconds": 0.0031270840000000005
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {}
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 0.023832333012251183,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.019015291996765882,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.019155582995153964,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.019136166985845193,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01894783301395364,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.019491707993438467,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01916858399636112,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.018918833986390382,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.01909200000227429,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.0190853749809321,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.01909200000227429,
+            "p95_seconds": 0.019491707993438467,
+            "max_seconds": 0.019491707993438467,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 9,
+                "parser.cache_hits": 1,
+                "parser.nodes": 24,
+                "parser.source_requests": 1,
+                "permissions.analyses": 1,
+                "resolver.constructions": 2,
+                "resolver.index_builds": 1,
+                "resolver.index_reuses": 1
+              },
+              "elapsed_seconds": 0.015811375,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 2e-06,
+                  "self_seconds": 2e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 5.420000000000001e-07,
+                  "self_seconds": 5.420000000000001e-07
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.167e-06,
+                  "self_seconds": 1.167e-06
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 2e-06,
+                  "self_seconds": 2e-06
+                },
+                "analysis.discover_types": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.875e-06,
+                  "self_seconds": 1.875e-06
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 7e-06,
+                  "self_seconds": 1.9579999999999997e-06
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.66e-07,
+                  "self_seconds": 1.66e-07
+                },
+                "analysis.purity": {
+                  "calls": 1,
+                  "inclusive_seconds": 5.42e-07,
+                  "self_seconds": 5.42e-07
+                },
+                "analysis.resolver_setup": {
+                  "calls": 2,
+                  "inclusive_seconds": 1.2209000000000001e-05,
+                  "self_seconds": 1.1751e-05
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.709e-06,
+                  "self_seconds": 1.709e-06
+                },
+                "analysis.using_projections": {
+                  "calls": 2,
+                  "inclusive_seconds": 4.58e-07,
+                  "self_seconds": 4.58e-07
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.015809041,
+                  "self_seconds": 5.63749999999974e-05
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000115917,
+                  "self_seconds": 0.000115917
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000601042,
+                  "self_seconds": 0.0005843749999999999
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.6667e-05,
+                  "self_seconds": 1.6667e-05
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 5.7541e-05,
+                  "self_seconds": 4.5372999999999994e-05
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.0012295,
+                  "self_seconds": 0.00044300000000000003
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011264167,
+                  "self_seconds": 0.011264167
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 4.4958e-05,
+                  "self_seconds": 4.4958e-05
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 5.1666e-05,
+                  "self_seconds": 5.1666e-05
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 4.1708e-05,
+                  "self_seconds": 4.1708e-05
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000186292,
+                  "self_seconds": 4.7959999999999995e-05
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.014523166,
+                  "self_seconds": 0.003072707000000001
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {}
+            }
+          }
+        }
+      },
+      {
+        "case": "double_bet",
+        "project": "double_bet",
+        "flags": [],
+        "source_sha256": {
+          "double_bet.thor": "34a3fbcc53eec6723da8a2d226937a4d71ba7455d6685efc40f748210b291c1c"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 0.18891183301457204,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.17160754100768827,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.17291466699680313,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.17149670797516592,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16813658401952125,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.17046712501905859,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.17239558300934732,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16950270801316947,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16762270897743292,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16938479198142886,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.17046712501905859,
+            "p95_seconds": 0.17291466699680313,
+            "max_seconds": 0.17291466699680313,
+            "profile": {
+              "counters": {
+                "emit.files": 2,
+                "lookup.calls": 58579,
+                "lookup.canonical_path_resolutions": 4,
+                "lookup.import_directory_resolutions": 35,
+                "parallel.batches": 6,
+                "parallel.tasks": 25,
+                "parallel.workers": 18,
+                "parser.cache_hits": 27,
+                "parser.nodes": 35683,
+                "parser.source_requests": 27,
+                "permissions.analyses": 1,
+                "permissions.field_hits": 1,
+                "permissions.member_hits": 15,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 44,
+                "resolver.constructions": 4,
+                "resolver.index_builds": 1,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.163313292,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.584e-06,
+                  "self_seconds": 1.584e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 3.7208e-05,
+                  "self_seconds": 3.7208e-05
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00437925,
+                  "self_seconds": 0.0036538750000000004
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.005307042,
+                  "self_seconds": 0.0012785839999999993
+                },
+                "analysis.discover_types": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.007521167,
+                  "self_seconds": 5.645900000000002e-05
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.017218458,
+                  "self_seconds": 1.099899999999765e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.167e-06,
+                  "self_seconds": 1.167e-06
+                },
+                "analysis.purity": {
+                  "calls": 2,
+                  "inclusive_seconds": 8.75e-07,
+                  "self_seconds": 8.75e-07
+                },
+                "analysis.resolver_setup": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.004031291000000001,
+                  "self_seconds": 0.004030456
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000724084,
+                  "self_seconds": 0.000724084
+                },
+                "analysis.using_projections": {
+                  "calls": 4,
+                  "inclusive_seconds": 8.349999999999999e-07,
+                  "self_seconds": 8.349999999999999e-07
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.163310917,
+                  "self_seconds": 0.025141207999999998
+                },
+                "emit.file": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.025163916,
+                  "self_seconds": 0.025163916
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.004098083,
+                  "self_seconds": 0.004098083
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003531084,
+                  "self_seconds": 0.00350821
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.051000042,
+                  "self_seconds": 0.0009689989999999982
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011711375,
+                  "self_seconds": 0.011711375
+                },
+                "parser.cache_validation": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.01264125,
+                  "self_seconds": 0.01264125
+                },
+                "parser.decode": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.009091834,
+                  "self_seconds": 0.009091834
+                },
+                "parser.normalize": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.006048166,
+                  "self_seconds": 0.006048166
+                },
+                "parser.source": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.028625625000000002,
+                  "self_seconds": 0.0008443749999999993
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.087169667,
+                  "self_seconds": 0.05429737500000001
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "emit.serialize": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.0030886670000000002,
+                  "self_seconds": 0.0030886670000000002
+                },
+                "parser.cache_validation": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.043667336,
+                  "self_seconds": 0.043667336
+                },
+                "parser.decode": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.031347664000000004,
+                  "self_seconds": 0.031347664000000004
+                },
+                "parser.normalize": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.020243961,
+                  "self_seconds": 0.020243961
+                },
+                "parser.source": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.098195042,
+                  "self_seconds": 0.0029360810000000036
+                }
+              }
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 0.18341308398521505,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.16743887501070276,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.1727520840067882,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16990854099276476,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16947466600686312,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.1689494579914026,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.1691477500135079,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.17085750002297573,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.16786804198636673,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.1695735829998739,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.16947466600686312,
+            "p95_seconds": 0.1727520840067882,
+            "max_seconds": 0.1727520840067882,
+            "profile": {
+              "counters": {
+                "emit.files": 2,
+                "lookup.calls": 58579,
+                "lookup.canonical_path_resolutions": 4,
+                "lookup.import_directory_resolutions": 35,
+                "parallel.batches": 6,
+                "parallel.tasks": 25,
+                "parallel.workers": 18,
+                "parser.cache_hits": 27,
+                "parser.nodes": 35683,
+                "parser.source_requests": 27,
+                "permissions.analyses": 1,
+                "permissions.field_hits": 1,
+                "permissions.member_hits": 15,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 44,
+                "resolver.constructions": 4,
+                "resolver.index_builds": 1,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.1652975,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.625e-06,
+                  "self_seconds": 1.625e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 3.6374999999999996e-05,
+                  "self_seconds": 3.6374999999999996e-05
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.004544458,
+                  "self_seconds": 0.0037497510000000004
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.005443709,
+                  "self_seconds": 0.0013396679999999996
+                },
+                "analysis.discover_types": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.007485292,
+                  "self_seconds": 6.354199999999977e-05
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.017484708,
+                  "self_seconds": 1.1249000000001369e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.67e-07,
+                  "self_seconds": 1.67e-07
+                },
+                "analysis.purity": {
+                  "calls": 2,
+                  "inclusive_seconds": 8.74e-07,
+                  "self_seconds": 8.74e-07
+                },
+                "analysis.resolver_setup": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.004106833,
+                  "self_seconds": 0.004105918000000001
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00079325,
+                  "self_seconds": 0.00079325
+                },
+                "analysis.using_projections": {
+                  "calls": 4,
+                  "inclusive_seconds": 9.15e-07,
+                  "self_seconds": 9.15e-07
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.16528925,
+                  "self_seconds": 0.02593754199999998
+                },
+                "emit.file": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.024891958,
+                  "self_seconds": 0.024891958
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.004707125,
+                  "self_seconds": 0.004707125
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003593375,
+                  "self_seconds": 0.0035700830000000004
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.051596791,
+                  "self_seconds": 0.0009025409999999998
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011618042,
+                  "self_seconds": 0.011618042
+                },
+                "parser.cache_validation": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.012722124,
+                  "self_seconds": 0.012722124
+                },
+                "parser.decode": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.009120501,
+                  "self_seconds": 0.009120501
+                },
+                "parser.normalize": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.006329459,
+                  "self_seconds": 0.006329459
+                },
+                "parser.source": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.028979500000000002,
+                  "self_seconds": 0.0008074159999999993
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.087754917,
+                  "self_seconds": 0.054579125
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "emit.serialize": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.003059458,
+                  "self_seconds": 0.003059458
+                },
+                "parser.cache_validation": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.043444419000000005,
+                  "self_seconds": 0.043444419000000005
+                },
+                "parser.decode": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.032022418999999996,
+                  "self_seconds": 0.032022418999999996
+                },
+                "parser.normalize": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.020175086000000002,
+                  "self_seconds": 0.020175086000000002
+                },
+                "parser.source": {
+                  "calls": 23,
+                  "inclusive_seconds": 0.098742583,
+                  "self_seconds": 0.003100659000000001
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "case": "poker",
+        "project": "poker",
+        "flags": [],
+        "source_sha256": {
+          "poker_test.thor": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255",
+          "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+          "simulation_test.thor": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50",
+          "poker.thor": "5cf074eafb7786ba7f2f15656079398f10d31a08bcea8989ede9490a2c49c269"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 0.4430867499904707,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.42604187500546686,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.41514262501732446,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4233146660262719,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4248113340290729,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4199295840226114,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.41689395799767226,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4192896250169724,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.43757179199019447,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4299104580131825,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.4233146660262719,
+            "p95_seconds": 0.43757179199019447,
+            "max_seconds": 0.43757179199019447,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 143969,
+                "lookup.canonical_path_resolutions": 12,
+                "lookup.import_directory_resolutions": 43,
+                "parallel.batches": 3,
+                "parallel.tasks": 354,
+                "parallel.workers": 12,
+                "parser.cache_hits": 355,
+                "parser.nodes": 120238,
+                "parser.source_requests": 355,
+                "permissions.analyses": 3,
+                "permissions.dependency_retries": 2,
+                "permissions.field_hits": 1044,
+                "permissions.member_hits": 599,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 3541,
+                "resolver.constructions": 6,
+                "resolver.index_builds": 3,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.41745475,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.666e-06,
+                  "self_seconds": 1.666e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 3.4916e-05,
+                  "self_seconds": 3.4916e-05
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.190778541,
+                  "self_seconds": 0.04291149899999999
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008423958,
+                  "self_seconds": 0.00014708300000000098
+                },
+                "analysis.discover_types": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.149114501,
+                  "self_seconds": 0.149114501
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.275733292,
+                  "self_seconds": 8.000099999999621e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.25e-06,
+                  "self_seconds": 1.25e-06
+                },
+                "analysis.purity": {
+                  "calls": 4,
+                  "inclusive_seconds": 1.6239999999999998e-06,
+                  "self_seconds": 1.6239999999999998e-06
+                },
+                "analysis.resolver_setup": {
+                  "calls": 6,
+                  "inclusive_seconds": 0.041705792,
+                  "self_seconds": 0.041661875999999994
+                },
+                "analysis.slice_permissions": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.041794417,
+                  "self_seconds": 0.041794417
+                },
+                "analysis.using_projections": {
+                  "calls": 6,
+                  "inclusive_seconds": 4.3916000000000004e-05,
+                  "self_seconds": 4.3916000000000004e-05
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.417448666,
+                  "self_seconds": 0.08948804100000002
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008063625,
+                  "self_seconds": 0.008063625
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003389125,
+                  "self_seconds": 0.0020541250000000004
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001335,
+                  "self_seconds": 0.001335
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.015077375,
+                  "self_seconds": 0.015051375
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.304432,
+                  "self_seconds": 0.0021351259999999317
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.012433625,
+                  "self_seconds": 0.012433625
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003507417,
+                  "self_seconds": 0.003507417
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002531291,
+                  "self_seconds": 0.002531291
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00179475,
+                  "self_seconds": 0.00179475
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008015666,
+                  "self_seconds": 0.00018220799999999968
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.023528625,
+                  "self_seconds": 0.0030793339999999995
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "parser.cache_validation": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.191296041,
+                  "self_seconds": 0.191296041
+                },
+                "parser.decode": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.147270072,
+                  "self_seconds": 0.147270072
+                },
+                "parser.normalize": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.119027957,
+                  "self_seconds": 0.119027957
+                },
+                "parser.source": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.491372051,
+                  "self_seconds": 0.03377798099999999
+                }
+              }
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 0.43036737499642186,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.4182152910216246,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4169960839790292,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4144712910056114,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.41329220798797905,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4256234999920707,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4234441249864176,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.442220458004158,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.43797499997890554,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.42067929200129583,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.42067929200129583,
+            "p95_seconds": 0.442220458004158,
+            "max_seconds": 0.442220458004158,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 143969,
+                "lookup.canonical_path_resolutions": 12,
+                "lookup.import_directory_resolutions": 43,
+                "parallel.batches": 3,
+                "parallel.tasks": 354,
+                "parallel.workers": 12,
+                "parser.cache_hits": 355,
+                "parser.nodes": 120238,
+                "parser.source_requests": 355,
+                "permissions.analyses": 3,
+                "permissions.dependency_retries": 2,
+                "permissions.field_hits": 1044,
+                "permissions.member_hits": 599,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 3541,
+                "resolver.constructions": 6,
+                "resolver.index_builds": 3,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.420193375,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.625e-06,
+                  "self_seconds": 1.625e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 3.65e-05,
+                  "self_seconds": 3.65e-05
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.192882125,
+                  "self_seconds": 0.043695998999999985
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008367042,
+                  "self_seconds": 0.00014841699999999965
+                },
+                "analysis.discover_types": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.14841479200000002,
+                  "self_seconds": 0.14841479200000002
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.2777355,
+                  "self_seconds": 7.370800000006117e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 2.09e-07,
+                  "self_seconds": 2.09e-07
+                },
+                "analysis.purity": {
+                  "calls": 4,
+                  "inclusive_seconds": 4.207999999999999e-06,
+                  "self_seconds": 4.207999999999999e-06
+                },
+                "analysis.resolver_setup": {
+                  "calls": 6,
+                  "inclusive_seconds": 0.042116792,
+                  "self_seconds": 0.042068168999999996
+                },
+                "analysis.slice_permissions": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.043307750000000006,
+                  "self_seconds": 0.043307750000000006
+                },
+                "analysis.using_projections": {
+                  "calls": 6,
+                  "inclusive_seconds": 4.8623e-05,
+                  "self_seconds": 4.8623e-05
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.420189167,
+                  "self_seconds": 0.08948208399999996
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008997042,
+                  "self_seconds": 0.008997042
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003714709,
+                  "self_seconds": 0.002336709
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001378,
+                  "self_seconds": 0.001378
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.015323709,
+                  "self_seconds": 0.015298001
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.30798025,
+                  "self_seconds": 0.0021704980000000207
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011517417,
+                  "self_seconds": 0.011517417
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003592709,
+                  "self_seconds": 0.003592709
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00251175,
+                  "self_seconds": 0.00251175
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001799458,
+                  "self_seconds": 0.001799458
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008086583,
+                  "self_seconds": 0.00018266599999999973
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.022726833,
+                  "self_seconds": 0.0031228329999999985
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "parser.cache_validation": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.189751988,
+                  "self_seconds": 0.189751988
+                },
+                "parser.decode": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.146135998,
+                  "self_seconds": 0.146135998
+                },
+                "parser.normalize": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.11609821,
+                  "self_seconds": 0.11609821
+                },
+                "parser.source": {
+                  "calls": 354,
+                  "inclusive_seconds": 0.48713507399999995,
+                  "self_seconds": 0.03514887799999999
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "case": "hilo",
+        "project": "hilo",
+        "flags": [],
+        "source_sha256": {
+          "hilo.thor": "eab70c077b373ebf856b35fdc72b35bcab2a699e1516bfa127049865405f8504"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 0.2408298329974059,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.2278205830079969,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.21737550001125783,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.22936958298669197,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2286246659932658,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2318501669797115,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.22666833401308395,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2272785420063883,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.22713520799879916,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2178385419829283,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.2272785420063883,
+            "p95_seconds": 0.2318501669797115,
+            "max_seconds": 0.2318501669797115,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 17942,
+                "lookup.canonical_path_resolutions": 18,
+                "lookup.import_directory_resolutions": 21,
+                "parallel.batches": 2,
+                "parallel.tasks": 104,
+                "parallel.workers": 8,
+                "parser.cache_hits": 105,
+                "parser.nodes": 73128,
+                "parser.source_requests": 105,
+                "permissions.analyses": 1,
+                "permissions.field_hits": 1,
+                "permissions.member_hits": 12,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 175,
+                "resolver.constructions": 5,
+                "resolver.index_builds": 2,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.219973209,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000306833,
+                  "self_seconds": 0.000306833
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 7.5840000000000006e-06,
+                  "self_seconds": 7.5840000000000006e-06
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.061394625,
+                  "self_seconds": 0.016443625000000003
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.007118625,
+                  "self_seconds": 5.5499999999999994e-05
+                },
+                "analysis.discover_types": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.100228958,
+                  "self_seconds": 0.100228958
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.136920292,
+                  "self_seconds": 2.4333999999986977e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 6.5e-06,
+                  "self_seconds": 6.5e-06
+                },
+                "analysis.purity": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.0007377099999999999,
+                  "self_seconds": 0.0007377099999999999
+                },
+                "analysis.resolver_setup": {
+                  "calls": 5,
+                  "inclusive_seconds": 0.016771124000000002,
+                  "self_seconds": 0.016764582
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002884458,
+                  "self_seconds": 0.002884458
+                },
+                "analysis.using_projections": {
+                  "calls": 5,
+                  "inclusive_seconds": 6.541999999999999e-06,
+                  "self_seconds": 6.541999999999999e-06
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.219969417,
+                  "self_seconds": 0.05592808400000002
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00426,
+                  "self_seconds": 0.00426
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.0028285,
+                  "self_seconds": 0.0014381669999999997
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001390333,
+                  "self_seconds": 0.001390333
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000968041,
+                  "self_seconds": 0.000961332
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.146943583,
+                  "self_seconds": 0.0014271249999999736
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.01177725,
+                  "self_seconds": 0.01177725
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000926542,
+                  "self_seconds": 0.000926542
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000697208,
+                  "self_seconds": 0.000697208
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000454916,
+                  "self_seconds": 0.000454916
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002158292,
+                  "self_seconds": 7.962599999999974e-05
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.01709775,
+                  "self_seconds": 0.0031622079999999997
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "parser.cache_validation": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.11813258400000001,
+                  "self_seconds": 0.11813258400000001
+                },
+                "parser.decode": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.09097503500000001,
+                  "self_seconds": 0.09097503500000001
+                },
+                "parser.normalize": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.070315044,
+                  "self_seconds": 0.070315044
+                },
+                "parser.source": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.292993035,
+                  "self_seconds": 0.013570371999999997
+                }
+              }
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 0.2296210000058636,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.22149904200341552,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.22584729199297726,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2227019160054624,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.22440375000587665,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.22647899997537024,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2315064999856986,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2184220000053756,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2233573329867795,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.21860087499953806,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.2233573329867795,
+            "p95_seconds": 0.2315064999856986,
+            "max_seconds": 0.2315064999856986,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 17942,
+                "lookup.canonical_path_resolutions": 18,
+                "lookup.import_directory_resolutions": 21,
+                "parallel.batches": 2,
+                "parallel.tasks": 104,
+                "parallel.workers": 8,
+                "parser.cache_hits": 105,
+                "parser.nodes": 73128,
+                "parser.source_requests": 105,
+                "permissions.analyses": 1,
+                "permissions.field_hits": 1,
+                "permissions.member_hits": 12,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 175,
+                "resolver.constructions": 5,
+                "resolver.index_builds": 2,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.21388525,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000306667,
+                  "self_seconds": 0.000306667
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 6.625e-06,
+                  "self_seconds": 6.625e-06
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.058900458,
+                  "self_seconds": 0.016025041000000004
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.006935791,
+                  "self_seconds": 5.979100000000001e-05
+                },
+                "analysis.discover_types": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.097992667,
+                  "self_seconds": 0.097992667
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.1334475,
+                  "self_seconds": 1.9541999999983517e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 6.084e-06,
+                  "self_seconds": 6.084e-06
+                },
+                "analysis.purity": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.000799,
+                  "self_seconds": 0.000799
+                },
+                "analysis.resolver_setup": {
+                  "calls": 5,
+                  "inclusive_seconds": 0.015686457,
+                  "self_seconds": 0.015679957999999997
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003096917,
+                  "self_seconds": 0.003096917
+                },
+                "analysis.using_projections": {
+                  "calls": 5,
+                  "inclusive_seconds": 6.499e-06,
+                  "self_seconds": 6.499e-06
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.213882208,
+                  "self_seconds": 0.053924499999999986
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.003973791,
+                  "self_seconds": 0.003973791
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002723333,
+                  "self_seconds": 0.0013440000000000001
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001379333,
+                  "self_seconds": 0.001379333
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000888334,
+                  "self_seconds": 0.000882042
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.142869125,
+                  "self_seconds": 0.001291168000000037
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011816,
+                  "self_seconds": 0.011816
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000919375,
+                  "self_seconds": 0.000919375
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00071425,
+                  "self_seconds": 0.00071425
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000446042,
+                  "self_seconds": 0.000446042
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002161959,
+                  "self_seconds": 8.229199999999987e-05
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.017088583,
+                  "self_seconds": 0.003110624000000001
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "parser.cache_validation": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.11737849400000001,
+                  "self_seconds": 0.11737849400000001
+                },
+                "parser.decode": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.091436456,
+                  "self_seconds": 0.091436456
+                },
+                "parser.normalize": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.072337331,
+                  "self_seconds": 0.072337331
+                },
+                "parser.source": {
+                  "calls": 104,
+                  "inclusive_seconds": 0.294392209,
+                  "self_seconds": 0.013239927999999998
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "case": "circles_on_dots",
+        "project": "circles_on_dots",
+        "flags": [],
+        "source_sha256": {
+          "cricles_on_dots.thor": "50b916158b50716793daee02d2d5dcc82aa34891788340c8fe31403c188cd8b5"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 2.0121527500159573,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 3,
+                  "writes": 3
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.3493689580063801,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34597270798985846,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.3560070840176195,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34851524999248795,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.3421592079976108,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34997049998492,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.3605133749952074,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.37004874998820014,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34842770898831077,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              }
+            ],
+            "median_seconds": 0.3493689580063801,
+            "p95_seconds": 0.37004874998820014,
+            "max_seconds": 0.37004874998820014,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 133902,
+                "lookup.canonical_path_resolutions": 35,
+                "lookup.import_directory_resolutions": 24,
+                "lookup.using_candidates": 34820,
+                "parallel.batches": 2,
+                "parallel.tasks": 29,
+                "parallel.workers": 8,
+                "parser.cache_hits": 30,
+                "parser.nodes": 68150,
+                "parser.source_requests": 30,
+                "permissions.analyses": 2,
+                "permissions.field_hits": 120,
+                "permissions.member_hits": 220,
+                "permissions.type_hits": 1768,
+                "projection.reference_visits": 3740,
+                "resolver.constructions": 5,
+                "resolver.index_builds": 2,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.336620292,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000100959,
+                  "self_seconds": 0.000100959
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 2.1292e-05,
+                  "self_seconds": 2.1292e-05
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.056188334,
+                  "self_seconds": 0.022741332999999996
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.010958708,
+                  "self_seconds": 7.370799999999872e-05
+                },
+                "analysis.discover_types": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.09194625099999999,
+                  "self_seconds": 0.09194625099999999
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.155151,
+                  "self_seconds": 1.574900000000934e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 4.083e-06,
+                  "self_seconds": 4.083e-06
+                },
+                "analysis.purity": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.001031708,
+                  "self_seconds": 0.001031708
+                },
+                "analysis.resolver_setup": {
+                  "calls": 5,
+                  "inclusive_seconds": 0.028824625000000003,
+                  "self_seconds": 0.017096041
+                },
+                "analysis.slice_permissions": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.032978583,
+                  "self_seconds": 0.032978583
+                },
+                "analysis.using_projections": {
+                  "calls": 5,
+                  "inclusive_seconds": 0.011728584000000002,
+                  "self_seconds": 0.011728584000000002
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.336616833,
+                  "self_seconds": 0.05267250099999998
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.006399291,
+                  "self_seconds": 0.006399291
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00284875,
+                  "self_seconds": 0.0014366250000000002
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001412125,
+                  "self_seconds": 0.001412125
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.077561792,
+                  "self_seconds": 0.075143917
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.263734416,
+                  "self_seconds": 0.0016041670000000452
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.01173575,
+                  "self_seconds": 0.01173575
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002267958,
+                  "self_seconds": 0.002267958
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001641875,
+                  "self_seconds": 0.001641875
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001116625,
+                  "self_seconds": 0.001116625
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.005167459,
+                  "self_seconds": 0.00014100100000000084
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.020209916,
+                  "self_seconds": 0.0033067070000000025
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "parser.cache_validation": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.11002762299999999,
+                  "self_seconds": 0.11002762299999999
+                },
+                "parser.decode": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.087485582,
+                  "self_seconds": 0.087485582
+                },
+                "parser.normalize": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.08733429300000001,
+                  "self_seconds": 0.08733429300000001
+                },
+                "parser.source": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.293304207,
+                  "self_seconds": 0.008456708999999995
+                }
+              }
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 1.8445965420105495,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 3,
+                  "writes": 3
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.352471666992642,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34112537500914186,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.3412052500061691,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34491045799222775,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34156183298910037,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.36738879201584496,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34228349998011254,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.3412100409914274,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              },
+              {
+                "seconds": 0.34233245899667963,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 3,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 3
+                }
+              }
+            ],
+            "median_seconds": 0.34228349998011254,
+            "p95_seconds": 0.36738879201584496,
+            "max_seconds": 0.36738879201584496,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 133902,
+                "lookup.canonical_path_resolutions": 35,
+                "lookup.import_directory_resolutions": 24,
+                "lookup.using_candidates": 34820,
+                "parallel.batches": 2,
+                "parallel.tasks": 29,
+                "parallel.workers": 8,
+                "parser.cache_hits": 30,
+                "parser.nodes": 68150,
+                "parser.source_requests": 30,
+                "permissions.analyses": 2,
+                "permissions.field_hits": 120,
+                "permissions.member_hits": 220,
+                "permissions.type_hits": 1768,
+                "projection.reference_visits": 3740,
+                "resolver.constructions": 5,
+                "resolver.index_builds": 2,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.335725959,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 9.7459e-05,
+                  "self_seconds": 9.7459e-05
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 2e-05,
+                  "self_seconds": 2e-05
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.057049,
+                  "self_seconds": 0.023091207000000002
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011449833,
+                  "self_seconds": 7.070799999999919e-05
+                },
+                "analysis.discover_types": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.091837458,
+                  "self_seconds": 0.091837458
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.156465083,
+                  "self_seconds": 2.0332999999983503e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 3.792e-06,
+                  "self_seconds": 3.792e-06
+                },
+                "analysis.purity": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.001065625,
+                  "self_seconds": 0.001065625
+                },
+                "analysis.resolver_setup": {
+                  "calls": 5,
+                  "inclusive_seconds": 0.029664626000000003,
+                  "self_seconds": 0.018043126000000003
+                },
+                "analysis.slice_permissions": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.033609083,
+                  "self_seconds": 0.033609083
+                },
+                "analysis.using_projections": {
+                  "calls": 5,
+                  "inclusive_seconds": 0.011621500000000002,
+                  "self_seconds": 0.011621500000000002
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.335722083,
+                  "self_seconds": 0.05154420799999998
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.006726167,
+                  "self_seconds": 0.006726167
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002699,
+                  "self_seconds": 0.001393292
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001305708,
+                  "self_seconds": 0.001305708
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.076253125,
+                  "self_seconds": 0.07388054200000001
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.264361292,
+                  "self_seconds": 0.0015752919999999504
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.01170275,
+                  "self_seconds": 0.01170275
+                },
+                "parser.cache_validation": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.002191083,
+                  "self_seconds": 0.002191083
+                },
+                "parser.decode": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00161925,
+                  "self_seconds": 0.00161925
+                },
+                "parser.normalize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001067209,
+                  "self_seconds": 0.001067209
+                },
+                "parser.source": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.005014708,
+                  "self_seconds": 0.00013716599999999933
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.019816583,
+                  "self_seconds": 0.003099125000000001
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "parser.cache_validation": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.108305208,
+                  "self_seconds": 0.108305208
+                },
+                "parser.decode": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.08576812200000002,
+                  "self_seconds": 0.08576812200000002
+                },
+                "parser.normalize": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.08804729099999999,
+                  "self_seconds": 0.08804729099999999
+                },
+                "parser.source": {
+                  "calls": 29,
+                  "inclusive_seconds": 0.29076016699999996,
+                  "self_seconds": 0.008639545999999994
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "case": "poker-test",
+        "project": "poker",
+        "flags": [
+          "-build-mode:test"
+        ],
+        "source_sha256": {
+          "poker_test.thor": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255",
+          "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+          "simulation_test.thor": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50",
+          "poker.thor": "5cf074eafb7786ba7f2f15656079398f10d31a08bcea8989ede9490a2c49c269"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 0.918609957996523,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.8819869169965386,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8841151669912506,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8811751249886584,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8890571249939967,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8769062079954892,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8744481659960002,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8791767499933485,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8913045410008635,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.9129870409960859,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.8819869169965386,
+            "p95_seconds": 0.9129870409960859,
+            "max_seconds": 0.9129870409960859,
+            "profile": {
+              "counters": {
+                "emit.files": 4,
+                "lookup.calls": 1520572,
+                "lookup.canonical_path_resolutions": 12,
+                "lookup.import_directory_resolutions": 104,
+                "parallel.batches": 6,
+                "parallel.tasks": 460,
+                "parallel.workers": 24,
+                "parser.cache_hits": 456,
+                "parser.nodes": 152185,
+                "parser.source_requests": 456,
+                "permissions.analyses": 3,
+                "permissions.dependency_retries": 2,
+                "permissions.field_hits": 3606,
+                "permissions.member_hits": 1738,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 12015,
+                "resolver.constructions": 7,
+                "resolver.index_builds": 4,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.911865708,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.791e-06,
+                  "self_seconds": 1.791e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.000269626,
+                  "self_seconds": 0.000269626
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.546170792,
+                  "self_seconds": 0.16207224899999995
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.014148375,
+                  "self_seconds": 0.0006021250000000002
+                },
+                "analysis.discover_types": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.186342292,
+                  "self_seconds": 0.186342292
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.677045875,
+                  "self_seconds": 0.00011566600000001426
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.167e-06,
+                  "self_seconds": 1.167e-06
+                },
+                "analysis.purity": {
+                  "calls": 5,
+                  "inclusive_seconds": 2.7509999999999996e-06,
+                  "self_seconds": 2.7509999999999996e-06
+                },
+                "analysis.resolver_setup": {
+                  "calls": 7,
+                  "inclusive_seconds": 0.067290459,
+                  "self_seconds": 0.067234373
+                },
+                "analysis.slice_permissions": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.260650125,
+                  "self_seconds": 0.260650125
+                },
+                "analysis.using_projections": {
+                  "calls": 7,
+                  "inclusive_seconds": 5.6086000000000005e-05,
+                  "self_seconds": 5.6086000000000005e-05
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.911862791,
+                  "self_seconds": 0.1142067080000001
+                },
+                "emit.file": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.053269126,
+                  "self_seconds": 0.053269126
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.007139042,
+                  "self_seconds": 0.007139042
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.019618125,
+                  "self_seconds": 0.019452457
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.760187125,
+                  "self_seconds": 0.0029782489999998774
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.011518042,
+                  "self_seconds": 0.011518042
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.037468958,
+                  "self_seconds": 0.025950915999999997
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "emit.serialize": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.008663249999999999,
+                  "self_seconds": 0.008663249999999999
+                },
+                "parser.cache_validation": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.248802923,
+                  "self_seconds": 0.248802923
+                },
+                "parser.decode": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.21049036999999998,
+                  "self_seconds": 0.21049036999999998
+                },
+                "parser.normalize": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.16032074899999996,
+                  "self_seconds": 0.16032074899999996
+                },
+                "parser.source": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.6661942429999999,
+                  "self_seconds": 0.04658020099999999
+                }
+              }
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 0.9024063750111964,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.8855642910057213,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8844568330096081,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8942718329781201,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8784027080109809,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8929617909889203,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8826232090068515,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.889069583005039,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.889617917011492,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.8820376669755206,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.8855642910057213,
+            "p95_seconds": 0.8942718329781201,
+            "max_seconds": 0.8942718329781201,
+            "profile": {
+              "counters": {
+                "emit.files": 4,
+                "lookup.calls": 1520572,
+                "lookup.canonical_path_resolutions": 12,
+                "lookup.import_directory_resolutions": 104,
+                "parallel.batches": 6,
+                "parallel.tasks": 460,
+                "parallel.workers": 24,
+                "parser.cache_hits": 456,
+                "parser.nodes": 152185,
+                "parser.source_requests": 456,
+                "permissions.analyses": 3,
+                "permissions.dependency_retries": 2,
+                "permissions.field_hits": 3606,
+                "permissions.member_hits": 1738,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 12015,
+                "resolver.constructions": 7,
+                "resolver.index_builds": 4,
+                "resolver.index_reuses": 3
+              },
+              "elapsed_seconds": 0.896357458,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.875e-06,
+                  "self_seconds": 1.875e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.000271167,
+                  "self_seconds": 0.000271167
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.541431375,
+                  "self_seconds": 0.1658050840000001
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.014429625,
+                  "self_seconds": 0.0005840419999999999
+                },
+                "analysis.discover_types": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.17530058399999998,
+                  "self_seconds": 0.17530058399999998
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.6658575,
+                  "self_seconds": 8.620799999992101e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 2.08e-07,
+                  "self_seconds": 2.08e-07
+                },
+                "analysis.purity": {
+                  "calls": 5,
+                  "inclusive_seconds": 4.958e-06,
+                  "self_seconds": 4.958e-06
+                },
+                "analysis.resolver_setup": {
+                  "calls": 7,
+                  "inclusive_seconds": 0.06923166700000001,
+                  "self_seconds": 0.06917408300000001
+                },
+                "analysis.slice_permissions": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.254872542,
+                  "self_seconds": 0.254872542
+                },
+                "analysis.using_projections": {
+                  "calls": 7,
+                  "inclusive_seconds": 5.758400000000001e-05,
+                  "self_seconds": 5.758400000000001e-05
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.896354375,
+                  "self_seconds": 0.11296245800000004
+                },
+                "emit.file": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.049646166,
+                  "self_seconds": 0.049646166
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.007162791,
+                  "self_seconds": 0.007162791
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.0191085,
+                  "self_seconds": 0.018935124
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.744809959,
+                  "self_seconds": 0.002907543000000068
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.012047917,
+                  "self_seconds": 0.012047917
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.038581958,
+                  "self_seconds": 0.026534041
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {
+                "emit.serialize": {
+                  "calls": 4,
+                  "inclusive_seconds": 0.007878124,
+                  "self_seconds": 0.007878124
+                },
+                "parser.cache_validation": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.24547003500000003,
+                  "self_seconds": 0.24547003500000003
+                },
+                "parser.decode": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.19036161499999996,
+                  "self_seconds": 0.19036161499999996
+                },
+                "parser.normalize": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.141843496,
+                  "self_seconds": 0.141843496
+                },
+                "parser.source": {
+                  "calls": 456,
+                  "inclusive_seconds": 0.620674791,
+                  "self_seconds": 0.04299964499999999
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "case": "generic-calls",
+        "project": "generic-calls",
+        "flags": [],
+        "source_sha256": {
+          "main.thor": "57417af71a9f3925064e6d1c932e3891d48143294fe3ff931fd8edf8ff2282b7"
+        },
+        "measurements": {
+          "before": {
+            "initial": {
+              "seconds": 0.4126717080071103,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.37238333298591897,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3686335409875028,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3704118329915218,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.37009074998786673,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3646178329945542,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.37733545899391174,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.37074208399280906,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3665663330175448,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3971909169922583,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.3704118329915218,
+            "p95_seconds": 0.3971909169922583,
+            "max_seconds": 0.3971909169922583,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 189434,
+                "lookup.canonical_path_resolutions": 4,
+                "parser.cache_hits": 2,
+                "parser.nodes": 11960,
+                "parser.source_requests": 2,
+                "permissions.analyses": 1,
+                "permissions.field_hits": 4094,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 6916,
+                "resolver.constructions": 3,
+                "resolver.index_builds": 1,
+                "resolver.index_reuses": 2
+              },
+              "elapsed_seconds": 0.3684225,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.625e-06,
+                  "self_seconds": 1.625e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.000144584,
+                  "self_seconds": 0.000144584
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.216011708,
+                  "self_seconds": 0.04840054000000002
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00018575,
+                  "self_seconds": 0.00018575
+                },
+                "analysis.discover_types": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008431084,
+                  "self_seconds": 8.495900000000077e-05
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.224654625,
+                  "self_seconds": 2.608300000001007e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.125e-06,
+                  "self_seconds": 1.125e-06
+                },
+                "analysis.purity": {
+                  "calls": 2,
+                  "inclusive_seconds": 1.709e-06,
+                  "self_seconds": 1.709e-06
+                },
+                "analysis.resolver_setup": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.001357166,
+                  "self_seconds": 0.0013560409999999999
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.166255209,
+                  "self_seconds": 0.166255209
+                },
+                "analysis.using_projections": {
+                  "calls": 3,
+                  "inclusive_seconds": 1.125e-06,
+                  "self_seconds": 1.125e-06
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.368417208,
+                  "self_seconds": 0.008346167000000015
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.077676875,
+                  "self_seconds": 0.077676875
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00170625,
+                  "self_seconds": 0.0008734580000000001
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000832792,
+                  "self_seconds": 0.000832792
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001556667,
+                  "self_seconds": 0.001449625
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.306917416,
+                  "self_seconds": 0.0012797909999999746
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.012850208,
+                  "self_seconds": 0.012850208
+                },
+                "parser.cache_validation": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.018981791,
+                  "self_seconds": 0.018981791
+                },
+                "parser.decode": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.014181084,
+                  "self_seconds": 0.014181084
+                },
+                "parser.normalize": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.011339876,
+                  "self_seconds": 0.011339876
+                },
+                "parser.source": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.045475541999999994,
+                  "self_seconds": 0.0009727909999999954
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.053153625,
+                  "self_seconds": 0.003174000000000003
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {}
+            }
+          },
+          "after": {
+            "initial": {
+              "seconds": 0.40398995799478143,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "warm": [
+              {
+                "seconds": 0.37058383401017636,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.37143037500209175,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3664504170010332,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.36432229200727306,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3694803749967832,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.37497708399314433,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.36993241601157933,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.36348379199625924,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.3702233750082087,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "median_seconds": 0.36993241601157933,
+            "p95_seconds": 0.37497708399314433,
+            "max_seconds": 0.37497708399314433,
+            "profile": {
+              "counters": {
+                "emit.files": 1,
+                "lookup.calls": 189434,
+                "lookup.canonical_path_resolutions": 4,
+                "parser.cache_hits": 2,
+                "parser.nodes": 11960,
+                "parser.source_requests": 2,
+                "permissions.analyses": 1,
+                "permissions.field_hits": 4094,
+                "permissions.reuses": 1,
+                "permissions.type_hits": 6916,
+                "resolver.constructions": 3,
+                "resolver.index_builds": 1,
+                "resolver.index_reuses": 2
+              },
+              "elapsed_seconds": 0.364291292,
+              "engine": "rust",
+              "schema": 1,
+              "stages": {
+                "analysis.borrow_model": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.75e-06,
+                  "self_seconds": 1.75e-06
+                },
+                "analysis.contexts": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.00012804100000000002,
+                  "self_seconds": 0.00012804100000000002
+                },
+                "analysis.discover_calls": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.213718042,
+                  "self_seconds": 0.04802400100000001
+                },
+                "analysis.discover_expressions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000199459,
+                  "self_seconds": 0.000199459
+                },
+                "analysis.discover_types": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.008330167,
+                  "self_seconds": 9.629199999999956e-05
+                },
+                "analysis.inspect_sources": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.22227725,
+                  "self_seconds": 2.958200000000022e-05
+                },
+                "analysis.local_borrowing": {
+                  "calls": 1,
+                  "inclusive_seconds": 1.67e-07,
+                  "self_seconds": 1.67e-07
+                },
+                "analysis.purity": {
+                  "calls": 2,
+                  "inclusive_seconds": 1.0409999999999999e-06,
+                  "self_seconds": 1.0409999999999999e-06
+                },
+                "analysis.resolver_setup": {
+                  "calls": 3,
+                  "inclusive_seconds": 0.0014510410000000001,
+                  "self_seconds": 0.0014501240000000001
+                },
+                "analysis.slice_permissions": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.164244708,
+                  "self_seconds": 0.164244708
+                },
+                "analysis.using_projections": {
+                  "calls": 3,
+                  "inclusive_seconds": 9.170000000000001e-07,
+                  "self_seconds": 9.170000000000001e-07
+                },
+                "command": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.364287834,
+                  "self_seconds": 0.007591875999999997
+                },
+                "emit.file": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.078010542,
+                  "self_seconds": 0.078010542
+                },
+                "emit.publish": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.001609709,
+                  "self_seconds": 0.0009583759999999999
+                },
+                "emit.serialize": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.000651333,
+                  "self_seconds": 0.000651333
+                },
+                "evaluation.schedule": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.00158175,
+                  "self_seconds": 0.001480584
+                },
+                "lowering.total": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.30468825,
+                  "self_seconds": 0.0011774579999999646
+                },
+                "parser.bootstrap": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.012146083,
+                  "self_seconds": 0.012146083
+                },
+                "parser.cache_validation": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.018665458,
+                  "self_seconds": 0.018665458
+                },
+                "parser.decode": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.013928458000000001,
+                  "self_seconds": 0.013928458000000001
+                },
+                "parser.normalize": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.011553292,
+                  "self_seconds": 0.011553292
+                },
+                "parser.source": {
+                  "calls": 2,
+                  "inclusive_seconds": 0.045004041,
+                  "self_seconds": 0.0008568329999999961
+                },
+                "project.load": {
+                  "calls": 1,
+                  "inclusive_seconds": 0.052007708,
+                  "self_seconds": 0.003091458999999998
+                }
+              },
+              "thor_version": "0.41.6",
+              "worker_stages": {}
+            }
+          }
+        }
+      }
+    ]
+  },
+  "reference_difference": "The frozen Python reference retains the inferred pure-result ownership/default bug. Native-only regressions validate correct values and owned storage instead of matching it.",
+  "limits": [
+    "Migration guards remain for unresolved shapes outside the verified corpus. See rust-migration-guards.md for the inventory.",
+    "Native Windows/Linux hosts are not verified by this macOS arm64 audit.",
+    "The historical isolated helper timeout did not reproduce; its original cause remains unconfirmed."
+  ]
+}

@@ -16,6 +16,16 @@ The reference baseline is commit `ca2df99`, also tagged
 `rust/`. Build its release binary explicitly before using the native launchers.
 Unsupported syntax produces a native diagnostic or migration guard.
 
+## Remaining guard audit, 2026-11-11
+
+The [guard audit](rust-migration-guards.md) records fixes for inactive generic
+compile-time requests, wide finite pure call graphs and ordinary source errors
+that incorrectly appeared as migration limitations. It also covers a native fix
+for inferred pure results escaping freed scratch storage, including named result
+defaults. Each retained guard is listed with the analysis contract it protects.
+The default launcher stays native; the Python reference stays available as
+`thor-python`.
+
 ## Data layout and hardening pass, 2026-11-11
 
 This pass added a correctness checkpoint, measured changes to the native data
