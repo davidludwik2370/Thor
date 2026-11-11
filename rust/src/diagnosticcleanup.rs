@@ -419,9 +419,10 @@ pub(crate) fn clean(
         if let Some((file, _)) = &location {
             let path = Path::new(file);
             if path.starts_with(runtime.join("format")) {
-                if msgs
-                    .iter()
-                    .any(|m| m.contains("type_is_integer(T)") && !m.contains("Grouping requires"))
+                if path == runtime.join("format/format.odin")
+                    && msgs.iter().any(|m| {
+                        m.contains("type_is_integer(T)") && !m.contains("Grouping requires")
+                    })
                 {
                     contract = Some("Integer grouping requires an integer value.");
                 }

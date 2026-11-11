@@ -278,6 +278,10 @@ switch bounds now keep their operand spans inside that region. All nine
 logical-number TLS tests passed, along with the live CodeLLDB numeric switch
 breakpoint test.
 
+Dynamic-width validation reports the width contract and its exact source span.
+The width diagnostic fixture now uses the selected compiler and passes for both
+engines. The native stdio test also covers an invalid unsaved width and recovery.
+
 ### Deep pure call chains
 
 The native verifier walks pending procedures without recursing through every

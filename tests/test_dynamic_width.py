@@ -115,6 +115,7 @@ consume::proc(text:string){assert(len(text)>0)}
 
 
 class DynamicWidthDiagnosticTests(unittest.TestCase):
+    compiler=base.THOR
     invoke=diagnostic_base.DiagnosticTests.invoke
     at=diagnostic_base.DiagnosticTests.at
     program=base.ThorTests.program
@@ -129,5 +130,7 @@ class DynamicWidthDiagnosticTests(unittest.TestCase):
                 source=self.program('/* 😀 */ text:=f"{12:{'+expression+'}}";delete(text)')
                 errors=self.at(source,expression,message=message)
                 self.assertEqual(len(errors),1,errors)
+                pos=errors[0]['pos']
+                self.assertEqual(pos['end_offset']-pos['offset'],len(expression.encode()))
                 self.assertNotIn('Thor expression',json.dumps(errors))
 
