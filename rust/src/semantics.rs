@@ -5,6 +5,9 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
+#[path = "nodetable.rs"]
+mod nodetable;
+use nodetable::NodeTable;
 #[path = "logicalfacts.rs"]
 mod logicalfacts;
 #[path = "calls.rs"]
@@ -180,7 +183,7 @@ pub struct Symbol {
     pub result: bool,
     pub projection: Option<Projection>,
 }
-type ScopeTable = HashMap<(usize, NodeId), HashMap<String, Vec<usize>>>;
+type ScopeTable = NodeTable<HashMap<String, Vec<usize>>>;
 /// Syntax-only state. Project snapshots may share this across flags and generic
 /// frames; evaluated types, conditions and using projections stay per resolver.
 #[derive(Clone)]
@@ -199,7 +202,7 @@ pub struct Resolver<'a> {
     import_packages: RefCell<HashMap<(usize, String), Option<usize>>>,
     canonical_paths: RefCell<HashMap<std::path::PathBuf, Option<std::path::PathBuf>>>,
     missing_packages: RefCell<BTreeSet<std::path::PathBuf>>,
-    types: HashMap<Ref, Type>,
+    types: NodeTable<Type>,
     active: HashSet<Ref>,
     planning: HashSet<(Ref, Vec<(String, Type)>)>,
     conditions: RefCell<HashSet<Ref>>,
@@ -290,13 +293,13 @@ impl<'a> Resolver<'a> {
         let mut this = Self {
             sources,
             symbols: base.map(|base| base.symbols.clone()).unwrap_or_default(),
-            scopes: base.map(|base| base.scopes.clone()).unwrap_or_default(),
+            scopes: base.map(|base| base.scopes.clone()).unwrap_or_else(|| Arc::new(ScopeTable::new(sources.iter().map(|source| source.nodes.len())))),
             index: base.map(|base| base.names.clone()).unwrap_or_else(|| Arc::new(namescope::NameIndex::new(sources))),
             base: None,
             import_packages: RefCell::new(HashMap::new()),
             canonical_paths: RefCell::new(HashMap::new()),
             missing_packages: RefCell::new(BTreeSet::new()),
-            types: HashMap::new(),
+            types: NodeTable::new(sources.iter().map(|source| source.nodes.len())),
             active: HashSet::new(),
             planning: HashSet::new(),
             conditions: RefCell::new(HashSet::new()),
@@ -419,8 +422,7 @@ impl<'a> Resolver<'a> {
                         projection: None,
                     };
                     Arc::get_mut(&mut this.scopes).expect("fresh scope index")
-                        .entry((file, owner))
-                        .or_default()
+                        .get_or_insert_with(Ref { file, node: owner }, HashMap::new)
                         .entry(name)
                         .or_default()
                         .push(this.symbols.len());
@@ -433,19 +435,24 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
-        let mut groups: HashMap<_, Vec<usize>> = HashMap::new();
-        for (index, symbol) in this.symbols.iter().enumerate() {
+        // Marker groups only matter when at least one binding is immutable.
+        // Borrow paths and names instead of copying them for every SDK symbol.
+        fn group_key<'s>(sources: &'s [Source], symbol: &'s Symbol) -> (&'s std::path::Path, Option<NodeId>, &'s str) {
             let source = &sources[symbol.reference.file];
-            let key = if symbol.scope.0 == 0 {
-                (
-                    source.path.parent().unwrap_or(&source.path).to_path_buf(),
-                    None,
-                    symbol.name.clone(),
-                )
+            if symbol.scope.0 == 0 {
+                (source.path.parent().unwrap_or(&source.path), None, symbol.name.as_str())
             } else {
-                (source.path.clone(), Some(symbol.scope), symbol.name.clone())
-            };
-            groups.entry(key).or_default().push(index);
+                (source.path.as_path(), Some(symbol.scope), symbol.name.as_str())
+            }
+        }
+        let mut groups: HashMap<_, Vec<usize>> = HashMap::new();
+        for symbol in this.symbols.iter().filter(|symbol| symbol.immutable) {
+            groups.entry(group_key(sources, symbol)).or_default();
+        }
+        for (index, symbol) in this.symbols.iter().enumerate() {
+            if let Some(ids) = groups.get_mut(&group_key(sources, symbol)) {
+                ids.push(index);
+            }
         }
         for ids in groups.values(){
             if !ids.iter().any(|id|this.symbols[*id].immutable)||!ids.iter().any(|id|{
@@ -488,7 +495,7 @@ impl<'a> Resolver<'a> {
             {
                 continue;
             }
-            if let Some(ids) = self.scopes.get(&(reference.file, owner)).and_then(|names| names.get(name)) {
+            if let Some(ids) = self.scopes.get(&Ref { file: reference.file, node: owner }).and_then(|names| names.get(name)) {
                 let own_decl = source.ancestors(reference.node).find(|id| {
                     source.node(*id).kind == "Declaration"
                         && source.node(*id).mutable
@@ -1684,7 +1691,7 @@ impl<'a> Resolver<'a> {
         if let Some(index)=self.symbol(r) {
             let symbol=&self.symbols[index];let owner=&self.sources[symbol.reference.file];
             if symbol.parameter||symbol.result||!symbol.constant||symbol.immutable{return false;}
-            if self.scopes.get(&(symbol.reference.file,symbol.scope)).and_then(|names|names.get(&symbol.name)).is_some_and(|symbols|symbols.len()>1){return false;}
+            if self.scopes.get(&Ref { file: symbol.reference.file, node: symbol.scope }).and_then(|names|names.get(&symbol.name)).is_some_and(|symbols|symbols.len()>1){return false;}
             return owner.node(symbol.reference.node).kind=="Declaration"&&symbol.value.is_some_and(|node|self.known_type_seen(Ref{file:symbol.reference.file,node},seen));
         }
         if node.kind=="Call" {return source.role(r.node,"callee").is_some_and(|node|self.native_builtin(Ref{file:r.file,node},"type_of"));}

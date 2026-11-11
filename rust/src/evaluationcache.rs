@@ -54,7 +54,8 @@ pub fn canonical(value: &Value) -> Vec<u8> {
             }
             Value::Object(values) => {
                 out.push('{');
-                let sorted = values.iter().collect::<std::collections::BTreeMap<_, _>>();
+                let mut sorted: Vec<_> = values.iter().collect();
+                sorted.sort_unstable_by(|a, b| a.0.cmp(b.0));
                 for (index, (key, value)) in sorted.into_iter().enumerate() {
                     if index > 0 {
                         out.push(',');
