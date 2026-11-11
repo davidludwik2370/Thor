@@ -3,6 +3,8 @@
 Both the Python `thor` launcher and the independent experimental `thor-rust`
 launcher are available. The Rust implementation passes the current macOS
 reference corpus. See the [migration status and comparison commands](docs/rust-migration.md).
+The [readiness audit and optimization plan](docs/rust-migration.md#readiness-audit-and-optimization-plan-2026-11-10)
+records the native installation checks and remaining performance work before cutover.
 
 ![Thor](assets/branding/logo-slim.png)
 

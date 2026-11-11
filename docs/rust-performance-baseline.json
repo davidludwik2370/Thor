@@ -1,0 +1,253 @@
+{
+  "date": "2026-11-10",
+  "compiler_revision": "700aa9c",
+  "scope": "Sequential transpile commands, final Odin backend excluded. First command uses an empty per-engine project cache; shared SDK/parser caches and OS caches retained. Two warm samples per real project. Any cache-miss native compile-time helpers are included in cold time. Sources copied; originals verified unchanged. Direct release binary, no Cargo launcher overhead.",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "architecture": "arm64",
+  "odin": "dev-2026-10:8169255b9",
+  "rustc": "1.89.0 (29483883e 2025-08-04)",
+  "rust_binary_sha256": "c01ed4c10dde329c4b6032dd611f96876d7bf8568d9b6af43e9b734d5b9efe69",
+  "projects": [
+    {
+      "name": "simple",
+      "source_sha256": {
+        "main.thor": "eee7dfff7203726db74d53d43de3fe907696e18861dd7d26cd8ad5caddfa07c0"
+      },
+      "engines": {
+        "python": {
+          "cold_seconds": 0.29885583400027826,
+          "warm_seconds": [
+            0.10839154201676138,
+            0.10754808300407603
+          ],
+          "warm_median_seconds": 0.1079698125104187
+        },
+        "rust": {
+          "cold_seconds": 0.03561833398998715,
+          "warm_seconds": [
+            0.020376125001348555,
+            0.02100979202077724
+          ],
+          "warm_median_seconds": 0.020692958511062898
+        }
+      }
+    },
+    {
+      "name": "double_bet",
+      "source_sha256": {
+        "double_bet.thor": "34a3fbcc53eec6723da8a2d226937a4d71ba7455d6685efc40f748210b291c1c"
+      },
+      "engines": {
+        "python": {
+          "cold_seconds": 1.4493128750182223,
+          "warm_seconds": [
+            1.036396124982275,
+            1.04412095900625
+          ],
+          "warm_median_seconds": 1.0402585419942625
+        },
+        "rust": {
+          "cold_seconds": 1.0741814160137437,
+          "warm_seconds": [
+            1.0391529580228962,
+            1.0675047499826178
+          ],
+          "warm_median_seconds": 1.053328854002757
+        }
+      }
+    },
+    {
+      "name": "poker",
+      "source_sha256": {
+        "poker_test.thor": "f72e09938067475389ef713e571848fd9011192c521376cb7799f65e3d4d3255",
+        "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+        "simulation_test.thor": "f48423cbc3053fd8a08cf0364e96ccf1dbf2390f818caacf6a6ec41443f23e50",
+        "poker.thor": "5cf074eafb7786ba7f2f15656079398f10d31a08bcea8989ede9490a2c49c269",
+        "ref/poker_single_thread.odin": "6de70a4bf635762bbaae579184a8e4fb33de9a3c371aee9ecbdf3d68b1c80dd6",
+        "ref/poker_multi_v1.odin": "e323e2582f07806e8f95987295315831d8f4b89b7a326dda717cde5a0271bd57"
+      },
+      "engines": {
+        "python": {
+          "cold_seconds": 2.757932833977975,
+          "warm_seconds": [
+            1.6592296670132782,
+            1.6768954579893034
+          ],
+          "warm_median_seconds": 1.6680625625012908
+        },
+        "rust": {
+          "cold_seconds": 3.633614958001999,
+          "warm_seconds": [
+            3.535264791978989,
+            3.500892374984687
+          ],
+          "warm_median_seconds": 3.518078583481838
+        }
+      }
+    },
+    {
+      "name": "hilo",
+      "source_sha256": {
+        "hilo.thor": "eab70c077b373ebf856b35fdc72b35bcab2a699e1516bfa127049865405f8504"
+      },
+      "engines": {
+        "python": {
+          "cold_seconds": 0.7872144170105457,
+          "warm_seconds": [
+            0.5455919170053676,
+            0.5215882500051521
+          ],
+          "warm_median_seconds": 0.5335900835052598
+        },
+        "rust": {
+          "cold_seconds": 2.2405100830073934,
+          "warm_seconds": [
+            2.1549964580044616,
+            2.1327201669919305
+          ],
+          "warm_median_seconds": 2.143858312498196
+        }
+      }
+    },
+    {
+      "name": "circles_on_dots",
+      "source_sha256": {
+        "cricles_on_dots.thor": "a892787ea8dff05a807f5cb5d988ea874406db545b2691c30ccba56639aaf701"
+      },
+      "engines": {
+        "python": {
+          "cold_seconds": 5.442137042002287,
+          "warm_seconds": [
+            2.5308146250026766,
+            2.5263826249865815
+          ],
+          "warm_median_seconds": 2.528598624994629
+        },
+        "rust": {
+          "cold_seconds": 64.308853791008,
+          "warm_seconds": [
+            47.029561750008725,
+            47.31937400001334
+          ],
+          "warm_median_seconds": 47.17446787501103
+        }
+      }
+    },
+    {
+      "name": "Dijkstra",
+      "source_sha256": {
+        "Dijkstra.thor": "0bb9a403fdacb02d8957f11356a09eaf403b57868e8ff9dca57d34d61a5590e5"
+      },
+      "engines": {
+        "python": {
+          "cold_seconds": 1.9494898340199143,
+          "warm_seconds": [
+            1.5543382499890868,
+            1.5150649169809185
+          ],
+          "warm_median_seconds": 1.5347015834850026
+        },
+        "rust": {
+          "cold_seconds": 12.994801667024149,
+          "warm_seconds": [
+            12.950509416987188,
+            13.017483415984316
+          ],
+          "warm_median_seconds": 12.983996416485752
+        }
+      }
+    }
+  ],
+  "runtime_body_edit": {
+    "project": "circles_on_dots",
+    "change": "Add an unused local variable and discard in main; compile-time dependencies unchanged. A prior added, unrelated procedure remains present in both runs.",
+    "engines": {
+      "python": {
+        "seconds": 2.6252597910061013,
+        "status": 0,
+        "cache": {
+          "thor_cache": {
+            "hits": 3,
+            "misses": 0,
+            "writes": 0,
+            "corrupt": 0,
+            "bypasses": 0
+          },
+          "thor_prepared_hits": 1
+        }
+      },
+      "rust": {
+        "seconds": 47.11175791700953,
+        "status": 0,
+        "cache": {
+          "thor_cache": {
+            "bypasses": 0,
+            "corrupt": 0,
+            "hits": 3,
+            "misses": 0,
+            "writes": 0
+          },
+          "thor_prepared_hits": 1
+        }
+      }
+    }
+  },
+  "profile_notes": [
+    "A separate 10-second CPU sample of a warm run finds resolver construction, using projections and repeated scope/package lookup hot. Cache stats: 3 hits, 0 misses, 0 writes, 1 prepared hit.",
+    "A separate sampled package-namespace edit invalidates 3 result entries in both engines. The cache-miss profile shows helper lowering rebuilding resolvers and inspecting sources again; peak sampled native footprint about 1.5 GB. Sampling and a brief concurrent synthetic run perturb timing, so this sample is not a baseline timing.",
+    "Initial simple first run is installation/process warmup-sensitive; no cold-install/bootstrap guarantee is inferred from these samples."
+  ],
+  "synthetic": {
+    "scope": "warm-cache transpile only; synthetic interpolation/power procedures; no Odin backend in timed runs",
+    "procedures": 200,
+    "source_bytes": 18760,
+    "source_sha256": "faefcdd351868dcf8ebc823999219bd179ea831759a861743e6dc5056be56bd4",
+    "runs_seconds": {
+      "python": [
+        0.7188182499958202,
+        0.7206270830065478,
+        0.7111966660013422
+      ],
+      "rust": [
+        0.19109345800825395,
+        0.1900380419974681,
+        0.1906669160234742
+      ]
+    },
+    "median_seconds": {
+      "python": 0.7188182499958202,
+      "rust": 0.1906669160234742
+    }
+  },
+  "version_command_startup": {
+    "scope": "--version only; three sequential samples per engine; cached Cargo build for development launcher",
+    "runs_seconds": {
+      "python": [
+        0.04397204201086424,
+        0.04335745799471624,
+        0.04286158399190754
+      ],
+      "rust": [
+        0.003384084004210308,
+        0.0027811249892693013,
+        0.002690374996745959
+      ],
+      "development_launcher": [
+        0.4044875410036184,
+        0.2784822079993319,
+        0.26683220799895935
+      ]
+    },
+    "median_seconds": {
+      "python": 0.04335745799471624,
+      "rust": 0.0027811249892693013,
+      "development_launcher": 0.2784822079993319
+    }
+  },
+  "new_validation": {
+    "tests": "python3 -m unittest tests.test_mkthor tests.test_rust_installation tests.test_assertion_hygiene -v",
+    "methods": 21,
+    "status": "passed",
+    "benchmark_modes": "Copied simple and double_bet projects (two warm samples plus native check for each engine), and existing 200-procedure synthetic (execution precheck plus three warm samples), all passed."
+  }
+}

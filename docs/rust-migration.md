@@ -7,13 +7,148 @@ available, and Python is the supported default.
 
 Rust remains experimental for inputs outside the verified corpus and native
 Windows/Linux hosts. Explicit migration guards still fail with exit status `3`.
-Performance characterization and parallel lowering are the next phase.
+The readiness/performance audit below records the remaining cutover work.
 
 The reference baseline is commit `ca2df99`, also tagged
 `rust-migration-baseline-2026-11-08`. The Python implementation remains in
 `thorlang/` and the `thor` launcher. The independent Rust crate is in `rust/`;
 `thor-rust` builds its release binary and launches it. It never runs the Python
 compiler, including for unsupported syntax.
+
+## Readiness audit and optimization plan, 2026-11-10
+
+The native compiler can serve as the installed `thor` on the verified macOS arm64
+host. The added installation gate copies the release executable into a separate
+toolchain, copies its frontend/runtime/templates, sets `THOR_ROOT`, and puts
+failing Python/Cargo/Rust tool sentinels first on `PATH`. It exercises `new`,
+`check`, `build`, `run`, `test`, `vet`, publishing and the generated VS Code debug
+build task. Checked and assertion/bounds/type-assert-disabled runs verify actual
+results and allocation tracking. The staged directory contains no Python
+implementation. Existing TLS and live debugger acceptance remains applicable;
+the staged task check additionally verifies native manifests and original maps.
+
+`mkthor` now delegates to the canonical executable's `new` command, preserving
+its default project parent and editor-opening behavior. It follows whichever
+engine is installed as `thor`, including the staged native executable. Python
+development/testing scripts may remain for reference comparisons without being
+dependencies of normal native compilation or project creation.
+
+The previous checkpoint's 1,854 original and 1,340 native-specific method results,
+19 copied projects, stdio TLS, live CodeLLDB and Node gates remain the compatibility
+baseline. This audit adds the installation checks and probes imported generic
+return ownership, including independent writable results from borrowed inputs.
+Those probes agree with the reference and execute correctly. No compiler semantic
+change was required. This is evidence for the verified host and tested inputs;
+the specialization/ownership/evaluation migration guards and unverified native
+Windows/Linux hosts remain explicit limitations. A guard is an unsuccessful
+migration case, not a reason to silently run Python.
+
+### Current timings and the one-second target
+
+The [machine-readable baseline](rust-performance-baseline.json) records revision,
+source hashes, cold samples, warm samples and cache counters. These are sequential
+`transpile` subprocess timings with the direct release executable, excluding the
+final Odin compilation. Project caches are separate by engine; shared parser/SDK
+and OS caches remain available. The real-project warm figures below are medians
+of two samples, sufficient to expose the large regression but not a p95 estimate.
+
+| Project | Python warm | Rust warm |
+| --- | ---: | ---: |
+| Minimal program | 0.108 s | 0.021 s |
+| `double_bet` | 1.040 s | 1.053 s |
+| `poker` | 1.668 s | 3.518 s |
+| `hilo` | 0.534 s | 2.144 s |
+| `Dijkstra` | 1.535 s | 12.984 s |
+| `circles_on_dots` | 2.529 s | 47.174 s |
+
+The existing 200-procedure interpolation/power benchmark takes 0.191 seconds in
+Rust versus 0.719 seconds in Python (three warm samples, executable fixture
+checked first). The large real-project regression depends on imported analysis
+work; the synthetic path and small programs are already fast. A separate `--version`
+startup check takes about 0.003 seconds for the native executable and 0.278 seconds
+through the Cargo-based development launcher (three samples each).
+
+An edit that adds an unused local in `circles_on_dots.main` still reuses all three
+compile-time results in both engines: three hits, zero misses and zero writes.
+Rust nevertheless takes 47.112 seconds, versus Python's 2.625 seconds. The warm
+slowdown is analysis overhead, rather than rerunning those computations.
+Adding an unrelated package-level procedure instead invalidates the three
+entries in both engines; namespace-sensitive dependency validation is a separate
+optimization opportunity, not a Rust parity difference.
+
+Native stack samples identify repeated `Resolver::with_flags` construction,
+`prepare_projections` and `lookup` as hot paths. Inspection explains the scaling:
+failed lookups scan package paths and all nodes looking for `using` statements;
+projection preparation considers expression identifiers across loaded SDK files.
+Source inspection, scheduling, final lowering and helper snapshots construct
+separate resolvers. A cache-miss helper profile repeats inspection/lowering and
+reaches roughly 1.5 GB sampled peak footprint. Samples locate work; they are not
+precise phase timers or unperturbed wall-clock measurements.
+
+The current Rust implementation is **not performance-ready to replace the default**
+under the one-second goal. The canonical `thor` remains Python for now. This does
+not require another language redesign or another port; optimization should retain
+the accepted behavior and differential gates.
+
+### Implementation sequence
+
+1. **Index name lookup and using projections.** Precompute package membership,
+   per-file imports and scoped `using` declarations. Reuse the existing scope/name
+   index without scanning unrelated source nodes on misses. Prepare projections
+   only where a visible `using` can affect a name. Keep conditional declarations,
+   import visibility, shadowing and generic binding changes in the lookup contract.
+   This directly addresses the measured hot stacks and should precede threading.
+2. **Reuse analysis within a command.** Build immutable syntax/package indexes
+   once, then separate them from evaluated values and generic bindings. Share
+   source/AST storage with helper snapshots instead of deeply cloning it. Reuse
+   completed source inspection and compatible purity/slice summaries, invalidating
+   binding-dependent facts explicitly. Measure each phase and the number of
+   resolver constructions so repeated whole-graph work cannot return unnoticed.
+3. **Load SDK bodies on demand.** Index imported names/signatures once and inspect
+   bodies only when selected calls, purity or slice effects require them. Avoid
+   eagerly running all projection/type machinery over unrelated math/raylib
+   implementations. Preserve target/build-flag conditions and private declarations.
+4. **Make cache hits cheap end to end.** Validate the existing result/dependency
+   records before reconstructing unnecessary helper plans. Reuse verified nominal
+   identities and prepared scalar sites when their dependencies still match.
+   Batch compatible native type probes. Keep invalidation for changed constants,
+   callees, overloads, files/resources, flags and corrupt entries. Investigate
+   namespace-only invalidation after these wins. None of this requires a whole
+   project output cache or skipping correctness checks.
+5. **Parallelize independent remaining work.** After removing redundant work,
+   parallelize independent parsing and per-file emission over the shared read-only
+   plan. Bound worker counts and helper concurrency to avoid multiplying the
+   observed memory footprint. Keep evaluation dependency ordering, diagnostic
+   ordering, cancellation and atomic cache/output publication deterministic.
+6. **Gate and cut over.** On a quiet performance runner, require under one second
+   at p95 for representative no-`#run` and warm-`#run` transpiles, including runtime
+   body edits and test-mode inputs. Measure installation bootstrap, real cache-miss
+   helper compilation/execution and final Odin backend time separately. Maintain a
+   comfortable margin below one second; the current samples do not establish a
+   guaranteed speedup or an all-project bound. Re-run affected differential,
+   TLS/debugger, checked/unchecked and copied-project gates at each substantive
+   change, followed by full acceptance before the default changes.
+
+For cutover, install a prebuilt native executable behind the canonical `thor`
+path, set/discover its installation root, and preserve the current Python launcher
+as an explicit reference command such as `thor-python`. The development
+`thor-rust` launcher currently invokes Cargo on every command; use a prebuilt
+executable for normal builds. Generated tasks, editor discovery and `mkthor`
+already use the canonical `thor` path. Other hosts need their own native acceptance
+before claiming the same readiness there.
+
+To repeat the real-project benchmark safely:
+
+```sh
+python3 tools/benchmark_lowering.py --runs 5 \
+  --project /path/to/poker --project /path/to/circles_on_dots \
+  --report /tmp/thor-project-timings.json
+```
+
+The tool copies projects, times cold/warm transpiles with separate engine caches,
+type-checks both outputs after timing and leaves the original projects untouched.
+It does not launch graphical applications. Run benchmarks without other compiler
+jobs. Omitting `--project` retains the existing executable synthetic benchmark.
 
 ## Active parity-first plan
 

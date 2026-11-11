@@ -1,20 +1,92 @@
 #!/usr/bin/env python3
-"""Measure warm transpile commands on a shared, supported synthetic program.
+"""Measure transpile commands on synthetic code or copies of real projects.
 
-This is not a whole-language parity or real-project performance result. Native
-compilation and execution validate the fixture before the timed lowering runs.
+The synthetic fixture is executed before timing. Real projects are type checked
+after timing and never executed. Timed commands exclude the final Odin backend,
+but include any native helpers required for a compile-time cache miss.
 """
 import argparse
 import hashlib
 import json
 import os
 from pathlib import Path
+import platform
+import shutil
 import statistics
 import subprocess
 import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def project_benchmark(options, engines):
+    environment = {**os.environ, 'THOR_ROOT': str(ROOT)}
+    report = {
+        'scope': 'transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included',
+        'platform': platform.platform(),
+        'engines': {name: str(path) for name, path in engines.items()},
+        'projects': [],
+    }
+    for original in options.project:
+        original = original.resolve()
+        if not original.is_dir():
+            raise ValueError('--project must name a project directory: '+str(original))
+        with tempfile.TemporaryDirectory(prefix='thor-project-benchmark-') as directory:
+            work = Path(directory)
+            entry = work/'source'/original.name
+            artifacts = shutil.ignore_patterns('.git', '.vscode', '.thor-*',
+                                              'node_modules', '*.app', '*.dSYM')
+
+            def ignored(directory, names):
+                excluded = set(artifacts(directory, names))
+                if Path(directory) == original:
+                    excluded.update(name for name in (original.name, original.name+'.exe')
+                                    if (original/name).is_file())
+                return excluded
+
+            shutil.copytree(original, entry, symlinks=True, ignore=ignored)
+            sources = {str(path.relative_to(entry)): hashlib.sha256(path.read_bytes()).hexdigest()
+                       for path in entry.rglob('*') if path.is_file() and path.suffix in {'.thor', '.odin'}}
+            case = {'name': original.name, 'source_sha256': sources, 'cold': {}, 'warm': {name: [] for name in engines}}
+
+            def invoke(name, command):
+                arguments = [str(engines[name]), command, str(entry), '--cache-dir',
+                             str(work/'cache'/name), '--output-dir', str(work/'output'/name),
+                             '--cache-report']
+                started = time.perf_counter()
+                result = subprocess.run(arguments, capture_output=True, text=True,
+                                        cwd=work, env=environment, timeout=options.timeout)
+                elapsed = time.perf_counter()-started
+                if result.returncode:
+                    raise RuntimeError(name+' '+command+' failed:\n'+result.stdout+result.stderr)
+                cache = next((json.loads(line) for line in result.stdout.splitlines()
+                              if line.startswith('{"thor_cache"')), None)
+                return {'seconds': elapsed, 'cache': cache}
+
+            for name in engines:
+                case['cold'][name] = invoke(name, 'transpile')
+            for iteration in range(options.runs):
+                order = list(engines) if iteration % 2 == 0 else list(reversed(engines))
+                for name in order:
+                    case['warm'][name].append(invoke(name, 'transpile'))
+            for name in engines:
+                invoke(name, 'check')
+            after = {str(path.relative_to(entry)): hashlib.sha256(path.read_bytes()).hexdigest()
+                     for path in entry.rglob('*') if path.is_file() and path.suffix in {'.thor', '.odin'}}
+            if after != sources:
+                raise RuntimeError('a compiler modified the copied project sources')
+            if any(hashlib.sha256((original/path).read_bytes()).hexdigest() != digest
+                   for path, digest in sources.items()):
+                raise RuntimeError('original project sources changed during the benchmark')
+            case['median_seconds'] = {name: statistics.median(run['seconds'] for run in runs)
+                                      for name, runs in case['warm'].items()}
+            report['projects'].append(case)
+            print(json.dumps({'project': original.name, 'median_seconds': case['median_seconds']}), flush=True)
+    if options.report:
+        options.report.parent.mkdir(parents=True, exist_ok=True)
+        options.report.write_text(json.dumps(report, indent=2)+'\n')
+    return 0
 
 
 def main(argv=None):
@@ -24,9 +96,13 @@ def main(argv=None):
     parser.add_argument('--engine', action='append', default=[], metavar='NAME=EXECUTABLE',
                         help='additional compiler, such as a historical Rust binary')
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--project', action='append', type=Path, default=[],
+                        help='benchmark a copy of this project instead of synthetic code (repeatable)')
+    parser.add_argument('--timeout', type=float, default=120,
+                        help='per-command limit in seconds for real projects')
     options = parser.parse_args(argv)
-    if options.procedures < 1 or options.runs < 1:
-        parser.error('--procedures and --runs must be positive')
+    if options.procedures < 1 or options.runs < 1 or not 0 < options.timeout < float('inf'):
+        parser.error('--procedures, --runs and --timeout must be positive finite values')
     engines = {'python': ROOT/'thor', 'rust': ROOT/'rust/target/release/thor-rust'}
     for entry in options.engine:
         if '=' not in entry:
@@ -38,6 +114,11 @@ def main(argv=None):
     for executable in engines.values():
         if not executable.is_file():
             parser.error('compiler does not exist: '+str(executable))
+    for project in options.project:
+        if not project.is_dir():
+            parser.error('--project must name a project directory: '+str(project))
+    if options.project:
+        return project_benchmark(options, engines)
     code = 'package main\n'
     for index in range(options.procedures):
         code += (f'f_{index} :: proc(x:int)->int {{text:=f"{{x}}-{{x**2}}"; '

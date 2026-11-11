@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
-from thorlang.project_template import mkthor_main
-
-raise SystemExit(mkthor_main())
+#!/bin/sh
+set -eu
+thor_toolchain=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+for argument do
+    case "$argument" in
+        --open|--no-open)
+            exec "$thor_toolchain/thor" new --parent "$HOME/Code/Thor" "$@"
+            ;;
+    esac
+done
+exec "$thor_toolchain/thor" new --parent "$HOME/Code/Thor" --open "$@"
