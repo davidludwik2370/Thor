@@ -137,7 +137,7 @@ impl Project {
         let mut pending: BTreeMap<(Ref, String, String), Vec<CaseBinding>> = BTreeMap::new();
         let mut imports: BTreeMap<usize, BTreeMap<String, String>> = BTreeMap::new();
         for (request, instances) in cases.iter() {
-            for (key, case) in instances {
+            for (key, case) in instances.iter().filter(|(_, case)| case.skipped != Some(true)) {
                 for (slot, binding) in &case.bindings {
                     if binding.value.is_some() || binding.canonical.is_empty() {
                         continue;

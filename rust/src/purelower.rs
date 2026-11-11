@@ -1,7 +1,66 @@
 //! Verified call scratch lifetimes and independently owned results.
 //! Unresolved effect/ownership specializations remain explicit migration gaps.
 use super::*;
+struct PureResult {
+    name: String,
+    field: NodeId,
+    annotation: Option<NodeId>,
+    default: Option<NodeId>,
+}
 impl Lower<'_, '_> {
+    fn pure_results(&self, signature: NodeId) -> Vec<PureResult> {
+        let source = self.source;
+        source.role(signature, "results").into_iter()
+            .flat_map(|fields| &source.node(fields).children)
+            .filter(|field| source.node(**field).kind == "Field")
+            .flat_map(|field| {
+                let names = source.group(*field, "names");
+                let names = if names.is_empty() { vec![String::new()] } else {
+                    names.iter().map(|name| {
+                        if source.names.get(source.node(*name).name) == "_" { "_".into() }
+                        else { source.text(*name).trim_start_matches('$').to_string() }
+                    }).collect()
+                };
+                names.into_iter().map(move |name| PureResult {
+                    name, field: *field,
+                    annotation: source.role(*field, "type"),
+                    default: source.role(*field, "default"),
+                })
+            }).collect()
+    }
+    fn pure_result_type(&mut self, result: &PureResult) -> Result<Code> {
+        if let Some(annotation) = result.annotation {
+            return self.render(annotation, None, true);
+        }
+        let default = result.default.ok_or_else(|| self.unsupported(result.field, "inferred pure result types"))?;
+        let typ = self.typ(default).defaulted();
+        let mut names = crate::specialization::TypeCode::new(self.file, Some(self.reference(result.field)));
+        if let Ok(code) = names.render(&typ, self.resolver) {
+            if names.imports.is_empty() { return Ok(self.g(code, default)); }
+        }
+        let value = self.render(default, None, true)?;
+        let type_of = self.native("type_of");
+        Ok(Code::concat([
+            self.g(format!("{type_of}("), default), value, self.g(")", default),
+        ]))
+    }
+    pub(super) fn pure_result_field(&mut self, field: NodeId) -> Result<Option<Code>> {
+        if self.pure_owned.is_empty() || self.source.role(field, "default").is_none() { return Ok(None); }
+        let Some(signature) = self.source.ancestors(field)
+            .find(|node| self.source.node(*node).kind == "ProcedureType") else { return Ok(None); };
+        let Some(proc) = self.source.node(signature).parent
+            .filter(|proc| self.pure_owned.contains(proc) && !self.pure_busy.contains(proc)) else { return Ok(None); };
+        if self.source.node(field).parent != self.source.role(signature, "results")
+            || self.source.role(proc, "type") != Some(signature) { return Ok(None); }
+        let Some(result) = self.pure_results(signature).into_iter()
+            .find(|result| result.field == field && result.default.is_some()) else { return Ok(None); };
+        let Some(last) = self.source.group(field, "names").last() else { return Ok(None); };
+        let span = Span::new(self.source.node(*last).span.end, self.source.node(field).span.end);
+        let typ = self.pure_result_type(&result)?;
+        // Initialize defaults only in the scratch-backed inner body. Keeping
+        // them on both signatures would allocate/evaluate them twice.
+        self.splice(field, vec![(span, Code::concat([self.g(":", field), typ]))], vec![]).map(Some)
+    }
     pub fn apply_purity(&mut self, facts: &crate::purity::Facts) -> Result<()> {
         let file = self.file;
         self.pure_conditional = facts
@@ -46,7 +105,7 @@ impl Lower<'_, '_> {
             return Ok(());
         }
         let signature = self.role(root.node, "type")?;
-        let results = self.resolver.fields(self.reference(signature), "results");
+        let results = self.pure_results(signature);
         let contextual = ["", "odin"].contains(
             &self.source.node(signature).data["calling_convention"]
                 .as_str()
@@ -55,11 +114,9 @@ impl Lower<'_, '_> {
         let owned = contextual
             && results
                 .iter()
-                .filter_map(|(_, annotation)| *annotation)
-                .any(|annotation| {
-                    let typ = self
-                        .resolver
-                        .specialized_type(annotation, &crate::semantics::Substitutions::new());
+                .filter_map(|result| result.annotation.or(result.default))
+                .any(|node| {
+                    let typ = self.resolver.specialized_type(self.reference(node), &crate::semantics::Substitutions::new());
                     self.pure_owns(&typ, &mut HashSet::new())
                 });
         let Some(body) = self.source.role(root.node, "body") else {
@@ -114,25 +171,25 @@ impl Lower<'_, '_> {
                 }
             }
         }
-        for (index, (name, annotation)) in results.into_iter().enumerate() {
-            if let Some(annotation) = annotation {
-                let typ = self.render(annotation.node, None, true)?;
+        for (index, result) in results.into_iter().enumerate() {
+            if let Some(site) = result.annotation.or(result.default) {
+                let typ = self.pure_result_type(&result)?;
                 let validator = self.pure_validator(root.node);
                 let token = self.pure_type_site(
-                    annotation.node,
+                    site,
                     root.node,
-                    &if name.is_empty() || name == "_" {
+                    &if result.name.is_empty() || result.name == "_" {
                         format!("result {}", index + 1)
                     } else {
-                        format!("result '{name}'")
+                        format!("result '{}'", result.name)
                     },
                 );
                 checks.push(Code::concat([
-                    self.g(format!("\n{validator}("), annotation.node),
+                    self.g(format!("\n{validator}("), site),
                     typ,
                     self.g(
                         format!(",true,{contextual},false,0,{token})\n"),
-                        annotation.node,
+                        site,
                     ),
                 ]));
             }
@@ -166,7 +223,7 @@ impl Lower<'_, '_> {
         let s = self.source;
         let sig = self.role(proc, "type")?;
         let params = self.role(sig, "params")?;
-        let results = self.resolver.fields(self.reference(sig), "results");
+        let results = self.pure_results(sig);
         let prefix = format!("{}pure_{}", self.prefix, s.node(proc).span.start);
         let module = self.module("pure");
         let inner = format!("{prefix}_body");
@@ -175,12 +232,18 @@ impl Lower<'_, '_> {
         let mut slots = vec![];
         let mut names = vec![];
         let mut types = vec![];
-        for (index, (name, annotation)) in results.into_iter().enumerate() {
-            let annotation =
-                annotation.ok_or_else(|| self.unsupported(proc, "inferred pure result types"))?;
-            names.push(Self::pure_result_name(&prefix, name, index));
+        let mut defaults = vec![];
+        for (index, result) in results.into_iter().enumerate() {
+            let typ = self.pure_result_type(&result)?;
+            let hint = Hint { constant_literal: true,
+                semantic: result.annotation.or(result.default).map(|node| self.typ(node).defaulted()),
+                code: typ.clone(), element_only: false,
+                plain_array: result.annotation.is_some_and(|node| s.node(node).kind == "ArrayType"),
+            };
+            defaults.push(result.default.map(|default| self.render(default, Some(hint), true)).transpose()?);
+            types.push(typ);
+            names.push(Self::pure_result_name(&prefix, result.name, index));
             slots.push(format!("{prefix}_slot_{index}"));
-            types.push(self.render(annotation.node, None, true)?);
         }
         if self.source.raw.as_bytes()[self.source.node(body).span.start] != b'{' {
             return Err(Error::at(
@@ -253,6 +316,10 @@ impl Lower<'_, '_> {
             }
             code.push(self.g(format!("{name}:"), proc));
             code.push(typ.clone());
+            if let Some(default) = &defaults[index] {
+                code.push(self.g("=", proc));
+                code.push(default.clone());
+            }
         }
         code.push(self.g(")", proc));
         for (index, clause) in s.group(proc, "where").iter().enumerate() {

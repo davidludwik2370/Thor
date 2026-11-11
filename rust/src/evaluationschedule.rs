@@ -280,14 +280,13 @@ impl<'p> Scheduler<'p> {
         } else {
             self.specialized_skips.insert(key.clone());
             if inactive {
+                // A helper must see that this binding was processed even when
+                // an inactive native when arm needs neither a value nor a type.
                 let unchecked = self.specialized_unchecked.contains(&key);
-                if unchecked {
-                    return;
-                }
                 let mut bindings = self.specializations.relevant(node, &self.resolver);
                 for binding in bindings
                     .values_mut()
-                    .filter(|binding| binding.value.is_none() && binding.canonical.is_empty())
+                    .filter(|binding| !unchecked && binding.value.is_none() && binding.canonical.is_empty())
                 {
                     let mut names = TypeCode::new(node.file, Some(node));
                     if names.render(&binding.typ, &self.resolver).is_err() {
@@ -302,7 +301,7 @@ impl<'p> Scheduler<'p> {
                     EvaluatedCase {
                         bindings,
                         value: Value::Null,
-                        skipped: Some(false),
+                        skipped: Some(unchecked),
                     },
                 );
             }
@@ -1222,6 +1221,12 @@ impl<'p> Scheduler<'p> {
                 if !self.known(arg)? {
                     if self.kind(node) == "Run" {
                         return Err(self.fail(arg,"#run arguments and required types must be compile-time known; runtime storage is not a constant."));
+                    }
+                    if self.kind(node) == "Comprehension" {
+                        return Err(self.fail(arg,"Compile-time comprehension inputs and bounds must be compile-time known; runtime storage is not a constant."));
+                    }
+                    if crate::extremaplan::plan(&self.resolver, call).is_some() && self.constant_context(node) {
+                        return Err(self.fail(arg,"Constant min/max expansion inputs must be compile-time known; runtime storage is not a constant."));
                     }
                     return Ok(false);
                 }

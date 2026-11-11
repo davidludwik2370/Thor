@@ -50,7 +50,10 @@ impl Lower<'_, '_> {
         } else {
             self.render(id, expected, constant)?
         };
-        for case in cases.values().rev() {
+        // Unchecked native when arms are already pruned by their enclosing
+        // condition. Keep their scheduling records, but never require a local
+        // type identity merely to emit a predicate for an unchecked expression.
+        for case in cases.values().rev().filter(|case| case.skipped != Some(true)) {
             let mut context =
                 crate::specialization::TypeCode::new(self.file, Some(self.reference(id)));
             let predicate = crate::specialization::Specializations::predicate(

@@ -401,6 +401,31 @@ main::proc(){
             client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_inferred_owned_pure_results_keep_source_frames_and_result_values(self):
+        text='''package main
+build::fn(n:int)->(result:=[]int{0}){
+    values:=make([]int,1)
+    values[0]=n
+    return values
+}
+main::proc(){
+    n:=3
+    values:=build(n)
+    defer delete(values)
+    values[0]+=1
+    if values[0]!=4{panic("inferred result")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,11])
+        for line,expression,expected in [(5,'n','3'),(11,'values.len','1')]:
+            thread,frame=self.frame(client)
+            self.assertEqual((frame['source']['path'],frame['line']),(str(source),line),frame)
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':expression,'context':'watch'})
+            self.assertEqual(value['result'],expected,value)
+            client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_generic_nonreturning_arm_skips_specialization_helpers_when_stepping(self):
         text='''package main
 stop::proc()->!{panic("unexpected")}

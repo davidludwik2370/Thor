@@ -103,7 +103,16 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                 "status": "experimental",
                 "complete": false,
                 "python_fallback": false,
+                "reference_command": "thor-python",
                 "parallel_lowering": false,
+                "parallel_work": {
+                    "source_parsing": true,
+                    "source_map_serialization": true,
+                    "semantic_lowering": false,
+                    "default_worker_limit": 4,
+                    "maximum_workers": 32,
+                    "worker_environment": "THOR_JOBS"
+                },
                 "supported": [
                     "shared Odin parser and arena AST",
                     "lexical symbols, native type facts, overloads and generic bindings",
@@ -137,8 +146,11 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                 },
                 "pending": [
                     "native-host verification on Windows and Linux",
-                    "guarded specialization and ownership paths outside the acceptance corpus",
-                    "performance characterization and parallel lowering"
+                    "guarded specialization and ownership paths outside the acceptance corpus"
+                ],
+                "optimization_opportunities": [
+                    "further permission-analysis and type-discovery optimization",
+                    "parallel semantic lowering where dependencies permit"
                 ]
             })
         );

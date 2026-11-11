@@ -36,7 +36,7 @@ pub struct Facts {
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
     facts: Facts,
-    visiting: HashSet<VisitKey>,
+    visiting: Visits,
     constants: HashSet<(Ref, Ref, Option<Ref>)>,
     speculative: Vec<Ref>,
     walk_stack: Vec<Ref>,
@@ -44,6 +44,41 @@ pub struct Purity<'a, 'r> {
     inherited_branch: Option<Branch>,
 }
 type VisitKey = (Ref, Vec<(String, Type)>, Option<Ref>);
+struct Visits {
+    keys: HashSet<VisitKey>,
+    procedures: HashSet<Ref>,
+    remaining: usize,
+    limit: usize,
+}
+enum Visit {
+    Seen,
+    New,
+    Exhausted,
+}
+impl Visits {
+    fn new(sources: &[crate::ast::Source]) -> Self {
+        // A wide, finite call graph is bounded by the input, not by an arbitrary
+        // procedure count. Budget repeated specializations to stop expanding
+        // recursive generic calls; explicit call sites scale that budget.
+        let limit = sources.iter().filter(|source| !source.shared_native)
+            .map(|source| source.nodes.len()).sum::<usize>().max(1024);
+        Self { keys: HashSet::new(), procedures: HashSet::new(), remaining: limit, limit }
+    }
+    fn clear(&mut self) {
+        self.keys.clear();
+        self.procedures.clear();
+        self.remaining = self.limit;
+    }
+    fn enter(&mut self, key: VisitKey) -> Visit {
+        let procedure = key.0;
+        if !self.keys.insert(key) { return Visit::Seen; }
+        if !self.procedures.insert(procedure) {
+            if self.remaining == 0 { return Visit::Exhausted; }
+            self.remaining -= 1;
+        }
+        Visit::New
+    }
+}
 #[derive(Clone, Copy)]
 struct Branch {
     owner: Ref,
@@ -109,13 +144,14 @@ impl<'a, 'r> Purity<'a, 'r> {
         entries: &BTreeSet<Ref>,
     ) -> Facts {
         let _phase = crate::profile::span("analysis.purity");
+        let visiting = Visits::new(r.sources);
         let mut this = Self {
             r,
             facts: Facts {
                 entry_roots: entries.clone(),
                 ..Facts::default()
             },
-            visiting: HashSet::new(),
+            visiting,
             constants: HashSet::new(),
             speculative: vec![],
             walk_stack: vec![],
@@ -133,10 +169,11 @@ impl<'a, 'r> Purity<'a, 'r> {
     }
     pub fn analyze_calls(r: &'r mut Resolver<'a>, calls: &[Ref]) -> Facts {
         let _phase = crate::profile::span("analysis.purity_calls");
+        let visiting = Visits::new(r.sources);
         let mut this = Self {
             r,
             facts: Facts::default(),
-            visiting: HashSet::new(),
+            visiting,
             constants: HashSet::new(),
             speculative: vec![],
             walk_stack: vec![],
@@ -310,12 +347,15 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .collect(),
             self.conditional_reference(),
         );
-        if !self.visiting.insert(key) {
-            return;
-        }
-        if self.visiting.len() > 1024 {
-            self.gap(root, proc);
-            return;
+        match self.visiting.enter(key) {
+            Visit::Seen => return,
+            Visit::Exhausted => {
+                self.fault(root, proc, via, format!(
+                    "Pure-call analysis exceeded its budget of {} repeated specializations; simplify expanding recursive generic calls.",
+                    self.visiting.limit));
+                return;
+            }
+            Visit::New => {}
         }
         self.facts.checked.insert(proc);
         let Some(sig) = self.role(proc, "type") else {
@@ -418,6 +458,15 @@ impl<'a, 'r> Purity<'a, 'r> {
             }
         }
         self.walk(root, proc, body, &bindings, via);
+        // Result defaults initialize every invocation, including ordinary
+        // procedures reached from a fn. Their effects are part of the body.
+        if let Some(results) = self.role(sig, "results") {
+            for field in self.children(results) {
+                if let Some(default) = self.role(field, "default") {
+                    self.walk(root, proc, default, &bindings, via);
+                }
+            }
+        }
         // Defaults are part of a declared fn's contract. Defaults on an
         // ordinary helper are visited only when the caller actually omits it.
         if proc == root {
@@ -793,16 +842,13 @@ impl<'a, 'r> Purity<'a, 'r> {
                     format!("Pure code requires a resolved direct call to an eligible procedure; An indirect call through runtime procedure value '{}' is not eligible.",self.text(callee)),
                 );
             } else if plans.is_empty() {
-                let source = &self.r.sources[callee.file];
-                let missing_name = self.kind(callee) == "Ident"
-                    && self.r.symbol(callee).is_none()
-                    && source.selections.is_empty()
-                    && !source
-                        .nodes
-                        .iter()
-                        .any(|node| node.kind == "Using" || node.data["using_field"] == true);
+                let missing_name = self.missing_identifier(callee) || self.missing_namespace(callee);
                 if !missing_name && !self.native_argument_error(call, callee, bindings) {
-                    self.gap(root, call);
+                    if self.invalid_record_call(callee, bindings) {
+                        self.fault(root, callee, via, "Pure code requires a resolved direct call to an eligible procedure; indirect, foreign and unknown calls are forbidden.");
+                    } else {
+                        self.gap(root, call);
+                    }
                 }
             } else {
                 let mut selected = 0;
@@ -929,6 +975,50 @@ impl<'a, 'r> Purity<'a, 'r> {
         }
         for arg in args {
             self.walk(root, proc, arg, bindings, via);
+        }
+    }
+    fn missing_identifier(&self, node: Ref) -> bool {
+        let source = &self.r.sources[node.file];
+        self.kind(node) == "Ident" && self.r.symbol(node).is_none()
+            && !source.selections.iter().any(|selection| selection.wildcard
+                || selection.names.iter().any(|name| name == self.text(node)))
+            && !source.nodes.iter().any(|node| node.kind == "Using" || node.data["using_field"] == true)
+    }
+    fn missing_namespace(&self, callee: Ref) -> bool {
+        if self.kind(callee) != "Selector" { return false; }
+        let Some(base) = self.role(callee, "expr") else { return false; };
+        if !self.missing_identifier(base) { return false; }
+        let source = &self.r.sources[base.file];
+        !source.nodes.iter().filter(|node| node.kind == "Import").any(|node| {
+            let name = source.names.get(node.name);
+            if !name.is_empty() { return name == self.text(base); }
+            crate::lower::unquote(&node.op).ok().is_some_and(|path| {
+                path.rsplit(['/', ':']).next() == Some(self.text(base))
+            })
+        })
+    }
+    fn invalid_record_call(&mut self, callee: Ref, bindings: &Substitutions) -> bool {
+        if self.kind(callee) != "Selector" { return false; }
+        let (Some(base), Some(field)) = (self.role(callee, "expr"), self.role(callee, "field")) else {
+            return false;
+        };
+        let mut typ = self.r.specialized_type(base, bindings);
+        while let Type::Pointer(inner) | Type::Nominal(_, inner) = typ { typ = *inner; }
+        if !matches!(typ, Type::Struct(_) | Type::Record(..) | Type::Anonymous(_)) {
+            return false;
+        }
+        if self.r.record_fields(&typ).iter().any(|(_, typ)| typ.is_unknown()) {
+            return false;
+        }
+        let name = self.text(field).to_owned();
+        if self.r.member_path(&typ, &name).is_none() { return true; }
+        // A resolved data member is not a callable procedure. Leave type-valued
+        // and still-generic members to native specialization rather than guess.
+        match self.r.specialized_type(callee, bindings) {
+            Type::Scalar { name, .. } => name != "typeid",
+            Type::String { .. } | Type::Array { .. } | Type::Slice(_) | Type::Dynamic(_)
+                | Type::Fixed { .. } | Type::BigInteger | Type::BigRational => true,
+            _ => false,
         }
     }
     /// Leave definite source argument errors to Odin's original call checker.
@@ -1213,5 +1303,43 @@ impl Facts {
             ));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod visit_tests {
+    use super::*;
+    fn key(procedure: usize, instance: Option<usize>) -> VisitKey {
+        (Ref { file: 0, node: NodeId(procedure) }, vec![],
+         instance.map(|node| Ref { file: 0, node: NodeId(node) }))
+    }
+    #[test]
+    fn distinct_procedures_and_duplicate_visits_do_not_consume_specialization_work() {
+        let mut visits = Visits::new(&[]);
+        visits.remaining = 2;
+        visits.limit = 2;
+        for procedure in 0..1030 {
+            if !matches!(visits.enter(key(procedure, None)), Visit::New) {
+                panic!("finite wide graph was limited by its number of procedures");
+            }
+        }
+        for _ in 0..10 {
+            if !matches!(visits.enter(key(0, None)), Visit::Seen) {
+                panic!("duplicate visit consumed specialization work");
+            }
+        }
+        for instance in 0..2 {
+            if !matches!(visits.enter(key(0, Some(instance))), Visit::New) {
+                panic!("bounded specialization was rejected too early");
+            }
+        }
+        if !matches!(visits.enter(key(0, Some(2))), Visit::Exhausted) {
+            panic!("expanding specialization did not reach its limit");
+        }
+        visits.clear();
+        if !matches!(visits.enter(key(0, Some(2))), Visit::New)
+            || !matches!(visits.enter(key(0, Some(3))), Visit::New) {
+            panic!("specialization work leaked from the previous entry root");
+        }
     }
 }

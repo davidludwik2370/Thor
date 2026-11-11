@@ -59,7 +59,7 @@ impl Error {
     }
     pub fn unsupported(source: &Source, span: Span, feature: &str) -> Self {
         let mut error = Self::at(source, span,
-            format!("Rust migration: {feature} has not been ported yet; use the Python compiler (`thor`) for this program."));
+            format!("Rust compiler limitation: {feature} remains unresolved for this program; compare with the Python reference (`thor-python`)."));
         error.unsupported = true;
         error.diagnostics[0]["stage"] = json!("rust-migration");
         error
@@ -194,4 +194,21 @@ pub fn overlay_source(error: &Value, path: &std::path::Path) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    #[test]
+    fn unresolved_guard_preserves_its_status_and_names_the_actual_reference_command() {
+        let source = Source::from_frontend("/audit.thor".into(), String::new(),
+            json!({"nodes":[],"features":[],"edits":[],"selections":[]}), true)
+            .expect("empty source protocol");
+        let error = Error::unsupported(&source, Span::new(0, 0), "symbolic ownership");
+        if !error.unsupported || error.diagnostics[0]["stage"] != "rust-migration"
+            || !error.message.contains("thor-python") || error.message.contains("(`thor`)")
+            || error.message.contains("has not been ported") {
+            panic!("unresolved guard lost its category or recommended the native launcher as Python");
+        }
+    }
 }

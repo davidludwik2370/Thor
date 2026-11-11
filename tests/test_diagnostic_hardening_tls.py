@@ -10,6 +10,63 @@ class DiagnosticHardeningTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_inferred_owned_result_defaults_keep_unsaved_diagnostic_locations(self):
+        text='''// café 🌩
+package main
+leaf::fn(n:int)->(result:=[]int{0}){a:=make([]int,1);a[0]=n;return a}
+main::proc(){n:=3;a:=leaf(n);defer delete(a)}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        hover=self.hover(client,main,text,'a:=leaf')
+        self.assertIn('[]int',hover['contents']['value'])
+        self.assertNotIn('__thor_',hover['contents']['value'])
+        changed=text.replace('[]int{0}','rawptr(nil)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='cannot convert values to pointers')
+        self.assertTrue(any(error['range']['start']==self.position(changed,'rawptr(nil)',0) for error in errors))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
+    def test_inactive_generic_run_recovers_after_unsaved_selected_branch_changes(self):
+        text='''// 😀 source positions
+package main
+inner::proc($T:typeid)->int{when T==int{return 3}else{return #run missing()}}
+outer::proc()->int{return inner(int)}
+VALUE::#run outer()
+main::proc(){_=VALUE}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        changed=text.replace('inner(int)','inner(string)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains='#run requires a resolved direct call')
+        self.assertTrue(any(error['range']['start']==self.position(changed,'#run missing()',0) for error in errors))
+        self.assertNotIn('Rust compiler limitation',json.dumps(errors))
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        self.assertEqual(main.read_text(),text)
+
+    def test_runtime_collection_constant_errors_keep_original_ranges_and_recover(self):
+        for expression,message,needle in [
+            ('[x for x in values]','Compile-time comprehension inputs','values]'),
+            ('max(**values)','Constant min/max expansion inputs','**values'),
+        ]:
+            with self.subTest(expression=expression):
+                text='// café 🌩\npackage main\nmain::proc(){values:=[1,2];COPY::'+expression+';_=COPY}\n'
+                client,main=self.open(text)
+                errors=client.diagnostic(main.as_uri(),contains=message)
+                self.assertEqual(errors[0]['range']['start'],self.position(text,needle,0))
+                self.assertNotIn('Rust compiler limitation',json.dumps(errors))
+                changed=text.replace('values:=','values::')
+                client.notifications.clear()
+                client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+                client.diagnostic(main.as_uri(),empty=True)
+
     def test_many_independent_index_roots_and_unsaved_recovery(self):
         names=[f'missing_{i}' for i in range(12)]
         text='// 😀\npackage main\nmain::proc(){i:=1;'+''.join(name+'[i]=2;' for name in names)+'}\n'

@@ -1092,6 +1092,11 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
+        if kind == "Field" {
+            if let Some(code) = self.pure_result_field(id)? {
+                return Ok(code);
+            }
+        }
         if !constant && self.querying == 0 && !self.fstring_busy.contains(&id) {
             if let Some(targets) = self.fstring_plans.get(&id).cloned() {
                 return self.fstring_expression(id, expected, targets);
