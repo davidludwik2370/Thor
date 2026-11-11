@@ -116,6 +116,7 @@ impl Project {
             evaluation: self.evaluation.clone(),
             type_probes: BTreeMap::new(),
             type_probe_imports: BTreeMap::new(),
+            source_facts: self.source_facts.clone(),
         })
     }
     pub(crate) fn resolve_evaluation_identities(
@@ -124,6 +125,10 @@ impl Project {
         skips: &BTreeMap<Ref, bool>,
         cases: &mut Cases,
     ) -> Result<()> {
+        if cases.is_empty() {
+            return Ok(());
+        }
+        let _phase = crate::profile::span("evaluation.nominal_identities");
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
         resolver.evaluated = results.clone();
         resolver.prepare_contexts();

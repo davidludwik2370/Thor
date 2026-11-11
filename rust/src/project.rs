@@ -60,6 +60,11 @@ struct LoweringNotes {
     operation: Option<crate::semantics::Ref>,
     related: Vec<Value>,
 }
+#[derive(Clone)]
+struct SourceFacts {
+    sources: Vec<Source>,
+    flags: Vec<String>,
+}
 pub struct Project {
     pub publish_layout: Option<String>,
     pub native_override: Option<Vec<String>>,
@@ -92,6 +97,7 @@ pub struct Project {
     evaluation: Option<crate::evaluation::Plan>,
     type_probes: BTreeMap<crate::semantics::Ref, Vec<String>>,
     type_probe_imports: BTreeMap<usize, BTreeMap<String, String>>,
+    source_facts: Option<SourceFacts>,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -296,6 +302,7 @@ impl Project {
             evaluation: None,
             type_probes: BTreeMap::new(),
             type_probe_imports: BTreeMap::new(),
+            source_facts: None,
             collections,
             common,
             file_entry,
@@ -410,11 +417,25 @@ impl Project {
         self.discover_type_facts()?;
         self.discover_expression_facts()?;
         self.discover_call_facts()?;
+        self.source_facts = Some(SourceFacts {
+            sources: self.sources.clone(), flags: self.options.flags.clone(),
+        });
         Ok(())
     }
     pub fn lower(&mut self) -> Result<PathBuf> {
         let _phase = crate::profile::span("lowering.total");
-        self.inspect_sources()?;
+        let ready = self.source_facts.as_ref().is_some_and(|facts| {
+            facts.flags == self.options.flags && facts.sources.len() == self.sources.len()
+                && facts.sources.iter().zip(&self.sources).all(|(old, current)| {
+                    old.shares_syntax(current) && old.shared_native == current.shared_native
+                        && old.collection_roots == current.collection_roots
+                })
+        });
+        if !ready {
+            self.inspect_sources()?;
+        } else {
+            crate::profile::count("analysis.inherited_source_facts", 1);
+        }
         self.schedule_evaluations()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
@@ -964,67 +985,9 @@ impl Project {
                 if source.excluded {
                     continue;
                 }
-                for (index, node) in source.nodes.iter().enumerate() {
-                    if node.kind != "Selector" {
-                        continue;
-                    }
-                    let typed = source.ancestors(crate::ast::NodeId(index)).any(|ancestor| {
-                        let owner = source.node(ancestor);
-                        owner.kind.as_str().ends_with("Type")
-                            || owner.kind == "Field"
-                                && source
-                                    .role(ancestor, "type")
-                                    .is_some_and(|typ| source.node(typ).span.contains(node.span))
-                            || owner.kind == "Declaration"
-                                && !owner.mutable
-                                && !source
-                                    .group(ancestor, "values")
-                                    .iter()
-                                    .any(|value| source.node(*value).kind == "Procedure")
-                                && source
-                                    .ancestors(ancestor)
-                                    .all(|parent| source.node(parent).kind != "Procedure")
-                    });
-                    if !typed {
-                        continue;
-                    }
-                    let Some(base) = source
-                        .role(crate::ast::NodeId(index), "expr")
-                        .filter(|base| source.node(*base).kind == "Ident")
-                    else {
-                        continue;
-                    };
-                    for import in &source.nodes {
-                        if import.kind != "Import" {
-                            continue;
-                        }
-                        let path = unquote(&import.op)?;
-                        if ["base:builtin", "base:intrinsics"].contains(&path.as_str()) {
-                            continue;
-                        }
-                        let alias = source.names.get(import.name);
-                        let alias = if alias.is_empty() {
-                            path.rsplit(['/', ':']).next().unwrap_or("")
-                        } else {
-                            alias
-                        };
-                        if alias != source.text(base) {
-                            continue;
-                        }
-                        let directory = if let Some((collection, suffix)) = path.split_once(':') {
-                            roots.get(collection).map(|root| root.join(suffix))
-                        } else {
-                            source.path.parent().map(|parent| parent.join(&path))
-                        };
-                        if let Some(directory) =
-                            directory.and_then(|dir| fs::canonicalize(dir).ok())
-                        {
-                            if !inspected.contains(&directory) {
-                                packages.insert(directory);
-                            }
-                        }
-                    }
-                }
+                // Dependencies of unused SDK bodies and declarations are not
+                // project inputs. Resolver queries request missing packages
+                // while inspecting signatures, types and selected call effects.
                 source.shared_native = true;
                 source.collection_roots = roots.clone();
                 self.sources.push(source);

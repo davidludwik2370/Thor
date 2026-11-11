@@ -251,7 +251,7 @@ impl Project {
                     });
                 }
             }
-            source.edits.extend(
+            let selection_edits =
                 source.info["selection_tags"]
                     .as_array()
                     .into_iter()
@@ -260,8 +260,8 @@ impl Project {
                     .map(|span| Edit {
                         span,
                         text: String::new(),
-                    }),
-            );
+                    }).collect::<Vec<_>>();
+            source.edits.extend(selection_edits);
             let view = plan.files.get_mut(&source.path).unwrap();
             for (index, node) in source.nodes.iter().enumerate() {
                 let id = Ref {
@@ -355,6 +355,7 @@ impl Project {
             evaluation: Some(plan),
             type_probes: BTreeMap::new(),
             type_probe_imports: BTreeMap::new(),
+            source_facts: self.source_facts.clone(),
         })
     }
     pub fn execute_evaluation(&self, expression: Ref, timeout: Duration) -> Result<Value> {
@@ -374,7 +375,7 @@ impl Project {
         mode: crate::evaluation::Mode,
     ) -> Result<Executed> {
         let _phase = crate::profile::span("evaluation.native_helper");
-        crate::profile::count("evaluation.native_helpers", 1);
+        crate::profile::count("evaluation.helper_preparations", 1);
         let source = &self.sources[expression.file];
         let site = source
             .node(expression.node)
@@ -475,6 +476,8 @@ impl Project {
         {
             command.arg("-max-error-count:1000");
         }
+        crate::profile::count("evaluation.helper_compilations", 1);
+        let _backend = crate::profile::span("evaluation.helper_backend");
         let built = helper
             .run_backend(&mut command, |command| {
                 capture(command, timeout.max(Duration::from_secs(30)))
@@ -484,6 +487,7 @@ impl Project {
                     "{label} could not start the helper compiler: {error}"
                 ))
             })?;
+        drop(_backend);
         if built.timed_out {
             return Err(fail(format!("{label} helper compilation timed out.")));
         }

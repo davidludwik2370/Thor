@@ -185,6 +185,7 @@ pub struct Resolver<'a> {
     scopes: HashMap<(usize, NodeId), HashMap<String, Vec<usize>>>,
     index: namescope::NameIndex,
     import_packages: RefCell<HashMap<(usize, String), Option<usize>>>,
+    missing_packages: RefCell<BTreeSet<std::path::PathBuf>>,
     types: HashMap<Ref, Type>,
     active: HashSet<Ref>,
     planning: HashSet<(Ref, Vec<(String, Type)>)>,
@@ -273,6 +274,7 @@ impl<'a> Resolver<'a> {
             scopes: HashMap::new(),
             index: namescope::NameIndex::new(sources),
             import_packages: RefCell::new(HashMap::new()),
+            missing_packages: RefCell::new(BTreeSet::new()),
             types: HashMap::new(),
             active: HashSet::new(),
             planning: HashSet::new(),
@@ -607,8 +609,13 @@ impl<'a> Resolver<'a> {
             source.path.parent()?.join(path)
         };
         crate::profile::count("lookup.import_directory_resolutions", 1);
-        let package = std::fs::canonicalize(directory).ok()
-            .and_then(|directory| self.index.packages.get(&directory).copied());
+        let package = std::fs::canonicalize(directory).ok().and_then(|directory| {
+            let package = self.index.packages.get(&directory).copied();
+            if package.is_none() && !["base:builtin", "base:intrinsics"].contains(&path) {
+                self.missing_packages.borrow_mut().insert(directory);
+            }
+            package
+        });
         self.import_packages.borrow_mut().insert(key, package);
         package
         }?;
@@ -617,6 +624,9 @@ impl<'a> Resolver<'a> {
                         .iter()
                         .find(|id| self.active_definition(self.symbols[**id].reference)))
                 .copied()
+    }
+    pub(crate) fn demanded_packages(&self) -> BTreeSet<std::path::PathBuf> {
+        self.missing_packages.borrow().clone()
     }
     pub fn active_definition(&self, r: Ref) -> bool {
         let source = &self.sources[r.file];

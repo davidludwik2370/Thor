@@ -111,16 +111,25 @@ impl Project {
     pub(super) fn discover_call_facts(&mut self) -> Result<()> {
         let _phase = crate::profile::span("analysis.discover_calls");
         if !self.sources.iter().any(|source| {
-            source
-                .nodes
-                .iter()
-                .any(|node| node.data["pure"] == true || node.kind == "Run")
-        }) {
-            return Ok(());
-        }
+            source.shared_native || source.nodes.iter().any(|node| {
+                node.immutable || node.data["pure"] == true
+                    || matches!(node.kind.as_str(), "Run" | "Interpolation" | "OrPanic")
+            }) || !source.selections.is_empty()
+                || source.info["mut_parameters"].as_array().is_some_and(|rows| !rows.is_empty())
+        }) { return Ok(()); }
         let mut inspected = HashSet::new();
         loop {
             let mut resolver = Resolver::with_flags(&self.sources, &self.options.flags);
+            resolver.prepare_contexts();
+            // Resolve the project's actual names. This follows type aliases and
+            // selected signatures without traversing unrelated SDK bodies.
+            for (file, source) in self.sources.iter().enumerate().filter(|(_, source)| !source.shared_native) {
+                for (index, node) in source.nodes.iter().enumerate() {
+                    if matches!(node.kind.as_str(), "Ident" | "Selector") {
+                        resolver.type_of(crate::semantics::Ref {file, node: crate::ast::NodeId(index)});
+                    }
+                }
+            }
             let mut roots = vec![];
             let mut requests = vec![];
             for (file, source) in resolver.sources.iter().enumerate() {
@@ -191,6 +200,12 @@ impl Project {
                     }
                 }
             }
+            // Slice-effect inspection also follows only demanded callees.
+            // Retry discovery before the final diagnostic/ownership pass when
+            // a selected implementation needs another native package.
+            let _effects = crate::privileges::Privileges::analyze_project(
+                &mut resolver, &self.options.flags, self.options.editor_info, self.evaluation.as_ref());
+            packages.extend(resolver.demanded_packages());
             packages.retain(|directory| {
                 !inspected.contains(directory)
                     && !self

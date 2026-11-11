@@ -9,6 +9,7 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
+    sync::Arc,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -96,25 +97,38 @@ pub struct Selection {
 
 #[derive(Clone, Debug)]
 pub struct Source {
+    syntax: Arc<SourceSyntax>,
+    pub edits: Vec<Edit>,
+    pub shared_native: bool,
+    pub collection_roots: BTreeMap<String, PathBuf>,
+}
+/// Parsed syntax is immutable. Helper projects share it while retaining their
+/// own edits, package views and collection bindings.
+#[derive(Debug)]
+pub struct SourceSyntax {
     pub path: PathBuf,
     pub raw: String,
     pub nodes: Vec<Node>,
     pub names: Names,
-    pub edits: Vec<Edit>,
     pub selections: Vec<Selection>,
     pub comments: Vec<Span>,
     pub info: Value,
     pub prefix: String,
     pub excluded: bool,
     pub thor: bool,
-    pub shared_native: bool,
-    pub collection_roots: BTreeMap<String, PathBuf>,
     line_starts: Vec<usize>,
     by_span: HashMap<Span, Vec<NodeId>>,
     traversal: Vec<NodeId>,
     subtree: Vec<(usize, usize)>,
 }
+impl std::ops::Deref for Source {
+    type Target = SourceSyntax;
+    fn deref(&self) -> &SourceSyntax { &self.syntax }
+}
 impl Source {
+    pub(crate) fn shares_syntax(&self, other: &Source) -> bool {
+        Arc::ptr_eq(&self.syntax, &other.syntax)
+    }
     pub fn from_frontend(path: PathBuf, raw: String, mut info: Value, thor: bool) -> Result<Self> {
         let rows = info["nodes"]
             .as_array_mut()
@@ -406,23 +420,25 @@ impl Source {
             return Err(Error::new("AST contains disconnected roots"));
         }
         Ok(Self {
+            syntax: Arc::new(SourceSyntax {
             path,
             raw,
             nodes,
             names,
-            edits,
             selections,
             comments,
             info,
             prefix,
             excluded,
             thor,
-            shared_native: false,
-            collection_roots: BTreeMap::new(),
             line_starts,
             by_span,
             traversal,
             subtree,
+            }),
+            edits,
+            shared_native: false,
+            collection_roots: BTreeMap::new(),
         })
     }
     pub fn node(&self, id: NodeId) -> &Node {
@@ -538,6 +554,21 @@ mod tests {
             json!({"nodes":nodes,"edits":[],"features":[],"selections":[]}),
             true,
         )
+    }
+    #[test]
+    fn helper_sources_share_syntax_but_own_their_edits_and_collections() {
+        let source = parsed("x", json!([
+            {"kind":"File","start":0,"end":1,"parent":-1},
+            {"kind":"Ident","start":0,"end":1,"parent":0,"name":"x"}
+        ])).expect("valid source");
+        let mut helper = source.clone();
+        if !source.shares_syntax(&helper) { panic!("syntax was copied"); }
+        helper.edits.push(Edit {span:Span::new(0,1), text:"helper".into()});
+        helper.collection_roots.insert("custom".into(), PathBuf::from("/custom"));
+        if !source.edits.is_empty() || !source.collection_roots.is_empty()
+            || source.text(NodeId(1)) != "x" || helper.text(NodeId(1)) != "x" {
+            panic!("a helper modified its parent's source view");
+        }
     }
     #[test]
     fn roles_distinguish_equal_span_wrappers_by_ancestry() {

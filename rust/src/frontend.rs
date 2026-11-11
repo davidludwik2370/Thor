@@ -193,6 +193,7 @@ impl Frontend {
                             Source::from_frontend(path.clone(), raw.clone(), info, thor)
                         {
                             crate::profile::count("parser.cache_hits", 1);
+                            crate::profile::count("parser.nodes", source.nodes.len() as u64);
                             return Ok(source);
                         }
                     }
@@ -266,6 +267,7 @@ impl Frontend {
             None
         };
         let source = Source::from_frontend(path, raw, info, thor)?;
+        crate::profile::count("parser.nodes", source.nodes.len() as u64);
         if let (Some(cache), Some(payload)) = (cache, cache_payload) {
             // Persist only parser output. Normalization and semantic facts must
             // be rebuilt by the current compiler even if its implementation changes.
