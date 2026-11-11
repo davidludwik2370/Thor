@@ -244,10 +244,23 @@ impl Resolver<'_> {
                 ));
             }
         }
+        if plans.len() <= 1 {
+            return plans.into_iter().map(|(_, plan)| plan).collect();
+        }
         let best = plans.iter().map(|(score, _)| *score).max();
+        // Mutually exclusive declarations are one native overload. A weaker
+        // match in the active arm cannot be shadowed by its inactive sibling.
+        let selected = plans
+            .iter()
+            .filter(|(score, _)| Some(*score) == best)
+            .map(|(_, plan)| self.checked_procedure_identity(plan.procedure))
+            .collect::<HashSet<_>>();
         plans
             .into_iter()
-            .filter(|(score, _)| Some(*score) == best)
+            .filter(|(score, plan)| {
+                Some(*score) == best
+                    || selected.contains(&self.checked_procedure_identity(plan.procedure))
+            })
             .map(|(_, plan)| plan)
             .collect()
     }

@@ -13,6 +13,7 @@ impl Lower<'_, '_> {
         json!(name).to_string()
     }
     fn checked_name(&self, target: Ref) -> String {
+        let target = self.resolver.checked_procedure_identity(target);
         format!(
             "{}checked_{}",
             self.resolver.sources[target.file].prefix, target.node.0
@@ -141,7 +142,7 @@ impl Lower<'_, '_> {
                 return Err(self.unsupported(target.node, "named checked procedure bodies"));
             };
             let body = self.role(target.node, "body")?;
-            let prefix = format!("{}_", self.checked_name(target));
+            let prefix = format!("{}checked_{}_", self.source.prefix, target.node.0);
             let saved_prefix = std::mem::replace(&mut self.prefix, prefix);
             let old_prologue = self.body_prologues.remove(&body);
             let old_owned = self.pure_owned.contains(&target.node);
@@ -250,8 +251,11 @@ impl Lower<'_, '_> {
             ]),
         );
         let mut names = vec![];
+        let mut emitted = HashSet::new();
         for target in targets {
-            names.push(self.checked_access(target, callee)?);
+            if emitted.insert(self.checked_name(target)) {
+                names.push(self.checked_access(target, callee)?);
+            }
         }
         let target = if names.len() == 1 {
             names.remove(0)

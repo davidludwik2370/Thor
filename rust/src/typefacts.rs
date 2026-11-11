@@ -1011,6 +1011,68 @@ impl Resolver<'_> {
     pub fn candidates(&mut self, callee: Ref) -> Vec<Ref> {
         self.candidate_inner(callee, &mut HashSet::new())
     }
+    fn enclosing_when(&self, declaration: Ref) -> Option<NodeId> {
+        let source = &self.sources[declaration.file];
+        source
+            .ancestors(declaration.node)
+            .take_while(|node| !is_scope(source, *node))
+            .filter(|node| source.node(*node).kind == "When")
+            .last()
+    }
+    fn conditional_procedures(&self, symbol: &Symbol) -> Vec<Ref> {
+        let Some(owner) = self.enclosing_when(symbol.reference) else {
+            return vec![];
+        };
+        let file = symbol.reference.file;
+        let source = &self.sources[file];
+        self.scopes
+            .get(&(file, symbol.scope, symbol.name.clone()))
+            .into_iter()
+            .flatten()
+            .filter_map(|index| {
+                let alternative = &self.symbols[*index];
+                let mut value = alternative.value?;
+                while source.node(value).kind == "Paren" {
+                    value = source.role(value, "expr")?;
+                }
+                (source.node(value).kind == "Procedure"
+                    && self.enclosing_when(alternative.reference) == Some(owner))
+                    .then_some(Ref { file, node: value })
+            })
+            .collect()
+    }
+    pub(crate) fn checked_procedure_identity(&self, procedure: Ref) -> Ref {
+        let source = &self.sources[procedure.file];
+        let mut value = procedure.node;
+        while let Some(parent) = source.node(value).parent {
+            if source.node(parent).kind != "Paren" {
+                break;
+            }
+            value = parent;
+        }
+        let Some(declaration) = source
+            .node(value)
+            .parent
+            .filter(|parent| source.node(*parent).kind == "Declaration")
+        else {
+            return procedure;
+        };
+        let declaration = Ref { node: declaration, ..procedure };
+        if self.enclosing_when(declaration).is_none() {
+            return procedure;
+        }
+        let Some(symbol) = self
+            .symbols
+            .iter()
+            .find(|symbol| symbol.reference == declaration && symbol.value == Some(value))
+        else {
+            return procedure;
+        };
+        self.conditional_procedures(symbol)
+            .into_iter()
+            .min()
+            .unwrap_or(procedure)
+    }
     fn candidate_inner(&mut self, callee: Ref, seen: &mut HashSet<Ref>) -> Vec<Ref> {
         if !seen.insert(callee) {
             return vec![];
@@ -1054,6 +1116,13 @@ impl Resolver<'_> {
         }
         if let Some(symbol) = self.symbol(callee) {
             let symbol = self.symbols[symbol].clone();
+            let conditional = self.conditional_procedures(&symbol);
+            if conditional.len() > 1 {
+                return conditional
+                    .into_iter()
+                    .filter(|candidate| self.active_definition(*candidate))
+                    .collect();
+            }
             if let Some(node) = symbol.annotation.or(symbol.value) {
                 return self.candidate_inner(
                     Ref {

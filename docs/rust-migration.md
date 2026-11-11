@@ -225,9 +225,11 @@ releases anonymous numeric operands while preserving named values. The
 original numeric method and variadic cases run with allocation tracking in
 debug and assertion-disabled release builds.
 
-Checked calls follow integer build defines, retain overload candidates when a
-generic argument's type is unknown, and include checked nested helpers inside
-the copied outer body. Diagnostics restore the original call, preserve Odin's
+Checked calls follow integer, Boolean and text build defines, retain overload
+candidates when a generic argument's type is unknown, and include checked
+nested helpers inside the copied outer body. Alternatives in one native
+`when` share a checked procedure name, so layout-dependent selection works
+in ordinary execution and in isolated helpers. Diagnostics restore the original call, preserve Odin's
 candidate list for invalid pointer arguments, and identify unsupported
 contextless dynamic results at their type annotations. Compile-time
 comprehensions retain declared element types and their dependencies. Length

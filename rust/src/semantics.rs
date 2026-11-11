@@ -681,27 +681,19 @@ impl<'a> Resolver<'a> {
             "Unary" if n.op == "!" => self.condition(role("expr")?).map(|x| !x),
             "Call" => {
                 let callee = role("callee")?;
-                let args = s.group(r.node, "args");
-                if s.text(callee.node) == "#config" && args.len() == 2 {
-                    let key = s.text(args[0]).trim_matches('"');
-                    let prefix = format!("-define:{key}=");
-                    if let Some(value) = self
-                        .flags
-                        .iter()
-                        .find_map(|flag| flag.strip_prefix(&prefix))
-                    {
-                        return match value {
-                            "true" => Some(true),
-                            "false" => Some(false),
-                            _ => None,
-                        };
-                    }
-                    return self.condition(Ref {
-                        file: r.file,
-                        node: args[1],
-                    });
+                if s.text(callee.node) != "#config" {
+                    return None;
                 }
-                None
+                let [name, default] = s.group(r.node, "args") else {
+                    return None;
+                };
+                if self.build_define(s.text(*name)).is_none() {
+                    return self.condition(Ref { node: *default, ..r });
+                }
+                match self.constant_value(r, &Substitutions::new(), None) {
+                    Some(Constant::Boolean(value)) => Some(value),
+                    _ => None,
+                }
             }
             "Binary" => {
                 let a = role("left")?;
@@ -762,16 +754,8 @@ impl<'a> Resolver<'a> {
                         None
                     };
                 }
-                let bindings = Substitutions::new();
-                let a = self.context_integer(a, &bindings)?;
-                let b = self.context_integer(b, &bindings)?;
-                match n.op.as_str() {
-                    "==" => Some(a == b),
-                    "!=" => Some(a != b),
-                    "<" => Some(a < b),
-                    "<=" => Some(a <= b),
-                    ">" => Some(a > b),
-                    ">=" => Some(a >= b),
+                match self.constant_value(r, &Substitutions::new(), None) {
+                    Some(Constant::Boolean(value)) => Some(value),
                     _ => None,
                 }
             }

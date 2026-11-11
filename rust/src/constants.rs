@@ -1,6 +1,14 @@
 //! Compile-time arguments carry values, rather than just their scalar types.
 use super::*;
 impl Resolver<'_> {
+    pub(crate) fn build_define(&self, name: &str) -> Option<&str> {
+        let prefix = format!("-define:{}=", name.trim_matches('"'));
+        self.flags
+            .iter()
+            .rev()
+            .find_map(|flag| flag.strip_prefix(&prefix))
+    }
+
     pub fn untyped_operand(&mut self, r: Ref) -> bool {
         self.untyped_operand_at(r, &mut HashSet::new())
     }
@@ -253,24 +261,25 @@ impl Resolver<'_> {
                 if args.len() != 2 {
                     return None;
                 }
-                let key = s.text(args[0]).trim_matches('"');
-                let prefix = format!("-define:{key}=");
-                if let Some(value) = self
-                    .flags
-                    .iter()
-                    .rev()
-                    .find_map(|flag| flag.strip_prefix(&prefix))
-                {
-                    return match value {
-                        "true" => Some(Constant::Boolean(true)),
-                        "false" => Some(Constant::Boolean(false)),
-                        _ => value
-                            .replace('_', "")
-                            .parse::<i128>()
-                            .ok()
-                            .map(Constant::Integer)
-                            .or_else(|| crate::lower::unquote(value).ok().map(Constant::Text)),
-                    };
+                if let Some(value) = self.build_define(s.text(args[0])) {
+                    if value.eq_ignore_ascii_case("true") || value.eq_ignore_ascii_case("t") {
+                        return Some(Constant::Boolean(true));
+                    }
+                    if value.eq_ignore_ascii_case("false") || value.eq_ignore_ascii_case("f") {
+                        return Some(Constant::Boolean(false));
+                    }
+                    if value.starts_with(|c: char| c.is_ascii_digit() || matches!(c, '+' | '-')) {
+                        // Leave floats and integers outside this resolver's
+                        // range to Odin. Neither is a known text value.
+                        return value.replace('_', "").parse().ok().map(Constant::Integer);
+                    }
+                    // Odin accepts raw text and optionally strips single
+                    // quotes. Double quotes are themselves part of the value.
+                    let text = value
+                        .strip_prefix('\'')
+                        .and_then(|rest| rest.strip_suffix('\''))
+                        .unwrap_or(value);
+                    return Some(Constant::Text(text.into()));
                 }
                 self.constant_value_seen(
                     Ref {
@@ -301,6 +310,9 @@ impl Resolver<'_> {
             }
             "Ident" if s.text(r.node) == "true" => Some(Constant::Boolean(true)),
             "Ident" if s.text(r.node) == "false" => Some(Constant::Boolean(false)),
+            "Ident" if s.text(r.node) == "ODIN_DEBUG" => {
+                Some(Constant::Boolean(self.flags.iter().any(|flag| flag == "-debug")))
+            }
             "Literal" if s.text(r.node).starts_with('"') => crate::lower::unquote(s.text(r.node))
                 .ok()
                 .map(Constant::Text),

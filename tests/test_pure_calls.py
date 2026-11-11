@@ -239,9 +239,46 @@ MODE::#config(MODE,1)
 when MODE==1{leaf::proc(value:int)->int{return value+1}}
 else{leaf::proc(value:int)->int{return value+2}}
 work::fn(value:int)->int{return leaf(value)}
+FOLDED::#run work(3)
 '''
-        for mode in [1,2]:
-            self.invoke(self.program(f'x:=3;if work(x)!={3+mode}{{panic("wrong implementation")}}',prefix),flags=[f'-define:MODE={mode}'])
+        for default,modes in [
+            ('1',[('1',4),('2',5)]),
+            ('true',[('true',4),('F',5)]),
+            ('"first"',[('first',4),("'first'",4),('"first"',5)]),
+        ]:
+            for mode,expected in modes:
+                with self.subTest(mode=mode):
+                    declarations=prefix.replace('#config(MODE,1)',f'#config(MODE,{default})').replace('MODE==1',f'MODE=={default}')
+                    body=f'x:=3;if work(x)!={expected}||FOLDED!={expected}{{panic("wrong implementation")}}'
+                    self.invoke(self.program(body,declarations),flags=[f'-define:MODE={mode}'])
+
+    def test_odin_selected_conditional_implementations_keep_checked_bodies(self):
+        declarations='''
+Record::struct{n:i64}
+state:int
+when size_of(Record)!=8 {
+    leaf::proc(value:int)->int{return state}
+    mixed::proc(value:int)->int{return state}
+} else {
+    leaf::proc(value:int)->int{return value+1}
+    mixed::proc(value:f64)->int{return int(value)+2}
+}
+work::fn(value:int)->int{return leaf(value)}
+mixed_work::fn(value:int)->int{return mixed(3)+value}
+FOLDED::#run work(3)
+MIXED::#run mixed_work(3)
+'''
+        for flags in [
+            ['-debug'],
+            ['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert'],
+        ]:
+            with self.subTest(flags=flags):
+                self.invoke(self.program(
+                    'value:=3;if work(value)!=4||FOLDED!=4||mixed_work(value)!=8||MIXED!=8{panic("wrong conditional implementation")}',
+                    declarations),flags=flags)
+        self.invoke(self.program('value:=3;_=work(value)',
+            declarations.replace('!=8','==8').split('FOLDED::')[0]),
+            command='check',fail='outside the function')
 
     def test_standard_library_math_at_runtime_and_compile_time(self):
         self.invoke(self.program('x:=9.0;assert(work(x)==3&&VALUE==4&&plain(x)==3)', '''
