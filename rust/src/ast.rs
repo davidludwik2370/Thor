@@ -7,10 +7,13 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     path::PathBuf,
     sync::Arc,
 };
+#[path = "nodefields.rs"]
+mod nodefields;
+pub use nodefields::NodeFields;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NodeId(pub usize);
@@ -75,9 +78,9 @@ pub struct Node {
     pub span: Span,
     pub parent: Option<NodeId>,
     pub children: Vec<NodeId>,
-    pub roles: BTreeMap<String, NodeId>,
-    pub spans: BTreeMap<String, Span>,
-    pub lists: BTreeMap<String, Vec<NodeId>>,
+    pub roles: NodeFields<NodeId>,
+    pub spans: NodeFields<Span>,
+    pub lists: NodeFields<Vec<NodeId>>,
     pub op: String,
     pub name: NameId,
     pub mutable: bool,
@@ -171,9 +174,9 @@ impl Source {
                     Some(NodeId(parent as usize))
                 },
                 children: vec![],
-                roles: BTreeMap::new(),
-                spans: BTreeMap::new(),
-                lists: BTreeMap::new(),
+                roles: NodeFields::default(),
+                spans: NodeFields::default(),
+                lists: NodeFields::default(),
                 op: row["op"].as_str().unwrap_or("").into(),
                 name: names.intern(row["name"].as_str().unwrap_or("")),
                 mutable: row["mutable"].as_bool().unwrap_or(false),
@@ -254,25 +257,30 @@ impl Source {
         }
         // Features can replace roles/lists. Resolve them only after merging,
         // distinguishing same-span wrappers using native ancestry.
+        let mut field_names = HashSet::<Arc<str>>::new();
         for i in 0..nodes.len() {
             let row = &nodes[i].data;
-            let mut resolved_roles = BTreeMap::new();
-            let mut role_spans = BTreeMap::new();
-            let mut resolved_lists = BTreeMap::new();
+            let mut resolved_roles = Vec::new();
+            let mut role_spans = Vec::new();
+            let mut resolved_lists = Vec::new();
             if let Some(roles) = row["roles"].as_object() {
+                resolved_roles.reserve(roles.len());
+                role_spans.reserve(roles.len());
                 for (name, value) in roles {
                     if let Some(span) = Span::from_wire(value) {
                         if !span.is_valid_for(&raw) {
                             return Err(Error::new("invalid AST role span"));
                         }
-                        role_spans.insert(name.clone(), span);
+                        let key = intern_field(&mut field_names, name);
+                        role_spans.push((key.clone(), span));
                         if let Some(id) = resolve_span(&nodes, &by_span, span, NodeId(i)) {
-                            resolved_roles.insert(name.clone(), id);
+                            resolved_roles.push((key, id));
                         }
                     }
                 }
             }
             if let Some(lists) = row["lists"].as_object() {
+                resolved_lists.reserve(lists.len());
                 for (name, value) in lists {
                     let mut ids = vec![];
                     for value in value.as_array().into_iter().flatten() {
@@ -285,12 +293,12 @@ impl Source {
                             }
                         }
                     }
-                    resolved_lists.insert(name.clone(), ids);
+                    resolved_lists.push((intern_field(&mut field_names, name), ids));
                 }
             }
-            nodes[i].roles = resolved_roles;
-            nodes[i].spans = role_spans;
-            nodes[i].lists = resolved_lists;
+            nodes[i].roles = NodeFields::from_entries(resolved_roles);
+            nodes[i].spans = NodeFields::from_entries(role_spans);
+            nodes[i].lists = NodeFields::from_entries(resolved_lists);
         }
         for feature in info["features"]
             .as_array()
@@ -358,10 +366,10 @@ impl Source {
                 .roles
                 .iter()
                 .filter(|(name, _)| matches!(
-                    name.as_str(),
+                    *name,
                     "loop" | "expr" | "type" | "output" | "key" | "cond"
                 ))
-                .map(|(name, id)| (name.clone(), id.0))
+                .map(|(name, id)| (name.to_owned(), id.0))
                 .collect::<BTreeMap<_, _>>());
             nodes[loop_id.0].data["comprehension"] = serde_json::json!(id.0);
         }
@@ -522,6 +530,14 @@ impl Source {
             .find(|id| *id != relative && self.is_descendant(*id, relative))
             .or_else(|| nodes.iter().copied().find(|id| *id != relative))
     }
+}
+fn intern_field(names: &mut HashSet<Arc<str>>, name: &str) -> Arc<str> {
+    if let Some(key) = names.get(name) {
+        return key.clone();
+    }
+    let key: Arc<str> = name.into();
+    names.insert(key.clone());
+    key
 }
 fn is_descendant(nodes: &[Node], id: NodeId, ancestor: NodeId) -> bool {
     let mut parent = nodes[id.0].parent;
