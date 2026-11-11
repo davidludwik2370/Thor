@@ -257,9 +257,20 @@ original use. Big-number lowering marks synthetic operand setup and cleanup
 so one breakpoint on an update stops once. The editor's 141 Node tests and
 13 source-map and TLS metadata tests also passed.
 
-The debugger and stdio TLS fixtures accept `THOR_TEST_COMPILER`. Use the
-root `thor-rust` launcher for TLS so its default collection discovery finds
-the sibling runtime directory.
+The Python debugger suite also passed all 41 cases. The debugger and stdio TLS
+fixtures accept `THOR_TEST_COMPILER`. For TLS, use the root `thor-rust` launcher
+or place a `runtime` symlink beside a standalone binary so collection discovery
+can find the bundled libraries.
+
+### TLS diagnostic ranges
+
+Slice guards preserve the original operand and related source ranges even
+when Odin reports the guard in a generated type query. Repeated reports from
+that query and the emitted expression collapse into one source diagnostic.
+Formatting diagnostics underline the entire affected f-string field. Purity
+errors reached through bundled library calls retain the user `#run` site and
+the standard-library cause. Existing UTF-16, unsaved-buffer recovery and
+generic immutable diagnostic fixtures exercise these paths.
 
 ### Anonymous producer ownership
 

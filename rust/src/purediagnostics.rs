@@ -58,7 +58,7 @@ pub(crate) fn diagnostic_span(source: &Source, site: NodeId) -> Span {
     span
 }
 
-fn position(sources: &[Source], reference: Ref) -> Value {
+pub(crate) fn position(sources: &[Source], reference: Ref) -> Value {
     let source = &sources[reference.file];
     let span = diagnostic_span(source, reference.node);
     let (line, column) = source.position(span.start);

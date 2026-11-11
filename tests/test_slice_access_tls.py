@@ -184,9 +184,16 @@ main::proc(){buffer :> []byte{0,0,0,0};values :> []int{7};_=format(buffer,values
                 errors=client.diagnostic(path.as_uri(),contains='read-only slice')
                 relevant=[error for error in errors if 'read-only slice' in error['message']]
                 self.assertEqual(len(relevant),1,errors)
-                self.assertTrue(any(error['range']['start']==self.position(text,'values)',0) for error in relevant),errors)
-                self.assertTrue(any(note['location']['range']['start']==self.position(text,'data[0]+=1',0)
-                                    for error in relevant for note in error.get('relatedInformation',[])),errors)
+                self.assertEqual(relevant[0]['range'], {
+                    'start': self.position(text, 'values)', 0),
+                    'end': self.position(text, 'values)', len('values')),
+                })
+                effect = {
+                    'start': self.position(text, 'data[0]+=1', 0),
+                    'end': self.position(text, 'data[0]+=1', len('data[0]')),
+                }
+                self.assertTrue(any(note['location']['range'] == effect and note['message']
+                                    for note in relevant[0].get('relatedInformation', [])), errors)
                 self.assertNotIn('Thor expression',json.dumps(errors))
                 corrected=text.replace('values :>','values :=')
                 client.notifications.clear()

@@ -215,7 +215,12 @@ impl<'a, 'r> Purity<'a, 'r> {
             path
         } else if sources[origin.file].shared_native {
             // An explicit #run of native code still needs a visible call site.
-            via.iter().rposition(|site| !sources[site.file].shared_native)
+            via.iter().rposition(|site| {
+                let caller = &sources[site.file];
+                !caller.shared_native
+                    && !caller.collection_roots.get("thor")
+                        .is_some_and(|runtime| caller.path.starts_with(runtime))
+            })
                 .map_or(&[][..], |index| &via[index..])
         } else {
             &[]
@@ -1096,7 +1101,16 @@ impl Facts {
             for fault in faults {
                 let source = &r.sources[fault.site.file];
                 let io=fault.message.contains("because it performs I/O.");
-                let site=if io && fault.related.is_empty() {source.role(fault.site.node,"callee").unwrap_or(fault.site.node)}else{fault.site.node};
+                let mut site = fault.site.node;
+                if io && fault.related.is_empty() {
+                    site = source.role(site, "callee").unwrap_or(site);
+                } else if fault.site == root
+                    && fault.related.last().is_some_and(|origin| r.sources[origin.file].shared_native)
+                {
+                    site = source.node(site).parent
+                        .filter(|parent| source.node(*parent).kind == "Run")
+                        .unwrap_or(site);
+                }
                 let mut diagnostic =
                     Error::at(source, purediagnostics::diagnostic_span(source, site), &fault.message)
                         .diagnostics

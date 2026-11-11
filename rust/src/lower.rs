@@ -326,7 +326,10 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
     }
-    pub fn apply_privileges(&mut self, facts: &crate::privileges::Facts) {
+    pub fn apply_privileges<'f>(
+        &mut self,
+        facts: &'f crate::privileges::Facts,
+    ) -> Vec<(String, &'f crate::privileges::Issue)> {
         self.mutating_params.extend(
             facts
                 .mutating
@@ -334,14 +337,22 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .filter(|r| r.file == self.file)
                 .map(|r| r.node),
         );
+        let mut sites = Vec::new();
         for (reference, issue) in &facts.issues {
-            if reference.file == self.file&&!self.conditional_immutable_issue(reference.node,issue.seed,&issue.message){self.permission_error(reference.node, &issue.message);}
+            if reference.file == self.file
+                && !self.conditional_immutable_issue(reference.node, issue.seed, &issue.message)
+            {
+                if let Some(token) = self.permission_error(reference.node, &issue.message) {
+                    sites.push((token, issue));
+                }
+            }
         }
         for (reference, message) in &facts.invalid {
             if reference.file == self.file {
-                self.permission_error(reference.node, message);
+                let _ = self.permission_error(reference.node, message);
             }
         }
+        sites
     }
     pub fn remap_imports(&mut self, paths: BTreeMap<String, String>) {
         for (i, node) in self.source.nodes.iter().enumerate() {
@@ -359,7 +370,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         self.import_paths = paths;
     }
-    fn permission_error(&mut self, origin: NodeId, message: &str) {
+    fn permission_error(&mut self, origin: NodeId, message: &str) -> Option<String> {
         let mut target = origin;
         if self.source.node(target).kind == "FieldValue" {
             target = self.source.role(target, "value").unwrap_or(target);
@@ -387,15 +398,17 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .span
                 .contains(self.source.node(*id).span)
         }) {
-            return;
+            return None;
         }
-        let code = self.error_token(origin, message);
+        let token = self.register_error(origin, message);
+        let code = self.g(token.clone(), origin);
         self.blocked.remove(&target);
         if self.source.thor {
             self.switch_replacements.insert(target, code);
         } else {
             self.edits.push((self.source.node(target).span, code));
         }
+        Some(token)
     }
     fn gen(&self, text: impl Into<String>, span: Span, kind: &str) -> Code {
         Code::generated(text, &self.source.path, span, kind)
@@ -443,6 +456,10 @@ impl<'a, 'r> Lower<'a, 'r> {
         Error::unsupported(self.source, self.source.node(id).span, name)
     }
     fn error_token(&mut self, id: NodeId, message: &str) -> Code {
+        let token = self.register_error(id, message);
+        self.g(token, id)
+    }
+    fn register_error(&mut self, id: NodeId, message: &str) -> String {
         let token = format!(
             "{}expression_error_{}_{}_end",
             self.source.prefix,
@@ -450,7 +467,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.errors.len()
         );
         self.errors.insert(token.clone(), message.into());
-        self.g(token, id)
+        token
     }
     pub fn finish(&mut self) -> Result<(Emitted, HashMap<String, String>)> {
         let request = self

@@ -474,7 +474,20 @@ pub(crate) fn clean(
                     .min_by_key(|node| node.span.len())
                     .map(|node| node.span)
                     .unwrap_or(Span::new(offset, offset + 1));
-                if contract.is_some_and(|message| LOOP_CONTRACTS.contains(&message)) {
+                if contract.is_some_and(|message| FORMAT_CONTRACTS.contains(&message)) {
+                    if let Some(field) = source
+                        .nodes
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, node)| node.kind == "Interpolation")
+                        .flat_map(|(index, _)| source.group(NodeId(index), "args"))
+                        .map(|field| source.node(*field).span)
+                        .filter(|span| span.start <= offset && offset < span.end)
+                        .min_by_key(|span| span.len())
+                    {
+                        at = field;
+                    }
+                } else if contract.is_some_and(|message| LOOP_CONTRACTS.contains(&message)) {
                     if let Some(annotation) = source
                         .nodes
                         .iter()
@@ -827,7 +840,15 @@ pub(crate) fn clean(
                 }
             }
         }
+        let immutable = msgs
+            .first()
+            .is_some_and(|message| message.contains(" immutable storage '"));
         msgs.retain(|message| {
+            if message.trim_start().starts_with("Called within")
+                && (immutable || project.sources.iter().any(|source| message.contains(&source.prefix)))
+            {
+                return false;
+            }
             !(message.contains("instantiated as")
                 && (project
                     .sources
@@ -917,6 +938,16 @@ pub(crate) fn clean(
     let mut result = vec![];
     let mut seen = BTreeSet::new();
     for candidate in &items {
+        if candidate.packet["msgs"][0].as_str()
+            .is_some_and(|message| message.contains(": read-only slice access from '"))
+            && items.iter().any(|other| {
+                other.location == candidate.location
+                    && other.packet["msgs"][0].as_str()
+                        .is_some_and(|message| message.contains(" immutable storage '"))
+            })
+        {
+            continue;
+        }
         if candidate.concat_operand_failure
             && candidate.location.as_ref().is_some_and(|(file, span)| {
                 items.iter().any(|other| {

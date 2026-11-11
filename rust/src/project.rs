@@ -56,6 +56,10 @@ pub struct Options {
     pub vet_apply: bool,
     pub vet_ask: bool,
 }
+struct LoweringNotes {
+    operation: Option<crate::semantics::Ref>,
+    related: Vec<Value>,
+}
 pub struct Project {
     pub publish_layout: Option<String>,
     pub native_override: Option<Vec<String>>,
@@ -72,7 +76,7 @@ pub struct Project {
     pub evaluation_scheduled: bool,
     pub evaluation_skips: BTreeMap<crate::semantics::Ref, bool>,
     pub evaluation_witnesses: BTreeMap<crate::semantics::Ref, String>,
-    related: HashMap<String, Vec<Value>>,
+    related: HashMap<String, LoweringNotes>,
     type_sites: HashMap<String, (crate::semantics::Ref, String)>,
     pure_error_sites: HashMap<String, crate::semantics::Ref>,
     pure_call_paths: BTreeMap<
@@ -478,7 +482,10 @@ impl Project {
                     "msgs":["Required by this pure call; the selected implementation must obey pure function rules."]})
             }).collect();
             self.pure_error_sites.insert(token.clone(), *site);
-            self.related.insert(token, notes);
+            self.related.insert(
+                token,
+                LoweringNotes { operation: None, related: notes },
+            );
         }
         let sdk = sdkmirror::SdkMirror::plan(
             &resolver,
@@ -512,18 +519,6 @@ impl Project {
                 source.node(site.node).span,
                 "unresolved native generic slice branch specialization",
             ));
-        }
-        for (reference, issue) in &privileges.issues {
-            let source = &self.sources[reference.file];
-            let token = format!(
-                "{}expression_error_{}_",
-                source.prefix,
-                source.node(reference.node).span.start
-            );
-            let notes=std::iter::once((issue.seed,"Read-only view declared here."))
-                .chain(issue.related.iter().map(|r|(*r,"Slice effect occurs here.")))
-                .map(|(r,message)|{let source=&self.sources[r.file];let span=source.node(r.node).span;let (line,column)=source.position(span.start);json!({"pos":{"file":source.path,"offset":span.start,"end_offset":span.end,"line":line,"column":column},"msgs":[message]})}).collect();
-            self.related.insert(token, notes);
         }
         let first = self
             .sources
@@ -701,7 +696,16 @@ impl Project {
                     .map(|(node, unchecked)| (node.node, *unchecked))
                     .collect(),
             );
-            lower.apply_privileges(&privileges);
+            for (token, issue) in lower.apply_privileges(&privileges) {
+                let notes = std::iter::once((issue.seed, "Read-only view declared here."))
+                    .chain(issue.related.iter().map(|site| (*site, "Slice effect occurs here.")))
+                    .map(|(site, message)| crate::purediagnostics::note(&self.sources, site, message))
+                    .collect();
+                self.related.insert(
+                    token,
+                    LoweringNotes { operation: Some(issue.operation), related: notes },
+                );
+            }
             lower.apply_local_borrowing(&local_borrowing);
             lower.apply_borrowing(&borrowing);
             lower.apply_purity(&purity)?;
@@ -1278,9 +1282,15 @@ impl Project {
             let mut purity_cause = None;
             let pure_site=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.pure_error_sites.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,site)|*site));
-            let related=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
-                .find_map(|message|self.related.iter().find(|(token,_)|message.contains(token.as_str())).map(|(_,notes)|notes.clone()));
-            if let Some(notes)=related {error["related"]=json!(notes);}
+            let mut messages = error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str);
+            let lowering_notes = |message: &str| {
+                self.related.iter().find(|(token, _)| message.contains(token.as_str()))
+            };
+            let primary = messages.next().and_then(lowering_notes);
+            let permission_site = primary.and_then(|(token, notes)| notes.operation.map(|site| (token, site)));
+            if let Some((_, notes)) = primary.or_else(|| messages.find_map(lowering_notes)) {
+                error["related"] = json!(notes.related);
+            }
             let mut mapped = None;
             let mut expression_texts=vec![];
             let file=error["pos"]["file"].as_str().map(PathBuf::from);
@@ -1303,6 +1313,13 @@ impl Project {
             if let Some(messages)=error["msgs"].as_array_mut(){for message in messages{
                 if let Some(text)=message.as_str(){let mut text=self.remap_references(text);for (generated,original) in &expression_texts{if text.trim()==generated.trim(){let indent=&text[..text.len()-text.trim_start().len()];text=format!("{indent}{original}");break;}}for (token,replacement) in &self.errors{if text.contains(token){text=replacement.clone();break;}}*message=json!(text);}
             }}
+            if let Some((token, site)) = permission_site {
+                // Odin can report the same guard from the emitted expression and its
+                // type witness. Both refer to the source operation that emitted it.
+                error["pos"] = crate::purediagnostics::position(&self.sources, site);
+                error["msgs"] = json!([self.errors[token]]);
+                error["stage"] = json!("checker");
+            }
             if let Some((token,(site,description)))=error["msgs"].as_array().into_iter().flatten().filter_map(Value::as_str)
                 .find_map(|message|self.type_sites.iter().find(|(token,_)|message.contains(token.as_str()))) {
                 let source=&self.sources[site.file];let span=crate::purediagnostics::diagnostic_span(source,site.node);
