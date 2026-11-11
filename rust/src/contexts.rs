@@ -15,6 +15,7 @@ pub struct ContextHint {
 }
 impl Resolver<'_> {
     pub fn prepare_contexts(&mut self) {
+        let _phase = crate::profile::span("analysis.contexts");
         let calls = self
             .sources
             .iter()

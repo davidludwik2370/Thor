@@ -45,6 +45,7 @@ impl Resolver<'_> {
         true
     }
     pub(super) fn prepare_projections(&mut self) {
+        let _phase = crate::profile::span("analysis.using_projections");
         let mut using: HashMap<(usize, NodeId), Vec<UsingOwner>> = HashMap::new();
         let mut references = vec![];
         for (file, s) in self.sources.iter().enumerate() {
@@ -97,45 +98,47 @@ impl Resolver<'_> {
         if using.is_empty() {
             return;
         }
+        // A using declaration in an unrelated SDK file cannot affect this
+        // reference. Group package owners once, preserving source-file order.
+        let package_using = self.index.members.iter().map(|members| {
+            members.iter().flat_map(|file| using.get(&(*file, NodeId(0)))
+                .into_iter().flatten().cloned()).collect::<Vec<_>>()
+        }).collect::<Vec<_>>();
+        let references = references.into_iter().filter_map(|reference| {
+            let scopes = self.index.scopes(reference).collect::<Vec<_>>();
+            scopes.iter().any(|scope| {
+                if *scope == NodeId(0) {
+                    !package_using[self.index.package_for[reference.file]].is_empty()
+                } else { using.contains_key(&(reference.file, *scope)) }
+            }).then_some((reference, scopes))
+        }).collect::<Vec<_>>();
         let mut projected: HashMap<(Ref, String), usize> = HashMap::new();
         // A later `using inner` can refer to an earlier promoted record field.
         // Resolve those aliases with the same field/type lookup until stable.
         loop {
             let mut changed = false;
-            for reference in &references {
+            for (reference, scopes) in &references {
+                crate::profile::count("projection.reference_visits", 1);
                 if self.using_symbols.contains_key(reference) {
                     continue;
                 }
                 let s = &self.sources[reference.file];
                 let name = s.text(reference.node).to_string();
                 let direct = self.lookup(*reference, &name);
-                let scopes = s
-                    .ancestors(reference.node)
-                    .filter(|node| is_scope(s, *node) || s.node(*node).kind == "ProcedureType")
-                    .chain(std::iter::once(NodeId(0)))
-                    .collect::<Vec<_>>();
-                'scopes: for scope in scopes {
+                'scopes: for scope in scopes.iter().copied() {
                     if let Some(id) = direct {
                         let symbol = &self.symbols[id];
                         if symbol.scope == scope
                             && (symbol.reference.file == reference.file
                                 || scope == NodeId(0)
-                                    && self.sources[symbol.reference.file].path.parent()
-                                        == s.path.parent())
+                                    && self.index.package_for[symbol.reference.file]
+                                        == self.index.package_for[reference.file])
                         {
                             break;
                         }
                     }
                     let owners = if scope == NodeId(0) {
-                        self.sources
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, unit)| unit.path.parent() == s.path.parent())
-                            .flat_map(|(file, _)| {
-                                using.get(&(file, NodeId(0))).into_iter().flatten()
-                            })
-                            .cloned()
-                            .collect::<Vec<_>>()
+                        package_using[self.index.package_for[reference.file]].clone()
                     } else {
                         using
                             .get(&(reference.file, scope))
@@ -152,23 +155,11 @@ impl Resolver<'_> {
                                 .lookup(entry.owner, owner_source.text(entry.owner.node))
                                 .is_none()
                         {
-                            let imported = owner_source
-                                .nodes
-                                .iter()
-                                .filter(|n| n.kind == "Import")
-                                .find_map(|n| {
-                                    let path = crate::lower::unquote(&n.op).ok()?;
-                                    let explicit = owner_source.names.get(n.name);
-                                    let namespace = if explicit.is_empty() {
-                                        path.rsplit(['/', ':']).next().unwrap_or("")
-                                    } else {
-                                        explicit
-                                    };
-                                    (namespace == owner_source.text(entry.owner.node))
-                                        .then_some(path)
-                                });
+                            let imported = self.index.imports[entry.owner.file]
+                                .get(owner_source.text(entry.owner.node))
+                                .and_then(|paths| paths.first());
                             if let Some(symbol) = imported
-                                .and_then(|path| self.package_symbol(owner_source, &path, &name))
+                                .and_then(|path| self.package_symbol(entry.owner.file, path, &name))
                             {
                                 self.using_symbols.insert(*reference, symbol);
                                 changed = true;

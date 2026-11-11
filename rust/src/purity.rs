@@ -108,6 +108,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         roots: &[Ref],
         entries: &BTreeSet<Ref>,
     ) -> Facts {
+        let _phase = crate::profile::span("analysis.purity");
         let mut this = Self {
             r,
             facts: Facts {
@@ -131,6 +132,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         this.facts
     }
     pub fn analyze_calls(r: &'r mut Resolver<'a>, calls: &[Ref]) -> Facts {
+        let _phase = crate::profile::span("analysis.purity_calls");
         let mut this = Self {
             r,
             facts: Facts::default(),

@@ -43,6 +43,7 @@ fn kind(typ: &Type) -> Kind {
 }
 impl Facts {
     pub fn analyze(resolver: &mut Resolver<'_>, purity: &purity::Facts) -> Self {
+        let _phase = crate::profile::span("analysis.local_borrowing");
         let roots = purity
             .checked
             .iter()

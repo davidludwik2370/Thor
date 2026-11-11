@@ -373,6 +373,8 @@ impl Project {
         context: &crate::evaluation::Context<'_>,
         mode: crate::evaluation::Mode,
     ) -> Result<Executed> {
+        let _phase = crate::profile::span("evaluation.native_helper");
+        crate::profile::count("evaluation.native_helpers", 1);
         let source = &self.sources[expression.file];
         let site = source
             .node(expression.node)

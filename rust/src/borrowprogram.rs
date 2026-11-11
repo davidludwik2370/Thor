@@ -219,6 +219,7 @@ impl Model {
         result
     }
     pub fn prepare(resolver: &mut Resolver<'_>, purity: &purity::Facts) -> Self {
+        let _phase = crate::profile::span("analysis.borrow_model");
         let mut model = Self::default();
         let mut queue = purity.checked.iter().copied().collect::<Vec<_>>();
         while let Some(proc) = queue.pop() {

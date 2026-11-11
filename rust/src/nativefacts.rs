@@ -3,6 +3,7 @@ use super::*;
 
 impl Project {
     pub(super) fn discover_expression_facts(&mut self) -> Result<()> {
+        let _phase = crate::profile::span("analysis.discover_expressions");
         use crate::{ast::NodeId, semantics::Ref};
 
         let operands = self
@@ -108,6 +109,7 @@ impl Project {
         Ok(())
     }
     pub(super) fn discover_call_facts(&mut self) -> Result<()> {
+        let _phase = crate::profile::span("analysis.discover_calls");
         if !self.sources.iter().any(|source| {
             source
                 .nodes

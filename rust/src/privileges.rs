@@ -175,6 +175,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         editor: bool,
         evaluation: Option<&crate::evaluation::Plan>,
     ) -> Facts {
+        let _phase = crate::profile::span("analysis.slice_permissions");
         let enabled = editor
             || r.sources.iter().any(|s| {
                 s.nodes

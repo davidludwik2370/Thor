@@ -3,6 +3,7 @@ use super::*;
 
 impl Project {
     pub(super) fn schedule_evaluations(&mut self) -> Result<()> {
+        let _phase = crate::profile::span("evaluation.schedule");
         if self.evaluation_scheduled {
             return Ok(());
         }

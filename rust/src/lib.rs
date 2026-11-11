@@ -23,6 +23,7 @@ pub mod kind;
 pub mod lower;
 pub mod memory;
 pub mod permissions;
+pub mod profile;
 pub mod privileges;
 pub mod project;
 pub mod project_template;

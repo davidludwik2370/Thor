@@ -16,6 +16,8 @@ mod constants;
 mod contexts;
 #[path = "projections.rs"]
 mod projections;
+#[path = "namescope.rs"]
+mod namescope;
 pub use projections::Projection;
 #[path = "typefacts.rs"]
 mod typefacts;
@@ -180,7 +182,9 @@ pub struct Symbol {
 pub struct Resolver<'a> {
     pub sources: &'a [Source],
     pub symbols: Vec<Symbol>,
-    scopes: HashMap<(usize, NodeId, String), Vec<usize>>,
+    scopes: HashMap<(usize, NodeId), HashMap<String, Vec<usize>>>,
+    index: namescope::NameIndex,
+    import_packages: RefCell<HashMap<(usize, String), Option<usize>>>,
     types: HashMap<Ref, Type>,
     active: HashSet<Ref>,
     planning: HashSet<(Ref, Vec<(String, Type)>)>,
@@ -261,10 +265,14 @@ impl<'a> Resolver<'a> {
         Self::with_flags(sources, &[])
     }
     pub fn with_flags(sources: &'a [Source], flags: &[String]) -> Self {
+        let _phase = crate::profile::span("analysis.resolver_setup");
+        crate::profile::count("resolver.constructions", 1);
         let mut this = Self {
             sources,
             symbols: vec![],
             scopes: HashMap::new(),
+            index: namescope::NameIndex::new(sources),
+            import_packages: RefCell::new(HashMap::new()),
             types: HashMap::new(),
             active: HashSet::new(),
             planning: HashSet::new(),
@@ -386,9 +394,15 @@ impl<'a> Resolver<'a> {
                         projection: None,
                     };
                     this.scopes
-                        .entry((file, owner, name))
+                        .entry((file, owner))
+                        .or_default()
+                        .entry(name)
                         .or_default()
                         .push(this.symbols.len());
+                    if owner == NodeId(0) {
+                        this.index.package_symbols[this.index.package_for[file]]
+                            .entry(symbol.name.clone()).or_default().push(this.symbols.len());
+                    }
                     this.symbols.push(symbol);
                 }
             }
@@ -425,16 +439,14 @@ impl<'a> Resolver<'a> {
         self.immutable_markers.get(&(symbol.reference,symbol.name.clone())).map(|name|(symbol.reference,name.clone()))
     }
     pub fn lookup(&self, reference: Ref, name: &str) -> Option<usize> {
+        crate::profile::count("lookup.calls", 1);
         let source = &self.sources[reference.file];
         if source.text(reference.node) == name {
             if let Some(symbol) = self.using_symbols.get(&reference) {
                 return Some(*symbol);
             }
         }
-        for owner in std::iter::once(reference.node)
-            .chain(source.ancestors(reference.node))
-            .filter(|id| is_scope(source, *id))
-        {
+        for owner in self.index.scopes(reference) {
             if source.node(owner).kind == "Range"
                 && ["expr", "init"].iter().any(|role| {
                     source.role(owner, role).is_some_and(|expr| {
@@ -447,7 +459,7 @@ impl<'a> Resolver<'a> {
             {
                 continue;
             }
-            if let Some(ids) = self.scopes.get(&(reference.file, owner, name.to_string())) {
+            if let Some(ids) = self.scopes.get(&(reference.file, owner)).and_then(|names| names.get(name)) {
                 let own_decl = source.ancestors(reference.node).find(|id| {
                     source.node(*id).kind == "Declaration"
                         && source.node(*id).mutable
@@ -485,25 +497,20 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
-        for (file, other) in self.sources.iter().enumerate() {
-            if other.path.parent() != source.path.parent() {
-                continue;
-            }
-            if let Some(ids) = self.scopes.get(&(file, NodeId(0), name.to_string())) {
-                if let Some(id) = ids
+        if let Some(ids) = self.index.package_symbols[self.index.package_for[reference.file]].get(name) {
+            if let Some(id) = ids
                     .iter()
                     .find(|id| self.active_definition(self.symbols[**id].reference))
                     .copied()
-                {
-                    return Some(id);
-                }
-            }
+            { return Some(id); }
         }
-        for (index, node) in source.nodes.iter().enumerate() {
-            if node.kind != "Using" || node.span.start >= source.node(reference.node).span.start {
+        for id in &self.index.using[reference.file] {
+            crate::profile::count("lookup.using_candidates", 1);
+            let node = source.node(*id);
+            if node.span.start >= source.node(reference.node).span.start {
                 continue;
             }
-            let owner = scope(source, NodeId(index));
+            let owner = self.index.scopes(Ref { file:reference.file, node:*id }).next().unwrap_or(NodeId(0));
             if owner != NodeId(0)
                 && !source
                     .node(owner)
@@ -512,26 +519,12 @@ impl<'a> Resolver<'a> {
             {
                 continue;
             }
-            for value in source.group(NodeId(index), "values") {
+            for value in source.group(*id, "values") {
                 let alias = source.text(*value);
-                for import in &source.nodes {
-                    if import.kind != "Import" {
-                        continue;
-                    }
-                    let Ok(path) = crate::lower::unquote(&import.op) else {
-                        continue;
-                    };
-                    let explicit = source.names.get(import.name);
-                    let namespace = if explicit.is_empty() {
-                        path.rsplit(['/', ':']).next().unwrap_or("")
-                    } else {
-                        explicit
-                    };
-                    if namespace == alias {
-                        if let Some(symbol) = self.package_symbol(source, &path, name) {
+                for path in self.index.imports[reference.file].get(alias).into_iter().flatten() {
+                        if let Some(symbol) = self.package_symbol(reference.file, path, name) {
                             return Some(symbol);
                         }
-                    }
                 }
             }
         }
@@ -557,7 +550,7 @@ impl<'a> Resolver<'a> {
                         .find_map(|selection| {
                             crate::lower::unquote(&selection.path)
                                 .ok()
-                                .and_then(|path| self.package_symbol(source, &path, name))
+                                .and_then(|path| self.package_symbol(reference.file, &path, name))
                         })
                 })
             }
@@ -590,7 +583,7 @@ impl<'a> Resolver<'a> {
                             explicit
                         };
                         if name == source.text(base) {
-                            self.package_symbol(source, &path, source.text(field))
+                            self.package_symbol(reference.file, &path, source.text(field))
                         } else {
                             None
                         }
@@ -603,26 +596,27 @@ impl<'a> Resolver<'a> {
             _ => None,
         }
     }
-    fn package_symbol(&self, source: &Source, path: &str, name: &str) -> Option<usize> {
+    fn package_symbol(&self, file: usize, path: &str, name: &str) -> Option<usize> {
+        let key = (file, path.to_string());
+        let cached = self.import_packages.borrow().get(&key).copied();
+        let package = if let Some(package) = cached { package } else {
+        let source = &self.sources[file];
         let directory = if let Some((collection, suffix)) = path.split_once(':') {
             source.collection_roots.get(collection)?.join(suffix)
         } else {
             source.path.parent()?.join(path)
         };
-        let directory = std::fs::canonicalize(directory).ok()?;
-        self.sources.iter().enumerate().find_map(|(file, unit)| {
-            if unit.path.parent() != Some(directory.as_path()) {
-                return None;
-            }
-            self.scopes
-                .get(&(file, NodeId(0), name.to_string()))
-                .and_then(|symbols| {
-                    symbols
+        crate::profile::count("lookup.import_directory_resolutions", 1);
+        let package = std::fs::canonicalize(directory).ok()
+            .and_then(|directory| self.index.packages.get(&directory).copied());
+        self.import_packages.borrow_mut().insert(key, package);
+        package
+        }?;
+        self.index.package_symbols[package].get(name)
+                .and_then(|symbols| symbols
                         .iter()
-                        .find(|id| self.active_definition(self.symbols[**id].reference))
-                })
+                        .find(|id| self.active_definition(self.symbols[**id].reference)))
                 .copied()
-        })
     }
     pub fn active_definition(&self, r: Ref) -> bool {
         let source = &self.sources[r.file];
@@ -1662,7 +1656,7 @@ impl<'a> Resolver<'a> {
         if let Some(index)=self.symbol(r) {
             let symbol=&self.symbols[index];let owner=&self.sources[symbol.reference.file];
             if symbol.parameter||symbol.result||!symbol.constant||symbol.immutable{return false;}
-            if self.scopes.get(&(symbol.reference.file,symbol.scope,symbol.name.clone())).is_some_and(|symbols|symbols.len()>1){return false;}
+            if self.scopes.get(&(symbol.reference.file,symbol.scope)).and_then(|names|names.get(&symbol.name)).is_some_and(|symbols|symbols.len()>1){return false;}
             return owner.node(symbol.reference.node).kind=="Declaration"&&symbol.value.is_some_and(|node|self.known_type_seen(Ref{file:symbol.reference.file,node},seen));
         }
         if node.kind=="Call" {return source.role(r.node,"callee").is_some_and(|node|self.native_builtin(Ref{file:r.file,node},"type_of"));}

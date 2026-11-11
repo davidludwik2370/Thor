@@ -1029,7 +1029,7 @@ impl Resolver<'_> {
         let file = symbol.reference.file;
         let source = &self.sources[file];
         self.scopes
-            .get(&(file, symbol.scope, symbol.name.clone()))
+            .get(&(file, symbol.scope)).and_then(|names| names.get(&symbol.name))
             .into_iter()
             .flatten()
             .filter_map(|index| {

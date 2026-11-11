@@ -16,6 +16,8 @@ extern "C" fn terminate(_: libc::c_int) {
 }
 
 fn main() -> ExitCode {
+    let _profile = thor_compiler::profile::Session::from_env();
+    let _command = thor_compiler::profile::span("command");
     #[cfg(unix)]
     // SAFETY: terminate has the C signal-handler ABI and only touches a
     // lock-free atomic or calls _exit.

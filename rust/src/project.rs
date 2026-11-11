@@ -166,6 +166,7 @@ fn package_files(entry: &Path, test: bool) -> Result<Vec<PathBuf>> {
 }
 impl Project {
     pub fn new(mut options: Options) -> Result<Self> {
+        let _phase = crate::profile::span("project.load");
         if !options.entry.exists() {
             return Err(Error::new(format!(
                 "source does not exist: {}",
@@ -405,12 +406,14 @@ impl Project {
     /// Load the same source/type facts used by lowering, without generating or
     /// compiling output. The differential analysis harness uses this entry.
     pub fn inspect_sources(&mut self) -> Result<()> {
+        let _phase = crate::profile::span("analysis.inspect_sources");
         self.discover_type_facts()?;
         self.discover_expression_facts()?;
         self.discover_call_facts()?;
         Ok(())
     }
     pub fn lower(&mut self) -> Result<PathBuf> {
+        let _phase = crate::profile::span("lowering.total");
         self.inspect_sources()?;
         self.schedule_evaluations()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
@@ -588,6 +591,8 @@ impl Project {
                 .as_ref()
                 .and_then(|plan| plan.files.get(&source.path))
                 .cloned();
+            let _file = crate::profile::span("emit.file");
+            crate::profile::count("emit.files", 1);
             let mut lower = Lower::new_with_view(file, &mut resolver, view)?;
             let mut import_paths = BTreeMap::new();
             let mut imports = source
@@ -764,6 +769,7 @@ impl Project {
             &self.options.root,
             &memory_map,
         )?;
+        let _publish = crate::profile::span("emit.publish");
         let raw_sources: Vec<_> = self
             .sources
             .iter()
@@ -869,6 +875,7 @@ impl Project {
         self.discover_type_facts_from(BTreeSet::new())
     }
     fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
+        let _phase = crate::profile::span("analysis.discover_types");
         let general = self.sources.iter().any(|s| {
             s.nodes.iter().any(|n| {
                 n.immutable
@@ -1086,6 +1093,7 @@ impl Project {
         result
     }
     pub fn compile(&mut self, target: &Path) -> Result<i32> {
+        let _phase = crate::profile::span("backend.final");
         let action = self.options.command.clone();
         let action = action.as_str();
         let mut command = Command::new(&self.frontend.odin);

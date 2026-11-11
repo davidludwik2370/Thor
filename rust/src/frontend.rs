@@ -57,6 +57,7 @@ fn odin_sources(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf)> {
+    let _phase = crate::profile::span("parser.bootstrap");
     let odin = executable(odin)?;
     let version = Command::new(&odin).arg("version").output()?;
     if !version.status.success() {
@@ -140,6 +141,8 @@ impl Frontend {
         package: bool,
         overlay: Option<&str>,
     ) -> Result<Source> {
+        let _phase = crate::profile::span("parser.source");
+        crate::profile::count("parser.source_requests", 1);
         let path = if overlay.is_some() {
             crate::project::absolute(path)?
         } else {
@@ -189,12 +192,14 @@ impl Frontend {
                         if let Ok(source) =
                             Source::from_frontend(path.clone(), raw.clone(), info, thor)
                         {
+                            crate::profile::count("parser.cache_hits", 1);
                             return Ok(source);
                         }
                     }
                 }
             }
         }
+        crate::profile::count("parser.processes", 1);
         let (status, stdout, stderr) = self.run(&args, bytes)?;
         let info: Value = serde_json::from_slice(&stdout).map_err(|_| {
             Error::new(format!(
