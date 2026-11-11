@@ -159,6 +159,7 @@ pub struct Privileges<'a, 'r> {
     specialized_types: HashMap<(Ref, Substitutions), Type>,
     field_types: HashMap<Type, Vec<(String, Type)>>,
     member_types: HashMap<(Type, String), Type>,
+    member_paths: HashMap<(Type, String), Option<Vec<String>>>,
 }
 #[derive(PartialEq, Eq, Hash)]
 struct SummaryKey {
@@ -205,6 +206,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if !enabled {
             return Facts::default();
         }
+        let previous_queries = r.begin_symbol_queries();
         let mut this = Self {
             r,
             values: vec![],
@@ -226,6 +228,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             specialized_types: HashMap::new(),
             field_types: HashMap::new(),
             member_types: HashMap::new(),
+            member_paths: HashMap::new(),
         };
         this.annotations();
         let procedures = this
@@ -247,6 +250,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         for proc in procedures {
             if discovering && this.r.has_demanded_packages() {
                 crate::profile::count("permissions.dependency_retries", 1);
+                this.r.end_symbol_queries(previous_queries);
                 return Facts::default();
             }
             let source = this.s(proc);
@@ -289,6 +293,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         if discovering && this.r.has_demanded_packages() {
             crate::profile::count("permissions.dependency_retries", 1);
+            this.r.end_symbol_queries(previous_queries);
             return Facts::default();
         }
         // Only incomplete recursive callees can invalidate an already
@@ -375,6 +380,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if editor {
             this.facts.editor_info = this.editor_info();
         }
+        this.r.end_symbol_queries(previous_queries);
         this.facts
     }
     fn editor_info(&mut self) -> Vec<serde_json::Value> {
@@ -682,7 +688,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let target = self.deref(v);
             return self.member(target, name);
         }
-        if let Some(path) = self.r.member_path(&self.values[v].typ.clone(), name) {
+        if let Some(path) = self.member_path(&self.values[v].typ.clone(), name) {
             if path.len() > 1 {
                 let mut child = v;
                 for field in path {
@@ -1393,6 +1399,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
     }
     // Resolver inputs stay fixed during this analysis. Keep resolved metadata
     // separate from the mutable value/alias graph held in `values` and `contexts`.
+    // Unknown fields are stable answers too: source/binding inputs cannot change
+    // inside this pass. A demanded dependency prevents caching and discovery
+    // restarts the analysis with a new resolver/cache once that source is loaded.
     fn specialized_type(&mut self, reference: Ref, bindings: &Substitutions) -> Type {
         let key = (reference, bindings.clone());
         if let Some(typ) = self.specialized_types.get(&key) {
@@ -1400,7 +1409,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return typ.clone();
         }
         let typ = self.r.specialized_type(reference, bindings);
-        if typ.resolved() && !self.r.has_demanded_packages() {
+        if !self.r.has_demanded_packages() {
             self.specialized_types.insert(key, typ.clone());
         }
         typ
@@ -1411,12 +1420,22 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return fields.clone();
         }
         let fields = self.r.record_fields(typ);
-        if typ.resolved() && fields.iter().all(|(_, typ)| typ.resolved())
-            && !self.r.has_demanded_packages()
-        {
+        if !self.r.has_demanded_packages() {
             self.field_types.insert(typ.clone(), fields.clone());
         }
         fields
+    }
+    fn member_path(&mut self, typ: &Type, name: &str) -> Option<Vec<String>> {
+        let key = (typ.clone(), name.to_string());
+        if let Some(path) = self.member_paths.get(&key) {
+            crate::profile::count("permissions.path_hits", 1);
+            return path.clone();
+        }
+        let path = self.r.member_path(typ, name);
+        if !self.r.has_demanded_packages() {
+            self.member_paths.insert(key, path.clone());
+        }
+        path
     }
     fn member_type(&mut self, typ: &Type, name: &str) -> Type {
         let key = (typ.clone(), name.to_string());
@@ -1425,7 +1444,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return member.clone();
         }
         let member = self.r.member_type(typ, name);
-        if member.resolved() && !self.r.has_demanded_packages() {
+        if !self.r.has_demanded_packages() {
             self.member_types.insert(key, member.clone());
         }
         member

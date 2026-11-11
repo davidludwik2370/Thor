@@ -216,6 +216,7 @@ pub struct Resolver<'a> {
     pub bound_types: BTreeMap<(Ref, String), Type>,
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
+    symbol_queries: RefCell<Option<HashMap<Ref, Option<usize>>>>,
 }
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
     let node = source.node(id);
@@ -313,6 +314,7 @@ impl<'a> Resolver<'a> {
             bound_types: BTreeMap::new(),
             bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
+            symbol_queries: RefCell::new(None),
         };
         if base.is_none() {
         crate::profile::count("resolver.index_builds", 1);
@@ -566,7 +568,32 @@ impl<'a> Resolver<'a> {
         }
         None
     }
+    // Source/binding inputs stay fixed while slice summaries are inspected.
+    // Keep this cache scoped to that pass; later evaluation and dependency
+    // discovery can supply different definitions to the same resolver.
+    pub(crate) fn begin_symbol_queries(&self) -> Option<HashMap<Ref, Option<usize>>> {
+        self.symbol_queries.replace(Some(HashMap::new()))
+    }
+    pub(crate) fn end_symbol_queries(&self, previous: Option<HashMap<Ref, Option<usize>>>) {
+        self.symbol_queries.replace(previous);
+    }
     pub fn symbol(&self, reference: Ref) -> Option<usize> {
+        if !self.has_demanded_packages() {
+            if let Some(value) = self.symbol_queries.borrow().as_ref()
+                .and_then(|queries| queries.get(&reference)).copied() {
+                crate::profile::count("lookup.symbol_hits", 1);
+                return value;
+            }
+        }
+        let value = self.symbol_uncached(reference);
+        if !self.has_demanded_packages() {
+            if let Some(queries) = self.symbol_queries.borrow_mut().as_mut() {
+                queries.insert(reference, value);
+            }
+        }
+        value
+    }
+    fn symbol_uncached(&self, reference: Ref) -> Option<usize> {
         if let Some(symbol) = self.using_symbols.get(&reference) {
             return Some(*symbol);
         }
@@ -1296,7 +1323,7 @@ impl<'a> Resolver<'a> {
                     Type::Dynamic(elem)
                 }
             }
-            "PointerType" => Type::Pointer(Box::new(
+            "PointerType" | "MultiPointerType" => Type::Pointer(Box::new(
                 child("elem")
                     .map(|r| self.type_of(r))
                     .unwrap_or(Type::Unknown),

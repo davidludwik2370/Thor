@@ -300,7 +300,7 @@ impl Lower<'_, '_> {
             Code::concat([
                 self.g(format!("{type_of}({}default_value((", self.prefix), id),
                 original,
-                self.g(")[:]))", id),
+                self.g(")[:0]))", id),
             ])
         };
         let p = format!("{}access_{}_", self.prefix, self.source.node(id).span.start);
