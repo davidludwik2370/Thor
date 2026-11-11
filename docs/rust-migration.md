@@ -8,13 +8,126 @@ retains the reference compiler.
 
 Rust remains experimental for inputs outside the verified corpus and native
 Windows/Linux hosts. Explicit migration guards still fail with exit status `3`.
-The measurements below record the remaining performance exception.
+The measurements below record lowering costs and validation limits.
 
 The reference baseline is commit `ca2df99`, also tagged
 `rust-migration-baseline-2026-11-08`. The Python implementation remains in
 `thorlang/` and the `thor-python` launcher. The independent Rust crate is in
 `rust/`. Build its release binary explicitly before using the native launchers.
 Unsupported syntax produces a native diagnostic or migration guard.
+
+## Data layout and hardening pass, 2026-11-11
+
+This pass added a correctness checkpoint, measured changes to the native data
+layout, and repeated integration checks. The Python reference remains available.
+Language features and the Odin compiler are unchanged.
+
+The following measurements use 25 quiet, warm invocations of each production
+release executable on macOS arm64, with four workers. Before/after samples are
+paired with alternating execution order. First invocations and separate profile
+runs are excluded. Times cover transpilation, including cached parser and
+compile-time-result handling, before Odin's final compilation step. Source
+hashes, executable hashes, individual samples, profiles and validation details
+are in the [measurement record](rust-performance-layout.json).
+
+| Project/mode | Before median | After median | After p95 | After maximum |
+| --- | ---: | ---: | ---: | ---: |
+| Minimal program | 0.022 s | 0.022 s | 0.023 s | 0.023 s |
+| `double_bet` | 0.221 s | 0.175 s | 0.179 s | 0.179 s |
+| `poker` | 0.619 s | 0.428 s | 0.446 s | 0.456 s |
+| `hilo` | 0.303 s | 0.225 s | 0.231 s | 0.233 s |
+| `Dijkstra` | 0.305 s | 0.235 s | 0.242 s | 0.255 s |
+| `circles_on_dots` | 0.428 s | 0.350 s | 0.373 s | 0.376 s |
+| `poker`, test mode | 1.197 s | 0.910 s | 0.931 s | 0.934 s |
+| `circles_on_dots`, test mode | 0.406 s | 0.348 s | 0.368 s | 0.380 s |
+| 64 files / 1,024 procedures | 0.185 s | 0.153 s | 0.158 s | 0.164 s |
+| 256 procedures with generic calls | 0.397 s | 0.371 s | 0.379 s | 0.383 s |
+
+The largest observed warm result in this corpus was 0.934 seconds. Project size,
+filesystem/OS delays and cold compile-time work still affect elapsed time; these
+measurements define the tested workload rather than a universal time bound.
+
+A separate allocation-counting executable measured Poker test mode's peak live
+Rust heap requests falling from 519.2 MiB to 223.7 MiB, a 57% reduction. Allocation
+calls fell from 7.26 million to 5.56 million. These figures exclude child processes,
+allocator metadata and RSS. Instrumented wall times are kept separate from the
+production timing comparison. The development-only instrument is
+`rust/examples/allocation_profile.rs`; the compiler library remains safe Rust.
+
+Small AST role, span and list maps now use contiguous entries with field names
+shared within each source. A node occupies 192 bytes on this host, down from 216.
+Known syntax tags decode directly into their enum representation. Core node
+fields decode into typed storage, while extension metadata retains its JSON
+representation. The original protocol is retained as shared bytes; full node
+JSON is reconstructed for `thor ast`. Generic role/list trees are released after
+normalization, with sparse overrides preserving feature edits. Unknown fields
+and the existing raw-v1 parser-cache protocol remain supported.
+
+Resolver scope and type tables now use lazy per-file node-indexed slots pointing
+to packed values. Untouched files do not allocate slot arrays. Shared syntax
+indexes remain immutable, while context-dependent type facts stay local and are
+cleared on binding/context changes. Immutable marker preparation borrows names
+and paths and builds only groups that can need markers. Canonical cache JSON
+uses a sorted contiguous list of references instead of a temporary tree. These
+changes preserve declaration ordering, flag selection, generic bindings and
+cache policy.
+
+For local comparisons, `tools/benchmark_lowering.py` benchmarks project copies,
+checks them after timing and accepts historical executables. Keep profiling in a
+separate run when measuring production wall time.
+
+```sh
+THOR_JOBS=4 python3 tools/benchmark_lowering.py \
+  --project /path/to/project --runs 25 \
+  --engine before=/path/to/old-thor --report /tmp/thor-comparison.json
+```
+
+The hardening work fixed independently reproduced failures:
+
+- Captured helper descendants could keep stdout/stderr pipes open after their
+  parent exited or timed out. Unix helpers now have an isolated process group,
+  terminated before reader threads are joined. Cancellation is checked throughout
+  captured calls used to establish evaluation toolchain identity, including calls
+  made before helper directories exist.
+- Cached AST list spans lacked the bounds/UTF-8 validation applied to other
+  spans. Invalid spans and malformed role/list containers now produce validation
+  errors, allowing invalid cache entries to be reparsed.
+- Native discovery omitted new unsaved editor files. File, package and SDK
+  discovery now include overlay-only sources, deduplicate saved replacements,
+  preserve test-file filtering and retain original source positions. Original
+  files are never created by this discovery. New regressions include imported
+  unsaved sources, symlinked folders and SDK-body edits used through pure calls.
+
+The data-layout checkpoint exercised 1,361 Rust integration methods and 39
+reference, installation/comparison and assertion-hygiene checks. One Finder test
+was deferred to its enabled LaunchServices run; all other checks passed. The editor run
+exposed the unsaved-file discovery gap above. After fixing it, the final release
+passed 67 focused editor/SDK/cache/CLI checks, including seven new overlay methods
+and the deferred Finder test. It also passed all 161 stdio TLS checks, all 41 live
+CodeLLDB checks, all 141 VS Code extension unit checks, 51 Rust unit checks in
+each of debug/release, and all-target Clippy with warnings denied. The assertion
+hygiene command passed separately after the final changes.
+
+Fresh copies of all 19 user projects built with both compilers (38 successful
+builds), and the original Thor source hashes were unchanged. Both synthetic
+projects ran successfully with both compilers in checked and
+`-o:speed -disable-assert -no-bounds-check -no-type-assert` configurations.
+Adding an unrelated runtime local to the circles example retained all three
+prepared results, with zero cache misses, writes or helper preparations.
+
+A separate stress run completed 64 fresh nested compile-time evaluation builds
+with four concurrent compiler processes, alternating checked/debug and unchecked
+release configurations. Each case performed an actual Odin helper compilation;
+there were no timeouts. The default five-second execution deadline is unchanged.
+The cause of the historical isolated helper timeout remains unconfirmed; the
+process-cleanup fixes above address independently reproduced bugs.
+
+The main remaining profile costs are permission-analysis convergence, type/call
+discovery and parser-cache decoding/normalization. Future changes to graph-state
+storage or type-shape sharing should retain the same context-invalidation and
+aliasing tests and be measured independently. Native Windows/Linux hosts have
+not been validated by this pass. The following sections record earlier
+checkpoints.
 
 ## Native optimization follow-up, 2026-11-11
 
