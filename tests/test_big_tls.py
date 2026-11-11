@@ -30,7 +30,10 @@ main::proc(){
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
         errors=client.diagnostic(main.as_uri(),contains='Cannot')
         error=next(e for e in errors if 'Cannot' in e['message'])
-        self.assertEqual(error['range']['start'],self.position(broken,'f64(0.5)',0))
+        self.assertEqual(error['range'], {
+            'start': self.position(broken, 'f64(0.5)', 0),
+            'end': self.position(broken, 'f64(0.5)', len('f64(0.5)')),
+        })
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
 

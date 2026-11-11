@@ -1217,9 +1217,9 @@ impl Lower<'_, '_> {
                             self.g(")", *operand),
                         ])
                     };
-                    code.push(self.gen(
-                        value.finish().text,
-                        self.source.node(*operand).span,
+                    code.push(value.region(
+                        &self.source.path,
+                        node.span,
                         "debug-capture",
                     ));
                 } else {

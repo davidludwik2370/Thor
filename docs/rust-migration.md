@@ -272,6 +272,12 @@ errors reached through bundled library calls retain the user `#run` site and
 the standard-library cause. Existing UTF-16, unsaved-buffer recovery and
 generic immutable diagnostic fixtures exercise these paths.
 
+All 162 tests in the main stdio TLS gate passed. The separate logical-number
+TLS suite exposed a range collapsed by a generated debugger region. Numeric
+switch bounds now keep their operand spans inside that region. All nine
+logical-number TLS tests passed, along with the live CodeLLDB numeric switch
+breakpoint test.
+
 ### Anonymous producer ownership
 
 The shared temporary algebra now follows `thorlang/ownership.py` for strings and
