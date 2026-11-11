@@ -90,16 +90,55 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         .take_while(|arg| arg.as_str() != "--")
         .any(|arg| arg == "--version")
     {
-        println!("Thor {VERSION} (Rust migration, incomplete)");
+        println!("Thor {VERSION} (experimental Rust compiler)");
         return Ok(0);
     }
     if args.first().is_some_and(|arg| arg == "--capabilities") {
         println!(
             "{}",
-            json!({"engine":"rust","complete":false,"python_fallback":false,"parallel_lowering":false,
-            "supported":["shared Odin parser","arena AST","lexical symbols","type shapes","structured source maps","native Odin passthrough","selective imports","bracket arrays","sequence membership","type-list constraints","constant concatenation","literal-count string repetition","runtime numeric power","runtime sequence bounds and generic assignments","typed loop bindings","multiple-result and compile switches","named Set operations","automatic using feature","initial interpolation and f-string argument lifetimes","multiple-value or_panic","runtime collection comprehensions","runtime expanded extrema","slice privileges and contextual mutation summaries","generic inline defaults","macOS allocation tracking and ASan source locations","editor source overlays","TLS slice metadata","native project creation","verified vet findings and source corrections","application publishing, icons and native dependency relocation","runtime pure contracts, checked ordinary callees and scalar/sequence/record/union result ownership"],
-            "evaluation":{"isolated_native_helpers":true,"generic_frames":true,"scalar_and_aggregate_results":true,"contents_cache":true,"prepared_scalar_cache":true,"verified_scalar_sites":true,"compile_time_comprehensions":true,"big_number_results":true},
-            "pending":["complete immutable-slice analysis","complete symbol/type/overload resolution","remaining pure function and SDK interactions","full interpolation ownership","complete switch/using/callback interactions","full Set temporary ownership","complete optional-result arities","wildcard imports","full live debugger acceptance","whole-language acceptance"]})
+            json!({
+                "engine": "rust",
+                "status": "experimental",
+                "complete": false,
+                "python_fallback": false,
+                "parallel_lowering": false,
+                "supported": [
+                    "shared Odin parser and arena AST",
+                    "lexical symbols, native type facts, overloads and generic bindings",
+                    "structured source maps, original diagnostics and live debugger metadata",
+                    "native Odin passthrough and selective/wildcard imports",
+                    "contextual bracket arrays, membership and type-list constraints",
+                    "constant array concatenation and string repetition",
+                    "numeric power, sequence bounds and typed loop bindings",
+                    "multiple-result switches, compile switches and nonreturning arms",
+                    "Set operations and temporary ownership",
+                    "automatic using feature and generic inline defaults",
+                    "f-string formatting, dynamic widths and expression-scoped ownership",
+                    "optional results and multiple-value or_panic",
+                    "runtime and compile-time collection comprehensions and expanded extrema",
+                    "slice privileges, contextual mutation summaries and TLS metadata",
+                    "Integer/Rational constants, runtime ownership and compile-time results",
+                    "pure functions, checked ordinary callees and owned results",
+                    "native project creation and verified vet corrections",
+                    "application publishing, icons and native dependency relocation",
+                    "macOS allocation tracking, ASan locations and source overlays"
+                ],
+                "evaluation": {
+                    "isolated_native_helpers": true,
+                    "generic_frames": true,
+                    "scalar_and_aggregate_results": true,
+                    "contents_cache": true,
+                    "prepared_scalar_cache": true,
+                    "verified_scalar_sites": true,
+                    "compile_time_comprehensions": true,
+                    "big_number_results": true
+                },
+                "pending": [
+                    "native-host verification on Windows and Linux",
+                    "guarded specialization and ownership paths outside the acceptance corpus",
+                    "performance characterization and parallel lowering"
+                ]
+            })
         );
         return Ok(0);
     }
@@ -111,7 +150,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             .take_while(|arg| arg.as_str() != "--")
             .any(|arg| arg == "--help" || arg == "-h")
     {
-        println!("Thor Rust migration compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|vet|publish|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --clear-cache        Clear managed parser/evaluation cache entries\n  --cache-report       Print compile-time cache counters\n  --run-timeout SEC    Native compile-time execution limit (default 5)\n  --raw-diagnostics    Show original Odin diagnostics\n  --vet[=CHECKS]       Check immutable,pure conventions\n  --apply | --ask      Apply or confirm verified vet corrections\n  --app-name NAME      Published application name\n  --app-type TYPE      gui (default) or console\n  --app-icon PATH      Project PNG/ICO icon\n  --app-resource PATH  Include another project resource (repeatable)\n  --app-library PATH   Bundle a native plugin/library (repeatable)\n  --app-id ID          Reverse-domain application identifier\n  --app-version VER    Published version (default 0.1.0)\n  --publish-dir PATH   Published package destination\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nIncomplete native port; unsupported features exit 3. Python `thor` remains the default.");
+        println!("Thor experimental Rust compiler\n\nUsage: thor-rust <transpile|check|build|run|test|new|vet|publish|ast> <source> [options] [Odin flags] [-- arguments]\n\nOptions:\n  --output-dir PATH    Generated Odin (default .thor-rust-build/<source>)\n  --cache-dir PATH     Parser and evaluation cache directory\n  --no-cache           Bypass parser and evaluation caches\n  --clear-cache        Clear managed parser/evaluation cache entries\n  --cache-report       Print compile-time cache counters\n  --run-timeout SEC    Native compile-time execution limit (default 5)\n  --raw-diagnostics    Show original Odin diagnostics\n  --vet[=CHECKS]       Check immutable,pure conventions\n  --apply | --ask      Apply or confirm verified vet corrections\n  --app-name NAME      Published application name\n  --app-type TYPE      gui (default) or console\n  --app-icon PATH      Project PNG/ICO icon\n  --app-resource PATH  Include another project resource (repeatable)\n  --app-library PATH   Bundle a native plugin/library (repeatable)\n  --app-id ID          Reverse-domain application identifier\n  --app-version VER    Published version (default 0.1.0)\n  --publish-dir PATH   Published package destination\n  --odin PATH          Odin compiler\n  --diagnostic-format json\n  --capabilities       Machine-readable port coverage\n\nExplicit migration guards exit 3. Python `thor` and `thor-rust` remain available.");
         return Ok(0);
     }
     let command = args.remove(0);

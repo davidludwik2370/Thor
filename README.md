@@ -1,8 +1,8 @@
 # Thor
 
-An independent Rust compiler port is under development alongside the Python
-reference. It is not yet a replacement for `thor`; see the
-[migration status and comparison commands](docs/rust-migration.md).
+Both the Python `thor` launcher and the independent experimental `thor-rust`
+launcher are available. The Rust implementation passes the current macOS
+reference corpus. See the [migration status and comparison commands](docs/rust-migration.md).
 
 ![Thor](assets/branding/logo-slim.png)
 

@@ -1,8 +1,13 @@
 # Rust migration: independent native compiler
 
-The Python compiler is still the supported default. The Rust port is **incomplete**;
-this checkpoint does not complete stages 1–3 or establish whole-language parity.
-Do not switch TLS or project build commands to it yet.
+The independent Rust implementation now passes the current reference acceptance
+corpus on macOS arm64. Type resolution, purity, compile-time execution and result
+caching are connected to the normal commands. Both `thor` and `thor-rust` remain
+available, and Python is the supported default.
+
+Rust remains experimental for inputs outside the verified corpus and native
+Windows/Linux hosts. Explicit migration guards still fail with exit status `3`.
+Performance characterization and parallel lowering are the next phase.
 
 The reference baseline is commit `ca2df99`, also tagged
 `rust-migration-baseline-2026-11-08`. The Python implementation remains in
@@ -19,24 +24,24 @@ correctness fixes made during the initial migration. Further reference fixes
 must remain separate, documented commits rather than silently changing the target.
 
 The [module inventory](rust-parity-inventory.json) maps every Python module to
-its current Rust counterparts and the checkpoint responsible for remaining work.
-A mapped module or a test count is not a declaration of complete parity.
+its Rust counterparts and records the current macOS acceptance scope. Finite
+acceptance coverage leaves the explicit guarded paths and other native hosts
+unverified.
 
-1. **Reference/inventory:** preserve the snapshot and map all modules (complete).
-2. **Resolution:** finish symbols, types, overloads and generic/conditional lookup.
-3. **Permissions/purity:** follow reference permission propagation and call checks.
-4. **Execution:** port compile-time extraction, scheduling and helper execution.
-5. **Results/cache:** install reconstructed results and port result cache policy.
-6. **Lowering:** complete logical numbers and remaining expression/ownership gaps.
-7. **Integration:** finish commands, TLS, diagnostics and debugger metadata.
-8. **Acceptance:** run whole-suite/project comparisons, then profile performance.
+1. **Reference/inventory** preserves the snapshot and maps all modules.
+2. **Resolution** connects symbols, types, overloads and generic/conditional lookup.
+3. **Permissions/purity** connects reference permission propagation and call checks.
+4. **Execution** connects extraction, scheduling and isolated native helpers.
+5. **Results/cache** connects reconstruction and contents/prepared/scalar cache policy.
+6. **Lowering** passes the acceptance corpus for logical numbers, expressions and ownership.
+7. **Integration** passes command, TLS, diagnostic and live debugger checks on macOS.
+8. **Acceptance** passes current original, Rust-specific and copied-project comparisons.
 
 Checkpoints 2–5 complete the previously discussed type/purity/compile-time scope.
-Retain existing Rust parser, node IDs, emission and tested lowerers. For unfinished
-or divergent semantic paths, follow the Python functions and decision order.
-Use focused comparisons while implementing and broader gates at integration
-boundaries. Further architectural optimization and parallel lowering wait for
-behavioral acceptance. The historical sections below record earlier checkpoints.
+Existing Rust parser, node IDs, emission and tested lowerers are retained. The
+Python reference still determines behavior when investigating an uncovered
+mismatch. The historical sections below record earlier checkpoints and their
+coverage at that time.
 
 One additional reference correctness fix protects qualified numeric constants:
 `library.VALUE` retains the same read-only mutation, address-taking and deletion
@@ -1671,33 +1676,34 @@ file/manifest/map. All 16 basic-library tests and the allocation-tracked walkthr
 pass after the correction. This is an intentional correction to the reference,
 rather than behavior the native port should reproduce.
 
-## Remaining work
+## Remaining verification and performance work
 
-The active eight-checkpoint plan and full module mapping are above. Earlier
-references to “stages 1–3” mean type resolution, purity and compile-time execution;
-they are not completion claims for checkpoints in the active plan.
+The current acceptance replay accounts for all **1,854 original test methods**
+and **1,340 Rust-specific methods** across the integration batches and corrected
+reruns. Both compilers built all 19 copied projects without changing original
+Thor sources. The current gates also passed 176 stdio TLS checks, all 41 live
+CodeLLDB checks, 141 Node editor tests, 35 Rust unit tests in each of debug and
+release, Clippy with warnings denied, and assertion hygiene. Finder launch passed
+with both engines.
 
-Each checkpoint retains Python as the default and records its actual test scope;
-an implemented subset is not whole-language acceptance. Optimization and parallel
-lowering follow behavioral acceptance.
+Initial sweeps exposed real diagnostic/metadata issues and stale fixture
+assumptions. The corrected checks passed individually and in their applicable
+integration groups. Two parallel Cargo setup builds exceeded their test timeout.
+Their 31 checks passed against the prebuilt compiler. This acceptance record
+combines the initial batches with their corrected reruns.
 
-- Complete symbol/type/overload resolution, imported/native type facts, generic
-  specialization and conditional declarations; the initial resolver is a subset.
-- Complete immutable-slice integration with pure calls, evaluated generic dimensions
-  and all remaining native type/overload specialization paths. The runtime slice
-  acceptance suites are now included in the differential gate.
-- Purity, local mutation provenance, checked callees, scratch/result ownership,
-  dependency extraction, automatic evaluation, `#run`, and evaluation caching.
-- Integer/Rational lowering and compile-time values; compile-time comprehensions and reductions,
-  full temporary ownership, wildcard exports and complete optional-result arities.
-- Complete switch/generic-callback and promoted-field context handling, Set
-  temporaries, and native access interactions beyond the selected reference cases.
-- Remaining diagnostic cleanup/related notes, frontend-warning policy, the
-  unused-inner-scope warning behavior, and source/resource path rewriting.
-- Full debug source regions, remaining sanitizer/tracker interactions and TLS
-  `--editor-info`; publishing, project creation and vet commands.
-- Full existing-suite and real-project differential acceptance. Only then should
-  phase-level speed comparisons, default-engine changes, or parallelization begin.
+The Rust compiler retains explicit migration errors for unresolved native
+specialization, cross-source symbolic ownership and unscheduled evaluation paths.
+The comparison runner treats each such result as an acceptance failure. The
+current corpus has no unresolved mismatch. Those guards remain visible for
+uncovered inputs. Native Windows/Linux execution and debugger behavior remain
+unverified. Portable packaging/protocol comparisons cover their data formats and
+controlled dependency cases.
+
+The next phase measures Python, Rust and Odin build phases under the same
+conditions, then evaluates parallelization and other performance changes.
+The `--capabilities` packet reports experimental status and the remaining scope.
+Both implementations and their launchers remain available.
 
 ## Differential gate
 

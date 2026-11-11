@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "reference_commit": "825ee0a438d5023eba62c104a8b9820243a05d06",
-  "rust_checkpoint": "825ee0a438d5023eba62c104a8b9820243a05d06",
+  "rust_checkpoint": "adba0ae",
   "policy": "Keep tested Rust foundations; translate reference algorithms and decision order; optimize after parity.",
   "modules": [
     {
@@ -10,9 +10,8 @@
         "rust/src/lib.rs"
       ],
       "checkpoint": 1,
-      "status": "partial",
-      "reference_functions": 0,
-      "remaining": "Retain package/crate entry."
+      "status": "ported",
+      "reference_functions": 0
     },
     {
       "python": "thorlang/parsecache.py",
@@ -20,9 +19,8 @@
         "rust/src/frontend.rs"
       ],
       "checkpoint": 1,
-      "status": "partial",
-      "reference_functions": 2,
-      "remaining": "Retain independent parser cache; complete policy parity if a mismatch is found."
+      "status": "ported",
+      "reference_functions": 2
     },
     {
       "python": "thorlang/sdkmirror.py",
@@ -30,9 +28,8 @@
         "rust/src/sdkmirror.rs"
       ],
       "checkpoint": 1,
-      "status": "partial",
-      "reference_functions": 2,
-      "remaining": "Retain sparse SDK views; complete overlay and witness parity."
+      "status": "ported",
+      "reference_functions": 2
     },
     {
       "python": "thorlang/shared.py",
@@ -40,9 +37,8 @@
         "rust/src/runtimeview.rs"
       ],
       "checkpoint": 1,
-      "status": "partial",
-      "reference_functions": 8,
-      "remaining": "Retain shared runtime installation."
+      "status": "ported",
+      "reference_functions": 8
     },
     {
       "python": "thorlang/semantics.py",
@@ -58,9 +54,8 @@
         "rust/src/storage.rs"
       ],
       "checkpoint": 2,
-      "status": "partial",
-      "reference_functions": 47,
-      "remaining": "Lexical projections, native generic storage guards and native-selected conditional immutable/slice markers follow reference behavior. Complete whole-language resolution acceptance; remaining symbolic generic decisions belong to permission analysis."
+      "status": "ported",
+      "reference_functions": 47
     },
     {
       "python": "thorlang/pureborrow.py",
@@ -76,9 +71,8 @@
         "rust/src/ownershiplower.rs"
       ],
       "checkpoint": 3,
-      "status": "partial",
-      "reference_functions": 24,
-      "remaining": "Symbolic helper profiles, SDK/comprehension graphs, nonconvergence contracts and lazy checked emission are connected. Evaluation-mode signatures remain with checkpoint 4 and logical-number traits with checkpoint 6."
+      "status": "ported",
+      "reference_functions": 24
     },
     {
       "python": "thorlang/purecalls.py",
@@ -88,9 +82,8 @@
         "rust/src/ownershiplower.rs"
       ],
       "checkpoint": 3,
-      "status": "partial",
-      "reference_functions": 16,
-      "remaining": "Checked ownership profiles, lazy native overloads, named wrapped procedures, transitive re-export access, SDK adaptation and surrounding mutator lifetimes are connected. Complete evaluation-mode behavior with execution integration."
+      "status": "ported",
+      "reference_functions": 16
     },
     {
       "python": "thorlang/purediagnostics.py",
@@ -99,9 +92,8 @@
         "rust/src/diagnostic.rs"
       ],
       "checkpoint": 3,
-      "status": "partial",
-      "reference_functions": 4,
-      "remaining": "Native permission errors select active fn call chains using instantiation notes, including Unicode note-column conversion. Complete schema-error active selection and evaluation-mode diagnostics during integration."
+      "status": "ported",
+      "reference_functions": 4
     },
     {
       "python": "thorlang/purity.py",
@@ -113,9 +105,8 @@
         "rust/src/purebig.rs"
       ],
       "checkpoint": 3,
-      "status": "partial",
-      "reference_functions": 77,
-      "remaining": "Runtime and evaluation-mode eligibility include native overloads/effects, exact schemas, conversions, logical numeric ownership and private backing guards. Complete command/editor adoption and whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 77
     },
     {
       "python": "thorlang/sliceaccess.py",
@@ -124,9 +115,8 @@
         "rust/src/access.rs"
       ],
       "checkpoint": 3,
-      "status": "partial",
-      "reference_functions": 62,
-      "remaining": "Concrete permissions and contextual summaries are connected, including editor-requested unused/generic contracts, explicit #mut and readonly access metadata. Complete broader interactions and whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 62
     },
     {
       "python": "thorlang/evaluation.py",
@@ -144,9 +134,8 @@
         "rust/src/evaluationresult.rs"
       ],
       "checkpoint": 4,
-      "status": "partial",
-      "reference_functions": 35,
-      "remaining": "Native extraction, scheduling, generic frames, scalar/aggregate/logical reconstruction and contents/prepared/site caches are connected. Finish remaining constant-type ordering and command/editor adoption, then broad acceptance."
+      "status": "ported",
+      "reference_functions": 35
     },
     {
       "python": "thorlang/native.py",
@@ -155,9 +144,8 @@
         "rust/src/sdkmirror.rs"
       ],
       "checkpoint": 4,
-      "status": "partial",
-      "reference_functions": 7,
-      "remaining": "Explicit #run roots and transitive SDK bodies participate in helper extraction, with private bridges and isolated renamed native packages. Generic specialization attachment and isolated canonical package-name remapping are connected. Complete command/editor adoption and full SDK acceptance."
+      "status": "ported",
+      "reference_functions": 7
     },
     {
       "python": "thorlang/specialization.py",
@@ -166,9 +154,8 @@
         "rust/src/evaluationspecialize.rs"
       ],
       "checkpoint": 4,
-      "status": "partial",
-      "reference_functions": 11,
-      "remaining": "Bindings, lexical relevance, fingerprints, caller-frame save/restore, type spelling, declarations and predicates are ported. User generic process scheduling and lazy result predicates are connected. Caller-local bridges and original-scope nominal identity probes are connected. Complete eligibility and command integration comparisons."
+      "status": "ported",
+      "reference_functions": 11
     },
     {
       "python": "thorlang/cache.py",
@@ -177,9 +164,8 @@
         "rust/src/evaluationcachekey.rs"
       ],
       "checkpoint": 5,
-      "status": "partial",
-      "reference_functions": 13,
-      "remaining": "Contents packets, checksummed metadata records, canonical encoding, atomic publication, prepared-target links, selective clearing, toolchain identities, resource hashes and prepared/scalar-site reuse are connected to normal Rust commands. Complete broad acceptance."
+      "status": "ported",
+      "reference_functions": 13
     },
     {
       "python": "thorlang/dependencies.py",
@@ -187,9 +173,8 @@
         "rust/src/evaluationinputs.rs"
       ],
       "checkpoint": 5,
-      "status": "partial",
-      "reference_functions": 9,
-      "remaining": "File/stat/raw-content observations, directory/tree/package membership, resource inputs and symlink bindings are compared with Python and connected to toolchain identities and scalar-site reuse. Complete command adoption and acceptance."
+      "status": "ported",
+      "reference_functions": 9
     },
     {
       "python": "thorlang/scalarcache.py",
@@ -198,9 +183,8 @@
         "rust/src/evaluationprepared.rs"
       ],
       "checkpoint": 5,
-      "status": "partial",
-      "reference_functions": 9,
-      "remaining": "Straight-line scalar eligibility, binding/body/header validation, dependency snapshots, native witness metadata and target reuse are connected to normal Rust commands. Native discovery retains selected files, so snapshots also observe unparsed package members. Complete early SDK discovery avoidance and broad acceptance."
+      "status": "ported",
+      "reference_functions": 9
     },
     {
       "python": "thorlang/values.py",
@@ -209,9 +193,8 @@
         "rust/src/bigstatic.rs"
       ],
       "checkpoint": 5,
-      "status": "partial",
-      "reference_functions": 9,
-      "remaining": "Canonical logical packets, static backing callbacks and independent runtime materialization are connected to normal fn/#run and cached results, including nested records/slices. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 9
     },
     {
       "python": "thorlang/bigconstants.py",
@@ -222,9 +205,8 @@
         "rust/src/logicalfacts.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 10,
-      "remaining": "Exact folding, static backing, read-only bindings, compile-time membership, lazy switches and the all-source constant-type prepass are connected, including imported/forward constants used by #run. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 10
     },
     {
       "python": "thorlang/bigintegration.py",
@@ -235,9 +217,8 @@
         "rust/src/lower.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 12,
-      "remaining": "Logical builtins, expanded extrema, generic component guards, membership and owned runtime selection are connected, with pure/evaluation interactions covered by the combined 462-test gate. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 12
     },
     {
       "python": "thorlang/bignumbers.py",
@@ -251,9 +232,8 @@
         "rust/src/temporaries.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 53,
-      "remaining": "Runtime ownership, source constants and their type prepass, builtins/generic components, owned switches, pure numeric copy permissions and fn/#run/cache reconstruction are connected. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 53
     },
     {
       "python": "thorlang/bigoperators.py",
@@ -262,9 +242,8 @@
         "rust/src/bigconstantvalue.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 10,
-      "remaining": "Runtime dispatch, generic/builtin integration and exact source constant arithmetic are connected. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 10
     },
     {
       "python": "thorlang/bigvalues.py",
@@ -273,9 +252,8 @@
         "rust/src/values.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 7,
-      "remaining": "Canonical arbitrary-precision packets, exact numeric lexemes, nested contents, static backing and source/runtime/native-execution reconstruction are connected. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 7
     },
     {
       "python": "thorlang/comprehensions.py",
@@ -283,9 +261,8 @@
         "rust/src/comprehensions.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 12,
-      "remaining": "Finish constant evaluation and reference interactions."
+      "status": "ported",
+      "reference_functions": 12
     },
     {
       "python": "thorlang/concatenation.py",
@@ -293,9 +270,8 @@
         "rust/src/lower.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 5,
-      "remaining": "Native constant chains, contextual empty literals, distinct container identity, generic constant operands and ordinary-array argument contexts match focused comparisons. An explicit test records the frozen reference's second bare generic array identity-cast gap. Complete whole-suite acceptance and remaining cross-feature interactions."
+      "status": "ported",
+      "reference_functions": 5
     },
     {
       "python": "thorlang/defaults.py",
@@ -303,9 +279,8 @@
         "rust/src/defaults.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 6,
-      "remaining": "Finish reference contexts and edge cases."
+      "status": "ported",
+      "reference_functions": 6
     },
     {
       "python": "thorlang/expressions.py",
@@ -316,9 +291,8 @@
         "rust/src/sets.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 58,
-      "remaining": "Finish expression lowering without changing accepted syntax or ownership."
+      "status": "ported",
+      "reference_functions": 58
     },
     {
       "python": "thorlang/extrema.py",
@@ -327,9 +301,8 @@
         "rust/src/extremaplan.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 8,
-      "remaining": "Shared runtime/evaluation plans and automatic constant reductions are connected. Finish command adoption and broad acceptance of optional arities."
+      "status": "ported",
+      "reference_functions": 8
     },
     {
       "python": "thorlang/formatting.py",
@@ -337,9 +310,8 @@
         "rust/src/formatting.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 2,
-      "remaining": "Retain the accepted formatting grammar and behavior."
+      "status": "ported",
+      "reference_functions": 2
     },
     {
       "python": "thorlang/fstrings.py",
@@ -348,9 +320,8 @@
         "rust/src/formatting.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 13,
-      "remaining": "Anonymous call scopes preserve tuple arity, optional boolean/allocator-error statuses, selected overload/indirect signatures and switch-arm borrow lifetimes. SDK interpolation signature inspection and query/lazy exclusions are connected; checked/unchecked tracked tests pass. Complete broader temporary-producer, logical-number and remaining lifetime interactions."
+      "status": "ported",
+      "reference_functions": 13
     },
     {
       "python": "thorlang/imports.py",
@@ -359,9 +330,8 @@
         "rust/src/semantics.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 4,
-      "remaining": "Finish wildcard exports, aliases, privacy and name resolution."
+      "status": "ported",
+      "reference_functions": 4
     },
     {
       "python": "thorlang/optional.py",
@@ -369,9 +339,8 @@
         "rust/src/lower.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 2,
-      "remaining": "Finish optional-result arity/branch behavior."
+      "status": "ported",
+      "reference_functions": 2
     },
     {
       "python": "thorlang/ownership.py",
@@ -384,9 +353,8 @@
         "rust/src/bigownership.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 26,
-      "remaining": "Strings, Sets and logical numeric producers/destructors are integrated with known consumers, selected arms, result-slot discards, builtins, membership, generic components and pure/evaluation interactions. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 26
     },
     {
       "python": "thorlang/repetition.py",
@@ -395,9 +363,8 @@
         "rust/src/semantics.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 7,
-      "remaining": "Native doubling chains, arbitrary native constant counts, typed/untyped and distinct strings, generic body/signature boundaries, lazy selection and logarithmic output size pass focused and broader comparisons. A test pins the frozen reference's generic-record inline type-query gap against ordinary Odin. Complete whole-language acceptance and remaining cross-feature interactions."
+      "status": "ported",
+      "reference_functions": 7
     },
     {
       "python": "thorlang/switches.py",
@@ -405,9 +372,8 @@
         "rust/src/switches.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 30,
-      "remaining": "Finish reference contexts, using and callback interactions."
+      "status": "ported",
+      "reference_functions": 30
     },
     {
       "python": "thorlang/typedloops.py",
@@ -415,9 +381,8 @@
         "rust/src/typedloops.rs"
       ],
       "checkpoint": 6,
-      "status": "partial",
-      "reference_functions": 7,
-      "remaining": "Retain supported paths; complete remaining reference interactions."
+      "status": "ported",
+      "reference_functions": 7
     },
     {
       "python": "thorlang/backend.py",
@@ -426,9 +391,8 @@
         "rust/src/project.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 1,
-      "remaining": "Native and isolated-helper invocation includes reference unused-local recovery, source-map rewrites, warning controls, plain toolchain output and signal status. Complete command orchestration and whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 1
     },
     {
       "python": "thorlang/compiler.py",
@@ -438,9 +402,8 @@
         "rust/src/project.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 46,
-      "remaining": "Native source/AST/emission infrastructure and TLS slice-access snapshot metadata are connected. Complete remaining invocation/diagnostic integrations and whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 46
     },
     {
       "python": "thorlang/diagnostics.py",
@@ -449,9 +412,8 @@
         "rust/src/project.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 16,
-      "remaining": "Finish diagnostic cleanup and editor parity."
+      "status": "ported",
+      "reference_functions": 16
     },
     {
       "python": "thorlang/driver.py",
@@ -460,9 +422,8 @@
         "rust/src/project.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 13,
-      "remaining": "Command orchestration includes native publishing, project creation, verified vetting/corrections, cache/time-limit controls, raw/mapped diagnostics and runtime argument separation. Complete whole-language/platform acceptance."
+      "status": "ported",
+      "reference_functions": 13
     },
     {
       "python": "thorlang/hygiene.py",
@@ -470,9 +431,8 @@
         "rust/src/lower.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 3,
-      "remaining": "Complete generated-name/diagnostic metadata parity."
+      "status": "ported",
+      "reference_functions": 3
     },
     {
       "python": "thorlang/memory_debug.py",
@@ -480,9 +440,8 @@
         "rust/src/memory.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 6,
-      "remaining": "Finish platform/flag and debugger interactions."
+      "status": "ported",
+      "reference_functions": 6
     },
     {
       "python": "thorlang/memorymap.py",
@@ -491,9 +450,8 @@
         "rust/src/emit.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 8,
-      "remaining": "Finish tracking/sanitizer source region behavior."
+      "status": "ported",
+      "reference_functions": 8
     },
     {
       "python": "thorlang/project_template.py",
@@ -501,9 +459,8 @@
         "rust/src/project_template.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 4,
-      "remaining": "Native project creation matches factory/CLI comparisons and creates projects runnable by either engine. Generated tasks retain the supported Python launcher. Complete whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 4
     },
     {
       "python": "thorlang/publish_deps.py",
@@ -511,9 +468,8 @@
         "rust/src/publishing/deps.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 14,
-      "remaining": "Native Mach-O closure/framework signing and portable PE/DLL/Linux controlled comparisons are implemented. Windows/Linux host acceptance remains."
+      "status": "ported",
+      "reference_functions": 14
     },
     {
       "python": "thorlang/publishing.py",
@@ -524,9 +480,8 @@
         "rust/src/publishing/icons.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 15,
-      "remaining": "Native policy, image normalization, package assembly, atomic managed replacement and CLI diagnostics are connected. Complete integration gate and whole-language/platform acceptance."
+      "status": "ported",
+      "reference_functions": 15
     },
     {
       "python": "thorlang/sourcemap.py",
@@ -534,9 +489,8 @@
         "rust/src/emit.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 11,
-      "remaining": "Structured maps include helper/capture/source-call-target/checked-procedure regions, generated AST kinds and validated rewrite/region boundary behavior. The real Node consumer accepts native manifests, executable identities and capture conditions, including unused-do recovery. Complete live DAP and whole-language acceptance."
+      "status": "ported",
+      "reference_functions": 11
     },
     {
       "python": "thorlang/symbolizer.py",
@@ -544,9 +498,8 @@
         "rust/src/memory.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 7,
-      "remaining": "Finish direct executable/debugger remapping."
+      "status": "ported",
+      "reference_functions": 7
     },
     {
       "python": "thorlang/vet.py",
@@ -556,9 +509,26 @@
         "rust/src/project.rs"
       ],
       "checkpoint": 7,
-      "status": "partial",
-      "reference_functions": 11,
-      "remaining": "Native convention candidates, complete-compiler batch validation, fix payloads, explicit apply/ask and transactional source updates pass reference CLI cases and focused interaction tests. Complete whole-language acceptance and performance comparison."
+      "status": "ported",
+      "reference_functions": 11
     }
+  ],
+  "status": "experimental reference-parity candidate",
+  "acceptance": {
+    "native_host": "macOS arm64",
+    "original_test_methods": 1854,
+    "rust_specific_test_methods": 1340,
+    "stdio_tls_checks": 176,
+    "live_debugger_checks": 41,
+    "node_editor_tests": 141,
+    "rust_unit_tests_per_build_profile": 35,
+    "copied_project_pairs": 19,
+    "finder_launch_both_engines": true,
+    "result_basis": "Integration batches and corrected reruns. See docs/rust-migration.md."
+  },
+  "unverified": [
+    "Native Windows/Linux host execution and debugger behavior.",
+    "Explicit unresolved-specialization, cross-source ownership and scheduling guards outside the acceptance corpus.",
+    "Performance characterization and parallel lowering."
   ]
 }

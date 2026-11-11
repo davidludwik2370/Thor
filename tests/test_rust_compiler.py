@@ -676,14 +676,18 @@ release::proc(text:string){}
                 packet=json.loads(result.stderr)
                 self.assertEqual(packet['error_count'],0)
 
-    def test_capabilities_admit_incomplete_port(self):
+    def test_capabilities_preserve_experimental_status_and_current_coverage(self):
         result = subprocess.run([str(RUST), '--capabilities'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         packet = json.loads(result.stdout)
+        self.assertEqual(packet['status'], 'experimental')
         self.assertFalse(packet['complete'])
-
         self.assertFalse(packet['python_fallback'])
         self.assertFalse(packet['parallel_lowering'])
+        self.assertTrue(packet['evaluation']['big_number_results'])
+        self.assertIn('slice privileges, contextual mutation summaries and TLS metadata', packet['supported'])
+        self.assertNotIn('full live debugger acceptance', packet['pending'])
+        self.assertNotIn('wildcard imports', packet['pending'])
 
     def test_frontend_ast_protocol_matches_reference_on_cross_feature_sources(self):
         from thorlang.compiler import Source
