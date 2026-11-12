@@ -2,7 +2,7 @@
 //! authority over exact types, overloads, constant evaluation and assignability.
 use crate::ast::{NodeId, Source};
 use serde::Serialize;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 #[path = "nodetable.rs"]
@@ -183,6 +183,15 @@ pub struct Symbol {
     pub result: bool,
     pub projection: Option<Projection>,
 }
+/// A name actually requested from an import not yet loaded by this resolver.
+/// Stable source indices let declaration-only discovery replay it after append.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct ImportDemand {
+    pub file: usize,
+    pub path: String,
+    pub name: String,
+    pub owner: Option<Ref>,
+}
 type ScopeTable = NodeTable<HashMap<String, Vec<usize>>>;
 /// Syntax-only state. Project snapshots may share this across flags and generic
 /// frames; evaluated types, conditions and using projections stay per resolver.
@@ -202,6 +211,8 @@ pub struct Resolver<'a> {
     import_packages: RefCell<HashMap<(usize, String), Option<usize>>>,
     canonical_paths: RefCell<HashMap<std::path::PathBuf, Option<std::path::PathBuf>>>,
     missing_packages: RefCell<BTreeSet<std::path::PathBuf>>,
+    missing_symbols: RefCell<BTreeSet<ImportDemand>>,
+    track_import_demands: Cell<bool>,
     types: NodeTable<Type>,
     active: HashSet<Ref>,
     planning: HashSet<(Ref, Vec<(String, Type)>)>,
@@ -311,6 +322,8 @@ impl<'a> Resolver<'a> {
             import_packages: RefCell::new(HashMap::new()),
             canonical_paths: RefCell::new(HashMap::new()),
             missing_packages: RefCell::new(BTreeSet::new()),
+            missing_symbols: RefCell::new(BTreeSet::new()),
+            track_import_demands: Cell::new(false),
             types: NodeTable::new(sources.iter().map(|source| source.nodes.len())),
             active: HashSet::new(),
             planning: HashSet::new(),
@@ -578,7 +591,7 @@ impl<'a> Resolver<'a> {
             for value in source.group(*id, "values") {
                 let alias = source.text(*value);
                 for path in self.index.imports[reference.file].get(alias).into_iter().flatten() {
-                        if let Some(symbol) = self.package_symbol(reference.file, path, name) {
+                        if let Some(symbol) = self.package_symbol(reference, path, name) {
                             return Some(symbol);
                         }
                 }
@@ -633,7 +646,7 @@ impl<'a> Resolver<'a> {
                         .find_map(|selection| {
                             crate::lower::unquote(&selection.path)
                                 .ok()
-                                .and_then(|path| self.package_symbol(reference.file, &path, name))
+                                .and_then(|path| self.package_symbol(reference, &path, name))
                         })
                 })
             }
@@ -655,7 +668,7 @@ impl<'a> Resolver<'a> {
                 let field = source.role(reference.node, "field")?;
                 self.index.imports[reference.file].get(source.text(base))
                     .into_iter().flatten().find_map(|path| {
-                        self.package_symbol(reference.file, path, source.text(field))
+                        self.package_symbol(reference, path, source.text(field))
                     })
             }
             "Paren" => self.symbol(Ref {
@@ -665,7 +678,13 @@ impl<'a> Resolver<'a> {
             _ => None,
         }
     }
-    fn package_symbol(&self, file: usize, path: &str, name: &str) -> Option<usize> {
+    pub(crate) fn package_symbol(&self, site: Ref, path: &str, name: &str) -> Option<usize> {
+        self.package_symbol_for(site.file, path, name, Some(site))
+    }
+    pub(crate) fn replay_import(&self, demand: &ImportDemand) -> Option<usize> {
+        self.package_symbol_for(demand.file, &demand.path, &demand.name, demand.owner)
+    }
+    fn package_symbol_for(&self, file: usize, path: &str, name: &str, site: Option<Ref>) -> Option<usize> {
         let key = (file, path.to_string());
         let cached = self.import_packages.borrow().get(&key).copied();
         let package = if let Some(package) = cached { package } else {
@@ -685,7 +704,23 @@ impl<'a> Resolver<'a> {
         });
         self.import_packages.borrow_mut().insert(key, package);
         package
-        }?;
+        };
+        let Some(package) = package else {
+            if self.track_import_demands.get() && !["base:builtin", "base:intrinsics"].contains(&path) {
+                let source = &self.sources[file];
+                let owner = site.and_then(|site| {
+                    std::iter::once(site.node).chain(source.ancestors(site.node))
+                        .find(|id| source.node(*id).kind == "Procedure")
+                        .or_else(|| std::iter::once(site.node).chain(source.ancestors(site.node))
+                            .find(|id| source.node(*id).kind == "Declaration"))
+                        .map(|node| Ref {file,node})
+                });
+                self.missing_symbols.borrow_mut().insert(ImportDemand {
+                    file, path: path.into(), name: name.into(), owner,
+                });
+            }
+            return None;
+        };
         self.index.package_symbols[package].get(name)
                 .and_then(|symbols| symbols
                         .iter()
@@ -694,6 +729,12 @@ impl<'a> Resolver<'a> {
     }
     pub(crate) fn demanded_packages(&self) -> BTreeSet<std::path::PathBuf> {
         self.missing_packages.borrow().clone()
+    }
+    pub(crate) fn demanded_symbols(&self) -> Vec<ImportDemand> {
+        self.missing_symbols.borrow().iter().cloned().collect()
+    }
+    pub(crate) fn track_import_demands(&self, enabled: bool) -> bool {
+        self.track_import_demands.replace(enabled)
     }
     pub(crate) fn has_demanded_packages(&self) -> bool {
         !self.missing_packages.borrow().is_empty()
@@ -1969,6 +2010,9 @@ mod index_tests {
         let resolver = Resolver::new(&sources);
         let site = Ref { file:0, node:NodeId(1) };
         resolver.missing_packages.borrow_mut().insert("/pending".into());
+        resolver.missing_symbols.borrow_mut().insert(ImportDemand {
+            file: 0, path: "pending".into(), name: "VALUE".into(), owner: Some(site),
+        });
         let outer = resolver.begin_symbol_queries();
         let first = resolver.symbol(site);
         let nested = resolver.begin_symbol_queries();
@@ -1980,7 +2024,7 @@ mod index_tests {
         }
         resolver.end_symbol_queries(outer);
         let next = Resolver::with_index(&sources, &[], Some(&resolver.syntax_index()));
-        if next.symbol_queries.borrow().is_some() || next.has_demanded_packages() {
+        if next.symbol_queries.borrow().is_some() || next.has_demanded_packages() || !next.demanded_symbols().is_empty() {
             panic!("semantic queries leaked into the next source graph");
         }
     }

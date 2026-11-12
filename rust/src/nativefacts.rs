@@ -118,6 +118,7 @@ impl Project {
                 || source.info["mut_parameters"].as_array().is_some_and(|rows| !rows.is_empty())
         }) { return Ok(()); }
         let mut inspected = HashSet::new();
+        let mut lookahead = super::dependencylookahead::Lookahead::new();
         loop {
             let mut resolver = self.resolver();
             resolver.begin_symbol_queries();
@@ -219,9 +220,11 @@ impl Project {
             if packages.is_empty() {
                 // Complete known signature/type dependencies before inspecting
                 // slice effects. An incomplete graph would require a repeat.
+                let tracking = resolver.track_import_demands(true);
                 let _effects = self.permission_cache.borrow_mut().discover(
                     &mut resolver, &self.options.flags, self.options.editor_info,
                     self.evaluation.as_ref());
+                resolver.track_import_demands(tracking);
                 packages.extend(resolver.demanded_packages());
                 packages.retain(needs_load);
             }
@@ -229,9 +232,27 @@ impl Project {
                 break;
             }
             inspected.extend(packages.iter().cloned());
+            let mut demands = resolver.demanded_symbols();
+            crate::profile::event("analysis.import_demands", || serde_json::json!(
+                demands.iter().map(|d| (&self.sources[d.file].path,&d.path,&d.name)).collect::<Vec<_>>()));
             crate::profile::event("analysis.call_dependencies", || serde_json::json!({"packages":packages,"sources":self.sources.len()}));
             drop(resolver);
             self.discover_type_facts_from(packages)?;
+            // Follow only declarations behind names this analysis requested.
+            // Batch their transitive name dependencies before another graph.
+            while !demands.is_empty() {
+                let resolver = self.resolver();
+                lookahead.expand(&resolver, &demands);
+                let mut packages = resolver.demanded_packages();
+                packages.retain(|directory| !inspected.contains(directory)
+                    && !self.sources.iter().any(|source| source.path.parent() == Some(directory)));
+                if packages.is_empty() { break; }
+                inspected.extend(packages.iter().cloned());
+                demands = resolver.demanded_symbols();
+                crate::profile::count("analysis.dependency_lookahead_loads", 1);
+                drop(resolver);
+                self.discover_type_facts_from(packages)?;
+            }
         }
         Ok(())
     }

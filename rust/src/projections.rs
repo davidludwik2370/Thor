@@ -149,7 +149,7 @@ impl Resolver<'_> {
                                 .get(owner_source.text(entry.owner.node))
                                 .and_then(|paths| paths.first());
                             if let Some(symbol) = imported
-                                .and_then(|path| self.package_symbol(entry.owner.file, path, &name))
+                                .and_then(|path| self.package_symbol(entry.owner, path, &name))
                             {
                                 self.using_symbols.insert(*reference, symbol);
                                 changed = true;

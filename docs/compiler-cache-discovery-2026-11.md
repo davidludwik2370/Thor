@@ -1,5 +1,8 @@
 # Earlier evaluation-cache lookup and dependency discovery
 
+The subsequent [general dependency-lookahead pass](compiler-dependency-lookahead-2026-11.md)
+addresses further retries without specializing for these benchmark programs.
+
 This follows the [compiler-efficiency pass](compiler-efficiency-2026-11.md).
 It changes the Rust implementation without changing Thor syntax, ownership,
 runtime behavior, or the Odin compiler. The Python reference remains available.

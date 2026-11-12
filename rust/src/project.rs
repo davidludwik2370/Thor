@@ -28,6 +28,8 @@ pub(crate) use evaluationexec::capture as capture_command;
 pub use evaluationexec::{cancel_active_evaluation, evaluation_cancelled};
 #[path = "nativefacts.rs"]
 mod nativefacts;
+#[path = "dependencylookahead.rs"]
+mod dependencylookahead;
 #[path = "runtimeview.rs"]
 mod runtimeview;
 #[path = "sdkmirror.rs"]
