@@ -119,6 +119,7 @@ impl Project {
             source_facts: self.source_facts.clone(),
             resolver_index: self.resolver_index.clone(),
             permission_cache: std::cell::RefCell::default(),
+            parsed_imports: HashMap::new(),
         })
     }
     pub(crate) fn resolve_evaluation_identities(

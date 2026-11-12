@@ -120,6 +120,8 @@ impl Project {
         let mut inspected = HashSet::new();
         loop {
             let mut resolver = self.resolver();
+            resolver.begin_symbol_queries();
+            let mut types = Vec::new();
             // Resolve the project's actual names. This follows type aliases and
             // selected signatures without traversing unrelated SDK bodies.
             for (file, source) in self.sources.iter().enumerate().filter(|(_, source)| {
@@ -130,10 +132,11 @@ impl Project {
                     if matches!(node.kind.as_str(), "Selector" | "Call")
                         || node.kind == "Ident" && resolver.expression_reference(reference)
                     {
-                        resolver.type_of(reference);
+                        types.push(resolver.type_of(reference));
                     }
                 }
             }
+            Self::discover_record_dependencies(&mut resolver, types);
             let mut roots = vec![];
             let mut requests = vec![];
             for (file, source) in resolver.sources.iter().enumerate() {
@@ -230,6 +233,57 @@ impl Project {
             self.discover_type_facts_from(packages)?;
         }
         Ok(())
+    }
+    /// Complete the shapes already requested by project expressions before
+    /// building effect graphs. This follows data declarations, never unrelated
+    /// SDK procedure bodies. The ordinary demand loop remains the fallback for
+    /// unresolved generics and recursively expanding type constructors.
+    fn discover_record_dependencies(resolver: &mut Resolver<'_>, mut pending: Vec<crate::semantics::Type>) {
+        use crate::semantics::{Ref, Type};
+        let _phase = crate::profile::span("analysis.discover_record_shapes");
+        let mut seen = HashSet::new();
+        let mut expansions = HashMap::<Ref, usize>::new();
+        let budget = resolver.sources.iter().map(|source| source.nodes.len()).sum::<usize>().max(1024);
+        while let Some(typ) = pending.pop() {
+            if seen.len() >= budget { break; }
+            if !seen.insert(typ.clone()) { continue; }
+            match typ {
+                Type::Pointer(elem) | Type::Slice(elem) | Type::Dynamic(elem) | Type::Set(elem)
+                | Type::Soa(elem) | Type::Nominal(_, elem) | Type::Array { elem, .. }
+                | Type::Fixed { elem, .. } => pending.push(*elem),
+                Type::Map { key, value } => pending.extend([*key, *value]),
+                Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
+                    // Non-regular pointer types can grow their argument on
+                    // every step: Node(T).next: ^Node([]T). This is a discovery
+                    // optimization, so yield to ordinary on-demand resolution
+                    // instead of expanding an unbounded family of shapes.
+                    if let Type::Struct(owner) | Type::Record(owner, _) = &typ {
+                        let count = expansions.entry(*owner).or_default();
+                        if *count >= 32 { continue; }
+                        *count += 1;
+                    }
+                    pending.extend(resolver.record_fields(&typ).into_iter().map(|(_, typ)| typ));
+                }
+                Type::Union(owner) => pending.extend(resolver.union_variants(owner)),
+                Type::Procedure(owner) => {
+                    let source = &resolver.sources[owner.file];
+                    let signature = if source.node(owner.node).kind == "Procedure" {
+                        source.role(owner.node, "type").unwrap_or(owner.node)
+                    } else { owner.node };
+                    for role in ["params", "results"] {
+                        if let Some(fields) = source.role(signature, role) {
+                            for field in &source.node(fields).children {
+                                if let Some(node) = source.role(*field, "type") {
+                                    pending.push(resolver.type_of(Ref { file: owner.file, node }));
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        crate::profile::count("analysis.record_shapes", seen.len() as u64);
     }
     fn referenced_packages(
         resolver: &Resolver<'_>,

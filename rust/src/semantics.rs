@@ -217,7 +217,18 @@ pub struct Resolver<'a> {
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
     symbol_queries: RefCell<Option<HashMap<Ref, Option<usize>>>>,
+    metadata: Option<Metadata>,
 }
+/// Immutable answers shared by permission, purity and emission queries in the
+/// same resolver. Binding/evaluation changes invalidate the entire table.
+#[derive(Default)]
+struct Metadata {
+    specialized: HashMap<Ref, HashMap<Substitutions, Type>>,
+    fields: HashMap<Type, RecordFields>,
+    members: HashMap<Type, HashMap<String, Type>>,
+    paths: HashMap<Type, HashMap<String, Option<Vec<String>>>>,
+}
+pub(crate) type RecordFields = Arc<[(String, Type)]>;
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
     let node = source.node(id);
     if node.kind == "Block"
@@ -262,13 +273,13 @@ impl<'a> Resolver<'a> {
         }
         self.bound_types = types;
         self.bound_constants = constants;
-        self.types.clear();
+        self.invalidate_queries();
         self.context_hints.clear();
         self.parameter_witnesses.clear();
         self.prepare_contexts();
     }
     pub(crate) fn remember_logical_constant(&mut self,node:Ref,value:serde_json::Value){
-        self.logical_constants.insert(node,value);self.types.clear();
+        self.logical_constants.insert(node,value);self.invalidate_queries();
     }
     pub(crate) fn logical_constant_type(&self,node:Ref)->Option<Type>{
         match self.logical_constants.get(&node).or_else(||self.evaluated.get(&node))?["kind"].as_str()?{
@@ -277,7 +288,7 @@ impl<'a> Resolver<'a> {
     }
     pub fn remember_evaluation(&mut self, node: Ref, value: serde_json::Value) {
         self.evaluated.insert(node, value);
-        self.types.clear();
+        self.invalidate_queries();
     }
     pub fn new(sources: &'a [Source]) -> Self {
         Self::with_flags(sources, &[])
@@ -315,6 +326,7 @@ impl<'a> Resolver<'a> {
             bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
             symbol_queries: RefCell::new(None),
+            metadata: None,
         };
         if base.is_none() {
         crate::profile::count("resolver.index_builds", 1);
@@ -470,7 +482,13 @@ impl<'a> Resolver<'a> {
         this.base = Some(ResolverIndex {symbols:this.symbols.clone(), scopes:this.scopes.clone(),
             names:this.index.clone(), markers:this.immutable_markers.clone()});
         this.prepare_projections();
+        this.metadata = Some(Metadata::default());
         this
+    }
+    fn invalidate_queries(&mut self) {
+        self.types.clear();
+        if let Some(metadata) = &mut self.metadata { *metadata = Metadata::default(); }
+        if let Some(queries) = self.symbol_queries.get_mut() { queries.clear(); }
     }
     pub fn immutable_marker(&self,reference:Ref)->Option<(Ref,String)>{
         let symbol=&self.symbols[self.symbol(reference)?];
@@ -568,28 +586,30 @@ impl<'a> Resolver<'a> {
         }
         None
     }
-    // Source/binding inputs stay fixed while slice summaries are inspected.
-    // Keep this cache scoped to that pass; later evaluation and dependency
-    // discovery can supply different definitions to the same resolver.
-    pub(crate) fn begin_symbol_queries(&self) -> Option<HashMap<Ref, Option<usize>>> {
-        self.symbol_queries.replace(Some(HashMap::new()))
+    // Nested fixed-input analyses share answers. Changes to bindings, context
+    // witnesses or evaluated values clear them through invalidate_queries.
+    pub(crate) fn begin_symbol_queries(&self) -> bool {
+        let mut queries = self.symbol_queries.borrow_mut();
+        let active = queries.is_some();
+        if !active { *queries = Some(HashMap::new()); }
+        active
     }
-    pub(crate) fn end_symbol_queries(&self, previous: Option<HashMap<Ref, Option<usize>>>) {
-        self.symbol_queries.replace(previous);
+    pub(crate) fn end_symbol_queries(&self, previous: bool) {
+        if !previous { self.symbol_queries.replace(None); }
     }
     pub fn symbol(&self, reference: Ref) -> Option<usize> {
-        if !self.has_demanded_packages() {
-            if let Some(value) = self.symbol_queries.borrow().as_ref()
-                .and_then(|queries| queries.get(&reference)).copied() {
-                crate::profile::count("lookup.symbol_hits", 1);
-                return value;
-            }
+        // A demanded import does not mutate this resolver's source graph.
+        // Keep both positive and negative answers until this fixed-input pass
+        // ends. Discovery creates a new resolver after loading dependencies;
+        // the outstanding package set is never cleared by a cache hit.
+        if let Some(value) = self.symbol_queries.borrow().as_ref()
+            .and_then(|queries| queries.get(&reference)).copied() {
+            crate::profile::count("lookup.symbol_hits", 1);
+            return value;
         }
         let value = self.symbol_uncached(reference);
-        if !self.has_demanded_packages() {
-            if let Some(queries) = self.symbol_queries.borrow_mut().as_mut() {
-                queries.insert(reference, value);
-            }
+        if let Some(queries) = self.symbol_queries.borrow_mut().as_mut() {
+            queries.insert(reference, value);
         }
         value
     }
@@ -1920,6 +1940,71 @@ impl<'a> Resolver<'a> {
 mod index_tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn record_layouts_are_shared_but_owned_results_and_new_epochs_are_independent() {
+        let mut resolver = Resolver::new(&[]);
+        let typ = Type::Anonymous(vec![("value".into(), Type::scalar("int"))]);
+        let first = resolver.shared_record_fields(&typ);
+        let second = resolver.shared_record_fields(&typ);
+        if !Arc::ptr_eq(&first, &second) { panic!("unchanged layout was copied"); }
+        let mut owned = resolver.record_fields(&typ);
+        owned[0].1 = Type::scalar("f64");
+        if resolver.shared_record_fields(&typ)[0].1 != Type::scalar("int") {
+            panic!("owned layout mutation reached the cache");
+        }
+        resolver.remember_evaluation(Ref { file:0, node:NodeId(0) }, json!(1));
+        let next = resolver.shared_record_fields(&typ);
+        if Arc::ptr_eq(&first, &next) || first.as_ref() != next.as_ref() {
+            panic!("a new semantic epoch retained the old layout cache");
+        }
+    }
+    #[test]
+    fn pending_imports_do_not_disable_fixed_input_symbol_queries_or_cross_resolvers() {
+        let source = Source::from_frontend("/example.thor".into(), "missing".into(), json!({
+            "nodes":[{"kind":"File","start":0,"end":7,"parent":-1},
+                     {"kind":"Ident","start":0,"end":7,"parent":0,"name":"missing"}],
+            "features":[],"edits":[],"selections":[]
+        }), true).unwrap();
+        let sources = vec![source];
+        let resolver = Resolver::new(&sources);
+        let site = Ref { file:0, node:NodeId(1) };
+        resolver.missing_packages.borrow_mut().insert("/pending".into());
+        let outer = resolver.begin_symbol_queries();
+        let first = resolver.symbol(site);
+        let nested = resolver.begin_symbol_queries();
+        let second = resolver.symbol(site);
+        resolver.end_symbol_queries(nested);
+        let retained = resolver.symbol_queries.borrow().as_ref().is_some_and(|queries| queries.contains_key(&site));
+        if first.is_some() || second.is_some() || !retained || !resolver.has_demanded_packages() {
+            panic!("fixed-input negative query or pending dependency was lost");
+        }
+        resolver.end_symbol_queries(outer);
+        let next = Resolver::with_index(&sources, &[], Some(&resolver.syntax_index()));
+        if next.symbol_queries.borrow().is_some() || next.has_demanded_packages() {
+            panic!("semantic queries leaked into the next source graph");
+        }
+    }
+    #[test]
+    fn metadata_is_invalidated_by_bindings_evaluations_and_context_preparation() {
+        let mut resolver = Resolver::new(&[]);
+        let site = Ref { file: 0, node: NodeId(0) };
+        for operation in 0..4 {
+            let memo = resolver.metadata.as_mut().unwrap();
+            memo.fields.insert(Type::Unknown, vec![("stale".into(), Type::Unknown)].into());
+            memo.members.entry(Type::Unknown).or_default().insert("field".into(), Type::Unknown);
+            memo.paths.entry(Type::Unknown).or_default().insert("field".into(), None);
+            memo.specialized.entry(site).or_default().insert(Substitutions::new(), Type::Unknown);
+            match operation {
+                0 => resolver.remember_evaluation(site, json!(1)),
+                1 => resolver.remember_logical_constant(site, json!(2)),
+                2 => resolver.set_lexical_bindings([((site, "T".into()), Type::scalar("int"))].into(), BTreeMap::new()),
+                _ => resolver.prepare_contexts(),
+            }
+            let memo = resolver.metadata.as_ref().unwrap();
+            if !memo.fields.is_empty() || !memo.members.is_empty() || !memo.paths.is_empty()
+                || !memo.specialized.is_empty() { panic!("stale metadata after operation {operation}"); }
+        }
+    }
     #[test]
     fn shared_indexes_do_not_cache_flag_selected_definitions() {
         let raw = "when ODIN_DEBUG {N::1}else{N::2};N";

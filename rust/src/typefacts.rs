@@ -21,6 +21,21 @@ impl Resolver<'_> {
             .collect()
     }
     pub fn record_fields(&mut self, typ: &Type) -> Vec<(String, Type)> {
+        self.shared_record_fields(typ).to_vec()
+    }
+    pub(crate) fn shared_record_fields(&mut self, typ: &Type) -> RecordFields {
+        if let Some(fields) = self.metadata.as_ref().and_then(|memo| memo.fields.get(typ)) {
+            crate::profile::count("resolver.field_hits", 1);
+            return fields.clone();
+        }
+        let stable = self.active.is_empty() && self.planning.is_empty();
+        let fields: RecordFields = self.record_fields_uncached(typ).into();
+        if stable && !self.has_demanded_packages() {
+            if let Some(memo) = &mut self.metadata { memo.fields.insert(typ.clone(), fields.clone()); }
+        }
+        fields
+    }
+    fn record_fields_uncached(&mut self, typ: &Type) -> Vec<(String, Type)> {
         let (owner, bindings) = match typ {
             Type::Anonymous(fields) => return fields.clone(),
             Type::Struct(owner) => (*owner, Substitutions::new()),
@@ -56,6 +71,18 @@ impl Resolver<'_> {
         result
     }
     pub fn member_type(&mut self, typ: &Type, name: &str) -> Type {
+        if let Some(member) = self.metadata.as_ref().and_then(|memo| memo.members.get(typ).and_then(|members| members.get(name))) {
+            crate::profile::count("resolver.member_hits", 1);
+            return member.clone();
+        }
+        let stable = self.active.is_empty() && self.planning.is_empty();
+        let member = self.member_type_uncached(typ, name);
+        if stable && !self.has_demanded_packages() {
+            if let Some(memo) = &mut self.metadata { memo.members.entry(typ.clone()).or_default().insert(name.to_owned(), member.clone()); }
+        }
+        member
+    }
+    fn member_type_uncached(&mut self, typ: &Type, name: &str) -> Type {
         match typ {
             Type::BigRational if matches!(name,"numerator"|"denominator") => Type::BigInteger,
             Type::Nominal(_, base) | Type::Pointer(base) => self.member_type(base, name),
@@ -88,10 +115,10 @@ impl Resolver<'_> {
                 let mut typ = typ.clone();
                 for component in path {
                     typ = self
-                        .record_fields(&typ)
-                        .into_iter()
+                        .shared_record_fields(&typ)
+                        .iter()
                         .find(|(field, _)| field == &component)
-                        .map(|(_, typ)| typ)
+                        .map(|(_, typ)| typ.clone())
                         .unwrap_or(Type::Unknown);
                 }
                 typ
@@ -102,7 +129,16 @@ impl Resolver<'_> {
     }
     /// Retain the actual storage path through promoted `using` fields.
     pub fn member_path(&mut self, typ: &Type, name: &str) -> Option<Vec<String>> {
-        self.member_path_seen(typ, name, &mut HashSet::new())
+        if let Some(path) = self.metadata.as_ref().and_then(|memo| memo.paths.get(typ).and_then(|paths| paths.get(name))) {
+            crate::profile::count("resolver.path_hits", 1);
+            return path.clone();
+        }
+        let stable = self.active.is_empty() && self.planning.is_empty();
+        let path = self.member_path_seen(typ, name, &mut HashSet::new());
+        if stable && !self.has_demanded_packages() {
+            if let Some(memo) = &mut self.metadata { memo.paths.entry(typ.clone()).or_default().insert(name.to_owned(), path.clone()); }
+        }
+        path
     }
     fn member_path_seen(
         &mut self,
@@ -126,7 +162,7 @@ impl Resolver<'_> {
         if !seen.insert(owner) {
             return None;
         }
-        let fields = self.record_fields(typ);
+        let fields = self.shared_record_fields(typ);
         if fields.iter().any(|(field, _)| field == name) {
             return Some(vec![name.into()]);
         }
@@ -141,22 +177,31 @@ impl Resolver<'_> {
             .map(|name| s.text(*name).to_string())
             .collect::<HashSet<_>>();
         let mut found = None;
-        for (field, typ) in fields {
-            if !promoted.contains(&field) {
+        for (field, typ) in fields.iter() {
+            if !promoted.contains(field) {
                 continue;
             }
-            if let Some(mut path) = self.member_path_seen(&typ, name, &mut seen.clone()) {
+            if let Some(mut path) = self.member_path_seen(typ, name, &mut seen.clone()) {
                 if found.is_some() {
                     return None;
                 }
-                path.insert(0, field);
+                path.insert(0, field.clone());
                 found = Some(path);
             }
         }
         found
     }
     pub fn specialized_type(&mut self, r: Ref, bindings: &Substitutions) -> Type {
-        self.specialize(r, bindings, &mut HashSet::new())
+        if let Some(typ) = self.metadata.as_ref().and_then(|memo| memo.specialized.get(&r).and_then(|types| types.get(bindings))) {
+            crate::profile::count("resolver.specialized_hits", 1);
+            return typ.clone();
+        }
+        let stable = self.active.is_empty() && self.planning.is_empty();
+        let typ = self.specialize(r, bindings, &mut HashSet::new());
+        if stable && !self.has_demanded_packages() {
+            if let Some(memo) = &mut self.metadata { memo.specialized.entry(r).or_default().insert(bindings.clone(), typ.clone()); }
+        }
+        typ
     }
     pub fn bound_type<'b>(&'b self, r: Ref, bindings: &'b Substitutions) -> Option<&'b Type> {
         if bindings.is_empty() && self.bound_types.is_empty() && self.bound_constants.is_empty() {

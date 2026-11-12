@@ -105,6 +105,9 @@ pub struct Project {
     source_facts: Option<SourceFacts>,
     resolver_index: std::cell::RefCell<Option<IndexedSources>>,
     permission_cache: std::cell::RefCell<crate::permissioncache::Cache>,
+    // Parsed import frontiers are consumed in the original depth-first order.
+    // Workers may finish in any order without changing source/evaluation order.
+    parsed_imports: HashMap<(PathBuf, bool), Result<Source>>,
 }
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
@@ -324,6 +327,7 @@ impl Project {
             source_facts: None,
             resolver_index: std::cell::RefCell::new(None),
             permission_cache: std::cell::RefCell::default(),
+            parsed_imports: HashMap::new(),
             collections,
             common,
             file_entry,
@@ -378,29 +382,13 @@ impl Project {
         let support_library =
             entry.starts_with(self.options.root.join("runtime")) && entry != self.options.entry;
         let files = package_files(&entry, self.frontend.test && !support_library, &self.options.overlays)?;
-        let mut shared_frontend = self.frontend.clone();
-        if shared_frontend.cache_dir.is_some() {
-            shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
-        }
         let files = files.into_iter().filter(|path| !self.sources.iter().any(|s| s.path == *path))
             .collect::<Vec<_>>();
-        let parsed = crate::parallel::map(&files, |path| {
-            let frontend = if path.starts_with(self.options.root.join("runtime"))
-                && path.extension().is_some_and(|ext| ext == "odin")
-            {
-                &shared_frontend
-            } else {
-                &self.frontend
-            };
-            frontend.parse_overlay(
-                path,
-                entry.is_dir(),
-                self.options.overlays.get(path).map(String::as_str),
-            )
-        });
+        self.parse_imports(files.iter().map(|path| (path.clone(), entry.is_dir())).collect());
         let mut imports = vec![];
-        for (path, source) in files.into_iter().zip(parsed) {
-            let mut source = source?;
+        for path in files {
+            let mut source = self.parsed_imports.remove(&(path.clone(), entry.is_dir()))
+                .expect("requested parse result")?;
             source.shared_native = path.extension().is_some_and(|ext| ext == "odin")
                 && path.starts_with(self.options.root.join("runtime"))
                 && path != self.options.entry
@@ -428,10 +416,44 @@ impl Project {
             }
             self.sources.push(source);
         }
+        let mut frontier = Vec::new();
+        // A single import already uses the ordinary per-package batch. Only
+        // inspect a frontier early when sibling packages can share workers.
+        for import in imports.iter().filter(|_| imports.len() > 1) {
+            let Ok(import) = absolute(import) else { continue; };
+            if visited.contains(&import) { continue; }
+            let support_library = import.starts_with(self.options.root.join("runtime"))
+                && import != self.options.entry;
+            // Discovery reports directory errors in its original order. A
+            // failed speculative parse is likewise retained until consumed.
+            if let Ok(files) = package_files(&import, self.frontend.test && !support_library, &self.options.overlays) {
+                frontier.extend(files.into_iter().map(|path| (path, import.is_dir())));
+            }
+        }
+        self.parse_imports(frontier);
         for import in imports {
             self.discover(&import, visited)?;
         }
         Ok(())
+    }
+    fn parse_imports(&mut self, files: Vec<(PathBuf, bool)>) {
+        let mut seen = HashSet::new();
+        let pending = files.into_iter().filter(|key| seen.insert(key.clone())
+            && !self.parsed_imports.contains_key(key)
+            && !self.sources.iter().any(|source| source.path == key.0)).collect::<Vec<_>>();
+        if pending.is_empty() { return; }
+        let mut shared_frontend = self.frontend.clone();
+        if shared_frontend.cache_dir.is_some() {
+            shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
+        }
+        let parsed = crate::parallel::map(&pending, |(path, package)| {
+            let frontend = if path.starts_with(self.options.root.join("runtime"))
+                && path.extension().is_some_and(|ext| ext == "odin") {
+                &shared_frontend
+            } else { &self.frontend };
+            frontend.parse_overlay(path, *package, self.options.overlays.get(path).map(String::as_str))
+        });
+        self.parsed_imports.extend(pending.into_iter().zip(parsed));
     }
     /// Load the same source/type facts used by lowering, without generating or
     /// compiling output. The differential analysis harness uses this entry.
@@ -489,6 +511,7 @@ impl Project {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
         }
         crate::lower::prime_logical_constants(&mut resolver);
+        resolver.begin_symbol_queries();
         let mut privileges = self.permission_cache.borrow_mut().analyze(
             &mut resolver,
             &self.options.flags,

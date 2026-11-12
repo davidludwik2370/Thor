@@ -8,6 +8,62 @@ struct PureResult {
     default: Option<NodeId>,
 }
 impl Lower<'_, '_> {
+    /// A deliberately small proof: inline values and a body with no explicit
+    /// calls or allocating Thor expressions. Unknown/generic types keep the
+    /// normal scratch lifetime; calls are not assumed allocation free.
+    fn allocation_free_leaf(&mut self, root: Ref) -> bool {
+        fn inline(r: &mut Resolver<'_>, typ: &Type, seen: &mut HashSet<Ref>) -> bool {
+            match typ {
+                Type::Scalar { name, .. } => name == "bool" || typ.numeric()
+                    || name.starts_with("complex") || name.starts_with("quaternion"),
+                Type::Enum(_) => true,
+                Type::Nominal(_, base) | Type::Array { elem: base, .. }
+                | Type::Fixed { elem: base, .. } => inline(r, base, seen),
+                Type::Struct(owner) | Type::Record(owner, _) => {
+                    if !seen.insert(*owner) { return false; }
+                    let fields = r.record_fields(typ);
+                    let result = !fields.is_empty() && fields.iter().all(|(_, typ)| inline(r, typ, seen));
+                    seen.remove(owner);
+                    result
+                }
+                _ => false,
+            }
+        }
+        let Some(sig) = self.source.role(root.node, "type") else { return false; };
+        for role in ["params", "results"] {
+            for (_, typ) in self.resolver.fields(self.reference(sig), role) {
+                let Some(typ) = typ else { return false; };
+                let typ = self.typ(typ.node);
+                if !inline(self.resolver, &typ, &mut HashSet::new()) { return false; }
+            }
+        }
+        let Some(body) = self.source.role(root.node, "body") else { return false; };
+        for node in self.source.descendants(body) {
+            let kind = self.source.node(node).kind.as_str();
+            if !matches!(kind,
+                "Ident" | "Literal" | "Binary" | "Unary" | "Ternary" | "Paren"
+                | "Block" | "Return" | "Declaration" | "Assignment" | "If" | "For"
+                | "Range" | "Branch" | "Label" | "Empty" | "Selector" | "ImplicitSelector"
+                | "Index" | "Compound" | "FieldValue" | "ArrayType") {
+                return false;
+            }
+            // A scalar result can hide allocated intermediate arithmetic,
+            // e.g. `return BIG_CONSTANT + 1 > 0`. Inspect operand expressions
+            // as well as signatures and local bindings.
+            if matches!(kind, "Binary" | "Unary" | "Ternary" | "Compound" | "Index" | "Selector")
+                || kind == "Ident" && self.resolver.expression_reference(self.reference(node)) {
+                let typ = self.typ(node);
+                if !inline(self.resolver, &typ, &mut HashSet::new()) { return false; }
+            }
+            if self.source.node(node).kind == "Declaration" {
+                for name in self.source.group(node, "names").to_vec() {
+                    let typ = self.typ(name);
+                    if !inline(self.resolver, &typ, &mut HashSet::new()) { return false; }
+                }
+            }
+        }
+        true
+    }
     fn pure_results(&self, signature: NodeId) -> Vec<PureResult> {
         let source = self.source;
         source.role(signature, "results").into_iter()
@@ -204,7 +260,10 @@ impl Lower<'_, '_> {
                         .any(|name| self.mutating_params.contains(&name))
                 })
             };
-        if contextual && !mutates {
+        // Keep the established debug prologue: Odin/LLVM may otherwise report
+        // unmaterialized parameter slots at the first checked-body breakpoint.
+        let debugging = self.resolver.flags.iter().any(|flag| flag == "-debug");
+        if contextual && !mutates && (debugging || !self.allocation_free_leaf(root)) {
             let scratch = format!(
                 "{}pure_scratch_{}",
                 self.prefix,

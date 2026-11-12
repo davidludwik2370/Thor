@@ -1,0 +1,93 @@
+{
+  "broad_compiler_gate": {
+    "methods": 1403,
+    "passed_after_environment_reruns": 1402,
+    "skipped": 1,
+    "skip": "Opt-in Finder launch integration",
+    "groups": [
+      {
+        "tests": 702,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 1896.724964041001,
+        "successful": true
+      },
+      {
+        "tests": 701,
+        "failures": 0,
+        "errors": 2,
+        "skipped": 1,
+        "seconds": 1770.3101771250076,
+        "successful": false
+      }
+    ],
+    "environment_reruns": {
+      "helper_process_cleanup": {
+        "methods": 2,
+        "passed": 2,
+        "reason": "Sandbox blocks ps process-status queries"
+      }
+    }
+  },
+  "followup_debug_sdk_and_semantics": {
+    "methods": 83,
+    "passed": 83
+  },
+  "final_discovery_and_pending_query_gate": {
+    "methods": 74,
+    "passed": 74
+  },
+  "rust_units": {
+    "debug": 57,
+    "release": 57,
+    "failed": 0
+  },
+  "clippy_all_targets_warnings_denied": "passed",
+  "assertion_hygiene": {
+    "methods": 7,
+    "passed": 7
+  },
+  "stdio_tls": {
+    "methods": 122,
+    "passed": 122
+  },
+  "editor_node": {
+    "methods": 141,
+    "passed": 141
+  },
+  "live_codelldb": {
+    "methods": 42,
+    "passed": 42,
+    "initial_regression": "Allocation-free checked helper parameter was unmaterialized at first breakpoint; debug prologue retained to fix it."
+  },
+  "corpus": {
+    "cases": 102,
+    "variants": [
+      "renamed Thor",
+      "idiomatic Thor"
+    ],
+    "valid_cases_each": 95,
+    "expected_invalid_cases_each": 7,
+    "builds": 204,
+    "unexpected": 0,
+    "originals_changed": false
+  },
+  "reference_backend_flake": {
+    "engine": "frozen Python reference Odin #run helper",
+    "signal": "SIGSEGV",
+    "native_rust_result": "3 3",
+    "isolated_retries": 6,
+    "all_retries_passed": true,
+    "each_retry_flags": [
+      "checked",
+      "unchecked"
+    ],
+    "evidence": "upstream/odin-codegen-race/evidence/recurrence-2026-11-11.txt"
+  },
+  "counts_overlap": true,
+  "shared_record_layout_followup": {
+    "methods": 84,
+    "passed": 84
+  }
+}

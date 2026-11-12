@@ -58,6 +58,16 @@ impl Lower<'_, '_> {
         ]))
     }
     pub(super) fn sequence_trait(&mut self, id: NodeId) -> Result<String> {
+        let typ = self.typ(id);
+        let mut base = &typ;
+        while let Type::Nominal(_, inner) = base { base = inner; }
+        match base {
+            Type::Slice(_) | Type::Dynamic(_) | Type::Fixed { .. } | Type::String { .. }
+            | Type::Array { length: Some(_), .. } => return Ok("true".into()),
+            // An array whose length is a type may be enum indexed. Odin's
+            // native trait remains authoritative for this unresolved shape.
+            _ => {}
+        }
         let typ = self.native_type(id)?.finish().text;
         self.meta = true;
         let m = format!("{}meta", self.prefix);
@@ -310,16 +320,36 @@ impl Lower<'_, '_> {
             Some(if pointer { "^" } else { "" }),
             |this| {
                 let addr=this.addressable(base)?;
-                let source_type=this.native_type(base)?.finish().text;
-                this.meta=true;let meta=format!("{}meta",this.source.prefix);
-                let array=format!("({meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}) || {meta}.type_is_fixed_capacity_dynamic_array({source_type}))");
+                let typ = this.typ(base);
+                let mut shape = &typ;
+                while let Type::Nominal(_, inner) = shape { shape = inner; }
+                let known_array = match shape {
+                    Type::Array { .. } | Type::Fixed { .. } => Some(true),
+                    Type::Slice(_) | Type::Dynamic(_) | Type::String { .. } => Some(false),
+                    _ => None,
+                };
+                let native_array = match shape {
+                    Type::Array { .. } => Some(true),
+                    Type::Fixed { .. } | Type::Slice(_) | Type::Dynamic(_) | Type::String { .. } => Some(false),
+                    _ => None,
+                };
+                let source_type = if known_array.is_none() { Some(this.native_type(base)?.finish().text) } else { None };
+                let meta=format!("{}meta",this.source.prefix);
+                let array = if let Some(value) = known_array { value.to_string() } else {
+                    this.meta = true;
+                    let typ = source_type.as_ref().unwrap();
+                    format!("({meta}.type_is_array({typ}) || {meta}.type_is_enumerated_array({typ}) || {meta}.type_is_fixed_capacity_dynamic_array({typ}))")
+                };
                 let trait_=this.sequence_trait(base)?;
                 let len=this.native("len");
                 let readonly_array_capture = index && !pointer
                     && this.source.node(base).kind == "Ident"
                     && this.resolver.symbol(this.reference(base))
                         .is_some_and(|symbol| !this.reference_capture(symbol));
-                let native_array = format!("({meta}.type_is_array({source_type}) || {meta}.type_is_enumerated_array({source_type}))");
+                let native_array = if let Some(value) = native_array { value.to_string() } else {
+                    let typ = source_type.as_ref().unwrap();
+                    format!("({meta}.type_is_array({typ}) || {meta}.type_is_enumerated_array({typ}))")
+                };
                 let borrowed_open = this.g(format!("when {native_array} {{"), id);
                 let borrowed_else = this.g("} else {", id);
                 let borrowed_close = this.g("}", id);
@@ -366,13 +396,19 @@ impl Lower<'_, '_> {
                         }
                     }
                     let op = if pointer { "&" } else { "" };
-                    code.extend([
+                    if trait_ == "true" || trait_ == "false" {
+                        code.extend([
+                            this.g(format!("return {op}({v})["), id),
+                            if trait_ == "true" { Code::concat(normalized) } else { Code::concat(native) },
+                            this.g("]", id),
+                        ]);
+                    } else { code.extend([
                         this.g(format!("when {trait_} {{return {op}({v})["), id),
                         Code::concat(normalized),
                         this.g(format!("]}} else {{return {op}({v})["), id),
                         Code::concat(native),
                         this.g("]}", id),
-                    ]);
+                    ]); }
                     Ok(Code::concat(code))
                 };
                 let value = branch(false, false)?;
@@ -380,13 +416,13 @@ impl Lower<'_, '_> {
                 // Copying it into another local adds work and changes Odin's
                 // aliasing through large immutable value parameters. Slice
                 // headers and side-effectful bases still need a saved value.
-                let value = if readonly_array_capture {
+                let value = if readonly_array_capture && native_array != "false" {
                     let borrowed = branch(false, true)?;
-                    Code::concat([
+                    if native_array == "true" { borrowed } else { Code::concat([
                         borrowed_open, borrowed, borrowed_else, value, borrowed_close,
-                    ])
+                    ]) }
                 } else { value };
-                if addr == "false" {
+                if addr == "false" || array == "false" {
                     if pointer {
                         let error = this.error_token(
                             id,
@@ -426,6 +462,7 @@ impl Lower<'_, '_> {
                         this.g("}", id),
                     ])
                 };
+                if array == "true" { return Ok(referenced); }
                 Ok(Code::concat([
                     this.g(format!("when {array} {{"), id),
                     referenced,

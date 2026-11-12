@@ -4,7 +4,7 @@
 and `thor-python` keeps the Python reference available for comparisons. The current
 acceptance corpus is verified on macOS arm64. See the
 [migration status and comparison commands](docs/rust-migration.md) and the
-[latest performance measurements](docs/rust-migration.md#data-layout-and-hardening-pass-2026-11-11).
+[latest compiler-efficiency follow-up](docs/compiler-efficiency-2026-11.md).
 
 ![Thor](assets/branding/logo-slim.png)
 

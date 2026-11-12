@@ -1,0 +1,3126 @@
+{
+  "compiler_sha256": "3c7b9e5b42692e9f232dd2bc556aa099f44daa04773d6405b040cde17a8fb035",
+  "scope": "Warm sequential -o:speed builds; warm transpile commands at jobs 1 and 4. Profiles are separate and excluded from wall-time samples.",
+  "repeats": 5,
+  "projects": [
+    {
+      "id": 12,
+      "label": "Odin/demo",
+      "source_sha256": {
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/demo/demo.thor": "17f65c74b4b5eb26cf008e9b20c540646d827ec0c757ec9559a08714ce3654b0"
+      },
+      "build": {
+        "odin": {
+          "samples": [
+            2.783418916980736,
+            2.7930289579671808,
+            2.76742499996908,
+            2.7778689159895293,
+            2.760839249996934
+          ],
+          "median_seconds": 2.7778689159895293
+        },
+        "thor": {
+          "samples": [
+            3.435786041954998,
+            3.411274958983995,
+            3.451431708992459,
+            3.390217832988128,
+            3.4030580410035327
+          ],
+          "median_seconds": 3.411274958983995
+        },
+        "idiomatic": {
+          "samples": [
+            4.509747916948982,
+            4.038289040967356,
+            3.9614833330269903,
+            3.957594707957469,
+            4.005531250033528
+          ],
+          "median_seconds": 4.005531250033528
+        }
+      },
+      "transpile": {
+        "1": {
+          "samples": [
+            1.331329291977454,
+            1.3217198749771342,
+            1.3229669169522822,
+            1.3252555840299465,
+            1.3531320830225013
+          ],
+          "median_seconds": 1.3252555840299465
+        },
+        "4": {
+          "samples": [
+            0.9191238330095075,
+            0.9701437079929747,
+            0.9233460419927724,
+            0.9257920410018414,
+            0.9441380409989506
+          ],
+          "median_seconds": 0.9257920410018414
+        }
+      },
+      "profile": {
+        "counters": {
+          "analysis.record_shapes": 4079,
+          "emit.files": 10,
+          "evaluation.helper_preparations": 9,
+          "lookup.calls": 124739,
+          "lookup.canonical_path_resolutions": 242,
+          "lookup.import_directory_resolutions": 328,
+          "lookup.symbol_hits": 653824,
+          "lookup.using_candidates": 106004,
+          "parallel.batches": 12,
+          "parallel.tasks": 998,
+          "parallel.workers": 48,
+          "parser.cache_hits": 999,
+          "parser.nodes": 168723,
+          "parser.source_requests": 999,
+          "permissions.analyses": 3,
+          "permissions.dependency_retries": 1,
+          "permissions.graph_comparisons": 458,
+          "permissions.graph_snapshots": 458,
+          "permissions.helper_analyses": 18,
+          "projection.reference_visits": 1260,
+          "resolver.constructions": 42,
+          "resolver.field_hits": 1928,
+          "resolver.index_builds": 3,
+          "resolver.index_reuses": 39,
+          "resolver.member_hits": 1862,
+          "resolver.path_hits": 2548,
+          "resolver.specialized_hits": 14943
+        },
+        "elapsed_seconds": 4.510518292,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 10,
+            "inclusive_seconds": 0.00077225,
+            "self_seconds": 0.00077225
+          },
+          "analysis.contexts": {
+            "calls": 56,
+            "inclusive_seconds": 0.002515412,
+            "self_seconds": 0.002515412
+          },
+          "analysis.discover_calls": {
+            "calls": 10,
+            "inclusive_seconds": 0.606630498,
+            "self_seconds": 0.35831196
+          },
+          "analysis.discover_expressions": {
+            "calls": 10,
+            "inclusive_seconds": 0.07865583400000001,
+            "self_seconds": 0.010232916999999998
+          },
+          "analysis.discover_record_shapes": {
+            "calls": 12,
+            "inclusive_seconds": 0.016724749,
+            "self_seconds": 0.016724749
+          },
+          "analysis.discover_types": {
+            "calls": 12,
+            "inclusive_seconds": 0.24213879200000005,
+            "self_seconds": 0.24213879200000005
+          },
+          "analysis.inspect_sources": {
+            "calls": 10,
+            "inclusive_seconds": 0.8592208739999999,
+            "self_seconds": 0.0016104580000000299
+          },
+          "analysis.local_borrowing": {
+            "calls": 10,
+            "inclusive_seconds": 0.000443375,
+            "self_seconds": 0.000443375
+          },
+          "analysis.purity": {
+            "calls": 13,
+            "inclusive_seconds": 0.005728873999999999,
+            "self_seconds": 0.005728873999999999
+          },
+          "analysis.purity_calls": {
+            "calls": 9,
+            "inclusive_seconds": 0.001790458,
+            "self_seconds": 0.001790458
+          },
+          "analysis.resolver_setup": {
+            "calls": 42,
+            "inclusive_seconds": 0.29078041400000004,
+            "self_seconds": 0.059517163
+          },
+          "analysis.slice_permissions": {
+            "calls": 21,
+            "inclusive_seconds": 0.092146958,
+            "self_seconds": 0.092146958
+          },
+          "analysis.using_projections": {
+            "calls": 42,
+            "inclusive_seconds": 0.23126325099999998,
+            "self_seconds": 0.23126325099999998
+          },
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 2.935277,
+            "self_seconds": 2.935277
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 4.510515042,
+            "self_seconds": 0.12391229199999998
+          },
+          "emit.file": {
+            "calls": 10,
+            "inclusive_seconds": 0.081142207,
+            "self_seconds": 0.081142207
+          },
+          "emit.publish": {
+            "calls": 10,
+            "inclusive_seconds": 0.023746461,
+            "self_seconds": 0.023461587
+          },
+          "emit.serialize": {
+            "calls": 10,
+            "inclusive_seconds": 0.000284874,
+            "self_seconds": 0.000284874
+          },
+          "evaluation.native_helper": {
+            "calls": 9,
+            "inclusive_seconds": 0.7659304169999999,
+            "self_seconds": 0.10462995899999998
+          },
+          "evaluation.schedule": {
+            "calls": 10,
+            "inclusive_seconds": 0.914092084,
+            "self_seconds": 0.1411457099999999
+          },
+          "lowering.total": {
+            "calls": 10,
+            "inclusive_seconds": 2.014682335,
+            "self_seconds": 0.031531504999999724
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011733583,
+            "self_seconds": 0.011733583
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.013447625,
+            "self_seconds": 0.013447625
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.00960825,
+            "self_seconds": 0.00960825
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.007123667,
+            "self_seconds": 0.007123667
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.03097175,
+            "self_seconds": 0.0007922079999999991
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.045933291,
+            "self_seconds": 0.003227958000000003
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 998,
+            "inclusive_seconds": 0.256759213,
+            "self_seconds": 0.256759213
+          },
+          "parser.decode": {
+            "calls": 998,
+            "inclusive_seconds": 0.20398100100000002,
+            "self_seconds": 0.20398100100000002
+          },
+          "parser.normalize": {
+            "calls": 998,
+            "inclusive_seconds": 0.17123798000000007,
+            "self_seconds": 0.17123798000000007
+          },
+          "parser.source": {
+            "calls": 998,
+            "inclusive_seconds": 0.7362657080000004,
+            "self_seconds": 0.10428751400000005
+          }
+        }
+      }
+    },
+    {
+      "id": 23,
+      "label": "Odin/hilo",
+      "source_sha256": {
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/hilo/hilo.thor": "e45df9d52958940b398f6bbca08b9498fa9dbca8165678a452ea28eba9fa9c13",
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/hilo/original/hilo.thor": "24f65d4f85fe49dd57aee9007e23952c7ad414171ada3916017a84228af5760f"
+      },
+      "build": {
+        "odin": {
+          "samples": [
+            1.28883458400378,
+            1.270490917027928,
+            1.2842455410282128,
+            1.2584270000224933,
+            1.259615707967896
+          ],
+          "median_seconds": 1.270490917027928
+        },
+        "thor": {
+          "samples": [
+            1.2897860840312205,
+            1.2905383750330657,
+            1.2964118749951012,
+            1.299476083018817,
+            1.2868614579783753
+          ],
+          "median_seconds": 1.2905383750330657
+        },
+        "idiomatic": {
+          "samples": [
+            1.5781054580002092,
+            1.6033252920024097,
+            1.6166825410327874,
+            1.5988775829900987,
+            1.6257849999819882
+          ],
+          "median_seconds": 1.6033252920024097
+        }
+      },
+      "transpile": {
+        "1": {
+          "samples": [
+            0.5901053340057842,
+            0.5945674580289051,
+            0.589735500048846,
+            0.6173402079730295,
+            0.6210768329910934
+          ],
+          "median_seconds": 0.5945674580289051
+        },
+        "4": {
+          "samples": [
+            0.3233749999781139,
+            0.3179719999898225,
+            0.32913500000722706,
+            0.31241545802913606,
+            0.3089080830104649
+          ],
+          "median_seconds": 0.3179719999898225
+        }
+      },
+      "profile": {
+        "counters": {
+          "analysis.record_shapes": 93,
+          "emit.files": 1,
+          "lookup.calls": 1245,
+          "lookup.canonical_path_resolutions": 4,
+          "lookup.import_directory_resolutions": 33,
+          "lookup.symbol_hits": 11487,
+          "parallel.batches": 2,
+          "parallel.tasks": 185,
+          "parallel.workers": 8,
+          "parser.cache_hits": 186,
+          "parser.nodes": 112805,
+          "parser.source_requests": 186,
+          "permissions.analyses": 1,
+          "permissions.graph_comparisons": 16,
+          "permissions.graph_snapshots": 16,
+          "permissions.reuses": 1,
+          "resolver.constructions": 5,
+          "resolver.field_hits": 8,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3,
+          "resolver.member_hits": 40,
+          "resolver.path_hits": 20,
+          "resolver.specialized_hits": 368
+        },
+        "elapsed_seconds": 1.5769162909999999,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.875e-06,
+            "self_seconds": 1.875e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 9.125e-06,
+            "self_seconds": 9.125e-06
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.10661425,
+            "self_seconds": 0.020618707999999986
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.006924375,
+            "self_seconds": 5.5582999999999674e-05
+          },
+          "analysis.discover_record_shapes": {
+            "calls": 2,
+            "inclusive_seconds": 0.000458417,
+            "self_seconds": 0.000458417
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.140896667,
+            "self_seconds": 0.140896667
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.187718083,
+            "self_seconds": 4.600000000001825e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.208e-06,
+            "self_seconds": 1.208e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 2.333e-06,
+            "self_seconds": 2.333e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.023429210000000002,
+            "self_seconds": 0.023401002
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 0.002234833,
+            "self_seconds": 0.002234833
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 2.8207999999999998e-05,
+            "self_seconds": 2.8207999999999998e-05
+          },
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 1.266968625,
+            "self_seconds": 1.266968625
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 1.5769131669999998,
+            "self_seconds": 0.08519229199999989
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.002429166,
+            "self_seconds": 0.002429166
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.001804333,
+            "self_seconds": 0.001802542
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 1.791e-06,
+            "self_seconds": 1.791e-06
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.01391275,
+            "self_seconds": 0.013897999
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.207815708,
+            "self_seconds": 0.001930250999999994
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011628542,
+            "self_seconds": 0.011628542
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.000948542,
+            "self_seconds": 0.000948542
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.0007015,
+            "self_seconds": 0.0007015
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.000442959,
+            "self_seconds": 0.000442959
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.002176792,
+            "self_seconds": 8.379099999999973e-05
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.016936542,
+            "self_seconds": 0.003131207999999998
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 185,
+            "inclusive_seconds": 0.18067721199999998,
+            "self_seconds": 0.18067721199999998
+          },
+          "parser.decode": {
+            "calls": 185,
+            "inclusive_seconds": 0.14254879199999998,
+            "self_seconds": 0.14254879199999998
+          },
+          "parser.normalize": {
+            "calls": 185,
+            "inclusive_seconds": 0.123547373,
+            "self_seconds": 0.123547373
+          },
+          "parser.source": {
+            "calls": 185,
+            "inclusive_seconds": 0.4689893699999999,
+            "self_seconds": 0.02221599300000001
+          }
+        }
+      }
+    },
+    {
+      "id": 38,
+      "label": "Odin/poker",
+      "source_sha256": {
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker/poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker/judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker/simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker/poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker/ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/poker/ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+      },
+      "build": {
+        "odin": {
+          "samples": [
+            1.428555583988782,
+            1.4053982910118066,
+            1.4329219160135835,
+            1.3994228329975158,
+            1.4012752500129864
+          ],
+          "median_seconds": 1.4053982910118066
+        },
+        "thor": {
+          "samples": [
+            1.4235635420191102,
+            1.4194291660096496,
+            1.4085367920342833,
+            1.4731750409700908,
+            1.4203953340183944
+          ],
+          "median_seconds": 1.4203953340183944
+        },
+        "idiomatic": {
+          "samples": [
+            1.87541700003203,
+            1.8811783749843016,
+            1.8493723329738714,
+            1.8545864999759942,
+            1.8381932909833267
+          ],
+          "median_seconds": 1.8545864999759942
+        }
+      },
+      "transpile": {
+        "1": {
+          "samples": [
+            0.6935798749909736,
+            0.6877940829726867,
+            0.6857083750073798,
+            0.6843149170163088,
+            0.6865495000383817
+          ],
+          "median_seconds": 0.6865495000383817
+        },
+        "4": {
+          "samples": [
+            0.40400358295300975,
+            0.4005737499683164,
+            0.3953603340196423,
+            0.39378162496723235,
+            0.38973474997328594
+          ],
+          "median_seconds": 0.3953603340196423
+        }
+      },
+      "profile": {
+        "counters": {
+          "analysis.record_shapes": 248,
+          "emit.files": 1,
+          "lookup.calls": 12684,
+          "lookup.canonical_path_resolutions": 22,
+          "lookup.import_directory_resolutions": 48,
+          "lookup.symbol_hits": 80884,
+          "parallel.batches": 3,
+          "parallel.tasks": 354,
+          "parallel.workers": 12,
+          "parser.cache_hits": 355,
+          "parser.nodes": 120253,
+          "parser.source_requests": 355,
+          "permissions.analyses": 2,
+          "permissions.dependency_retries": 1,
+          "permissions.graph_comparisons": 110,
+          "permissions.graph_snapshots": 110,
+          "permissions.reuses": 1,
+          "resolver.constructions": 6,
+          "resolver.field_hits": 1029,
+          "resolver.index_builds": 3,
+          "resolver.index_reuses": 3,
+          "resolver.member_hits": 600,
+          "resolver.path_hits": 2339,
+          "resolver.specialized_hits": 5438
+        },
+        "elapsed_seconds": 1.8704700829999998,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 7.95e-05,
+            "self_seconds": 7.95e-05
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 3.2915999999999995e-05,
+            "self_seconds": 3.2915999999999995e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.172472916,
+            "self_seconds": 0.042962
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.008092042,
+            "self_seconds": 0.000133167
+          },
+          "analysis.discover_record_shapes": {
+            "calls": 3,
+            "inclusive_seconds": 0.0006692919999999999,
+            "self_seconds": 0.0006692919999999999
+          },
+          "analysis.discover_types": {
+            "calls": 3,
+            "inclusive_seconds": 0.15006554099999997,
+            "self_seconds": 0.15006554099999997
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.256748125,
+            "self_seconds": 9.48339999999881e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 2e-05,
+            "self_seconds": 2e-05
+          },
+          "analysis.purity": {
+            "calls": 4,
+            "inclusive_seconds": 0.000757042,
+            "self_seconds": 0.000757042
+          },
+          "analysis.resolver_setup": {
+            "calls": 6,
+            "inclusive_seconds": 0.042489831000000006,
+            "self_seconds": 0.042444789000000004
+          },
+          "analysis.slice_permissions": {
+            "calls": 2,
+            "inclusive_seconds": 0.019745251,
+            "self_seconds": 0.019745251
+          },
+          "analysis.using_projections": {
+            "calls": 6,
+            "inclusive_seconds": 4.5042e-05,
+            "self_seconds": 4.5042e-05
+          },
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 1.479685417,
+            "self_seconds": 1.479685417
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 1.870467,
+            "self_seconds": 0.09235304100000019
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.01111625,
+            "self_seconds": 0.01111625
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.002216542,
+            "self_seconds": 0.002151834
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 6.4708e-05,
+            "self_seconds": 6.4708e-05
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.002883375,
+            "self_seconds": 0.0028511680000000003
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.27529875,
+            "self_seconds": 0.002065415999999931
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011714292,
+            "self_seconds": 0.011714292
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.003516625,
+            "self_seconds": 0.003516625
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.002542333,
+            "self_seconds": 0.002542333
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.002049625,
+            "self_seconds": 0.002049625
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.008285667,
+            "self_seconds": 0.00017708400000000096
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.023129792,
+            "self_seconds": 0.003129833000000002
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 354,
+            "inclusive_seconds": 0.190130037,
+            "self_seconds": 0.190130037
+          },
+          "parser.decode": {
+            "calls": 354,
+            "inclusive_seconds": 0.14904616000000004,
+            "self_seconds": 0.14904616000000004
+          },
+          "parser.normalize": {
+            "calls": 354,
+            "inclusive_seconds": 0.114248002,
+            "self_seconds": 0.114248002
+          },
+          "parser.source": {
+            "calls": 354,
+            "inclusive_seconds": 0.488515384,
+            "self_seconds": 0.035091185
+          }
+        }
+      }
+    },
+    {
+      "id": 68,
+      "label": "Odin/ui_demo",
+      "source_sha256": {
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin/ui_demo/ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+      },
+      "build": {
+        "odin": {
+          "samples": [
+            1.715541707992088,
+            1.7089345839922316,
+            1.7095898750121705,
+            1.7499032499617897,
+            1.7321455829660408
+          ],
+          "median_seconds": 1.715541707992088
+        },
+        "thor": {
+          "samples": [
+            1.8023570829536766,
+            1.797999875037931,
+            1.7960798330022953,
+            1.8072204579948448,
+            1.7980839170049876
+          ],
+          "median_seconds": 1.7980839170049876
+        },
+        "idiomatic": {
+          "samples": [
+            3.0066827079863288,
+            2.9833923330297694,
+            2.9706683750264347,
+            2.9948640830116346,
+            3.0311774159781635
+          ],
+          "median_seconds": 2.9948640830116346
+        }
+      },
+      "transpile": {
+        "1": {
+          "samples": [
+            1.5871844590292312,
+            1.5648575000232086,
+            1.6107617079978809,
+            1.5755134159699082,
+            1.5637794159702025
+          ],
+          "median_seconds": 1.5755134159699082
+        },
+        "4": {
+          "samples": [
+            1.216845957969781,
+            1.2440652499790303,
+            1.2201166249578819,
+            1.2183007079875097,
+            1.2116377080092207
+          ],
+          "median_seconds": 1.2183007079875097
+        }
+      },
+      "profile": {
+        "counters": {
+          "analysis.record_shapes": 1559,
+          "emit.files": 1,
+          "lookup.calls": 39407,
+          "lookup.canonical_path_resolutions": 12,
+          "lookup.import_directory_resolutions": 141,
+          "lookup.symbol_hits": 3784643,
+          "parallel.batches": 5,
+          "parallel.tasks": 128,
+          "parallel.workers": 20,
+          "parser.cache_hits": 129,
+          "parser.nodes": 157344,
+          "parser.source_requests": 129,
+          "permissions.analyses": 3,
+          "permissions.dependency_retries": 2,
+          "permissions.graph_comparisons": 410,
+          "permissions.graph_snapshots": 410,
+          "permissions.reuses": 1,
+          "resolver.constructions": 8,
+          "resolver.field_hits": 87280,
+          "resolver.index_builds": 5,
+          "resolver.index_reuses": 3,
+          "resolver.member_hits": 10693,
+          "resolver.path_hits": 38452,
+          "resolver.specialized_hits": 58279
+        },
+        "elapsed_seconds": 3.032981042,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.667e-06,
+            "self_seconds": 1.667e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 0.00010062499999999999,
+            "self_seconds": 0.00010062499999999999
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.896956209,
+            "self_seconds": 0.3282338789999999
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.016146875,
+            "self_seconds": 0.00021770800000000048
+          },
+          "analysis.discover_record_shapes": {
+            "calls": 5,
+            "inclusive_seconds": 0.007597166000000001,
+            "self_seconds": 0.007597166000000001
+          },
+          "analysis.discover_types": {
+            "calls": 5,
+            "inclusive_seconds": 0.20969079100000002,
+            "self_seconds": 0.20969079100000002
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 1.044637917,
+            "self_seconds": 0.00011125000000000718
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.166e-06,
+            "self_seconds": 1.166e-06
+          },
+          "analysis.purity": {
+            "calls": 6,
+            "inclusive_seconds": 4.874e-06,
+            "self_seconds": 4.874e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 8,
+            "inclusive_seconds": 0.085303374,
+            "self_seconds": 0.085193833
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.41351516600000005,
+            "self_seconds": 0.41351516600000005
+          },
+          "analysis.using_projections": {
+            "calls": 8,
+            "inclusive_seconds": 0.000109541,
+            "self_seconds": 0.000109541
+          },
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 1.773750833,
+            "self_seconds": 1.773750833
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 3.032977708,
+            "self_seconds": 0.11299495800000026
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.045331459,
+            "self_seconds": 0.045331459
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.002454833,
+            "self_seconds": 0.002452624
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 2.209e-06,
+            "self_seconds": 2.209e-06
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.020061166,
+            "self_seconds": 0.019989542
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 1.115613792,
+            "self_seconds": 0.003060291999999576
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.011537041,
+            "self_seconds": 0.011537041
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.006789375,
+            "self_seconds": 0.006789375
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.004889,
+            "self_seconds": 0.004889
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.00384,
+            "self_seconds": 0.00384
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.015861583,
+            "self_seconds": 0.0003432079999999976
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.030618125,
+            "self_seconds": 0.003219501000000003
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 128,
+            "inclusive_seconds": 0.24922262400000006,
+            "self_seconds": 0.24922262400000006
+          },
+          "parser.decode": {
+            "calls": 128,
+            "inclusive_seconds": 0.19899896599999997,
+            "self_seconds": 0.19899896599999997
+          },
+          "parser.normalize": {
+            "calls": 128,
+            "inclusive_seconds": 0.16268542300000002,
+            "self_seconds": 0.16268542300000002
+          },
+          "parser.source": {
+            "calls": 128,
+            "inclusive_seconds": 0.6349473219999999,
+            "self_seconds": 0.024040309000000003
+          }
+        }
+      }
+    },
+    {
+      "id": 80,
+      "label": "Odin_Projects/Cricles_on_dots",
+      "source_sha256": {
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin_Projects/Cricles_on_dots/cricles_on_dots.thor": "ed45dd74341ea0ec47fe9bba139918d36d749234c0b5dd664ae5faa5fdce2feb"
+      },
+      "build": {
+        "odin": {
+          "samples": [
+            1.244450542028062,
+            1.2749397089937702,
+            1.2729525409522466,
+            1.2532073329784907,
+            1.2783549589803442
+          ],
+          "median_seconds": 1.2729525409522466
+        },
+        "thor": {
+          "samples": [
+            1.2948761659790762,
+            1.2834922499605455,
+            1.307084667030722,
+            1.2925370830344036,
+            1.2832838750327937
+          ],
+          "median_seconds": 1.2925370830344036
+        },
+        "idiomatic": {
+          "samples": [
+            1.5669396659941413,
+            1.520085999974981,
+            1.5181397080305032,
+            1.5178445419878699,
+            1.5116944999899715
+          ],
+          "median_seconds": 1.5181397080305032
+        }
+      },
+      "transpile": {
+        "1": {
+          "samples": [
+            0.4041746669681743,
+            0.4033869589911774,
+            0.3988605830236338,
+            0.39964833395788446,
+            0.41532270901370794
+          ],
+          "median_seconds": 0.4033869589911774
+        },
+        "4": {
+          "samples": [
+            0.25520841602701694,
+            0.2440107089933008,
+            0.2529497079667635,
+            0.2462660830351524,
+            0.24606212502112612
+          ],
+          "median_seconds": 0.2462660830351524
+        }
+      },
+      "profile": {
+        "counters": {
+          "analysis.record_shapes": 86,
+          "emit.files": 1,
+          "lookup.calls": 11749,
+          "lookup.canonical_path_resolutions": 4,
+          "lookup.import_directory_resolutions": 19,
+          "lookup.symbol_hits": 74519,
+          "lookup.using_candidates": 7277,
+          "parallel.batches": 2,
+          "parallel.tasks": 29,
+          "parallel.workers": 8,
+          "parser.cache_hits": 30,
+          "parser.nodes": 68198,
+          "parser.source_requests": 30,
+          "permissions.analyses": 1,
+          "permissions.graph_comparisons": 9,
+          "permissions.graph_snapshots": 9,
+          "permissions.reuses": 1,
+          "projection.reference_visits": 3760,
+          "resolver.constructions": 5,
+          "resolver.field_hits": 161,
+          "resolver.index_builds": 2,
+          "resolver.index_reuses": 3,
+          "resolver.member_hits": 119,
+          "resolver.path_hits": 112,
+          "resolver.specialized_hits": 2564
+        },
+        "elapsed_seconds": 1.5351493330000001,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 1.584e-06,
+            "self_seconds": 1.584e-06
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 2.2499999999999998e-05,
+            "self_seconds": 2.2499999999999998e-05
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.050667917,
+            "self_seconds": 0.020926959999999994
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.010972375,
+            "self_seconds": 8.14170000000003e-05
+          },
+          "analysis.discover_record_shapes": {
+            "calls": 2,
+            "inclusive_seconds": 0.0001915,
+            "self_seconds": 0.0001915
+          },
+          "analysis.discover_types": {
+            "calls": 2,
+            "inclusive_seconds": 0.09533612500000001,
+            "self_seconds": 0.09533612500000001
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.15272,
+            "self_seconds": 2.1957999999988598e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 1.166e-06,
+            "self_seconds": 1.166e-06
+          },
+          "analysis.purity": {
+            "calls": 3,
+            "inclusive_seconds": 1.416e-06,
+            "self_seconds": 1.416e-06
+          },
+          "analysis.resolver_setup": {
+            "calls": 5,
+            "inclusive_seconds": 0.028972499,
+            "self_seconds": 0.017118998000000003
+          },
+          "analysis.slice_permissions": {
+            "calls": 1,
+            "inclusive_seconds": 0.011983208,
+            "self_seconds": 0.011983208
+          },
+          "analysis.using_projections": {
+            "calls": 5,
+            "inclusive_seconds": 0.011853501000000002,
+            "self_seconds": 0.011853501000000002
+          },
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 1.286753416,
+            "self_seconds": 1.286753416
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 1.535147458,
+            "self_seconds": 0.052461125
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.006857125,
+            "self_seconds": 0.006857125
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.001176792,
+            "self_seconds": 0.00117625
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 5.42e-07,
+            "self_seconds": 5.42e-07
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.010815958,
+            "self_seconds": 0.008474375
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.175403375,
+            "self_seconds": 0.0013547500000000157
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.0117315,
+            "self_seconds": 0.0117315
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.002391292,
+            "self_seconds": 0.002391292
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.001734958,
+            "self_seconds": 0.001734958
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.00129375,
+            "self_seconds": 0.00129375
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.005561583,
+            "self_seconds": 0.00014158300000000068
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.020529542,
+            "self_seconds": 0.0032364590000000006
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 29,
+            "inclusive_seconds": 0.10772649900000002,
+            "self_seconds": 0.10772649900000002
+          },
+          "parser.decode": {
+            "calls": 29,
+            "inclusive_seconds": 0.08730325099999998,
+            "self_seconds": 0.08730325099999998
+          },
+          "parser.normalize": {
+            "calls": 29,
+            "inclusive_seconds": 0.073582461,
+            "self_seconds": 0.073582461
+          },
+          "parser.source": {
+            "calls": 29,
+            "inclusive_seconds": 0.277270623,
+            "self_seconds": 0.008658412000000008
+          }
+        }
+      }
+    },
+    {
+      "id": 82,
+      "label": "Odin_Projects/Othello_pvai",
+      "source_sha256": {
+        "/Users/davidludwik/Thor/thor_test/idiomatic/Odin_Projects/Othello_pvai/othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+      },
+      "build": {
+        "odin": {
+          "samples": [
+            1.7749697089893743,
+            1.7895864580059424,
+            1.814977333007846,
+            1.8063964999746531,
+            1.8329286249936558
+          ],
+          "median_seconds": 1.8063964999746531
+        },
+        "thor": {
+          "samples": [
+            2.0067886249744333,
+            1.9906563750118949,
+            2.0264644999988377,
+            2.006294708000496,
+            2.0275660830084234
+          ],
+          "median_seconds": 2.0067886249744333
+        },
+        "idiomatic": {
+          "samples": [
+            3.212020000035409,
+            3.175046874966938,
+            3.1472455830080435,
+            3.220557583961636,
+            3.1549191249650903
+          ],
+          "median_seconds": 3.175046874966938
+        }
+      },
+      "transpile": {
+        "1": {
+          "samples": [
+            1.4596254579955712,
+            1.4492548330454156,
+            1.4541356659610756,
+            1.4643890829756856,
+            1.4386873749899678
+          ],
+          "median_seconds": 1.4541356659610756
+        },
+        "4": {
+          "samples": [
+            1.0611799170146696,
+            1.0562394590233453,
+            1.073661833012011,
+            1.0569395829807036,
+            1.0715583330020308
+          ],
+          "median_seconds": 1.0611799170146696
+        }
+      },
+      "profile": {
+        "counters": {
+          "analysis.record_shapes": 952,
+          "emit.files": 1,
+          "lookup.calls": 251506,
+          "lookup.canonical_path_resolutions": 50,
+          "lookup.import_directory_resolutions": 160,
+          "lookup.symbol_hits": 1104184,
+          "lookup.using_candidates": 96159,
+          "parallel.batches": 4,
+          "parallel.tasks": 476,
+          "parallel.workers": 16,
+          "parser.cache_hits": 477,
+          "parser.nodes": 181914,
+          "parser.source_requests": 477,
+          "permissions.analyses": 3,
+          "permissions.dependency_retries": 2,
+          "permissions.graph_comparisons": 405,
+          "permissions.graph_snapshots": 405,
+          "permissions.reuses": 1,
+          "projection.reference_visits": 2296,
+          "resolver.constructions": 7,
+          "resolver.field_hits": 2401,
+          "resolver.index_builds": 4,
+          "resolver.index_reuses": 3,
+          "resolver.member_hits": 3112,
+          "resolver.path_hits": 3148,
+          "resolver.specialized_hits": 19112
+        },
+        "elapsed_seconds": 3.213999334,
+        "engine": "rust",
+        "schema": 1,
+        "stages": {
+          "analysis.borrow_model": {
+            "calls": 1,
+            "inclusive_seconds": 0.001601917,
+            "self_seconds": 0.001601917
+          },
+          "analysis.contexts": {
+            "calls": 2,
+            "inclusive_seconds": 0.000134959,
+            "self_seconds": 0.000134959
+          },
+          "analysis.discover_calls": {
+            "calls": 1,
+            "inclusive_seconds": 0.566098917,
+            "self_seconds": 0.281492416
+          },
+          "analysis.discover_expressions": {
+            "calls": 1,
+            "inclusive_seconds": 0.017307834,
+            "self_seconds": 0.00036129200000000264
+          },
+          "analysis.discover_record_shapes": {
+            "calls": 4,
+            "inclusive_seconds": 0.004156166,
+            "self_seconds": 0.004156166
+          },
+          "analysis.discover_types": {
+            "calls": 4,
+            "inclusive_seconds": 0.24477579200000005,
+            "self_seconds": 0.24477579200000005
+          },
+          "analysis.inspect_sources": {
+            "calls": 1,
+            "inclusive_seconds": 0.716132709,
+            "self_seconds": 9.19580000000586e-05
+          },
+          "analysis.local_borrowing": {
+            "calls": 1,
+            "inclusive_seconds": 0.0001005,
+            "self_seconds": 0.0001005
+          },
+          "analysis.purity": {
+            "calls": 5,
+            "inclusive_seconds": 0.007115375,
+            "self_seconds": 0.007115375
+          },
+          "analysis.resolver_setup": {
+            "calls": 7,
+            "inclusive_seconds": 0.11294112599999999,
+            "self_seconds": 0.08469796099999999
+          },
+          "analysis.slice_permissions": {
+            "calls": 3,
+            "inclusive_seconds": 0.07505062500000001,
+            "self_seconds": 0.07505062500000001
+          },
+          "analysis.using_projections": {
+            "calls": 7,
+            "inclusive_seconds": 0.028243164999999997,
+            "self_seconds": 0.028243164999999997
+          },
+          "backend.final": {
+            "calls": 1,
+            "inclusive_seconds": 2.168757875,
+            "self_seconds": 2.168757875
+          },
+          "command": {
+            "calls": 1,
+            "inclusive_seconds": 3.213995833,
+            "self_seconds": 0.1323379990000002
+          },
+          "emit.file": {
+            "calls": 1,
+            "inclusive_seconds": 0.067730333,
+            "self_seconds": 0.067730333
+          },
+          "emit.publish": {
+            "calls": 1,
+            "inclusive_seconds": 0.0044165,
+            "self_seconds": 0.003794833
+          },
+          "emit.serialize": {
+            "calls": 1,
+            "inclusive_seconds": 0.000621667,
+            "self_seconds": 0.000621667
+          },
+          "evaluation.schedule": {
+            "calls": 1,
+            "inclusive_seconds": 0.061264792,
+            "self_seconds": 0.057061625
+          },
+          "lowering.total": {
+            "calls": 1,
+            "inclusive_seconds": 0.861273459,
+            "self_seconds": 0.004242874999999979
+          },
+          "parser.bootstrap": {
+            "calls": 1,
+            "inclusive_seconds": 0.012206125,
+            "self_seconds": 0.012206125
+          },
+          "parser.cache_validation": {
+            "calls": 1,
+            "inclusive_seconds": 0.015484042,
+            "self_seconds": 0.015484042
+          },
+          "parser.decode": {
+            "calls": 1,
+            "inclusive_seconds": 0.011113375,
+            "self_seconds": 0.011113375
+          },
+          "parser.normalize": {
+            "calls": 1,
+            "inclusive_seconds": 0.008711584,
+            "self_seconds": 0.008711584
+          },
+          "parser.source": {
+            "calls": 1,
+            "inclusive_seconds": 0.036140083,
+            "self_seconds": 0.0008310820000000038
+          },
+          "project.load": {
+            "calls": 1,
+            "inclusive_seconds": 0.0516265,
+            "self_seconds": 0.003280291999999997
+          }
+        },
+        "thor_version": "0.41.6",
+        "worker_stages": {
+          "parser.cache_validation": {
+            "calls": 476,
+            "inclusive_seconds": 0.277534512,
+            "self_seconds": 0.277534512
+          },
+          "parser.decode": {
+            "calls": 476,
+            "inclusive_seconds": 0.21824578900000005,
+            "self_seconds": 0.21824578900000005
+          },
+          "parser.normalize": {
+            "calls": 476,
+            "inclusive_seconds": 0.15701742399999996,
+            "self_seconds": 0.15701742399999996
+          },
+          "parser.source": {
+            "calls": 476,
+            "inclusive_seconds": 0.7023592690000001,
+            "self_seconds": 0.04956154399999999
+          }
+        }
+      }
+    }
+  ],
+  "validation": {
+    "broad_compiler_gate": {
+      "methods": 1403,
+      "passed_after_environment_reruns": 1402,
+      "skipped": 1,
+      "skip": "Opt-in Finder launch integration",
+      "groups": [
+        {
+          "tests": 702,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "seconds": 1896.724964041001,
+          "successful": true
+        },
+        {
+          "tests": 701,
+          "failures": 0,
+          "errors": 2,
+          "skipped": 1,
+          "seconds": 1770.3101771250076,
+          "successful": false
+        }
+      ],
+      "environment_reruns": {
+        "helper_process_cleanup": {
+          "methods": 2,
+          "passed": 2,
+          "reason": "Sandbox blocks ps process-status queries"
+        }
+      }
+    },
+    "followup_debug_sdk_and_semantics": {
+      "methods": 83,
+      "passed": 83
+    },
+    "final_discovery_and_pending_query_gate": {
+      "methods": 74,
+      "passed": 74
+    },
+    "rust_units": {
+      "debug": 57,
+      "release": 57,
+      "failed": 0
+    },
+    "clippy_all_targets_warnings_denied": "passed",
+    "assertion_hygiene": {
+      "methods": 7,
+      "passed": 7
+    },
+    "stdio_tls": {
+      "methods": 122,
+      "passed": 122
+    },
+    "editor_node": {
+      "methods": 141,
+      "passed": 141
+    },
+    "live_codelldb": {
+      "methods": 42,
+      "passed": 42,
+      "initial_regression": "Allocation-free checked helper parameter was unmaterialized at first breakpoint; debug prologue retained to fix it."
+    },
+    "corpus": {
+      "cases": 102,
+      "variants": [
+        "renamed Thor",
+        "idiomatic Thor"
+      ],
+      "valid_cases_each": 95,
+      "expected_invalid_cases_each": 7,
+      "builds": 204,
+      "unexpected": 0,
+      "originals_changed": false
+    },
+    "reference_backend_flake": {
+      "engine": "frozen Python reference Odin #run helper",
+      "signal": "SIGSEGV",
+      "native_rust_result": "3 3",
+      "isolated_retries": 6,
+      "all_retries_passed": true,
+      "each_retry_flags": [
+        "checked",
+        "unchecked"
+      ],
+      "evidence": "upstream/odin-codegen-race/evidence/recurrence-2026-11-11.txt"
+    },
+    "counts_overlap": true,
+    "shared_record_layout_followup": {
+      "methods": 84,
+      "passed": 84
+    }
+  },
+  "runtime": [
+    {
+      "id": 23,
+      "label": "Odin/hilo",
+      "samples": {
+        "odin": [
+          1.022304832993541,
+          1.011341082979925,
+          1.0405416669673286,
+          1.007854666968342,
+          1.0164119169930927
+        ],
+        "thor": [
+          1.5934496249537915,
+          1.0539340000250377,
+          1.0487134589930065,
+          1.0521613750024699,
+          1.0553695000126027
+        ],
+        "idiomatic": [
+          1.180381290963851,
+          1.0547762080095708,
+          1.0502097500138916,
+          1.0501332500134595,
+          1.086153333017137
+        ]
+      },
+      "medians": {
+        "odin": 1.0164119169930927,
+        "thor": 1.0539340000250377,
+        "idiomatic": 1.0547762080095708
+      }
+    },
+    {
+      "id": 24,
+      "label": "Odin/hilo/original",
+      "samples": {
+        "odin": [
+          1.0615172079997137,
+          1.0787221250357106,
+          1.0564236660138704,
+          1.0623480409849435,
+          1.057213291991502
+        ],
+        "thor": [
+          1.1869963329518214,
+          1.0560744159738533,
+          1.0545270830043592,
+          1.0563078340492211,
+          1.0570817499537952
+        ],
+        "idiomatic": [
+          1.1956553329946473,
+          1.0592025420046411,
+          1.0742930420092307,
+          1.056425417016726,
+          1.0613516250159591
+        ]
+      },
+      "medians": {
+        "odin": 1.0615172079997137,
+        "thor": 1.0563078340492211,
+        "idiomatic": 1.0613516250159591
+      }
+    },
+    {
+      "id": 38,
+      "label": "Odin/poker",
+      "samples": {
+        "odin": [
+          0.21645729104056954,
+          0.2123403750010766,
+          0.21153008402325213,
+          0.21306262497091666,
+          0.212017499958165
+        ],
+        "thor": [
+          0.35399274999508634,
+          0.21641254104906693,
+          0.21913570794276893,
+          0.21979462500894442,
+          0.22032545797992498
+        ],
+        "idiomatic": [
+          0.3916032910346985,
+          0.2197605000110343,
+          0.21811087505193427,
+          0.21849166695028543,
+          0.21951537497807294
+        ]
+      },
+      "medians": {
+        "odin": 0.2123403750010766,
+        "thor": 0.21979462500894442,
+        "idiomatic": 0.21951537497807294
+      }
+    },
+    {
+      "id": 41,
+      "label": "Odin/poker/ref/poker_single_thread.odin",
+      "samples": {
+        "odin": [
+          0.2104589170194231,
+          0.20807229104684666,
+          0.20872570801293477,
+          0.2088540840195492,
+          0.21171620796667412
+        ],
+        "thor": [
+          0.35589937499025837,
+          0.21596850000787526,
+          0.21589137497358024,
+          0.21731716598151252,
+          0.21703979204175994
+        ],
+        "idiomatic": [
+          0.3555552079924382,
+          0.2174005419947207,
+          0.2168601670418866,
+          0.21923412499018013,
+          0.21741566702257842
+        ]
+      },
+      "medians": {
+        "odin": 0.2088540840195492,
+        "thor": 0.21703979204175994,
+        "idiomatic": 0.21741566702257842
+      }
+    }
+  ],
+  "paired_refinements": {
+    "pending-cache": {
+      "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+      "platform": "macOS-15.6-arm64-arm-64bit",
+      "engines": {
+        "before": "/tmp/thor-before-pending-cache",
+        "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+      },
+      "profiling": false,
+      "projects": [
+        {
+          "name": "ui_demo",
+          "source_sha256": {
+            "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+          },
+          "cold": {
+            "before": {
+              "seconds": 1.5618621250032447,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 1.34222900000168,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 1.3181227500317618,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3138343330356292,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.325590624997858,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3101442080223933,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3263807910261676,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3340600419905968,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3362528329598717,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3503308750223368,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3536679579992779,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3276457079919055,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 1.3117663750308566,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3344253749819472,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3430630420334637,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.348930708016269,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2962966249906458,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.323391041951254,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3225424999836832,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.305169166997075,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3034334589610808,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.311214999994263,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 1.3270132495090365,
+            "after": 1.31715443750727
+          }
+        },
+        {
+          "name": "Othello_pvai",
+          "source_sha256": {
+            "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+          },
+          "cold": {
+            "before": {
+              "seconds": 1.1616734170238487,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 1.1153049169806764,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 1.0922058339929208,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0672903750091791,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1446422499720939,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1437940829782747,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0898274580249563,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1152734589995816,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1305675830226392,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0976602080045268,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1760804169462062,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.128639375034254,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 1.0958580839796923,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.089981125027407,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2225668749888428,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0955949160270393,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1427400829852559,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0719875420327298,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.065512333996594,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1088197089848109,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0669725409825332,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.1174822920002043,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 1.1219564170169178,
+            "after": 1.0957265000033658
+          }
+        }
+      ]
+    },
+    "shared-layout": {
+      "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+      "platform": "macOS-15.6-arm64-arm-64bit",
+      "engines": {
+        "before": "/tmp/thor-before-shared-layouts",
+        "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+      },
+      "profiling": false,
+      "projects": [
+        {
+          "name": "ui_demo",
+          "source_sha256": {
+            "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+          },
+          "cold": {
+            "before": {
+              "seconds": 1.8255564999999478,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 1.2619255839963444,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 1.2687243329710327,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.264090207987465,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2882875420036726,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.3259945420431904,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.298865124990698,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2659823750145733,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2946361250360496,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2798000000184402,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2736902500037104,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.277497000002768,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 1.2567329160519876,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2287655420368537,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2121056250180118,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.203258665977046,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.226927416981198,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.233523290953599,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2241762080229819,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2202925000456162,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.2208011249895208,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.208206083974801,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 1.278648500010604,
+            "after": 1.2224886665062513
+          }
+        },
+        {
+          "name": "Othello_pvai",
+          "source_sha256": {
+            "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+          },
+          "cold": {
+            "before": {
+              "seconds": 1.1142687079845928,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 1.1168438750319183,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 1.0691244999761693,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0842100829468109,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.067119500017725,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0943574160337448,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0822438329923898,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0735819159890525,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0606571669923142,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.08798808301799,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0806757920072414,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0666216249810532,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 1.0468534999527037,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.08191499998793,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0555794999818318,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.065563041018322,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0545205830130726,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0676475000218488,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.057758625014685,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0871331669623032,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0494434590218589,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 1.0631560829933733,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 1.077128853998147,
+            "after": 1.0604573540040292
+          }
+        }
+      ]
+    }
+  },
+  "before_profile_ui": {
+    "counters": {
+      "emit.files": 1,
+      "lookup.calls": 1696026,
+      "lookup.canonical_path_resolutions": 16,
+      "lookup.import_directory_resolutions": 124,
+      "lookup.symbol_hits": 4554208,
+      "parallel.batches": 5,
+      "parallel.tasks": 128,
+      "parallel.workers": 20,
+      "parser.cache_hits": 129,
+      "parser.nodes": 157344,
+      "parser.source_requests": 129,
+      "permissions.analyses": 4,
+      "permissions.dependency_retries": 3,
+      "permissions.field_hits": 86137,
+      "permissions.member_hits": 9310,
+      "permissions.path_hits": 38068,
+      "permissions.reuses": 1,
+      "permissions.type_hits": 46538,
+      "resolver.constructions": 8,
+      "resolver.index_builds": 5,
+      "resolver.index_reuses": 3
+    },
+    "elapsed_seconds": 3.73477525,
+    "engine": "rust",
+    "schema": 1,
+    "stages": {
+      "analysis.borrow_model": {
+        "calls": 1,
+        "inclusive_seconds": 1.708e-06,
+        "self_seconds": 1.708e-06
+      },
+      "analysis.contexts": {
+        "calls": 2,
+        "inclusive_seconds": 8.45e-05,
+        "self_seconds": 8.45e-05
+      },
+      "analysis.discover_calls": {
+        "calls": 1,
+        "inclusive_seconds": 1.546099458,
+        "self_seconds": 0.3925045410000001
+      },
+      "analysis.discover_expressions": {
+        "calls": 1,
+        "inclusive_seconds": 0.016391291,
+        "self_seconds": 0.00020520699999999892
+      },
+      "analysis.discover_types": {
+        "calls": 5,
+        "inclusive_seconds": 0.22483995799999998,
+        "self_seconds": 0.22483995799999998
+      },
+      "analysis.inspect_sources": {
+        "calls": 1,
+        "inclusive_seconds": 1.7029558329999999,
+        "self_seconds": 6.433399999972167e-05
+      },
+      "analysis.local_borrowing": {
+        "calls": 1,
+        "inclusive_seconds": 1.209e-06,
+        "self_seconds": 1.209e-06
+      },
+      "analysis.purity": {
+        "calls": 6,
+        "inclusive_seconds": 5.750000000000001e-06,
+        "self_seconds": 5.750000000000001e-06
+      },
+      "analysis.resolver_setup": {
+        "calls": 8,
+        "inclusive_seconds": 0.08552866799999997,
+        "self_seconds": 0.085424167
+      },
+      "analysis.slice_permissions": {
+        "calls": 4,
+        "inclusive_seconds": 0.9998398340000001,
+        "self_seconds": 0.9998398340000001
+      },
+      "analysis.using_projections": {
+        "calls": 8,
+        "inclusive_seconds": 0.00010450100000000001,
+        "self_seconds": 0.00010450100000000001
+      },
+      "backend.final": {
+        "calls": 1,
+        "inclusive_seconds": 1.7953705420000001,
+        "self_seconds": 1.7953705420000001
+      },
+      "command": {
+        "calls": 1,
+        "inclusive_seconds": 3.7347715,
+        "self_seconds": 0.12264354099999952
+      },
+      "emit.file": {
+        "calls": 1,
+        "inclusive_seconds": 0.053919208,
+        "self_seconds": 0.053919208
+      },
+      "emit.publish": {
+        "calls": 1,
+        "inclusive_seconds": 0.003019208,
+        "self_seconds": 0.003018125
+      },
+      "emit.serialize": {
+        "calls": 1,
+        "inclusive_seconds": 1.083e-06,
+        "self_seconds": 1.083e-06
+      },
+      "evaluation.schedule": {
+        "calls": 1,
+        "inclusive_seconds": 0.019806834,
+        "self_seconds": 0.019745625
+      },
+      "lowering.total": {
+        "calls": 1,
+        "inclusive_seconds": 1.784047375,
+        "self_seconds": 0.00428762500000035
+      },
+      "parser.bootstrap": {
+        "calls": 1,
+        "inclusive_seconds": 0.01207825,
+        "self_seconds": 0.01207825
+      },
+      "parser.cache_validation": {
+        "calls": 1,
+        "inclusive_seconds": 0.007011958,
+        "self_seconds": 0.007011958
+      },
+      "parser.decode": {
+        "calls": 1,
+        "inclusive_seconds": 0.004869958,
+        "self_seconds": 0.004869958
+      },
+      "parser.normalize": {
+        "calls": 1,
+        "inclusive_seconds": 0.003754875,
+        "self_seconds": 0.003754875
+      },
+      "parser.source": {
+        "calls": 1,
+        "inclusive_seconds": 0.017101041,
+        "self_seconds": 0.0014642500000000003
+      },
+      "project.load": {
+        "calls": 1,
+        "inclusive_seconds": 0.032710042,
+        "self_seconds": 0.0035307509999999986
+      }
+    },
+    "thor_version": "0.41.6",
+    "worker_stages": {
+      "parser.cache_validation": {
+        "calls": 128,
+        "inclusive_seconds": 0.25018608800000003,
+        "self_seconds": 0.25018608800000003
+      },
+      "parser.decode": {
+        "calls": 128,
+        "inclusive_seconds": 0.19934892,
+        "self_seconds": 0.19934892
+      },
+      "parser.normalize": {
+        "calls": 128,
+        "inclusive_seconds": 0.158731242,
+        "self_seconds": 0.158731242
+      },
+      "parser.source": {
+        "calls": 128,
+        "inclusive_seconds": 0.6819046340000001,
+        "self_seconds": 0.07363838399999997
+      }
+    }
+  },
+  "historical_binaries": {
+    "pending-cache": {
+      "path": "/Users/davidludwik/Thor/thor_test/artifacts/optimization/binaries/before-pending-cache",
+      "sha256": "77eeb733cc34e40ea3b5c7da85264be113e66abba292eb8499ff9cd5302b0f88"
+    },
+    "shared-layouts": {
+      "path": "/Users/davidludwik/Thor/thor_test/artifacts/optimization/binaries/before-shared-layouts",
+      "sha256": "97a031a58501dfc72d827585a6c6be58dee4289e724caf009aa0c3873c5eed4a"
+    }
+  }
+}

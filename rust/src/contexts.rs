@@ -16,6 +16,9 @@ pub struct ContextHint {
 impl Resolver<'_> {
     pub fn prepare_contexts(&mut self) {
         let _phase = crate::profile::span("analysis.contexts");
+        // Witnesses are prepared incrementally; cache only the completed view.
+        self.invalidate_queries();
+        let memoized = self.metadata.take().is_some();
         let calls = self
             .sources
             .iter()
@@ -193,6 +196,8 @@ impl Resolver<'_> {
                 }
             }
         }
+        self.types.clear();
+        if memoized { self.metadata = Some(Metadata::default()); }
     }
     fn context_identifiers(source: &Source, node: NodeId, used: &mut BTreeSet<String>) {
         let n = source.node(node);

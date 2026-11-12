@@ -156,10 +156,6 @@ pub struct Privileges<'a, 'r> {
     deleting: bool,
     discovering: bool,
     library_names: std::cell::RefCell<HashMap<Ref, Option<(String, String)>>>,
-    specialized_types: HashMap<(Ref, Substitutions), Type>,
-    field_types: HashMap<Type, Vec<(String, Type)>>,
-    member_types: HashMap<(Type, String), Type>,
-    member_paths: HashMap<(Type, String), Option<Vec<String>>>,
 }
 #[derive(PartialEq, Eq, Hash)]
 struct SummaryKey {
@@ -169,6 +165,27 @@ struct SummaryKey {
     checked: bool,
 }
 impl<'a, 'r> Privileges<'a, 'r> {
+    fn new(r: &'r mut Resolver<'a>, flags: &[String], discovering: bool) -> Self {
+        Self {
+            r,
+            values: vec![],
+            contexts: vec![],
+            summaries: HashMap::new(),
+            recursive_pending: BTreeSet::new(),
+            globals: HashMap::new(),
+            global_active: HashSet::new(),
+            explicit: HashSet::new(),
+            facts: Facts::default(),
+            changed: false,
+            depth: 0,
+            flags: flags.to_vec(),
+            pure_depth: 0,
+            uncertain: None,
+            deleting: false,
+            discovering,
+            library_names: std::cell::RefCell::new(HashMap::new()),
+        }
+    }
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
         Self::analyze_editor(r, flags, false)
     }
@@ -207,29 +224,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return Facts::default();
         }
         let previous_queries = r.begin_symbol_queries();
-        let mut this = Self {
-            r,
-            values: vec![],
-            contexts: vec![],
-            summaries: HashMap::new(),
-            recursive_pending: BTreeSet::new(),
-            globals: HashMap::new(),
-            global_active: HashSet::new(),
-            explicit: HashSet::new(),
-            facts: Facts::default(),
-            changed: false,
-            depth: 0,
-            flags: flags.to_vec(),
-            pure_depth: 0,
-            uncertain: None,
-            deleting: false,
-            discovering,
-            library_names: std::cell::RefCell::new(HashMap::new()),
-            specialized_types: HashMap::new(),
-            field_types: HashMap::new(),
-            member_types: HashMap::new(),
-            member_paths: HashMap::new(),
-        };
+        let mut this = Self::new(r, flags, discovering);
         this.annotations();
         let procedures = this
             .r
@@ -316,7 +311,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             this.pure_depth = usize::from(this.contexts[c].checked);
             this.statement(body, c);
             this.pure_depth = 0;
-            if before != this.state(c) {
+            if !this.state_matches(c, &before) {
                 if visits[&c] == 24 {
                     this.conservative_summary(
                         c,
@@ -489,16 +484,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
     fn s(&self, r: Ref) -> &'a crate::ast::Source {
         &self.r.sources[r.file]
     }
-    fn state(&self, c: C) -> GraphState {
-        fn register(v: V, ids: &mut HashMap<V, V>, queue: &mut Vec<V>) -> V {
-            if let Some(id) = ids.get(&v) {
-                return *id;
-            }
-            let id = queue.len();
-            queue.push(v);
-            ids.insert(v, id);
-            id
-        }
+    fn register(v: V, ids: &mut HashMap<V, V>, queue: &mut Vec<V>) -> V {
+        if let Some(id) = ids.get(&v) { return *id; }
+        let id = queue.len();
+        queue.push(v);
+        ids.insert(v, id);
+        id
+    }
+    fn state_roots(&self, c: C) -> (GraphState, HashMap<V, V>, Vec<V>) {
         let context = &self.contexts[c];
         let mut ids = HashMap::new();
         let mut queue = vec![];
@@ -510,18 +503,27 @@ impl<'a, 'r> Privileges<'a, 'r> {
         env.sort_unstable_by_key(|(symbol, _)| *symbol);
         let roots = env
             .into_iter()
-            .map(|(symbol, v)| (symbol, register(v, &mut ids, &mut queue)))
+            .map(|(symbol, v)| (symbol, Self::register(v, &mut ids, &mut queue)))
             .collect();
         let results = context
             .results
             .iter()
-            .map(|v| register(*v, &mut ids, &mut queue))
+            .map(|v| Self::register(*v, &mut ids, &mut queue))
             .collect();
         let stores = context
             .stores
             .iter()
-            .map(|(path, v)| (path.clone(), register(*v, &mut ids, &mut queue)))
+            .map(|(path, v)| (path.clone(), Self::register(*v, &mut ids, &mut queue)))
             .collect();
+        let state = GraphState {
+            roots, results, stores, values: vec![],
+            effects: context.effects.iter().map(|(origin, effect)| (origin.clone(), effect.clone())).collect(),
+        };
+        (state, ids, queue)
+    }
+    fn state(&self, c: C) -> GraphState {
+        crate::profile::count("permissions.graph_snapshots", 1);
+        let (mut state, mut ids, mut queue) = self.state_roots(c);
         let mut values = vec![];
         let mut cursor = 0;
         while cursor < queue.len() {
@@ -530,10 +532,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let fields = v
                 .fields
                 .iter()
-                .map(|(name, v)| (name.clone(), register(*v, &mut ids, &mut queue)))
+                .map(|(name, v)| (name.clone(), Self::register(*v, &mut ids, &mut queue)))
                 .collect();
             let children =
-                [v.element, v.target, v.base].map(|v| v.map(|v| register(v, &mut ids, &mut queue)));
+                [v.element, v.target, v.base].map(|v| v.map(|v| Self::register(v, &mut ids, &mut queue)));
             values.push(GraphValue {
                 typ: v.typ.clone(),
                 data: v.data.clone(),
@@ -544,17 +546,38 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 children,
             });
         }
-        GraphState {
-            roots,
-            results,
-            stores,
-            values,
-            effects: context
-                .effects
-                .iter()
-                .map(|(origin, effect)| (origin.clone(), effect.clone()))
-                .collect(),
+        state.values = values;
+        state
+    }
+    /// Compare the current canonical graph directly with the saved snapshot.
+    /// Equality remains exact; no hashes or mutation counters stand in for it.
+    fn state_matches(&self, c: C, expected: &GraphState) -> bool {
+        crate::profile::count("permissions.graph_comparisons", 1);
+        let (state, mut ids, mut queue) = self.state_roots(c);
+        if state.roots != expected.roots || state.results != expected.results
+            || state.stores != expected.stores || state.effects != expected.effects {
+            return false;
         }
+        let mut cursor = 0;
+        while cursor < queue.len() {
+            let Some(old) = expected.values.get(cursor) else { return false; };
+            let value = &self.values[queue[cursor]];
+            cursor += 1;
+            if value.typ != old.typ || value.data != old.data || value.storage != old.storage
+                || value.locations != old.locations || value.path != old.path
+                || value.fields.len() != old.fields.len() {
+                return false;
+            }
+            for ((name, child), (old_name, old_child)) in value.fields.iter().zip(&old.fields) {
+                if name != old_name || Self::register(*child, &mut ids, &mut queue) != *old_child {
+                    return false;
+                }
+            }
+            let children = [value.element, value.target, value.base]
+                .map(|child| child.map(|child| Self::register(child, &mut ids, &mut queue)));
+            if children != old.children { return false; }
+        }
+        cursor == expected.values.len()
     }
     fn role(&self, r: Ref, role: &str) -> Option<Ref> {
         self.s(r)
@@ -754,10 +777,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 result
             } else {
                 let result = self.value(*elem.clone());
-                for (name, _) in self.record_fields(&elem) {
-                    let column = self.member(v, &name);
+                for (name, _) in self.record_fields(&elem).iter() {
+                    let column = self.member(v, name);
                     let item = self.item(column);
-                    self.values[result].fields.insert(name, item);
+                    self.values[result].fields.insert(name.clone(), item);
                 }
                 self.values[v].element = Some(result);
                 result
@@ -858,10 +881,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
         match base_type(&old.typ) {
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                 let fields = self.record_fields(&old.typ);
-                for (name, _) in fields {
-                    let child = self.member(v, &name);
+                for (name, _) in fields.iter() {
+                    let child = self.member(v, name);
                     let copy = self.copy_seen(child, seen);
-                    self.values[id].fields.insert(name, copy);
+                    self.values[id].fields.insert(name.clone(), copy);
                 }
             }
             Type::Array { .. } | Type::Fixed { .. } => {
@@ -909,10 +932,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     ..origin
                 });
                 let fields = self.record_fields(&self.values[v].typ.clone());
-                for (name, _) in fields {
-                    let child = self.member(v, &name);
+                for (name, _) in fields.iter() {
+                    let child = self.member(v, name);
                     self.freeze_seen(child, seed, seen);
-                    self.values[v].fields.insert(name, child);
+                    self.values[v].fields.insert(name.clone(), child);
                 }
             }
             Type::Array { .. } | Type::Fixed { .. } => {
@@ -951,8 +974,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             match base_type(&self.values[v].typ).clone() {
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                     let fields = self.record_fields(&self.values[v].typ.clone());
-                    for (name, _) in fields {
-                        self.member(v, &name);
+                    for (name, _) in fields.iter() {
+                        self.member(v, name);
                     }
                 }
                 Type::Array { .. }
@@ -967,8 +990,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     self.deref(v);
                 }
                 Type::Soa(elem) => {
-                    for (name, _) in self.record_fields(&elem) {
-                        self.member(v, &name);
+                    for (name, _) in self.record_fields(&elem).iter() {
+                        self.member(v, name);
                     }
                 }
                 _ => {}
@@ -998,8 +1021,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             | Type::Set(elem)
             | Type::Map { value: elem, .. } => self.contains_slice(elem, seen),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self.record_fields(typ)
-                .into_iter()
-                .any(|(_, typ)| self.contains_slice(&typ, seen)),
+                .iter()
+                .any(|(_, typ)| self.contains_slice(typ, seen)),
             Type::Union(owner) => {
                 let variants = self.group(*owner, "variants");
                 variants.into_iter().any(|r| {
@@ -1337,7 +1360,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 for pass in 0..24 {
                     let before = self.state(c);
                     self.statement(body, c);
-                    if before == self.state(c) {
+                    if self.state_matches(c, &before) {
                         break;
                     }
                     if pass == 23 {
@@ -1397,57 +1420,18 @@ impl<'a, 'r> Privileges<'a, 'r> {
             );
         }
     }
-    // Resolver inputs stay fixed during this analysis. Keep resolved metadata
-    // separate from the mutable value/alias graph held in `values` and `contexts`.
-    // Unknown fields are stable answers too: source/binding inputs cannot change
-    // inside this pass. A demanded dependency prevents caching and discovery
-    // restarts the analysis with a new resolver/cache once that source is loaded.
+    // Share fixed-input metadata with the resolver's other analyses and emitter.
     fn specialized_type(&mut self, reference: Ref, bindings: &Substitutions) -> Type {
-        let key = (reference, bindings.clone());
-        if let Some(typ) = self.specialized_types.get(&key) {
-            crate::profile::count("permissions.type_hits", 1);
-            return typ.clone();
-        }
-        let typ = self.r.specialized_type(reference, bindings);
-        if !self.r.has_demanded_packages() {
-            self.specialized_types.insert(key, typ.clone());
-        }
-        typ
+        self.r.specialized_type(reference, bindings)
     }
-    fn record_fields(&mut self, typ: &Type) -> Vec<(String, Type)> {
-        if let Some(fields) = self.field_types.get(typ) {
-            crate::profile::count("permissions.field_hits", 1);
-            return fields.clone();
-        }
-        let fields = self.r.record_fields(typ);
-        if !self.r.has_demanded_packages() {
-            self.field_types.insert(typ.clone(), fields.clone());
-        }
-        fields
+    fn record_fields(&mut self, typ: &Type) -> crate::semantics::RecordFields {
+        self.r.shared_record_fields(typ)
     }
     fn member_path(&mut self, typ: &Type, name: &str) -> Option<Vec<String>> {
-        let key = (typ.clone(), name.to_string());
-        if let Some(path) = self.member_paths.get(&key) {
-            crate::profile::count("permissions.path_hits", 1);
-            return path.clone();
-        }
-        let path = self.r.member_path(typ, name);
-        if !self.r.has_demanded_packages() {
-            self.member_paths.insert(key, path.clone());
-        }
-        path
+        self.r.member_path(typ, name)
     }
     fn member_type(&mut self, typ: &Type, name: &str) -> Type {
-        let key = (typ.clone(), name.to_string());
-        if let Some(member) = self.member_types.get(&key) {
-            crate::profile::count("permissions.member_hits", 1);
-            return member.clone();
-        }
-        let member = self.r.member_type(typ, name);
-        if !self.r.has_demanded_packages() {
-            self.member_types.insert(key, member.clone());
-        }
-        member
+        self.r.member_type(typ, name)
     }
     fn typ(&mut self, r: Ref, c: C) -> Type {
         if let Some(symbol) = self.r.symbol(r) {
@@ -2484,8 +2468,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .cloned()
                         .unwrap_or(Type::Unknown);
                     let names = self.record_fields(&typ)
-                        .into_iter()
-                        .map(|(name, _)| name)
+                        .iter()
+                        .map(|(name, _)| name.clone())
                         .collect::<Vec<_>>();
                     let values = names
                         .into_iter()
@@ -2523,8 +2507,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     let fields = self.record_fields(&self.values[values[0]].typ.clone());
                     let expanded = if !fields.is_empty() {
                         fields
-                            .into_iter()
-                            .map(|(name, _)| self.member(values[0], &name))
+                            .iter()
+                            .map(|(name, _)| self.member(values[0], name))
                             .collect::<Vec<_>>()
                     } else if let Type::Array {
                         length: Some(length),
@@ -2977,8 +2961,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if self.kind(arg) == "Unary" && self.op(arg) == "**" {
                 let fields = self.record_fields(&self.values[v].typ.clone());
                 if !fields.is_empty() {
-                    for (name, _) in fields {
-                        let child = self.member(v, &name);
+                    for (name, _) in fields.iter() {
+                        let child = self.member(v, name);
                         result.push((arg, child));
                     }
                 } else if let Type::Array {
@@ -3039,9 +3023,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.values[id].element = Some(child);
             }
             Type::Struct(_) | Type::Record(..) => {
-                for (name, typ) in self.record_fields(&typ) {
-                    let child = self.opaque_result(typ, seed, seen);
-                    self.values[id].fields.insert(name, child);
+                for (name, typ) in self.record_fields(&typ).iter() {
+                    let child = self.opaque_result(typ.clone(), seed, seen);
+                    self.values[id].fields.insert(name.clone(), child);
                 }
             }
             _ => {}
@@ -3407,3 +3391,55 @@ const FMT_READERS: &[&str] = &[
     "tprintf",
     "tprintfln",
 ];
+
+#[cfg(test)]
+mod graph_tests {
+    use super::*;
+
+    #[test]
+    fn direct_graph_comparison_matches_full_snapshot_equality_with_cycles_and_aliases() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        analysis.contexts.push(Context::new(None, Substitutions::new()));
+        for n in 0..8 {
+            let value = analysis.value(Type::scalar("int"));
+            analysis.contexts[0].env.insert(n, value);
+        }
+        let site = Ref { file: 0, node: NodeId(0) };
+        let origin = Origin { path: Path { index: 0, steps: vec![] }, aspect: Aspect::Data, seed: Some(site) };
+        // A cycle and shared child make numeric arena IDs insufficient for equality.
+        analysis.values[0].target = Some(0);
+        analysis.values[1].fields.insert("shared".into(), 0);
+        analysis.contexts[0].results.extend([0, 1]);
+        for step in 0..120 {
+            let before = analysis.state(0);
+            let value = step % 8;
+            match step % 12 {
+                0 => { analysis.values[value].data.insert(origin.clone()); }
+                1 => { analysis.values[value].storage.insert(origin.clone()); }
+                2 => { analysis.values[value].locations.insert(origin.path.clone()); }
+                3 => { analysis.values[value].path = Some(origin.path.clone()); }
+                4 => { analysis.values[value].typ = Type::scalar("i64"); }
+                5 => { analysis.values[value].fields.insert(format!("field_{step}"), (value + 1) % 8); }
+                6 => { analysis.values[value].element = Some((value + 2) % 8); }
+                7 => { analysis.values[value].target = Some((value + 3) % 8); }
+                8 => { analysis.values[value].base = Some((value + 4) % 8); }
+                9 => { analysis.contexts[0].stores.insert(origin.path.clone(), value); }
+                10 => { analysis.contexts[0].effects.insert(origin.clone(), Effect {
+                    operation: site, unresolved: None, deleting: false,
+                    reason: format!("effect_{step}"), related: vec![], changes_storage: true,
+                }); }
+                _ => { analysis.contexts[0].env.insert(20, value); }
+            }
+            let exact = analysis.state(0) == before;
+            if analysis.state_matches(0, &before) != exact {
+                panic!("graph comparison changed at mutation {step}");
+            }
+            let current = analysis.state(0);
+            if !analysis.state_matches(0, &current) { panic!("unchanged graph failed comparison"); }
+            // Unreachable allocations have no effect on a context's graph.
+            analysis.value(Type::Unknown);
+            if !analysis.state_matches(0, &current) { panic!("unreachable value changed graph"); }
+        }
+    }
+}

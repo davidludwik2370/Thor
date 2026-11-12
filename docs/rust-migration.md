@@ -10,6 +10,10 @@ Rust remains experimental for inputs outside the verified corpus and native
 Windows/Linux hosts. Explicit migration guards still fail with exit status `3`.
 The measurements below record lowering costs and validation limits.
 
+The subsequent [compiler-efficiency follow-up](compiler-efficiency-2026-11.md)
+records the corpus-driven metadata, graph-allocation and import-frontier work,
+with current measurements and validation limits.
+
 The reference baseline is commit `ca2df99`, also tagged
 `rust-migration-baseline-2026-11-08`. The Python implementation remains in
 `thorlang/` and the `thor-python` launcher. The independent Rust crate is in

@@ -1,0 +1,35 @@
+Stock Odin compiler crash during the compiler-efficiency follow-up.
+Personal filesystem paths are omitted. This is an extracted summary, not a raw dump.
+
+Report basename: odin-2026-11-11-225758.ips
+Capture time: 2026-11-11 22:57:58.3632 -0500
+Compiler: odin version dev-2026-10:8169255b9
+Process: odin (Python reference #run helper compilation, not generated program execution)
+Signal: SIGSEGV
+Exception: KERN_INVALID_ADDRESS at 0x0000000000000000
+Faulting thread: 5
+Compiler threads in report: 11
+
+Faulting stack:
+  alloc_cstring(gbAllocator, String) +896
+  lb_type_internal(lbModule*, Type*) +680
+  lb_type(lbModule*, Type*) +568
+  lb_generate_procedures_and_types_per_module(void*) +72
+  internal_thread_proc(void*) +636
+
+Saved registers (matching the existing compiler disassembly):
+  x20 = 0 (source pointer)
+  x19 = 30 (source length)
+  x0 != 0 (destination allocation)
+
+Acceptance fixture: tests.test_rust_conditional_bindings.RustConditionalBindingTests.
+  test_pure_and_compile_time_selected_mutability
+
+The checked Python-reference #run helper build exited -11. The Rust comparison
+succeeded and printed the expected "3 3". One isolated retry and five further
+fresh comparisons passed on both engines, each exercising checked and unchecked
+build flags. The complete earlier 1,403-case compiler gate also passed this case.
+The same first three stack offsets and null-source/nonzero-length string match
+earlier evidence; this does not identify an Entity or prove which concurrent
+write caused this recurrence. No Odin compiler changes or automatic retry
+behavior were introduced.

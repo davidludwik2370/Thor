@@ -70,6 +70,17 @@ impl SdkMirror {
                     .map(|source| source.path.clone()),
             );
         }
+        // SDK overlays also apply to ordinary calls. A new unsaved SDK file
+        // need not be inspected by Thor's analyses for Odin to require it.
+        // Keep this lookup out of ordinary builds without overlays.
+        if !overlays.is_empty() {
+            let sdk = sources.iter().find_map(|source| source.info["odin_root"].as_str())
+                .map(fs::canonicalize).transpose()?;
+            changed.extend(overlays.keys().filter(|path| {
+                sdk.as_ref().is_some_and(|sdk| path.starts_with(sdk))
+                    || sources.iter().any(|source| source.shared_native && source.path == **path)
+            }).cloned());
+        }
         if changed.is_empty() {
             return Ok(Self::default());
         }

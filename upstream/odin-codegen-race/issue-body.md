@@ -47,6 +47,13 @@ passed on both engines. The extracted record is
 `evidence/recurrence-2026-11-10.txt`; it does not identify the accessed entity or
 independently prove which concurrent write caused this recurrence.
 
+A November 11 optimization follow-up encountered the same initial stack offsets
+in a Python-reference `#run` helper compilation, with a null source pointer and
+length 30. Rust produced the expected result, and six fresh comparisons passed
+on both engines in checked and unchecked builds. The extracted record is
+`evidence/recurrence-2026-11-11.txt`; it does not independently identify the
+concurrent write responsible.
+
 ## Steps to reproduce
 
 1. In a separate Odin checkout at the commit above, build the compiler with C++
