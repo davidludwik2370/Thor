@@ -1,7 +1,7 @@
 //! Reuse completed slice checks only for identical semantic inputs in one command.
 use crate::{
     ast::Source,
-    privileges::{Facts, Privileges},
+    privileges::{Facts, Privileges, SummaryCache},
     semantics::{ContextHint, ParameterWitness, Ref, Resolver, Type},
 };
 use std::collections::{BTreeMap, HashMap};
@@ -12,6 +12,7 @@ struct Inputs {
     flags: Vec<String>,
     resolver_flags: Vec<String>,
     editor: bool,
+    logical_mode: bool,
     evaluated: BTreeMap<Ref, serde_json::Value>,
     logical_constants: BTreeMap<Ref, serde_json::Value>,
     bound_types: BTreeMap<(Ref, String), Type>,
@@ -26,6 +27,7 @@ impl Inputs {
             flags: flags.to_vec(),
             resolver_flags: resolver.flags.clone(),
             editor,
+            logical_mode: Self::logical_mode(resolver),
             evaluated: resolver.evaluated.clone(),
             logical_constants: resolver.logical_constants.clone(),
             bound_types: resolver.bound_types.clone(),
@@ -48,6 +50,7 @@ impl Inputs {
             && self.flags == flags
             && self.resolver_flags == resolver.flags
             && self.editor == editor
+            && self.logical_mode == Self::logical_mode(resolver)
             && self.evaluated == resolver.evaluated
             && self.logical_constants == resolver.logical_constants
             && self.bound_types == resolver.bound_types
@@ -55,11 +58,39 @@ impl Inputs {
             && self.contexts == resolver.context_hints
             && self.witnesses == resolver.parameter_witnesses
     }
+    fn extends(&self, resolver: &Resolver<'_>, flags: &[String], editor: bool) -> bool {
+        let count = self.sources.len();
+        if resolver.sources.len() < count || self.flags != flags || self.resolver_flags != resolver.flags
+            || self.editor != editor || self.logical_mode != Self::logical_mode(resolver) { return false; }
+        if !self.sources.iter().zip(resolver.sources).all(|(old,current)|
+            old.shares_syntax(current) && old.shared_native == current.shared_native
+                && old.collection_roots == current.collection_roots) { return false; }
+        let old_packages = self.sources.iter().filter_map(|source|source.path.parent()).collect::<std::collections::HashSet<_>>();
+        if resolver.sources[count..].iter().any(|source|source.path.parent().is_some_and(|p|old_packages.contains(p))) {
+            return false;
+        }
+        macro_rules! same_prefix {
+            ($old:expr,$new:expr,$file:expr) => {{
+                $old.iter().all(|(key,value)| $new.get(key)==Some(value))
+                    && $new.keys().filter(|key| $file(key)<count).count()==$old.len()
+            }};
+        }
+        same_prefix!(self.evaluated,resolver.evaluated,|key: &Ref|key.file)
+            && same_prefix!(self.logical_constants,resolver.logical_constants,|key: &Ref|key.file)
+            && same_prefix!(self.bound_types,resolver.bound_types,|key: &(Ref,String)|key.0.file)
+            && same_prefix!(self.bound_constants,resolver.bound_constants,|key: &(Ref,String)|key.0.file)
+            && same_prefix!(self.contexts,resolver.context_hints,|key: &Ref|key.file)
+            && same_prefix!(self.witnesses,resolver.parameter_witnesses,|key: &Ref|key.file)
+    }
+    fn logical_mode(resolver:&Resolver<'_>)->bool {
+        resolver.sources.iter().position(|source|source.thor).is_some_and(|file|resolver.logical_enabled(file))
+    }
 }
 
 #[derive(Clone, Default)]
 pub(crate) struct Cache {
     completed: Option<(Inputs, Facts)>,
+    retry: Option<(Inputs, SummaryCache)>,
 }
 impl Cache {
     pub fn analyze(
@@ -105,14 +136,18 @@ impl Cache {
             }
         }
         crate::profile::count("permissions.analyses", 1);
+        let mut summaries = self.retry.take().filter(|(inputs,_)| inputs.extends(resolver,flags,editor))
+            .map(|(_,cache)|cache).unwrap_or_default();
         let inputs = Inputs::new(resolver, flags, editor);
         let facts = if discovering {
-            Privileges::discover(resolver, flags, editor, None)
+            Privileges::discover_cached(resolver, flags, editor, &mut summaries)
         } else {
             Privileges::analyze_project(resolver, flags, editor, None)
         };
         if !resolver.has_demanded_packages() {
             self.completed = Some((inputs, facts.clone()));
+        } else if discovering {
+            self.retry = Some((inputs,summaries));
         }
         facts
     }
@@ -291,5 +326,38 @@ mod tests {
         if !demanded || published {
             panic!("partial dependency graph was cached as complete");
         }
+    }
+    #[test]
+    fn summary_extension_requires_unchanged_semantics_and_new_namespaces() {
+        let old = vec![source()];
+        let inputs = Inputs::new(&Resolver::new(&old), &[], false);
+        let make = |path:&str| Source::from_frontend(path.into(),"x".into(),serde_json::json!({
+            "nodes":[{"kind":"File","start":0,"end":1,"parent":-1}],
+            "features":[],"edits":[],"selections":[]
+        }),false).unwrap();
+        let extended = vec![old[0].clone(),make("/additional/new.odin")];
+        let mut resolver = Resolver::new(&extended);
+        if !inputs.extends(&resolver,&[],false) { panic!("new namespace rejected"); }
+        if inputs.extends(&resolver,&["-debug".into()],false) || inputs.extends(&resolver,&[],true) {
+            panic!("changed modes reused summaries");
+        }
+        let site = Ref {file:0,node:crate::ast::NodeId(0)};
+        resolver.evaluated.insert(site,serde_json::json!(3));
+        if inputs.extends(&resolver,&[],false) { panic!("changed value reused summaries"); }
+        resolver.evaluated.clear();
+        resolver.bound_types.insert((site,"T".into()),Type::scalar("int"));
+        if inputs.extends(&resolver,&[],false) { panic!("changed binding reused summaries"); }
+        let augmented = vec![old[0].clone(),make("/another.odin")];
+        if inputs.extends(&Resolver::new(&augmented),&[],false) { panic!("existing namespace augmented"); }
+        let replaced = vec![source(),make("/additional/new.odin")];
+        if inputs.extends(&Resolver::new(&replaced),&[],false) { panic!("reparsed source reused summaries"); }
+        let raw="import \"thor:big\"";
+        let logical=Source::from_frontend("/logical/new.thor".into(),raw.into(),serde_json::json!({
+            "nodes":[{"kind":"File","start":0,"end":raw.len(),"parent":-1},
+                {"kind":"Import","start":0,"end":raw.len(),"parent":0,"op":"\"thor:big\""}],
+            "features":[],"edits":[],"selections":[]
+        }),true).unwrap();
+        let activation=vec![old[0].clone(),logical];
+        if inputs.extends(&Resolver::new(&activation),&[],false) {panic!("changed logical activation reused summaries");}
     }
 }

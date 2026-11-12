@@ -6,6 +6,9 @@ use crate::{
     semantics::{Ref, Resolver, Substitutions, Type, SharedType, TypeInput},
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+#[path = "privilegesummaries.rs"]
+mod cached;
+pub(crate) use cached::SummaryCache;
 type V = usize;
 type C = usize;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -86,7 +89,7 @@ struct Effect {
     related: Vec<Ref>,
     changes_storage: bool,
 }
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 struct GraphState {
     roots: Vec<(usize, V)>,
     results: Vec<V>,
@@ -94,7 +97,7 @@ struct GraphState {
     values: Vec<GraphValue>,
     effects: Vec<(Origin, Effect)>,
 }
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 struct GraphValue {
     typ: SharedType,
     data: Origins,
@@ -118,6 +121,12 @@ struct Context {
     active: bool,
     controls: Vec<Ref>,
     named: Vec<Option<usize>>,
+    callees: BTreeSet<C>,
+    complete: bool,
+    cacheable: bool,
+    event_start: usize,
+    event_end: usize,
+    cached_events: Option<std::sync::Arc<[cached::FactEvent]>>,
 }
 impl Context {
     fn new(proc: Option<Ref>, bindings: Substitutions) -> Self {
@@ -135,6 +144,9 @@ impl Context {
             active: false,
             controls: vec![],
             named: vec![],
+            callees: BTreeSet::new(), complete: false, cacheable: true,
+            event_start: 0, event_end: 0,
+            cached_events: None,
         }
     }
 }
@@ -156,8 +168,10 @@ pub struct Privileges<'a, 'r> {
     deleting: bool,
     discovering: bool,
     library_names: std::cell::RefCell<HashMap<Ref, Option<(String, String)>>>,
+    reuse: Option<SummaryCache>,
+    fact_events: Vec<cached::FactEvent>,
 }
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct SummaryKey {
     procedure: Ref,
     bindings: Vec<(String, Type)>,
@@ -184,6 +198,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             deleting: false,
             discovering,
             library_names: std::cell::RefCell::new(HashMap::new()),
+            reuse: None, fact_events: vec![],
         }
     }
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
@@ -198,17 +213,22 @@ impl<'a, 'r> Privileges<'a, 'r> {
         editor: bool,
         evaluation: Option<&crate::evaluation::Plan>,
     ) -> Facts {
-        Self::analyze_with_dependencies(r, flags, editor, evaluation, false)
+        Self::analyze_with_dependencies(r, flags, editor, evaluation, false, None)
     }
     pub(crate) fn discover(
         r: &'r mut Resolver<'a>, flags: &[String], editor: bool,
         evaluation: Option<&crate::evaluation::Plan>,
     ) -> Facts {
-        Self::analyze_with_dependencies(r, flags, editor, evaluation, true)
+        Self::analyze_with_dependencies(r, flags, editor, evaluation, true, None)
+    }
+    pub(crate) fn discover_cached(r: &'r mut Resolver<'a>, flags: &[String], editor: bool,
+        cache: &mut SummaryCache) -> Facts {
+        Self::analyze_with_dependencies(r, flags, editor, None, true, Some(cache))
     }
     fn analyze_with_dependencies(
         r: &'r mut Resolver<'a>, flags: &[String], editor: bool,
         evaluation: Option<&crate::evaluation::Plan>, discovering: bool,
+        mut cache: Option<&mut SummaryCache>,
     ) -> Facts {
         let _phase = crate::profile::span("analysis.slice_permissions");
         let enabled = editor
@@ -225,6 +245,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         let previous_queries = r.begin_symbol_queries();
         let mut this = Self::new(r, flags, discovering);
+        this.reuse = cache.as_deref().cloned();
         this.annotations();
         let procedures = this
             .r
@@ -245,6 +266,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         for proc in procedures {
             if discovering && this.r.has_demanded_packages() {
                 crate::profile::count("permissions.dependency_retries", 1);
+                if let Some(cache) = cache.as_deref_mut() { this.harvest(cache); }
                 this.r.end_symbol_queries(previous_queries);
                 return Facts::default();
             }
@@ -294,6 +316,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         if discovering && this.r.has_demanded_packages() {
             crate::profile::count("permissions.dependency_retries", 1);
+            if let Some(cache) = cache.as_deref_mut() { this.harvest(cache); }
             this.r.end_symbol_queries(previous_queries);
             return Facts::default();
         }
@@ -1104,12 +1127,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 // statement is active; it does not require branch prediction.
                 let name = self.text(seed);
                 let message = format!("Cannot {reason}: read-only slice access from '{name}'.");
-                self.facts.issues.entry(operation).or_insert(Issue {
+                self.fact_event(cached::FactEvent::Issue(std::sync::Arc::new(Issue {
                     operation,
                     seed,
                     message,
                     related: related.clone(),
-                });
+                })));
             } else {
                 let incoming = Effect {
                     operation,
@@ -1281,18 +1304,27 @@ impl<'a, 'r> Privileges<'a, 'r> {
         };
         if let Some(c) = self.summaries.get(&key).copied() {
             if let Some(caller) = caller {
+                self.contexts[caller].callees.insert(c);
                 self.contexts[c].callers.insert(caller);
                 if self.contexts[c].active {
+                    self.contexts[c].cacheable = false;
+                    self.contexts[caller].cacheable = false;
                     self.recursive_pending.insert(caller);
                 }
             }
             return c;
         }
+        if self.uncertain.is_none() && !self.deleting {
+            if let Some(c) = self.restore_summary(&key, caller) { return c; }
+        }
         let c = self.contexts.len();
         self.contexts
             .push(Context::new(Some(proc), bindings.clone()));
         self.contexts[c].checked = self.pure_depth > 0;
+        self.contexts[c].cacheable = self.uncertain.is_none() && !self.deleting;
+        self.contexts[c].event_start = self.fact_events.len();
         if let Some(caller) = caller {
+            self.contexts[caller].callees.insert(c);
             self.contexts[c].callers.insert(caller);
         }
         self.summaries.insert(key, c);
@@ -1375,6 +1407,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
             }
         } else {
+            self.contexts[c].cacheable = false;
             for (index, (name, _)) in self.params(sig).into_iter().enumerate() {
                 self.require(
                     [Origin {
@@ -1401,9 +1434,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.facts.mutating.insert(*name);
             }
         }
+        self.contexts[c].complete = !self.r.has_demanded_packages();
+        self.contexts[c].event_end = self.fact_events.len();
         c
     }
     fn conservative_summary(&mut self, c: C, reason: &str) {
+        self.contexts[c].cacheable = false;
         let Some(proc) = self.contexts[c].proc else {
             return;
         };
@@ -1554,6 +1590,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn eval(&mut self, r: Ref, c: C) -> V {
+        if self.reuse.is_some() { self.observe_cache_input(r, c); }
         let typ = self.typ(r, c);
         let kind = self.kind(r).to_string();
         if kind == "Call" {
@@ -1612,7 +1649,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 let v = self.member(v, &field);
                 if self.values[v].storage.iter().any(|o| o.seed.is_some()) {
                     if let Some(field) = self.role(r, "field") {
-                        self.facts.readonly.insert(field);
+                        self.fact_event(cached::FactEvent::Readonly(field));
                     }
                 }
                 v
@@ -2107,6 +2144,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             }
                             return;
                         }
+                        self.contexts[c].cacheable = false;
                     }
                 }
                 self.contexts[c].controls.push(r);
@@ -2781,10 +2819,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         base_type(&self.values[v].typ),
                         Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic
                     ) {
-                        self.facts.invalid.insert(
-                            r,
-                            "#mut requires a slice parameter in this specialization.".into(),
-                        );
+                        self.fact_event(cached::FactEvent::Invalid(r,
+                            std::sync::Arc::new("#mut requires a slice parameter in this specialization.".into())));
                     }
                     self.require(
                         self.values[v].data.clone(),
