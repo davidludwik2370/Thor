@@ -6,7 +6,8 @@ acceptance corpus is verified on macOS arm64. See the
 [migration status and comparison commands](docs/rust-migration.md) and the
 [compiler-efficiency follow-up](docs/compiler-efficiency-2026-11.md) and the
 [cache/discovery improvements](docs/compiler-cache-discovery-2026-11.md) and the
-[latest dependency lookahead](docs/compiler-dependency-lookahead-2026-11.md).
+[dependency lookahead](docs/compiler-dependency-lookahead-2026-11.md) and the
+[shared type, summary, and parallel lowering pass](docs/compiler-structural-3-5-2026-11.md).
 
 ![Thor](assets/branding/logo-slim.png)
 

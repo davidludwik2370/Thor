@@ -2061,10 +2061,15 @@ python3 -m unittest tests.test_assertion_hygiene
 
 `thor` and `thor-rust` execute `rust/target/release/thor-rust` without a Cargo
 startup check. Use that binary directly when measuring the compiler itself.
-Independent package parsing and artifact serialization use bounded workers.
+Independent package parsing, per-file lowering/semantic queries, and artifact
+serialization use bounded workers. Lowering shares a frozen prepared resolver
+with local query deltas; project-wide effect graphs retain their dependency order.
 `THOR_JOBS=1` selects serial execution. Completed compatible slice analyses can
 be reused within the current command, and project compile-time results remain
 cached across commands.
+
+See the [shared type, completed-summary, and parallel lowering follow-up](compiler-structural-3-5-2026-11.md)
+for snapshot invalidation, validation, and measurements.
 
 Both compilers accept separate `--output-dir` and `--cache-dir` paths. Rust's
 default generated directory is `.thor-rust-build/<source>`, so comparisons do not

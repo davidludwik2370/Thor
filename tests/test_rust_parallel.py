@@ -40,6 +40,9 @@ class RustParallelTests(unittest.TestCase):
                         self.assertGreater(profile['counters']['parallel.tasks'], 8)
                         self.assertIn('parser.source', profile['worker_stages'])
                         self.assertIn('emit.serialize', profile['worker_stages'])
+                        self.assertIn('emit.file', profile['worker_stages'])
+                        self.assertGreaterEqual(profile['counters'].get('emit.parallel_files',0),9)
+                        self.assertGreater(profile['counters'].get('resolver.frozen_snapshots',0),0)
                 run, _ = self.profiled(4, command='run', flags=flags)
                 self.assertEqual(run.returncode, 0, run.stderr)
                 self.assertEqual(run.stdout, 'sum 36\n')
@@ -138,6 +141,84 @@ read :: proc(box:Holder($T))->T {return box.value}
                 invalid, _ = self.profiled(4, command='run', flags=flags+['-json-errors'])
                 self.assertEqual(invalid.returncode, 1, invalid.stderr)
                 self.assertIn('read-only slice', invalid.stderr.lower())
+
+    def test_parallel_queries_preserve_big_constants_contexts_generics_and_owned_results(self):
+        (self.app/'a.thor').write_text("""package main
+import "thor:big"
+BASE :: Integer(123456789012345678901234567890)
+RATIO :: Rational(1,3)
+Holder::struct($T:typeid){value:T}
+read::proc(box:Holder($T))->T{return box.value}
+counted::fn()->int{return 6}
+""")
+        (self.app/'b.thor').write_text("""package main
+import "thor:big"
+NEXT :: BASE+1
+TWICE :: RATIO*2
+Cell::struct{value:int}
+Container::struct{using cell:Cell}
+from_container::proc(c:Container)->int{using c;return value}
+""")
+        self.source.write_text(self.program('''
+values:=make([]int,3);defer delete(values)
+values[0]=1;values[1]=2;values[2]=3
+view:>values
+copied:=[v*2 for v in view];defer delete(copied)
+aliased:>read(Holder([]int){view})
+integer:=read(Holder(int){4})
+real:=read(Holder(f64){2.5})
+COUNT :: #run counted()
+if COUNT!=6||integer!=4||real!=2.5||copied[2]!=6||aliased[0]!=1||from_container({{7}})!=7 {
+    panic("parallel contextual queries")
+}
+fmt.println(f"{NEXT} {TWICE} {copied[2]}")
+''','import "thor:big"\nimport "core:fmt"\n'))
+        for flags in (['-debug'],native.UNCHECKED):
+            baseline=None
+            for workers in (1,4,2,4):
+                result,profile=self.profiled(workers,flags=flags)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                generated={str(p.relative_to(self.root/'rust')):p.read_bytes()
+                    for p in (self.root/'rust').rglob('*') if p.is_file()}
+                if baseline is None:baseline=generated
+                else:self.assertEqual(generated,baseline)
+                if workers>1:self.assertIn('emit.file',profile['worker_stages'])
+            result,_=self.profiled(4,command='run',flags=flags)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual(result.stdout,'123456789012345678901234567891 2/3 6\n')
+            self.assertEqual(result.stderr,'')
+
+    def test_parallel_lowering_errors_remain_ordered_and_mapped_to_original_sources(self):
+        self.source.write_text(self.program(''))
+        for name in ('a.thor','z.thor'):
+            (self.app/name).write_text('package main\n'+name[0]+'::proc(){_=f"{3:<9}"}\n')
+        baseline=None
+        for workers in (1,4,2,4):
+            result,profile=self.profiled(workers,flags=['-json-errors'])
+            self.assertNotEqual(result.returncode,0)
+            packet=json.loads(result.stderr)
+            self.assertTrue(all(e['pos']['file'].endswith('/a.thor') for e in packet['errors']),packet)
+            self.assertNotIn('Thor expression',result.stderr)
+            if baseline is None:baseline=(result.stdout,result.stderr)
+            else:self.assertEqual((result.stdout,result.stderr),baseline)
+            if workers>1:self.assertIn('emit.file',profile['worker_stages'])
+
+    def test_deep_member_queries_keep_the_serial_stack_budget(self):
+        depth=1000
+        declarations=['package main','N0::struct{value:int}']
+        declarations += [f'N{n}::struct{{child:N{n-1}}}' for n in range(1,depth+1)]
+        declarations += [f'main::proc(){{root:N{depth};_=root'+'.child'*depth+'.value}']
+        self.source.write_text('\n'.join(declarations)+'\n')
+        (self.app/'part.thor').write_text('package main\nextra::proc(){}\n')
+        baseline=None
+        for workers in (1,4):
+            result,profile=self.profiled(workers,flags=['-debug'])
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            generated={str(p.relative_to(self.root/'rust')):p.read_bytes()
+                for p in (self.root/'rust').rglob('*') if p.is_file()}
+            if baseline is None:baseline=generated
+            else:self.assertEqual(generated,baseline)
+            if workers>1:self.assertIn('emit.file',profile['worker_stages'])
 
 
 if __name__ == '__main__':

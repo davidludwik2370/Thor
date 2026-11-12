@@ -316,7 +316,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         if discovering && this.r.has_demanded_packages() {
             crate::profile::count("permissions.dependency_retries", 1);
-            if let Some(cache) = cache.as_deref_mut() { this.harvest(cache); }
+            if let Some(cache) = cache { this.harvest(cache); }
             this.r.end_symbol_queries(previous_queries);
             return Facts::default();
         }

@@ -197,7 +197,7 @@ impl Resolver<'_> {
             if !changed {
                 break;
             }
-            self.types.clear();
+            self.invalidate_queries();
         }
     }
     pub fn projection(&self, r: Ref) -> Option<Projection> {

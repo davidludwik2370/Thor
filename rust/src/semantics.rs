@@ -30,6 +30,8 @@ pub use contexts::{ContextHint, ParameterWitness};
 pub use typefacts::Substitutions;
 #[path = "typepool.rs"]
 mod typepool;
+#[path = "resolverseed.rs"]
+mod resolverseed;
 pub(crate) use typepool::{SharedType, TypeId, TypeInput};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
@@ -217,6 +219,7 @@ pub struct Resolver<'a> {
     missing_symbols: RefCell<BTreeSet<ImportDemand>>,
     track_import_demands: Cell<bool>,
     types: NodeTable<Type>,
+    base_types: Option<Arc<NodeTable<Type>>>,
     active: HashSet<Ref>,
     planning: HashSet<(Ref, Vec<(String, Type)>)>,
     conditions: RefCell<HashSet<Ref>>,
@@ -232,6 +235,8 @@ pub struct Resolver<'a> {
     using_symbols: HashMap<Ref, usize>,
     symbol_queries: RefCell<Option<HashMap<Ref, Option<usize>>>>,
     metadata: Option<Metadata>,
+    base_metadata: Option<Arc<Metadata>>,
+    base_symbol_queries: Option<Arc<HashMap<Ref, Option<usize>>>>,
     type_pool: RefCell<typepool::TypePool>,
 }
 /// Immutable answers shared by permission, purity and emission queries in the
@@ -338,6 +343,7 @@ impl<'a> Resolver<'a> {
             missing_symbols: RefCell::new(BTreeSet::new()),
             track_import_demands: Cell::new(false),
             types: NodeTable::new(sources.iter().map(|source| source.nodes.len())),
+            base_types: None,
             active: HashSet::new(),
             planning: HashSet::new(),
             conditions: RefCell::new(HashSet::new()),
@@ -353,6 +359,8 @@ impl<'a> Resolver<'a> {
             using_symbols: HashMap::new(),
             symbol_queries: RefCell::new(None),
             metadata: None,
+            base_metadata: None,
+            base_symbol_queries: None,
             type_pool: RefCell::new(typepool::TypePool::default()),
         };
         if base.is_none() {
@@ -514,6 +522,9 @@ impl<'a> Resolver<'a> {
     }
     fn invalidate_queries(&mut self) {
         self.types.clear();
+        self.base_types = None;
+        self.base_metadata = None;
+        self.base_symbol_queries = None;
         if let Some(metadata) = &mut self.metadata { *metadata = Metadata::default(); }
         if let Some(queries) = self.symbol_queries.get_mut() { queries.clear(); }
     }
@@ -630,7 +641,8 @@ impl<'a> Resolver<'a> {
         // ends. Discovery creates a new resolver after loading dependencies;
         // the outstanding package set is never cleared by a cache hit.
         if let Some(value) = self.symbol_queries.borrow().as_ref()
-            .and_then(|queries| queries.get(&reference)).copied() {
+            .and_then(|queries| queries.get(&reference)
+                .or_else(|| self.base_symbol_queries.as_ref()?.get(&reference))).copied() {
             crate::profile::count("lookup.symbol_hits", 1);
             return value;
         }
@@ -1202,7 +1214,8 @@ impl<'a> Resolver<'a> {
                 return typ.clone();
             }
         }
-        if let Some(typ) = self.types.get(&reference) {
+        if let Some(typ) = self.types.get(&reference)
+            .or_else(|| self.base_types.as_ref()?.get(&reference)) {
             return typ.clone();
         }
         if !self.active.insert(reference) {

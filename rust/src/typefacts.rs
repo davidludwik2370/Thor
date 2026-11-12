@@ -25,7 +25,8 @@ impl Resolver<'_> {
     }
     pub(crate) fn shared_record_fields(&mut self, typ: &Type) -> RecordFields {
         let id = self.type_id(typ);
-        if let Some(fields) = self.metadata.as_ref().and_then(|memo| memo.fields.get(&id)) {
+        if let Some(fields) = self.metadata.as_ref().and_then(|memo| memo.fields.get(&id))
+            .or_else(|| self.base_metadata.as_ref()?.fields.get(&id)) {
             crate::profile::count("resolver.field_hits", 1);
             return fields.clone();
         }
@@ -73,7 +74,8 @@ impl Resolver<'_> {
     }
     pub fn member_type(&mut self, typ: &Type, name: &str) -> Type {
         let id = self.type_id(typ);
-        if let Some(member) = self.metadata.as_ref().and_then(|memo| memo.members.get(&id).and_then(|members| members.get(name))) {
+        if let Some(member) = self.metadata.as_ref().and_then(|memo| memo.members.get(&id).and_then(|members| members.get(name)))
+            .or_else(|| self.base_metadata.as_ref()?.members.get(&id)?.get(name)) {
             crate::profile::count("resolver.member_hits", 1);
             return member.clone();
         }
@@ -132,7 +134,8 @@ impl Resolver<'_> {
     /// Retain the actual storage path through promoted `using` fields.
     pub fn member_path(&mut self, typ: &Type, name: &str) -> Option<Vec<String>> {
         let id = self.type_id(typ);
-        if let Some(path) = self.metadata.as_ref().and_then(|memo| memo.paths.get(&id).and_then(|paths| paths.get(name))) {
+        if let Some(path) = self.metadata.as_ref().and_then(|memo| memo.paths.get(&id).and_then(|paths| paths.get(name)))
+            .or_else(|| self.base_metadata.as_ref()?.paths.get(&id)?.get(name)) {
             crate::profile::count("resolver.path_hits", 1);
             return path.clone();
         }
@@ -195,7 +198,8 @@ impl Resolver<'_> {
         found
     }
     pub fn specialized_type(&mut self, r: Ref, bindings: &Substitutions) -> Type {
-        if let Some(typ) = self.metadata.as_ref().and_then(|memo| memo.specialized.get(&r).and_then(|types| types.get(bindings))) {
+        if let Some(typ) = self.metadata.as_ref().and_then(|memo| memo.specialized.get(&r).and_then(|types| types.get(bindings)))
+            .or_else(|| self.base_metadata.as_ref()?.specialized.get(&r)?.get(bindings)) {
             crate::profile::count("resolver.specialized_hits", 1);
             return typ.clone();
         }

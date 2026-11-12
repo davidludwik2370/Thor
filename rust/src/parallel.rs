@@ -2,7 +2,11 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub(crate) fn map<T: Sync, R: Send>(items: &[T], action: impl Fn(&T) -> R + Sync) -> Vec<R> {
-    let workers = std::env::var("THOR_JOBS")
+    map_with_workers(items, workers(), action)
+}
+
+pub(crate) fn workers() -> usize {
+    std::env::var("THOR_JOBS")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|count| *count > 0)
@@ -10,8 +14,18 @@ pub(crate) fn map<T: Sync, R: Send>(items: &[T], action: impl Fn(&T) -> R + Sync
             std::thread::available_parallelism()
                 .map_or(1, usize::from)
                 .min(4)
-        });
-    map_with_workers(items, workers.min(32), action)
+        })
+        .min(32)
+}
+
+/// Construct one mutable state per worker, inside its thread. State is never
+/// shared or returned; only ordered, owned results cross the thread boundary.
+pub(crate) fn map_with_local<T: Sync, R: Send, S>(
+    items: &[T],
+    make: impl Fn() -> S + Sync,
+    action: impl Fn(&mut S, &T) -> R + Sync,
+) -> Vec<R> {
+    map_local_with_workers(items, workers(), make, action)
 }
 
 fn map_with_workers<T: Sync, R: Send>(
@@ -19,9 +33,22 @@ fn map_with_workers<T: Sync, R: Send>(
     workers: usize,
     action: impl Fn(&T) -> R + Sync,
 ) -> Vec<R> {
+    map_local_with_workers(items, workers, || (), |_, item| action(item))
+}
+
+fn map_local_with_workers<T: Sync, R: Send, S>(
+    items: &[T],
+    workers: usize,
+    make: impl Fn() -> S + Sync,
+    action: impl Fn(&mut S, &T) -> R + Sync,
+) -> Vec<R> {
+    if items.is_empty() {
+        return Vec::new();
+    }
     let workers = workers.min(items.len());
     if workers <= 1 {
-        return items.iter().map(action).collect();
+        let mut state = make();
+        return items.iter().map(|item| action(&mut state, item)).collect();
     }
     crate::profile::count("parallel.batches", 1);
     crate::profile::count("parallel.tasks", items.len() as u64);
@@ -31,18 +58,27 @@ fn map_with_workers<T: Sync, R: Send>(
         let handles = (0..workers)
             .map(|_| {
                 let action = &action;
+                let make = &make;
                 let next = &next;
-                scope.spawn(move || {
-                    crate::profile::worker(|| {
-                        let mut results = Vec::new();
-                        loop {
-                            let index = next.fetch_add(1, Ordering::Relaxed);
-                            let Some(item) = items.get(index) else { break };
-                            results.push((index, action(item)));
-                        }
-                        results
+                // Source/type emission can recurse as deeply as the serial
+                // pipeline. Rust's smaller default worker stack regresses valid
+                // deep member expressions that fit on the main thread.
+                std::thread::Builder::new()
+                    .name("thor-worker".into())
+                    .stack_size(8 * 1024 * 1024)
+                    .spawn_scoped(scope, move || {
+                        crate::profile::worker(|| {
+                            let mut state = make();
+                            let mut results = Vec::new();
+                            loop {
+                                let index = next.fetch_add(1, Ordering::Relaxed);
+                                let Some(item) = items.get(index) else { break };
+                                results.push((index, action(&mut state, item)));
+                            }
+                            results
+                        })
                     })
-                })
+                    .expect("failed to spawn independent compiler worker")
             })
             .collect::<Vec<_>>();
         let mut results = Vec::with_capacity(items.len());
@@ -60,6 +96,39 @@ fn map_with_workers<T: Sync, R: Send>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mutable_worker_state_is_local_initialized_once_and_not_required_to_be_send() {
+        for workers in [1, 2, 4] {
+            let initialized = AtomicUsize::new(0);
+            let inputs = (0..80).collect::<Vec<_>>();
+            let results = map_local_with_workers(
+                &inputs,
+                workers,
+                || {
+                    initialized.fetch_add(1, Ordering::Relaxed);
+                    std::rc::Rc::new(std::cell::Cell::new(0))
+                },
+                |state, item| {
+                    state.set(state.get() + 1);
+                    *item * 2
+                },
+            );
+            if initialized.load(Ordering::Relaxed) != workers
+                || results != inputs.iter().map(|item| item * 2).collect::<Vec<_>>()
+            {
+                panic!("worker initialization or result ordering changed");
+            }
+        }
+        let empty = map_local_with_workers::<usize, usize, ()>(
+            &[],
+            4,
+            || panic!("empty batch initialized a worker"),
+            |_, item| *item,
+        );
+        if !empty.is_empty() {
+            panic!("empty batch returned values");
+        }
+    }
     #[test]
     fn results_and_errors_follow_input_order_and_each_item_runs_once() {
         for workers in [1, 2, 4, 32] {

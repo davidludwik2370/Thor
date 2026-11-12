@@ -65,6 +65,10 @@ not changed, and builds without overlays keep the original fast path.
 
 ## Parallelism boundaries
 
+The boundaries below describe this earlier pass. The subsequent
+[structural steps 3–5](compiler-structural-3-5-2026-11.md) add shared type IDs,
+guarded completed summaries, and per-file lowering over a frozen semantic view.
+
 Parsing and output serialization use bounded workers. Purity/slice graphs and
 actual source lowering remain primarily serial and share resolved metadata.
 This pass avoids duplicating their work in independent resolvers merely to

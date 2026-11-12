@@ -49,14 +49,27 @@ impl Hash for SharedType {
 #[derive(Clone, Default)]
 pub(crate) struct TypePool {
     types: HashMap<Arc<Type>, SharedType>,
+    base: Option<Arc<TypePool>>,
 }
 impl TypePool {
+    pub fn fork(base: Arc<Self>) -> Self {
+        Self {
+            types: HashMap::new(),
+            base: Some(base),
+        }
+    }
+    fn len(&self) -> usize {
+        self.types.len() + self.base.as_ref().map_or(0, |base| base.len())
+    }
+    fn get(&self, typ: &Type) -> Option<&SharedType> {
+        self.types.get(typ).or_else(|| self.base.as_ref()?.get(typ))
+    }
     pub fn intern(&mut self, typ: &Type) -> SharedType {
-        if let Some(shared) = self.types.get(typ) {
+        if let Some(shared) = self.get(typ) {
             crate::profile::count("types.intern_hits", 1);
             return shared.clone();
         }
-        let id = TypeId(u32::try_from(self.types.len()).expect("type arena exhausted"));
+        let id = TypeId(u32::try_from(self.len()).expect("type arena exhausted"));
         let mut hash = std::collections::hash_map::DefaultHasher::new();
         typ.hash(&mut hash);
         let raw = Arc::new(typ.clone());
@@ -88,6 +101,26 @@ impl From<SharedType> for TypeInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn worker_type_deltas_keep_base_ids_and_never_mix_new_identities() {
+        let mut parent = TypePool::default();
+        let typ = Type::scalar("int");
+        let base_type = parent.intern(&typ);
+        let seed = Arc::new(parent);
+        let mut a = TypePool::fork(seed.clone());
+        let mut b = TypePool::fork(seed.clone());
+        let fresh_a = a.intern(&Type::Slice(Box::new(typ.clone())));
+        let fresh_b = b.intern(&Type::Slice(Box::new(Type::scalar("f64"))));
+        if a.intern(&typ) != base_type
+            || b.intern(&typ) != base_type
+            || fresh_a.id() == base_type.id()
+            || fresh_a.id() != fresh_b.id()
+            || fresh_a == fresh_b
+            || seed.len() != 1
+        {
+            panic!("local type IDs or canonical storage crossed worker boundaries");
+        }
+    }
     #[test]
     fn identities_share_storage_and_remain_scoped_to_their_arena() {
         let mut pool = TypePool::default();

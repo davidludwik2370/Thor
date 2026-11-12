@@ -4,7 +4,7 @@ use crate::{
     digest::sha256,
     emit::Emitted,
     frontend::{atomic_write, bootstrap, Frontend},
-    lower::{unquote, Lower},
+    lower::unquote,
     semantics::Resolver,
     VERSION,
 };
@@ -34,6 +34,8 @@ mod dependencylookahead;
 mod runtimeview;
 #[path = "sdkmirror.rs"]
 mod sdkmirror;
+#[path = "filelowering.rs"]
+mod filelowering;
 
 #[derive(Clone)]
 pub struct Options {
@@ -643,187 +645,35 @@ impl Project {
         }
         self.collections
             .insert(project_collection.clone(), self.destination.clone());
-        for (file, source) in self.sources.iter().enumerate() {
-            if source.shared_native && !sdk.adapts(&source.path) {
-                continue;
+        let mut jobs=Vec::new();
+        let mut planning_error=None;
+        for (file,source) in self.sources.iter().enumerate() {
+            if source.shared_native && !sdk.adapts(&source.path) { continue; }
+            match filelowering::Job::prepare(self,file,&sdk,&project_collection,&mut paths) {
+                Ok(job)=>jobs.push(job),
+                Err(error)=>{planning_error=Some(error);break;}
             }
-            let mut relative = if source.shared_native {
-                sdk.output(&source.path)
-                    .and_then(|path| {
-                        path.strip_prefix(&self.destination)
-                            .ok()
-                            .map(Path::to_path_buf)
-                    })
-                    .ok_or_else(|| Error::new("adapted SDK file has no output path"))?
-            } else {
-                source
-                    .path
-                    .strip_prefix(&self.common)
-                    .map_err(|_| Error::new("source outside project root"))?
-                    .with_extension("odin")
-            };
-            if self.evaluation.is_some()
-                && relative
-                    .file_name()
-                    .is_some_and(|name| name.to_string_lossy().ends_with("_test.odin"))
-            {
-                relative.set_file_name(format!(
-                    "thor_evaluation_{}_source.odin",
-                    source.prefix.trim_matches('_')
-                ));
-            }
-            if !paths.insert(relative.clone()) {
-                return Err(Error::new(format!(
-                    "generated filename collision: {}",
-                    relative.display()
-                )));
-            }
-            let view = self
-                .evaluation
-                .as_ref()
-                .and_then(|plan| plan.files.get(&source.path))
-                .cloned();
-            let _file = crate::profile::span("emit.file");
-            crate::profile::count("emit.files", 1);
-            let mut lower = Lower::new_with_view(file, &mut resolver, view)?;
-            let mut import_paths = BTreeMap::new();
-            let mut imports = source
-                .nodes
-                .iter()
-                .filter(|node| node.kind == "Import")
-                .map(|node| unquote(&node.op))
-                .collect::<Result<Vec<_>>>()?;
-            if let Some(view) = self
-                .evaluation
-                .as_ref()
-                .and_then(|plan| plan.files.get(&source.path))
-            {
-                imports.extend(view.imports.values().cloned());
-            }
-            for path in imports {
-                let directory = if let Some((collection, suffix)) = path.split_once(':') {
-                    source
-                        .collection_roots
-                        .get(collection)
-                        .map(|root| root.join(suffix))
-                } else {
-                    source.path.parent().map(|parent| parent.join(&path))
-                };
-                if let Some(directory) = directory.and_then(|dir| fs::canonicalize(dir).ok()) {
-                    if self.sources.iter().any(|unit| {
-                        !unit.shared_native && unit.path.parent() == Some(directory.as_path())
-                    }) {
-                        let relative = directory
-                            .strip_prefix(&self.common)
-                            .map_err(|_| Error::new("adapted import outside project root"))?;
-                        let suffix = if relative.as_os_str().is_empty() {
-                            ".".to_string()
-                        } else {
-                            relative.to_string_lossy().into_owned()
-                        };
-                        import_paths.insert(path, format!("{project_collection}:{suffix}"));
-                    }
-                }
-            }
-            if self.evaluation.is_some() {
-                for dependency in &self.sources {
-                    if dependency.shared_native && !sdk.adapts(&dependency.path) {
-                        continue;
-                    }
-                    let directory = dependency.path.parent().unwrap();
-                    let generated = if dependency.shared_native {
-                        sdk.output(directory)
-                            .ok_or_else(|| Error::new("evaluation SDK package has no output"))?
-                    } else {
-                        self.destination
-                            .join(directory.strip_prefix(&self.common).map_err(|_| {
-                                Error::new("evaluation dependency outside project root")
-                            })?)
-                    };
-                    let suffix = generated
-                        .strip_prefix(&self.destination)
-                        .map_err(|_| Error::new("evaluation import outside generated tree"))?;
-                    let suffix = if suffix.as_os_str().is_empty() {
-                        ".".to_owned()
-                    } else {
-                        suffix.to_string_lossy().replace('\\', "/")
-                    };
-                    let path = crate::evaluation::dependency_path(source, directory);
-                    import_paths.insert(path, format!("{project_collection}:{suffix}"));
-                }
-            }
-            lower.remap_imports(import_paths);
-            lower.apply_type_probes(
-                self.type_probes
-                    .iter()
-                    .filter(|(scope, _)| scope.file == file)
-                    .map(|(scope, codes)| (scope.node, codes.clone()))
-                    .collect(),
-                self.type_probe_imports
-                    .get(&file)
-                    .cloned()
-                    .unwrap_or_default(),
-            );
-            lower.apply_evaluation_results(
-                self.evaluated
-                    .iter()
-                    .filter(|(node, _)| node.file == file)
-                    .map(|(node, value)| (node.node, value.clone()))
-                    .collect(),
-            );
-            lower.apply_evaluation_witnesses(
-                self.evaluation_witnesses
-                    .iter()
-                    .filter(|(node, _)| node.file == file)
-                    .map(|(node, witness)| (node.node, witness.clone()))
-                    .collect(),
-            );
-            lower.apply_specialized_results(
-                self.specialized
-                    .iter()
-                    .filter(|(node, _)| node.file == file)
-                    .map(|(node, cases)| (node.node, cases.clone()))
-                    .collect(),
-                self.evaluation_scheduled,
-            );
-            lower.apply_evaluation_skips(
-                self.evaluation_skips
-                    .iter()
-                    .filter(|(node, _)| node.file == file)
-                    .map(|(node, unchecked)| (node.node, *unchecked))
-                    .collect(),
-            );
-            for (token, issue) in lower.apply_privileges(&privileges) {
-                let notes = std::iter::once((issue.seed, "Read-only view declared here."))
-                    .chain(issue.related.iter().map(|site| (*site, "Slice effect occurs here.")))
-                    .map(|(site, message)| crate::purediagnostics::note(&self.sources, site, message))
-                    .collect();
-                self.related.insert(
-                    token,
-                    LoweringNotes { operation: Some(issue.operation), related: notes },
-                );
-            }
-            lower.apply_local_borrowing(&local_borrowing);
-            lower.apply_borrowing(&borrowing);
-            lower.apply_purity(&purity)?;
-            lower.instrument_memory(
-                &self.memory,
-                &memory_collection,
-                &memory_map,
-                if self.file_entry {
-                    source.path == self.options.entry
-                } else {
-                    source.path.parent() == Some(self.options.entry.as_path())
-                },
-            );
-            let (emitted, errors) = lower.finish()?;
-            self.type_sites
-                .extend(std::mem::take(&mut lower.type_sites));
-            self.pure_error_sites
-                .extend(std::mem::take(&mut lower.pure_error_sites));
-            self.errors.extend(errors);
-            planned.push((self.destination.join(relative), (file, emitted)));
         }
+        let inputs=filelowering::Inputs::new(self,&privileges,&purity,&local_borrowing,
+            &borrowing,&memory_collection,&memory_map);
+        let results=if jobs.len()>1 && crate::parallel::workers()>1 && resolver.can_freeze() {
+            let seed=resolver.freeze();
+            crate::profile::count("emit.parallel_files",jobs.len() as u64);
+            crate::parallel::map_with_local(&jobs,||seed.fork(),|worker,job|inputs.emit(worker,job))
+        } else {
+            jobs.iter().map(|job|inputs.emit(&mut resolver,job)).collect()
+        };
+        // Fold in source order, including any planning failure after this prefix.
+        // No successful later worker can mask the first source's error.
+        for (job,result) in jobs.into_iter().zip(results) {
+            let output=result?;
+            self.related.extend(output.related);
+            self.type_sites.extend(output.type_sites);
+            self.pure_error_sites.extend(output.pure_error_sites);
+            self.errors.extend(output.errors);
+            planned.push((self.destination.join(job.relative),(job.file,output.emitted)));
+        }
+        if let Some(error)=planning_error {return Err(error);}
         if self
             .sources
             .iter()

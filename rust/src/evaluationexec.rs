@@ -36,7 +36,7 @@ fn evaluation_cancelled() -> bool {
     false
 }
 
-fn check_cancellation() -> Result<()> {
+pub(super) fn check_cancellation() -> Result<()> {
     if evaluation_cancelled() {
         return Err(Error::new("Compile-time evaluation cancelled."));
     }
