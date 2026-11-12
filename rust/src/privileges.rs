@@ -284,6 +284,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
                 this.summary(proc, Substitutions::new(), None, editor);
                 this.pure_depth = 0;
+                if discovering && this.r.has_demanded_packages() {
+                    crate::profile::event("permissions.incomplete", || serde_json::json!({
+                        "file":this.s(proc).path,"offset":this.s(proc).node(proc.node).span.start,
+                        "packages":this.r.demanded_packages()
+                    }));
+                }
             }
         }
         if discovering && this.r.has_demanded_packages() {

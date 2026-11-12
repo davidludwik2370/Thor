@@ -12,8 +12,9 @@ class RustPreparedExecutionTests(unittest.TestCase):
     write=cached.RustCachedExecutionTests.write
     def invoke(self,**kwargs):
         # Exercise the intermediate prepared-key policy independently of the
-        # still earlier verified-site lookup.
-        shutil.rmtree(self.cache/'scalar-v1',ignore_errors=True)
+        # verified-site lookup and exact-snapshot helper aliases.
+        for namespace in ('scalar-v1','request-v1'):
+            shutil.rmtree(self.cache/namespace,ignore_errors=True)
         return cached.RustCachedExecutionTests.invoke(self,**kwargs)
 
     def test_scalar_reuse_survives_unrelated_runtime_body_edits(self):

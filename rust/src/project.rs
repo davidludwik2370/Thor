@@ -19,6 +19,8 @@ use std::{
 mod backend;
 #[path = "evaluationexec.rs"]
 mod evaluationexec;
+#[path = "evaluationrequest.rs"]
+mod evaluationrequest;
 #[path = "evaluationinstall.rs"]
 mod evaluationinstall;
 pub(crate) use evaluationexec::capture as capture_command;

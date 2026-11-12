@@ -136,7 +136,7 @@ impl Project {
                     }
                 }
             }
-            Self::discover_record_dependencies(&mut resolver, types);
+            let record_packages = Self::discover_record_dependencies(&mut resolver, types);
             let mut roots = vec![];
             let mut requests = vec![];
             for (file, source) in resolver.sources.iter().enumerate() {
@@ -174,7 +174,7 @@ impl Project {
             }
             roots.retain(|root| resolver.sources[root.file].node(root.node).kind == "Procedure");
             let purity = crate::purity::Purity::analyze_from(&mut resolver, &roots);
-            let mut packages = BTreeSet::new();
+            let mut packages = record_packages;
             for request in requests {
                 if let Some(callee) = resolver.sources[request.file].role(request.node, "callee") {
                     Self::referenced_packages(
@@ -229,6 +229,7 @@ impl Project {
                 break;
             }
             inspected.extend(packages.iter().cloned());
+            crate::profile::event("analysis.call_dependencies", || serde_json::json!({"packages":packages,"sources":self.sources.len()}));
             drop(resolver);
             self.discover_type_facts_from(packages)?;
         }
@@ -238,20 +239,24 @@ impl Project {
     /// building effect graphs. This follows data declarations, never unrelated
     /// SDK procedure bodies. The ordinary demand loop remains the fallback for
     /// unresolved generics and recursively expanding type constructors.
-    fn discover_record_dependencies(resolver: &mut Resolver<'_>, mut pending: Vec<crate::semantics::Type>) {
+    fn discover_record_dependencies(resolver: &mut Resolver<'_>, types: Vec<crate::semantics::Type>) -> BTreeSet<PathBuf> {
         use crate::semantics::{Ref, Type};
         let _phase = crate::profile::span("analysis.discover_record_shapes");
         let mut seen = HashSet::new();
+        let mut pending = types.into_iter().map(|typ|(typ,false)).collect::<Vec<_>>();
+        let mut packages = BTreeSet::new();
+        let mut files = HashSet::new();
         let mut expansions = HashMap::<Ref, usize>::new();
         let budget = resolver.sources.iter().map(|source| source.nodes.len()).sum::<usize>().max(1024);
-        while let Some(typ) = pending.pop() {
+        while let Some((typ, indirect)) = pending.pop() {
             if seen.len() >= budget { break; }
-            if !seen.insert(typ.clone()) { continue; }
+            if !seen.insert((typ.clone(),indirect)) { continue; }
             match typ {
-                Type::Pointer(elem) | Type::Slice(elem) | Type::Dynamic(elem) | Type::Set(elem)
+                Type::Pointer(elem) => pending.push((*elem,true)),
+                Type::Slice(elem) | Type::Dynamic(elem) | Type::Set(elem)
                 | Type::Soa(elem) | Type::Nominal(_, elem) | Type::Array { elem, .. }
-                | Type::Fixed { elem, .. } => pending.push(*elem),
-                Type::Map { key, value } => pending.extend([*key, *value]),
+                | Type::Fixed { elem, .. } => pending.push((*elem,indirect)),
+                Type::Map { key, value } => pending.extend([(*key,indirect),(*value,indirect)]),
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                     // Non-regular pointer types can grow their argument on
                     // every step: Node(T).next: ^Node([]T). This is a discovery
@@ -262,9 +267,27 @@ impl Project {
                         if *count >= 32 { continue; }
                         *count += 1;
                     }
-                    pending.extend(resolver.record_fields(&typ).into_iter().map(|(_, typ)| typ));
+                    let fields = resolver.shared_record_fields(&typ);
+                    if indirect && fields.iter().any(|(_, typ)| typ.element().is_some()) {
+                        if let Type::Struct(owner) | Type::Record(owner, _) = &typ {
+                            let source = &resolver.sources[owner.file];
+                            if source.shared_native && files.insert(owner.file) {
+                                // Pointer-reachable SDK contexts often use their
+                                // file's imported helpers in reference-taking APIs.
+                                // Load those declarations together before effects;
+                                // do not walk unrelated SDK procedure bodies.
+                                for node in source.nodes.iter().filter(|node|
+                                    node.kind=="Import" && node.parent==Some(crate::ast::NodeId(0))) {
+                                    if let Ok(path) = unquote(&node.op) {
+                                        packages.extend(Self::referenced_directory(source,&path));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    pending.extend(fields.iter().map(|(_, typ)|(typ.clone(),indirect)));
                 }
-                Type::Union(owner) => pending.extend(resolver.union_variants(owner)),
+                Type::Union(owner) => pending.extend(resolver.union_variants(owner).into_iter().map(|typ|(typ,indirect))),
                 Type::Procedure(owner) => {
                     let source = &resolver.sources[owner.file];
                     let signature = if source.node(owner.node).kind == "Procedure" {
@@ -274,7 +297,7 @@ impl Project {
                         if let Some(fields) = source.role(signature, role) {
                             for field in &source.node(fields).children {
                                 if let Some(node) = source.role(*field, "type") {
-                                    pending.push(resolver.type_of(Ref { file: owner.file, node }));
+                                    pending.push((resolver.type_of(Ref { file: owner.file, node }),false));
                                 }
                             }
                         }
@@ -284,6 +307,8 @@ impl Project {
             }
         }
         crate::profile::count("analysis.record_shapes", seen.len() as u64);
+        crate::profile::count("analysis.record_namespace_files", files.len() as u64);
+        packages
     }
     fn referenced_packages(
         resolver: &Resolver<'_>,

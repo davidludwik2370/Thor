@@ -55,6 +55,58 @@ if work(copy)!=0{panic("record")}
         self.assertEqual(counters.get('permissions.dependency_retries', 0), 0)
         self.assertEqual(counters.get('permissions.analyses', 0), 1)
 
+    def test_pointer_context_namespaces_are_ready_before_permission_graphs(self):
+        overlay=self.sdk_overlay({
+            'core/math/thor_efficiency_context.odin':'''package math
+import "core:mem"
+import "core:strconv"
+Thor_Efficiency_Context::struct{values:[]int}
+thor_efficiency_update::proc(ctx:^Thor_Efficiency_Context)->int{
+    mem.zero_slice(ctx.values)
+    value,ok:=strconv.parse_int("7")
+    if !ok {return 0}
+    return value
+}
+''',
+        })
+        self.source.write_text(self.program('''
+values:=[]int{1,2};ctx:=math.Thor_Efficiency_Context{values}
+answer:>math.thor_efficiency_update(&ctx)
+if answer!=7||values[0]!=0 {panic("context")}
+''','import math "core:math"\n'))
+        for flags in [[],native.UNCHECKED]:
+            profile=self.root/'context-profile.json'
+            result=self.invoke('rust',flags=['--overlay',str(overlay),*flags],
+                               env={**os.environ,'THOR_PROFILE':str(profile)})
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            counters=json.loads(profile.read_text())['counters']
+            self.assertEqual(counters.get('permissions.dependency_retries',0),0,counters)
+            self.assertEqual(counters.get('permissions.analyses',0),1,counters)
+
+    def test_scalar_only_pointer_records_do_not_prefetch_unrelated_namespaces(self):
+        counts=[]
+        for attempt in range(2):
+            overlay=self.sdk_overlay({
+                'core/math/thor_efficiency_scalar_context.odin':'''package math
+import "core:time"
+Thor_Efficiency_Number::struct{value:f64}
+thor_efficiency_read_number::proc(value:^Thor_Efficiency_Number)->f64{return value.value}
+''',
+                'core/time/thor_efficiency_scalar_unused.odin':'package time\n'+
+                    '\n'.join(f'thor_efficiency_unused_{n}::proc()->int{{return {n}}}' for n in range(attempt*200)),
+            })
+            self.source.write_text(self.program('''
+values:>[]math.Thor_Efficiency_Number{{7}}
+copy:=values[0]
+if math.thor_efficiency_read_number(&copy)!=7{panic("scalar context")}
+''','import math "core:math"\n'))
+            profile=self.root/'scalar-profile.json'
+            result=self.invoke('rust',command='check',flags=['--overlay',str(overlay)],
+                               env={**os.environ,'THOR_PROFILE':str(profile)})
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            counts.append(json.loads(profile.read_text())['counters']['parser.nodes'])
+        self.assertEqual(counts[0],counts[1])
+
     def test_concrete_index_helpers_have_no_native_shape_branches(self):
         self.source.write_text(self.program('''values:=[3]int{1,2,3}
 slice:=values[:];i:=1

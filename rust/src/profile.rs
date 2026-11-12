@@ -22,6 +22,7 @@ struct Report {
     worker_stages: BTreeMap<&'static str, Timing>,
     counters: BTreeMap<&'static str, u64>,
     children: Vec<f64>,
+    events: Vec<serde_json::Value>,
 }
 thread_local! { static REPORT: RefCell<Report> = RefCell::new(Report::default()); }
 
@@ -48,7 +49,7 @@ impl Drop for Session {
             let report = report.borrow();
             serde_json::json!({"schema":1,"engine":"rust","thor_version":crate::VERSION,
                 "elapsed_seconds":started.elapsed().as_secs_f64(),
-                "stages":report.stages,"worker_stages":report.worker_stages,"counters":report.counters})
+                "stages":report.stages,"worker_stages":report.worker_stages,"counters":report.counters,"events":report.events})
         });
         let result = serde_json::to_vec_pretty(&packet)
             .map_err(crate::diagnostic::Error::from)
@@ -91,6 +92,11 @@ pub fn count(name: &'static str, amount: u64) {
         REPORT.with(|report| *report.borrow_mut().counters.entry(name).or_default() += amount);
     }
 }
+pub(crate) fn event(name: &'static str, data: impl FnOnce() -> serde_json::Value) {
+    if ENABLED.load(Ordering::Relaxed) {
+        REPORT.with(|report| report.borrow_mut().events.push(serde_json::json!({"name":name,"data":data()})));
+    }
+}
 
 pub(crate) struct WorkerReport(Report);
 
@@ -108,6 +114,7 @@ pub(crate) fn merge_worker(worker: Option<WorkerReport>) {
     let Some(WorkerReport(worker)) = worker else { return };
     REPORT.with(|report| {
         let mut report = report.borrow_mut();
+        report.events.extend(worker.events);
         for (name, count) in worker.counters {
             *report.counters.entry(name).or_default() += count;
         }

@@ -450,7 +450,7 @@ impl Project {
         mode: crate::evaluation::Mode,
     ) -> Result<Executed> {
         let _phase = crate::profile::span("evaluation.native_helper");
-        crate::profile::count("evaluation.helper_preparations", 1);
+        check_cancellation()?;
         let source = &self.sources[expression.file];
         let site = source
             .node(expression.node)
@@ -478,6 +478,25 @@ impl Project {
                 return Err(fail("Compile-time execution supports native targets only; host execution cannot evaluate a cross-target program.".into()));
             }
         }
+        let request_key = self.evaluation_request_key(expression, context, mode);
+        if let Some(cache) = context.cache {
+            let record = cache.borrow().read_record("request-v1", request_key.as_deref());
+            if let Some(record) = record {
+                if let Some(target) = record["target"].as_str().filter(|target| !context.cache_misses.contains(*target)) {
+                    if record.get("inputs").is_some_and(|inputs|
+                        crate::evaluationinputs::Inputs::new(Some(inputs.clone())).valid()) {
+                        let value = cache.borrow_mut().get(Some(target));
+                        if let Some(value) = value {
+                            check_cancellation()?;
+                            cache.borrow_mut().prepared_hits += 1;
+                            crate::profile::count("evaluation.request_hits", 1);
+                            return Ok(Executed { value, target: Some(target.into()) });
+                        }
+                    }
+                }
+            }
+        }
+        crate::profile::count("evaluation.helper_preparations", 1);
         let work = Temporary::new()?;
         let mut helper =
             self.evaluation_helper_with_context(expression, work.path.join("source"), context, mode)?;
@@ -528,12 +547,16 @@ impl Project {
                 &self.options.root,
             )
         });
+        let request_inputs = request_key.as_ref().map(|_| self.evaluation_request_inputs(&helper));
         if let Some(value) = cache.as_mut().and_then(|cache| {
             cache.get(
                 key.as_deref()
                     .filter(|key| !context.cache_misses.contains(*key)),
             )
         }) {
+            if let (Some(cache), Some(inputs)) = (&cache, &request_inputs) {
+                Self::remember_evaluation_request(cache, request_key.as_deref(), key.as_deref(), inputs);
+            }
             return Ok(Executed { value, target: key });
         }
         let executable = work.path.join(format!("helper{}", env::consts::EXE_SUFFIX));
@@ -716,6 +739,9 @@ impl Project {
                 }
             }
             cache.put(key.as_deref(), &value);
+            if let Some(inputs) = &request_inputs {
+                Self::remember_evaluation_request(cache, request_key.as_deref(), key.as_deref(), inputs);
+            }
         }
         Ok(Executed { value, target: key })
     }
