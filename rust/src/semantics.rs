@@ -28,6 +28,9 @@ mod typefacts;
 pub use calls::CallPlan;
 pub use contexts::{ContextHint, ParameterWitness};
 pub use typefacts::Substitutions;
+#[path = "typepool.rs"]
+mod typepool;
+pub(crate) use typepool::{SharedType, TypeId, TypeInput};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct Ref {
@@ -229,15 +232,16 @@ pub struct Resolver<'a> {
     using_symbols: HashMap<Ref, usize>,
     symbol_queries: RefCell<Option<HashMap<Ref, Option<usize>>>>,
     metadata: Option<Metadata>,
+    type_pool: RefCell<typepool::TypePool>,
 }
 /// Immutable answers shared by permission, purity and emission queries in the
 /// same resolver. Binding/evaluation changes invalidate the entire table.
 #[derive(Default)]
 struct Metadata {
     specialized: HashMap<Ref, HashMap<Substitutions, Type>>,
-    fields: HashMap<Type, RecordFields>,
-    members: HashMap<Type, HashMap<String, Type>>,
-    paths: HashMap<Type, HashMap<String, Option<Vec<String>>>>,
+    fields: HashMap<TypeId, RecordFields>,
+    members: HashMap<TypeId, HashMap<String, Type>>,
+    paths: HashMap<TypeId, HashMap<String, Option<Vec<String>>>>,
 }
 pub(crate) type RecordFields = Arc<[(String, Type)]>;
 pub fn is_scope(source: &Source, id: NodeId) -> bool {
@@ -304,6 +308,15 @@ impl<'a> Resolver<'a> {
     pub fn new(sources: &'a [Source]) -> Self {
         Self::with_flags(sources, &[])
     }
+    pub(crate) fn shared_type(&self, typ: impl Into<TypeInput>) -> SharedType {
+        match typ.into() {
+            TypeInput::Owned(typ) => self.type_pool.borrow_mut().intern(&typ),
+            TypeInput::Shared(typ) => typ,
+        }
+    }
+    pub(crate) fn type_id(&self, typ: &Type) -> TypeId {
+        self.type_pool.borrow_mut().intern(typ).id()
+    }
     pub fn with_flags(sources: &'a [Source], flags: &[String]) -> Self {
         Self::with_index(sources, flags, None)
     }
@@ -340,6 +353,7 @@ impl<'a> Resolver<'a> {
             using_symbols: HashMap::new(),
             symbol_queries: RefCell::new(None),
             metadata: None,
+            type_pool: RefCell::new(typepool::TypePool::default()),
         };
         if base.is_none() {
         crate::profile::count("resolver.index_builds", 1);
@@ -2033,10 +2047,11 @@ mod index_tests {
         let mut resolver = Resolver::new(&[]);
         let site = Ref { file: 0, node: NodeId(0) };
         for operation in 0..4 {
+            let id = resolver.type_id(&Type::Unknown);
             let memo = resolver.metadata.as_mut().unwrap();
-            memo.fields.insert(Type::Unknown, vec![("stale".into(), Type::Unknown)].into());
-            memo.members.entry(Type::Unknown).or_default().insert("field".into(), Type::Unknown);
-            memo.paths.entry(Type::Unknown).or_default().insert("field".into(), None);
+            memo.fields.insert(id, vec![("stale".into(), Type::Unknown)].into());
+            memo.members.entry(id).or_default().insert("field".into(), Type::Unknown);
+            memo.paths.entry(id).or_default().insert("field".into(), None);
             memo.specialized.entry(site).or_default().insert(Substitutions::new(), Type::Unknown);
             match operation {
                 0 => resolver.remember_evaluation(site, json!(1)),

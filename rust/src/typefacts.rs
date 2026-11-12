@@ -24,14 +24,15 @@ impl Resolver<'_> {
         self.shared_record_fields(typ).to_vec()
     }
     pub(crate) fn shared_record_fields(&mut self, typ: &Type) -> RecordFields {
-        if let Some(fields) = self.metadata.as_ref().and_then(|memo| memo.fields.get(typ)) {
+        let id = self.type_id(typ);
+        if let Some(fields) = self.metadata.as_ref().and_then(|memo| memo.fields.get(&id)) {
             crate::profile::count("resolver.field_hits", 1);
             return fields.clone();
         }
         let stable = self.active.is_empty() && self.planning.is_empty();
         let fields: RecordFields = self.record_fields_uncached(typ).into();
         if stable && !self.has_demanded_packages() {
-            if let Some(memo) = &mut self.metadata { memo.fields.insert(typ.clone(), fields.clone()); }
+            if let Some(memo) = &mut self.metadata { memo.fields.insert(id, fields.clone()); }
         }
         fields
     }
@@ -71,14 +72,15 @@ impl Resolver<'_> {
         result
     }
     pub fn member_type(&mut self, typ: &Type, name: &str) -> Type {
-        if let Some(member) = self.metadata.as_ref().and_then(|memo| memo.members.get(typ).and_then(|members| members.get(name))) {
+        let id = self.type_id(typ);
+        if let Some(member) = self.metadata.as_ref().and_then(|memo| memo.members.get(&id).and_then(|members| members.get(name))) {
             crate::profile::count("resolver.member_hits", 1);
             return member.clone();
         }
         let stable = self.active.is_empty() && self.planning.is_empty();
         let member = self.member_type_uncached(typ, name);
         if stable && !self.has_demanded_packages() {
-            if let Some(memo) = &mut self.metadata { memo.members.entry(typ.clone()).or_default().insert(name.to_owned(), member.clone()); }
+            if let Some(memo) = &mut self.metadata { memo.members.entry(id).or_default().insert(name.to_owned(), member.clone()); }
         }
         member
     }
@@ -129,14 +131,15 @@ impl Resolver<'_> {
     }
     /// Retain the actual storage path through promoted `using` fields.
     pub fn member_path(&mut self, typ: &Type, name: &str) -> Option<Vec<String>> {
-        if let Some(path) = self.metadata.as_ref().and_then(|memo| memo.paths.get(typ).and_then(|paths| paths.get(name))) {
+        let id = self.type_id(typ);
+        if let Some(path) = self.metadata.as_ref().and_then(|memo| memo.paths.get(&id).and_then(|paths| paths.get(name))) {
             crate::profile::count("resolver.path_hits", 1);
             return path.clone();
         }
         let stable = self.active.is_empty() && self.planning.is_empty();
         let path = self.member_path_seen(typ, name, &mut HashSet::new());
         if stable && !self.has_demanded_packages() {
-            if let Some(memo) = &mut self.metadata { memo.paths.entry(typ.clone()).or_default().insert(name.to_owned(), path.clone()); }
+            if let Some(memo) = &mut self.metadata { memo.paths.entry(id).or_default().insert(name.to_owned(), path.clone()); }
         }
         path
     }

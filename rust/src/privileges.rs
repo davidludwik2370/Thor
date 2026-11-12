@@ -3,7 +3,7 @@
 //! An arena preserves pointer cycles without Rust ownership cycles.
 use crate::{
     ast::NodeId,
-    semantics::{Ref, Resolver, Substitutions, Type},
+    semantics::{Ref, Resolver, Substitutions, Type, SharedType, TypeInput},
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 type V = usize;
@@ -35,7 +35,7 @@ struct Origin {
 type Origins = BTreeSet<Origin>;
 #[derive(Clone, Debug)]
 struct Value {
-    typ: Type,
+    typ: SharedType,
     data: Origins,
     storage: Origins,
     fields: BTreeMap<String, V>,
@@ -46,7 +46,7 @@ struct Value {
     locations: BTreeSet<Path>,
 }
 impl Value {
-    fn new(typ: Type) -> Self {
+    fn new(typ: SharedType) -> Self {
         Self {
             typ,
             data: Origins::new(),
@@ -96,7 +96,7 @@ struct GraphState {
 }
 #[derive(PartialEq, Eq)]
 struct GraphValue {
-    typ: Type,
+    typ: SharedType,
     data: Origins,
     storage: Origins,
     locations: BTreeSet<Path>,
@@ -410,7 +410,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .r
                     .symbol(*name)
                     .and_then(|symbol| self.contexts[c].env.get(&symbol))
-                    .map(|v| self.values[*v].typ.clone())
+                    .map(|v| self.values[*v].typ.owned())
                     .unwrap_or(Type::Unknown);
                 if self.unresolved_value_type(&typ, &mut HashSet::new()) {
                     ready = false;
@@ -438,7 +438,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         self.r
                             .symbol(*name)
                             .and_then(|symbol| self.contexts[c].env.get(&symbol))
-                            .map(|v| self.values[*v].typ.clone())
+                            .map(|v| self.values[*v].typ.owned())
                     })
                     .unwrap_or(Type::Unknown);
                 let value = self.value(typ);
@@ -620,9 +620,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
     fn op(&self, r: Ref) -> String {
         self.s(r).node(r.node).op.clone()
     }
-    fn value(&mut self, typ: Type) -> V {
+    fn value(&mut self, typ: impl Into<TypeInput>) -> V {
         let id = self.values.len();
-        self.values.push(Value::new(typ));
+        self.values.push(Value::new(self.r.shared_type(typ)));
         id
     }
     fn fresh(&mut self, typ: Type, path: Option<Path>) -> V {
@@ -734,7 +734,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 return item;
             }
             let id = self.value(Type::Array {
-                elem: Box::new(self.values[item].typ.clone()),
+                elem: Box::new(self.values[item].typ.owned()),
                 length: Some(name.len() as i128),
             });
             self.values[id].element = Some(item);
@@ -1446,7 +1446,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .get(&symbol)
                 .or(self.globals.get(&symbol))
             {
-                return self.values[*v].typ.clone();
+                return self.values[*v].typ.owned();
             }
         }
         match self.kind(r) {
@@ -1653,7 +1653,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 let elem = self.item(v);
                 let result = self.value(if typ.is_unknown() {
-                    Type::Slice(Box::new(self.values[elem].typ.clone()))
+                    Type::Slice(Box::new(self.values[elem].typ.owned()))
                 } else {
                     typ
                 });
@@ -1692,7 +1692,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                                 vec![],
                             );
                         }
-                        let id = self.value(Type::Pointer(Box::new(self.values[v].typ.clone())));
+                        let id = self.value(Type::Pointer(Box::new(self.values[v].typ.owned())));
                         self.values[id].target = Some(v);
                         id
                     }
@@ -1712,7 +1712,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     );
                 }
                 let id = self.copied(v);
-                self.values[id].typ = typ.clone();
+                self.values[id].typ = self.r.shared_type(typ.clone());
                 if matches!(base_type(&typ), Type::Slice(_)) {
                     let origins = self.values[v]
                         .storage
@@ -1768,7 +1768,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         typ.element()
                     };
                     if let Some(expected) = expected.filter(|t| !t.is_unknown()) {
-                        self.values[incoming].typ = expected.clone();
+                        self.values[incoming].typ = self.r.shared_type(expected.clone());
                     }
                     if expected.is_some_and(opaque) || matches!(base_type(&typ), Type::Set(_)) {
                         let refs = self.refs(incoming);
@@ -1902,7 +1902,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         vec![],
                     );
                 }
-                let id = self.value(Type::Pointer(Box::new(self.values[incoming].typ.clone())));
+                let id = self.value(Type::Pointer(Box::new(self.values[incoming].typ.owned())));
                 self.values[id].target = Some(incoming);
                 id
             } else {
@@ -1951,7 +1951,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     let mut v = self.copied(v);
                     if let Some(annotation) = self.role(r, "type") {
                         let bindings = self.contexts[c].bindings.clone();
-                        self.values[v].typ = self.specialized_type(annotation, &bindings);
+                        let typ = self.specialized_type(annotation, &bindings);
+                        self.values[v].typ = self.r.shared_type(typ);
                     }
                     if self.s(r).node(r.node).immutable {
                         v = self.freeze(v, name)
@@ -2152,7 +2153,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         let typ = if variants.len() == 1 {
                             self.specialized_type(variants[0], &self.contexts[c].bindings.clone())
                         } else {
-                            self.values[original].typ.clone()
+                            self.values[original].typ.owned()
                         };
                         for name in &names {
                             let mut incoming = self.narrow(original, typ.clone());
@@ -2200,7 +2201,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
     }
     fn narrow(&mut self, original: V, typ: Type) -> V {
         let result = self.copied(original);
-        self.values[result].typ = typ.clone();
+        self.values[result].typ = self.r.shared_type(typ.clone());
         if !reference_data(&typ) {
             self.values[result].data.clear();
         }
@@ -2497,7 +2498,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         })
                         .unwrap_or(0);
                     let copy = self.copied(values[index]);
-                    let result = self.value(Type::Pointer(Box::new(self.values[copy].typ.clone())));
+                    let result = self.value(Type::Pointer(Box::new(self.values[copy].typ.owned())));
                     self.values[result].target = Some(copy);
                     let error = self.value(Type::scalar("Allocator_Error"));
                     return self.record(r, c, vec![result, error], true);
@@ -2565,7 +2566,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         vec![],
                     );
                     let item = self.item(values[0]);
-                    let id = self.value(Type::Pointer(Box::new(self.values[item].typ.clone())));
+                    let id = self.value(Type::Pointer(Box::new(self.values[item].typ.owned())));
                     self.values[id].target = Some(item);
                     return id;
                 }
@@ -2638,7 +2639,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .copied()
                     .unwrap_or_else(|| self.value(typ.clone()));
                 let id = self.copied(v);
-                self.values[id].typ = typ.clone();
+                self.values[id].typ = self.r.shared_type(typ.clone());
                 if matches!(base_type(&typ), Type::Slice(_)) {
                     let storage = self.values[v]
                         .storage
@@ -2718,7 +2719,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     let spread = self.s(r).node(r.node).spans.get("ellipsis").copied();
                     if spread.is_none() {
                         let slice =
-                            self.value(Type::Slice(Box::new(self.values[value].typ.clone())));
+                            self.value(Type::Slice(Box::new(self.values[value].typ.owned())));
                         self.values[slice].element = Some(value);
                         for (_, other) in expanded.iter().skip(positional) {
                             let child = self.copied(*other);
@@ -2733,7 +2734,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let mut substitutions = self.contexts[c].bindings.clone();
             let types = bound
                 .iter()
-                .map(|v| self.values[*v].typ.clone())
+                .map(|v| self.values[*v].typ.owned())
                 .collect::<Vec<_>>();
             substitutions.extend(self.r.parameter_bindings(sig, &types));
             substitutions.extend(self.r.constant_parameter_bindings(
@@ -2765,7 +2766,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         let actual = if self.denotes_type(actual_site) {
                             Type::scalar("typeid")
                         } else {
-                            self.values[*v].typ.clone()
+                            self.values[*v].typ.owned()
                         };
                         !self.r.shape_matches(annotation, &actual, &substitutions)
                     })
@@ -3425,7 +3426,7 @@ mod graph_tests {
                 1 => { analysis.values[value].storage.insert(origin.clone()); }
                 2 => { analysis.values[value].locations.insert(origin.path.clone()); }
                 3 => { analysis.values[value].path = Some(origin.path.clone()); }
-                4 => { analysis.values[value].typ = Type::scalar("i64"); }
+                4 => { analysis.values[value].typ = analysis.r.shared_type(Type::scalar("i64")); }
                 5 => { analysis.values[value].fields.insert(format!("field_{step}"), (value + 1) % 8); }
                 6 => { analysis.values[value].element = Some((value + 2) % 8); }
                 7 => { analysis.values[value].target = Some((value + 3) % 8); }
