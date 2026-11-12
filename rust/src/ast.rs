@@ -14,6 +14,8 @@ use std::{
 #[path = "nodefields.rs"]
 mod nodefields;
 pub use nodefields::NodeFields;
+#[path = "astcache.rs"]
+pub(crate) mod cache;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NodeId(pub usize);

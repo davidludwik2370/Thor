@@ -264,6 +264,7 @@ impl Project {
             .and_then(|target| target.split_once('_'))
             .map(|(os, arch)| (os.into(), arch.into()));
         let frontend = Frontend {
+            normalized_cache: false,
             fingerprint: sha256(&fs::read(&parser)?),
             executable: parser,
             odin,
@@ -449,6 +450,7 @@ impl Project {
             && !self.sources.iter().any(|source| source.path == key.0)).collect::<Vec<_>>();
         if pending.is_empty() { return; }
         let mut shared_frontend = self.frontend.clone();
+        shared_frontend.normalized_cache = true;
         if shared_frontend.cache_dir.is_some() {
             shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
         }
@@ -846,6 +848,7 @@ impl Project {
         };
         let mut roots = self.collections.clone();
         let mut frontend = self.frontend.clone();
+        frontend.normalized_cache = true;
         if frontend.cache_dir.is_some() {
             frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
         }

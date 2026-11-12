@@ -20,6 +20,7 @@ pub struct Frontend {
     pub fingerprint: String,
     pub odin: PathBuf,
     pub cache_dir: Option<PathBuf>,
+    pub normalized_cache: bool,
     pub test: bool,
     pub target: Option<(String, String)>,
     pub project_name: String,
@@ -206,9 +207,23 @@ impl Frontend {
         let mut key = self.fingerprint.as_bytes().to_vec();
         key.extend_from_slice(&serde_json::to_vec(&args)?);
         key.extend_from_slice(&bytes);
+        let key = sha256(&key);
+        let normalized = self.cache_dir.as_ref().filter(|_| self.normalized_cache).map(|base| {
+            base.join("rust-syntax-v1").join(crate::ast::cache::revision())
+                .join(format!("{key}.bin"))
+        });
+        if let Some(cache) = &normalized {
+            if let Ok(data) = fs::read(cache) {
+                if let Some(source) = crate::ast::cache::read(path.clone(), raw.into(), thor, &key, &data) {
+                    crate::profile::count("parser.syntax_cache_hits", 1);
+                    crate::profile::count("parser.nodes", source.nodes.len() as u64);
+                    return Ok(source);
+                }
+            }
+        }
         let cache = self.cache_dir.as_ref().map(|base| {
             base.join("rust-parse-v1")
-                .join(format!("{}.json", sha256(&key)))
+                .join(format!("{key}.json"))
         });
         if let Some(cache) = &cache {
             if let Ok(data) = fs::read(cache) {
@@ -217,6 +232,9 @@ impl Frontend {
                     {
                         crate::profile::count("parser.cache_hits", 1);
                         crate::profile::count("parser.nodes", source.nodes.len() as u64);
+                        if let Some(cache) = &normalized {
+                            let _ = atomic_write(cache, &crate::ast::cache::write(&source, &key));
+                        }
                         return Ok(source);
                     }
                 }
@@ -285,6 +303,9 @@ impl Frontend {
             });
         }
         let source = Source::from_frontend_bytes(path, raw, &stdout, thor)?;
+        if let Some(cache) = &normalized {
+            let _ = atomic_write(cache, &crate::ast::cache::write(&source, &key));
+        }
         crate::profile::count("parser.nodes", source.nodes.len() as u64);
         if let Some(cache) = cache {
             // Persist only parser output. Normalization and semantic facts must
