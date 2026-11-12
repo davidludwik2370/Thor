@@ -8,6 +8,8 @@ acceptance corpus is verified on macOS arm64. See the
 [cache/discovery improvements](docs/compiler-cache-discovery-2026-11.md) and the
 [dependency lookahead](docs/compiler-dependency-lookahead-2026-11.md) and the
 [shared type, summary, and parallel lowering pass](docs/compiler-structural-3-5-2026-11.md).
+The [slice-checker follow-up](docs/slice-checker-efficiency-2026-11.md) covers
+permission-root pruning, type-property caching, shared graph storage, and selective replay.
 
 ![Thor](assets/branding/logo-slim.png)
 

@@ -2070,6 +2070,8 @@ cached across commands.
 
 See the [shared type, completed-summary, and parallel lowering follow-up](compiler-structural-3-5-2026-11.md)
 for snapshot invalidation, validation, and measurements.
+The [slice-checker efficiency pass](slice-checker-efficiency-2026-11.md) narrows
+permission roots and reduces repeated type, graph-copying, and convergence work.
 
 Both compilers accept separate `--output-dir` and `--cache-dir` paths. Rust's
 default generated directory is `.thor-rust-build/<source>`, so comparisons do not

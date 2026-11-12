@@ -31,7 +31,7 @@ class RustCompletedSummaryTests(unittest.TestCase):
         return json.loads(path.read_text())['counters']
 
     def test_completed_summaries_survive_namespace_extension(self):
-        prefix='\n'.join(f'reader_{n}::proc(values:[]int)->int{{return values[0]+{n}}}' for n in range(30))
+        prefix='\n'.join(f'reader_{n}::proc(values:[]int)->int{{view:>values;return view[0]+{n}}}' for n in range(30))
         overlay=self.prepare(prefix)
         for flags in [['-debug'],native.UNCHECKED]:
             counts=self.profile(overlay,flags=flags)

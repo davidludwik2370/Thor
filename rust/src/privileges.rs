@@ -9,6 +9,13 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 #[path = "privilegesummaries.rs"]
 mod cached;
 pub(crate) use cached::SummaryCache;
+#[path = "privilegequeries.rs"]
+mod queries;
+#[path = "privilegecow.rs"]
+mod cow;
+use cow::Shared;
+#[path = "privilegework.rs"]
+mod work;
 type V = usize;
 type C = usize;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -20,7 +27,7 @@ enum Step {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Path {
     index: usize,
-    steps: Vec<Step>,
+    steps: Shared<Vec<Step>>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Aspect {
@@ -35,18 +42,18 @@ struct Origin {
     aspect: Aspect,
     seed: Option<Ref>,
 }
-type Origins = BTreeSet<Origin>;
-#[derive(Clone, Debug)]
+type Origins = Shared<BTreeSet<Origin>>;
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Value {
     typ: SharedType,
     data: Origins,
     storage: Origins,
-    fields: BTreeMap<String, V>,
+    fields: Shared<BTreeMap<String, V>>,
     element: Option<V>,
     target: Option<V>,
     base: Option<V>,
     path: Option<Path>,
-    locations: BTreeSet<Path>,
+    locations: Shared<BTreeSet<Path>>,
 }
 impl Value {
     fn new(typ: SharedType) -> Self {
@@ -54,12 +61,12 @@ impl Value {
             typ,
             data: Origins::new(),
             storage: Origins::new(),
-            fields: BTreeMap::new(),
+            fields: Shared::new(),
             element: None,
             target: None,
             base: None,
             path: None,
-            locations: BTreeSet::new(),
+            locations: Shared::new(),
         }
     }
 }
@@ -102,7 +109,7 @@ struct GraphValue {
     typ: SharedType,
     data: Origins,
     storage: Origins,
-    locations: BTreeSet<Path>,
+    locations: Shared<BTreeSet<Path>>,
     path: Option<Path>,
     fields: Vec<(String, V)>,
     children: [Option<V>; 3],
@@ -113,7 +120,7 @@ struct Context {
     callers: BTreeSet<C>,
     bindings: Substitutions,
     env: HashMap<usize, V>,
-    effects: BTreeMap<Origin, Effect>,
+    effects: Shared<BTreeMap<Origin, Effect>>,
     stores: BTreeMap<Path, V>,
     results: Vec<V>,
     expressions: HashMap<Ref, Vec<V>>,
@@ -127,6 +134,7 @@ struct Context {
     event_start: usize,
     event_end: usize,
     cached_events: Option<std::sync::Arc<[cached::FactEvent]>>,
+    revision: u64,
 }
 impl Context {
     fn new(proc: Option<Ref>, bindings: Substitutions) -> Self {
@@ -136,7 +144,7 @@ impl Context {
             callers: BTreeSet::new(),
             bindings,
             env: HashMap::new(),
-            effects: BTreeMap::new(),
+            effects: Shared::new(),
             stores: BTreeMap::new(),
             results: vec![],
             expressions: HashMap::new(),
@@ -147,12 +155,13 @@ impl Context {
             callees: BTreeSet::new(), complete: false, cacheable: true,
             event_start: 0, event_end: 0,
             cached_events: None,
+            revision: 0,
         }
     }
 }
 pub struct Privileges<'a, 'r> {
     r: &'r mut Resolver<'a>,
-    values: Vec<Value>,
+    values: work::Values,
     contexts: Vec<Context>,
     summaries: HashMap<SummaryKey, C>,
     recursive_pending: BTreeSet<C>,
@@ -170,6 +179,9 @@ pub struct Privileges<'a, 'r> {
     library_names: std::cell::RefCell<HashMap<Ref, Option<(String, String)>>>,
     reuse: Option<SummaryCache>,
     fact_events: Vec<cached::FactEvent>,
+    type_properties: HashMap<(crate::semantics::TypeId, queries::Property), bool>,
+    work: HashMap<(C, Ref), work::Dependencies>,
+    work_weight: usize,
 }
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct SummaryKey {
@@ -182,7 +194,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
     fn new(r: &'r mut Resolver<'a>, flags: &[String], discovering: bool) -> Self {
         Self {
             r,
-            values: vec![],
+            values: work::Values::default(),
             contexts: vec![],
             summaries: HashMap::new(),
             recursive_pending: BTreeSet::new(),
@@ -199,6 +211,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             discovering,
             library_names: std::cell::RefCell::new(HashMap::new()),
             reuse: None, fact_events: vec![],
+            type_properties: HashMap::new(),
+            work: HashMap::new(), work_weight: 0,
         }
     }
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
@@ -303,6 +317,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .any(|id| this.s(sig).node(id).kind == "PolyType")
             });
             if editor || !generic || this.s(proc).node(proc.node).data["pure"] == true {
+                crate::profile::count("permissions.root_candidates", 1);
+                if !editor && !this.needs_root(proc) {
+                    crate::profile::count("permissions.roots_skipped", 1);
+                    continue;
+                }
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
                 this.summary(proc, Substitutions::new(), None, editor);
                 this.pure_depth = 0;
@@ -338,9 +357,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
             };
             let before = this.state(c);
             this.pure_depth = usize::from(this.contexts[c].checked);
-            this.statement(body, c);
+            this.body_pass(body, c, true);
             this.pure_depth = 0;
             if !this.state_matches(c, &before) {
+                this.contexts[c].revision += 1;
                 if visits[&c] == 24 {
                     this.conservative_summary(
                         c,
@@ -382,7 +402,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .or_else(|| this.role(*field, "default"))
                         .map(|annotation| this.r.specialized_type(annotation, &bindings))
                         .unwrap_or(Type::Unknown);
-                    if this.unresolved_value_type(&typ, &mut HashSet::new()) {
+                    if this.type_property(&typ, queries::Property::Unresolved) {
                         // A generic value copy may be inline storage or a
                         // borrowed header. Until native conditional ownership
                         // guards are emitted, this is a migration gap, not proof
@@ -435,7 +455,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .and_then(|symbol| self.contexts[c].env.get(&symbol))
                     .map(|v| self.values[*v].typ.owned())
                     .unwrap_or(Type::Unknown);
-                if self.unresolved_value_type(&typ, &mut HashSet::new()) {
+                if self.type_property(&typ, queries::Property::Unresolved) {
                     ready = false;
                 }
                 if self
@@ -673,9 +693,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let id = self.value(self.values[v].typ.clone());
         self.values[id] = self.values[v].clone();
         self.values[id].base = Some(v);
-        self.values[id].storage.extend(origins.clone());
+        self.values[id].storage.extend(origins.iter().cloned());
         if reference_data(&self.values[v].typ) {
-            self.values[id].data.extend(origins);
+            self.values[id].data.extend(origins.iter().cloned());
         }
         id
     }
@@ -683,7 +703,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.merge_seen(dst, src, &mut HashSet::new())
     }
     fn merge_seen(&mut self, dst: V, src: V, seen: &mut HashSet<(V, V)>) -> bool {
-        if dst == src || !seen.insert((dst, src)) {
+        if dst == src || self.values[dst] == self.values[src] {
+            crate::profile::count("permissions.noop_merges", 1);
+            return false;
+        }
+        if !seen.insert((dst, src)) {
             return false;
         }
         let incoming = self.values[src].clone();
@@ -699,17 +723,17 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 &mut self.values[dst].data
             };
             let n = set.len();
-            set.extend(source);
+            set.extend(source.iter().cloned());
             change |= n != set.len();
         }
         let n = self.values[dst].locations.len();
-        self.values[dst].locations.extend(incoming.locations);
+        self.values[dst].locations.extend(incoming.locations.iter().cloned());
         change |= n != self.values[dst].locations.len();
-        for (name, v) in incoming.fields {
-            if let Some(existing) = self.values[dst].fields.get(&name).copied() {
-                change |= self.merge_seen(existing, v, seen)
+        for (name, v) in incoming.fields.iter() {
+            if let Some(existing) = self.values[dst].fields.get(name).copied() {
+                change |= self.merge_seen(existing, *v, seen)
             } else {
-                self.values[dst].fields.insert(name, v);
+                self.values[dst].fields.insert(name.clone(), *v);
                 change = true;
             }
         }
@@ -883,9 +907,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         seen.insert(v, result);
         self.values[result] = old.clone();
         self.values[result].fields.clear();
-        for (name, child) in old.fields {
-            let child = self.snapshot(child, seen);
-            self.values[result].fields.insert(name, child);
+        for (name, child) in old.fields.iter() {
+            let child = self.snapshot(*child, seen);
+            self.values[result].fields.insert(name.clone(), child);
         }
         self.values[result].element = old.element.map(|child| self.snapshot(child, seen));
         self.values[result].target = old.target.map(|child| self.snapshot(child, seen));
@@ -945,7 +969,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let origin = Origin {
             path: Path {
                 index: 0,
-                steps: vec![],
+                steps: Shared::new(),
             },
             aspect: Aspect::Data,
             seed: Some(seed),
@@ -983,6 +1007,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.refs_seen(v, &mut HashSet::new(), 0)
     }
     fn refs_seen(&mut self, v: V, seen: &mut HashSet<V>, depth: usize) -> Origins {
+        let value=&self.values[v];
+        if value.path.is_none() && value.data.is_empty() && value.storage.is_empty()
+            && value.fields.is_empty() && value.element.is_none() && value.target.is_none() && value.base.is_none() {
+            crate::profile::count("permissions.origin_free_leaves", 1);
+            return Origins::new();
+        }
         if !seen.insert(v) {
             return Origins::new();
         }
@@ -998,7 +1028,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return result;
         }
         if self.values[v].path.is_some()
-            && self.contains_slice(&self.values[v].typ.clone(), &mut HashSet::new())
+            && self.type_property(&self.values[v].typ.owned(), queries::Property::Slice)
         {
             match base_type(&self.values[v].typ).clone() {
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
@@ -1194,27 +1224,27 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 seen.insert(v, id);
                 for origin in &old.data {
                     let origins = self.resolve(origin, args);
-                    self.values[id].data.extend(origins);
+                    self.values[id].data.extend(origins.iter().cloned());
                 }
                 return id;
             }
         }
         let id = self.value(old.typ);
         seen.insert(v, id);
-        for origin in old.data {
-            let origins = self.resolve(&origin, args);
-            self.values[id].data.extend(origins);
+        for origin in old.data.iter() {
+            let origins = self.resolve(origin, args);
+            self.values[id].data.extend(origins.iter().cloned());
         }
-        for origin in old.storage {
-            let origins = self.resolve(&origin, args);
+        for origin in old.storage.iter() {
+            let origins = self.resolve(origin, args);
             self.values[id].storage.extend(origins);
         }
         if depth > 16 {
             return id;
         }
-        for (name, child) in old.fields {
-            let child = self.instantiate(child, args, seen, depth + 1);
-            self.values[id].fields.insert(name, child);
+        for (name, child) in old.fields.iter() {
+            let child = self.instantiate(*child, args, seen, depth + 1);
+            self.values[id].fields.insert(name.clone(), child);
         }
         if let Some(child) = old.element {
             let child = self.instantiate(child, args, seen, depth + 1);
@@ -1318,6 +1348,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if let Some(c) = self.restore_summary(&key, caller) { return c; }
         }
         let c = self.contexts.len();
+        crate::profile::count("permissions.summaries_built", 1);
         self.contexts
             .push(Context::new(Some(proc), bindings.clone()));
         self.contexts[c].checked = self.pure_depth > 0;
@@ -1342,7 +1373,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 typ,
                 contract.then_some(Path {
                     index,
-                    steps: vec![],
+                    steps: Shared::new(),
                 }),
             );
             if let Some(symbol) = self.r.symbol(name) {
@@ -1353,7 +1384,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     [Origin {
                         path: Path {
                             index,
-                            steps: vec![],
+                            steps: Shared::new(),
                         },
                         aspect: Aspect::Data,
                         seed: None,
@@ -1396,8 +1427,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if self.depth < 40 {
             if let Some(body) = self.role(proc, "body") {
                 for pass in 0..24 {
+                    crate::profile::count("permissions.body_passes", 1);
                     let before = self.state(c);
-                    self.statement(body, c);
+                    self.body_pass(body, c, pass >= 2);
                     if self.state_matches(c, &before) {
                         break;
                     }
@@ -1413,7 +1445,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     [Origin {
                         path: Path {
                             index,
-                            steps: vec![],
+                            steps: Shared::new(),
                         },
                         aspect: Aspect::All,
                         seed: None,
@@ -1435,6 +1467,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
         self.contexts[c].complete = !self.r.has_demanded_packages();
+        self.contexts[c].revision += 1;
         self.contexts[c].event_end = self.fact_events.len();
         c
     }
@@ -1449,7 +1482,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 [Origin {
                     path: Path {
                         index,
-                        steps: vec![],
+                        steps: Shared::new(),
                     },
                     aspect: Aspect::All,
                     seed: None,
@@ -1762,7 +1795,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             origin
                         })
                         .collect::<Vec<_>>();
-                    self.values[id].data.extend(origins);
+                    self.values[id].data.extend(origins.iter().cloned());
                 }
                 id
             }
@@ -2503,7 +2536,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         }
                     }
                     let result = self.value(Type::Soa(Box::new(Type::Anonymous(fields))));
-                    self.values[result].fields = columns;
+                    self.values[result].fields = columns.into();
                     return result;
                 }
                 "soa_unzip" if !values.is_empty() => {
@@ -2884,7 +2917,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let result_references = result_fields.iter().any(|(_, annotation)| {
                 annotation.is_none_or(|r| {
                     let typ = self.specialized_type(r, &substitutions);
-                    self.contains_slice(&typ, &mut HashSet::new())
+                    self.type_property(&typ, queries::Property::Slice)
                 })
             });
             // As in the reference analyzer, body inspection is needed only
@@ -2919,6 +2952,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.pure_depth += 1;
             }
             let summary = self.summary(candidate, substitutions, Some(c), true);
+            self.note_callee(summary);
             self.pure_depth = old_depth;
             let effects = self.contexts[summary].effects.clone();
             for (origin, effect) in effects {
@@ -3045,7 +3079,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.values[id].data.insert(Origin {
                 path: Path {
                     index: 0,
-                    steps: vec![],
+                    steps: Shared::new(),
                 },
                 aspect: Aspect::Data,
                 seed: Some(seed),
@@ -3449,7 +3483,7 @@ mod graph_tests {
             analysis.contexts[0].env.insert(n, value);
         }
         let site = Ref { file: 0, node: NodeId(0) };
-        let origin = Origin { path: Path { index: 0, steps: vec![] }, aspect: Aspect::Data, seed: Some(site) };
+        let origin = Origin { path: Path { index: 0, steps: Shared::new() }, aspect: Aspect::Data, seed: Some(site) };
         // A cycle and shared child make numeric arena IDs insufficient for equality.
         analysis.values[0].target = Some(0);
         analysis.values[1].fields.insert("shared".into(), 0);
