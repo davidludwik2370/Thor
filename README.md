@@ -946,6 +946,12 @@ Slices reached through an immutable binding become read-only views, including
 nested slice references. Existing writable aliases can still modify the shared
 storage. Pointer targets and dynamic arrays retain their existing behavior.
 Taking an immutable header's mutable address is rejected.
+Immutable slice literals with provably compile-time contents use read-only
+backing storage: `@(rodata)` at package scope and `@(static, rodata)` inside a
+procedure. Local backing is shared between calls, avoiding repeated stack
+initialization. This is a storage optimization; the binding remains a runtime
+value. Runtime initializers and views of existing storage retain their normal
+behavior. See [slice literal storage](docs/slice-access.md#constant-literal-storage).
 Native map entry assignment can change the map header, so it requires a mutable
 header (a mutable shallow copy may still access shared entries). Ordinary Odin
 copying and ownership rules apply; this feature does not add lifetime checking.

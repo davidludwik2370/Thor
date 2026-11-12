@@ -664,6 +664,7 @@ class Source:
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
         owning = set()
         kind = n.kind
+        readonly_data = None
         if kind == 'Import':
             namespace = self.import_names[n]
             path = self.import_code(namespace)
@@ -722,10 +723,12 @@ class Source:
                 namespace, member = self.selected[n.text].split(".", 1)
                 return self.namespace_code(namespace) + "." + member
         if kind == "Declaration":
+            from .readonlydata import attributes
+            readonly_data = attributes(self, n)
             annotation = n.role("type")
             hint = Hint(self, annotation) if annotation else None
             for value in n.group("values"):
-                overrides[value] = (hint, not n.data["mutable"])
+                overrides[value] = (hint, not n.data["mutable"] or readonly_data is not None)
                 if n.data['mutable'] and (len(n.group('values'))==len(n.group('names'))): owning.add(value)
             if len(n.group('values')) == 1 and len(n.group('names')) > 1:
                 from .switches import unwrap
@@ -938,6 +941,8 @@ class Source:
             code = self.big.owned(child, hint, const) if child in owning else self.render(child, hint, const)
             replacements.append((child.start, child.end, code))
         inserts = []
+        if readonly_data:
+            inserts.append((n.start, self.mapping.wrap(readonly_data, self.path, n.start, n.end, 'readonly-data')))
         if n is self.root:
             inserts.extend(self.using_feature_insert())
         if self.defaults and kind == 'Call':

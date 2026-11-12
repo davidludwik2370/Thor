@@ -55,6 +55,8 @@ mod sets;
 mod intervals;
 #[path = "storage.rs"]
 mod storage;
+#[path = "readonlydata.rs"]
+mod readonlydata;
 #[path = "switches.rs"]
 mod switches;
 #[path = "typedloops.rs"]
@@ -95,6 +97,7 @@ pub struct Lower<'a, 'r> {
     meta: bool,
     builtin: bool,
     native_qualification: HashMap<String, bool>,
+    readonly_data_budget: usize,
     pub errors: HashMap<String, String>,
     pub type_sites: HashMap<String, (Ref, String)>,
     pub pure_error_sites: HashMap<String, Ref>,
@@ -168,6 +171,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             meta: false,
             builtin: false,
             native_qualification: HashMap::new(),
+            readonly_data_budget: 0,
             errors: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
@@ -1298,6 +1302,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 return Ok(code);
             }
         }
+        let readonly_data = if kind == "Declaration" { self.readonly_data(id) } else { None };
         let mut overrides: HashMap<NodeId, (Option<Hint>, bool)> = HashMap::new();
         match kind.as_str() {
             "Declaration" => {
@@ -1312,7 +1317,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     None
                 };
                 for value in self.source.group(id, "values") {
-                    overrides.insert(*value, (hint.clone(), !node.mutable));
+                    overrides.insert(*value, (hint.clone(), !node.mutable || readonly_data.is_some()));
                 }
             }
             "Assignment" if !native_type_operand => {
@@ -1578,6 +1583,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             ));
         }
         let mut inserts = if kind=="Call" {self.default_arguments(id)?}else{vec![]};
+        if let Some(attribute) = readonly_data {
+            inserts.push((node.span.start, self.gen(attribute, node.span, "readonly-data")));
+        }
         if id.0 == 0 {
             let has_flag = self.source.info["file_tags"]
                 .as_array()

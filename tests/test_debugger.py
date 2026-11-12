@@ -111,6 +111,29 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_static_readonly_slice_literals_keep_source_breakpoints_and_values(self):
+        text='''package main
+GLOBAL :> []int{1,2}
+main::proc(){
+    values :> []int{7,8}
+    total:=values[0]+values[1]+GLOBAL[0]
+    if total!=16 {panic("literal values")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,6])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        for expression,expected in [('values.len','2'),('values.data[1]','8')]:
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':expression,'context':'watch'})
+            self.assertEqual(value['result'],expected,value)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'total','context':'watch'})
+        self.assertEqual(value['result'],'16',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_vet_corrections_keep_function_breakpoints_and_immutable_locals(self):
         text='''package main
 INPUT:int=3

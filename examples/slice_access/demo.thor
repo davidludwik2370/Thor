@@ -39,6 +39,11 @@ optional_tail :: proc(values: []int) -> (int, []int, bool) {
 Row :: struct {count: int, items: []int}
 
 main :: proc() {
+    // Constant immutable literal backing is embedded as read-only static data.
+    // It is reused across calls and must not be deleted.
+    literal :> []int{1, 2, 3}
+    if sum(literal) != 6 { panic("constant literal") }
+
     println("Read-only views share storage; they do not freeze other aliases.")
     storage := make([]int, 3)
     defer delete(storage) // The view is an alias, not another allocation owner.

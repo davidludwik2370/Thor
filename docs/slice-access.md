@@ -65,6 +65,44 @@ Deleting backing storage and allocator destruction remain manual ownership and
 lifetime responsibilities. A read-only view is not necessarily an owner, so do
 not delete multiple aliases of one allocation.
 
+## Constant literal storage
+
+An immutable slice constructed entirely from proven native constant values can
+use embedded read-only data:
+
+```odin
+TABLE :> []int{1, 2, 3} // Lowers with @(rodata).
+
+example :: proc() {
+    table :> []int{1, 2, 3} // Lowers with @(static, rodata).
+    // The same read-only backing is reused on each call.
+    _ = table
+}
+```
+
+This avoids initializing local literal backing on every invocation. Ordinary
+local slice literals already use stack storage rather than heap allocation;
+this optimization removes the repeated initialization and backing stack space.
+Literal backing is borrowed static data and must not be deleted. The optimization
+does not make `:>` a compile-time constant declaration or extend its write access.
+
+The proof handles native numbers, booleans, strings, enums, constant expressions,
+inline arrays/records and nested slice literals. It follows genuine `::`
+constants and supports contextually typed literals and groups of slice literals.
+Numeric/Boolean/enum `#run` results qualify after evaluation. `#run` strings and
+aggregates retain their existing materialization and ownership rules. The
+optimization never executes an ordinary procedure to decide whether its result
+could be constant.
+
+Runtime values, existing slice views, dynamic containers, allocating logical big
+numbers, unresolved generic shapes and explicit declaration attributes retain
+their existing lowering. In particular, `view :> original` still shares
+`original`'s storage and observes writes through its mutable aliases. Runtime
+slice-to-string view conversions also retain their usual local lifetime.
+Mixed groups containing non-slice initializers and declarations in statement
+headers retain their existing lowering. If the compiler cannot prove eligibility,
+it uses the ordinary implementation without adding a new restriction.
+
 ## Procedure contracts
 
 Thor infers which parameter storage needs writable access. Requirements include

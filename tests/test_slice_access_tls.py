@@ -107,6 +107,32 @@ main::proc(){
         self.assertIn('workspace/semanticTokens/refresh',methods)
         self.assertIsNone(client.process.poll())
 
+    def test_constant_literal_storage_keeps_unsaved_diagnostic_and_token_positions(self):
+        text='''// 😀 source positions
+package main
+GLOBAL :> []int{1,2}
+main::proc(){
+    values :> []int{3,4}
+    if values[1]+GLOBAL[0]!=5 {panic("values")}
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        spans=self.semantic_spans(client,path,text)
+        values=[span for span in spans if span[3]=='values']
+        self.assertEqual(len(values),2,spans)
+        self.assertTrue(all(span[4]&readonly for span in values),values)
+        changed=text.replace('if values[1]+GLOBAL[0]!=5 {panic("values")}','values[0]=9')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+                                           'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+        relevant=[error for error in errors if 'read-only slice' in error['message']]
+        self.assertTrue(relevant,errors)
+        self.assertEqual(relevant[0]['range']['start'],self.position(changed,'values[0]=9',0),errors)
+        self.assertNotIn('Thor expression',json.dumps(errors))
+
     def test_scalar_generic_copies_do_not_get_slice_mutation_hints(self):
         text='package main\ncopy_value::proc(value:$T)->T{local:=value;return local}\nmain::proc(){_=copy_value(7)}\n'
         client,path=self.open(text)
