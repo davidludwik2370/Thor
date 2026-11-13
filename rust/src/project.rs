@@ -244,27 +244,7 @@ impl Project {
             });
         if options.clear_cache {
             crate::evaluationcache::EvaluationCache::new(&cache, true).clear();
-            if let Ok(entries) = fs::read_dir(cache.join("rust-parse-v1")) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if entry.file_type().is_ok_and(|kind| kind.is_file())
-                        && path
-                            .extension()
-                            .is_some_and(|extension| extension == "json")
-                        && path
-                            .file_stem()
-                            .and_then(|name| name.to_str())
-                            .is_some_and(|name| {
-                                name.len() == 64
-                                    && name
-                                        .bytes()
-                                        .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
-                            })
-                    {
-                        let _ = fs::remove_file(path);
-                    }
-                }
-            }
+            crate::frontend::clear_parser_cache(&cache);
         }
         let test = options.command == "test"
             || options.flags.iter().any(|flag| flag == "-build-mode:test");
@@ -275,7 +255,7 @@ impl Project {
             .and_then(|target| target.split_once('_'))
             .map(|(os, arch)| (os.into(), arch.into()));
         let frontend = Frontend {
-            normalized_cache: false,
+            normalized_cache: true,
             fingerprint: sha256(&fs::read(&parser)?),
             executable: parser,
             odin,
@@ -467,8 +447,7 @@ impl Project {
             shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
         }
         let parsed = crate::parallel::map(&pending, |(path, package)| {
-            let frontend = if path.starts_with(self.options.root.join("runtime"))
-                && path.extension().is_some_and(|ext| ext == "odin") {
+            let frontend = if path.starts_with(self.options.root.join("runtime")) {
                 &shared_frontend
             } else { &self.frontend };
             frontend.parse_overlay(path, *package, self.options.overlays.get(path).map(String::as_str))

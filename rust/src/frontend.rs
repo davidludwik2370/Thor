@@ -163,6 +163,43 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     }
     result
 }
+
+pub(crate) fn clear_parser_cache(base: &Path) {
+    fn digest_name(name: &str) -> bool {
+        name.len() == 64 && name.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    }
+    fn clear_files(directory: &Path, extension: &str) {
+        if directory.is_symlink() {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if entry.file_type().is_ok_and(|kind| kind.is_file())
+                && path.extension().is_some_and(|value| value == extension)
+                && path.file_stem().and_then(|value| value.to_str()).is_some_and(digest_name)
+            {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    clear_files(&base.join("rust-parse-v1"), "json");
+    let syntax = base.join("rust-syntax-v1");
+    if syntax.is_symlink() {
+        return;
+    }
+    if let Ok(entries) = fs::read_dir(syntax) {
+        for entry in entries.flatten() {
+            if entry.file_type().is_ok_and(|kind| kind.is_dir())
+                && entry.file_name().to_str().is_some_and(digest_name)
+            {
+                clear_files(&entry.path(), "bin");
+            }
+        }
+    }
+}
 impl Frontend {
     pub fn parse(&self, path: &Path, package: bool) -> Result<Source> {
         self.parse_overlay(path, package, None)

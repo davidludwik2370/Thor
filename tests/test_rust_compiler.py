@@ -658,6 +658,8 @@ release::proc(text:string){}
         self.assertTrue(cache_files)
         for file in cache_files:
             file.write_text('{broken')
+        for file in (self.root/'cache/rust-syntax-v1').glob('*/*.bin'):
+            file.write_bytes(b'broken syntax')
         second = self.invoke('rust', command='check')
         self.assertEqual(second.returncode, 0, second.stderr)
         for file in cache_files:
