@@ -1,0 +1,4883 @@
+{
+  "baseline_commit": "8be73874755902e2d61a49b3e153f757a760f9f3",
+  "implementation_commit": "a42c85602f9cd65a0238998ca53be268f8197059",
+  "compiler_sha256": {
+    "before": "9f03e05d255313a8e00d42b11324d17eef36e498d96b08a7c7b53d13f2d1c498",
+    "after": "8354cdb4d142c2d9caaaaf79752d3b3f2f0170e7eb79092b93187f235675bb14"
+  },
+  "checkpoints": {
+    "thor_syntax": "d3056a23a36ba35b7530f7dd4a1badc5cf050547",
+    "packed_ast": "68b5e86568de771b69424202fce536feea9947d0",
+    "index_extension": "a2498d829af9056475aadc62662a1cdb1b5cd3dd",
+    "signature_layout": "a42c85602f9cd65a0238998ca53be268f8197059"
+  },
+  "paired_transpile": {
+    "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+    "platform": "macOS-15.6-arm64-arm-64bit",
+    "engines": {
+      "before": "/private/tmp/thor-before-ast-index-signatures",
+      "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+    },
+    "profiling": false,
+    "projects": [
+      {
+        "name": "demo",
+        "source_sha256": {
+          "demo.thor": "17f65c74b4b5eb26cf008e9b20c540646d827ec0c757ec9559a08714ce3654b0"
+        },
+        "cold": {
+          "before": {
+            "seconds": 4.7454679170041345,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 1,
+                "misses": 8,
+                "writes": 8
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 5.021988958003931,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 1,
+                "misses": 8,
+                "writes": 8
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.710011208022479,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6796525419922546,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6928166669677012,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.7478368749725632,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6537524579907767,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6616127080051228,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6725129580008797,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.5918587080086581,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.5949985409970395,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6126855830079876,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.5848894999944605,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.6024216249934398,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.5759407909936272,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            },
+            {
+              "seconds": 0.5813728339853697,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 9,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 9
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.6796525419922546,
+          "after": 0.5918587080086581
+        }
+      },
+      {
+        "name": "hilo",
+        "source_sha256": {
+          "hilo.thor": "e45df9d52958940b398f6bbca08b9498fa9dbca8165678a452ea28eba9fa9c13",
+          "original/hilo.thor": "24f65d4f85fe49dd57aee9007e23952c7ad414171ada3916017a84228af5760f"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.246958082949277,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.21418362500844523,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.21980712504591793,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.21490870899287984,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.21305687504354864,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.21592833299655467,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.2304000409785658,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.2191401249729097,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.2180426249979064,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.19342641695402563,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.19061049999436364,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.19220445799874142,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.19359795801574364,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.2010759999975562,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.19818816700717434,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.19117087498307228,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.2180426249979064,
+          "after": 0.19342641695402563
+        }
+      },
+      {
+        "name": "poker",
+        "source_sha256": {
+          "poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+          "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+          "simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+          "poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+          "ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+          "ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.35202962497714907,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.28209204197628424,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.3064276250079274,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.3317155829863623,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.3006740830023773,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.3001110829645768,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.30385750002460554,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.296367833041586,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.3015039999736473,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.265176875051111,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.2689527909969911,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.25315112504176795,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.24906549998559058,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.25209641602123156,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.24651370797073469,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.25586983299581334,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.3015039999736473,
+          "after": 0.25315112504176795
+        }
+      },
+      {
+        "name": "ui_demo",
+        "source_sha256": {
+          "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.5995139590231702,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.5402729579946026,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.5726644579553977,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.572878832987044,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.561891374993138,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5681030839914456,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5604924579965882,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5675879999762401,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5628747079754248,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.48896462499396876,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.48768891696818173,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.48942999995779246,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5054057909874246,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.49312554200878367,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.4968389160349034,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.4956383749959059,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.5675879999762401,
+          "after": 0.49312554200878367
+        }
+      },
+      {
+        "name": "Cricles_on_dots",
+        "source_sha256": {
+          "cricles_on_dots.thor": "ed45dd74341ea0ec47fe9bba139918d36d749234c0b5dd664ae5faa5fdce2feb"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.18253725004615262,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.16382483299821615,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.16761862498242408,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16649820801103488,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1670716250082478,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16977208404568955,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1681632089894265,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16865416703512892,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.17114175000460818,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.14477662497665733,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.14500608295202255,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.14498520898632705,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.14646770898252726,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.14614516700385138,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.14829641696996987,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1466056250501424,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.1681632089894265,
+          "after": 0.14614516700385138
+        }
+      },
+      {
+        "name": "Othello_pvai",
+        "source_sha256": {
+          "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.7483978749951348,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.6788049580063671,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.7127128750435077,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6933974170242436,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6939338340307586,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6899176660226658,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6881741249817424,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6978611669619568,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6955730839981697,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.6036391250090674,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5869079999974929,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5829344170051627,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5873761250404641,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.6153576669748873,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5934907909831963,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.5830820829723962,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.6939338340307586,
+          "after": 0.5873761250404641
+        }
+      },
+      {
+        "name": "many_files",
+        "source_sha256": {
+          "part_09.thor": "cde6c3b5eef7171e768d3fea713ccab7692c3404dfeb25f7d97e1e9b80d88e9a",
+          "part_05.thor": "4e4a68faa0bd793db6f9464a7ba6285921ae1feb5ff480447fdecb0713ccaf13",
+          "part_13.thor": "ecfa24e13067a0ca1167104a446fc91df637a1d21c124747fded1cadad5bdd82",
+          "part_12.thor": "0936b9d708fb7e2a5dedcbb3f976265d3f0a97c831bcfd72d86380994851f456",
+          "part_04.thor": "b5fd25d76cac1f53a8afb437afaa37e6d2e73a0538222daf3b70a84fd04b5115",
+          "part_08.thor": "b5cca2d7f516a4795a30e7d8262b6796e3d05b0d92d5ceabd338a43ed073972b",
+          "part_03.thor": "8028ac1ed31c847cbaf93b5823b8a04c189548133ac7bc78eb64510e54c78856",
+          "part_15.thor": "7b4df6415e8faa6b1550c1839972e9ea36502f5be3b3a76e8f842c209795e69e",
+          "part_19.thor": "77a3d4fe2636cc53b778188b754500114451204a503893a99ddf69d3b2fc145b",
+          "part_23.thor": "90f7bdda4265c7e67a5ec3c0af4105ad6bac7c5f921b56a43431b45a66b2e85d",
+          "part_22.thor": "d2ecafea9be1248c34adb38cafe983b605d42e649532ecaf726fec29b2465774",
+          "part_18.thor": "a31a707fb2ce4773d80e198faf044d4d8fba7b04ced878d5ececdb4b486f7bc7",
+          "part_14.thor": "568d44f5e930b36a8e97f2ad0e2594c9464170518f5f709ce8aeb0359a8da022",
+          "part_02.thor": "2a6761da4cf61a8657d23a3002d7738d06c7a7b7a9540a079e9858171d0aa263",
+          "part_17.thor": "e5465d71ad691200a00319ab0fdefef0d3465ca7e429809dd6a0207e4db63fac",
+          "part_01.thor": "41c5b40e4e053412f3026cfe6f1682a21b51bbd4e414ee9afe689e5497ba20fb",
+          "part_21.thor": "4c75edd81766e4d3b720cb2200e5002eef1138bb6fe5fca3dc8bb53fb9dfef12",
+          "part_20.thor": "3293f4b2a95fd7b735bfc35f757a5bf2559677bfddac89e78654a3cbe9be9df7",
+          "part_00.thor": "e07d58249567f6617b71d818788292df48fd8659872e3d80c0c29292eeb64c89",
+          "part_16.thor": "cd926d42bbb45bed8d429a8a8ddb8879c026ad42c2056be8eeb29201014a0a1c",
+          "part_11.thor": "5a2e3e35137a5693a2c0076d10b27f965d0bb73793ada8529ca21aa4e83ee574",
+          "part_07.thor": "b7c784da05ae7df45de9d2e886eaace204119cfb406fdc3777be6b2a6e58f3de",
+          "part_06.thor": "36b27106ffb45eca4bd129b55663327cfae2b2d8b0a10f88e70e0a5ad3369da2",
+          "part_10.thor": "ee8b61b1e079ffa0d7bba5f48a0a3bd5a636de3f0b9c62e9c5f82dc046c08906",
+          "common.thor": "53118a3883ca36d446eb7d49d827fb789c5b14805f73777a008483e6c9da414b",
+          "main.thor": "76f68fc0be7edfe2f70e854e06214735c20ff340e7e4cb94937aeedad337a307"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.21443766704760492,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.27805295801954344,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.17825550003908575,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.18050870898878202,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.17805058299563825,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.18396620801649988,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.18111424997914582,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1783752499613911,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.17640620796009898,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.1677759580197744,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16792162496130913,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16802087501855567,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16830112499883398,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1697782080154866,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.16994570899987593,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.17010620795190334,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.1783752499613911,
+          "after": 0.16830112499883398
+        }
+      },
+      {
+        "name": "sdk_many",
+        "source_sha256": {
+          "main.thor": "7d891e5d9697acf5a59c7193601cae43e94411142b3648e1122992fa4fab7309"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.14126150001538917,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.20492170803481713,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.12119954102672637,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.12006566696800292,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.12096037500305101,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.12240895797731355,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.12251579097937793,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.12122387503040954,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1219918749993667,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.11066295899217948,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.10887033300241455,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.11072550003882498,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.10886079195188358,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.11086558399256319,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.10769508400699124,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.1078388339956291,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.12122387503040954,
+          "after": 0.10887033300241455
+        }
+      },
+      {
+        "name": "scalar_roots",
+        "source_sha256": {
+          "main.thor": "17af91ee3576002d65810305dee4f007416ed4760c8b19b9450100d918724ffb"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.07496125000761822,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.0844165839953348,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.05800945800729096,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.05878987500909716,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.05872112500946969,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.058388000004924834,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.058545166975818574,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.05787087499629706,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.05784541700268164,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.04932391701731831,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.04906916699837893,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.04983262502355501,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.05005595798138529,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.050202874990645796,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.050305499986279756,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.04928600002313033,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.058388000004924834,
+          "after": 0.04983262502355501
+        }
+      },
+      {
+        "name": "alias_chain",
+        "source_sha256": {
+          "main.thor": "65f51fa52e566b31553b723aa40601480e344582c2b276f6b926dcb2ac8c8e5c"
+        },
+        "cold": {
+          "before": {
+            "seconds": 0.03970229101832956,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          },
+          "after": {
+            "seconds": 0.040047625021543354,
+            "cache": {
+              "thor_cache": {
+                "bypasses": 0,
+                "corrupt": 0,
+                "hits": 0,
+                "misses": 0,
+                "writes": 0
+              },
+              "thor_prepared_hits": 0
+            }
+          }
+        },
+        "warm": {
+          "before": [
+            {
+              "seconds": 0.03278562502237037,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.03295216697733849,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.03281962499022484,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.032488209020812064,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.033365916984621435,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.03263658401556313,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.032518666004762053,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ],
+          "after": [
+            {
+              "seconds": 0.032634500006679446,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.032587042020168155,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.031696166028268635,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.03156895801657811,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.032444374985061586,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.03204179200110957,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            {
+              "seconds": 0.03340091701829806,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          ]
+        },
+        "median_seconds": {
+          "before": 0.03278562502237037,
+          "after": 0.032444374985061586
+        }
+      }
+    ]
+  },
+  "exploratory_stages": {
+    "1": {
+      "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+      "platform": "macOS-15.6-arm64-arm-64bit",
+      "engines": {
+        "before": "/tmp/thor-before-ast-index-signatures",
+        "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+      },
+      "profiling": false,
+      "projects": [
+        {
+          "name": "poker",
+          "source_sha256": {
+            "poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+            "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+            "simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+            "poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+            "ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+            "ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.5442801250028424,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.3263245419948362,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.29212649998953566,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2954204579582438,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2999772499897517,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.28839566704118624,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.29430679202778265,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.2932655409676954,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.30028787499759346,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2877230830490589,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2888638330041431,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.38729525002418086,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.29430679202778265,
+            "after": 0.2932655409676954
+          }
+        },
+        {
+          "name": "ui_demo",
+          "source_sha256": {
+            "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.5873212500009686,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.5837704999721609,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.5775231250445358,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5740397920017131,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5663661250146106,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5553008330170996,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5579962080228142,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.5559509160229936,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.568604750034865,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.551736333000008,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5466670829919167,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5470740410382859,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.5663661250146106,
+            "after": 0.551736333000008
+          }
+        },
+        {
+          "name": "Othello_pvai",
+          "source_sha256": {
+            "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.7420530829695053,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.7473712500068359,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.702812833013013,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6881810419727117,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6996322919731028,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.7008193749934435,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6992939170449972,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.6769597500097007,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6685273749753833,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6791366660036147,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6723393340362236,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6816417090012692,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.6996322919731028,
+            "after": 0.6769597500097007
+          }
+        }
+      ]
+    },
+    "2": {
+      "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+      "platform": "macOS-15.6-arm64-arm-64bit",
+      "engines": {
+        "before": "/tmp/thor-after-thor-syntax-cache",
+        "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+      },
+      "profiling": false,
+      "projects": [
+        {
+          "name": "poker",
+          "source_sha256": {
+            "poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+            "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+            "simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+            "poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+            "ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+            "ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.5291202080552466,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.6991859580157325,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.2903419579961337,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2719149169861339,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2725787500385195,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2699878750136122,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2686411669710651,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.270080832997337,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.26470775000052527,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2591545410105027,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.25709933298639953,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2553704170277342,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.2719149169861339,
+            "after": 0.2591545410105027
+          }
+        },
+        {
+          "name": "ui_demo",
+          "source_sha256": {
+            "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.5718565830029547,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.5455168750486337,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.5307249579927884,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5308280829922296,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5341093750321306,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5340727500151843,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5347682919818908,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.5158910829923116,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5174041659920476,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5184729589964263,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5257864579907618,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5159471249789931,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.5340727500151843,
+            "after": 0.5174041659920476
+          }
+        },
+        {
+          "name": "Othello_pvai",
+          "source_sha256": {
+            "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.7357075000181794,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.9915185420541093,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.6503297080053017,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6492340840050019,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6530652499641292,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6778662920114584,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6597626670263708,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.6293283329578117,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6472654170356691,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6390574999968521,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6748402919620275,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6353076250525191,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.6530652499641292,
+            "after": 0.6390574999968521
+          }
+        }
+      ]
+    },
+    "3": {
+      "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+      "platform": "macOS-15.6-arm64-arm-64bit",
+      "engines": {
+        "before": "/tmp/thor-after-packed-ast",
+        "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+      },
+      "profiling": false,
+      "projects": [
+        {
+          "name": "poker",
+          "source_sha256": {
+            "poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+            "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+            "simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+            "poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+            "ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+            "ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.6198059580055997,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.45833095896523446,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.27642287500202656,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.27969866700004786,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2832946670241654,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2725701250019483,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.29987704200902954,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.24407108401646838,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.26433379197260365,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.24331633298425004,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.24443324998719618,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.26932679099263623,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.27969866700004786,
+            "after": 0.24443324998719618
+          }
+        },
+        {
+          "name": "ui_demo",
+          "source_sha256": {
+            "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.6233272079844028,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.5912132500088774,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.5899632919463329,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5798465840052813,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5545076669659466,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5669351249816827,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5629177499795333,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.5429814170347527,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5274531670147553,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5012683749664575,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5031623750110157,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5125035420060158,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.5669351249816827,
+            "after": 0.5125035420060158
+          }
+        },
+        {
+          "name": "Othello_pvai",
+          "source_sha256": {
+            "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.750733416993171,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.6880582500016317,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.6696440419764258,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6758876660023816,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6762233750196174,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6898438750067726,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.65865220798878,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.6159944579703733,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5825102920061909,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6164356660447083,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5793084999895655,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6237712500151247,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.6758876660023816,
+            "after": 0.6159944579703733
+          }
+        }
+      ]
+    },
+    "4": {
+      "scope": "transpile only; empty project cache then warm runs; shared SDK/parser caches retained; final Odin backend excluded; compile-time helper work included",
+      "platform": "macOS-15.6-arm64-arm-64bit",
+      "engines": {
+        "before": "/tmp/thor-after-incremental-index",
+        "after": "/Users/davidludwik/Thor/rust/target/release/thor-rust"
+      },
+      "profiling": false,
+      "projects": [
+        {
+          "name": "poker",
+          "source_sha256": {
+            "poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+            "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+            "simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+            "poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+            "ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+            "ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.470984417013824,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.2591230420512147,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.24228224996477365,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2355019170208834,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.23745237494586036,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.23570312501396984,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.2361430000164546,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.2398409580346197,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.23623279202729464,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.23736791696865112,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.23438312497455627,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.23705825000070035,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.2361430000164546,
+            "after": 0.23705825000070035
+          }
+        },
+        {
+          "name": "ui_demo",
+          "source_sha256": {
+            "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.5399461250053719,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.5229947500047274,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.4969092920073308,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.49978650000412017,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4954768330208026,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4938172090332955,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.49738941597752273,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.4901689999969676,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.49474466702667996,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.4940436670440249,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.49173691699979827,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.49415170901920646,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.4969092920073308,
+            "after": 0.4940436670440249
+          }
+        },
+        {
+          "name": "Othello_pvai",
+          "source_sha256": {
+            "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+          },
+          "cold": {
+            "before": {
+              "seconds": 0.6619106660364196,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            },
+            "after": {
+              "seconds": 0.673186625004746,
+              "cache": {
+                "thor_cache": {
+                  "bypasses": 0,
+                  "corrupt": 0,
+                  "hits": 0,
+                  "misses": 0,
+                  "writes": 0
+                },
+                "thor_prepared_hits": 0
+              }
+            }
+          },
+          "warm": {
+            "before": [
+              {
+                "seconds": 0.5916950000100769,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5872112920042127,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5897811250179075,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.584210166009143,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5878019579686224,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ],
+            "after": [
+              {
+                "seconds": 0.5869037919910625,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.585635875002481,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5867551250266843,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.5914616250083782,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              },
+              {
+                "seconds": 0.6023091249517165,
+                "cache": {
+                  "thor_cache": {
+                    "bypasses": 0,
+                    "corrupt": 0,
+                    "hits": 0,
+                    "misses": 0,
+                    "writes": 0
+                  },
+                  "thor_prepared_hits": 0
+                }
+              }
+            ]
+          },
+          "median_seconds": {
+            "before": 0.5878019579686224,
+            "after": 0.5869037919910625
+          }
+        }
+      ]
+    }
+  },
+  "exploratory_note": "Stage comparisons are directional checks. Some early stage runs overlapped brief checks/profiling. Only the final quiet unprofiled seven-pair comparison is used for combined latency claims; step 4 is also a quiet five-pair comparison. Its isolated differences are within timing noise.",
+  "warm_index_counters": [
+    {
+      "project": "poker",
+      "source_sha256": {
+        "poker_test.thor": "f0cd2e7495877aa47fe8fb8be1332c5f0376a402433ee29c2b5f99f8f67a1d1b",
+        "judge_test.thor": "9579327c1f098c899b1ec914b2b876b2f4309a6e0f736886a69c9618d732f662",
+        "simulation_test.thor": "93035a51ccbbe38f48535bef936e7e664eece94a07ba43ef09560badd7fe1ecc",
+        "poker.thor": "12051c7e84b0ab57719416db16db074af14daf1e7ce4060d63e9ba3cfeacf3e5",
+        "ref/poker_multi_v1.thor": "1e022ebbc2eafcf0bb186cdce4dbc1bbd6947898baaaf25d6232f78e8ee19a80",
+        "ref/poker_single_thread.thor": "ceb6bd9dbdee4507fd561ca438fdffb18c05a6ee25b408ab1c02c21d4fd8e241"
+      },
+      "before": {
+        "analysis.dependency_lookahead_nodes": 9,
+        "analysis.record_namespace_files": 3,
+        "analysis.record_shapes": 304,
+        "discovery.source_scans": 137,
+        "discovery.type_queries": 1477,
+        "discovery.type_query_reuses": 1304,
+        "discovery.worklist_resets": 1,
+        "emit.files": 1,
+        "lookup.calls": 6049,
+        "lookup.canonical_path_resolutions": 17,
+        "lookup.import_directory_resolutions": 38,
+        "lookup.symbol_hits": 63881,
+        "parallel.batches": 3,
+        "parallel.tasks": 354,
+        "parallel.workers": 12,
+        "parser.cache_hits": 1,
+        "parser.nodes": 120253,
+        "parser.source_requests": 355,
+        "parser.syntax_cache_hits": 354,
+        "permissions.analyses": 2,
+        "permissions.body_passes": 86,
+        "permissions.collection_detaches": 202,
+        "permissions.copy_fields": 1216,
+        "permissions.copy_visits": 3190,
+        "permissions.dependency_retries": 1,
+        "permissions.graph_comparisons": 86,
+        "permissions.graph_snapshots": 86,
+        "permissions.noop_merges": 1110,
+        "permissions.origin_free_leaves": 618,
+        "permissions.reuses": 1,
+        "permissions.root_candidates": 39,
+        "permissions.roots_skipped": 2,
+        "permissions.statements_traced": 23,
+        "permissions.summaries_built": 43,
+        "permissions.summary_entries": 12,
+        "permissions.summary_hits": 10,
+        "permissions.summary_snapshot_values": 382,
+        "permissions.type_property_hits": 232,
+        "permissions.type_property_walks": 39,
+        "permissions.values": 8613,
+        "resolver.call_plan_hits": 344,
+        "resolver.constructions": 5,
+        "resolver.context_reuses": 1,
+        "resolver.field_hits": 852,
+        "resolver.frozen_snapshots": 2,
+        "resolver.index_builds": 3,
+        "resolver.index_reuses": 2,
+        "resolver.member_hits": 526,
+        "resolver.path_hits": 2193,
+        "resolver.resumed_snapshots": 2,
+        "resolver.specialized_hits": 4792,
+        "types.intern_hits": 8442,
+        "types.interned": 162
+      },
+      "after": {
+        "analysis.dependency_lookahead_nodes": 9,
+        "analysis.record_namespace_files": 3,
+        "analysis.record_shapes": 304,
+        "discovery.source_scans": 137,
+        "discovery.type_queries": 1477,
+        "discovery.type_query_reuses": 1304,
+        "discovery.worklist_resets": 1,
+        "emit.files": 1,
+        "lookup.calls": 6049,
+        "lookup.canonical_path_resolutions": 17,
+        "lookup.import_directory_resolutions": 38,
+        "lookup.symbol_hits": 63881,
+        "parallel.batches": 3,
+        "parallel.tasks": 354,
+        "parallel.workers": 12,
+        "parser.nodes": 120253,
+        "parser.source_requests": 355,
+        "parser.syntax_cache_hits": 355,
+        "permissions.analyses": 2,
+        "permissions.body_passes": 86,
+        "permissions.collection_detaches": 202,
+        "permissions.copy_fields": 1216,
+        "permissions.copy_visits": 3190,
+        "permissions.dependency_retries": 1,
+        "permissions.graph_comparisons": 86,
+        "permissions.graph_snapshots": 86,
+        "permissions.noop_merges": 1110,
+        "permissions.origin_free_leaves": 618,
+        "permissions.reuses": 1,
+        "permissions.root_candidates": 39,
+        "permissions.roots_skipped": 2,
+        "permissions.statements_traced": 23,
+        "permissions.summaries_built": 43,
+        "permissions.summary_entries": 12,
+        "permissions.summary_hits": 10,
+        "permissions.summary_snapshot_values": 382,
+        "permissions.type_property_hits": 232,
+        "permissions.type_property_walks": 39,
+        "permissions.values": 8613,
+        "resolver.call_plan_hits": 344,
+        "resolver.constructions": 5,
+        "resolver.context_reuses": 1,
+        "resolver.field_hits": 852,
+        "resolver.frozen_snapshots": 2,
+        "resolver.index_builds": 1,
+        "resolver.index_extensions": 2,
+        "resolver.index_reuses": 4,
+        "resolver.member_hits": 526,
+        "resolver.path_hits": 2193,
+        "resolver.resumed_snapshots": 2,
+        "resolver.signature_layouts": 49,
+        "resolver.specialized_hits": 4792,
+        "resolver.syntax_sources_indexed": 137,
+        "types.intern_hits": 8442,
+        "types.interned": 162
+      }
+    },
+    {
+      "project": "ui_demo",
+      "source_sha256": {
+        "ui_demo.thor": "56461910bfe3733c8ca8fcc46346bd4b2cba6862a889917a2862c0e4885ad6f0"
+      },
+      "before": {
+        "analysis.record_namespace_files": 14,
+        "analysis.record_shapes": 1374,
+        "discovery.source_scans": 110,
+        "discovery.type_queries": 4385,
+        "discovery.type_query_reuses": 1525,
+        "discovery.worklist_resets": 1,
+        "emit.files": 1,
+        "lookup.calls": 18710,
+        "lookup.canonical_path_resolutions": 4,
+        "lookup.import_directory_resolutions": 71,
+        "lookup.symbol_hits": 1188695,
+        "parallel.batches": 3,
+        "parallel.tasks": 127,
+        "parallel.workers": 12,
+        "parser.cache_hits": 1,
+        "parser.nodes": 166271,
+        "parser.source_requests": 128,
+        "parser.syntax_cache_hits": 127,
+        "permissions.analyses": 1,
+        "permissions.body_passes": 185,
+        "permissions.collection_detaches": 2419,
+        "permissions.copy_fields": 724,
+        "permissions.copy_visits": 3193,
+        "permissions.graph_comparisons": 185,
+        "permissions.graph_snapshots": 185,
+        "permissions.noop_merges": 1155,
+        "permissions.origin_free_leaves": 2919,
+        "permissions.reuses": 1,
+        "permissions.root_candidates": 33,
+        "permissions.roots_skipped": 2,
+        "permissions.statements_traced": 42,
+        "permissions.summaries_built": 93,
+        "permissions.type_property_hits": 16109,
+        "permissions.type_property_walks": 81,
+        "permissions.values": 12933,
+        "resolver.call_plan_hits": 944,
+        "resolver.constructions": 4,
+        "resolver.context_reuses": 1,
+        "resolver.field_hits": 2211,
+        "resolver.frozen_snapshots": 2,
+        "resolver.index_builds": 3,
+        "resolver.index_reuses": 1,
+        "resolver.member_hits": 4515,
+        "resolver.path_hits": 16506,
+        "resolver.resumed_snapshots": 2,
+        "resolver.specialized_hits": 12003,
+        "types.intern_hits": 51572,
+        "types.interned": 364
+      },
+      "after": {
+        "analysis.record_namespace_files": 14,
+        "analysis.record_shapes": 1374,
+        "discovery.source_scans": 110,
+        "discovery.type_queries": 4385,
+        "discovery.type_query_reuses": 1525,
+        "discovery.worklist_resets": 1,
+        "emit.files": 1,
+        "lookup.calls": 18710,
+        "lookup.canonical_path_resolutions": 4,
+        "lookup.import_directory_resolutions": 71,
+        "lookup.symbol_hits": 1188695,
+        "parallel.batches": 3,
+        "parallel.tasks": 127,
+        "parallel.workers": 12,
+        "parser.nodes": 166271,
+        "parser.source_requests": 128,
+        "parser.syntax_cache_hits": 128,
+        "permissions.analyses": 1,
+        "permissions.body_passes": 185,
+        "permissions.collection_detaches": 2419,
+        "permissions.copy_fields": 724,
+        "permissions.copy_visits": 3193,
+        "permissions.graph_comparisons": 185,
+        "permissions.graph_snapshots": 185,
+        "permissions.noop_merges": 1155,
+        "permissions.origin_free_leaves": 2919,
+        "permissions.reuses": 1,
+        "permissions.root_candidates": 33,
+        "permissions.roots_skipped": 2,
+        "permissions.statements_traced": 42,
+        "permissions.summaries_built": 93,
+        "permissions.type_property_hits": 16109,
+        "permissions.type_property_walks": 81,
+        "permissions.values": 12933,
+        "resolver.call_plan_hits": 944,
+        "resolver.constructions": 4,
+        "resolver.context_reuses": 1,
+        "resolver.field_hits": 2211,
+        "resolver.frozen_snapshots": 2,
+        "resolver.index_builds": 1,
+        "resolver.index_extensions": 2,
+        "resolver.index_reuses": 3,
+        "resolver.member_hits": 4515,
+        "resolver.path_hits": 16506,
+        "resolver.resumed_snapshots": 2,
+        "resolver.signature_layouts": 198,
+        "resolver.specialized_hits": 12003,
+        "resolver.syntax_sources_indexed": 110,
+        "types.intern_hits": 51572,
+        "types.interned": 364
+      }
+    },
+    {
+      "project": "Othello_pvai",
+      "source_sha256": {
+        "othello.thor": "9248ed919686280725abcaa51907d42d416abdf9369956430d717df7af61dd31"
+      },
+      "before": {
+        "analysis.dependency_lookahead_loads": 1,
+        "analysis.dependency_lookahead_nodes": 490,
+        "analysis.record_namespace_files": 6,
+        "analysis.record_shapes": 876,
+        "discovery.source_scans": 155,
+        "discovery.type_queries": 5974,
+        "discovery.type_query_reuses": 6182,
+        "discovery.worklist_resets": 1,
+        "emit.files": 1,
+        "lookup.calls": 28987,
+        "lookup.canonical_path_resolutions": 26,
+        "lookup.import_directory_resolutions": 101,
+        "lookup.symbol_hits": 528985,
+        "lookup.using_candidates": 11603,
+        "parallel.batches": 4,
+        "parallel.tasks": 476,
+        "parallel.workers": 16,
+        "parser.cache_hits": 1,
+        "parser.nodes": 181914,
+        "parser.source_requests": 477,
+        "parser.syntax_cache_hits": 476,
+        "permissions.analyses": 2,
+        "permissions.body_passes": 256,
+        "permissions.collection_detaches": 58,
+        "permissions.copy_fields": 1072,
+        "permissions.copy_visits": 5269,
+        "permissions.dependency_retries": 1,
+        "permissions.graph_comparisons": 256,
+        "permissions.graph_snapshots": 256,
+        "permissions.noop_merges": 1930,
+        "permissions.origin_free_leaves": 2053,
+        "permissions.reuses": 1,
+        "permissions.root_candidates": 129,
+        "permissions.roots_skipped": 28,
+        "permissions.statements_traced": 16,
+        "permissions.summaries_built": 133,
+        "permissions.summary_entries": 7,
+        "permissions.summary_hits": 7,
+        "permissions.summary_snapshot_values": 107,
+        "permissions.type_property_hits": 1062,
+        "permissions.type_property_walks": 81,
+        "permissions.values": 14932,
+        "projection.reference_visits": 1968,
+        "resolver.call_plan_hits": 1946,
+        "resolver.constructions": 6,
+        "resolver.context_reuses": 1,
+        "resolver.field_hits": 1159,
+        "resolver.frozen_snapshots": 2,
+        "resolver.index_builds": 4,
+        "resolver.index_reuses": 2,
+        "resolver.member_hits": 2173,
+        "resolver.path_hits": 2579,
+        "resolver.resumed_snapshots": 2,
+        "resolver.specialized_hits": 13585,
+        "types.intern_hits": 20738,
+        "types.interned": 303
+      },
+      "after": {
+        "analysis.dependency_lookahead_loads": 1,
+        "analysis.dependency_lookahead_nodes": 490,
+        "analysis.record_namespace_files": 6,
+        "analysis.record_shapes": 876,
+        "discovery.source_scans": 155,
+        "discovery.type_queries": 5974,
+        "discovery.type_query_reuses": 6182,
+        "discovery.worklist_resets": 1,
+        "emit.files": 1,
+        "lookup.calls": 28987,
+        "lookup.canonical_path_resolutions": 26,
+        "lookup.import_directory_resolutions": 101,
+        "lookup.symbol_hits": 528985,
+        "lookup.using_candidates": 11603,
+        "parallel.batches": 4,
+        "parallel.tasks": 476,
+        "parallel.workers": 16,
+        "parser.nodes": 181914,
+        "parser.source_requests": 477,
+        "parser.syntax_cache_hits": 477,
+        "permissions.analyses": 2,
+        "permissions.body_passes": 256,
+        "permissions.collection_detaches": 58,
+        "permissions.copy_fields": 1072,
+        "permissions.copy_visits": 5269,
+        "permissions.dependency_retries": 1,
+        "permissions.graph_comparisons": 256,
+        "permissions.graph_snapshots": 256,
+        "permissions.noop_merges": 1930,
+        "permissions.origin_free_leaves": 2053,
+        "permissions.reuses": 1,
+        "permissions.root_candidates": 129,
+        "permissions.roots_skipped": 28,
+        "permissions.statements_traced": 16,
+        "permissions.summaries_built": 133,
+        "permissions.summary_entries": 7,
+        "permissions.summary_hits": 7,
+        "permissions.summary_snapshot_values": 107,
+        "permissions.type_property_hits": 1062,
+        "permissions.type_property_walks": 81,
+        "permissions.values": 14932,
+        "projection.reference_visits": 1968,
+        "resolver.call_plan_hits": 1946,
+        "resolver.constructions": 6,
+        "resolver.context_reuses": 1,
+        "resolver.field_hits": 1159,
+        "resolver.frozen_snapshots": 2,
+        "resolver.index_builds": 1,
+        "resolver.index_extensions": 3,
+        "resolver.index_reuses": 5,
+        "resolver.member_hits": 2173,
+        "resolver.path_hits": 2579,
+        "resolver.resumed_snapshots": 2,
+        "resolver.signature_layouts": 174,
+        "resolver.specialized_hits": 13585,
+        "resolver.syntax_sources_indexed": 155,
+        "types.intern_hits": 20738,
+        "types.interned": 303
+      }
+    }
+  ],
+  "validation": {
+    "core": {
+      "methods": 199,
+      "seconds": 444.796,
+      "status": "passed"
+    },
+    "emission": {
+      "methods": 167,
+      "seconds": 613.795,
+      "status": "passed"
+    },
+    "tls-vet": {
+      "methods": 53,
+      "seconds": 151.487,
+      "status": "passed"
+    },
+    "debugger": {
+      "methods": 43,
+      "seconds": 120.525,
+      "status": "passed"
+    },
+    "native_configurations": [
+      "checked/debug",
+      "-o:speed -disable-assert -no-bounds-check -no-type-assert"
+    ],
+    "new_compiler_methods": 11,
+    "new_rust_units": 4,
+    "rust_units": {
+      "debug": 74,
+      "release": 74,
+      "status": "passed"
+    },
+    "clippy": {
+      "all_targets": true,
+      "warnings_denied": true,
+      "status": "passed"
+    },
+    "assertion_hygiene": {
+      "methods": 7,
+      "status": "passed"
+    },
+    "corpus": {
+      "builds": 204,
+      "valid": 190,
+      "expected_invalid": 14,
+      "status_changes": [],
+      "project_suite_runs": 12,
+      "project_suite_failures": [],
+      "original_file_changes": []
+    },
+    "scope": "Focused native compiler, TLS, debugger and vet groups; copied corpus build outcomes and four project test suites in three variants. Not a full repository-suite claim.",
+    "synthetic_benchmark_execution": "Both compilers execute the generated scalar and alias fixtures with assertions, bounds checks and type assertions disabled before timing. Real benchmark projects are copied and checked after timing.",
+    "timing_isolation": "All test/build jobs completed before the final latency comparison. Profiling was disabled for that comparison.",
+    "preexisting_limitations": "Previously recorded contextual #run array inference and unoptimized development-executable deep-stack limitations remain outside this optimization pass; see sdk-resolver-efficiency-2026-11.md. Shipping release deep-member stress and live debug tests passed."
+  }
+}

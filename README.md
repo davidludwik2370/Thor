@@ -12,6 +12,8 @@ The [slice-checker follow-up](docs/slice-checker-efficiency-2026-11.md) covers
 permission-root pruning, type-property caching, shared graph storage, and selective replay.
 The [SDK and resolver pass](docs/sdk-resolver-efficiency-2026-11.md) covers compact
 syntax caching, semantic state transfer, dependency worklists and complete call plans.
+The [AST and index pass](docs/ast-index-efficiency-2026-11.md) extends project
+syntax caching, packs AST lists, and reuses dependency indexes and signature layouts.
 
 ![Thor](assets/branding/logo-slim.png)
 
