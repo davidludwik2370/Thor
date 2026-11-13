@@ -76,6 +76,7 @@ fn main() -> ExitCode {
     }
 }
 fn run(mut args: Vec<String>) -> Result<i32> {
+    let setup = thor_compiler::profile::span("command.setup");
     if args.first().is_some_and(|arg| arg == "new") {
         let root = env::var_os("THOR_ROOT")
             .map(PathBuf::from)
@@ -451,10 +452,11 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             "application packaging options are only supported by thor publish",
         ));
     }
+    drop(setup);
     if options.command == "publish" {
         return thor_compiler::publishing::run(options, publishing);
     }
-    let mut project = Project::new(options)?;
+    let mut project = thor_compiler::profile::Owned::new("project.teardown", Project::new(options)?);
     if project.options.command == "ast" {
         let sources: Vec<_> = project
             .sources

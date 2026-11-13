@@ -571,6 +571,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         (state, ids, queue)
     }
     fn state(&self, c: C) -> GraphState {
+        let _phase = crate::profile::span("permissions.snapshot");
         crate::profile::count("permissions.graph_snapshots", 1);
         let (mut state, mut ids, mut queue) = self.state_roots(c);
         let mut values = vec![];
@@ -601,6 +602,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
     /// Compare the current canonical graph directly with the saved snapshot.
     /// Equality remains exact; no hashes or mutation counters stand in for it.
     fn state_matches(&self, c: C, expected: &GraphState) -> bool {
+        let _phase = crate::profile::span("permissions.compare");
         crate::profile::count("permissions.graph_comparisons", 1);
         let (state, mut ids, mut queue) = self.state_roots(c);
         if state.roots != expected.roots || state.results != expected.results
@@ -664,6 +666,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.s(r).node(r.node).op.clone()
     }
     fn value(&mut self, typ: impl Into<TypeInput>) -> V {
+        crate::profile::count("permissions.values", 1);
         let id = self.values.len();
         self.values.push(Value::new(self.r.shared_type(typ)));
         id
@@ -917,6 +920,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
         result
     }
     fn copy_seen(&mut self, v: V, seen: &mut HashMap<V, V>) -> V {
+        let _phase = seen.is_empty().then(||crate::profile::span("permissions.copy"));
+        crate::profile::count("permissions.copy_visits", 1);
         if let Some(id) = seen.get(&v) {
             return *id;
         }
@@ -934,6 +939,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         match base_type(&old.typ) {
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                 let fields = self.record_fields(&old.typ);
+                crate::profile::count("permissions.copy_fields", fields.len() as u64);
                 for (name, _) in fields.iter() {
                     let child = self.member(v, name);
                     let copy = self.copy_seen(child, seen);
@@ -1004,6 +1010,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn refs(&mut self, v: V) -> Origins {
+        let _phase = crate::profile::span("permissions.references");
         self.refs_seen(v, &mut HashSet::new(), 0)
     }
     fn refs_seen(&mut self, v: V, seen: &mut HashSet<V>, depth: usize) -> Origins {
@@ -1213,6 +1220,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn instantiate(&mut self, v: V, args: &[V], seen: &mut HashMap<V, V>, depth: usize) -> V {
+        let _phase = (depth == 0).then(||crate::profile::span("permissions.instantiate"));
         if let Some(id) = seen.get(&v) {
             return *id;
         }

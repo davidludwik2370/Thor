@@ -64,6 +64,18 @@ collection roots, or new Thor files discard the discovery worklist. Existing
 source/node order is preserved. This is command-local reuse, not an incremental
 project artifact cache.
 
+## Attributing remaining time
+
+Opt-in profiling now separates CLI setup, resolver destruction and final project
+destruction. On warm copied projects, final project teardown accounts for about
+66 ms (Poker), 92 ms (UI), and 102 ms (Othello AI). Permission graph copying takes
+only about 1–2 ms in these samples, so changing its semantics or adding a broad
+POD-copy shortcut would have little headroom. Further permission work is guided
+by function-level timings rather than assuming record expansion is dominant.
+
+Profiler worker durations are aggregate CPU-side measurements and overlap wall
+time. They must not be added to the parent's spans or treated as command latency.
+
 ## Investigation notes
 
 The explicit contextual array call `#run add([3,4])` with a `[2]i8` parameter was

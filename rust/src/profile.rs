@@ -92,6 +92,27 @@ pub fn count(name: &'static str, amount: u64) {
         REPORT.with(|report| *report.borrow_mut().counters.entry(name).or_default() += amount);
     }
 }
+
+/// Attribute destruction without changing object lifetime or cleanup behavior.
+/// Ordinary compilation still performs exactly the same drop operations.
+pub fn destroy<T>(name: &'static str, value: T) {
+    let _phase = span(name);
+    drop(value);
+}
+pub struct Owned<T> { value: Option<T>, name: &'static str }
+impl<T> Owned<T> {
+    pub fn new(name: &'static str, value: T) -> Self { Self {value:Some(value), name} }
+}
+impl<T> std::ops::Deref for Owned<T> {
+    type Target = T;
+    fn deref(&self) -> &T { self.value.as_ref().expect("live profiled owner") }
+}
+impl<T> std::ops::DerefMut for Owned<T> {
+    fn deref_mut(&mut self) -> &mut T { self.value.as_mut().expect("live profiled owner") }
+}
+impl<T> Drop for Owned<T> {
+    fn drop(&mut self) { destroy(self.name, self.value.take()); }
+}
 pub(crate) fn event(name: &'static str, data: impl FnOnce() -> serde_json::Value) {
     if ENABLED.load(Ordering::Relaxed) {
         REPORT.with(|report| report.borrow_mut().events.push(serde_json::json!({"name":name,"data":data()})));

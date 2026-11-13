@@ -672,11 +672,13 @@ impl Project {
         let inputs=filelowering::Inputs::new(self,&privileges,&purity,&local_borrowing,
             &borrowing,&memory_collection,&memory_map);
         let results=if jobs.len()>1 && crate::parallel::workers()>1 && resolver.can_freeze() {
-            let seed=resolver.freeze();
+            let seed=crate::profile::Owned::new("analysis.resolver_teardown", resolver.freeze());
             crate::profile::count("emit.parallel_files",jobs.len() as u64);
             crate::parallel::map_with_local(&jobs,||seed.fork(),|worker,job|inputs.emit(worker,job))
         } else {
-            jobs.iter().map(|job|inputs.emit(&mut resolver,job)).collect()
+            let results = jobs.iter().map(|job|inputs.emit(&mut resolver,job)).collect();
+            crate::profile::destroy("analysis.resolver_teardown", resolver);
+            results
         };
         // Fold in source order, including any planning failure after this prefix.
         // No successful later worker can mask the first source's error.

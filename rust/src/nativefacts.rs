@@ -102,7 +102,7 @@ impl Project {
                 .iter()
                 .any(|source| source.path.parent() == Some(directory))
         });
-        drop(resolver);
+        crate::profile::destroy("analysis.resolver_teardown", resolver);
         if !packages.is_empty() {
             self.discover_type_facts_from(packages)?;
         }
@@ -207,7 +207,7 @@ impl Project {
             crate::profile::event("analysis.import_demands", || serde_json::json!(
                 demands.iter().map(|d| (&self.sources[d.file].path,&d.path,&d.name)).collect::<Vec<_>>()));
             crate::profile::event("analysis.call_dependencies", || serde_json::json!({"packages":packages,"sources":self.sources.len()}));
-            drop(resolver);
+            crate::profile::destroy("analysis.resolver_teardown", resolver);
             self.discover_type_facts_from(packages)?;
             // Follow only declarations behind names this analysis requested.
             // Batch their transitive name dependencies before another graph.
@@ -221,7 +221,7 @@ impl Project {
                 inspected.extend(packages.iter().cloned());
                 demands = resolver.demanded_symbols();
                 crate::profile::count("analysis.dependency_lookahead_loads", 1);
-                drop(resolver);
+                crate::profile::destroy("analysis.resolver_teardown", resolver);
                 self.discover_type_facts_from(packages)?;
             }
         }
