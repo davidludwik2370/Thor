@@ -456,7 +456,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
     if options.command == "publish" {
         return thor_compiler::publishing::run(options, publishing);
     }
-    let mut project = thor_compiler::profile::Owned::new("project.teardown", Project::new(options)?);
+    let mut project = thor_compiler::profile::Owned::with_cleanup("project.teardown", Project::new(options)?, Project::release);
     if project.options.command == "ast" {
         let sources: Vec<_> = project
             .sources

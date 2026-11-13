@@ -63,6 +63,7 @@ fn run(request: &Value) -> Value {
                     fingerprint: String::new(),
                     odin: PathBuf::from("odin"),
                     cache_dir: None,
+                    normalized_cache: false,
                     test: false,
                     target: None,
                     project_name: "input".into(),

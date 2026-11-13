@@ -62,6 +62,14 @@ impl Resolver<'_> {
         self.sources[actual.file].node(actual.node).kind == "AutoCast"
     }
     pub fn call_plans(&mut self, call: Ref, context: &Substitutions) -> Vec<CallPlan> {
+        let _phase = crate::profile::span("resolver.call_plans");
+        if let Some(plans) = self.metadata.as_ref().and_then(|m|m.calls.get(&call)?.get(context))
+            .or_else(||self.base_metadata.as_ref()?.calls.get(&call)?.get(context)) {
+            crate::profile::count("resolver.call_plan_hits", 1);
+            return plans.clone();
+        }
+        let stable = self.active.is_empty() && self.planning.is_empty() && self.conditions.borrow().is_empty();
+        let epoch = self.incomplete_plans.get();
         let key = (
             call,
             context
@@ -70,10 +78,24 @@ impl Resolver<'_> {
                 .collect(),
         );
         if !self.planning.insert(key.clone()) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return vec![];
         }
         let plans = self.plan_calls(call, context);
         self.planning.remove(&key);
+        // Retain only a unique plan with fully known inputs/bindings. Partial,
+        // ambiguous, recursively curtailed and unloaded-import plans take the
+        // existing planner path on their next use.
+        if stable && plans.len() == 1 && !self.has_demanded_packages()
+            && context.values().all(Type::resolved)
+            && plans[0].bindings.values().all(Type::resolved)
+            && plans[0].arguments.iter().flatten()
+                .all(|arg|self.specialized_type(*arg,context).resolved())
+            && epoch == self.incomplete_plans.get() && !self.has_demanded_packages() {
+            if let Some(memo) = &mut self.metadata {
+                memo.calls.entry(call).or_default().insert(context.clone(),plans.clone());
+            }
+        }
         plans
     }
 

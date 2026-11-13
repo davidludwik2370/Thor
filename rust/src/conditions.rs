@@ -44,6 +44,7 @@ impl Resolver<'_> {
         seen: &mut HashSet<Ref>,
     ) -> Option<bool> {
         if !seen.insert(r) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return None;
         }
         if let Some(Constant::Boolean(value)) = self.constant_value(r, bindings, None) {

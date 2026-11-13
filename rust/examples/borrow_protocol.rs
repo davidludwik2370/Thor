@@ -85,6 +85,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         fingerprint: String::new(),
         odin,
         cache_dir: None,
+        normalized_cache: false,
         test: false,
         target: None,
         project_name: String::new(),

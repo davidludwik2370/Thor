@@ -29,6 +29,7 @@ fn run(request: &Value) -> Value {
             fingerprint: String::new(),
             odin: "odin".into(),
             cache_dir: None,
+            normalized_cache: false,
             test: false,
             target: None,
             project_name: "cache".into(),

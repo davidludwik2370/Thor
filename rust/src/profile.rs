@@ -99,9 +99,12 @@ pub fn destroy<T>(name: &'static str, value: T) {
     let _phase = span(name);
     drop(value);
 }
-pub struct Owned<T> { value: Option<T>, name: &'static str }
+pub struct Owned<T> { value: Option<T>, name: &'static str, cleanup: fn(T) }
 impl<T> Owned<T> {
-    pub fn new(name: &'static str, value: T) -> Self { Self {value:Some(value), name} }
+    pub fn new(name: &'static str, value: T) -> Self { Self::with_cleanup(name,value,drop) }
+    pub fn with_cleanup(name: &'static str, value: T, cleanup: fn(T)) -> Self {
+        Self {value:Some(value), name, cleanup}
+    }
 }
 impl<T> std::ops::Deref for Owned<T> {
     type Target = T;
@@ -111,7 +114,10 @@ impl<T> std::ops::DerefMut for Owned<T> {
     fn deref_mut(&mut self) -> &mut T { self.value.as_mut().expect("live profiled owner") }
 }
 impl<T> Drop for Owned<T> {
-    fn drop(&mut self) { destroy(self.name, self.value.take()); }
+    fn drop(&mut self) {
+        let _phase = span(self.name);
+        if let Some(value) = self.value.take() { (self.cleanup)(value); }
+    }
 }
 pub(crate) fn event(name: &'static str, data: impl FnOnce() -> serde_json::Value) {
     if ENABLED.load(Ordering::Relaxed) {

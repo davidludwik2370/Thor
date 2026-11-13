@@ -223,6 +223,7 @@ pub struct Resolver<'a> {
     base_types: Option<Arc<NodeTable<Type>>>,
     active: HashSet<Ref>,
     planning: HashSet<(Ref, Vec<(String, Type)>)>,
+    incomplete_plans: Cell<u64>,
     conditions: RefCell<HashSet<Ref>>,
     pub context_hints: HashMap<Ref, ContextHint>,
     pub parameter_witnesses: BTreeMap<Ref, ParameterWitness>,
@@ -245,6 +246,7 @@ pub struct Resolver<'a> {
 /// same resolver. Binding/evaluation changes invalidate the entire table.
 #[derive(Default)]
 struct Metadata {
+    calls: HashMap<Ref, HashMap<Substitutions, Vec<CallPlan>>>,
     specialized: HashMap<Ref, HashMap<Substitutions, Type>>,
     fields: HashMap<TypeId, RecordFields>,
     members: HashMap<TypeId, HashMap<String, Type>>,
@@ -353,6 +355,7 @@ impl<'a> Resolver<'a> {
             base_types: None,
             active: HashSet::new(),
             planning: HashSet::new(),
+            incomplete_plans: Cell::new(0),
             conditions: RefCell::new(HashSet::new()),
             context_hints: HashMap::new(),
             parameter_witnesses: BTreeMap::new(),
@@ -798,6 +801,7 @@ impl<'a> Resolver<'a> {
     }
     pub fn condition(&self, r: Ref) -> Option<bool> {
         if !self.conditions.borrow_mut().insert(r) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return None;
         }
         let value = self.condition_inner(r);
@@ -1228,6 +1232,7 @@ impl<'a> Resolver<'a> {
             return typ.clone();
         }
         if !self.active.insert(reference) {
+            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
             return Type::Unknown;
         }
         let typ = self.infer(reference);
@@ -2078,6 +2083,9 @@ mod index_tests {
             memo.members.entry(id).or_default().insert("field".into(), Type::Unknown);
             memo.paths.entry(id).or_default().insert("field".into(), None);
             memo.specialized.entry(site).or_default().insert(Substitutions::new(), Type::Unknown);
+            memo.calls.entry(site).or_default().insert(Substitutions::new(), vec![CallPlan {
+                procedure:site, signature:site, arguments:vec![], bindings:Substitutions::new(),
+            }]);
             match operation {
                 0 => resolver.remember_evaluation(site, json!(1)),
                 1 => resolver.remember_logical_constant(site, json!(2)),
@@ -2086,7 +2094,7 @@ mod index_tests {
             }
             let memo = resolver.metadata.as_ref().unwrap();
             if !memo.fields.is_empty() || !memo.members.is_empty() || !memo.paths.is_empty()
-                || !memo.specialized.is_empty() { panic!("stale metadata after operation {operation}"); }
+                || !memo.specialized.is_empty() || !memo.calls.is_empty() { panic!("stale metadata after operation {operation}"); }
         }
     }
     #[test]

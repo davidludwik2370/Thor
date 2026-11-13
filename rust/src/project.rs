@@ -202,6 +202,14 @@ fn package_files(entry: &Path, test: bool, overlays: &BTreeMap<PathBuf, String>)
     Ok(files)
 }
 impl Project {
+    /// Attribute metadata and syntax destruction separately. Keep cleanup
+    /// serial: concurrent frees contended with the host allocator in profiling.
+    pub fn release(mut self) {
+        let sources = std::mem::take(&mut self.sources);
+        crate::profile::destroy("project.metadata_teardown", self);
+        let _phase = crate::profile::span("project.syntax_teardown");
+        drop(sources);
+    }
     pub fn new(mut options: Options) -> Result<Self> {
         let _phase = crate::profile::span("project.load");
         options.entry = absolute(&options.entry)?;

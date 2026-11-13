@@ -11,6 +11,7 @@ pub(super) enum Property {
 
 impl Privileges<'_, '_> {
     pub(super) fn needs_root(&mut self, proc: Ref) -> bool {
+        let _phase = crate::profile::span("permissions.root_selection");
         let source = self.s(proc);
         if source.node(proc.node).data["pure"] == true {
             return true;

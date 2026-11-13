@@ -1517,6 +1517,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.r.member_type(typ, name)
     }
     fn typ(&mut self, r: Ref, c: C) -> Type {
+        let _phase = crate::profile::span("permissions.type_queries");
         if let Some(symbol) = self.r.symbol(r) {
             if let Some(v) = self.contexts[c]
                 .env
@@ -2389,6 +2390,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn call(&mut self, r: Ref, c: C) -> V {
+        let _phase = crate::profile::span("permissions.calls");
         let Some(callee) = self.role(r, "callee") else {
             return self.value(Type::Unknown);
         };
@@ -2701,11 +2703,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
         } else {
             self.r.candidates(callee)
         };
-        let plans = if indirect {
+        let plans = { let _phase=crate::profile::span("permissions.call_plans"); if indirect {
             vec![]
         } else {
             self.r.call_plans(r, &self.contexts[c].bindings.clone())
-        };
+        }};
         if !indirect && !plans.is_empty() {
             candidates.retain(|candidate| plans.iter().any(|plan| plan.procedure == *candidate));
         }
@@ -3118,6 +3120,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         id
     }
     fn builtin_name(&self, callee: Ref, seen: &mut HashSet<Ref>) -> Option<String> {
+        let _phase = seen.is_empty().then(||crate::profile::span("permissions.builtin_names"));
         if !seen.insert(callee) {
             return None;
         }
@@ -3166,6 +3169,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.r.denotes_type(r)
     }
     fn verified_library(&self, reference: Ref, path: &str) -> bool {
+        let _phase = crate::profile::span("permissions.library_verification");
         let Some((collection, suffix)) = path.split_once(':') else {
             return false;
         };
