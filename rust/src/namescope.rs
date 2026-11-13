@@ -13,6 +13,7 @@ pub(super) struct NameIndex {
     pub using: Vec<Vec<NodeId>>,
     pub promotions: Vec<Vec<NodeId>>,
     pub expression_names: Vec<Vec<NodeId>>,
+    pub signatures: HashMap<Ref, std::sync::OnceLock<Arc<signaturelayout::SignatureLayout>>>,
     heads: Vec<Vec<NodeId>>,
     parents: Vec<Vec<NodeId>>,
 }
@@ -27,6 +28,7 @@ impl NameIndex {
             using: vec![],
             promotions: vec![],
             expression_names: vec![],
+            signatures: HashMap::new(),
             heads: vec![],
             parents: vec![],
         };
@@ -52,6 +54,9 @@ impl NameIndex {
             let mut expression_names = vec![];
             for (n, node) in source.nodes.iter().enumerate() {
                 let id = NodeId(n);
+                if matches!(node.kind.as_str(), "ProcedureType" | "StructType") {
+                    self.signatures.insert(Ref { file, node: id }, std::sync::OnceLock::new());
+                }
                 let parent = node.parent.map(|p| heads[p.0]).unwrap_or(NodeId(0));
                 heads.push(if is_scope(source, id) { id } else { parent });
                 parents.push(parent);

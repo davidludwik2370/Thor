@@ -79,70 +79,7 @@ struct IndexedSources {
     index: crate::semantics::ResolverIndex,
 }
 
-#[cfg(test)]
-mod incremental_index_tests {
-    use super::*;
-    use crate::{ast::NodeId, semantics::Ref};
 
-    fn source(path: &str, name: &str) -> Source {
-        let raw = format!("{name}::7");
-        let length = name.len();
-        Source::from_frontend(path.into(), raw.clone(), json!({
-            "nodes":[
-                {"kind":"File","start":0,"end":raw.len(),"parent":-1},
-                {"kind":"Declaration","start":0,"end":raw.len(),"parent":0,
-                 "lists":{"names":[[0,length]],"values":[[length+2,raw.len()]]}},
-                {"kind":"Ident","name":name,"start":0,"end":length,"parent":1},
-                {"kind":"Literal","op":"integer","start":length+2,"end":raw.len(),"parent":1}
-            ],"features":[],"edits":[],"selections":[]
-        }), path.ends_with(".thor")).unwrap()
-    }
-
-    #[test]
-    fn extended_indexes_match_fresh_lookup_types_and_symbol_order() {
-        let old = vec![source("/project/main.thor", "old")];
-        let initial = Resolver::new(&old).syntax_index();
-        let mut sources = old.clone();
-        sources.push(source("/sdk/new/a.odin", "first"));
-        sources.push(source("/sdk/new/b.odin", "second"));
-        let saved = IndexedSources { sources: old.clone(), index: initial };
-        if !saved.can_extend(&sources) {
-            panic!("new namespace could not extend its index");
-        }
-        let mut extended = Resolver::extend_index(&sources, &[], saved.index, old.len());
-        let mut fresh = Resolver::new(&sources);
-        for (file, source) in sources.iter().enumerate() {
-            for node in 0..source.nodes.len() {
-                let at = Ref { file, node: NodeId(node) };
-                for name in ["old", "first", "second"] {
-                    if extended.lookup(at, name) != fresh.lookup(at, name) {
-                        panic!("extended lookup changed symbol identity");
-                    }
-                }
-                if extended.type_of(at) != fresh.type_of(at) {
-                    panic!("extended lookup changed inferred types");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn extension_rejects_reparsed_sources_changed_views_and_existing_namespaces() {
-        let old = vec![source("/project/main.thor", "value")];
-        let saved = IndexedSources { index: Resolver::new(&old).syntax_index(), sources: old.clone() };
-        let added = source("/other/lib.odin", "new_value");
-        let mut changed = vec![source("/project/main.thor", "value"), added.clone()];
-        if saved.can_extend(&changed) { panic!("reparsed source reused an index"); }
-        changed = vec![old[0].clone(), source("/project/more.odin", "more")];
-        if saved.can_extend(&changed) { panic!("existing namespace reused an index"); }
-        changed = vec![old[0].clone(), added];
-        changed[0].shared_native = true;
-        if saved.can_extend(&changed) { panic!("source view change reused an index"); }
-        changed[0] = old[0].clone();
-        changed[0].collection_roots.insert("core".into(), "/other".into());
-        if saved.can_extend(&changed) { panic!("collection change reused an index"); }
-    }
-}
 impl IndexedSources {
     fn prefix_matches(&self, sources: &[Source]) -> bool {
         self.sources.len() <= sources.len() && self.sources.iter().zip(sources).all(|(old, current)| {
@@ -1589,4 +1526,69 @@ impl Project {
 }
 pub fn print_diagnostic(error: &Value) {
     eprintln!("{}",crate::diagnostic::text(error,None,false,false));
+}
+
+#[cfg(test)]
+mod incremental_index_tests {
+    use super::*;
+    use crate::{ast::NodeId, semantics::Ref};
+
+    fn source(path: &str, name: &str) -> Source {
+        let raw = format!("{name}::7");
+        let length = name.len();
+        Source::from_frontend(path.into(), raw.clone(), json!({
+            "nodes":[
+                {"kind":"File","start":0,"end":raw.len(),"parent":-1},
+                {"kind":"Declaration","start":0,"end":raw.len(),"parent":0,
+                 "lists":{"names":[[0,length]],"values":[[length+2,raw.len()]]}},
+                {"kind":"Ident","name":name,"start":0,"end":length,"parent":1},
+                {"kind":"Literal","op":"integer","start":length+2,"end":raw.len(),"parent":1}
+            ],"features":[],"edits":[],"selections":[]
+        }), path.ends_with(".thor")).unwrap()
+    }
+
+    #[test]
+    fn extended_indexes_match_fresh_lookup_types_and_symbol_order() {
+        let old = vec![source("/project/main.thor", "old")];
+        let initial = Resolver::new(&old).syntax_index();
+        let mut sources = old.clone();
+        sources.push(source("/sdk/new/a.odin", "first"));
+        sources.push(source("/sdk/new/b.odin", "second"));
+        let saved = IndexedSources { sources: old.clone(), index: initial };
+        if !saved.can_extend(&sources) {
+            panic!("new namespace could not extend its index");
+        }
+        let mut extended = Resolver::extend_index(&sources, &[], saved.index, old.len());
+        let mut fresh = Resolver::new(&sources);
+        for (file, source) in sources.iter().enumerate() {
+            for node in 0..source.nodes.len() {
+                let at = Ref { file, node: NodeId(node) };
+                for name in ["old", "first", "second"] {
+                    if extended.lookup(at, name) != fresh.lookup(at, name) {
+                        panic!("extended lookup changed symbol identity");
+                    }
+                }
+                if extended.type_of(at) != fresh.type_of(at) {
+                    panic!("extended lookup changed inferred types");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn extension_rejects_reparsed_sources_changed_views_and_existing_namespaces() {
+        let old = vec![source("/project/main.thor", "value")];
+        let saved = IndexedSources { index: Resolver::new(&old).syntax_index(), sources: old.clone() };
+        let added = source("/other/lib.odin", "new_value");
+        let mut changed = vec![source("/project/main.thor", "value"), added.clone()];
+        if saved.can_extend(&changed) { panic!("reparsed source reused an index"); }
+        changed = vec![old[0].clone(), source("/project/more.odin", "more")];
+        if saved.can_extend(&changed) { panic!("existing namespace reused an index"); }
+        changed = vec![old[0].clone(), added];
+        changed[0].shared_native = true;
+        if saved.can_extend(&changed) { panic!("source view change reused an index"); }
+        changed[0] = old[0].clone();
+        changed[0].collection_roots.insert("core".into(), "/other".into());
+        if saved.can_extend(&changed) { panic!("collection change reused an index"); }
+    }
 }

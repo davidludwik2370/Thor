@@ -749,13 +749,14 @@ impl Resolver<'_> {
     }
     pub fn parameter_bindings(&mut self, signature: Ref, args: &[Type]) -> Substitutions {
         let mut bindings = Substitutions::new();
-        for ((name, annotation), actual) in self.fields(signature, "params").into_iter().zip(args) {
+        let layout = self.signature_layout(signature);
+        for ((name, annotation), actual) in layout.params.iter().zip(args) {
             if let Some(annotation) = annotation {
                 let s = &self.sources[annotation.file];
                 if s.node(annotation.node).kind == "TypeidType" {
                     bindings.insert(name.trim_start_matches('$').into(), actual.clone());
                 }
-                self.bind_shape(annotation, actual, &mut bindings, &mut HashSet::new());
+                self.bind_shape(*annotation, actual, &mut bindings, &mut HashSet::new());
             }
         }
         bindings

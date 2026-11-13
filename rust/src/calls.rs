@@ -153,10 +153,11 @@ impl Resolver<'_> {
             let Some(arguments) = self.arrange_arguments(signature, &args) else {
                 continue;
             };
-            let fields = self.fields(signature, "params");
+            let layout = self.signature_layout(signature);
+            let fields = &layout.params;
             let types = arguments
                 .iter()
-                .zip(&fields)
+                .zip(fields)
                 .map(|(group, (_, annotation))| {
                     group
                         .first()
@@ -290,20 +291,9 @@ impl Resolver<'_> {
     /// Arguments in declaration order, including defaults and variadic groups.
     /// No argument expressions are executed while considering an overload.
     pub fn arrange_arguments(&self, signature: Ref, args: &[Ref]) -> Option<Vec<Vec<Ref>>> {
-        let source = &self.sources[signature.file];
-        let params = source.role(signature.node, "params")?;
-        let fields = source
-            .node(params)
-            .children
-            .iter()
-            .filter(|node| source.node(**node).kind == "Field")
-            .flat_map(|field| {
-                source
-                    .group(*field, "names")
-                    .iter()
-                    .map(move |name| (*name, *field))
-            })
-            .collect::<Vec<_>>();
+        let layout = self.signature_layout(signature);
+        let arguments = layout.arguments.as_ref()?;
+        let fields = &arguments.fields;
         let mut bound = vec![vec![]; fields.len()];
         let mut positional = 0;
         let mut named = false;
@@ -313,9 +303,7 @@ impl Resolver<'_> {
             if node.kind == "FieldValue" {
                 named = true;
                 let name = owner.text(owner.role(arg.node, "field")?);
-                let index = fields.iter().position(|(parameter, _)| {
-                    source.text(*parameter).trim_start_matches('$') == name
-                })?;
+                let index = *arguments.positions.get(name)?;
                 if !bound[index].is_empty() {
                     return None;
                 }
@@ -328,19 +316,16 @@ impl Resolver<'_> {
                     return None;
                 }
                 bound[positional].push(*arg);
-                if source.node(fields[positional].1).data["variadic"] != true {
+                if !fields[positional].variadic {
                     positional += 1;
                 }
             }
         }
-        for (index, (_, field)) in fields.iter().enumerate() {
+        for (index, field) in fields.iter().enumerate() {
             if bound[index].is_empty() {
-                if let Some(default) = source.role(*field, "default") {
-                    bound[index].push(Ref {
-                        file: signature.file,
-                        node: default,
-                    });
-                } else if source.node(*field).data["variadic"] != true {
+                if let Some(default) = field.default {
+                    bound[index].push(default);
+                } else if !field.variadic {
                     return None;
                 }
             }
@@ -351,8 +336,8 @@ impl Resolver<'_> {
     pub fn specialized_result(&mut self, call: Ref, index: usize, context: &Substitutions) -> Type {
         let mut result = None;
         for plan in self.call_plans(call, context) {
-            let typ = self
-                .fields(plan.signature, "results")
+            let layout = self.signature_layout(plan.signature);
+            let typ = layout.results
                 .get(index)
                 .and_then(|(_, annotation)| *annotation)
                 .map(|annotation| self.specialized_type(annotation, &plan.bindings))

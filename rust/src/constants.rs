@@ -496,29 +496,10 @@ impl Resolver<'_> {
         args: &[Ref],
         context: &Substitutions,
     ) -> Substitutions {
-        let source = &self.sources[sig.file];
         let mut bindings = Substitutions::new();
-        let params = source.role(sig.node, "params");
-        let names = params
-            .into_iter()
-            .flat_map(|params| source.node(params).children.iter())
-            .flat_map(|field| source.group(*field, "names"))
-            .copied()
-            .collect::<Vec<_>>();
-        for (name, arg) in names.into_iter().zip(args) {
-            if source.node(name).kind != "PolyType" {
-                continue;
-            }
-            let key = source.text(name).trim_start_matches('$').to_string();
-            let Some(field) = source.node(name).parent else {
-                continue;
-            };
-            if source
-                .role(field, "type")
-                .is_some_and(|annotation| source.node(annotation).kind == "TypeidType")
-            {
-                continue;
-            }
+        let layout = self.signature_layout(sig);
+        for parameter in &layout.constants {
+            let Some(arg) = args.get(parameter.index) else { continue; };
             let arg_source = &self.sources[arg.file];
             let value = arg_source
                 .role(arg.node, "value")
@@ -527,17 +508,9 @@ impl Resolver<'_> {
                     node,
                 })
                 .unwrap_or(*arg);
-            let expected = source.role(field, "type").map(|node| {
-                self.specialized_type(
-                    Ref {
-                        file: sig.file,
-                        node,
-                    },
-                    context,
-                )
-            });
+            let expected = parameter.annotation.map(|annotation| self.specialized_type(annotation, context));
             bindings.insert(
-                key,
+                parameter.name.clone(),
                 self.constant_value(value, context, expected.as_ref())
                     .map(Type::Constant)
                     .unwrap_or(Type::Unknown),

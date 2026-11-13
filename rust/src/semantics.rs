@@ -12,6 +12,8 @@ use nodetable::NodeTable;
 mod logicalfacts;
 #[path = "calls.rs"]
 mod calls;
+#[path = "signaturelayout.rs"]
+mod signaturelayout;
 #[path = "conditions.rs"]
 mod conditions;
 #[path = "constants.rs"]
@@ -1147,33 +1149,11 @@ impl<'a> Resolver<'a> {
             || source.nodes.iter().any(|node| node.kind == "Using" || node.data["using_field"] == true)
     }
     pub fn fields(&self, reference: Ref, role: &str) -> Vec<(String, Option<Ref>)> {
-        let source = &self.sources[reference.file];
-        let Some(fields) = source.role(reference.node, role) else {
-            return vec![];
-        };
-        let mut result = vec![];
-        for field in &source.node(fields).children {
-            if source.node(*field).kind != "Field" {
-                continue;
-            }
-            let annotation = source.role(*field, "type").map(|node| Ref {
-                file: reference.file,
-                node,
-            });
-            let names = source.group(*field, "names");
-            if names.is_empty() {
-                result.push((String::new(), annotation));
-            }
-            for name in names {
-                let name = if source.names.get(source.node(*name).name) == "_" {
-                    "_"
-                } else {
-                    source.text(*name).trim_start_matches('$')
-                };
-                result.push((name.into(), annotation));
-            }
+        if matches!(role, "params" | "results") && self.index.signatures.contains_key(&reference) {
+            let layout = self.signature_layout(reference);
+            return if role == "params" { layout.params.clone() } else { layout.results.clone() };
         }
-        result
+        signaturelayout::collect_fields(self.sources, reference, role)
     }
     pub fn attributes(&self, declaration: Ref) -> Vec<(String, Option<Ref>)> {
         let s = &self.sources[declaration.file];
