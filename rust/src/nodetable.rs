@@ -34,6 +34,9 @@ impl<T> NodeTable<T> {
         let index = *self.files.get(key.file)?.indexes.get(key.node.0)?;
         self.values.get(index).map(|entry| &entry.1)
     }
+    pub fn extend_files(&mut self, counts: impl IntoIterator<Item = usize>) {
+        self.files.extend(counts.into_iter().map(|count| Slots { count, indexes: vec![] }));
+    }
     pub fn insert(&mut self, key: Ref, value: T) -> Option<T> {
         let file = &mut self.files[key.file];
         if file.indexes.is_empty() {
@@ -114,6 +117,12 @@ mod tests {
         table.clear();
         if table.get(&b).is_some() {
             panic!("cleared slot kept an old value");
+        }
+        table.extend_files([3]);
+        let extra = Ref { file: 3, node: NodeId(2) };
+        table.insert(extra, String::from("new file"));
+        if table.get(&extra).map(String::as_str) != Some("new file") || copy.get(&extra).is_some() {
+            panic!("appending files changed a previous table");
         }
     }
 }

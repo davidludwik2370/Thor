@@ -3,6 +3,7 @@
 use super::*;
 use std::path::PathBuf;
 
+#[derive(Clone)]
 pub(super) struct NameIndex {
     pub package_for: Vec<usize>,
     pub packages: HashMap<PathBuf, usize>,
@@ -29,16 +30,20 @@ impl NameIndex {
             heads: vec![],
             parents: vec![],
         };
-        for (file, source) in sources.iter().enumerate() {
+        index.append(sources, 0);
+        index
+    }
+    pub fn append(&mut self, sources: &[Source], start: usize) {
+        for (file, source) in sources.iter().enumerate().skip(start) {
             let directory = source.path.parent().unwrap_or(&source.path).to_path_buf();
-            let next = index.packages.len();
-            let package = *index.packages.entry(directory).or_insert(next);
-            if package == index.members.len() {
-                index.members.push(vec![]);
-                index.package_symbols.push(HashMap::new());
+            let next = self.packages.len();
+            let package = *self.packages.entry(directory).or_insert(next);
+            if package == self.members.len() {
+                self.members.push(vec![]);
+                self.package_symbols.push(HashMap::new());
             }
-            index.package_for.push(package);
-            index.members[package].push(file);
+            self.package_for.push(package);
+            self.members[package].push(file);
             let mut heads: Vec<NodeId> = Vec::with_capacity(source.nodes.len());
             let mut parents = Vec::with_capacity(source.nodes.len());
             let mut imports: HashMap<String, Vec<String>> = HashMap::new();
@@ -73,14 +78,13 @@ impl NameIndex {
                     }
                 }
             }
-            index.heads.push(heads);
-            index.parents.push(parents);
-            index.imports.push(imports);
-            index.using.push(using);
-            index.promotions.push(promotions);
-            index.expression_names.push(expression_names);
+            self.heads.push(heads);
+            self.parents.push(parents);
+            self.imports.push(imports);
+            self.using.push(using);
+            self.promotions.push(promotions);
+            self.expression_names.push(expression_names);
         }
-        index
     }
     pub fn scopes(&self, reference: Ref) -> impl Iterator<Item = NodeId> + '_ {
         std::iter::successors(

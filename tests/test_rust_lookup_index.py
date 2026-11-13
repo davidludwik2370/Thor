@@ -32,9 +32,11 @@ work::fn(n:int)->int {return n+1}
                                  (plain.returncode, plain.stdout, plain.stderr))
                 self.assertEqual(report['schema'], 1)
                 self.assertGreater(report['counters']['resolver.constructions'], 0)
-                self.assertGreater(report['counters']['resolver.index_reuses'], 0)
+                self.assertGreater(report['counters'].get('resolver.index_reuses', 0)
+                                   + report['counters'].get('resolver.resumed_snapshots', 0), 0)
                 self.assertEqual(report['counters']['resolver.constructions'],
-                                 report['counters']['resolver.index_builds']+report['counters']['resolver.index_reuses'])
+                                 report['counters']['resolver.index_builds']
+                                 + report['counters'].get('resolver.index_reuses', 0))
                 self.assertGreater(report['counters']['lookup.calls'], 0)
                 self.assertIn('backend.final', report['stages'])
                 for stage in report['stages'].values():

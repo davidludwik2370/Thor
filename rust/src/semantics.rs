@@ -338,13 +338,30 @@ impl<'a> Resolver<'a> {
         self.base.as_ref().expect("prepared syntax index").clone()
     }
     pub(crate) fn with_index(sources: &'a [Source], flags: &[String], base: Option<&ResolverIndex>) -> Self {
+        let build_from = base.is_none().then_some(0);
+        Self::from_index(sources, flags, base.cloned(), build_from)
+    }
+    pub(crate) fn extend_index(sources: &'a [Source], flags: &[String], base: ResolverIndex, start: usize) -> Self {
+        Self::from_index(sources, flags, Some(base), Some(start))
+    }
+    fn from_index(sources: &'a [Source], flags: &[String], base: Option<ResolverIndex>, build_from: Option<usize>) -> Self {
         let _phase = crate::profile::span("analysis.resolver_setup");
         crate::profile::count("resolver.constructions", 1);
+        let (symbols, mut scopes, mut index, markers) = match base {
+            Some(base) => (base.symbols, base.scopes, base.names, base.markers),
+            None => (Arc::default(), Arc::new(ScopeTable::new(sources.iter().map(|source| source.nodes.len()))),
+                Arc::new(namescope::NameIndex::new(sources)), Arc::default()),
+        };
+        let symbol_start = symbols.len();
+        if let Some(start) = build_from.filter(|start| *start > 0) {
+            Arc::make_mut(&mut scopes).extend_files(sources[start..].iter().map(|source| source.nodes.len()));
+            Arc::make_mut(&mut index).append(sources, start);
+        }
         let mut this = Self {
             sources,
-            symbols: base.map(|base| base.symbols.clone()).unwrap_or_default(),
-            scopes: base.map(|base| base.scopes.clone()).unwrap_or_else(|| Arc::new(ScopeTable::new(sources.iter().map(|source| source.nodes.len())))),
-            index: base.map(|base| base.names.clone()).unwrap_or_else(|| Arc::new(namescope::NameIndex::new(sources))),
+            symbols,
+            scopes,
+            index,
             base: None,
             import_packages: RefCell::new(HashMap::new()),
             canonical_paths: RefCell::new(HashMap::new()),
@@ -359,7 +376,7 @@ impl<'a> Resolver<'a> {
             conditions: RefCell::new(HashSet::new()),
             context_hints: HashMap::new(),
             parameter_witnesses: BTreeMap::new(),
-            immutable_markers: base.map(|base| base.markers.clone()).unwrap_or_default(),
+            immutable_markers: markers,
             flags: flags.to_vec(),
             evaluated: BTreeMap::new(),
             logical_constants: BTreeMap::new(),
@@ -374,9 +391,15 @@ impl<'a> Resolver<'a> {
             type_pool: RefCell::new(typepool::TypePool::default()),
             contexts_ready: false,
         };
-        if base.is_none() {
-        crate::profile::count("resolver.index_builds", 1);
-        for (file, source) in sources.iter().enumerate() {
+        if let Some(start) = build_from {
+        if start == 0 {
+            crate::profile::count("resolver.index_builds", 1);
+        } else {
+            crate::profile::count("resolver.index_reuses", 1);
+            crate::profile::count("resolver.index_extensions", 1);
+        }
+        crate::profile::count("resolver.syntax_sources_indexed", (sources.len()-start) as u64);
+        for (file, source) in sources.iter().enumerate().skip(start) {
             if source.excluded {
                 continue;
             }
@@ -481,17 +504,17 @@ impl<'a> Resolver<'a> {
                         result,
                         projection: None,
                     };
-                    Arc::get_mut(&mut this.scopes).expect("fresh scope index")
+                    Arc::make_mut(&mut this.scopes)
                         .get_or_insert_with(Ref { file, node: owner }, HashMap::new)
                         .entry(name)
                         .or_default()
                         .push(this.symbols.len());
                     if owner == NodeId(0) {
                         let package = this.index.package_for[file];
-                        Arc::get_mut(&mut this.index).expect("fresh name index").package_symbols[package]
+                        Arc::make_mut(&mut this.index).package_symbols[package]
                             .entry(symbol.name.clone()).or_default().push(this.symbols.len());
                     }
-                    Arc::get_mut(&mut this.symbols).expect("fresh symbol index").push(symbol);
+                    Arc::make_mut(&mut this.symbols).push(symbol);
                 }
             }
         }
@@ -506,10 +529,10 @@ impl<'a> Resolver<'a> {
             }
         }
         let mut groups: HashMap<_, Vec<usize>> = HashMap::new();
-        for symbol in this.symbols.iter().filter(|symbol| symbol.immutable) {
+        for symbol in this.symbols.iter().skip(symbol_start).filter(|symbol| symbol.immutable) {
             groups.entry(group_key(sources, symbol)).or_default();
         }
-        for (index, symbol) in this.symbols.iter().enumerate() {
+        for (index, symbol) in this.symbols.iter().enumerate().skip(symbol_start) {
             if let Some(ids) = groups.get_mut(&group_key(sources, symbol)) {
                 ids.push(index);
             }
@@ -522,7 +545,7 @@ impl<'a> Resolver<'a> {
             let first=&this.symbols[ids[0]];let source=&sources[first.reference.file];
             let key=crate::digest::sha256(format!("{}{}",first.name,source.node(first.scope).span.start).as_bytes());
             let marker=format!("{}immutable_{}",source.prefix,&key[..12]);
-            for id in ids{let symbol=&this.symbols[*id];Arc::get_mut(&mut this.immutable_markers).expect("fresh marker index").insert((symbol.reference,symbol.name.clone()),marker.clone());}
+            for id in ids{let symbol=&this.symbols[*id];Arc::make_mut(&mut this.immutable_markers).insert((symbol.reference,symbol.name.clone()),marker.clone());}
         }
         } else { crate::profile::count("resolver.index_reuses", 1); }
         this.base = Some(ResolverIndex {symbols:this.symbols.clone(), scopes:this.scopes.clone(),
