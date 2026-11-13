@@ -85,7 +85,7 @@ impl Scheduler<'_> {
         .map_err(|error| self.fail(at, error.to_string()))
     }
     fn refresh_bindings(&mut self) {
-        self.resolver.evaluated = self.results.clone();
+        self.resolver.set_evaluations(self.results.clone());
         self.specializations.apply(&mut self.resolver);
         for (node, cases) in &self.cases {
             let (_, key) = self.key(*node);

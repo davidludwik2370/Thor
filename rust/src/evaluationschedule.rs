@@ -40,6 +40,13 @@ pub struct Scheduler<'p> {
     pub scalar_witnesses: BTreeMap<Ref, String>,
 }
 impl<'p> Scheduler<'p> {
+    pub(crate) fn retain_resolver(mut self) {
+        // Generic evaluator frames are transient, not the enclosing project's
+        // lexical environment. Keep ordinary lowering independent of the last
+        // specialization visited by the scheduler.
+        self.resolver.set_lexical_bindings(BTreeMap::new(), BTreeMap::new());
+        self.project.retain_resolver(self.resolver);
+    }
     pub fn new(project: &'p Project, timeout: Duration) -> Self {
         let mut resolver = project.resolver();
         resolver.prepare_contexts();

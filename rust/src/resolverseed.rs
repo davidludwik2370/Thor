@@ -2,8 +2,8 @@
 //! only their own query deltas; no RefCell or inference stack crosses threads.
 use super::*;
 
-pub(crate) struct ResolverSeed<'a> {
-    sources: &'a [Source],
+pub(crate) struct ResolverSeed {
+    sources: Vec<Source>,
     symbols: Arc<Vec<Symbol>>,
     scopes: Arc<ScopeTable>,
     index: Arc<namescope::NameIndex>,
@@ -24,6 +24,7 @@ pub(crate) struct ResolverSeed<'a> {
     bound_types: BTreeMap<(Ref, String), Type>,
     bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
+    contexts_ready: bool,
 }
 impl<'a> Resolver<'a> {
     pub(crate) fn can_freeze(&self) -> bool {
@@ -35,7 +36,7 @@ impl<'a> Resolver<'a> {
             && self.base_metadata.is_none()
             && self.base_symbol_queries.is_none()
     }
-    pub(crate) fn freeze(self) -> ResolverSeed<'a> {
+    pub(crate) fn freeze(self) -> ResolverSeed {
         // The caller checks this before consuming the serial resolver. Never
         // publish partial queries, or recursively freeze worker-local deltas.
         if !self.can_freeze() {
@@ -43,7 +44,7 @@ impl<'a> Resolver<'a> {
         }
         crate::profile::count("resolver.frozen_snapshots", 1);
         ResolverSeed {
-            sources: self.sources,
+            sources: self.sources.to_vec(),
             symbols: self.symbols,
             scopes: self.scopes,
             index: self.index,
@@ -64,14 +65,45 @@ impl<'a> Resolver<'a> {
             bound_types: self.bound_types,
             bound_constants: self.bound_constants,
             using_symbols: self.using_symbols,
+            contexts_ready: self.contexts_ready,
         }
     }
 }
-impl<'a> ResolverSeed<'a> {
-    pub(crate) fn fork(&self) -> Resolver<'a> {
+impl ResolverSeed {
+    pub(crate) fn matches(&self, sources: &[Source], flags: &[String]) -> bool {
+        self.flags == flags && self.sources.len() == sources.len()
+            && self.sources.iter().zip(sources).all(|(old, current)|
+                old.shares_syntax(current) && old.shared_native == current.shared_native
+                    && old.collection_roots == current.collection_roots)
+    }
+    /// Transfer the completed state to the next serial phase, without cloning
+    /// query tables or retaining a reference into Project's movable source list.
+    pub(crate) fn resume(self, sources: &[Source]) -> Resolver<'_> {
+        crate::profile::count("resolver.resumed_snapshots", 1);
+        Resolver {
+            sources, symbols: self.symbols, scopes: self.scopes, index: self.index,
+            base: self.syntax, import_packages: RefCell::new(self.imports),
+            canonical_paths: RefCell::new(self.paths),
+            missing_packages: RefCell::new(BTreeSet::new()),
+            missing_symbols: RefCell::new(BTreeSet::new()), track_import_demands: Cell::new(false),
+            types: Arc::try_unwrap(self.types).unwrap_or_else(|_| panic!("live resolver workers")),
+            metadata: self.metadata.map(|m| Arc::try_unwrap(m).unwrap_or_else(|_| panic!("live resolver metadata"))),
+            type_pool: RefCell::new(Arc::try_unwrap(self.pool).unwrap_or_else(|_| panic!("live resolver type pool"))),
+            symbol_queries: RefCell::new(self.queries.map(|q| Arc::try_unwrap(q).unwrap_or_else(|_| panic!("live resolver queries")))),
+            base_types: None, base_metadata: None, base_symbol_queries: None,
+            active: HashSet::new(), planning: HashSet::new(), conditions: RefCell::new(HashSet::new()),
+            context_hints: self.context_hints, parameter_witnesses: self.parameter_witnesses,
+            immutable_markers: self.markers, flags: self.flags, evaluated: self.evaluated,
+            logical_constants: self.logical_constants,
+            logical_activation: self.logical_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
+            bound_types: self.bound_types, bound_constants: self.bound_constants,
+            using_symbols: self.using_symbols, contexts_ready: self.contexts_ready,
+        }
+    }
+    pub(crate) fn fork(&self) -> Resolver<'_> {
         crate::profile::count("resolver.lowering_workers", 1);
         Resolver {
-            sources: self.sources,
+            sources: &self.sources,
             symbols: self.symbols.clone(),
             scopes: self.scopes.clone(),
             index: self.index.clone(),
@@ -104,6 +136,7 @@ impl<'a> ResolverSeed<'a> {
             metadata: self.metadata.as_ref().map(|_| Metadata::default()),
             base_metadata: self.metadata.clone(),
             type_pool: RefCell::new(typepool::TypePool::fork(self.pool.clone())),
+            contexts_ready: self.contexts_ready,
         }
     }
 }
@@ -112,6 +145,34 @@ impl<'a> ResolverSeed<'a> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn serial_resume_moves_completed_answers_and_guards_source_and_flag_identity() {
+        let source = Source::from_frontend("/example.thor".into(), "7".into(), json!({
+            "nodes":[{"kind":"File","start":0,"end":1,"parent":-1},
+                {"kind":"Literal","op":"integer","start":0,"end":1,"parent":0}],
+            "features":[],"edits":[],"selections":[]
+        }), true).unwrap();
+        let sources = vec![source]; let site = Ref {file:0,node:NodeId(1)};
+        let mut resolver = Resolver::new(&sources);
+        let expected = resolver.type_of(site);
+        resolver.prepare_contexts(); resolver.begin_symbol_queries(); resolver.symbol(site);
+        let seed = resolver.freeze();
+        let mut changed = sources.clone(); changed[0].shared_native = true;
+        if !seed.matches(&sources, &[]) || seed.matches(&sources, &["-debug".into()])
+            || seed.matches(&changed, &[]) || seed.matches(&[], &[]) {
+            panic!("resolver snapshot ignored its inputs");
+        }
+        let mut resumed = seed.resume(&sources);
+        if resumed.type_of(site) != expected || !resumed.contexts_ready
+            || resumed.types.get(&site).is_none() || !resumed.can_freeze() {
+            panic!("resumed resolver lost completed state");
+        }
+        resumed.set_evaluations([(site,json!({"kind":"big_integer","value":"9"}))].into());
+        if resumed.contexts_ready || resumed.type_of(site) != Type::BigInteger {
+            panic!("resumed resolver kept stale evaluation facts");
+        }
+    }
 
     #[test]
     fn workers_share_completed_answers_and_invalidate_only_their_own_view() {
@@ -160,7 +221,7 @@ mod tests {
                     [((site, "T".into()), Type::scalar("f64"))].into(),
                     BTreeMap::new(),
                 ),
-                _ => worker.prepare_contexts(),
+                _ => { worker.remember_evaluation(site, json!(3)); worker.prepare_contexts(); }
             }
             if worker.base_types.is_some()
                 || worker.base_metadata.is_some()

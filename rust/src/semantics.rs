@@ -32,6 +32,7 @@ pub use typefacts::Substitutions;
 mod typepool;
 #[path = "resolverseed.rs"]
 mod resolverseed;
+pub(crate) use resolverseed::ResolverSeed;
 pub(crate) use typepool::{SharedType, TypeId, TypeInput};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
@@ -238,6 +239,7 @@ pub struct Resolver<'a> {
     base_metadata: Option<Arc<Metadata>>,
     base_symbol_queries: Option<Arc<HashMap<Ref, Option<usize>>>>,
     type_pool: RefCell<typepool::TypePool>,
+    contexts_ready: bool,
 }
 /// Immutable answers shared by permission, purity and emission queries in the
 /// same resolver. Binding/evaluation changes invalidate the entire table.
@@ -299,6 +301,7 @@ impl<'a> Resolver<'a> {
         self.prepare_contexts();
     }
     pub(crate) fn remember_logical_constant(&mut self,node:Ref,value:serde_json::Value){
+        if self.logical_constants.get(&node) == Some(&value) { return; }
         self.logical_constants.insert(node,value);self.invalidate_queries();
     }
     pub(crate) fn logical_constant_type(&self,node:Ref)->Option<Type>{
@@ -307,8 +310,12 @@ impl<'a> Resolver<'a> {
         }
     }
     pub fn remember_evaluation(&mut self, node: Ref, value: serde_json::Value) {
+        if self.evaluated.get(&node) == Some(&value) { return; }
         self.evaluated.insert(node, value);
         self.invalidate_queries();
+    }
+    pub(crate) fn set_evaluations(&mut self, values: BTreeMap<Ref, serde_json::Value>) {
+        if self.evaluated != values { self.evaluated = values; self.invalidate_queries(); }
     }
     pub fn new(sources: &'a [Source]) -> Self {
         Self::with_flags(sources, &[])
@@ -362,6 +369,7 @@ impl<'a> Resolver<'a> {
             base_metadata: None,
             base_symbol_queries: None,
             type_pool: RefCell::new(typepool::TypePool::default()),
+            contexts_ready: false,
         };
         if base.is_none() {
         crate::profile::count("resolver.index_builds", 1);
@@ -521,6 +529,7 @@ impl<'a> Resolver<'a> {
         this
     }
     fn invalidate_queries(&mut self) {
+        self.contexts_ready = false;
         self.types.clear();
         self.base_types = None;
         self.base_metadata = None;
@@ -2070,7 +2079,7 @@ mod index_tests {
                 0 => resolver.remember_evaluation(site, json!(1)),
                 1 => resolver.remember_logical_constant(site, json!(2)),
                 2 => resolver.set_lexical_bindings([((site, "T".into()), Type::scalar("int"))].into(), BTreeMap::new()),
-                _ => resolver.prepare_contexts(),
+                _ => { resolver.set_evaluations(BTreeMap::new()); resolver.prepare_contexts(); }
             }
             let memo = resolver.metadata.as_ref().unwrap();
             if !memo.fields.is_empty() || !memo.members.is_empty() || !memo.paths.is_empty()

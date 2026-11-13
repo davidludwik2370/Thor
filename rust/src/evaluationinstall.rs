@@ -23,7 +23,7 @@ impl Project {
             .iter()
             .map(|node| (*node, scheduler.unchecked.contains(node)))
             .collect();
-        drop(scheduler);
+        scheduler.retain_resolver();
         self.evaluated = values;
         self.specialized = cases;
         self.evaluation_skips = skips;

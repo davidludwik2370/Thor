@@ -229,6 +229,7 @@ impl Project {
                 packages.retain(needs_load);
             }
             if packages.is_empty() {
+                self.retain_resolver(resolver);
                 break;
             }
             inspected.extend(packages.iter().cloned());

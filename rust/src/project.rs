@@ -110,6 +110,7 @@ pub struct Project {
     type_probe_imports: BTreeMap<usize, BTreeMap<String, String>>,
     source_facts: Option<SourceFacts>,
     resolver_index: std::cell::RefCell<Option<IndexedSources>>,
+    resolver_state: std::cell::RefCell<Option<crate::semantics::ResolverSeed>>,
     permission_cache: std::cell::RefCell<crate::permissioncache::Cache>,
     // Parsed import frontiers are consumed in the original depth-first order.
     // Workers may finish in any order without changing source/evaluation order.
@@ -333,6 +334,7 @@ impl Project {
             type_probe_imports: BTreeMap::new(),
             source_facts: None,
             resolver_index: std::cell::RefCell::new(None),
+            resolver_state: std::cell::RefCell::new(None),
             permission_cache: std::cell::RefCell::default(),
             parsed_imports: HashMap::new(),
             collections,
@@ -476,9 +478,18 @@ impl Project {
         Ok(())
     }
     pub(crate) fn resolver(&self) -> Resolver<'_> {
-        Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index)
+        Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index, &self.resolver_state)
     }
-    fn resolver_for<'a>(sources: &'a [Source], flags: &[String], index: &std::cell::RefCell<Option<IndexedSources>>) -> Resolver<'a> {
+    pub(crate) fn retain_resolver(&self, resolver: Resolver<'_>) {
+        if resolver.can_freeze() {
+            *self.resolver_state.borrow_mut() = Some(resolver.freeze());
+        }
+    }
+    fn resolver_for<'a>(sources: &'a [Source], flags: &[String], index: &std::cell::RefCell<Option<IndexedSources>>,
+        state: &std::cell::RefCell<Option<crate::semantics::ResolverSeed>>) -> Resolver<'a> {
+        if let Some(saved) = state.borrow_mut().take().filter(|saved| saved.matches(sources, flags)) {
+            return saved.resume(sources);
+        }
         let cached = index.borrow();
         if let Some(cached) = cached.as_ref().filter(|cached| {
             cached.sources.len() == sources.len()
@@ -512,8 +523,8 @@ impl Project {
         }
         self.schedule_evaluations()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
-        let mut resolver = Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index);
-        resolver.evaluated = self.evaluated.clone();
+        let mut resolver = Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index, &self.resolver_state);
+        resolver.set_evaluations(self.evaluated.clone());
         resolver.prepare_contexts();
         if let Some(plan) = &self.evaluation {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);

@@ -177,7 +177,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
         &project.options.entry
     };
     let mut resolver = project.resolver();
-    resolver.evaluated = project.evaluated.clone();
+    resolver.set_evaluations(project.evaluated.clone());
     resolver.prepare_contexts();
     crate::lower::prime_logical_constants(&mut resolver);
     let mut result = vec![];

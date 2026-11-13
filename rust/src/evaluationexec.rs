@@ -265,7 +265,7 @@ impl Project {
         mode: crate::evaluation::Mode,
     ) -> Result<Self> {
         let mut resolver = self.resolver();
-        resolver.evaluated = context.results.clone();
+        resolver.set_evaluations(context.results.clone());
         resolver.prepare_contexts();
         crate::specialization::Specializations::apply_bindings(context.bindings, &mut resolver);
         let mut plan =
@@ -429,6 +429,7 @@ impl Project {
             type_probe_imports: BTreeMap::new(),
             source_facts: self.source_facts.clone(),
             resolver_index: self.resolver_index.clone(),
+            resolver_state: std::cell::RefCell::new(None),
             permission_cache: std::cell::RefCell::default(),
             parsed_imports: HashMap::new(),
         })

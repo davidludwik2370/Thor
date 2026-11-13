@@ -118,6 +118,7 @@ impl Project {
             type_probe_imports: BTreeMap::new(),
             source_facts: self.source_facts.clone(),
             resolver_index: self.resolver_index.clone(),
+            resolver_state: std::cell::RefCell::new(None),
             permission_cache: std::cell::RefCell::default(),
             parsed_imports: HashMap::new(),
         })
@@ -133,7 +134,7 @@ impl Project {
         }
         let _phase = crate::profile::span("evaluation.nominal_identities");
         let mut resolver = self.resolver();
-        resolver.evaluated = results.clone();
+        resolver.set_evaluations(results.clone());
         resolver.prepare_contexts();
         let mut pending: BTreeMap<(Ref, String, String), Vec<CaseBinding>> = BTreeMap::new();
         let mut imports: BTreeMap<usize, BTreeMap<String, String>> = BTreeMap::new();

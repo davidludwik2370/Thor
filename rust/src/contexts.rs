@@ -16,9 +16,10 @@ pub struct ContextHint {
 impl Resolver<'_> {
     pub fn prepare_contexts(&mut self) {
         let _phase = crate::profile::span("analysis.contexts");
-        // Witnesses are prepared incrementally; cache only the completed view.
-        self.invalidate_queries();
-        let memoized = self.metadata.take().is_some();
+        if self.contexts_ready {
+            crate::profile::count("resolver.context_reuses", 1);
+            return;
+        }
         let calls = self
             .sources
             .iter()
@@ -28,28 +29,25 @@ impl Resolver<'_> {
                 s.nodes
                     .iter()
                     .enumerate()
-                    .filter(|(_, n)| n.kind == "Call")
+                    .filter(|(id, n)| n.kind == "Call" && s.group(NodeId(*id), "args").iter().any(|arg|
+                        std::iter::once(*arg).chain(s.descendants(*arg)).any(|node|
+                            s.node(node).kind == "Compound" && s.node(node).spans.get("open")
+                                .is_some_and(|span| s.slice(*span) == "["))))
                     .map(move |(node, _)| Ref {
                         file,
                         node: NodeId(node),
                     })
             })
             .collect::<Vec<_>>();
+        if calls.is_empty() {
+            self.contexts_ready = !self.has_demanded_packages();
+            return;
+        }
+        // Witnesses are prepared incrementally; cache only the completed view.
+        self.invalidate_queries();
+        let memoized = self.metadata.take().is_some();
         for call in calls {
             let s = &self.sources[call.file];
-            if !s.group(call.node, "args").iter().any(|arg| {
-                std::iter::once(*arg)
-                    .chain(s.descendants(*arg))
-                    .any(|node| {
-                        s.node(node).kind == "Compound"
-                            && s.node(node)
-                                .spans
-                                .get("open")
-                                .is_some_and(|span| s.slice(*span) == "[")
-                    })
-            }) {
-                continue;
-            }
             let plans = self.call_plans(call, &Substitutions::new());
             if plans.len() != 1 {
                 continue;
@@ -198,6 +196,7 @@ impl Resolver<'_> {
         }
         self.types.clear();
         if memoized { self.metadata = Some(Metadata::default()); }
+        self.contexts_ready = !self.has_demanded_packages();
     }
     fn context_identifiers(source: &Source, node: NodeId, used: &mut BTreeSet<String>) {
         let n = source.node(node);
