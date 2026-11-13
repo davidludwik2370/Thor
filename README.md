@@ -10,6 +10,8 @@ acceptance corpus is verified on macOS arm64. See the
 [shared type, summary, and parallel lowering pass](docs/compiler-structural-3-5-2026-11.md).
 The [slice-checker follow-up](docs/slice-checker-efficiency-2026-11.md) covers
 permission-root pruning, type-property caching, shared graph storage, and selective replay.
+The [SDK and resolver pass](docs/sdk-resolver-efficiency-2026-11.md) covers compact
+syntax caching, semantic state transfer, dependency worklists and complete call plans.
 
 ![Thor](assets/branding/logo-slim.png)
 
