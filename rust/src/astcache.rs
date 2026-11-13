@@ -10,7 +10,8 @@ pub(crate) fn revision() -> &'static str {
     static REVISION: OnceLock<String> = OnceLock::new();
     REVISION.get_or_init(|| sha256(concat!(
         include_str!("ast.rs"), include_str!("astcache.rs"),
-        include_str!("nodefields.rs"), include_str!("kind.rs")
+        include_str!("nodefields.rs"), include_str!("kind.rs"),
+        include_str!("packed.rs"), include_str!("aststorage.rs")
     ).as_bytes()))
 }
 
@@ -161,7 +162,7 @@ pub(crate) fn read(path: PathBuf, raw: String, thor: bool, key: &str, packet: &[
     let count = input.length()?;
     if count == 0 { return None; }
     let mut names = Names::default(); let mut nodes: Vec<Node> = Vec::with_capacity(count);
-    let mut by_span: HashMap<Span, Vec<NodeId>> = HashMap::new();
+    let mut fields = storage::FieldsBuilder::default();
     for i in 0..count {
         let kind = Kind::from(input.text()?.as_ref()); let span = input.span(&raw)?;
         let parent = input.uint()?;
@@ -170,22 +171,24 @@ pub(crate) fn read(path: PathBuf, raw: String, thor: bool, key: &str, packet: &[
         let op = input.text()?.to_string(); let name = names.intern(&input.text()?);
         let mutable = match input.byte()? { 0 => false, 1 => true, _ => return None };
         let immutable = match input.byte()? { 0 => false, 1 => true, _ => return None };
-        let n = input.length()?; let mut roles = Vec::with_capacity(n);
-        for _ in 0..n { roles.push((input.text()?, input.id(count)?)); }
-        let n = input.length()?; let mut spans = Vec::with_capacity(n);
-        for _ in 0..n { spans.push((input.text()?, input.span(&raw)?)); }
-        let n = input.length()?; let mut lists = Vec::with_capacity(n);
-        for _ in 0..n {
-            let name = input.text()?; let n = input.length()?; let mut ids = Vec::with_capacity(n);
-            for _ in 0..n { ids.push(input.id(count)?); } lists.push((name, ids));
+        let role_count = input.length()?;
+        for _ in 0..role_count { fields.roles.push((input.text()?, input.id(count)?)); }
+        let span_count = input.length()?;
+        for _ in 0..span_count { fields.spans.push((input.text()?, input.span(&raw)?)); }
+        let list_count = input.length()?;
+        for _ in 0..list_count {
+            let name = input.text()?;
+            let item_count = input.length()?;
+            let start = fields.items.len();
+            for _ in 0..item_count { fields.items.push(input.id(count)?); }
+            fields.lists.push((name, start..fields.items.len()));
         }
+        fields.counts.push([role_count, span_count, list_count]);
         let data = input.value(0)?;
         if !data.is_object() { return None; }
-        nodes.push(Node { kind, span, parent, children: vec![],
-            roles: NodeFields::from_entries(roles), spans: NodeFields::from_entries(spans),
-            lists: NodeFields::from_entries(lists), op, name, mutable, immutable, data });
-        if let Some(parent) = parent { nodes[parent.0].children.push(NodeId(i)); }
-        by_span.entry(span).or_default().push(NodeId(i));
+        nodes.push(Node { kind, span, parent, children: PackedSlice::default(),
+            roles: NodeFields::default(), spans: NodeFields::default(),
+            lists: NodeFields::default(), op, name, mutable, immutable, data });
     }
     let info = input.value(0)?;
     if !info.is_object() { return None; }
@@ -199,6 +202,9 @@ pub(crate) fn read(path: PathBuf, raw: String, thor: bool, key: &str, packet: &[
         if protocol_overrides.insert(id, fields).is_some() { return None; }
     }
     if !input.bytes.is_empty() { return None; }
+    fields.finish(&mut nodes);
+    storage::pack_children(&mut nodes);
+    let by_span = storage::pack_spans(&nodes);
     let mut edits = vec![];
     for row in info["edits"].as_array().into_iter().flatten() {
         let span = Span::new(row["start"].as_u64()? as usize, row["end"].as_u64()? as usize);

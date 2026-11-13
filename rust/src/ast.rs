@@ -14,6 +14,11 @@ use std::{
 #[path = "nodefields.rs"]
 mod nodefields;
 pub use nodefields::NodeFields;
+#[path = "packed.rs"]
+mod packed;
+pub use packed::PackedSlice;
+#[path = "aststorage.rs"]
+mod storage;
 #[path = "astcache.rs"]
 pub(crate) mod cache;
 
@@ -79,10 +84,10 @@ pub struct Node {
     pub kind: Kind,
     pub span: Span,
     pub parent: Option<NodeId>,
-    pub children: Vec<NodeId>,
+    pub children: PackedSlice<NodeId>,
     pub roles: NodeFields<NodeId>,
     pub spans: NodeFields<Span>,
-    pub lists: NodeFields<Vec<NodeId>>,
+    pub lists: NodeFields<PackedSlice<NodeId>>,
     pub op: String,
     pub name: NameId,
     pub mutable: bool,
@@ -157,7 +162,7 @@ pub struct SourceSyntax {
     protocol: Arc<[u8]>,
     protocol_overrides: HashMap<NodeId, WireOverrides>,
     line_starts: Vec<usize>,
-    by_span: HashMap<Span, Vec<NodeId>>,
+    by_span: HashMap<Span, PackedSlice<NodeId>>,
     traversal: Vec<NodeId>,
     subtree: Vec<(usize, usize)>,
 }
@@ -191,7 +196,6 @@ impl Source {
         }
         let mut names = Names::default();
         let mut nodes = Vec::with_capacity(rows.len());
-        let mut by_span: HashMap<Span, Vec<NodeId>> = HashMap::new();
         for (i, mut row) in rows.into_iter().enumerate() {
             let start = row.start.ok_or_else(|| Error::new("invalid AST start"))?;
             let end = row.end.ok_or_else(|| Error::new("invalid AST end"))?;
@@ -203,7 +207,6 @@ impl Source {
             if parent >= i as i64 {
                 return Err(Error::new("invalid AST parent order"));
             }
-            by_span.entry(span).or_default().push(NodeId(i));
             for (key, value) in [("roles", row.roles.take()), ("lists", row.lists.take())] {
                 if let Some(value) = value {
                     if !value.is_object() && !value.is_null() {
@@ -220,7 +223,7 @@ impl Source {
                 } else {
                     Some(NodeId(parent as usize))
                 },
-                children: vec![],
+                children: PackedSlice::default(),
                 roles: NodeFields::default(),
                 spans: NodeFields::default(),
                 lists: NodeFields::default(),
@@ -231,11 +234,8 @@ impl Source {
                 data: Value::Object(row.data),
             });
         }
-        for i in 1..nodes.len() {
-            if let Some(parent) = nodes[i].parent {
-                nodes[parent.0].children.push(NodeId(i));
-            }
-        }
+        storage::pack_children(&mut nodes);
+        let by_span = storage::pack_spans(&nodes);
         let mut changed_roles = vec![false; nodes.len()];
         let mut changed_lists = vec![false; nodes.len()];
         for feature in info["features"].as_array().into_iter().flatten() {
@@ -352,7 +352,7 @@ impl Source {
                             }
                         }
                     }
-                    resolved_lists.push((intern_field(&mut field_names, name), ids));
+                    resolved_lists.push((intern_field(&mut field_names, name), PackedSlice::from_vec(ids)));
                 }
             }
             nodes[i].roles = NodeFields::from_entries(resolved_roles);
@@ -502,6 +502,7 @@ impl Source {
         if traversal.len() != nodes.len() {
             return Err(Error::new("AST contains disconnected roots"));
         }
+        storage::FieldsBuilder::pack(&mut nodes);
         Ok(Self {
             syntax: Arc::new(SourceSyntax {
             path,
@@ -563,7 +564,7 @@ impl Source {
         self.node(id)
             .lists
             .get(name)
-            .map(Vec::as_slice)
+            .map(PackedSlice::as_slice)
             .unwrap_or(&[])
     }
     pub fn ancestors(&self, id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
@@ -640,7 +641,7 @@ fn is_descendant(nodes: &[Node], id: NodeId, ancestor: NodeId) -> bool {
 }
 fn resolve_span(
     nodes: &[Node],
-    spans: &HashMap<Span, Vec<NodeId>>,
+    spans: &HashMap<Span, PackedSlice<NodeId>>,
     span: Span,
     relative: NodeId,
 ) -> Option<NodeId> {
