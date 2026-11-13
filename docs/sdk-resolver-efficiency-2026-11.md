@@ -48,6 +48,22 @@ logical constant does not discard those answers. Generic evaluator bindings
 are reset before the scheduler returns its resolver to the enclosing project.
 Helper projects keep their own semantic state even when their syntax is shared.
 
+## Dependency worklists
+
+Within a discovery command, project expression sites, pure roots and `#run`
+request sites are collected once per newly loaded source. A positive resolved
+type answer can be reused across the addition of separate SDK namespaces only
+if it was obtained before any outstanding dependency demand and without
+evaluations, generic bindings or contextual witnesses. This conservative rule
+also excludes answers obtained from an earlier memoized partial dependency.
+Unknown answers stay on the retry path. Record fields, signature dependencies,
+purity and slice effects are rechecked against the enlarged source graph.
+
+New files in an existing namespace, reparsed syntax, changed source views or
+collection roots, or new Thor files discard the discovery worklist. Existing
+source/node order is preserved. This is command-local reuse, not an incremental
+project artifact cache.
+
 ## Investigation notes
 
 The explicit contextual array call `#run add([3,4])` with a `[2]i8` parameter was

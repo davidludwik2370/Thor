@@ -47,7 +47,6 @@ impl Resolver<'_> {
         self.invalidate_queries();
         let memoized = self.metadata.take().is_some();
         for call in calls {
-            let s = &self.sources[call.file];
             let plans = self.call_plans(call, &Substitutions::new());
             if plans.len() != 1 {
                 continue;

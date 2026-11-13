@@ -1237,6 +1237,9 @@ impl<'a> Resolver<'a> {
         }
         typ
     }
+    pub(crate) fn adopt_closed_type(&mut self, reference: Ref, typ: Type) {
+        self.types.insert(reference, typ);
+    }
     fn infer(&mut self, r: Ref) -> Type {
         if let Some(typ)=self.logical_constant_type(r){return typ;}
         if let Some(typ) = self.logical_type(r) {

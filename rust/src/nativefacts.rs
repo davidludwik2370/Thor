@@ -119,45 +119,15 @@ impl Project {
         }) { return Ok(()); }
         let mut inspected = HashSet::new();
         let mut lookahead = super::dependencylookahead::Lookahead::new();
+        let mut work = super::discoverywork::Work::default();
         loop {
             let mut resolver = self.resolver();
             resolver.begin_symbol_queries();
-            let mut types = Vec::new();
-            // Resolve the project's actual names. This follows type aliases and
-            // selected signatures without traversing unrelated SDK bodies.
-            for (file, source) in self.sources.iter().enumerate().filter(|(_, source)| {
-                !source.shared_native && !source.path.starts_with(self.options.root.join("runtime"))
-            }) {
-                for (index, node) in source.nodes.iter().enumerate() {
-                    let reference = crate::semantics::Ref {file, node: crate::ast::NodeId(index)};
-                    if matches!(node.kind.as_str(), "Selector" | "Call")
-                        || node.kind == "Ident" && resolver.expression_reference(reference)
-                    {
-                        types.push(resolver.type_of(reference));
-                    }
-                }
-            }
+            work.update(&resolver, &self.options.root.join("runtime"));
+            let types = work.types(&mut resolver);
             let record_packages = Self::discover_record_dependencies(&mut resolver, types);
-            let mut roots = vec![];
-            let mut requests = vec![];
-            for (file, source) in resolver.sources.iter().enumerate() {
-                for (index, node) in source.nodes.iter().enumerate() {
-                    if node.data["pure"] == true {
-                        roots.push(crate::semantics::Ref {
-                            file,
-                            node: crate::ast::NodeId(index),
-                        });
-                    }
-                    if node.kind == "Run" {
-                        requests.extend(
-                            source
-                                .descendants(crate::ast::NodeId(index))
-                                .filter(|id| source.node(*id).kind == "Call")
-                                .map(|node| crate::semantics::Ref { file, node }),
-                        );
-                    }
-                }
-            }
+            let mut roots = work.roots.clone();
+            let requests = work.requests.clone();
             for request in &requests {
                 let plans = resolver.call_plans(*request, &Default::default());
                 if plans.is_empty() {

@@ -30,6 +30,8 @@ pub use evaluationexec::{cancel_active_evaluation, evaluation_cancelled};
 mod nativefacts;
 #[path = "dependencylookahead.rs"]
 mod dependencylookahead;
+#[path = "discoverywork.rs"]
+mod discoverywork;
 #[path = "runtimeview.rs"]
 mod runtimeview;
 #[path = "sdkmirror.rs"]
