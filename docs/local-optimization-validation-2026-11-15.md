@@ -74,3 +74,22 @@ and unchecked generic/default/variadic calls, lexical shadowing, conditional
 array contexts, read-only alias rejection, cycle diagnostics and assertion
 hygiene. Linux also passed all 88 Rust unit tests, including the new syntax-index
 extension regression. The same unit suite passed on Mac.
+
+Linux warm optimized Skald test builds subsequently took 29.393 and 27.743
+seconds, compared with 35.531 and 35.419 seconds before these changes. All 108
+test names and verdicts matched. The cold sample took 198.489 seconds with
+1,192 MiB peak single-process RSS.
+
+## Vet graph reuse
+
+Vet retains procedure portability results for its current source snapshot.
+Shared helper bodies are traversed once. Rejection propagates through callers
+before any successful result is cached, including callers in recursive cycles.
+Native validation still checks the complete proposed edits.
+
+The regression adds 48 candidates sharing one helper and a recursive group
+that reaches a conditional implementation. It verifies both bounded body scans
+and the retained rejection. The 73-test Mac vet selection passed. Its larger
+Skald samples took 201.021 seconds initially and 41.528 seconds on repetition.
+The latter includes two correction-validation checks. These timings include
+the preceding warm-analysis improvements.

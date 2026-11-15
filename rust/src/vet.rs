@@ -178,28 +178,60 @@ fn field_types(resolver: &mut Resolver<'_>, signature: Ref, role: &str) -> Vec<T
 }
 // A correction lives in source shared by future targets and #config values.
 // Current-target validation cannot establish every inactive implementation.
-fn portable_body(resolver: &mut Resolver<'_>, root: Ref) -> bool {
-    let mut pending = vec![root];
-    let mut seen = HashSet::new();
-    while let Some(procedure) = pending.pop() {
-        if !seen.insert(procedure) { continue; }
-        let source = &resolver.sources[procedure.file];
-        if source.info["target_specific"] == true || source.info["file_tags"].as_array()
-            .into_iter().flatten().filter_map(Value::as_str).any(|tag| tag.starts_with("#+build")) {
-            return false;
-        }
-        for node in source.descendants(procedure.node) {
-            if matches!(source.node(node).kind.as_str(), "When" | "WhenExpr" | "CompileSwitch" | "CompileSwitchExpr") {
-                return false;
+#[derive(Default)]
+struct PortableBodies {
+    known: std::collections::HashMap<Ref, bool>,
+}
+impl PortableBodies {
+    fn check(&mut self, resolver: &mut Resolver<'_>, root: Ref) -> bool {
+        if let Some(result) = self.known.get(&root) { return *result; }
+        let mut pending = vec![root];
+        let mut seen = HashSet::new();
+        let mut callers = std::collections::HashMap::<Ref, Vec<Ref>>::new();
+        let mut rejected = HashSet::new();
+        while let Some(procedure) = pending.pop() {
+            if let Some(portable) = self.known.get(&procedure) {
+                if !portable { rejected.insert(procedure); }
+                continue;
             }
-            if source.node(node).kind == "Call" {
-                if let Some(callee) = source.role(node, "callee") {
-                    pending.extend(resolver.candidates(Ref {file:procedure.file,node:callee}));
+            if !seen.insert(procedure) { continue; }
+            crate::profile::count("vet.portability_body_scans", 1);
+            let source = &resolver.sources[procedure.file];
+            let target_specific = source.info["target_specific"] == true
+                || source.info["file_tags"].as_array().into_iter().flatten()
+                    .filter_map(Value::as_str).any(|tag| tag.starts_with("#+build"));
+            if target_specific {
+                rejected.insert(procedure);
+                continue;
+            }
+            for node in source.descendants(procedure.node) {
+                if matches!(source.node(node).kind.as_str(), "When" | "WhenExpr" | "CompileSwitch" | "CompileSwitchExpr") {
+                    rejected.insert(procedure);
+                    break;
+                }
+                if source.node(node).kind == "Call" {
+                    if let Some(callee) = source.role(node, "callee") {
+                        for target in resolver.candidates(Ref {file:procedure.file,node:callee}) {
+                            callers.entry(target).or_default().push(procedure);
+                            pending.push(target);
+                        }
+                    }
                 }
             }
         }
+        // Propagate through the entire discovered graph before caching any
+        // successful result. A cycle can reach a nonportable implementation.
+        let mut pending = rejected.iter().copied().collect::<Vec<_>>();
+        while let Some(procedure) = pending.pop() {
+            for caller in callers.get(&procedure).into_iter().flatten() {
+                if rejected.insert(*caller) { pending.push(*caller); }
+            }
+        }
+        for procedure in seen {
+            self.known.insert(procedure, !rejected.contains(&procedure));
+        }
+        self.known[&root]
     }
-    true
 }
 
 pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
@@ -216,7 +248,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
     resolver.prepare_contexts();
     crate::lower::prime_logical_constants(&mut resolver);
     let mut result = vec![];
-    let mut portable = std::collections::HashMap::new();
+    let mut portable = PortableBodies::default();
     for (file, source) in project.sources.iter().enumerate() {
         if !source.thor || source.excluded || !source.path.starts_with(root) {
             continue;
@@ -295,7 +327,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 if types.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
                     || !possible(typ, &mut resolver, &mut HashSet::new())) {
                     let owner = Ref {file,node:owner};
-                    if !*portable.entry(owner).or_insert_with(|| portable_body(&mut resolver, owner)) { continue; }
+                    if !portable.check(&mut resolver, owner) { continue; }
                 }
                 // Returning a readonly alias changes an API used by callers
                 // outside this entry point. Keep that ownership choice explicit.
@@ -386,7 +418,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
             if purity.faults.values().any(|faults| !faults.is_empty()) || !purity.gaps.is_empty() {
                 continue;
             }
-            if !*portable.entry(procedure).or_insert_with(|| portable_body(&mut resolver, procedure)) { continue; }
+            if !portable.check(&mut resolver, procedure) { continue; }
             let start = source.node(proc).span.start;
             if source.raw.get(start..start + 4) == Some("proc") {
                 result.push(Fix {

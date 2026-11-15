@@ -1,5 +1,6 @@
 """Run existing convention/apply contracts through the independent compiler."""
 import json
+import os
 import subprocess
 import unittest
 from tests import test_vet as reference
@@ -16,6 +17,29 @@ class RustVetTests(unittest.TestCase):
                               cwd=self.root,capture_output=True,text=True,input=input,timeout=90)
         self.assertEqual(result.returncode,status,result.stdout+result.stderr)
         return result
+
+    def test_shared_portability_graph_is_scanned_once_and_cycles_retain_rejections(self):
+        wrappers = '\n'.join(f'wrapper_{index}::proc(x:int)->int{{return shared(x)}}'
+                             for index in range(48))
+        self.write('''package main
+shared::proc(x:int)->int{return x+1}
+cycle_a::proc(x:int)->int{return cycle_b(x)}
+cycle_b::proc(x:int)->int{when true{return x}else{return cycle_a(x)}}
+blocked::proc(x:int)->int{return cycle_a(x)}
+''' + wrappers + '\nmain::proc(){}\n')
+        profile = self.root/'profile.json'
+        result = subprocess.run([str(native.RUST), 'vet', str(self.app), '--vet=pure',
+            '-json-errors', '--output-dir', str(self.output)], cwd=self.root,
+            env={**os.environ, 'THOR_PROFILE':str(profile)}, capture_output=True,
+            text=True, timeout=90)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        findings = json.loads(result.stderr)['errors']
+        names = [error['msgs'][0] for error in findings]
+        self.assertEqual(len(names), 49, names)
+        self.assertTrue(all('cycle_' not in name and "'blocked'" not in name for name in names), names)
+        counters = json.loads(profile.read_text())['counters']
+        self.assertLessEqual(counters.get('vet.portability_body_scans', 0), 52, counters)
+        self.assertGreater(counters.get('vet.portability_body_scans', 0), 48, counters)
 
     def test_options_before_source_and_large_batches(self):
         body='\n'.join(f'value_{index}:={index};if value_{index}!={index}{{panic("result")}}' for index in range(80))
