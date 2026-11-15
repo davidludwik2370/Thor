@@ -1,4 +1,4 @@
-//! Conservative native result keys. Toolchain metadata is validated lazily;
+//! Conservative native result keys. Toolchain content is hashed once per session;
 //! result keys cover emitted dependencies, flags and observable resource inputs.
 use super::*;
 use crate::{
@@ -113,32 +113,6 @@ impl EvaluationCache {
             native.join("core"),
             native.join("vendor"),
         ];
-        let mut snapshot = Inputs::default();
-        snapshot.file(&executable, None, false);
-        snapshot.file(&compiler, None, false);
-        snapshot.binding(&native);
-        for tree in &trees {
-            snapshot.tree_with_extensions(tree, &["odin", "thor", "rs", "py"]);
-        }
-        let stamp = snapshot.usable.then(|| {
-            sha256(&canonical(&json!([
-                config,
-                hex(&commands[0].1),
-                snapshot.data
-            ])))
-        });
-        if let Some(value) = self
-            .read_record("identity-v1", stamp.as_deref())
-            .and_then(|value| {
-                value
-                    .as_str()
-                    .filter(|key| key_valid(key))
-                    .map(str::to_string)
-            })
-        {
-            self.identities.insert(executable, value.clone());
-            return Some(value);
-        }
         let mut digest = canonical(&config);
         digest.extend(canonical(&json!([
             executable.to_string_lossy(),
@@ -164,9 +138,6 @@ impl EvaluationCache {
         }
         let identity = sha256(&digest);
         self.identities.insert(executable, identity.clone());
-        if snapshot.valid() {
-            self.write_record("identity-v1", stamp.as_deref(), &json!(identity));
-        }
         Some(identity)
     }
     pub fn resources(sources: &[Source]) -> Option<String> {

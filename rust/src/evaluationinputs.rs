@@ -158,11 +158,11 @@ pub fn members(path: &Path, suffixes: &[String]) -> io::Result<Vec<String>> {
         let entry = entry?;
         let path = entry.path();
         if path.is_file()
-            && path.extension().is_some_and(|extension| {
+            && (suffixes.iter().any(|suffix| suffix == "*") || path.extension().is_some_and(|extension| {
                 suffixes
                     .iter()
                     .any(|suffix| suffix.strip_prefix('.').unwrap_or(suffix) == extension)
-            })
+            }))
         {
             names.push(entry.file_name().to_string_lossy().into_owned());
         }
@@ -386,6 +386,9 @@ impl Inputs {
                     {
                         Ok(mut entries) => {
                             entries.sort_by_key(|entry| entry.file_name());
+                            let files = entries.iter().map(|entry| entry.path())
+                                .filter(|path| path.is_file()).collect::<Vec<_>>();
+                            self.package(&path, &files, &["*".into()]);
                             for entry in entries {
                                 let path = entry.path();
                                 if path.is_file() {
@@ -421,14 +424,10 @@ impl Inputs {
                         byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
                         return Some(false);
                     }
-                    if &current == expected {
-                        crate::profile::count("cache.unchanged_files", 1);
-                    } else {
-                        crate::profile::count("cache.rehashed_files", 1);
-                        if file_digest(path).ok()?.as_str() != expected_digest
-                            || json!(signature(path).ok()?) != current {
-                            return Some(false);
-                        }
+                    crate::profile::count("cache.rehashed_files", 1);
+                    if file_digest(path).ok()?.as_str() != expected_digest
+                        || json!(signature(path).ok()?) != current {
+                        return Some(false);
                     }
                 }
             }

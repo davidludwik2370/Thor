@@ -14,6 +14,7 @@ pub(super) struct NameIndex {
     pub promotions: Vec<Vec<NodeId>>,
     pub expression_names: Vec<Vec<NodeId>>,
     pub contextual_calls: Vec<Vec<NodeId>>,
+    pub constant_requests: Vec<HashMap<NodeId, Vec<NodeId>>>,
     pub signatures: HashMap<Ref, std::sync::OnceLock<Arc<signaturelayout::SignatureLayout>>>,
     heads: Vec<Vec<NodeId>>,
     parents: Vec<Vec<NodeId>>,
@@ -30,6 +31,7 @@ impl NameIndex {
             promotions: vec![],
             expression_names: vec![],
             contextual_calls: vec![],
+            constant_requests: vec![],
             signatures: HashMap::new(),
             heads: vec![],
             parents: vec![],
@@ -56,6 +58,7 @@ impl NameIndex {
             let mut promotions = vec![];
             let mut expression_names = vec![];
             let mut contextual_calls = vec![];
+            let mut constant_requests: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
             for (n, node) in source.nodes.iter().enumerate() {
                 let id = NodeId(n);
                 if matches!(node.kind.as_str(), "ProcedureType" | "StructType") {
@@ -66,6 +69,22 @@ impl NameIndex {
                 parents.push(parent);
                 if expression_name(source, id) {
                     expression_names.push(id);
+                }
+                if (matches!(node.kind.as_str(), "Call" | "Run" | "Comprehension")
+                    || node.kind == "Binary" && node.op == "**")
+                    && !source.ancestors(id).any(|owner| source.node(owner).kind == "Procedure")
+                {
+                    if let Some(declaration) = source.ancestors(id)
+                        .find(|owner| source.node(*owner).kind == "Declaration")
+                    {
+                        let definition = source.node(declaration);
+                        if !definition.mutable && !definition.immutable
+                            && source.group(declaration, "values").iter().any(|value|
+                                source.node(*value).span.contains(node.span))
+                        {
+                            constant_requests.entry(declaration).or_default().push(id);
+                        }
+                    }
                 }
                 if node.kind == "Call" && source.group(id, "args").iter().any(|arg|
                     std::iter::once(*arg).chain(source.descendants(*arg)).any(|node|
@@ -101,6 +120,7 @@ impl NameIndex {
             self.promotions.push(promotions);
             self.expression_names.push(expression_names);
             self.contextual_calls.push(contextual_calls);
+            self.constant_requests.push(constant_requests);
         }
     }
     pub fn scopes(&self, reference: Ref) -> impl Iterator<Item = NodeId> + '_ {
@@ -108,6 +128,13 @@ impl NameIndex {
             Some(self.heads[reference.file][reference.node.0]),
             move |id| (id.0 != 0).then(|| self.parents[reference.file][id.0]),
         )
+    }
+}
+
+impl Resolver<'_> {
+    pub(crate) fn declaration_evaluations(&self, declaration: Ref) -> Vec<Ref> {
+        self.index.constant_requests[declaration.file].get(&declaration.node)
+            .into_iter().flatten().map(|node| Ref { file: declaration.file, node: *node }).collect()
     }
 }
 

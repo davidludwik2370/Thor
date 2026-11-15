@@ -18,7 +18,7 @@ def signature(path):
 def members(path, suffixes):
     with os.scandir(path) as entries:
         return sorted(entry.name for entry in entries
-                      if Path(entry.name).suffix in suffixes and entry.is_file())
+                      if ('*' in suffixes or Path(entry.name).suffix in suffixes) and entry.is_file())
 
 
 class Inputs:
@@ -89,9 +89,10 @@ class Inputs:
             if path.is_dir():
                 self.data['directories'][str(path)] = signature(path)
                 if callee.text == '#load_directory':
-                    for child in sorted(path.iterdir()):
-                        if child.is_file():
-                            self.file(child)
+                    children = [child for child in sorted(path.iterdir()) if child.is_file()]
+                    self.package(path, children, ('*',))
+                    for child in children:
+                        self.file(child)
             else:
                 self.file(path)
 

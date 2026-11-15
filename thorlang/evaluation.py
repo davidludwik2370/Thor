@@ -821,6 +821,21 @@ class Evaluator:
                   b.typ.node.kind in {'StructType','UnionType','EnumType','DistinctType','BitSetType'} else b.typ.node
                   for b in bindings.values() if b.typ.node]
         keep,imports,aliases,procedures,queries,calls,external=self.closure(roots)
+        # A retained global constant may itself require automatic fn execution.
+        # Its declaration order does not establish evaluation readiness.
+        for declaration in sorted(keep,key=lambda node:(str(node.source.path),node.start)):
+            if declaration.kind!='Declaration' or declaration.data.get('mutable') or declaration.data.get('immutable'):
+                continue
+            if any(owner.kind=='Procedure' for owner in declaration.ancestors()):
+                continue
+            for value in declaration.group('values'):
+                if value.kind=='Procedure':
+                    continue
+                for request in descendants(value):
+                    if request.kind=='Procedure' or any(owner.kind=='Procedure' for owner in request.ancestors()):
+                        continue
+                    if self.automatic(request) and self.key(request) not in self.results:
+                        self.evaluate(request)
         prepared=self.prepared_key(n,roots,keep,procedures,queries) if not (condition or condition_case is not None or extra or bindings) else None
         failed_prepared=None
         if prepared is not None:

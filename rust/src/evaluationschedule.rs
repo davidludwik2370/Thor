@@ -13,6 +13,8 @@ mod integer;
 mod prepared;
 #[path = "evaluationscalar.rs"]
 mod scalar;
+#[path = "evaluationbatch.rs"]
+mod batch;
 #[path = "evaluationspecialize.rs"]
 mod specialize;
 
@@ -38,6 +40,7 @@ pub struct Scheduler<'p> {
     execution_records: BTreeMap<Ref, scalar::ExecutionRecord>,
     failed_scalar_targets: BTreeMap<Ref, String>,
     prepared_inputs: std::cell::OnceCell<prepared::PreparedInputs>,
+    batch_failed: bool,
     pub scalar_witnesses: BTreeMap<Ref, String>,
 }
 impl<'p> Scheduler<'p> {
@@ -93,6 +96,7 @@ impl<'p> Scheduler<'p> {
             execution_records: BTreeMap::new(),
             failed_scalar_targets: BTreeMap::new(),
             prepared_inputs: std::cell::OnceCell::new(),
+            batch_failed: false,
             scalar_witnesses: BTreeMap::new(),
         };
         this.prepare_work_sources();
@@ -824,12 +828,21 @@ impl<'p> Scheduler<'p> {
         }
         Ok(false)
     }
+    pub(super) fn required_evaluations(&mut self, graph: &Closure) -> BTreeSet<Ref> {
+        let mut required = graph.nested_runs.clone();
+        for declaration in &graph.keep {
+            for request in self.resolver.declaration_evaluations(*declaration) {
+                if self.automatic(request) { required.insert(request); }
+            }
+        }
+        required
+    }
     fn execute(&mut self, node: Ref, mode: Mode) -> Result<Value> {
         let roots = request_roots(self.source(node), node, mode);
         let graph = Extraction::build(&mut self.resolver, &roots)?;
-        for nested in &graph.nested_runs {
-            if self.value(*nested).is_none() && !self.cases.contains_key(nested) {
-                self.evaluate(*nested)?;
+        for nested in self.required_evaluations(&graph) {
+            if self.value(nested).is_none() && !self.cases.contains_key(&nested) {
+                self.evaluate(nested)?;
             }
         }
         let prepared = self.prepared_key(node, &roots, &graph, mode);
@@ -857,6 +870,9 @@ impl<'p> Scheduler<'p> {
             }
             cache_misses.extend(target);
         }
+        if matches!(mode, Mode::Value) {
+            if let Some(value) = self.batch(node)? { return Ok(value); }
+        }
         let skips = self
             .inactive
             .iter()
@@ -866,6 +882,7 @@ impl<'p> Scheduler<'p> {
             node,
             self.timeout,
             &Context {
+                batch: &[],
                 results: &self.results,
                 skips: &skips,
                 cases: &self.cases,

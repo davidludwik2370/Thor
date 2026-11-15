@@ -45,16 +45,14 @@ class RustEvaluationKeyTests(unittest.TestCase):
     def identity(self,compiler,support):
         return self.run_native([dict(op='identity',odin=str(compiler),root=str(support))])['answers'][0]
 
-    def test_identity_reuses_validated_metadata_record(self):
+    def test_identity_is_stable_without_persisted_metadata_aliases(self):
         compiler,support=self.toolchain()
         before=self.identity(compiler,support)
-        records=list((self.root/'cache/identity-v1').glob('*.json'))
         after=self.identity(compiler,support)
-        final_records=list((self.root/'cache/identity-v1').glob('*.json'))
         self.assertIsInstance(before,str)
         self.assertEqual(len(before),64)
         self.assertEqual(before,after)
-        self.assertEqual(final_records,records)
+        self.assertFalse((self.root/'cache/identity-v1').exists())
 
     def test_support_frontend_and_native_source_changes_invalidate(self):
         compiler,support=self.toolchain()
@@ -87,13 +85,16 @@ class RustEvaluationKeyTests(unittest.TestCase):
         after=self.identity(compiler,support)
         self.assertEqual(before,after)
 
-    def test_invalid_saved_identity_is_recomputed(self):
+    def test_old_metadata_aliases_do_not_override_content_identity(self):
         compiler,support=self.toolchain()
         before=self.identity(compiler,support)
-        record=next((self.root/'cache/identity-v1').glob('*.json'))
-        record.write_text('{')
+        directory=self.root/'cache/identity-v1';directory.mkdir(parents=True)
+        (directory/('0'*64+'.json')).write_text('{')
         after=self.identity(compiler,support)
         self.assertEqual(before,after)
+        source=support/'runtime/basic.thor'
+        source.write_text('package basic\nVALUE::2\n')
+        self.assertNotEqual(before,self.identity(compiler,support))
 
     def test_failed_compiler_query_is_optional(self):
         compiler,support=self.toolchain()

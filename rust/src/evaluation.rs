@@ -25,6 +25,7 @@ use eligibility::source_location_dependent;
 /// Borrowed evaluator state used by one isolated helper. Native helper creation
 /// snapshots the selected inputs; the scheduler retains its own registries.
 pub struct Context<'a> {
+    pub batch: &'a [Ref],
     pub results: &'a BTreeMap<Ref, serde_json::Value>,
     pub skips: &'a BTreeMap<Ref, bool>,
     pub cases: &'a crate::specialization::Cases,
@@ -41,6 +42,7 @@ static EMPTY_CACHE_MISSES: BTreeSet<String> = BTreeSet::new();
 impl Default for Context<'_> {
     fn default() -> Self {
         Self {
+            batch: &[],
             results: &EMPTY_RESULTS,
             skips: &EMPTY_SKIPS,
             cases: &EMPTY_CASES,
@@ -72,6 +74,7 @@ pub struct Bridge {
 #[derive(Clone)]
 pub struct Request {
     pub expression: NodeId,
+    pub batch: Vec<NodeId>,
     pub locals: BTreeMap<NodeId, Vec<NodeId>>,
     pub mode: Mode,
     pub prelude: String,
@@ -206,7 +209,11 @@ impl Plan {
     ) -> Result<Self> {
         let results = context.results;
         let skips = context.skips;
-        let roots = request_roots(&r.sources[expression.file], expression, mode);
+        let roots = if context.batch.is_empty() {
+            request_roots(&r.sources[expression.file], expression, mode)
+        } else {
+            context.batch.to_vec()
+        };
         let definitions = context
             .bindings
             .values()

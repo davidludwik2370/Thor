@@ -93,3 +93,59 @@ and the retained rejection. The 73-test Mac vet selection passed. Its larger
 Skald samples took 201.021 seconds initially and 41.528 seconds on repetition.
 The latter includes two correction-validation checks. These timings include
 the preceding warm-analysis improvements.
+
+The same 73-test selection passed on Linux. Its Skald vet samples took 207.612
+and 41.421 seconds, with two validation checks. Both hosts retained the same 13
+rejected proposals, including 12 read-only changes and one pure-function change.
+
+## Cold compile-time work
+
+Independent automatic pure calls with compatible scalar results share native
+helpers in batches of at most 32. Results retain independent dependency keys.
+Changing one callable recomputes its affected values. The path uses the normal
+executor resource checks and publishes the batch only after complete validation.
+A failed batch returns to individual evaluation to preserve source diagnostics.
+Each scalar call owns a separate scratch lifetime, releasing its temporary
+allocations before the next result is computed. A native helper instrumentation
+test checks this before serialization in checked and unchecked builds.
+
+Finite per-call deadlines, generic roots, explicit `#run`, conditional or loop
+execution, local captures and variadic packs retain individual evaluation. The
+helper builds remain serial to bound native compiler memory use. Parsing and
+file lowering retain their existing bounded parallelism.
+
+The investigation also found a forward-declared constant dependency that failed
+in both frontends. Retained global constants now complete their required pure
+calls before a dependent helper is built. The Rust syntax index records those
+potential requests once, and the scheduler applies current semantic eligibility.
+
+Linux repeated resource edits exposed identical filesystem timestamps across a
+same-size rewrite. Content snapshots now verify their SHA-256 contents on reuse.
+Directory resources also retain explicit immediate-file membership, including
+extensionless files. Toolchain identity hashes content once per session. The
+persisted metadata-only identity aliases have been removed. SHA-256 uses the
+RustCrypto implementation with its runtime-selected native backend.
+
+The final Mac scalar fixture took 46.543 seconds cold before batching and 1.970
+seconds with batching. Warm samples were 0.348 and 0.398 seconds. The Linux
+fixture took 66.473 and 2.590 seconds cold, with 0.282 and 0.331 second warm
+samples. These measurements include final native compilation and executable
+checks. The later scratch-lifetime regression also runs in checked and unchecked modes.
+
+Mac and Linux each passed the 87-test targeted selection and all 88 Rust unit
+tests. The additional native scratch-lifetime check passed on both hosts in
+checked and unchecked modes. It confirms that existing pure-call cleanup also
+covers batched scalar results.
+
+The larger Mac optimized single-worker samples took 97.301 seconds cold and
+22.875/23.351 seconds warm, matching all 108 native outcomes. Their peak
+single-process RSS was 1,436–1,445 MiB. Warm lowering itself took 10.664 seconds.
+These Mac samples explicitly use one native compiler worker. The earlier Mac
+samples used their original native concurrency, so their total build times
+require a final paired comparison with matching flags.
+
+The larger Linux samples took 138.048 seconds cold and 36.281/29.116 seconds
+warm, with all 108 outcomes matching. The first warm sample overlapped release
+linking on the host. The quieter second sample retains the prior warm-analysis
+improvement while adding content-based resource validation. Its peak
+single-process RSS was about 1,196 MiB.

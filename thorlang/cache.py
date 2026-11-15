@@ -95,30 +95,15 @@ class EvaluationCache:
             commands[command]=result.stdout
         native_root=Path(commands['root'].decode().strip())
         trees=[root/'thorlang',root/'frontend',root/'runtime',native_root/'base',native_root/'core',native_root/'vendor']
-        # This inventory only validates the compile-time toolchain identity.
-        # It is built lazily; ordinary builds without evaluation do not scan SDKs.
-        from .dependencies import Inputs
-        snapshot=Inputs()
-        try:
-            snapshot.file(executable,content=False)
-            snapshot.file(Path(sys.executable).resolve(),content=False)
-            snapshot.binding(native_root)
-            for tree in trees:snapshot.tree(tree)
-        except OSError:snapshot.usable=False
-        stamp=hashlib.sha256(canonical([config,commands['version'].hex(),snapshot.data])).hexdigest() if snapshot.usable else None
-        saved=self.read_record('identity-v1',stamp)
-        if isinstance(saved,str) and re.fullmatch('[0-9a-f]{64}',saved):
-            self.identities[odin]=saved;return saved
         digest=hashlib.sha256(canonical(config))
         digest.update(canonical([str(executable),file_digest(executable)]))
         for command,output in commands.items():digest.update(canonical([command,output.hex()]))
         # Locally edited stdlib/compiler support invalidates unchanged binaries.
         for tree in trees:
             for path in sorted(tree.rglob('*')):
-                if path.suffix in {'.odin', '.py'} and path.is_file():
+                if path.suffix in {'.odin', '.thor', '.py'} and path.is_file():
                     digest.update(canonical([str(path),file_digest(path)]))
         self.identities[odin] = digest.hexdigest()
-        if snapshot.valid():self.write_record('identity-v1',stamp,self.identities[odin])
         return self.identities[odin]
 
     def resources(self, project):

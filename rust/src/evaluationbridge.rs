@@ -38,6 +38,7 @@ impl Plan {
         let direct = Specializations::declarations(context.bindings, &mut types, r);
         let mut request = Request {
             expression: expression.node,
+            batch: context.batch.iter().map(|request| request.node).collect(),
             locals: locals.get(&expression.file).cloned().unwrap_or_default(),
             mode,
             prelude: direct.as_ref().cloned().unwrap_or_default(),

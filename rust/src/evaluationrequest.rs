@@ -36,7 +36,7 @@ impl Project {
         let cache = context.cache?;
         // Nested helper views have additional lexical retention/bridge state.
         // Keep their full emitted-code validation rather than approximate it.
-        if self.evaluation.is_some() || !cache.borrow().enabled {
+        if self.evaluation.is_some() || !context.batch.is_empty() || !cache.borrow().enabled {
             return None;
         }
         let identity = cache

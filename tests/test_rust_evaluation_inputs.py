@@ -250,5 +250,22 @@ class RustEvaluationInputTests(unittest.TestCase):
         changed=self.run_native([],packet['data'])
         self.assertFalse(changed['valid'])
 
+    def test_content_change_invalidates_even_if_all_metadata_matches(self):
+        path=self.root/'data';path.write_text('before')
+        packet=self.run_native([{'op':'file','path':str(path)}])
+        path.write_text('change')
+        packet['data']['files'][str(path)]['stat']=signature(path)
+        self.assertFalse(self.run_native([],packet['data'])['valid'])
+
+    def test_directory_resources_track_extensionless_additions_with_equal_metadata(self):
+        directory=self.root/'assets';directory.mkdir()
+        (directory/'one').write_text('first')
+        path=self.source('#load_directory("assets")')
+        packet=self.compare([{'op':'source','path':str(path)}])
+        (directory/'two').write_text('second')
+        packet['data']['directories'][str(directory)]=signature(directory)
+        self.assertFalse(self.run_native([],packet['data'])['valid'])
+        self.assertFalse(self.run_reference([],packet['data'])['valid'])
+
 
 if __name__=='__main__':unittest.main()

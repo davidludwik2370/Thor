@@ -7,7 +7,20 @@ impl Lower<'_, '_> {
         let checked = std::mem::replace(&mut self.checked_mode, true);
         let result = (|| {
             let id = request.expression;
-            let expression = if let crate::evaluation::Mode::Case(index) = request.mode {
+            let expression = if !request.batch.is_empty() {
+                let first = self.render(request.batch[0], None, false)?;
+                let type_of = self.native("type_of");
+                let mut parts = vec![
+                    self.g(format!("[{}]{type_of}(", request.batch.len()), id),
+                    first.clone(), self.g("){", id), first,
+                ];
+                for node in request.batch.iter().skip(1) {
+                    parts.push(self.g(",", *node));
+                    parts.push(self.render(*node, None, false)?);
+                }
+                parts.push(self.g("}", id));
+                Code::concat(parts)
+            } else if let crate::evaluation::Mode::Case(index) = request.mode {
                 self.evaluation_case_condition(id, index)?
             } else {
                 self.render(id, None, matches!(request.mode,crate::evaluation::Mode::Condition))?
