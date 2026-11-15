@@ -129,6 +129,7 @@ pub struct EvaluationCache {
     pub stats: Stats,
     pub prepared_hits: u64,
     identities: std::collections::BTreeMap<PathBuf, String>,
+    source_key: Option<key::SourceKey>,
 }
 fn key_valid(key: &str) -> bool {
     key.len() == 64
@@ -193,6 +194,7 @@ impl EvaluationCache {
             stats: Stats::default(),
             prepared_hits: 0,
             identities: std::collections::BTreeMap::new(),
+            source_key: None,
         }
     }
     pub fn clear(&self) {

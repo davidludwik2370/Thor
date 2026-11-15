@@ -402,6 +402,7 @@ impl Inputs {
         }
     }
     pub fn valid(&self) -> bool {
+        let _phase = crate::profile::span("cache.validate_inputs");
         if !self.usable {
             return false;
         }
@@ -414,8 +415,21 @@ impl Inputs {
                 if &current != expected && digest.is_null() {
                     return Some(false);
                 }
-                if !digest.is_null() && file_digest(path).ok()?.as_str() != digest.as_str()? {
-                    return Some(false);
+                if !digest.is_null() {
+                    let expected_digest = digest.as_str()?;
+                    if expected_digest.len() != 64 || !expected_digest.bytes().all(|byte|
+                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
+                        return Some(false);
+                    }
+                    if &current == expected {
+                        crate::profile::count("cache.unchanged_files", 1);
+                    } else {
+                        crate::profile::count("cache.rehashed_files", 1);
+                        if file_digest(path).ok()?.as_str() != expected_digest
+                            || json!(signature(path).ok()?) != current {
+                            return Some(false);
+                        }
+                    }
                 }
             }
             for (path, expected) in self.data.get("directories")?.as_object()? {

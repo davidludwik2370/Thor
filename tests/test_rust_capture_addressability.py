@@ -68,6 +68,30 @@ update::proc(row:$T,calls:^int){
             with self.subTest(flags=flags):
                 self.compare(source, flags=flags, expected='')
 
+    def test_skipping_generic_indexed_multi_assignments_keeps_destination_snapshots(self):
+        source = self.program('''array := [4, 5]
+index := 0
+write(&array, &index, true)
+if index != 1 || array[0] != 9 || array[1] != 5 { panic("array snapshot") }
+view := array[:]
+index = 0
+write(&view, &index, false)
+if index != 0 || view[0] != 9 { panic("slice skip") }
+values: map[int]int
+defer delete(values)
+write(&values, &index, true)
+if index != 1 || values[0] != 9 { panic("map snapshot") }
+index = 0
+write(&values, &index, false)
+if index != 0 || values[0] != 9 { panic("map skip") }
+''', '''write :: proc(a: ^$T, i: ^int, apply: bool) {
+    i^, a^[i^] = switch { case apply: 1, 9; case: break }
+}
+''')
+        for flags in ([], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(source, flags=flags)
+
     def test_projected_value_parameters_support_runtime_indices(self):
         for declaration,body in [('using row:Row',''),('row:Row','using row;')]:
             prefix='''import "core:fmt"

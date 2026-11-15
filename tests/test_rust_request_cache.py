@@ -43,6 +43,29 @@ make_box :: proc(value:$T)->Box(T){return {value}}
             self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
             self.assertEqual(self.count(warm,'evaluation.helper_compilations'),0)
 
+    def test_multiple_requests_share_one_validated_source_inventory(self):
+        self.source.write_text(self.program('''
+a:=#run work(1); b:=#run work(2); c:=#run work(3)
+if a.value!=2 || b.value!=3 || c.value!=4 {panic("requests")}
+''','Box::struct($T:typeid){value:T}\nwork::proc(n:$T)->Box(T){return {n+1}}\n'))
+        for flags in [[],native.UNCHECKED]:
+            self.profile(flags=flags)
+            warm=self.profile(flags=flags)
+            self.assertEqual(self.count(warm,'cache.source_key_builds'),1)
+            self.assertGreaterEqual(self.count(warm,'cache.source_key_hits'),2)
+            self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
+
+    def test_prepared_values_share_interface_and_resource_fingerprints(self):
+        self.source.write_text(self.program('if A+B+C!=9{panic("prepared values")}',
+            'work::fn(n:int)->int{return n+1}\nA::work(1)\nB::work(2)\nC::work(3)\n'))
+        for flags in [[],native.UNCHECKED]:
+            self.profile(flags=flags)
+            warm=self.profile(flags=flags)
+            self.assertEqual(self.count(warm,'cache.prepared_inventories'),1)
+            self.assertEqual(warm['stages']['cache.resources']['calls'],1)
+            self.assertGreaterEqual(self.count(warm,'cache.source_key_hits'),2)
+            self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
+
     def test_runtime_only_edits_keep_dependency_granular_reuse(self):
         prefix='work::proc(n:int)->int{return n+2}\nVALUE::#run work(4)\n'
         self.source.write_text(self.program('if VALUE!=6{panic("value")}',prefix))
@@ -58,6 +81,13 @@ make_box :: proc(value:$T)->Box(T){return {value}}
         warm=self.profile(flags=['-out:'+str(self.root/'second')])
         self.assertGreater(self.count(warm,'evaluation.request_hits'),0)
         self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
+
+    def test_cold_helpers_reuse_source_facts_with_explicit_output_flags(self):
+        self.source.write_text(self.box(extra='if MODE!=2{panic("define")}').replace('package main',
+            'package main\nMODE::#config(MODE,1)'))
+        cold=self.profile(command='build',flags=['-out:'+str(self.root/'program'),'-define:MODE=2'])
+        self.assertGreater(self.count(cold,'evaluation.helper_compilations'),0)
+        self.assertGreater(self.count(cold,'analysis.inherited_source_facts'),0)
 
     def test_arguments_and_generic_local_nominal_identities_are_distinct(self):
         self.source.write_text(self.program('''

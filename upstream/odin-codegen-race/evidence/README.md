@@ -38,3 +38,7 @@ original stock-compiler SIGSEGV. Every fresh check emitted LLVM IR.
 Raw stderr, stdout and LLVM IR from the fresh checks were retained locally in
 the temporary validation output directories; this portable bundle includes
 selected traces and structured results rather than unrelated sanitizer output.
+
+The November 15 integration-hardening run repeated the null-source string
+signature with length 22 in a native `#run` helper compilation. The extracted
+record is in `recurrence-2026-11-15.txt`.

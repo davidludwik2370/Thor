@@ -1750,6 +1750,13 @@ impl Lower<'_, '_> {
             s.node(parent).kind == "For" && s.role(parent, "post") == Some(owner)
         });
         let lhs = s.group(owner, "lhs").to_vec();
+        if self.assigning.contains(&owner) && !post {
+            // The surrounding indexed-assignment block has already captured
+            // its destinations. Keep their generated locals in that scope.
+            let targets = lhs.iter().map(|target| self.render(*target, None, false))
+                .collect::<Result<Vec<_>>>()?;
+            return self.native_switch(id, &hints, Some(&targets), None).map(Some);
+        }
         let native = lhs
             .iter()
             .flat_map(|id| std::iter::once(*id).chain(s.descendants(*id)))

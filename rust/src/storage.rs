@@ -504,7 +504,7 @@ impl Lower<'_, '_>{
             let Ok(path)=unquote(&node.op)else{continue;};
             let base=if let Some((collection,suffix))=path.split_once(':'){self.source.collection_roots.get(collection).map(|root|root.join(suffix))}
                 else{self.source.path.parent().map(|root|root.join(&path))};
-            if base.and_then(|path|std::fs::canonicalize(path).ok()).as_deref()!=Some(directory){continue;}
+            if base.and_then(|path|crate::project::canonicalize(path).ok()).as_deref()!=Some(directory){continue;}
             let alias=format!("{}immutable_import_{}",self.source.prefix,node.span.start);self.modules.insert(alias.clone(),path);return format!("{alias}.{name}");
         }
         name.into()

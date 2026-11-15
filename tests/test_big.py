@@ -6,6 +6,7 @@ from pathlib import Path
 import random
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -13,6 +14,7 @@ from tests import test_thor as base
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TRACKING = ['--track-allocations=basic'] if sys.platform=='darwin' else []
 
 
 class BigRuntimeTests(unittest.TestCase):
@@ -26,14 +28,14 @@ class BigRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='thor-big-native-') as temporary:
             result = subprocess.run([odin, 'test', str(ROOT / 'runtime' / 'big'),
                 '-collection:thor='+str(ROOT/'runtime'),
-                '-out:' + str(Path(temporary) / 'big-tests'),
+                '-out:' + str(Path(temporary) / ('big-tests.exe' if os.name=='nt' else 'big-tests')),
                 '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true'],
                 text=True, capture_output=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_commented_runtime_demo(self):
         result = subprocess.run([str(base.THOR), 'run', str(ROOT / 'examples' / 'big_runtime'),
-            '--track-allocations=basic'], text=True, capture_output=True, timeout=60)
+            *TRACKING], text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('Repeating: 1/6', result.stdout)
         self.assertIn('Independent copy: -3/4', result.stdout)
@@ -71,7 +73,7 @@ for item in cases {
     delete(text)
     big.destroy(&value)
 }
-''', 'import "thor:big"\nimport "core:fmt"\n'), flags=('--track-allocations=basic',))
+''', 'import "thor:big"\nimport "core:fmt"\n'), flags=TRACKING)
 
     def test_rational_reference_values(self):
         rng = random.Random(0x524154)
@@ -118,7 +120,7 @@ for item in cases {
     delete(text)
     big.destroy(&value)
 }
-''', 'import "thor:big"\nimport "core:fmt"\n'), flags=('--track-allocations=basic',))
+''', 'import "thor:big"\nimport "core:fmt"\n'), flags=TRACKING)
 
     def test_fresh_project_imports_and_test_file_exclusion(self):
         root, _ = self.invoke(self.program('''
@@ -131,7 +133,7 @@ assert(text == "1/6")
 delete(text)
 big.destroy(&value)
 big.destroy(&copy)
-''', 'import "thor:big"\n'), flags=('--track-allocations=basic',))
+''', 'import "thor:big"\n'), flags=TRACKING)
         manifest = json.loads((root / 'output' / 'thor-manifest.json').read_text())
         self.assertNotIn('big_test.odin', json.dumps(manifest))
         # Selection/wildcard imports use the existing language mechanisms.

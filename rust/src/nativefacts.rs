@@ -411,6 +411,6 @@ impl Project {
         } else {
             source.path.parent()?.join(path)
         };
-        fs::canonicalize(directory).ok()
+        crate::project::canonicalize(directory).ok()
     }
 }

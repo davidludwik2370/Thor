@@ -18,7 +18,7 @@ THOR = Path(os.environ.get('THOR_TEST_COMPILER', ROOT / 'thor'))
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False):
+    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False, checker_args=""):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
@@ -46,7 +46,7 @@ class Client:
                 'enable_unused_imports_reporting': unused_imports,
                 'enable_unused_imports_on_change': unused_imports, 'enable_auto_import': False,
                 'enable_checker_workspace_diagnostics': False, 'thread_count': 1,
-                'checker_args': '--vet' if vet else ''}
+                'checker_args': ('--vet ' if vet else '')+checker_args}
         })['capabilities']
         self.send('initialized', {})
 

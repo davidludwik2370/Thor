@@ -155,7 +155,10 @@ def caller_arguments(source, call):
         else: continue
         added.append(name+'='+value)
     args = call.group('args')
-    return [((args[-1].end if args else call.end-1), (', ' if args else '')+', '.join(added))] if added else []
+    if not added:return []
+    text=(', ' if args else '')+', '.join(added)
+    return [((args[-1].end if args else call.end-1),
+             source.mapping.wrap(text,source.path,call.start,call.end,'source-location-support'))]
 
 
 def expression(node):

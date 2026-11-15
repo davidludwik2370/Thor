@@ -100,7 +100,7 @@ VALUE::#run bad(7)
         text=self.program('if VALUE!=7{panic("result")}', 'bad::fn(n:int)->int{assert(false,"elided");return n}\nVALUE::#run bad(7)\n')
         self.invoke(text,flags=['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert'])
         text=text.replace('assert(false,"elided");','panic("still active");')
-        self.invoke(text,command='check',flags=['-o:speed','-disable-assert'],fail='still active')
+        self.invoke(text,command='build',flags=['-o:speed','-disable-assert'],fail='still active')
 
 
 class EvaluationInfrastructureTests(unittest.TestCase):

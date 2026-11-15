@@ -278,6 +278,7 @@ async function run() {
         const commentEditor=vscode.window.activeTextEditor;
         const jumpAt=async position=>{
             commentEditor.selection=new vscode.Selection(position,position);
+            await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
             await vscode.commands.executeCommand('editor.action.jumpToBracket');
             return commentEditor.selection.active;
         };

@@ -27,11 +27,11 @@ class ThorTests(unittest.TestCase):
         root = Path(temporary.name)
         entry = root / "input" / "main.thor"
         entry.parent.mkdir()
-        entry.write_text(source, encoding="utf-8")
+        entry.write_text(source, encoding="utf-8", newline="")
         for name, content in (files or {}).items():
             path = entry.parent / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content, encoding="utf-8")
+            path.write_text(content, encoding="utf-8", newline="")
         compiler = getattr(self, "compiler", THOR)
         argv = [str(compiler), command, str(entry.parent if directory else entry), "--output-dir", str(root / "output"), *flags]
         if args:
@@ -110,6 +110,7 @@ class ThorTests(unittest.TestCase):
             directory.mkdir()
             launcher = directory / 'thor'
             launcher.write_text('keep this launcher')
+            (directory / 'runtime').symlink_to(ROOT / 'runtime', target_is_directory=True)
             source = directory / 'main.thor'
             source.write_text(self.program(''))
             errors = io.StringIO()
@@ -160,15 +161,20 @@ class ThorTests(unittest.TestCase):
     def test_rebuild_removes_only_owned_stale_sources(self):
         root, _ = self.invoke(self.program(""), command="transpile", directory=True,
                               files={"old.thor": "package main\nold :: 1\n"})
+        before = json.loads((root / "output" / "thor-manifest.json").read_text())
+        stale = [root / 'output' / path for path in before['generated']
+                 if Path(path).name in ('old.odin', 'old.odin.map.json')]
+        self.assertEqual(len(stale), 2)
         (root / "input" / "old.thor").unlink()
         preserved = root / "output" / "keep.txt"
         preserved.write_text("keep")
         result = subprocess.run([str(THOR), "transpile", str(root / "input"), "--output-dir", str(root / "output")], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse((root / "output" / "old.odin").exists())
+        self.assertTrue(all(not path.exists() for path in stale))
         self.assertEqual(preserved.read_text(), "keep")
         manifest = json.loads((root / "output" / "thor-manifest.json").read_text())
-        self.assertEqual(manifest["generated"], ["main.odin", "main.odin.map.json"])
+        self.assertEqual([Path(path).name for path in manifest["generated"]],
+                         ["main.odin", "main.odin.map.json"])
 
     def test_output_directory_protection(self):
         root, _ = self.invoke(self.program(""), command="transpile")

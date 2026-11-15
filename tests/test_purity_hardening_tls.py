@@ -71,7 +71,7 @@ main::proc(){n:=7;_=bad(n)}
         for broken,corrected,message in cases:
             with self.subTest(message=message):
                 text='// 😀\npackage main\n'+broken+'\nmain::proc(){}\n'
-                client,main=self.open(text)
+                client,main=self.open(text,checker_args='--run-timeout 0.2' if message=='timeout' else '')
                 errors=client.diagnostic(main.as_uri(),contains=message)
                 self.assertEqual(len(errors),1,errors)
                 self.assertGreater(errors[0]['range']['start']['line'],1)
@@ -113,7 +113,7 @@ main::proc(){n:=7;_=bad(n)}
             with self.subTest(body=body):
                 text=('// 😀\npackage main\nstate:int\nRecord::struct{x:int}\nleaf::proc(n:int)->'+result+'{/* 😀 */'+body+'}\n'
                       'work::fn(n:int)->'+result+'{return leaf(n)}\nmain::proc(){n:=7;_=work(n)}\n')
-                client,main=self.open(text)
+                client,main=self.open(text,checker_args='--run-timeout 0.2' if message=='timeout' else '')
                 errors=client.diagnostic(main.as_uri(),contains=message)
                 self.assertEqual(errors[0]['range']['start'],self.position(text,'leaf(n)',0))
                 self.assertTrue(any(note['location']['range']['start']==self.position(text,needle,0)
@@ -137,7 +137,7 @@ main::proc(){n:=7;_=bad(n)}
         for broken,corrected,message in cases:
             with self.subTest(message=message):
                 text='// 😀\npackage main\n'+broken+'\n'
-                client,main=self.open(text)
+                client,main=self.open(text,checker_args='--run-timeout 0.2' if message=='timeout' else '')
                 errors=client.diagnostic(main.as_uri(),contains=message)
                 self.assertTrue(all(e['range']['start']['line']>1 for e in errors),errors)
                 fixed=text.replace(broken,corrected)

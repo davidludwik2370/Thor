@@ -146,7 +146,7 @@ pub fn collect_resources(root: &Path, entries: &[String]) -> Result<Resources> {
                 relative.display()
             )));
         }
-        let resolved = fs::canonicalize(path)?;
+        let resolved = crate::project::canonicalize(path)?;
         if !resolved.starts_with(root) {
             return Err(Error::new(format!(
                 "Resource symlink leaves the project: {}",
@@ -222,7 +222,7 @@ pub fn copy_file(source: &Path, destination: &Path) -> Result<()> {
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     fn resolve(path: &Path, links: &mut BTreeSet<PathBuf>) -> Result<PathBuf> {
         if path.exists() {
-            return Ok(fs::canonicalize(path)?);
+            return Ok(crate::project::canonicalize(path)?);
         }
         if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_symlink()) {
             if !links.insert(path.to_path_buf()) {

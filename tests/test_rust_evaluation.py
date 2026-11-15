@@ -111,7 +111,7 @@ class RustEvaluationTests(unittest.TestCase):
 
     def test_unrelated_runtime_globals_and_init_fini_are_pruned(self):
         texts = self.evaluate('state:int\n@(init) initialize::proc(){panic("init ran")}\n@(fini) finalize::proc(){panic("fini ran")}\nunused::proc(){unknown()}\nwork::proc()->int{return 7}', 'work()', emit=True)
-        text = texts['main.odin']
+        text = next(text for path,text in texts.items() if Path(path).name=='main.odin')
         for name in ('initialize', 'finalize', 'unused', 'state:int'):
             self.assertNotIn(name, text)
         self.evaluate('@(init) initialize::proc(){panic("init ran")}\nwork::proc()->int{return 7}', 'work()')

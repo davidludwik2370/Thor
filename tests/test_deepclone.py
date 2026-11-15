@@ -1,12 +1,15 @@
 """Library-only graph copying, public basic exports, and release-safe cleanup."""
+import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 from tests import test_thor as base
 
 ROOT = Path(__file__).resolve().parents[1]
+TRACKING = ['--track-allocations=basic'] if sys.platform=='darwin' else []
 
 
 class DeepcloneTests(unittest.TestCase):
@@ -19,7 +22,7 @@ class DeepcloneTests(unittest.TestCase):
             for index, flags in enumerate(configurations):
                 with self.subTest(flags=flags):
                     result = subprocess.run(['odin', 'test', str(ROOT/'runtime/graph'),
-                        f'-collection:thor={ROOT / "runtime"}', f'-out:{temporary}/tests-{index}',
+                        f'-collection:thor={ROOT / "runtime"}', '-out:'+str(Path(temporary)/('tests-'+str(index)+('.exe' if os.name=='nt' else ''))),
                         '-sanitize:address', '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',
                         *flags], capture_output=True, text=True, timeout=60)
                     self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
@@ -44,7 +47,7 @@ if free_error!=.None {panic("free")}
                 text=self.program(body.replace('CALL_CLONE',namespace+'deepclone')
                     .replace('CALL_FREE',namespace+'deepfree').replace('ERROR_TYPE',namespace+'Deep_Error'),
                     declaration+'\nNode::struct{value:int,next:^Node}\n')
-                _,result=self.invoke(text,flags=['--track-allocations=basic'])
+                _,result=self.invoke(text,flags=TRACKING)
                 self.assertNotIn('still allocated',result.stderr)
 
     def test_thor_containers_big_numbers_union_and_interior_pointers(self):
@@ -66,7 +69,7 @@ if free_error!=.None {panic("cleanup")}
 ''','''import "thor:basic"
 Data::struct{selected:^int,values,tail:[]int,names:set[string],integer:Integer,rational:Rational,variant:union{int,string}}
 ''')
-        for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert','--track-allocations=basic']]:
+        for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert',*TRACKING]]:
             with self.subTest(flags=flags):
                 _,result=self.invoke(text,flags=flags)
                 self.assertNotIn('still allocated',result.stderr)
@@ -91,7 +94,7 @@ if free_error!=.Unsupported_Type {panic("free validation")}
     def test_commented_demo_checked_and_unchecked(self):
         source=(ROOT/'examples/deepclone/demo.thor').read_text()
         for flags in [['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert',
-                                  '--track-allocations=basic']]:
+                                  *TRACKING]]:
             with self.subTest(flags=flags):
                 _,result=self.invoke(source,flags=flags)
                 self.assertNotIn('still allocated',result.stderr)

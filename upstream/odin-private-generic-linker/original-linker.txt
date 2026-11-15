@@ -1,0 +1,11 @@
+duplicate symbol '_test_internal::not_const:proc(v:i32)->(:i32)' in:
+    /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/artifact-test_internal-test_mem_copy_small$2-1503f35c0.o
+    /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/artifact-test_internal-test_mem_copy_small$1-1503f3180.o
+duplicate symbol '_test_internal::not_const:proc(v:i8)->(:i8)' in:
+    /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/artifact-test_internal-test_mem_copy_small$2-1503f35c0.o
+    /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/artifact-test_internal-test_mem_copy_small$1-1503f3180.o
+duplicate symbol '_test_internal::not_const:proc(v:i64)->(:i64)' in:
+    /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/artifact-test_internal-test_mem_copy_small$2-1503f35c0.o
+    /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/artifact-test_internal-test_mem_copy_small$1-1503f3180.o
+ld: 3 duplicate symbols
+clang: error: linker command failed with exit code 1 (use -v to see invocation)

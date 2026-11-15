@@ -398,7 +398,9 @@ class SliceAccess:
         path=value.path if value.typ.kind in {'slice','pointer','dynamic','map','set','generic','unknown','union'} else None
         result=Value(value.typ,data,element=value.element,target=value.target,path=path)
         seen[id(value)]=result
-        if value.typ.kind=='struct':
+        if value.typ.soa:
+            for name in self.struct_names(value.typ.elem or Type()):result.fields[name]=self.member(value,name)
+        elif value.typ.kind=='struct':
             for name in self.struct_names(value.typ):result.fields[name]=self.copied(self.member(value,name),seen)
         elif value.typ.kind in {'array','fixed'}:result.element=self.copied(self.item(value),seen)
         else:result.fields=dict(value.fields)
@@ -936,7 +938,9 @@ class SliceAccess:
                           and any(n.kind=='Declaration' and n.data.get('immutable')
                                   for n in self.project.purity.walk(target)))
         inspect_result=result_references and (self.has_readonly_views()
-            or context.checked or self.project.purity.pure(target))
+            or context.checked or self.project.purity.pure(target)
+            or any(self.nested_slice(self.r.type_node(annotation,plan.substitutions))
+                   for _,annotation in self.r.fields(signature.role('results'))))
         if not any(self.references(value) for value in bindings) and not inspect_result and not local_checks:
             return self.fresh_call_results(node,context,Value(self.type(node,context)))
         substitutions=dict(context.substitutions)
@@ -994,6 +998,21 @@ class SliceAccess:
         if typ.kind=='union' and typ.node and typ.node not in seen:
             seen.add(typ.node)
             return any(self.contains_slice(self.r.type_node(variant,typ.substitutions),seen) for variant in typ.node.group('variants'))
+        return False
+
+    def nested_slice(self,typ,seen=None):
+        seen=set() if seen is None else seen
+        if len(seen)>24:return True
+        if typ.kind in {'slice','dynamic','map'} or typ.soa:
+            return self.contains_slice(typ.elem or Type())
+        if typ.kind in {'array','fixed'}:return self.nested_slice(typ.elem or Type(),seen)
+        if typ.kind in {'unknown','generic','union'}:return True
+        if typ.kind=='struct' and typ.members:
+            return any(self.nested_slice(member,seen.copy()) for member in typ.members.values())
+        if typ.kind=='struct' and typ.node and typ.node not in seen:
+            seen.add(typ.node)
+            return any(self.nested_slice(self.r.type_node(field.role('type'),typ.substitutions),seen.copy())
+                       for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
         return False
 
     def eval(self,node,context):

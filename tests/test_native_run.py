@@ -56,7 +56,7 @@ Record::struct{x:int}
 NAME::intrinsics.type_canonical_name(Record)
 work::proc()->string{return NAME}
 X::#run work()
-'''), command='check', fail='Source-location-dependent')
+'''), command='check', fail='not an eligible pure operation')
         self.invoke(self.program('_=X', '''
 NAME::ODIN_BUILD_PROJECT_NAME
 work::proc()->string{return NAME}

@@ -23,7 +23,8 @@ class RustDiscoveryWorkTests(unittest.TestCase):
         self.source.write_text(self.source.read_text().replace('main :: proc()',leaves+'\nmain :: proc()')
             .replace('items:=[1]int{7}',calls+'\nitems:=[1]int{7}'))
         counts=self.profile(overlay,command='transpile')
-        self.assertGreater(counts.get('discovery.type_query_reuses',0),120,counts)
+        self.assertGreater(counts.get('discovery.type_query_reuses',0),0,counts)
+        self.assertLess(counts.get('discovery.type_queries',0),20,counts)
         self.assertLessEqual(counts.get('discovery.source_scans',0),counts['parser.source_requests'],counts)
         self.assertGreater(counts.get('analysis.dependency_lookahead_loads',0),0,counts)
 

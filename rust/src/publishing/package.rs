@@ -103,7 +103,7 @@ impl Publisher {
                 root.display()
             )));
         }
-        let root = fs::canonicalize(root)?;
+        let root = crate::project::canonicalize(root)?;
         let mut arch = arch.to_string();
         if let Some(target) = flags.iter().find_map(|flag| flag.strip_prefix("-target:")) {
             let parts = target.split('_').collect::<Vec<_>>();
@@ -219,7 +219,7 @@ impl Publisher {
             existing.into_iter().next()
         };
         if let Some(icon) = &icon {
-            if !icon.is_file() || !fs::canonicalize(icon)?.starts_with(&root) {
+            if !icon.is_file() || !crate::project::canonicalize(icon)?.starts_with(&root) {
                 return Err(Error::new(format!(
                     "Icon must be an existing file inside the project: {}",
                     icon.display()
@@ -242,7 +242,7 @@ impl Publisher {
         }
         let resources = policy::collect_resources(&root, &entries)?;
         for path in &resources.directories {
-            if output.starts_with(fs::canonicalize(root.join(path))?) {
+            if output.starts_with(crate::project::canonicalize(root.join(path))?) {
                 return Err(Error::new(
                     "Publish output must be outside the included resource directories.",
                 ));
@@ -252,7 +252,7 @@ impl Publisher {
             || resources
                 .files
                 .values()
-                .any(|path| fs::canonicalize(path).is_ok_and(|path| path == output))
+                .any(|path| crate::project::canonicalize(path).is_ok_and(|path| path == output))
         {
             return Err(Error::new("Publish output would replace a project input."));
         }

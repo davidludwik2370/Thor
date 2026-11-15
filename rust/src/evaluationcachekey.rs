@@ -12,6 +12,21 @@ pub struct HelperCode<'a> {
     pub target: &'a Path,
     pub generated: &'a BTreeMap<PathBuf, Vec<u8>>,
 }
+pub(super) struct SourceKey {
+    sources: Vec<Source>,
+    inputs: Inputs,
+    digest: String,
+    resources: String,
+}
+impl SourceKey {
+    fn matches(&self, sources: &[Source]) -> bool {
+        self.sources.len() == sources.len() && self.sources.iter().zip(sources).all(|(old, current)| {
+            old.shares_syntax(current) && old.path == current.path && old.thor == current.thor
+                && old.excluded == current.excluded && old.shared_native == current.shared_native
+                && old.collection_roots == current.collection_roots
+        }) && self.inputs.valid()
+    }
+}
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -43,8 +58,35 @@ fn files(tree: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
     Ok(())
 }
 impl EvaluationCache {
+    /// Reuse immutable syntax inventories within this evaluation session.
+    /// Resource signatures are revalidated on every use.
+    pub fn source_key(&mut self, sources: &[Source]) -> Option<String> {
+        let _phase = crate::profile::span("cache.source_key");
+        if let Some(key) = self.source_key.as_ref().filter(|key| key.matches(sources)) {
+            crate::profile::count("cache.source_key_hits", 1);
+            return Some(key.digest.clone());
+        }
+        crate::profile::count("cache.source_key_builds", 1);
+        let mut inputs = Inputs::default();
+        for source in sources.iter().filter(|source| !source.excluded) {
+            inputs.source(source, false);
+        }
+        let resources = Self::resources(sources)?;
+        let inventory = sources.iter().map(|source| json!([
+            source.path, sha256(source.raw.as_bytes()), source.thor, source.excluded,
+            source.shared_native, source.collection_roots
+        ])).collect::<Vec<_>>();
+        let digest = sha256(&canonical(&json!([inventory, resources])));
+        if !inputs.valid() { return None; }
+        self.source_key = Some(SourceKey { sources: sources.to_vec(), inputs, digest: digest.clone(), resources });
+        Some(digest)
+    }
+    pub fn resource_key(&mut self, sources: &[Source]) -> Option<String> {
+        self.source_key(sources)?;
+        self.source_key.as_ref().map(|key| key.resources.clone())
+    }
     pub fn identity(&mut self, odin: &Path, root: &Path) -> Option<String> {
-        let executable = fs::canonicalize(odin).ok()?;
+        let executable = crate::project::canonicalize(odin).ok()?;
         if let Some(value) = self.identities.get(&executable) {
             return Some(value.clone());
         }
@@ -61,7 +103,7 @@ impl EvaluationCache {
             commands.push((name, result.stdout));
         }
         let native = PathBuf::from(std::str::from_utf8(&commands[1].1).ok()?.trim());
-        let compiler = std::env::current_exe().and_then(fs::canonicalize).ok()?;
+        let compiler = std::env::current_exe().and_then(crate::project::canonicalize).ok()?;
         let config = json!({"schema":SCHEMA,"engine":"rust","platform":std::env::consts::OS,"machine":std::env::consts::ARCH});
         let trees = [
             root.join("rust/src"),
@@ -128,6 +170,7 @@ impl EvaluationCache {
         Some(identity)
     }
     pub fn resources(sources: &[Source]) -> Option<String> {
+        let _phase = crate::profile::span("cache.resources");
         let mut digest = vec![];
         for source in sources.iter().filter(|source| !source.excluded) {
             for (name, path) in evaluationinputs::source_resources(source)? {
@@ -177,7 +220,7 @@ impl EvaluationCache {
             if !self.enabled {
                 return None;
             }
-            let resources = Self::resources(sources)?;
+            let resources = self.resource_key(sources)?;
             let normalize =
                 |text: &str| text.replace(destination.to_string_lossy().as_ref(), "<helper>");
             let flags = flags.iter().map(|flag| normalize(flag)).collect::<Vec<_>>();

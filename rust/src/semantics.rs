@@ -770,7 +770,7 @@ impl<'a> Resolver<'a> {
             source.path.parent()?.join(path)
         };
         crate::profile::count("lookup.import_directory_resolutions", 1);
-        let package = std::fs::canonicalize(directory).ok().and_then(|directory| {
+        let package = crate::project::canonicalize(directory).ok().and_then(|directory| {
             let package = self.index.packages.get(&directory).copied();
             if package.is_none() && !["base:builtin", "base:intrinsics"].contains(&path) {
                 self.missing_packages.borrow_mut().insert(directory);
@@ -1124,7 +1124,7 @@ impl<'a> Resolver<'a> {
             return cached.clone();
         }
         crate::profile::count("lookup.canonical_path_resolutions", 1);
-        let canonical = std::fs::canonicalize(path).ok();
+        let canonical = crate::project::canonicalize(path).ok();
         self.canonical_paths.borrow_mut().insert(path.to_path_buf(), canonical.clone());
         canonical
     }

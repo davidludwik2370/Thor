@@ -1,6 +1,7 @@
 package server
 
 import "base:runtime"
+import "base:intrinsics"
 
 import "core:encoding/json"
 import "core:io"
@@ -73,6 +74,23 @@ marshal :: proc(
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options) -> Marshal_Error {
 	return marshal_to_writer(strings.to_writer(b), v, opt)
+}
+
+@(private = "file")
+marshal_json_string :: proc(w: io.Writer, text: string) -> Marshal_Error {
+	when intrinsics.type_proc_parameter_type(type_of(io.write_quoted_string), 4) == bool {
+		io.write_quoted_string(w, text, '"', nil, true) or_return
+	} else {
+		// Newer SDKs moved JSON escaping out of io.write_quoted_string.
+		err := json.marshal_to_writer(w, text)
+		switch value in err {
+		case io.Error:
+			return value
+		case json.Marshal_Data_Error:
+			return .Unsupported_Type
+		}
+	}
+	return nil
 }
 
 marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
@@ -211,9 +229,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_String:
 		switch s in a {
 		case string:
-			io.write_quoted_string(w, s, '"', nil, true) or_return
+			marshal_json_string(w, s) or_return
 		case cstring:
-			io.write_quoted_string(w, string(s), '"', nil, true) or_return
+			marshal_json_string(w, string(s)) or_return
 		}
 
 	case runtime.Type_Info_Boolean:

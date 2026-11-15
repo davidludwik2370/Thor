@@ -21,7 +21,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='thor-vscode-') as directory:
         temporary = Path(directory)
         result_file = temporary / 'result.json'
-        target=ROOT
+        # Keep workspace indexing within the editor fixture. Integration clones
+        # and generated SDK copies elsewhere in the repository are unrelated.
+        target=ROOT/'demo'
         suite='vscode.js'
         if options.standalone_run:
             target=temporary/'standalone file.thor'

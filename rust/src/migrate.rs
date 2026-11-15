@@ -133,7 +133,7 @@ fn request(args: &[String]) -> Result<Request> {
 fn settings(mut request: Request) -> Result<Settings> {
     let cwd = env::current_dir()?;
     let source_argument = commands::lexical(&cwd.join(request.source.unwrap()));
-    let source = fs::canonicalize(&source_argument)?;
+    let source = crate::project::canonicalize(&source_argument)?;
     if !source.is_dir() {
         return Err(Error::usage("thor migrate expects a project directory"));
     }
@@ -158,7 +158,7 @@ fn settings(mut request: Request) -> Result<Settings> {
             .parent()
             .ok_or_else(|| Error::new("invalid migration destination"))?;
     }
-    let mut destination = fs::canonicalize(parent)?;
+    let mut destination = crate::project::canonicalize(parent)?;
     for component in tail.into_iter().rev() {
         destination.push(component);
     }
@@ -355,7 +355,7 @@ pub(super) fn rebased_flags(settings: &Settings, destination: &Path) -> Result<V
                 .split_once('=')
                 .ok_or_else(|| Error::usage("-collection requires NAME=PATH"))?;
             let path = Path::new(path);
-            let path = fs::canonicalize(if path.is_absolute() {
+            let path = crate::project::canonicalize(if path.is_absolute() {
                 path.to_path_buf()
             } else {
                 cwd.join(path)

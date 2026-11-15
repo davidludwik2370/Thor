@@ -127,7 +127,7 @@ impl Case {
         toolchain: &Path,
     ) -> Result<Output> {
         fs::create_dir_all(output)?;
-        let original = fs::canonicalize(&self.entry).unwrap_or_else(|_| self.entry.clone());
+        let original = crate::project::canonicalize(&self.entry).unwrap_or_else(|_| self.entry.clone());
         let entry = if let Ok(relative) = original.strip_prefix(&settings.source) {
             let entry = stage.join(relative);
             if self.entry.is_file() {

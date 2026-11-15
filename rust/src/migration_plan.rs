@@ -83,8 +83,8 @@ fn native_sdk_import(source: &Source, path: &str) -> bool {
     if !matches!(collection, "base" | "core" | "vendor") { return false; }
     let Some(configured) = source.collection_roots.get(collection) else { return false; };
     let Some(odin_root) = source.info["odin_root"].as_str() else { return false; };
-    let Ok(configured) = fs::canonicalize(configured) else { return false; };
-    fs::canonicalize(Path::new(odin_root).join(collection))
+    let Ok(configured) = crate::project::canonicalize(configured) else { return false; };
+    crate::project::canonicalize(Path::new(odin_root).join(collection))
         .is_ok_and(|native| configured == native)
 }
 
@@ -402,7 +402,7 @@ fn rename_identifier(
                             Some(source.path.parent().unwrap().join(path))
                         };
                         if let Some(directory) = directory {
-                            return Ok(fs::canonicalize(&directory)
+                            return Ok(crate::project::canonicalize(&directory)
                                 .unwrap_or(directory)
                                 .starts_with(root));
                         }
@@ -497,7 +497,7 @@ fn load_demands(
             .into_iter()
             .filter(|path| path.extension().is_some_and(|ext| ext == "odin"))
         {
-            let path = fs::canonicalize(path)?;
+            let path = crate::project::canonicalize(path)?;
             if sources.iter().any(|source| source.path == path) {
                 continue;
             }
@@ -666,7 +666,7 @@ pub(super) fn create(
                     let target = if lexical.starts_with(&settings.source) {
                         lexical
                     } else {
-                        fs::canonicalize(&target).unwrap_or(lexical)
+                        crate::project::canonicalize(&target).unwrap_or(lexical)
                     };
                     if target.starts_with(&settings.source) {
                         let relative = super::relative_link(source.path.parent().unwrap(), &target);

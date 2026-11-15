@@ -44,7 +44,7 @@ impl Lower<'_, '_> {
                 self.source.path.parent().map(|root| root.join(&path))
             };
             if directory
-                .and_then(|p| std::fs::canonicalize(p).ok())
+                .and_then(|p| crate::project::canonicalize(p).ok())
                 .as_deref()
                 == owner.path.parent()
             {

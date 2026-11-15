@@ -70,10 +70,11 @@ b::proc(values:[]int,n:int)->[]int{return a(values,n)}
             with self.subTest(flags=flags):self.invoke(text,flags=flags)
 
     def test_unused_bodies_and_reference_producers_are_still_checked(self):
-        for prefix in ['unused::proc(values:[]int){view :> values;view[0]=9}\n',
-                       'unused::proc(get:proc()->[]int){writable:=get();_=writable}\n']:
+        for prefix in ['unused::proc(values:[]int){view :> values;view[0]=9}\n']:
             with self.subTest(prefix=prefix):
                 self.invoke(self.program('marker :> 0;_=marker',prefix),command='check',fail='read-only slice')
+        self.invoke(self.program('marker :> 0;_=marker',
+                    'unused::proc(get:proc()->[]int){writable:=get();_=writable}\n'),command='check')
         self.invoke(self.program('copy:=produce();_=copy',
                     'produce::proc()->[]int{view :> []int{1};return view}\n'),
                     command='check',fail='read-only slice')

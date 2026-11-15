@@ -1,7 +1,7 @@
 mod help;
 
 use serde_json::json;
-use std::{env, path::PathBuf, process::ExitCode};
+use std::{env, path::PathBuf};
 use thor_compiler::{
     diagnostic::{Error, Result},
     project::{absolute, Options, Project},
@@ -17,7 +17,10 @@ extern "C" fn terminate(_: libc::c_int) {
     }
 }
 
-fn main() -> ExitCode {
+fn main() {
+    std::process::exit(entry());
+}
+fn entry() -> i32 {
     let _profile = thor_compiler::profile::Session::from_env();
     let _command = thor_compiler::profile::span("command");
     #[cfg(unix)]
@@ -41,14 +44,14 @@ fn main() -> ExitCode {
     let result = run(args);
     #[cfg(unix)]
     if thor_compiler::project::evaluation_cancelled() {
-        return ExitCode::from((128 + libc::SIGTERM) as u8);
+        return 128 + libc::SIGTERM;
     }
     match result {
-        Ok(status) => ExitCode::from(status.clamp(0, 255) as u8),
+        Ok(status) => status,
         Err(error) => {
             if error.exit_status == 2 {
                 eprintln!("{}\nthor: error: {}\nRun thor help for help.", help::USAGE, error.message);
-                return ExitCode::from(2);
+                return 2;
             }
             let exit_status = if error.unsupported {
                 3
@@ -73,7 +76,7 @@ fn main() -> ExitCode {
                     eprintln!("{}",thor_compiler::diagnostic::text(&error,raw.as_deref(),compiler_args.iter().any(|arg|arg=="-terse-errors"),compiler_args.iter().any(|arg|arg=="-error-pos-style:unix")));
                 }
             }
-            ExitCode::from(exit_status)
+            i32::from(exit_status)
         }
     }
 }

@@ -230,5 +230,25 @@ class RustEvaluationInputTests(unittest.TestCase):
         packet=self.run_native([],{'files':[],'directories':{},'members':{},'bindings':{}})
         self.assertFalse(packet['valid'])
 
+    def test_invalid_content_digest_cannot_use_unchanged_metadata(self):
+        path=self.root/'data';path.write_text('contents')
+        packet=self.run_native([{'op':'file','path':str(path)}])
+        for digest in ['bad','A'*64,42,{},'g'*64]:
+            with self.subTest(digest=digest):
+                data=json.loads(json.dumps(packet['data']))
+                data['files'][str(path)]['sha256']=digest
+                changed=self.run_native([],data)
+                self.assertFalse(changed['valid'])
+
+    def test_restoring_mtime_does_not_hide_changed_content(self):
+        import os
+        path=self.root/'data';path.write_text('before')
+        packet=self.run_native([{'op':'file','path':str(path)}])
+        metadata=path.stat()
+        path.write_text('change')
+        os.utime(path,ns=(metadata.st_atime_ns,metadata.st_mtime_ns))
+        changed=self.run_native([],packet['data'])
+        self.assertFalse(changed['valid'])
+
 
 if __name__=='__main__':unittest.main()

@@ -32,6 +32,7 @@ impl Project {
         context: &crate::evaluation::Context<'_>,
         mode: crate::evaluation::Mode,
     ) -> Option<String> {
+        let _phase = crate::profile::span("cache.request_key");
         let cache = context.cache?;
         // Nested helper views have additional lexical retention/bridge state.
         // Keep their full emitted-code validation rather than approximate it.
@@ -41,21 +42,7 @@ impl Project {
         let identity = cache
             .borrow_mut()
             .identity(&self.frontend.odin, &self.options.root)?;
-        let resources = EvaluationCache::resources(&self.sources)?;
-        let sources = self
-            .sources
-            .iter()
-            .map(|source| {
-                json!([
-                    source.path,
-                    sha256(source.raw.as_bytes()),
-                    source.thor,
-                    source.excluded,
-                    source.shared_native,
-                    source.collection_roots
-                ])
-            })
-            .collect::<Vec<_>>();
+        let sources = cache.borrow_mut().source_key(&self.sources)?;
         let cases = context
             .cases
             .iter()
@@ -91,7 +78,7 @@ impl Project {
             .filter(|flag| !flag.starts_with("-out:") && flag.as_str() != "-keep-executable" && crate::cli::helper_flag(flag))
             .collect::<Vec<_>>();
         Some(sha256(&canonical(
-            &json!({"schema":1,"identity":identity,"resources":resources,
+            &json!({"schema":2,"identity":identity,
                 "entry":self.options.entry,"file_entry":self.file_entry,"flags":flags,
                 "test":self.frontend.test,"target":self.frontend.target,"overlays":self.options.overlays,
                 "collections":self.collections,"sources":sources,"expression":expression,"mode":mode,

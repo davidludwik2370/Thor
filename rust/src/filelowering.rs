@@ -74,7 +74,7 @@ impl Job {
             } else {
                 source.path.parent().map(|parent| parent.join(&path))
             };
-            if let Some(directory) = directory.and_then(|dir| fs::canonicalize(dir).ok()) {
+            if let Some(directory) = directory.and_then(|dir| crate::project::canonicalize(dir).ok()) {
                 if project.sources.iter().any(|unit| {
                     !unit.shared_native && unit.path.parent() == Some(directory.as_path())
                 }) {
@@ -82,7 +82,7 @@ impl Job {
                     let suffix = if relative.as_os_str().is_empty() {
                         ".".to_string()
                     } else {
-                        relative.to_string_lossy().into_owned()
+                        relative.to_string_lossy().replace('\\', "/")
                     };
                     import_paths.insert(path, format!("{project_collection}:{suffix}"));
                 }

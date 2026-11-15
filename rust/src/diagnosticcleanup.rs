@@ -625,7 +625,8 @@ pub(crate) fn clean(
                     }
                 }
                 let normalization = msgs.iter().any(|m| sequence_group(project, m, "normalize"));
-                if normalization && msgs.iter().any(|message| message.contains("invalid type")) {
+                let assignment_bound = msgs.iter().any(|m| sequence_group(project, m, "assignment_bound"));
+                if (normalization || assignment_bound) && msgs.iter().any(|message| message.contains("invalid type")) {
                     inference = true;
                 }
                 for (index, operation) in source

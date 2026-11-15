@@ -1,0 +1,40 @@
+Stock Odin compiler crash during the local integration-hardening regression run.
+This is an extracted summary. Personal filesystem paths are omitted.
+
+Report basename odin-2026-11-15-150943.ips
+Capture time 2026-11-15 15:09:43.2901 -0500
+Compiler odin version dev-2026-10:8169255b9
+Process odin, compiling the Rust scheduling protocol's #run helper
+Signal SIGSEGV
+Exception KERN_INVALID_ADDRESS at 0x0000000000000000
+Faulting thread 7
+Compiler threads in report 11
+
+First faulting frames
+  alloc_cstring(gbAllocator, String) +896
+  lb_type_internal(lbModule*, Type*) +680
+  lb_type(lbModule*, Type*) +568
+
+The next frames recursively alternate lb_type_internal and lb_type while
+materializing the LLVM type. Saved register x20 is zero, x19 is 22, and x0 is
+nonzero. This matches the earlier null source string, nonzero source length and
+nonzero destination allocation signature, including the first three offsets.
+It does not identify the Entity or independently prove the concurrent write.
+
+Acceptance fixture
+  tests.test_rust_call_eligibility.RustCallEligibilityTests.
+    test_default_allocator_clone_is_a_known_nested_argument
+
+Source body
+  fmt.println(#run len(strings.clone("hello")))
+
+The preceding Python reference evaluation succeeded. The independent Rust
+scheduling protocol reported the native helper compiler's SIGSEGV with the
+original #run expression range. No compiler code change or automatic retry
+was introduced for this failure. Isolated repeat results are recorded in the
+integration-hardening report.
+
+The complete affected module then passed all 24 tests. Six additional fresh
+comparisons passed, three with checked debug flags and three with unchecked
+release flags. Each comparison independently evaluated both implementations,
+compiled its emitted native source and verified program output "5".

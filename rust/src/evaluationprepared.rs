@@ -4,7 +4,7 @@ use super::*;
 use crate::{
     ast::Source,
     digest::sha256,
-    evaluationcache::{canonical, EvaluationCache},
+    evaluationcache::canonical,
 };
 use serde_json::json;
 
@@ -28,7 +28,7 @@ pub(crate) fn support(source: &Source, root: &std::path::Path) -> bool {
             })
     })
 }
-pub(crate) fn headers(project: &Project) -> Value {
+fn headers(project: &Project) -> Value {
     let mut result = vec![];
     for source in project
         .sources
@@ -67,6 +67,33 @@ pub(crate) fn headers(project: &Project) -> Value {
     }
     Value::Array(result)
 }
+/// Syntax is immutable for a scheduler's lifetime. Hash shared interfaces and
+/// native/support sources once, while resource contents are validated separately.
+pub(super) struct PreparedInputs {
+    pub headers: String,
+    native: String,
+    support: String,
+}
+impl PreparedInputs {
+    fn new(project: &Project) -> Self {
+        crate::profile::count("cache.prepared_inventories", 1);
+        let mut native = vec![];
+        let mut support_sources = vec![];
+        for source in &project.sources {
+            if !source.shared_native && !support(source, &project.options.root) { continue; }
+            let item = json!([source.path, sha256(source.raw.as_bytes())]);
+            if source.shared_native { native.push(item); }
+            else { support_sources.push(item); }
+        }
+        native.sort_by_key(Value::to_string);
+        support_sources.sort_by_key(Value::to_string);
+        Self {
+            headers: sha256(&canonical(&headers(project))),
+            native: sha256(&canonical(&json!(native))),
+            support: sha256(&canonical(&json!(support_sources))),
+        }
+    }
+}
 // These packets contain values rather than helper-local type identities.
 // Generic frames, records/unions and opaque values keep the emitted-helper key.
 fn prepared_value_type(typ: &Type) -> bool {
@@ -80,6 +107,9 @@ fn prepared_value_type(typ: &Type) -> bool {
     }
 }
 impl Scheduler<'_> {
+    pub(super) fn prepared_inputs(&self) -> &PreparedInputs {
+        self.prepared_inputs.get_or_init(|| PreparedInputs::new(self.project))
+    }
     pub(super) fn prepared_key(
         &mut self,
         node: Ref,
@@ -129,18 +159,6 @@ impl Scheduler<'_> {
             })
             .collect::<Vec<_>>();
         dependencies.sort_by_key(Value::to_string);
-        let mut native = vec![];
-        let mut support_sources = vec![];
-        for source in &self.project.sources {
-            let item = json!([source.path, sha256(source.raw.as_bytes())]);
-            if source.shared_native {
-                native.push(item);
-            } else if support(source, &self.project.options.root) {
-                support_sources.push(item);
-            }
-        }
-        native.sort_by_key(Value::to_string);
-        support_sources.sort_by_key(Value::to_string);
         let mut previous = self
             .results
             .iter()
@@ -176,15 +194,16 @@ impl Scheduler<'_> {
             .filter_map(|id| source.role(id, "type"))
             .map(|id| source.text(id))
             .collect::<Vec<_>>();
-        let resources = EvaluationCache::resources(&self.project.sources)?;
+        let resources = self.cache.borrow_mut().resource_key(&self.project.sources)?;
         let identity = self
             .cache
             .borrow_mut()
             .identity(&self.project.frontend.odin, &self.project.options.root)?;
+        let inventory = self.prepared_inputs();
         Some(sha256(&canonical(
-            &json!({"schema":2,"identity":identity,"entry":self.project.options.entry,
+            &json!({"schema":3,"identity":identity,"entry":self.project.options.entry,
             "flags":self.project.options.flags,"test":self.project.frontend.test,"expression":source.text(node.node),
-            "headers":headers(self.project),"dependencies":dependencies,"native":native,"support":support_sources,
+            "headers":inventory.headers,"dependencies":dependencies,"native":inventory.native,"support":inventory.support,
             "previous":previous,"queries":queries,"scopes":scopes,"resources":resources}),
         )))
     }

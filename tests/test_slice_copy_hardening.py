@@ -178,6 +178,17 @@ factory::proc()->([]Row,[]Row){values:=make([]Row,1);return values,values}
 '''
         self.check('a,b:=factory();readonly :> []int{1};a[0]=Row{readonly};b[0].items[0]=9',prefix,writable=False)
 
+    def test_returned_nested_reference_aliases_preserve_shared_and_independent_storage(self):
+        row='Row::struct{items:[]int}\n'
+        self.check('a:=factory();b:=a;readonly:>[]int{1};a[0]=Row{readonly};b[0].items[0]=9',
+                   row+'factory::proc()->[]Row{return make([]Row,1)}\n',writable=False)
+        self.check('views:=factory();readonly:>[]int{1};views.left[0]=Row{readonly};views.right[0].items[0]=9',
+                   row+'Views::struct{left,right:[]Row}\n'
+                       'factory::proc()->Views{values:=make([]Row,1);return {values,values}}\n',writable=False)
+        self.check('a,b:=factory();readonly:>[]int{1};a[0]=Row{readonly};'
+                   'b[0].items=make([]int,1);b[0].items[0]=9',
+                   row+'factory::proc()->([]Row,[]Row){return make([]Row,1),make([]Row,1)}\n')
+
     def test_mixed_scalar_reference_results_keep_separate_facts(self):
         prefix='pair::proc(values:[]int)->(int,[]int,int,bool){return 7,values,9,true}\n'
         self.check('source :> []int{1};first,view,last :> pair(source) or_panic;'

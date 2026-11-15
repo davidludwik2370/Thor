@@ -85,7 +85,7 @@ impl Temporary {
             match builder.create(&path) {
                 Ok(()) => {
                     let mut work = Self { path, _active: active };
-                    work.path = fs::canonicalize(&work.path)?;
+                    work.path = crate::project::canonicalize(&work.path)?;
                     return Ok(work);
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,

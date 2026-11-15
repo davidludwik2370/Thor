@@ -75,10 +75,14 @@ from pathlib import Path
 args=sys.argv[1:]
 phase=os.environ['THOR_TEST_HELPER_PHASE']
 helper=args and args[0]=='build' and any('thor-rust-run-' in arg for arg in args)
-if helper and phase=='build' or args==['root'] and phase=='identity':
+frontend=args and args[0]=='build' and any('rust-frontend-' in arg for arg in args)
+selected=(helper and phase=='build' or frontend and phase=='frontend'
+          or args==['root'] and phase=='identity' or args==['version'] and phase=='version')
+if selected:
     child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])
-    directory=next((str(parent) for arg in args for parent in Path(arg).parents
-                    if parent.name.startswith('thor-rust-run-')),None)
+    paths=[arg.removeprefix('-out:') for arg in args]
+    directory=next((str(parent) for arg in paths for parent in Path(arg).parents
+                    if parent.name.startswith(('thor-rust-run-','rust-frontend-'))),None)
     Path(os.environ['THOR_TEST_HELPER_MARKER']).write_text(json.dumps(
         {'parent':os.getpid(),'child':child.pid,'directory':directory}))
     time.sleep(30)
@@ -95,7 +99,7 @@ main :: proc() {}
         environment = {**os.environ, 'THOR_TEST_HELPER_PHASE':phase,
                        'THOR_TEST_HELPER_MARKER':str(marker),
                        'THOR_TEST_REAL_ODIN':shutil.which('odin')}
-        process = subprocess.Popen([str(native.RUST),'check',str(self.source),
+        process = subprocess.Popen([str(native.RUST),'build',str(self.source),
                                     '--odin',str(wrapper),'-json-errors',*flags],
                                    env=environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         descendants = None
@@ -133,6 +137,12 @@ main :: proc() {}
 
     def test_cancelling_toolchain_identity_query_reaps_descendants(self):
         self.cancel('identity', native.UNCHECKED)
+
+    def test_cancelling_frontend_version_query_reaps_descendants(self):
+        self.cancel('version', ['-debug'])
+
+    def test_cancelling_frontend_build_reaps_descendants_and_temporary_sources(self):
+        self.cancel('frontend', native.UNCHECKED)
 
 
 if __name__ == '__main__':

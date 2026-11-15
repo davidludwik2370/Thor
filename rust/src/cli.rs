@@ -121,7 +121,7 @@ pub(crate) fn same_file(left: &Path, right: &Path) -> bool {
     }
     #[cfg(not(unix))]
     {
-        match (std::fs::canonicalize(left), std::fs::canonicalize(right)) {
+        match (crate::project::canonicalize(left), crate::project::canonicalize(right)) {
             (Ok(left), Ok(right)) => left
                 .to_string_lossy()
                 .eq_ignore_ascii_case(&right.to_string_lossy()),
@@ -543,8 +543,10 @@ pub fn resolve_entry(options: &mut Options) -> Result<()> {
         options.root.join("runtime")
     } else if matches!(collection, "core" | "base" | "vendor") {
         let executable = crate::frontend::executable(&options.odin)?;
-        let output = Command::new(executable).arg("root").output()?;
-        if !output.status.success() {
+        let output = crate::project::capture_command(
+            Command::new(executable).arg("root"), std::time::Duration::ZERO,
+        )?;
+        if !output.status.success() || output.oversized {
             return Err(Error::new("could not query the native compiler root"));
         }
         PathBuf::from(String::from_utf8_lossy(&output.stdout).trim()).join(collection)

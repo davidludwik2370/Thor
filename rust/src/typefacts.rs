@@ -754,7 +754,7 @@ impl Resolver<'_> {
             .parent()
             .unwrap()
             .join("runtime/sets/sets.odin");
-        let genuine = matches!((std::fs::canonicalize(&s.path),std::fs::canonicalize(expected)),(Ok(actual),Ok(expected)) if actual==expected);
+        let genuine = matches!((crate::project::canonicalize(&s.path),crate::project::canonicalize(expected)),(Ok(actual),Ok(expected)) if actual==expected);
         let named_set = s.node(owner.node).parent.is_some_and(|declaration| {
             s.group(declaration, "names")
                 .iter()

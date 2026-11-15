@@ -680,6 +680,12 @@ class Purity:
         while parent and parent.kind=='Paren':child,parent=parent,parent.parent
         if not parent:return typ
         if parent.kind=='Declaration' and parent.role('type'):return self.r.type_node(parent.role('type'))
+        if parent.kind=='Return':
+            procedure=self.owner(parent)
+            values=parent.group('values') or parent.group('results')
+            results=self.r.fields(procedure.role('type').role('results')) if procedure else []
+            if child in values and values.index(child)<len(results):
+                return self.r.type_node(results[values.index(child)][1])
         if parent.kind=='Assignment' and child in parent.group('rhs'):
             index=parent.group('rhs').index(child);lhs=parent.group('lhs')
             if index<len(lhs):return self.r.type_of(lhs[index])

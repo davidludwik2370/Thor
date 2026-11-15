@@ -125,7 +125,7 @@ impl TypeCode {
                 source.path.parent().map(|root| root.join(&path))
             };
             if resolved
-                .and_then(|path| std::fs::canonicalize(path).ok())
+                .and_then(|path| crate::project::canonicalize(path).ok())
                 .as_deref()
                 != Some(directory)
             {

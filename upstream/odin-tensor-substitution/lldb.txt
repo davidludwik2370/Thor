@@ -1,0 +1,62 @@
+(lldb) target create "integration-projects/odin/odin-lang__Odin/odin"
+Current executable set to '/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin' (arm64).
+(lldb) settings set -- target.run-args  "build" "upstream/odin-tensor-substitution" "-build-mode:test" "-thread-count:1" "-out:/tmp/thor-tensor-bundle"
+(lldb) run
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(7:2) Error: Undeclared name: conv2d_grouped
+	conv2d_grouped,
+	^~~~~~~~~~~~~^
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(18:2) Error: Assignment count mismatch '2' = '1'
+	h_out, w_out := get_hw(h, w, k_h, k_w, stride, dilation ...
+	^~~~^
+	/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(48:12) instantiated as 'conv2d_single($T=f32)'
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(18:18) Error: Undeclared name: get_hw
+	... _out, w_out := get_hw(h, w, k_h, k_w, stride, dilation, padding)
+	                   ^~~~~^
+	/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(48:12) instantiated as 'conv2d_single($T=f32)'
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(19:9) Error: Undeclared name: im2col
+	col := im2col(input, k_h, k_w, stride, dilation, padding, allo ...
+	       ^~~~~^
+	/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(48:12) instantiated as 'conv2d_single($T=f32)'
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(20:20) Error: Cannot determine polymorphic type from parameter: 'invalid type' to '^Tensor($T)'
+	defer free_tensor(col, allocator)
+	                  ^~^
+	/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(48:12) instantiated as 'conv2d_single($T=f32)'
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(39:27) Error: Cannot assign value 'context.temp_allocator' of type 'Allocator' to '^Tensor($T=f32)' in a procedure argument
+	defer free_tensor(input, context.temp_allocator)
+	                         ^~~~~~~~~~~~~~~~~~~~~^
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(47:28) Error: Cannot assign value 'context.temp_allocator' of type 'Allocator' to '^Tensor($T=f32)' in a procedure argument
+	defer free_tensor(kernel, context.temp_allocator)
+	                          ^~~~~~~~~~~~~~~~~~~~~^
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(49:28) Error: Cannot assign value 'context.temp_allocator' of type 'Allocator' to '^Tensor($T=f32)' in a procedure argument
+	defer free_tensor(result, context.temp_allocator)
+	                          ^~~~~~~~~~~~~~~~~~~~~^
+/Users/davidludwik/Thor/upstream/odin-tensor-substitution/main.odin(77:2) Error: Undeclared name: free_tensor_one
+	free_tensor_one,
+	^~~~~~~~~~~~~~^
+src/check_type.cpp(2625): Assertion Failure: `found != nullptr` subst_apply: no instantiation found for 'Tensor($T)'
+This is a compiler error. Please report this.
+Process 50556 launched: '/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin' (arm64)
+Process 50556 stopped
+* thread #1, queue = 'com.apple.main-thread', stop reason = EXC_BREAKPOINT (code=1, subcode=0x10017bfa8)
+    frame #0: 0x000000010017bfa8 odin`subst_apply(CheckerContext*, Type*, Type*, PolySubst*) + 6412
+odin`subst_apply:
+->  0x10017bfa8 <+6412>: brk    #0x1
+    0x10017bfac <+6416>: adrp   x0, 620
+    0x10017bfb0 <+6420>: add    x0, x0, #0x819            ; "Assertion Failure"
+    0x10017bfb4 <+6424>: adrp   x1, 644
+(lldb) thread backtrace -c 12
+* thread #1, queue = 'com.apple.main-thread', stop reason = EXC_BREAKPOINT (code=1, subcode=0x10017bfa8)
+  * frame #0: 0x000000010017bfa8 odin`subst_apply(CheckerContext*, Type*, Type*, PolySubst*) + 6412
+    frame #1: 0x000000010017aaa0 odin`subst_apply(CheckerContext*, Type*, Type*, PolySubst*) + 1028
+    frame #2: 0x000000010017aa68 odin`subst_apply(CheckerContext*, Type*, Type*, PolySubst*) + 972
+    frame #3: 0x000000010016ba6c odin`determine_type_from_polymorphic(CheckerContext*, Type*, Operand const&) + 176
+    frame #4: 0x00000001000bfa18 odin`check_procedure_type(CheckerContext*, Type*, Ast*, Array<Operand> const*) + 3808
+    frame #5: 0x00000001000f73b4 odin`find_or_generate_polymorphic_procedure(CheckerContext*, Entity*, Type*, Array<Operand> const*, Ast*, PolyProcData*) + 2456
+    frame #6: 0x00000001001b4e84 odin`check_call_arguments_single(CheckerContext*, Ast*, Operand*, Entity*, Type*, Array<Operand> const&, Array<Operand> const&, CallArgumentErrorMode, CallArgumentData*, bool) + 4464
+    frame #7: 0x00000001001b01fc odin`check_call_arguments_proc_group(CheckerContext*, Operand*, Ast*) + 3052
+    frame #8: 0x00000001000b8e70 odin`check_expr_base(CheckerContext*, Operand*, Ast*, Type*) + 25324
+    frame #9: 0x000000010010e530 odin`check_stmt_internal(CheckerContext*, Ast*, unsigned int) + 164
+    frame #10: 0x000000010010f314 odin`check_stmt_internal(CheckerContext*, Ast*, unsigned int) + 3720
+    frame #11: 0x00000001000da368 odin`check_stmt_list(CheckerContext*, Slice<Ast*> const&, unsigned int) + 1392
+(lldb) process kill
+Process 50556 exited with status = 9 (0x00000009) killed

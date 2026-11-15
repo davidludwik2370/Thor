@@ -515,7 +515,7 @@ main::proc(){
 
     def test_generic_dispatch_errors_belong_to_user_operation(self):
         source='package main\nf::proc(a,b:$T)->T{return a|b}\nmain::proc(){_=f(f64(1),f64(2))}\n'
-        errors=self.at(source,'a|b')
+        errors=self.at(source,'|')
         self.assertNotIn('runtime/sets/compiler',json.dumps(errors))
         self.assertNotIn('Thor expression',json.dumps(errors))
         source='package main\nf::proc(a:$A,b:$B){_=a|b}\nmain::proc(){a:=set[int]{1};b:=set[string]{"x"};f(a,b)}\n'

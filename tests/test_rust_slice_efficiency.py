@@ -119,6 +119,7 @@ first::proc(values:$T)->int{return values[0]}
         names=', '.join(f'a{n}' for n in range(8))
         assignments=';'.join(f'a{n}=a{n+1}' for n in range(7))+';a7=values'
         helper=f'''propagate::proc(values:[]int)->[]int{{
+read_only:>values;_=read_only
 {declarations}
 {names}:[]int
 for _ in 0..<9 {{{assignments}}}

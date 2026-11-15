@@ -75,7 +75,7 @@ pub fn sign_macos(root: &Path) -> Result<()> {
     let mut seen = BTreeSet::new();
     for path in &paths {
         if path.is_file() {
-            let original = fs::canonicalize(path)?;
+            let original = crate::project::canonicalize(path)?;
             if !seen.contains(&original) && macho(path)? {
                 seen.insert(original);
                 run!["codesign", "--force", "--sign", "-", path.display()]?;
@@ -287,7 +287,7 @@ pub fn windows(
     );
     let system_root =
         PathBuf::from(std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into()));
-    let system_root = fs::canonicalize(&system_root).unwrap_or_else(|_| {
+    let system_root = crate::project::canonicalize(&system_root).unwrap_or_else(|_| {
         if system_root.is_absolute() {
             system_root.clone()
         } else {
@@ -296,7 +296,7 @@ pub fn windows(
                 .join(&system_root)
         }
     });
-    let mut queue = VecDeque::from([(fs::canonicalize(executable)?, binary.to_path_buf())]);
+    let mut queue = VecDeque::from([(crate::project::canonicalize(executable)?, binary.to_path_buf())]);
     let mut owners = BTreeMap::new();
     fn register(
         source: PathBuf,
@@ -335,7 +335,7 @@ pub fn windows(
     }
     for source in declared {
         register(
-            fs::canonicalize(source)?,
+            crate::project::canonicalize(source)?,
             destination,
             &mut owners,
             &mut dirs,
@@ -361,7 +361,7 @@ pub fn windows(
                 for entry in fs::read_dir(directory)? {
                     let path = entry?.path();
                     if path.is_file() && path_name(&path).to_lowercase() == lower {
-                        found = Some(fs::canonicalize(path)?);
+                        found = Some(crate::project::canonicalize(path)?);
                         break;
                     }
                 }
@@ -421,7 +421,7 @@ pub fn linux(
         .ok_or_else(|| {
             Error::new("Linux publishing requires readelf (binutils) or llvm-readelf.")
         })?;
-    let mut queue = VecDeque::from([(fs::canonicalize(executable)?, binary.to_path_buf())]);
+    let mut queue = VecDeque::from([(crate::project::canonicalize(executable)?, binary.to_path_buf())]);
     let mut owners = BTreeMap::new();
     let mut patched = BTreeSet::new();
     fn register(
@@ -436,7 +436,7 @@ pub fn linux(
                 source.display()
             )));
         }
-        let source = fs::canonicalize(source)?;
+        let source = crate::project::canonicalize(source)?;
         let name = path_name(&source);
         let target = destination.join(&name);
         if let Some(owner) = owners.get(&name) {
@@ -637,7 +637,7 @@ struct Mac<'a> {
 }
 impl Mac<'_> {
     fn register(&mut self, path: &Path, inherited: Vec<PathBuf>) -> Result<PathBuf> {
-        let path = fs::canonicalize(path)?;
+        let path = crate::project::canonicalize(path)?;
         if let Some(target) = self.mapped.get(&path) {
             return Ok(target.clone());
         }
@@ -669,11 +669,11 @@ impl Mac<'_> {
             }
             if framework.is_some() {
                 copy_tree(&source, &target)?;
-                let root = fs::canonicalize(&target)?;
+                let root = crate::project::canonicalize(&target)?;
                 for link in walk(&target)? {
                     let kind = fs::symlink_metadata(&link)?;
                     if kind.is_symlink() {
-                        if !fs::canonicalize(&link)?.starts_with(&root) {
+                        if !crate::project::canonicalize(&link)?.starts_with(&root) {
                             return Err(Error::new(format!(
                                 "Framework has an external symlink: {owner}/{}",
                                 link.strip_prefix(&target).unwrap().display()
@@ -719,7 +719,7 @@ pub fn macos(
     declared: &[PathBuf],
     hints: &[PathBuf],
 ) -> Result<Vec<String>> {
-    let original = fs::canonicalize(executable)?;
+    let original = crate::project::canonicalize(executable)?;
     let mut mac = Mac {
         executable,
         destination,
@@ -829,7 +829,7 @@ pub fn macos(
             let resolved = candidates
                 .drain(..)
                 .find(|path| path.is_file())
-                .map(fs::canonicalize)
+                .map(crate::project::canonicalize)
                 .transpose()?;
             let Some(resolved) = resolved else {
                 return Err(Error::new(format!("Cannot locate dependency {dependency:?} required by {}; declare it with --app-library or [publish].libraries.",path_name(&source))));

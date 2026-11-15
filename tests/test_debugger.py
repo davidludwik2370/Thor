@@ -130,7 +130,7 @@ main :: proc() {
 ''')
         directory=root/'converted'/'sample'
         command=shlex.join(['odin','build',str(original),'-debug','-vet','-thread-count:1',
-            '-out:'+str(original/'program')])
+            '-out:'+str(original/('program.exe' if os.name=='nt' else 'program'))])
         migrated=subprocess.run([str(THOR),'migrate',str(original),'--output-dir',str(directory.parent),
             '--command',command],cwd=root,capture_output=True,text=True,timeout=90)
         self.assertEqual(migrated.returncode,0,migrated.stdout+migrated.stderr)
@@ -542,7 +542,7 @@ choose::proc(callback:$P)->int{
 main::proc(){value:=choose(stop);if value!=7{panic("wrong result")}}
 '''
         directory,source=self.build(text)
-        client=self.launch(directory,source,[5,8])
+        client=self.launch(directory,source,[5])
         thread,frame=self.frame(client)
         self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
         client.request('next',{'threadId':thread})
@@ -1103,20 +1103,21 @@ main::proc(){
             corrected=subprocess.run([str(THOR),'vet',str(directory),'--apply'],capture_output=True,text=True,timeout=90)
             self.assertEqual(corrected.returncode,0,corrected.stdout+corrected.stderr)
         build = subprocess.run([str(THOR),'build',str(directory),'-debug','-o:none',
-            '--output-dir',str(directory/'generated'),'-out:'+str(directory/'program')],capture_output=True,text=True,timeout=90)
+            '--output-dir',str(directory/'generated'),'-out:'+str(directory/('program.exe' if os.name=='nt' else 'program'))],capture_output=True,text=True,timeout=90)
         self.assertEqual(build.returncode,0,build.stdout+build.stderr)
         return directory,source
 
-    def launch(self,directory,source,lines):
+    def launch(self,directory,source,lines,*,verified=None):
         client=DAP(directory)
         self.addCleanup(client.close)
         client.request('initialize',{'adapterID':'thor','linesStartAt1':True,'columnsStartAt1':True,'pathFormat':'path',
             'supportsRunInTerminalRequest':False,'supportsVariableType':True})
-        launch=client.send('launch',{'program':str(directory/'program'),'cwd':str(directory),
+        launch=client.send('launch',{'program':str(directory/('program.exe' if os.name=='nt' else 'program')),'cwd':str(directory),
             'manifest':str(directory/'generated/thor-manifest.json'),'terminal':'console'})
         client.event('initialized')
         bps=client.request('setBreakpoints',{'source':{'path':str(source)},'breakpoints':[line if isinstance(line,dict) else {'line':line} for line in lines]})
-        self.assertTrue(all(bp['verified'] for bp in bps['breakpoints']),bps)
+        expected = [True] * len(lines) if verified is None else verified
+        self.assertEqual([bp['verified'] for bp in bps['breakpoints']],expected,bps)
         client.request('configurationDone')
         client.response(launch)
         return client
@@ -1304,12 +1305,11 @@ main::proc(){
     when false {
         missing()
     }
-    assert(len(data)==6)
+    data[0] = SIZE
+    if data[0] != 6 {panic("compile-time size")}
 }
 ''')
-        client=self.launch(directory,source,[9])
-        bps=client.request('setBreakpoints',{'source':{'path':str(source)},'breakpoints':[{'line':3},{'line':7},{'line':9}]})
-        self.assertEqual([bp['verified'] for bp in bps['breakpoints']],[False,False,True],bps)
+        client=self.launch(directory,source,[3,7,9],verified=[False,False,True])
         thread,frame=self.frame(client)
         self.assertEqual(frame['line'],9,frame)
         client.request('continue',{'threadId':thread})

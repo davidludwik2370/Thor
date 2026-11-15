@@ -78,6 +78,17 @@ struct LoweringNotes {
 struct SourceFacts {
     sources: Vec<Source>,
     flags: Vec<String>,
+    test: bool,
+}
+impl SourceFacts {
+    fn same_flags(&self, flags: &[String], test: bool) -> bool {
+        let relevant = |flag: &&String| !flag.starts_with("-out:")
+            && flag.as_str() != "-keep-executable"
+            && flag.as_str() != "-ignore-unused-defineables"
+            && flag.as_str() != "-all-packages"
+            && !(self.test && flag.as_str() == "-build-mode:test");
+        self.test == test && self.flags.iter().filter(relevant).eq(flags.iter().filter(relevant))
+    }
 }
 #[derive(Clone)]
 struct IndexedSources {
@@ -144,6 +155,34 @@ pub struct Project {
     // Workers may finish in any order without changing source/evaluation order.
     parsed_imports: HashMap<(PathBuf, bool), Result<Source>>,
 }
+/// Canonical filesystem identity in a spelling accepted by native compiler flags.
+/// Windows canonicalization adds verbatim prefixes even to ordinary short paths.
+pub fn canonicalize(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+    std::fs::canonicalize(path).map(native_path)
+}
+fn native_path(path: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    {
+        use std::path::Prefix;
+        let mut components = path.components();
+        if let Some(Component::Prefix(prefix)) = components.next() {
+            let mut ordinary = match prefix.kind() {
+                Prefix::VerbatimDisk(drive) => PathBuf::from(format!("{}:", drive as char)),
+                Prefix::VerbatimUNC(server, share) => {
+                    let mut unc = PathBuf::from(r"\\");
+                    unc.push(server);
+                    unc.push(share);
+                    unc
+                }
+                _ => return path,
+            };
+            ordinary.extend(components);
+            return ordinary;
+        }
+    }
+    path
+}
+
 pub fn absolute(path: &Path) -> Result<PathBuf> {
     let input = if path.is_absolute() {
         path.to_path_buf()
@@ -151,11 +190,11 @@ pub fn absolute(path: &Path) -> Result<PathBuf> {
         env::current_dir()?.join(path)
     };
     if input.exists() {
-        return Ok(fs::canonicalize(input)?);
+        return Ok(crate::project::canonicalize(input)?);
     }
     if let Some(parent) = input.parent() {
         if parent.exists() {
-            return Ok(fs::canonicalize(parent)?.join(
+            return Ok(crate::project::canonicalize(parent)?.join(
                 input
                     .file_name()
                     .ok_or_else(|| Error::new("invalid output path"))?,
@@ -210,7 +249,7 @@ fn package_files(entry: &Path, test: bool, overlays: &BTreeMap<PathBuf, String>)
         if !test && (name.ends_with("_test.thor") || name.ends_with("_test.odin")) {
             continue;
         }
-        files.push(fs::canonicalize(path)?);
+        files.push(crate::project::canonicalize(path)?);
     }
     for path in overlays.keys() {
         if path.parent() != Some(entry)
@@ -501,7 +540,7 @@ impl Project {
         self.discover_expression_facts()?;
         self.discover_call_facts()?;
         self.source_facts = Some(SourceFacts {
-            sources: self.sources.clone(), flags: self.options.flags.clone(),
+            sources: self.sources.clone(), flags: self.options.flags.clone(), test: self.frontend.test,
         });
         Ok(())
     }
@@ -542,7 +581,7 @@ impl Project {
     pub fn lower(&mut self) -> Result<PathBuf> {
         let _phase = crate::profile::span("lowering.total");
         let ready = self.source_facts.as_ref().is_some_and(|facts| {
-            facts.flags == self.options.flags && facts.sources.len() == self.sources.len()
+            facts.same_flags(&self.options.flags, self.frontend.test) && facts.sources.len() == self.sources.len()
                 && facts.sources.iter().zip(&self.sources).all(|(old, current)| {
                     old.shares_syntax(current) && old.shared_native == current.shared_native
                         && old.collection_roots == current.collection_roots
@@ -1654,6 +1693,36 @@ pub fn print_diagnostic(error: &Value) {
 mod incremental_index_tests {
     use super::*;
     use crate::{ast::NodeId, semantics::Ref};
+
+    #[test]
+    fn output_flags_preserve_source_facts_and_semantic_flags_invalidate_them() {
+        let mut facts = SourceFacts { sources: vec![], flags: vec!["-define:MODE=1".into(), "-out:first".into(), "-keep-executable".into()], test: false };
+        if !facts.same_flags(&["-define:MODE=1".into(), "-out:second".into(), "-ignore-unused-defineables".into()], false) {
+            panic!("output selection invalidated source facts");
+        }
+        for changed in ["-define:MODE=2", "-target:windows_amd64", "-debug", "-build-mode:test"] {
+            if facts.same_flags(&[changed.into()], false) { panic!("semantic flag reused source facts"); }
+        }
+        facts.test = true;
+        if !facts.same_flags(&["-define:MODE=1".into(), "-build-mode:test".into(), "-all-packages".into()], true)
+            || facts.same_flags(&["-define:MODE=1".into()], false) {
+            panic!("effective test mode changed during source-fact reuse");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_paths_preserve_drive_unc_unicode_and_ordinary_spelling() {
+        for (input, expected) in [
+            (r"\\?\C:\project folder\é\main.thor", r"C:\project folder\é\main.thor"),
+            (r"\\?\UNC\server\share\project\main.thor", r"\\server\share\project\main.thor"),
+            (r"C:\project\main.thor", r"C:\project\main.thor"),
+            (r"\\server\share\main.thor", r"\\server\share\main.thor"),
+        ] {
+            let actual = native_path(PathBuf::from(input));
+            if actual != PathBuf::from(expected) { panic!("native path changed its target: {actual:?}"); }
+        }
+    }
 
     fn source(path: &str, name: &str) -> Source {
         let raw = format!("{name}::7");

@@ -169,7 +169,10 @@ VALUE::#run work()
         path=root/'input/main.thor'
         path.write_text(source.replace('EXISTS::#exists("optional.txt")','PATH::"optional.txt"\nEXISTS::#exists(PATH)'))
         result=self.again(root)
-        self.assertGreater(self.report(result)['bypasses'],0)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(self.report(self.again(root))['hits'],1)
+        (root/'input/optional.txt').unlink()
+        self.assertEqual(self.report(self.again(root))['hits'],0)
 
     def test_loaded_directory_contents_and_membership_invalidate(self):
         # Native #load_directory is runtime-initialized rather than an Odin

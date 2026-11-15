@@ -194,7 +194,7 @@ impl Scheduler<'_> {
         let key = self.scalar_key(site)?;
         let record = self.cache.borrow().read_record("scalar-v1", Some(&key))?;
         if !PRIMITIVES.contains(&record["type"].as_str()?)
-            || record["headers"] != prepared::headers(self.project)
+            || record["headers"].as_str() != Some(self.prepared_inputs().headers.as_str())
             || record["bindings"] != self.scalar_bindings(site, record["names"].as_array()?)?
             || record["bodies"] != self.scalar_bodies(record["descriptors"].as_array()?)?
             || !Inputs::new(Some(record.get("inputs")?.clone())).valid()
@@ -404,7 +404,7 @@ impl Scheduler<'_> {
             "expression"
         };
         self.cache.borrow().write_record("scalar-v1",Some(&key),&json!({"type":name,"target":target,
-            "witness":witness,"headers":prepared::headers(self.project),"names":names,"bindings":bindings,
+            "witness":witness,"headers":self.prepared_inputs().headers,"names":names,"bindings":bindings,
             "descriptors":descriptors,"bodies":bodies,"inputs":inputs.data}));
     }
 }

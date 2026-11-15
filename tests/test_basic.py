@@ -133,6 +133,25 @@ if writable[0]!=9 {panic("zip writable column")}
                 self.invoke(self.program(body.replace('a=readonly, b=writable', 'a=writable, b=readonly'),
                                          prefix), command='check', fail='read-only slice')
 
+    def test_zip_column_permissions_survive_forwarding_and_returned_views(self):
+        helpers='''
+write::proc(values:#soa[]$T){values.b[0]=9}
+forward::proc(values:#soa[]$T){write(values)}
+identity::proc(values:$T)->T{return values}
+'''
+        for declaration,callee in [('import "thor:basic"','basic.zip'),
+                                   ('import _ "thor:basic" / zip','zip')]:
+            for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+                with self.subTest(declaration=declaration,flags=flags):
+                    body='''
+readonly:>[]int{1};writable:=[]int{2}
+forward(identity(ZIP(a=readonly,b=writable)))
+if writable[0]!=9 {panic("writable column")}
+'''.replace('ZIP',callee)
+                    self.invoke(self.program(body,declaration+'\n'+helpers),flags=flags)
+                    self.invoke(self.program(body.replace('a=readonly,b=writable','a=writable,b=readonly'),
+                                             declaration+'\n'+helpers),command='build',flags=flags,fail='read-only slice')
+
     def test_native_runtime_parameter_witnesses_are_emitted_with_original_maps(self):
         code=self.program('''
 values:=basic.to_set([3,1,3,2])
@@ -398,8 +417,9 @@ main::proc(){
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_private_implementation_is_not_exported(self):
-        self.invoke(self.program('_, _ = basic._parse_int("7", int)', 'import "thor:basic"\n'),
-                    command='check', fail='private')
+        _, result = self.invoke(self.program('_, _ = basic._parse_int("7", int)', 'import "thor:basic"\n'),
+                                command='check', fail='Error:')
+        self.assertRegex(result.stderr, r'private|not exported')
 
     def test_commented_basic_example(self):
         result = subprocess.run([str(base.THOR), 'run', str(base.ROOT / 'examples' / 'basic')],

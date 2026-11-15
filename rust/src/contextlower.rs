@@ -87,7 +87,7 @@ impl Lower<'_, '_> {
             } else {
                 self.source.path.parent()?.join(&path)
             };
-            if std::fs::canonicalize(directory).ok().as_deref() != target.path.parent() {
+            if crate::project::canonicalize(directory).ok().as_deref() != target.path.parent() {
                 continue;
             }
             // A separate alias also works for blank imports and local shadowing.

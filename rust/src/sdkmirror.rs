@@ -75,7 +75,7 @@ impl SdkMirror {
         // Keep this lookup out of ordinary builds without overlays.
         if !overlays.is_empty() {
             let sdk = sources.iter().find_map(|source| source.info["odin_root"].as_str())
-                .map(fs::canonicalize).transpose()?;
+                .map(crate::project::canonicalize).transpose()?;
             changed.extend(overlays.keys().filter(|path| {
                 sdk.as_ref().is_some_and(|sdk| path.starts_with(sdk))
                     || sources.iter().any(|source| source.shared_native && source.path == **path)
@@ -87,7 +87,7 @@ impl SdkMirror {
         let sdk = sources
             .iter()
             .find_map(|s| s.info["odin_root"].as_str())
-            .map(fs::canonicalize)
+            .map(crate::project::canonicalize)
             .transpose()?;
         let mut roots = BTreeSet::new();
         for path in &changed {
@@ -98,7 +98,7 @@ impl SdkMirror {
             let root = sources
                 .iter()
                 .flat_map(|s| s.collection_roots.values())
-                .filter_map(|root| fs::canonicalize(root).ok())
+                .filter_map(|root| crate::project::canonicalize(root).ok())
                 .filter(|root| path.starts_with(root))
                 .max_by_key(|root| root.components().count())
                 .ok_or_else(|| {
@@ -157,7 +157,7 @@ impl SdkMirror {
             }
         }
         for root in collections.values_mut().filter(|_| evaluation.is_none()) {
-            if let Ok(canonical) = fs::canonicalize(&root) {
+            if let Ok(canonical) = crate::project::canonicalize(&root) {
                 if let Some(output) = this.output(&canonical) {
                     *root = output;
                 }

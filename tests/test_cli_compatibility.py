@@ -30,6 +30,14 @@ class CliCompatibilityTests(unittest.TestCase):
     setUpClass=classmethod(native.RustCompilerTests.setUpClass.__func__)
     setUp=native.RustCompilerTests.setUp
 
+    @unittest.skipUnless(os.name=='nt','Windows preserves full 32-bit process exit statuses')
+    def test_windows_runtime_exit_statuses_preserve_the_full_failure_code(self):
+        for code in [37,0xC0000005,0x80000000]:
+            self.source.write_text('package main\nimport "core:os"\nmain::proc(){os.exit('+str(code)+')}\n',newline='')
+            for flags in [[],native.UNCHECKED]:
+                with self.subTest(code=code,flags=flags):
+                    self.call('rust','run',self.source,*flags,status=code)
+
     def call(self, engine, *args, status=0, cwd=None, env=None):
         compiler=native.PYTHON if engine=='python' else native.RUST
         result=subprocess.run([*([sys.executable] if engine=='python' else []), str(compiler), *map(str,args)], cwd=cwd or self.app,

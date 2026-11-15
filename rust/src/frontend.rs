@@ -56,18 +56,18 @@ fn decode(bytes: &[u8]) -> serde_json::Result<Value> {
 pub fn executable(name: &str) -> Result<PathBuf> {
     let path = PathBuf::from(name);
     if path.components().count() > 1 && path.is_file() {
-        return Ok(fs::canonicalize(path)?);
+        return Ok(crate::project::canonicalize(path)?);
     }
     for base in env::split_paths(&env::var_os("PATH").unwrap_or_default()) {
         let candidate = base.join(name);
         if candidate.is_file() {
-            return Ok(fs::canonicalize(candidate)?);
+            return Ok(crate::project::canonicalize(candidate)?);
         }
         #[cfg(windows)]
         {
             let candidate = base.join(format!("{name}.exe"));
             if candidate.is_file() {
-                return Ok(fs::canonicalize(candidate)?);
+                return Ok(crate::project::canonicalize(candidate)?);
             }
         }
     }
@@ -89,12 +89,12 @@ fn odin_sources(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
 pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf, String)> {
     let _phase = crate::profile::span("parser.bootstrap");
     let odin = executable(odin)?;
-    let version = Command::new(&odin).arg("version").output()?;
-    if !version.status.success() {
+    let version = crate::project::capture_command(Command::new(&odin).arg("version"), Duration::ZERO)?;
+    if !version.status.success() || version.oversized {
         return Err(Error::new("could not query Odin version"));
     }
-    let sdk = Command::new(&odin).arg("root").output()?;
-    if !sdk.status.success() { return Err(Error::new("could not query Odin SDK root")); }
+    let sdk = crate::project::capture_command(Command::new(&odin).arg("root"), Duration::ZERO)?;
+    if !sdk.status.success() || sdk.oversized { return Err(Error::new("could not query Odin SDK root")); }
     let odin_root = String::from_utf8_lossy(&sdk.stdout).trim().to_string();
     let builder = if let Some(name) = env::var_os("THOR_FRONTEND_ODIN") {
         executable(&name.to_string_lossy())?
@@ -103,7 +103,13 @@ pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf, String)> 
     bytes.extend_from_slice(b"frontend-bootstrap-custom-synchronizes-v1");
     bytes.extend_from_slice(&version.stdout);
     bytes.extend_from_slice(builder.to_string_lossy().as_bytes());
-    if builder != odin { bytes.extend_from_slice(&Command::new(&builder).arg("version").output()?.stdout); }
+    if builder != odin {
+        let version = crate::project::capture_command(Command::new(&builder).arg("version"), Duration::ZERO)?;
+        if !version.status.success() || version.oversized {
+            return Err(Error::new("could not query frontend builder version"));
+        }
+        bytes.extend_from_slice(&version.stdout);
+    }
     let source_root = root.join("frontend");
     let mut files = vec![];
     odin_sources(&source_root, &mut files)?;
@@ -126,20 +132,24 @@ pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf, String)> 
         let work = directory.join(format!("rust-frontend-{}-{}", std::process::id(), unique()));
         fs::create_dir(&work)?;
         let intermediate = work.join(format!("frontend{}", env::consts::EXE_SUFFIX));
-        let result = Command::new(&builder)
-            .arg("build")
-            .arg(source_root)
-            .arg("-o:speed")
-            .arg("-custom-attribute:synchronizes")
-            .arg(format!("-out:{}", intermediate.display()))
-            .status();
-        let result = match result {
-            Ok(status) if status.success() => {
-                fs::rename(&intermediate, &binary).map_err(Error::from)
+        let result = (|| -> Result<()> {
+            let output = crate::project::capture_command(
+                Command::new(&builder)
+                    .arg("build")
+                    .arg(source_root)
+                    .arg("-o:speed")
+                    .arg("-custom-attribute:synchronizes")
+                    .arg(format!("-out:{}", intermediate.display())),
+                Duration::ZERO,
+            )?;
+            std::io::stdout().write_all(&output.stdout)?;
+            std::io::stderr().write_all(&output.stderr)?;
+            if !output.status.success() || output.oversized {
+                return Err(Error::new("could not build Thor's Odin frontend"));
             }
-            Ok(_) => Err(Error::new("could not build Thor's Odin frontend")),
-            Err(error) => Err(Error::from(error)),
-        };
+            fs::rename(&intermediate, &binary)?;
+            Ok(())
+        })();
         let _ = fs::remove_dir_all(work);
         result?;
     }
@@ -227,7 +237,7 @@ impl Frontend {
         let path = if overlay.is_some() {
             crate::project::absolute(path)?
         } else {
-            fs::canonicalize(path)?
+            crate::project::canonicalize(path)?
         };
         let bytes = if let Some(raw) = overlay {
             raw.as_bytes().to_vec()

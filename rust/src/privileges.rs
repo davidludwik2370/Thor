@@ -839,7 +839,15 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.values[v].fields.insert(name.into(), child);
                 child
             };
-            return self.qualify(child, self.values[v].data.clone());
+            let origins = self.values[v].data.iter().map(|origin| {
+                let mut origin = origin.clone();
+                if origin.seed.is_none() && origin.aspect == Aspect::Data {
+                    origin.path.steps.push(Step::Field(name.into()));
+                    origin.aspect = Aspect::Storage;
+                }
+                origin
+            }).collect();
+            return self.qualify(child, origins);
         }
         if let Some(child) = self.values[v].fields.get(name) {
             return *child;
@@ -986,6 +994,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 let child = self.item(v);
                 self.values[id].element = Some(child);
             }
+            Type::Soa(elem) => {
+                for (name, _) in self.record_fields(elem).iter() {
+                    let column = self.member(v, name);
+                    self.values[id].fields.insert(name.clone(), column);
+                }
+            }
             _ => {
                 self.values[id].fields = old.fields;
                 self.values[id].element = old.element;
@@ -1067,6 +1081,13 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return Origins::new();
         }
         let mut result = self.values[v].data.clone();
+        // SOA columns are native multipointers. Their storage qualifiers
+        // describe the referenced column memory retained by a header copy.
+        if matches!(base_type(&self.values[v].typ), Type::Soa(_)) {
+            for column in self.values[v].fields.values() {
+                result.extend(self.values[*column].storage.iter().cloned());
+            }
+        }
         if result.iter().any(|origin| origin.aspect == Aspect::All) {
             return result;
         }
@@ -1281,6 +1302,15 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if origin.aspect == Aspect::All {
             return self.refs(*v);
         }
+        // Native SOA columns are multipointers, while a freshly zipped
+        // column can still carry its source slice's provenance. Both shapes
+        // describe the same referenced element storage across header copies.
+        let column = origin.path.steps.split_last().is_some_and(|(last, prefix)| {
+            matches!(last, Step::Field(_)) && {
+                let parent = self.follow(*v, prefix);
+                matches!(base_type(&self.values[parent].typ), Type::Soa(_))
+            }
+        });
         let v = self.follow(*v, &origin.path.steps);
         if origin.aspect == Aspect::References {
             return self.refs(v);
@@ -1288,7 +1318,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if origin.aspect == Aspect::Data {
             self.values[v].data.clone()
         } else {
-            self.values[v].storage.clone()
+            let mut storage = self.values[v].storage.clone();
+            if column { storage.extend(self.values[v].data.iter().cloned()); }
+            storage
         }
     }
     fn instantiate(&mut self, v: V, args: &[V], seen: &mut HashMap<V, V>, depth: usize) -> V {
@@ -1632,6 +1664,21 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             file: r.file,
                             node: parent,
                         };
+                        let mut child = r;
+                        while self.kind(parent) == "Paren" {
+                            child = parent;
+                            let Some(node) = self.s(parent).node(parent.node).parent else { break; };
+                            parent.node = node;
+                        }
+                        if self.kind(parent) == "Return" {
+                            let index = self.group(parent, "values").iter().position(|value| *value == child);
+                            if let (Some(index), Some(procedure)) = (index, self.contexts[c].proc) {
+                                let signature = self.role(procedure, "type").unwrap_or(procedure);
+                                if let Some((_, Some(annotation))) = self.r.fields(signature, "results").get(index) {
+                                    return self.specialized_type(*annotation, &self.contexts[c].bindings.clone());
+                                }
+                            }
+                        }
                         let mut field = None;
                         if self.kind(parent) == "FieldValue" {
                             field = self.role(parent, "field").map(|r| self.text(r));
@@ -3018,7 +3065,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .descendants(candidate.node)
                     .any(|id| self.s(candidate).node(id).immutable);
             let inspect_result = result_references && (self.opaque_readonly
-                || self.pure_depth > 0 || self.s(candidate).node(candidate.node).data["pure"] == true);
+                || self.pure_depth > 0 || self.s(candidate).node(candidate.node).data["pure"] == true
+                || result_fields.iter().any(|(_, annotation)| annotation.is_some_and(|node| {
+                    let typ = self.specialized_type(node, &substitutions);
+                    self.type_property(&typ, queries::Property::NestedSlice)
+                })));
             // Without escaping read-only storage or qualified arguments, a
             // reference-shaped result cannot acquire a read-only qualifier.
             // Avoid materializing an unrelated parser/allocator object graph.
@@ -3334,7 +3385,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                                 .map(|parent| parent.join(&path))
                         };
                         if directory
-                            .and_then(|p| std::fs::canonicalize(p).ok())
+                            .and_then(|p| crate::project::canonicalize(p).ok())
                             .as_deref()
                             == target.path.parent()
                         {

@@ -7,6 +7,7 @@ pub(super) enum Property {
     Slice,
     Unresolved,
     Reference,
+    NestedSlice,
 }
 
 impl Privileges<'_, '_> {
@@ -201,11 +202,27 @@ impl Privileges<'_, '_> {
             Property::Slice => self.contains_slice(typ, &mut HashSet::new()),
             Property::Unresolved => self.unresolved_value_type(typ, &mut HashSet::new()),
             Property::Reference => self.root_reference_type(typ, &mut HashSet::new()),
+            Property::NestedSlice => self.nested_slice_type(typ, &mut HashSet::new()),
         };
         if !self.r.has_demanded_packages() {
             self.type_properties.insert(key, value);
         }
         value
+    }
+    fn nested_slice_type(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
+        if !seen.insert(typ.clone()) { return false; }
+        if seen.len() > 24 { return true; }
+        match base_type(typ) {
+            Type::Slice(elem) | Type::Dynamic(elem) | Type::Soa(elem) =>
+                self.type_property(elem, Property::Slice),
+            Type::Map { value, .. } => self.type_property(value, Property::Slice),
+            Type::Array { elem, .. } | Type::Fixed { elem, .. } =>
+                self.nested_slice_type(elem, seen),
+            Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self.record_fields(typ)
+                .iter().any(|(_, field)| self.nested_slice_type(field, seen)),
+            Type::Union(..) | Type::Unknown | Type::Generic => true,
+            _ => false,
+        }
     }
     fn root_reference_type(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
         if !seen.insert(typ.clone()) {

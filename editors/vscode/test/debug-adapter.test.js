@@ -5,7 +5,30 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const {Framing,DebugMaps} = require('../debug-adapter');
+const {Framing,DebugMaps,ThorDebugAdapter} = require('../debug-adapter');
+
+test('statement stepping leaves source-less native routines and instruction stepping remains visible',async()=>{
+    for (const granularity of ['statement','instruction']) {
+        const adapter=Object.create(ThorDebugAdapter.prototype);
+        adapter.step={command:'stepIn',args:{granularity},count:0,
+            start:{source:{path:'/project/main.thor'},line:7}};
+        adapter.maps={debugRoots:[]};
+        adapter.references=new Map();
+        adapter.frames=new Map([[1,{point:{internal:false},generated:false}]]);
+        adapter.mapFrames=frames=>frames;
+        const calls=[],events=[];
+        adapter.request=async(command)=>{
+            calls.push(command);
+            return {stackFrames:[{id:1,line:4,name:'__memset_zva64',
+                source:{name:'@__memset_zva64',sourceReference:1003}}]};
+        };
+        adapter.emit=message=>events.push(message);
+        const message={body:{threadId:1,reason:'step'}};
+        await adapter.stopped(message);
+        assert.deepEqual(calls,granularity==='statement'?['stackTrace','stepOut']:['stackTrace']);
+        assert.equal(events.length,granularity==='statement'?0:1);
+    }
+});
 
 test('DAP framing preserves fragmented UTF-8 and coalesced messages',()=>{
     const received=[];

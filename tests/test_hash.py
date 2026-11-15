@@ -24,7 +24,7 @@ class HashTests(unittest.TestCase):
             for flags in [[],UNCHECKED]:
                 with self.subTest(flags=flags):
                     result=subprocess.run([os.environ.get('THOR_ODIN','odin'),'test',str(base.ROOT/'runtime/hash'),
-                        '-collection:thor='+str(base.ROOT/'runtime'),'-out:'+str(Path(directory)/'hash-test'),
+                        '-collection:thor='+str(base.ROOT/'runtime'),'-out:'+str(Path(directory)/('hash-test.exe' if os.name=='nt' else 'hash-test')),
                         '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',*flags],capture_output=True,text=True,timeout=60)
                     self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 

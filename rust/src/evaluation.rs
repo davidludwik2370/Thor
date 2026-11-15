@@ -583,7 +583,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
             } else {
                 source.path.parent().map(|root| root.join(path))
             };
-            let directory = directory.and_then(|path| std::fs::canonicalize(path).ok());
+            let directory = directory.and_then(|path| crate::project::canonicalize(path).ok());
             self.r.symbols.iter().any(|symbol| {
                 symbol.name == name
                     && symbol.scope == NodeId(0)

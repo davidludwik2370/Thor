@@ -37,6 +37,7 @@ pub struct Scheduler<'p> {
     cache: std::cell::RefCell<crate::evaluationcache::EvaluationCache>,
     execution_records: BTreeMap<Ref, scalar::ExecutionRecord>,
     failed_scalar_targets: BTreeMap<Ref, String>,
+    prepared_inputs: std::cell::OnceCell<prepared::PreparedInputs>,
     pub scalar_witnesses: BTreeMap<Ref, String>,
 }
 impl<'p> Scheduler<'p> {
@@ -91,6 +92,7 @@ impl<'p> Scheduler<'p> {
             )),
             execution_records: BTreeMap::new(),
             failed_scalar_targets: BTreeMap::new(),
+            prepared_inputs: std::cell::OnceCell::new(),
             scalar_witnesses: BTreeMap::new(),
         };
         this.prepare_work_sources();

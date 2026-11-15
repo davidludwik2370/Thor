@@ -90,6 +90,9 @@ substantial type/call analysis and request-key work. The final native backend
 accounts for about 2.7 seconds of that repeated run. The cold and warm profiles
 are saved as `integration-projects/results/verified-skald-cache-*.json`.
 
+The November 15 follow-up records further work reuse, correctness fixes, local
+platform validation and updated timings. [Integration hardening report](integration-hardening-2026-11-15.md).
+
 Compiler regression verification includes 86 Rust unit tests, 94 cache checks,
 assertion-hygiene checks and the 155-case compiler/slice hardening run with one
 SDK-dependent skip. Targeted pure-call, vet, diagnostic and language-server
@@ -176,7 +179,8 @@ corrections that Thor must reject.
 
 The local capture is under `integration-projects/results/repros/anvil-vet`.
 It includes generated native sources, the backend command and debugger output.
-This capture still requires minimization for an upstream report. Thor preserves
+A standalone 86-line native reproducer, license and single-worker backtrace
+are now in [`upstream/odin-tensor-substitution`](../upstream/odin-tensor-substitution/README.md). Thor preserves
 and maps the preceding source errors so the failed proposal can be rejected.
 
 Generic unions retain their instantiated arguments during type/effect analysis,
@@ -198,6 +202,8 @@ helpers. The saved generated Odin input also fails when built directly with
 Odin revision `537fac56cfee40cd51967d509ef089aa0a71444b`. Its ordinary multi-module
 build fails, while `-use-single-module` succeeds. The reduced capture and
 per-hunk investigation are in `integration-projects/results/repros/sdk-internal`.
+A portable copied-SDK reproduction and successful single-module control are
+recorded in [`upstream/odin-private-generic-linker`](../upstream/odin-private-generic-linker/README.md).
 Thor retries this specific unlocated generic-procedure duplicate-symbol failure
 once with a single native module. Located source errors and ordinary duplicate
 external symbols retain their normal failure. Parser/source/debug maps are

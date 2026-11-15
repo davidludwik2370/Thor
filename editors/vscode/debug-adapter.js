@@ -529,11 +529,12 @@ class ThorDebugAdapter {
             const same = top && step.start && top.source?.path === step.start.source?.path && top.line === step.start.line;
             const sourcePath = detail?.point?.source?.path || raw[0]?.source?.path;
             const runtimeLibrary = sourcePath && this.maps.debugRoots.some(root => canonical(sourcePath).startsWith(root+path.sep));
-            const internal = detail?.point?.internal || runtimeLibrary;
+            const sourceLess = raw[0] && !raw[0].source?.path && step.args.granularity !== 'instruction';
+            const internal = detail?.point?.internal || runtimeLibrary || sourceLess;
             const sameFunction = top && step.start && top.name === step.start.name && top.source?.path === step.start.source?.path;
             const returnedToOwner = sameFunction && step.ownerPoint && top.line === step.ownerPoint.line && !detail.generated;
             if (top && (internal || same || returnedToOwner || step.command === 'stepOut' && sameFunction) && ++step.count < 10000) {
-                const command = runtimeLibrary && !detail.generated ? 'stepOut' : step.command === 'stepOut' ? 'stepOut'
+                const command = (runtimeLibrary || sourceLess) && !detail.generated ? 'stepOut' : step.command === 'stepOut' ? 'stepOut'
                     : detail?.point?.kind === 'pure-contract' && !detail.generated ? 'next' : step.command;
                 await this.request(command, {...step.args, threadId: message.body.threadId});
                 return;

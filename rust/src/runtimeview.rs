@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) fn prepare(root: &Path) -> Result<PathBuf> {
-    let source = fs::canonicalize(root.join("runtime"))?;
+    let source = crate::project::canonicalize(root.join("runtime"))?;
     let mut links = BTreeMap::new();
     for package in fs::read_dir(&source)? {
         let package = package?;

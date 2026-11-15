@@ -125,15 +125,15 @@ fn resolved(path: &Path) -> std::io::Result<PathBuf> {
     let mut suffix = Vec::new();
     while !existing.exists() {
         let Some(name) = existing.file_name() else {
-            return fs::canonicalize(path);
+            return crate::project::canonicalize(path);
         };
         suffix.push(name.to_os_string());
         let Some(parent) = existing.parent() else {
-            return fs::canonicalize(path);
+            return crate::project::canonicalize(path);
         };
         existing = parent;
     }
-    let mut result = fs::canonicalize(existing)?;
+    let mut result = crate::project::canonicalize(existing)?;
     result.extend(suffix.into_iter().rev());
     Ok(result)
 }
