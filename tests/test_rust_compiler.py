@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from tests.test_thor import runtime_flags
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = ROOT / 'thor-python'
@@ -40,7 +41,7 @@ class RustCompilerTests(unittest.TestCase):
         compiler = PYTHON if engine == 'python' else RUST
         argv = [str(compiler), command, str(self.app if directory else self.source),
                 '--output-dir', str(self.root/engine), '--cache-dir', str(self.root/'cache'),
-                *flags]
+                *runtime_flags(flags)]
         if args:
             argv += ['--', *args]
         return subprocess.run(argv, capture_output=True, text=True, cwd=self.root,

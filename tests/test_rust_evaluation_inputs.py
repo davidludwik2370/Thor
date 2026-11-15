@@ -154,6 +154,20 @@ class RustEvaluationInputTests(unittest.TestCase):
         answer=self.compare([],packet['data'])
         self.assertFalse(answer['valid'])
 
+    def test_tree_rejects_content_and_child_directory_changes_with_equal_metadata(self):
+        path=self.root/'module.odin';path.write_text('before')
+        packet=self.compare([{'op':'tree','path':str(self.root)}])
+        path.write_text('change')
+        packet['data']['files'][str(path)]['stat']=signature(path)
+        self.assertFalse(self.run_native([],packet['data'])['valid'])
+        self.assertFalse(self.run_reference([],packet['data'])['valid'])
+        packet=self.compare([{'op':'tree','path':str(self.root)}])
+        child=self.root/'new_package';child.mkdir()
+        (child/'new.odin').write_text('package example')
+        packet['data']['directories'][str(self.root)]['stat']=signature(self.root)
+        self.assertFalse(self.run_native([],packet['data'])['valid'])
+        self.assertFalse(self.run_reference([],packet['data'])['valid'])
+
     def source(self,expression):
         path=self.root/'main.thor'
         path.write_text('package main\nDATA::'+expression+'\nmain::proc(){}\n')
@@ -227,8 +241,12 @@ class RustEvaluationInputTests(unittest.TestCase):
         self.assertTrue(packet['usable'])
 
     def test_malformed_snapshot_cannot_validate(self):
-        packet=self.run_native([],{'files':[],'directories':{},'members':{},'bindings':{}})
-        self.assertFalse(packet['valid'])
+        empty=dict(files={},directories={},members={},bindings={})
+        for data in [{},[],False,{**empty,'files':[]},{**empty,'directories':[]},
+                     {**empty,'members':None},{**empty,'bindings':[]}]:
+            with self.subTest(data=data):
+                packet=self.compare([],data)
+                self.assertFalse(packet['valid'])
 
     def test_invalid_content_digest_cannot_use_unchanged_metadata(self):
         path=self.root/'data';path.write_text('contents')

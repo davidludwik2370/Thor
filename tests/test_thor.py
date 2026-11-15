@@ -7,12 +7,28 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 THOR = Path(os.environ.get("THOR_TEST_COMPILER", ROOT / "thor"))
+
+
+def runtime_flags(flags, *, platform=None):
+    """Keep functional fixtures runnable where optional tracking is unavailable.
+
+    CLI policy tests invoke the compiler directly. Mac runs retain the leak and
+    allocation-stack checks. Other hosts exercise the same program and options
+    with tracking disabled.
+    """
+    platform = sys.platform if platform is None else platform
+    if platform == 'darwin':
+        return list(flags)
+    return ['--track-allocations=off' if flag in
+            ('--track-allocations=basic', '--track-allocations=trace') else flag
+            for flag in flags]
 
 
 class ThorTests(unittest.TestCase):
@@ -33,7 +49,7 @@ class ThorTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8", newline="")
         compiler = getattr(self, "compiler", THOR)
-        argv = [str(compiler), command, str(entry.parent if directory else entry), "--output-dir", str(root / "output"), *flags]
+        argv = [str(compiler), command, str(entry.parent if directory else entry), "--output-dir", str(root / "output"), *runtime_flags(flags)]
         if args:
             argv += ["--", *args]
         result = subprocess.run(argv, cwd=root if command == "build" else None,

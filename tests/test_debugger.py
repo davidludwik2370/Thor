@@ -578,6 +578,9 @@ main::proc(){
         for name,expected in [('first','7'),('second','9')]:
             value=client.request('evaluate',{'frameId':frame['id'],'expression':name,'context':'watch'})
             self.assertEqual(value['result'],expected,value)
+        # ARM64 CodeLLDB can hit the landing-line breakpoint again after a step,
+        # including with native Odin. The mapped stops have now been checked.
+        client.request('setBreakpoints',{'source':{'path':str(source)},'breakpoints':[]})
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
@@ -605,6 +608,8 @@ main::proc(){
         for name,expected in [('first','7'),('second','9')]:
             value=client.request('evaluate',{'frameId':frame['id'],'expression':name,'context':'watch'})
             self.assertEqual(value['result'],expected,value)
+        # Release the verified landing-line breakpoint before final execution.
+        client.request('setBreakpoints',{'source':{'path':str(source)},'breakpoints':[]})
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 

@@ -29,6 +29,17 @@ class MemoryPolicyTests(unittest.TestCase):
                     self.assertEqual(options.tracking, 'basic' if expected else 'off')
                     self.assertEqual('-sanitize:address' in options.extra_flags, expected)
 
+    def test_functional_fixtures_disable_only_unsupported_tracking(self):
+        from tests.test_thor import runtime_flags
+        flags=['-debug','--track-allocations=trace','-o:speed']
+        self.assertEqual(runtime_flags(flags,platform='darwin'),flags)
+        self.assertEqual(runtime_flags(flags,platform='linux'),
+                         ['-debug','--track-allocations=off','-o:speed'])
+        self.assertEqual(runtime_flags(['--track-allocations=invalid'],platform='linux'),
+                         ['--track-allocations=invalid'])
+        with self.assertRaisesRegex(ThorError,'native macOS'):
+            MemoryDebug.select('run',[],'basic',platform='linux')
+
     def test_allocator_and_sanitizer_overrides_are_independent(self):
         options = MemoryDebug.select('run', ['-debug'], 'off', platform='darwin')
         self.assertTrue(options.address)

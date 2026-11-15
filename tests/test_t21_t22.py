@@ -72,7 +72,7 @@ class CacheTests(unittest.TestCase):
     def again(self,root,*,flags=(),fail=None):
         compiler=getattr(self,'compiler',base.THOR)
         result=subprocess.run([str(compiler),'run',str(root/'input'),'--output-dir',str(root/'output'),
-                               '--cache-report',*flags],capture_output=True,text=True,timeout=45)
+                               '--cache-report',*base.runtime_flags(flags)],capture_output=True,text=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0);self.assertIn(fail,result.stderr)
         else:self.assertEqual(result.returncode,0,result.stderr)
         return result

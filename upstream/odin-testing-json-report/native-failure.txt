@@ -1,0 +1,5 @@
+/opt/odin-november/odin version dev-2026-11-nightly:9a69916
+/opt/odin-november/core/testing/runner.odin(1050:74) Error: Cannot assign value '&{pretty = true}' of type '^Marshal_Options' to 'Marshal_Options' in a procedure argument 
+	... o_writer(os.to_stream(json_fd), json_report, &{ pretty = true }) 
+	                                                 ^~~~~~~~~~~~~~~~~^ 
+	Suggestion: Did you mean `{pretty = true}` 

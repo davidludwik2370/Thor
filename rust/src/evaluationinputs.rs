@@ -152,6 +152,13 @@ pub fn signature(path: &Path) -> io::Result<Option<Value>> {
         ))
     }
 }
+fn directory_names(path: &Path) -> io::Result<Vec<String>> {
+    let mut names = fs::read_dir(path)?.map(|entry|
+        entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
+        .collect::<io::Result<Vec<_>>>()?;
+    names.sort();
+    Ok(names)
+}
 pub fn members(path: &Path, suffixes: &[String]) -> io::Result<Vec<String>> {
     let mut names = vec![];
     for entry in fs::read_dir(path)? {
@@ -337,6 +344,13 @@ impl Inputs {
             return;
         };
         entries.sort_by_key(|entry| entry.file_name());
+        let names = entries.iter().map(|entry|
+            entry.file_name().to_string_lossy().into_owned()).collect::<Vec<_>>();
+        if let Some(directories) = self.map("directories") {
+            if let Some(stamp) = directories.get_mut(root.to_string_lossy().as_ref()) {
+                *stamp = json!({"stat":stamp.clone(), "entries":names});
+            }
+        }
         for entry in entries {
             let path = entry.path();
             let typ = match entry.file_type() {
@@ -357,7 +371,7 @@ impl Inputs {
                     extensions.iter().any(|expected| extension == *expected)
                 })
             {
-                self.file(&path, None, false);
+                self.file(&path, None, true);
             }
         }
     }
@@ -432,9 +446,12 @@ impl Inputs {
                 }
             }
             for (path, expected) in self.data.get("directories")?.as_object()? {
-                if json!(signature(Path::new(path)).ok()?) != *expected {
-                    return Some(false);
-                }
+                let path = Path::new(path);
+                let stamp = json!(signature(path).ok()?);
+                let current = if expected.is_object() {
+                    json!({"stat":stamp, "entries":directory_names(path).ok()?})
+                } else { stamp };
+                if current != *expected { return Some(false); }
             }
             for (path, expected) in self.data.get("members")?.as_object()? {
                 let suffixes = expected

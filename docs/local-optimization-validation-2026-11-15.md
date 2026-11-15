@@ -8,7 +8,8 @@ regressions and documentation. Windows validation remains deferred.
 ## Baseline environment
 
 The Mac has 32 GiB of memory. The local Ubuntu 24.04 ARM64 container has three
-CPUs and a 4 GiB memory limit. Native compiler jobs run with one worker during
+CPUs and initially had a 4 GiB memory limit. Editor validation uses a 6 GiB
+container limit within the approximately 7.65 GiB VM. Native compiler jobs run with one worker during
 performance comparisons. The Linux environment includes LLVM 18, Rust 1.100,
 Node 22.14.0, CodeLLDB 1.12.3, SDL 3.2.10 and rebuilt native stb libraries.
 
@@ -149,3 +150,48 @@ warm, with all 108 outcomes matching. The first warm sample overlapped release
 linking on the host. The quieter second sample retains the prior warm-analysis
 improvement while adding content-based resource validation. Its peak
 single-process RSS was about 1,196 MiB.
+
+## Full platform regression pass
+
+The functional regression suite now adapts its explicitly requested automatic
+allocation-tracking flags on platforms where that tracker is unavailable.
+Linux executes those fixtures with tracking disabled. Direct policy tests still
+verify the platform rejection, and Mac fixtures retain their leak and call-stack
+checks. This adjustment applies to test invocation helpers.
+
+The Linux native checkout initially contained an older editor harness. That
+harness opened the full compiler checkout and its upstream clones during rename.
+The current tracked harness confines indexing to the demo fixture. Synchronizing
+the tracked snapshot restored the intended editor scope. The full Linux VS Code
+suite passed all 71 checks with TLS peaking at approximately 103 MiB. The separate
+standalone-file run passed six checks. Earlier runs of the obsolete harness
+reached approximately 4.8 GiB in TLS and triggered two container OOM kills. Those
+runs are retained as failed setup evidence.
+
+The native TLS suite passed 1,151 tests, and the editor's Node unit suite passed
+142 tests. The Linux debugger suite passed all 45 tests. Two stepping fixtures
+now remove their already-verified landing-line breakpoints before continuing to
+program exit. On this ARM64 LLVM 18/CodeLLDB combination, stepping onto such a
+breakpoint can trigger the same breakpoint again on continue. An independent
+native Odin program through raw CodeLLDB reproduced that behavior with Thor's
+source mapping bypassed. The fixtures continue to verify their original Thor
+breakpoint positions, step lines and watched values.
+
+Functional regression comparisons use the same Odin source revision as the
+installed Mac compiler, `8169255b97b85d6a08691d99764f51fb01f92b5a`. The Linux
+compiler was built from a pristine archive of that revision using LLVM 18.
+The earlier pinned integration compiler rejects one later generic-default
+syntax fixture and uses an older Unicode quoted-string representation. These
+native version differences disappear with the matching source revision.
+The upstream matrix retains each project's own pinned native compiler.
+
+The low-level evaluation-input tree snapshots also record file contents and
+immediate directory membership. Regression cases preserve identical metadata
+while changing an existing file or adding a child package. Both frontends reject
+those stale snapshots. Malformed optional snapshots consistently become cache
+misses. This closes the corresponding low-level tree path after the content-based
+cache hardening in the previous step.
+
+The independent upstream JSON-reporting SDK failure has a standalone reproducer
+and native control logs under `upstream/odin-testing-json-report`.
+The complete Mac and Linux functional suites remain in progress at this point.

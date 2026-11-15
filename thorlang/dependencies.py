@@ -23,7 +23,7 @@ def members(path, suffixes):
 
 class Inputs:
     def __init__(self, data=None):
-        self.data = data or dict(files={}, directories={}, members={}, bindings={})
+        self.data = data if data is not None else dict(files={}, directories={}, members={}, bindings={})
         self.usable = True
 
     def file(self, path, raw=None, *, content=True):
@@ -61,10 +61,11 @@ class Inputs:
         for directory, directories, files in os.walk(root):
             directories[:] = sorted(name for name in directories
                                     if name not in {'__pycache__', '.git', '.thor-cache', '.thor-build'})
-            self.data['directories'][directory] = signature(directory)
+            self.data['directories'][directory] = dict(
+                stat=signature(directory), entries=sorted(os.listdir(directory)))
             for name in files:
                 if Path(name).suffix in {'.odin', '.py'}:
-                    self.file(Path(directory) / name, content=False)
+                    self.file(Path(directory) / name)
 
     def source(self, source, *, source_file=True):
         from .compiler import unquote
@@ -108,7 +109,9 @@ class Inputs:
                 if value['sha256'] is not None and file_digest(Path(path)) != value['sha256']:
                     return False
             for path, expected in self.data['directories'].items():
-                if signature(path) != expected:
+                current = dict(stat=signature(path), entries=sorted(os.listdir(path))) \
+                    if isinstance(expected,dict) else signature(path)
+                if current != expected:
                     return False
             for path, expected in self.data['members'].items():
                 if members(path, expected['suffixes']) != expected['names']:
@@ -116,6 +119,6 @@ class Inputs:
             for path, expected in self.data['bindings'].items():
                 if str(Path(path).resolve()) != expected:
                     return False
-        except (OSError, ValueError, TypeError, KeyError):
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
             return False
         return True

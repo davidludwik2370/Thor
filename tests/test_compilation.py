@@ -145,6 +145,9 @@ class CompilationTests(unittest.TestCase):
 
     def test_flags_and_test_mode_remain_independent(self):
         self.write('''package main
+import "core:testing"
+@(test)
+check_value::proc(t:^testing.T){if VALUE!=MODE{panic("test mode")}}
 MODE::#config(MODE,1)
 work::proc()->int{return MODE}
 VALUE::#run work()
