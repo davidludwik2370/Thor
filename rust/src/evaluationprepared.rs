@@ -35,6 +35,12 @@ pub(crate) fn headers(project: &Project) -> Value {
         .iter()
         .filter(|source| !source.shared_native && !support(source, &project.options.root))
     {
+        // Discovery reparses the exclusion decision before lookup. Activation
+        // changes this entry's flag and restores its complete active interface.
+        if source.excluded {
+            result.push(json!([source.path, true, ""]));
+            continue;
+        }
         let mut spans = vec![];
         for (index, node) in source.nodes.iter().enumerate() {
             let id = NodeId(index);

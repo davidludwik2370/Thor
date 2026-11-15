@@ -529,7 +529,7 @@ impl Lower<'_, '_> {
                 .into_iter()
                 .map(|(_, typ)| typ)
                 .collect(),
-            Type::Union(owner) => self.resolver.union_variants(*owner),
+            Type::Union(..) => self.resolver.union_variants(typ),
             _ => return Some(false),
         };
         let shapes = children
@@ -654,9 +654,9 @@ impl Lower<'_, '_> {
                 .record_fields(typ)
                 .iter()
                 .any(|(_, typ)| self.unresolved_pure_operand(typ, seen)),
-            Type::Union(owner) => self
+            Type::Union(..) => self
                 .resolver
-                .union_variants(*owner)
+                .union_variants(typ)
                 .iter()
                 .any(|typ| self.unresolved_pure_operand(typ, seen)),
             Type::Nominal(_, base)

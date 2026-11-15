@@ -92,8 +92,14 @@ Server** channel in VS Code's Output panel.
 
 ## Thor convention checks
 
-Enable `"tls.vet": true` in workspace settings for opt-in immutable-binding and
-pure-function warnings. The setting restarts TLS. Quick fixes offer `:>` and `fn`
+Enable `"tls.vet": true` in workspace settings for opt-in immutable-binding,
+pure-function, unused-binding and unnecessary-semicolon warnings. Unused local bindings and parameters
+are dimmed and highlighted at their original Thor declarations, including in
+unsaved files. Their removal requires reviewing initializer side effects.
+Bindings used only in explicit `_ = name` discards receive neither unused nor
+immutable-binding warnings or immutable quick fixes. Other uses make the binding
+eligible for immutable advice regardless of the discard's position.
+The setting restarts TLS. Quick fixes remove unnecessary semicolons and offer `:>` and `fn`
 conversions that Thor has validated, including in unsaved files. Editing the
 buffer invalidates older correction snapshots. The compiler supports the same
 checks with `thor vet .` and `thor build . --vet`; use `thor vet . --apply` to apply

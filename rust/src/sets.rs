@@ -3,6 +3,14 @@
 use super::*;
 
 impl Lower<'_, '_> {
+    pub(super) fn sets_enabled(&self) -> bool {
+        *self.resolver.set_activation.get_or_init(|| {
+            self.resolver.sources.iter().any(|source| {
+                source.nodes.iter().any(|node| node.kind == "SetType")
+                    || source.nodes.first().is_some_and(|node| source.names.get(node.name) == "thor_sets")
+            })
+        })
+    }
     pub(super) fn set_trait(&mut self, id: NodeId) -> Result<Code> {
         self.querying += 1;
         let rendered = self.render(id, None, false);
@@ -21,6 +29,7 @@ impl Lower<'_, '_> {
         format!("((({t}=={sets}.Set({type_of}({sets}.key_witness(({rendered}).table)))) when {m}.type_is_map({type_of}(({rendered}).table)) else false) when {m}.type_has_field({t},\"table\") else false)")
     }
     pub(super) fn set_expression(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
+        if !self.sets_enabled() { return Ok(None); }
         let s = self.source;
         let node = s.node(id);
         if node.kind == "SetType" {
@@ -164,12 +173,31 @@ impl Lower<'_, '_> {
                 let build = |this: &mut Self| -> Result<Code> {
                     let lhs = this.render(left, None, false)?;
                     let rhs = this.render(right, None, false)?;
-                    Ok(Code::concat([
+                    let dispatched = Code::concat([
                         this.g(format!("{sets}.{name}(&("), left),
-                        lhs,
+                        lhs.clone(),
                         this.g("), ", id),
-                        rhs,
+                        rhs.clone(),
                         this.g(")", id),
+                    ]);
+                    let swizzle = this.source.node(left).kind == "Selector"
+                        && this.source.role(left, "field").is_some_and(|field| {
+                            let name = this.source.text(field);
+                            name.len() > 1 && name.chars().all(|c| "xyzwrgba".contains(c))
+                        });
+                    if !swizzle { return Ok(dispatched); }
+                    let base = this.role(left, "expr")?;
+                    let typ = this.native_type(base)?.finish().text;
+                    this.meta = true;
+                    let meta = format!("{}meta", this.prefix);
+                    Ok(Code::concat([
+                        this.g(format!("when ({meta}.type_is_array({typ}) || ({meta}.type_is_array({meta}.type_elem_type({typ})) when {meta}.type_is_pointer({typ}) else false)) {{"), id),
+                        lhs,
+                        this.g(format!(" {} ", node.op), id),
+                        rhs,
+                        this.g("} else {", id),
+                        dispatched,
+                        this.g("}", id),
                     ]))
                 };
                 if post {

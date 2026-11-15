@@ -466,17 +466,45 @@ class Purity:
             else:return []
         return result
 
-    def validator(self,s,mode=False):
+    def validator_for(self,s,typ):
+        pending=[(typ,0)];seen=set();names=set()
+        while pending:
+            typ,depth=pending.pop()
+            if depth>24:return self.validator(s)
+            key=id(typ) if typ.members else self.schema_key(typ)
+            if key in seen:continue
+            seen.add(key)
+            if typ.kind in {'unknown','generic','set'} or typ.soa:return self.validator(s)
+            if typ.elem:pending.append((typ.elem,depth+1))
+            if typ.kind=='struct':
+                if typ.members:
+                    names.update(typ.members);pending.extend((value,depth+1) for value in typ.members.values())
+                elif typ.node:
+                    for field in (typ.node.role('fields') or typ.node).children:
+                        if field.kind!='Field':continue
+                        names.update(name.text for name in field.group('names'))
+                        pending.append((self.r.type_node(field.role('type'),typ.substitutions),depth+1))
+                else:return self.validator(s)
+            if typ.kind=='union':
+                if not typ.node:return self.validator(s)
+                pending.extend((self.r.type_node(value,typ.substitutions),depth+1) for value in typ.node.group('variants'))
+        return self.validator(s,fields=sorted(names))
+
+    def validator(self,s,mode=False,fields=None):
         """Use shared AST field names, and native exact instantiated field types.
 
         This Odin release cannot unroll struct fields. A count assertion rejects
         external record schemas we cannot inspect instead of trusting them.
         """
-        name=s.prefix+'pure_validate';key=s.root,name
+        suffix=''
+        if fields is not None:
+            import hashlib
+            suffix='_'+hashlib.sha256(json.dumps(fields,separators=(',',':')).encode()).hexdigest()[:16]
+        name=s.prefix+'pure_validate'+suffix;key=s.root,name
         if key in s.expressions.helpers:return name+'_mode' if mode else name
         public=name;name+='_mode'
-        names=sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
-                      for f in record.role('fields').children if f.kind=='Field' for n in f.group('names')})
+        names=fields if fields is not None else sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
+                      for f in (record.role('fields') or record).children if f.kind=='Field' for n in f.group('names')})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
         builtin=s.expressions.module('builtin','base:builtin')
         forbidden=' || '.join([f'{meta}.type_is_{kind}(T)' for kind in ['pointer','multi_pointer','proc','map','cstring','cstring16','string16']]+['T==rawptr','T==any','T==typeid'])
@@ -489,7 +517,6 @@ class Purity:
         parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
         parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
         parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
-        parts.append(f'else when {meta}.type_is_struct(T) {{')
         def direct_field(field):
             # type_has_field includes promoted `using` members. A one-field
             # structural probe checks physical fields without counting aliases.
@@ -508,12 +535,14 @@ class Purity:
             middle=len(fields)//2
             return '('+overlapping_fields(fields[:middle])+'+'+overlapping_fields(fields[middle:])+')'
         overlapping=overlapping_fields(names)
-        parts.append(f'when {overlapping}>1 {{#panic("Raw-union storage cannot be proved pure: overlapping fields in a raw-union"+Site)}} else {{')
+        # Specialize the expensive schema scanner only for actual records.
+        # Odin otherwise copies this entire AST into every scalar/site instance.
+        record_parts=[f'when {overlapping}>1 {{#panic("Raw-union storage cannot be proved pure: overlapping fields in a raw-union"+Site)}} else {{']
         # Keep checker recursion logarithmic even when SDK access inference has
         # inspected many record schemas. A left-associated sum can exhaust the
         # native compiler's stack before it can report any useful diagnostic.
         count=count_fields(names)
-        parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
+        record_parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
         from .imports import file_private
         for unit in self.r.sources:
             for record in unit.nodes:
@@ -524,18 +553,21 @@ class Purity:
                             and not(file_private(declaration) and unit is not s))
                 reference=self.r.access(s,unit,raw_name) if accessible else None
                 if reference and (unit.path.parent==s.path.parent or reference!=raw_name):
-                    parts.append(f'when T=={reference} {{#panic("Raw-union storage cannot be proved pure"+Site)}}')
+                    record_parts.append(f'when T=={reference} {{#panic("Raw-union storage cannot be proved pure"+Site)}}')
         for field in names:
             predicate=direct_field(field)
             field=json.dumps(field)
-            parts.append(f'when {predicate} {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
-        parts.extend(['}','}',f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
+            record_parts.append(f'when {predicate} {{{name}({meta}.type_field_type(T,{field}),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
+        record_parts.append('}')
+        parts.extend([f'else when {meta}.type_is_struct(T) {{{name}_record(T,Result,Allow_Owned,Allow_Refs,Depth,Site,Mode)}}',
+                      f'else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T)||{meta}.type_is_slice(T) {{',
                       f'when Result && !Allow_Owned && {meta}.type_is_slice(T) {{#panic("Contextless compile-time procedures cannot return strings/slices; use fn or a contextful proc"+Site)}}',
                       f'else {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}','}',
                       f'else when {meta}.type_is_union(T) {{',
                       f'{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,0,Site,Mode)','}',
                       f'else {{{native}.validate(T,Result && !Allow_Owned,Depth,Site)}}'])
-        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n'+ '\n'.join(parts)+'\n}\n'
+        code=f'\n@(private="file")\n{name}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n'+ '\n'.join(parts).replace('\nelse', ' else')+'\n}\n'
+        code+=f'\n@(private="file")\n{name}_record::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string,$Mode:int){{\n'+ '\n'.join(record_parts)+'\n}\n'
         code+=f'\n@(private="file")\n{name}_union::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Index:int,$Site:string,$Mode:int){{\nwhen Index<{meta}.type_union_variant_count(T){{{name}({meta}.type_variant_type_of(T,Index),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode);{name}_union(T,Result,Allow_Owned,Allow_Refs,Depth,Index+1,Site,Mode)}}\n}}\n'
         code+=f'\n@(private="file")\n{public}::proc "contextless"($T:typeid,$Result:bool,$Allow_Owned:bool,$Allow_Refs:bool,$Depth:int,$Site:string){{{name}(T,Result,Allow_Owned,Allow_Refs,Depth,Site,0)}}\n'
         s.expressions.helpers[key]=s.mapping.wrap(code,s.path,0,0,'pure-type-validator')
@@ -602,7 +634,7 @@ class Purity:
             if typ.kind=='slice' and n.group('elems') and self.owner(n):result.stack.add(self.owner(n))
             fields=[]
             if typ.kind=='struct' and typ.node:
-                for field in typ.node.role('fields').children:
+                for field in (typ.node.role('fields') or typ.node).children:
                     if field.kind=='Field':fields.extend(name.text for name in field.group('names'))
             for i,elem in enumerate(n.group('elems')):
                 if elem.kind=='FieldValue':result.fields[elem.role('field').text]=self.flow(elem.role('value'),env)
@@ -768,7 +800,7 @@ class Purity:
         if typ.elem and self.unsafe_storage(typ.elem,seen):return True
         if typ.kind=='struct' and typ.node:
             if typ.node.data.get('op')=='raw_union':return True
-            for field in typ.node.role('fields').children:
+            for field in (typ.node.role('fields') or typ.node).children:
                 if field.kind=='Field' and self.unsafe_storage(self.r.type_node(field.role('type'),typ.substitutions),seen):return True
         if typ.kind=='union' and typ.node:
             return any(self.unsafe_storage(self.r.type_node(v,typ.substitutions),seen) for v in typ.node.group('variants'))
@@ -782,7 +814,7 @@ class Purity:
         if typ.elem and self.unresolved_storage(typ.elem,seen):return True
         if typ.kind=='struct' and typ.node:
             return any(self.unresolved_storage(self.r.type_node(field.role('type'),typ.substitutions),seen)
-                       for field in typ.node.role('fields').children if field.kind=='Field')
+                       for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
         if typ.kind=='union' and typ.node:
             return any(self.unresolved_storage(self.r.type_node(value,typ.substitutions),seen) for value in typ.node.group('variants'))
         return False
@@ -800,7 +832,7 @@ class Purity:
         children=[]
         if typ.elem and typ.kind in {'array','fixed'}:children.append(typ.elem)
         if typ.kind=='struct' and typ.node:
-            children.extend(self.r.type_node(field.role('type'),typ.substitutions) for field in typ.node.role('fields').children if field.kind=='Field')
+            children.extend(self.r.type_node(field.role('type'),typ.substitutions) for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
         if typ.kind=='union' and typ.node:children.extend(self.r.type_node(value,typ.substitutions) for value in typ.node.group('variants'))
         results=[self.pointer_comparison(child,seen.copy()) for child in children]
         return True if True in results else None if None in results else False
@@ -1061,7 +1093,7 @@ class Purity:
         if typ.elem:children.append(typ.elem)
         if typ.kind=='struct' and typ.node:
             if typ.node.data.get('op')=='raw_union':return True
-            children.extend(self.r.type_node(field.role('type'),typ.substitutions) for field in typ.node.role('fields').children if field.kind=='Field')
+            children.extend(self.r.type_node(field.role('type'),typ.substitutions) for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
         if typ.kind=='union' and typ.node:children.extend(self.r.type_node(value,typ.substitutions) for value in typ.node.group('variants'))
         shapes=[self.conversion_shape(child,seen.copy()) for child in children]
         return True if True in shapes else None if None in shapes else False
@@ -1361,7 +1393,7 @@ class Purity:
         if typ.elem:return self.owned_type(typ.elem,seen)
         if typ.kind=='struct' and typ.node:
             return any(self.owned_type(self.r.type_node(f.role('type'),typ.substitutions),seen.copy())
-                       for f in typ.node.role('fields').children if f.kind=='Field')
+                       for f in (typ.node.role('fields') or typ.node).children if f.kind=='Field')
         if typ.kind=='union' and typ.node:
             return any(self.owned_type(self.r.type_node(v,typ.substitutions),seen.copy()) for v in typ.node.group('variants'))
         return False
@@ -1443,9 +1475,12 @@ class Purity:
                     if annotation and (annotation.kind=='TypeidType' or annotation.text=='typeid'):
                         code.append(validate(name,f'{self.validator(s)}({name.text.lstrip("$")},false,true,{str(self.borrowing.internal(proc)).lower()},0)',f"type parameter '{name.text}'"))
                     continue
-                code.append(validate(field.role('type') or name,f'{self.validator(s)}(type_of({self.parameter_name(name)}),false,true,{str(self.borrowing.internal(proc)).lower()},0)',f"parameter '{name.text}'"))
+                validator=self.validator_for(s,self.r.type_of(name))
+                code.append(validate(field.role('type') or name,f'{validator}(type_of({self.parameter_name(name)}),false,true,{str(self.borrowing.internal(proc)).lower()},0)',f"parameter '{name.text}'"))
         for index,(name,typ) in enumerate(self.r.fields(proc.role('type').role('results'))):
-            if typ:code.append(validate(typ,f'{self.validator(s)}({"typeid" if typ.kind=="TypeidType" else self.r.template(typ)},true,{str(self.contextual(proc)).lower()},false,0)',f"result '{name}'" if name else f'result {index+1}'))
+            if typ:
+                validator=self.validator_for(s,self.r.type_node(typ))
+                code.append(validate(typ,f'{validator}({"typeid" if typ.kind=="TypeidType" else self.r.template(typ)},true,{str(self.contextual(proc)).lower()},false,0)',f"result '{name}'" if name else f'result {index+1}'))
         if not self.contextual(proc):
             return s.mapping.wrap('\n'+'\n'.join(code)+'\n',s.path,proc.start,proc.role('type').end,'pure-contract')
         if self.wraps(proc):code.append(f'{prefix}_caller:=context.allocator')

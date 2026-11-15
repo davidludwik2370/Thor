@@ -1,0 +1,40 @@
+--- a/tests/ase_test.odin
++++ b/tests/ase_test.odin
+@@ -14,7 +14,7 @@
+ 
+ @(test)
+ ase_unmarshal :: proc(t: ^testing.T) {
+-    data := #load("/asefile/basic-16x16.aseprite")
++    data := #load("asefile/basic-16x16.aseprite")
+     doc: ase.Document
+     defer ase.destroy_doc(&doc)
+ 
+@@ -26,7 +26,7 @@
+ @(test)
+ ase_marshal :: proc(t: ^testing.T) {
+     // FIXME: Marshaler isn't working.
+-    data := #load("/asefile/basic-16x16.aseprite")
++    data := #load("asefile/basic-16x16.aseprite")
+     doc: ase.Document
+     defer ase.destroy_doc(&doc)
+ 
+--- a/tests/raw_test.odin
++++ b/tests/raw_test.odin
+@@ -26,7 +26,7 @@
+ 		}
+ 	}
+ 
+-    data := #load("/asefile/basic-16x16.aseprite")
++    data := #load("asefile/basic-16x16.aseprite")
+     doc: raw.ASE_Document
+     defer raw.destroy_doc(&doc)
+ 
+@@ -54,7 +54,7 @@
+ 		}
+ 	}
+ 
+-    data := #load("/asefile/basic-16x16.aseprite")
++    data := #load("asefile/basic-16x16.aseprite")
+     doc: raw.ASE_Document
+     defer raw.destroy_doc(&doc)
+ 

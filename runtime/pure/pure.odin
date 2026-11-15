@@ -3,6 +3,7 @@ package thor_pure
 
 import "base:intrinsics"
 import "base:runtime"
+import "thor:typeinfo"
 
 // Compiler scratch must not import core:mem/core:reflect: checked SDK bodies
 // can belong to those packages or their dependencies. Keep tracking local to
@@ -165,7 +166,7 @@ allocate_dynamic_storage :: proc(count,capacity,elem_size,alignment:int,nonnull:
 // dst carries a pointer so its type and address remain explicit in this
 // trusted runtime. User fn code cannot call or expose these pointer operations.
 clone_fields :: proc(dst:any,src:any,allocator:runtime.Allocator,depth:int) {
-    pointer_info:=runtime.type_info_base(type_info_of(dst.id)).variant.(runtime.Type_Info_Pointer)
+    pointer_info:=runtime.type_info_base(type_info_of(dst.id)).variant.(typeinfo.Type_Info_Pointer)
     clone_at((cast(^rawptr)dst.data)^,src.data,pointer_info.elem,allocator,depth)
 }
 
@@ -176,10 +177,10 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
     for item in compiler_logical_values {if item.id==info.id && item.clone!=nil {item.clone(dst,src,allocator);return}}
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
-    case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,
-         runtime.Type_Info_Complex,runtime.Type_Info_Quaternion,runtime.Type_Info_Enum,runtime.Type_Info_Bit_Set:
+    case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
+         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set:
         runtime.mem_copy_non_overlapping(dst,src,info.size)
-    case runtime.Type_Info_String:
+    case typeinfo.Type_Info_String:
         if item.is_cstring||item.encoding!=.UTF_8 {panic("Unsupported pure string result")}
         value:=(cast(^string)src)^
         result:string
@@ -190,7 +191,7 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
             result=string(data)
         }
         (cast(^string)dst)^=result
-    case runtime.Type_Info_Slice:
+    case typeinfo.Type_Info_Slice:
         value:=(cast(^runtime.Raw_Slice)src)^
         result:=runtime.Raw_Slice{len=value.len}
         if value.data==nil&&value.len!=0&&item.elem_size!=0 {panic("Invalid pure slice result")}
@@ -202,21 +203,21 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
             for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
         }
         (cast(^runtime.Raw_Slice)dst)^=result
-    case runtime.Type_Info_Dynamic_Array:
+    case typeinfo.Type_Info_Dynamic_Array:
         value:=(cast(^runtime.Raw_Dynamic_Array)src)^
         result:=allocate_dynamic_storage(value.len,value.cap,item.elem_size,item.elem.align,value.data!=nil,allocator)
         if value.data!=nil {
             for i in 0..<value.len {clone_at(offset(result.data,i*item.elem_size),offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
         }
         (cast(^runtime.Raw_Dynamic_Array)dst)^=result
-    case runtime.Type_Info_Array:
+    case typeinfo.Type_Info_Array:
         for i in 0..<item.count {clone_at(offset(dst,i*item.elem_size),offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
-    case runtime.Type_Info_Enumerated_Array:
+    case typeinfo.Type_Info_Enumerated_Array:
         for i in 0..<item.count {clone_at(offset(dst,i*item.elem_size),offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
-    case runtime.Type_Info_Struct:
+    case typeinfo.Type_Info_Struct:
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
         for i in 0..<int(item.field_count) {clone_at(offset(dst,int(item.offsets[i])),offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)}
-    case runtime.Type_Info_Union:
+    case typeinfo.Type_Info_Union:
         runtime.mem_copy_non_overlapping(dst,src,info.size)
         variant:=union_variant(src,item)
         if variant!=nil {clone_at(dst,src,variant,allocator,depth+1)}
@@ -233,30 +234,30 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocato
     for item in compiler_logical_values {if item.id==info.id && item.destroy!=nil {item.destroy(src);return}}
     info:=runtime.type_info_base(info)
     #partial switch item in info.variant {
-    case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,
-         runtime.Type_Info_Complex,runtime.Type_Info_Quaternion,runtime.Type_Info_Enum,runtime.Type_Info_Bit_Set:
-    case runtime.Type_Info_String:
+    case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
+         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set:
+    case typeinfo.Type_Info_String:
         value:=(cast(^string)src)^;if len(value)>0 {delete(value,allocator)}
-    case runtime.Type_Info_Slice:
+    case typeinfo.Type_Info_Slice:
         value:=(cast(^runtime.Raw_Slice)src)^
         if value.data!=nil {
             for i in 0..<value.len {destroy_at(offset(value.data,i*item.elem_size),item.elem,allocator,depth+1)}
             runtime.mem_free(value.data,allocator)
         }
-    case runtime.Type_Info_Dynamic_Array:
+    case typeinfo.Type_Info_Dynamic_Array:
         value:=(cast(^runtime.Raw_Dynamic_Array)src)^
         if value.data!=nil {
             for i in 0..<value.len {destroy_at(offset(value.data,i*item.elem_size),item.elem,value.allocator,depth+1)}
             runtime.mem_free(value.data,value.allocator)
         }
-    case runtime.Type_Info_Array:
+    case typeinfo.Type_Info_Array:
         for i in 0..<item.count {destroy_at(offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
-    case runtime.Type_Info_Enumerated_Array:
+    case typeinfo.Type_Info_Enumerated_Array:
         for i in 0..<item.count {destroy_at(offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
-    case runtime.Type_Info_Struct:
+    case typeinfo.Type_Info_Struct:
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
         for i in 0..<int(item.field_count) {destroy_at(offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)}
-    case runtime.Type_Info_Union:
+    case typeinfo.Type_Info_Union:
         variant:=union_variant(src,item)
         if variant!=nil {destroy_at(src,variant,allocator,depth+1)}
     case:panic("Unsupported pure result type")
@@ -265,7 +266,7 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocato
 
 // Pure unions cannot contain pointer representations, including pointer-only
 // Maybe unions. Their native integer tag selects the recursively owned payload.
-union_variant :: proc(value:rawptr,info:runtime.Type_Info_Union)->^runtime.Type_Info {
+union_variant :: proc(value:rawptr,info:typeinfo.Type_Info_Union)->^runtime.Type_Info {
     if len(info.variants)==0 {return nil}
     assert(info.tag_type!=nil,"Unsupported pure union representation")
     pointer:=offset(value,int(info.tag_offset))

@@ -1,0 +1,22 @@
+diff --git a/komplodin.odin b/komplodin.odin
+index 8a48a58..b41ee7d 100644
+--- a/komplodin.odin
++++ b/komplodin.odin
+@@ -5,7 +5,7 @@ import "core:bufio"
+ import "core:fmt"
+ import "core:io"
+ import "core:mem"
+-import os "core:os/os2"
++import os "core:os"
+ import "core:strconv"
+ import "core:strings"
+ import "core:unicode"
+@@ -559,7 +559,7 @@ main :: proc() {
+ 		}
+ 	}
+ 
+-	bufio.reader_init_with_buf(&lisp_reader, f.stream, buffer[:])
++	bufio.reader_init_with_buf(&lisp_reader, os.to_stream(f), buffer[:])
+ 	defer if f != os.stdin { os.close(f) }
+ 	defer bufio.reader_destroy(&lisp_reader)
+ 

@@ -78,6 +78,22 @@ main :: proc() {
 }
 ''')
 
+    def test_default_output_cannot_replace_a_launcher_through_a_filesystem_alias(self):
+        self.app.mkdir()
+        (self.app/'main.thor').write_text('package main\nmain :: proc() {}\n')
+        alias = self.toolchain/self.toolchain.name
+        os.link(self.compiler, alias)
+        original = self.compiler.read_bytes()
+        for flags in ([], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                result = subprocess.run([str(self.compiler), 'build', str(self.app), *flags],
+                                        cwd=self.toolchain, env=self.environment,
+                                        capture_output=True, text=True, timeout=90)
+                self.assertEqual(result.returncode, 1, result.stdout+result.stderr)
+                self.assertIn('would overwrite a Thor launcher', result.stderr)
+                self.assertEqual(self.compiler.read_bytes(), original)
+                self.assertEqual(alias.read_bytes(), original)
+
     def test_native_named_thor_runs_builds_and_uses_the_project_debug_task(self):
         self.write_program()
         expected = 'native 42: 123456789012345678901234567890\n'
@@ -140,10 +156,10 @@ works :: proc(t:^testing.T) { testing.expect(t, VALUE == 42) }
                 self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
             self.assertEqual((self.root/name/(name+'.thor')).read_bytes(),
                              (self.toolchain/'templates/main.thor').read_bytes())
-            help_result = subprocess.run([str(launcher), '--help'], env=self.environment,
+            help_result = subprocess.run([str(launcher), 'help'], env=self.environment,
                                          cwd=self.root, capture_output=True, text=True, timeout=10)
             self.assertEqual(help_result.returncode, 0, help_result.stderr)
-            self.assertIn('thor-python', help_result.stdout)
+            self.assertIn('thor help', help_result.stdout)
         binary.unlink()
         for launcher in launchers:
             missing = subprocess.run([str(launcher), '--version'], env=self.environment,

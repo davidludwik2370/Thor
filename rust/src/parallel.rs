@@ -1,11 +1,20 @@
 //! Bounded independent work with input-order result and diagnostic ordering.
 use std::sync::atomic::{AtomicUsize, Ordering};
+static REQUESTED_WORKERS: AtomicUsize = AtomicUsize::new(0);
+
+pub(crate) fn set_workers(count: usize) {
+    REQUESTED_WORKERS.store(count, Ordering::Relaxed);
+}
 
 pub(crate) fn map<T: Sync, R: Send>(items: &[T], action: impl Fn(&T) -> R + Sync) -> Vec<R> {
     map_with_workers(items, workers(), action)
 }
 
 pub(crate) fn workers() -> usize {
+    let requested = REQUESTED_WORKERS.load(Ordering::Relaxed);
+    if requested > 0 {
+        return requested.min(32);
+    }
     std::env::var("THOR_JOBS")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())

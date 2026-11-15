@@ -77,5 +77,22 @@ write::proc(x:[]int){x[0]=9}
             self.assertIn('read-only slice',result.stderr)
             self.assertIn(str(self.source),result.stderr)
 
+    def test_cyclic_constant_arguments_reach_the_evaluation_diagnostic(self):
+        for marker in ['#run ', '']:
+            for definitions in [
+                    'FIRST::MARKERwork(FIRST)',
+                    'FIRST::MARKERwork(SECOND)\nSECOND::MARKERwork(FIRST)',
+                    'FIRST::MARKERwork(n=SECOND)\nSECOND::MARKERwork(n=FIRST)']:
+                code = self.program('_=FIRST', 'work::fn(n:int)->int{return n}\n'
+                                    + definitions.replace('MARKER', marker)+'\n')
+                for flags in (['-debug'], native.UNCHECKED):
+                    with self.subTest(marker=marker, definitions=definitions, flags=flags):
+                        result, _ = self.profile(code, [*flags, '-json-errors'], command='build')
+                        self.assertEqual(result.returncode, 1, result.stderr)
+                        packet = json.loads(result.stderr)
+                        errors = [error for error in packet['errors'] if 'Cyclic' in str(error['msgs'])]
+                        self.assertTrue(errors, packet)
+                        self.assertTrue(all(error['pos']['file'] == str(self.source) for error in errors), packet)
+
 
 if __name__=='__main__':unittest.main()

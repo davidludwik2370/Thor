@@ -194,6 +194,8 @@ class Source:
         self.sequence_bounds = {}
         self.hidden_namespaces = {}
         self.asset_collections = {}
+        self.branch_captures = []
+        self.branch_procedures = set()
         self.blocked = {}
         self.guards = {}
         self.block_guards = {}
@@ -661,6 +663,20 @@ class Source:
         return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
+        parent = n.parent
+        if n.kind == 'Ident' and parent and (parent.kind == 'Attribute' or parent.kind == 'FieldValue'
+                and parent.role('field') is n and any(owner.kind == 'Attribute' for owner in parent.ancestors())):
+            return self.copy(n.start, n.end)
+        if parent and parent.kind == 'Call' and parent.role('callee').text == '#config' and parent.group('args')[:1] == [n]:
+            return self.copy(n.start, n.end)
+        from . import sourceidentity
+        if sourceidentity.resource_argument(n) and n.kind != 'Literal':
+            busy=getattr(self,'resource_busy',set())
+            self.resource_busy=busy
+            if n not in busy:
+                busy.add(n)
+                try: return sourceidentity.resource(self,n,self._render(n,expected,constant))
+                finally: busy.remove(n)
         overrides: dict[Node, tuple[Hint | None, bool]] = {}
         owning = set()
         kind = n.kind
@@ -701,6 +717,8 @@ class Source:
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code
+        identity=sourceidentity.directive(self,n)
+        if identity is not None: return identity
         if kind=='Comprehension':return self.comprehensions.render(n,expected,constant)
         if kind=='Range':
             typed_loop=self.typed_loops.render(n)
@@ -947,6 +965,8 @@ class Source:
             inserts.extend(self.using_feature_insert())
         if self.defaults and kind == 'Call':
             inserts.extend(self.defaults.arguments(n))
+        if kind == 'Call':
+            inserts.extend(sourceidentity.caller_arguments(self,n))
         if self.purity and kind=='Call':
             inserts.extend(self.purity.calls.arguments(n))
         guards = self.block_guards.get(n)
@@ -1104,7 +1124,16 @@ class Source:
                 declarations={declaration for declaration,_ in self.resolver.wrappers if declaration.source is self}
                 inserts.extend((declaration.end,self.resolver.declaration_support(declaration))
                                for declaration in sorted(declarations,key=lambda declaration:declaration.start))
-            code=self.splice(self.root,[],inserts)
+            from . import sourceidentity
+            replacements=[]
+            for node in self.nodes:
+                identity=sourceidentity.directive(self,node)
+                if identity is not None: replacements.append((node.start,node.end,identity))
+                elif sourceidentity.resource_argument(node):
+                    replacements=[r for r in replacements if not(node.start<=r[0] and r[1]<=node.end)]
+                    replacements.append((node.start,node.end,self.render(node)))
+                if node.kind=='Call': inserts.extend(sourceidentity.caller_arguments(self,node))
+            code=self.splice(self.root,replacements,inserts)
         else:
             code = self.render(self.root)
         code += self.expressions.declarations(self.root)
@@ -1134,6 +1163,8 @@ class Source:
         code, self.source_map = self.mapping.finish(code)
         from .hygiene import qualify
         code, self.source_map = qualify(self, code, self.source_map)
+        from . import branch_locations
+        code, self.source_map = branch_locations.finish(self, code, self.source_map)
         return code
 
 

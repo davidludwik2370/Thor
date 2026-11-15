@@ -82,7 +82,6 @@ impl Resolver<'_> {
             return vec![];
         }
         let plans = self.plan_calls(call, context);
-        self.planning.remove(&key);
         // Retain only a unique plan with fully known inputs/bindings. Partial,
         // ambiguous, recursively curtailed and unloaded-import plans take the
         // existing planner path on their next use.
@@ -96,6 +95,9 @@ impl Resolver<'_> {
                 memo.calls.entry(call).or_default().insert(context.clone(),plans.clone());
             }
         }
+        // Keep the recursion guard while proving the argument types complete.
+        // That proof can revisit this call through cyclic constant arguments.
+        self.planning.remove(&key);
         plans
     }
 

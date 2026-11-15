@@ -121,7 +121,8 @@ impl<T> Drop for Owned<T> {
 }
 pub(crate) fn event(name: &'static str, data: impl FnOnce() -> serde_json::Value) {
     if ENABLED.load(Ordering::Relaxed) {
-        REPORT.with(|report| report.borrow_mut().events.push(serde_json::json!({"name":name,"data":data()})));
+        let data = data();
+        REPORT.with(|report| report.borrow_mut().events.push(serde_json::json!({"name":name,"data":data})));
     }
 }
 

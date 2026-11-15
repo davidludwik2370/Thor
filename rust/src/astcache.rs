@@ -142,8 +142,14 @@ pub(crate) fn write(source: &Source, key: &str) -> Vec<u8> {
         }
         out.value(&node.data);
     }
-    out.value(&source.info); out.text(&source.prefix);
-    out.uint(usize::from(source.excluded)); out.blob(&source.protocol);
+    let migration_info = source.migration_identifiers.as_ref().map(|spans| {
+        let mut info = source.info.clone();
+        info["migration_identifiers"] = serde_json::json!(spans.iter()
+            .map(|span| [span.start,span.end]).collect::<Vec<_>>());
+        info
+    });
+    out.value(migration_info.as_ref().unwrap_or(&source.info)); out.text(&source.prefix);
+    out.uint(usize::from(source.excluded)); out.blob(&source.protocol_bytes());
     out.uint(source.protocol_overrides.len());
     for (id, fields) in &source.protocol_overrides {
         out.uint(id.0); out.optional(&fields.roles); out.optional(&fields.lists);
@@ -184,8 +190,8 @@ pub(crate) fn read(path: PathBuf, raw: String, thor: bool, key: &str, packet: &[
             fields.lists.push((name, start..fields.items.len()));
         }
         fields.counts.push([role_count, span_count, list_count]);
-        let data = input.value(0)?;
-        if !data.is_object() { return None; }
+        let mut data = input.value(0)?;
+        compact_defaults(kind.as_str(), data.as_object_mut()?);
         nodes.push(Node { kind, span, parent, children: PackedSlice::default(),
             roles: NodeFields::default(), spans: NodeFields::default(),
             lists: NodeFields::default(), op, name, mutable, immutable, data });
@@ -224,8 +230,8 @@ pub(crate) fn read(path: PathBuf, raw: String, thor: bool, key: &str, packet: &[
         stack.extend(nodes[id.0].children.iter().rev().map(|id| (*id, false)));
     }
     Some(Source { syntax: Arc::new(SourceSyntax { path, raw, nodes, names, selections, comments,
-        info, prefix, excluded, thor, protocol, protocol_overrides, line_starts, by_span, traversal, subtree }),
-        edits, shared_native: false, collection_roots: BTreeMap::new() })
+        info, prefix, excluded, thor, protocol, protocol_compressed: false, migration_identifiers: None, protocol_overrides, line_starts, by_span, traversal, subtree }),
+        edits, shared_native: false, collection_roots: BTreeMap::new(), support_collection:"thor".into() })
 }
 
 #[cfg(test)]

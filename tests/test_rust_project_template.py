@@ -63,7 +63,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         self.assertEqual((self.root/'no_tools/no_tools.thor').read_bytes(),
                          (ROOT/'templates/main.thor').read_bytes())
         self.assertFalse((self.root/'no_tools/.thor-cache').exists())
-        result = self.invoke('rust', ['--help'], env=environment)
+        result = self.invoke('rust', ['-help'], env=environment)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('new', result.stdout)
 

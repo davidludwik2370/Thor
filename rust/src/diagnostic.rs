@@ -2,6 +2,7 @@ use crate::ast::{Source, Span};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fmt;
+use std::io::IsTerminal;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Position {
@@ -89,6 +90,23 @@ impl From<serde_json::Error> for Error {
 /// notes. Source-map coordinates remain UTF-8 offsets and UTF-16 LSP columns;
 /// the terminal excerpt uses Unicode scalars and four-column tab stops.
 pub fn text(error: &Value, raw: Option<&str>, terse: bool, unix: bool) -> String {
+    let color = std::io::stderr().is_terminal()
+        && std::env::var_os("NO_COLOR").is_none_or(|value| value.is_empty())
+        && std::env::var("TERM").as_deref() != Ok("dumb")
+        && std::env::var("CLICOLOR").as_deref() != Ok("0");
+    render(error, raw, terse, unix, color)
+}
+
+fn style(text: &str, severity: &str, color: bool) -> String {
+    let code = match (color, severity) {
+        (true, "Error") => "31",
+        (true, "Warning") => "33",
+        _ => return text.to_string(),
+    };
+    format!("\x1b[{code}m{text}\x1b[0m")
+}
+
+fn render(error: &Value, raw: Option<&str>, terse: bool, unix: bool, color: bool) -> String {
     let pos = &error["pos"];
     let file = pos["file"].as_str();
     let location = if let Some(file) = file {
@@ -112,7 +130,8 @@ pub fn text(error: &Value, raw: Option<&str>, terse: bool, unix: bool) -> String
         .filter_map(Value::as_str)
         .collect::<Vec<_>>()
         .join("\n");
-    let mut output = format!("{location} {severity}: {messages}");
+    let label = style(&format!("{severity}:"), severity, color);
+    let mut output = format!("{location} {label} {messages}");
     let read = if raw.is_none() {
         file.and_then(|file| std::fs::read_to_string(file).ok())
     } else {
@@ -139,7 +158,7 @@ pub fn text(error: &Value, raw: Option<&str>, terse: bool, unix: bool) -> String
                 "\n    {}\n    {}{}",
                 tabs(line),
                 " ".repeat(tabs(prefix).chars().count()),
-                "^".repeat(tabs(selected).chars().count().max(1))
+                style(&"^".repeat(tabs(selected).chars().count().max(1)), severity, color)
             ));
         }
     }
@@ -150,11 +169,12 @@ pub fn text(error: &Value, raw: Option<&str>, terse: bool, unix: bool) -> String
             .unwrap_or_else(|| note["msgs"].as_array().cloned().unwrap_or_default());
         let same = file.is_some() && note["pos"]["file"].as_str() == file;
         output.push('\n');
-        output.push_str(&text(
+        output.push_str(&render(
             &json!({"type":"note","pos":note["pos"],"msgs":messages}),
             raw.filter(|_| same),
             terse,
             unix,
+            color,
         ));
     }
     output
@@ -199,6 +219,30 @@ pub fn overlay_source(error: &Value, path: &std::path::Path) -> Option<String> {
 #[cfg(test)]
 mod migration_tests {
     use super::*;
+    #[test]
+    fn colors_preserve_source_spacing_related_notes_and_terse_locations() {
+        let pos = json!({"file":"/source.thor","line":1,"column":2,"offset":1,"end_offset":4});
+        for (severity, label, code) in [("error", "Error", "31"), ("warning", "Warning", "33")] {
+            let diagnostic = json!({"type":severity,"pos":pos,"msgs":["message"],
+                "related":[{"pos":pos,"message":"related note"}]});
+            for (terse, unix) in [(false, false), (true, false), (false, true)] {
+                let plain = render(&diagnostic, Some("\tbad"), terse, unix, false);
+                let colored = render(&diagnostic, Some("\tbad"), terse, unix, true);
+                let prefix = format!("\x1b[{code}m");
+                let stripped = colored.replace(&prefix, "").replace("\x1b[0m", "");
+                if stripped != plain || !colored.contains(&format!("{prefix}{label}:\x1b[0m")) {
+                    panic!("coloring changed the diagnostic contents or omitted the severity label");
+                }
+                if !terse && !colored.contains(&format!("        {prefix}^^^\x1b[0m")) {
+                    panic!("coloring changed tab alignment or omitted the source underline");
+                }
+                if !colored.contains(" Note: related note") {
+                    panic!("related notes inherited an error or warning style");
+                }
+            }
+        }
+    }
+
     #[test]
     fn unresolved_guard_preserves_its_status_and_names_the_actual_reference_command() {
         let source = Source::from_frontend("/audit.thor".into(), String::new(),

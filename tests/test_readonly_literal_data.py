@@ -22,7 +22,7 @@ class ReadonlyLiteralDataTests(unittest.TestCase):
                     result = self.invoke(engine, flags=options)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertEqual(result.stderr, '')
-                    generated = (self.root/engine/'main.odin').read_text()
+                    generated = next((self.root/engine).rglob('main.odin')).read_text()
                     if static is not None:
                         self.assertEqual(generated.count('@(static, rodata)'), static, generated)
                     if global_count is not None:
@@ -148,7 +148,7 @@ if arrays[0][0]!=4 || !equal[0] || swizzles[0][0]!=2 || lengths[0]!=2 {panic("ru
         for engine in ['rust', 'python']:
             result = self.invoke(engine, command='transpile')
             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
-            generated = (self.root/engine/'main.odin').read_text()
+            generated = next((self.root/engine).rglob('main.odin')).read_text()
             self.assertEqual(generated.count('@(static, rodata)'), 1, generated)
 
     def test_mutable_literals_fixed_arrays_and_owned_values_keep_existing_lowering(self):

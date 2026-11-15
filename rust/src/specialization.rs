@@ -102,7 +102,13 @@ impl TypeCode {
     }
     fn access(&mut self, owner: Ref, name: &str, r: &Resolver<'_>) -> Result<String> {
         let source = &r.sources[self.file];
-        let directory = r.sources[owner.file].path.parent().unwrap();
+        let target = &r.sources[owner.file];
+        if owner.file != self.file && target.ancestors(owner.node)
+            .find(|node| target.node(*node).kind == "Declaration")
+            .is_some_and(|node| r.file_private_declaration(Ref {file:owner.file,node})) {
+            return Err(Unresolved("A file-private generic type needs its original file scope.".into()));
+        }
+        let directory = target.path.parent().unwrap();
         if source.path.parent() == Some(directory) {
             return Ok(name.into());
         }
@@ -180,7 +186,7 @@ impl TypeCode {
             | Type::Struct(owner)
             | Type::Record(owner, _)
             | Type::Enum(owner)
-            | Type::Union(owner) => *owner,
+            | Type::Union(owner, _) => *owner,
             _ => return Err(Unresolved("The generic type could not be resolved.".into())),
         };
         let source = &r.sources[owner.file];
@@ -206,7 +212,7 @@ impl TypeCode {
                     ));
                 }
                 let mut name = self.access(owner, source.text(names[0]), r)?;
-                if let Type::Record(_, bindings) = typ {
+                if let Type::Record(_, bindings) | Type::Union(_, bindings) = typ {
                     if let Some(params) = source.role(owner.node, "params") {
                         let mut args = vec![];
                         for field in &source.node(params).children {
@@ -414,11 +420,11 @@ fn shape(typ: &Type, r: &Resolver<'_>) -> Value {
     };
     match typ {
         Type::Nominal(owner, base) => json!(["nominal", origin(owner), shape(base, r)]),
-        Type::Struct(owner) | Type::Enum(owner) | Type::Union(owner) => {
+        Type::Struct(owner) | Type::Enum(owner) => {
             json!(["named", origin(owner)])
         }
-        Type::Record(owner, bindings) => json!([
-            "record",
+        Type::Record(owner, bindings) | Type::Union(owner, bindings) => json!([
+            if matches!(typ, Type::Union(..)) { "union" } else { "record" },
             origin(owner),
             bindings
                 .iter()

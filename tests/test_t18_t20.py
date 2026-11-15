@@ -226,7 +226,7 @@ work::fn(n:int)->int{data:=make([]int,n);return len(data)}
     def test_run_cycles_cross_target_and_timeout_configuration(self):
         self.invoke(self.program('_=FIRST','work::fn(n:int)->int{return n}\nFIRST::#run work(SECOND)\nSECOND::#run work(FIRST)\n'),command='check',fail='Cyclic #run')
         self.invoke(self.program('_=VALUE','work::fn()->int{return 7}\nVALUE::#run work()\n'),command='check',flags=['-target:linux_amd64'],fail='native targets only')
-        self.invoke(self.program(''),command='check',flags=['--run-timeout','0'],fail='--run-timeout must be')
+        self.invoke(self.program(''),command='check',flags=['--run-timeout','-1'],fail='--run-timeout must be')
 
     def test_run_imports_and_selective_aliases(self):
         self.invoke(self.program('assert(VALUE==25)','import "lib" / square\nVALUE::#run square(5)\n'),

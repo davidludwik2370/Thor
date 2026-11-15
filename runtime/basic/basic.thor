@@ -39,6 +39,9 @@ Deep_Error :: graph.Error
 to_set   :: sets.to_set
 to_slice :: sets.to_slice
 
+// A structure-of-arrays view of the supplied named slices.
+zip :: soa_zip
+
 // Print each argument with sep between values, followed by end.
 print :: proc(args:..any, sep:=" ", flush:=true, end:="\n"){
     // Write directly: fmt.print's temporary buffer cannot survive flush=false.
@@ -246,6 +249,23 @@ filter :: proc(vals: []$T, f: proc(x: T)->bool, allocator:=context.allocator) ->
     copy(result, ret[:])
     delete(ret)
     return result
+}
+
+// Boolean reductions stop scanning as soon as the result is known. Arguments
+// are evaluated before the call; spread a slice with and(..values)/or(..values).
+// Empty inputs return true for and and false for or. Neither allocates.
+and :: proc(values: ..bool) -> bool {
+    for value in values {
+        if !value do return false
+    }
+    return true
+}
+
+or :: proc(values: ..bool) -> bool {
+    for value in values {
+        if value do return true
+    }
+    return false
 }
 
 // Empty inputs yield T's zero value. Arithmetic keeps Odin's overflow rules.

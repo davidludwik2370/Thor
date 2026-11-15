@@ -67,11 +67,15 @@ pub fn run(options: ProjectOptions, settings: Options) -> Result<i32> {
         }
         fs::create_dir_all(publisher.output.parent().unwrap())?;
         let scratch = scratch(publisher.output.parent().unwrap())?;
+        let preparing = std::time::Instant::now();
         project = Some(Project::new(options.clone())?);
         let project = project.as_mut().unwrap();
+        project.timings.insert("preparation", preparing.elapsed().as_secs_f64());
         project.publish_layout = Some(system.into());
         project.collected_diagnostics = Some(Default::default());
+        let lowering = std::time::Instant::now();
         let target = project.lower()?;
+        project.timings.insert("lowering", lowering.elapsed().as_secs_f64());
         let mut flags = publisher.native_flags(&project.native_flags(), &scratch.0)?;
         let directory = scratch.0.join("compiled");
         fs::create_dir(&directory)?;
@@ -113,8 +117,16 @@ pub fn run(options: ProjectOptions, settings: Options) -> Result<i32> {
             i32::from(status)
         }
     };
+    let mut information = String::new();
+    diagnostics.retain(|item| {
+        if item["stage"] == "compiler-information" {
+            information.push_str(item["text"].as_str().unwrap_or_default());
+            false
+        } else { true }
+    });
     if options.json {
         let mut packet = json!({"error_count":diagnostics.iter().filter(|error|error["type"]=="error").count(),"errors":diagnostics});
+        if !information.is_empty() { packet["information"] = json!(information); }
         if options.editor_info {
             packet["slice_access"] = json!(editor_info);
         }

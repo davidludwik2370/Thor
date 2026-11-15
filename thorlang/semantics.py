@@ -110,7 +110,7 @@ class Resolver:
                     if n.data.get("using_field"):
                         self.using.setdefault(self.scope_key(scope), []).append(n)
                 elif n.kind == "Field":
-                    parent = next((a for a in n.ancestors() if a.kind in {"ProcedureType", "StructType"}), None)
+                    parent = next((a for a in n.ancestors() if a.kind in {"ProcedureType", "StructType", "BitFieldType"}), None)
                     if parent and parent.kind == "ProcedureType":
                         scope = parent.parent if parent.parent and parent.parent.kind == "Procedure" else parent
                         names, annotation = n.group("names"), n.role("type")
@@ -197,6 +197,10 @@ class Resolver:
                     return next((s for s in symbols if s.immutable), symbols[0])
                 if projections:
                     for using in self.using.get(self.scope_key(scope), []):
+                        if (scope.kind != 'File' and (using.kind == 'Using'
+                                or using.kind == 'Declaration' and using.data.get('mutable', True))
+                                and using.source is context.source and using.end > context.start):
+                            continue
                         owners = using.group("values") if using.kind == "Using" else using.group("names")
                         for owner in owners:
                             if using.kind=='Using' and owner.kind=='Ident' and not self.lookup(owner.text,owner):
@@ -367,6 +371,25 @@ class Resolver:
                    "Use a named generic procedure as the default, or require an explicit callback.")
         return signature, message
 
+    def frozen_slice_storage(self, typ):
+        """Value storage that freezing can expose as a read-only slice."""
+        pending=[typ];seen=set()
+        while pending:
+            typ=pending.pop()
+            key=(typ.kind,typ.node,tuple((name,id(value) if isinstance(value,Type) else repr(value))
+                                       for name,value in sorted(typ.substitutions.items())))
+            if key in seen:continue
+            seen.add(key)
+            if typ.soa or typ.kind in {'slice','array','fixed','unknown','generic'}:return True
+            if typ.kind=='struct':
+                if typ.members:pending.extend(typ.members.values())
+                elif typ.node:
+                    pending.extend(self.type_node(field.role('type'),typ.substitutions)
+                        for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
+            if typ.kind=='union' and typ.node:
+                pending.extend(self.type_node(variant,typ.substitutions) for variant in typ.node.group('variants'))
+        return False
+
     def type_node(self, n, substitutions=None, seen=None):
         cache=self.query_caches
         use=cache is not None and n is not None and seen is None and not self.bound_types and not self.bound_constants
@@ -416,7 +439,7 @@ class Resolver:
         if kind=='Run':return self.type_of(n.role('expr'),seen)
         if kind == 'SetType':
             return Type('set',node=n,elem=self.type_node(n.group('args')[0],substitutions,seen))
-        if kind == "Paren":
+        if kind in {"Paren", "HelperType"}:
             return self.type_node(n.role("expr"), substitutions, seen)
         if kind=='WhenExpr':
             left=self.type_node(n.role('x'),substitutions,seen.copy())
@@ -449,7 +472,7 @@ class Resolver:
             return Type("map", node=n, elem=self.type_node(n.role("value"), substitutions, seen))
         if kind == "DistinctType":
             return replace(self.type_node(n.role("type"), substitutions, seen), nominal=n)
-        if kind in {"StructType", "UnionType", "EnumType", "BitSetType", "ProcedureType"}:
+        if kind in {"StructType", "UnionType", "EnumType", "BitSetType", "BitFieldType", "ProcedureType"}:
             substitutions=dict(substitutions)
             lexical={}
             owners=set(n.ancestors())
@@ -463,13 +486,15 @@ class Resolver:
                     symbol=self.by_decl.get((declaration,name))
                     lexical[declaration,name]=(self.type_node(symbol.annotation) if symbol and symbol.annotation else Type('scalar','int'),bound)
             return Type({"StructType": "struct", "UnionType": "union", "EnumType": "enum",
-                         "BitSetType": "bitset", "ProcedureType": "procedure"}[kind], node=n, substitutions=substitutions,lexical=lexical)
+                         "BitSetType": "bitset", "BitFieldType": "struct", "ProcedureType": "procedure"}[kind], node=n, substitutions=substitutions,lexical=lexical)
         if kind == "Ident":
             if n.text in substitutions and isinstance(substitutions[n.text], Type):
                 return substitutions[n.text]
             primitive=self.primitive_type(n.text,n)
             if primitive is not None:return primitive
         symbol = self.symbol(n)
+        if symbol is None and kind == 'Ident' and n.text == 'Maybe':
+            symbol = self.package_symbol(self.import_directory(n.source, 'base:runtime'), 'Maybe')
         if symbol:
             if (symbol.declaration.source.path == BIG_TYPES_SOURCE
                     and symbol.name in {'Integer','Rational'}):
@@ -483,7 +508,11 @@ class Resolver:
         if kind == "Call":
             declaration = self.declaration_for(n.role("callee"))
             values = declaration.group("values") if declaration else []
-            if len(values) == 1 and values[0].kind == "StructType":
+            if not values:
+                target = self.type_node(n.role('callee'), substitutions, seen.copy())
+                if target.kind in {'struct', 'union'} and target.node:
+                    values = [target.node]
+            if len(values) == 1 and values[0].kind in {"StructType", "UnionType"}:
                 record = values[0]
                 parameters = self.fields(record.role("params"))
                 # A record's identity contains its own arguments and lexical
@@ -508,7 +537,7 @@ class Resolver:
                 if (record.source.path == Path(__file__).resolve().parents[1]/'runtime'/'sets'/'sets.odin'
                         and any(name.text=='Set' for name in declaration.group('names'))):
                     return Type('set',node=n,elem=mapping.get('T',Type()))
-                return Type("struct", node=record, substitutions=mapping)
+                return Type("union" if record.kind == "UnionType" else "struct", node=record, substitutions=mapping)
         return Type(node=n)
 
     def record_constant(self, node, substitutions, seen=None, expected=None):
@@ -599,6 +628,9 @@ class Resolver:
             return Type(node=n)
         seen.add(n)
         kind = n.kind
+        if kind=='Implicit' and n.text=='context':
+            symbol=self.package_symbol(self.import_directory(n.source,'base:runtime'),'Context')
+            return self.type_node(symbol.value) if symbol and symbol.value else Type()
         if kind=='Comprehension':return n.source.comprehensions.result_type(n,seen)
         data=n.source.big.constants.payloads.get(n,{})
         if data.get('kind') in {'big_integer','big_rational'}:return Type(data['kind'],'Integer' if data['kind']=='big_integer' else 'Rational',n,witness=n)
@@ -892,7 +924,7 @@ class Resolver:
         seen.add(typ.node)
         if typ.kind == "struct":
             fields = typ.node.role("fields")
-            for f in fields.children if fields else []:
+            for f in fields.children if fields else typ.node.group("fields"):
                 if f.kind != "Field":
                     continue
                 field_type = self.type_node(f.role("type"), typ.substitutions)
@@ -912,7 +944,7 @@ class Resolver:
         if typ.kind!='struct' or typ.node is None or typ.node in seen:return None
         seen.add(typ.node)
         fields=typ.node.role('fields')
-        fields=[field for field in fields.children if field.kind=='Field'] if fields else []
+        fields=[field for field in (fields.children if fields else typ.node.group('fields')) if field.kind=='Field']
         if any(any(binding_name(n)==name for n in field.group('names')) for field in fields):return (name,)
         found=[]
         for field in fields:

@@ -22,7 +22,7 @@ class Runtime:
         self.metadata={}
 
     def bundled(self,source):
-        return source.path.is_relative_to(self.sources) and 'thor' in self.project.default_collections
+        return source.path.is_relative_to(self.sources)
 
     def native(self,source):
         return self.bundled(source) and source.path.suffix=='.odin'
@@ -81,6 +81,12 @@ class Runtime:
                 builder=Project(self.sources/'basic',self.project.frontend,[],use_shared=False,
                     cache_directory=self.root/'.thor-cache',debug_maps=True)
                 source=builder.sources[self.sources/'basic/basic.thor']
+                # A shared library cannot depend on a consuming project's
+                # private support alias (which may collide with a user alias).
+                source.support_collection='thor'
+                for namespace,path in list(source.imports.items()):
+                    if namespace.startswith(source.prefix) and path.startswith(builder.support_collection+':'):
+                        source.imports[namespace]='thor:'+path.split(':',1)[1]
                 code=source.transpile().encode()
                 data=source.source_map.json(directory/'basic/basic.odin',builder.sources)
                 data['generated_sha256']=hashlib.sha256(code).hexdigest()

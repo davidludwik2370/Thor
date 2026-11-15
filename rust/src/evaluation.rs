@@ -153,8 +153,8 @@ impl Plan {
         };
         match typ {
             Type::Nominal(owner, inner) => present(*owner) && self.emits_type(inner, sources),
-            Type::Struct(owner) | Type::Enum(owner) | Type::Union(owner) => present(*owner),
-            Type::Record(owner, bindings) => {
+            Type::Struct(owner) | Type::Enum(owner) => present(*owner),
+            Type::Record(owner, bindings) | Type::Union(owner, bindings) => {
                 present(*owner)
                     && bindings
                         .iter()
@@ -645,7 +645,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
             | Type::Struct(owner)
             | Type::Record(owner, _)
             | Type::Enum(owner)
-            | Type::Union(owner) => Some(*owner),
+            | Type::Union(owner, _) => Some(*owner),
             Type::Array { elem, .. }
             | Type::Slice(elem)
             | Type::Pointer(elem)

@@ -4,20 +4,34 @@ use super::*;
 use std::collections::BTreeMap;
 pub type Substitutions = BTreeMap<String, Type>;
 impl Resolver<'_> {
-    pub fn union_variants(&mut self, owner: Ref) -> Vec<Type> {
+    /// Storage affected by freezing a value, including an inline array that
+    /// can later be sliced. Pointer/map/dynamic-array targets retain Odin access.
+    pub fn frozen_slice_storage(&mut self, typ: &Type) -> bool {
+        let mut pending = vec![typ.clone()];
+        let mut seen = HashSet::new();
+        while let Some(typ) = pending.pop() {
+            if !seen.insert(typ.clone()) { continue; }
+            match typ {
+                Type::Slice(_) | Type::Soa(_) | Type::Array {..} | Type::Fixed {..}
+                | Type::Unknown | Type::Generic => return true,
+                Type::Nominal(_, inner) => pending.push(*inner),
+                Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) =>
+                    pending.extend(self.shared_record_fields(&typ).iter().map(|(_, typ)| typ.clone())),
+                Type::Union(..) => pending.extend(self.union_variants(&typ)),
+                _ => {}
+            }
+        }
+        false
+    }
+
+    pub fn union_variants(&mut self, typ: &Type) -> Vec<Type> {
+        let Type::Union(owner, bindings) = typ else { return vec![]; };
+        let bindings = bindings.iter().cloned().collect();
         self.sources[owner.file]
             .group(owner.node, "variants")
             .to_vec()
             .into_iter()
-            .map(|node| {
-                self.specialized_type(
-                    Ref {
-                        file: owner.file,
-                        node,
-                    },
-                    &Substitutions::new(),
-                )
-            })
+            .map(|node| self.specialized_type(Ref { file: owner.file, node }, &bindings))
             .collect()
     }
     pub fn record_fields(&mut self, typ: &Type) -> Vec<(String, Type)> {
@@ -46,11 +60,11 @@ impl Resolver<'_> {
             _ => return vec![],
         };
         let s = &self.sources[owner.file];
-        let Some(fields) = s.role(owner.node, "fields") else {
-            return vec![];
-        };
+        let fields = s.role(owner.node, "fields")
+            .map(|fields| s.node(fields).children.as_slice())
+            .unwrap_or_else(|| s.group(owner.node, "fields"));
         let mut result = vec![];
-        for field in &s.node(fields).children {
+        for field in fields {
             if s.node(*field).kind != "Field" {
                 continue;
             }
@@ -111,7 +125,7 @@ impl Resolver<'_> {
                     }
                 }
             }
-            Type::Soa(elem) => Type::Slice(Box::new(self.member_type(elem, name))),
+            Type::Soa(elem) => Type::Pointer(Box::new(self.member_type(elem, name))),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                 let Some(path) = self.member_path(typ, name) else {
                     return Type::Unknown;
@@ -373,13 +387,15 @@ impl Resolver<'_> {
                 }
             }
         }
+        let specialization_division = n.kind == "Binary" && n.op == "/"
+            && child("left").is_some_and(|left|self.denotes_type(left));
         let mut subtype = |role: &str| {
             child(role)
                 .map(|r| self.specialize(r, bindings, &mut seen.clone()))
                 .unwrap_or(Type::Unknown)
         };
         match n.kind.as_str() {
-            "Paren" | "Run" => subtype("expr"),
+            "Paren" | "HelperType" | "Run" => subtype("expr"),
             "Binary" if n.op == "++" => {
                 crate::lower::concatenation::result_type(s, r.node, |node| {
                     self.specialize(Ref { node, ..r }, bindings, &mut seen.clone())
@@ -430,7 +446,8 @@ impl Resolver<'_> {
                     .unwrap_or("");
                 self.member_type(&typ, name)
             }
-            "Index" | "Deref" => subtype("expr").element().cloned().unwrap_or(Type::Unknown),
+            "Deref" => subtype("expr").element().cloned().unwrap_or(Type::Unknown),
+            "Index" => subtype("expr").indexed_element().cloned().unwrap_or(Type::Unknown),
             "ArrayType" => {
                 let elem = Box::new(subtype("elem"));
                 if let Some(len) = child("len") {
@@ -472,7 +489,8 @@ impl Resolver<'_> {
                     .unwrap_or(Type::Unknown),
             )),
             "DistinctType" => Type::Nominal(r, Box::new(subtype("type"))),
-            "StructType" => {
+            "BitSetType" => Type::Nominal(r, Box::new(Type::scalar("bit_set"))),
+            "StructType" | "BitFieldType" | "UnionType" => {
                 let params = s.role(r.node, "params");
                 let names = params
                     .into_iter()
@@ -480,10 +498,13 @@ impl Resolver<'_> {
                     .flat_map(|field| s.group(*field, "names"))
                     .map(|name| s.text(*name).trim_start_matches('$').to_string())
                     .collect::<Vec<_>>();
-                let captures = s
-                    .role(r.node, "fields")
-                    .into_iter()
-                    .flat_map(|fields| s.descendants(fields))
+                let contents = if n.kind == "UnionType" {
+                    s.group(r.node, "variants").to_vec()
+                } else {
+                    s.role(r.node, "fields").into_iter().collect()
+                };
+                let captures = contents.into_iter()
+                    .flat_map(|field| s.descendants(field))
                     .filter(|node| s.node(*node).kind == "Ident")
                     .filter_map(|node| {
                         let name = s.text(node);
@@ -507,20 +528,13 @@ impl Resolver<'_> {
                     })
                     .collect::<BTreeMap<_, _>>();
                 if names.is_empty() && captures.is_empty() {
-                    Type::Struct(r)
-                } else {
-                    Type::Record(
-                        r,
-                        names
-                            .into_iter()
-                            .map(|name| {
-                                let typ = bindings.get(&name).cloned().unwrap_or(Type::Generic);
-                                (name, typ)
-                            })
-                            .chain(captures)
-                            .collect(),
-                    )
+                    return if n.kind == "UnionType" { Type::Union(r, vec![]) } else { Type::Struct(r) };
                 }
+                let arguments = names.into_iter().map(|name| {
+                    let typ = bindings.get(&name).cloned().unwrap_or(Type::Generic);
+                    (name, typ)
+                }).chain(captures).collect();
+                if n.kind == "UnionType" { Type::Union(r, arguments) } else { Type::Record(r, arguments) }
             }
             "Call" => {
                 let Some(callee) = child("callee") else {
@@ -528,7 +542,7 @@ impl Resolver<'_> {
                 };
                 let base = self.specialize(callee, bindings, &mut seen.clone());
                 let owner = match &base {
-                    Type::Struct(owner) | Type::Record(owner, _) => Some(*owner),
+                    Type::Struct(owner) | Type::Record(owner, _) | Type::Union(owner, _) => Some(*owner),
                     _ => None,
                 };
                 if let Some(owner) = owner {
@@ -570,7 +584,7 @@ impl Resolver<'_> {
                                 (name, typ)
                             })
                             .collect();
-                        if let Type::Record(_, captured) = &base {
+                        if let Type::Record(_, captured) | Type::Union(_, captured) = &base {
                             for (name, typ) in captured {
                                 if !arguments.iter().any(|(parameter, _)| parameter == name) {
                                     arguments.push((name.clone(), typ.clone()));
@@ -591,7 +605,15 @@ impl Resolver<'_> {
                     }
                 }
             }
-            "Binary" if n.op == "/" => subtype("right"),
+            "Binary" if specialization_division => subtype("right"),
+            "Binary" => {
+                if matches!(n.op.as_str(), "in" | "not_in" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||") {
+                    return Type::scalar("bool");
+                }
+                let left = subtype("left");
+                let right = subtype("right");
+                if n.op == "*" && right.is_string() || left.untyped() && !right.untyped() {right} else {left}
+            }
             _ => self.type_of(r),
         }
     }
@@ -611,7 +633,7 @@ impl Resolver<'_> {
         let n = s.node(r.node);
         let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
         match n.kind.as_str() {
-            "Paren" | "Run" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
+            "Paren" | "HelperType" | "Run" | "OrPanic" | "OrReturn" | "OrBranch" => child("expr")
                 .map(|r| self.specialized_value_result(r, index, bindings, seen))
                 .unwrap_or(Type::Unknown),
             "OrElse" => child("x")
@@ -725,6 +747,9 @@ impl Resolver<'_> {
     }
     fn record_instance(&self, owner: Ref, arguments: Vec<(String, Type)>) -> Type {
         let s = &self.sources[owner.file];
+        if s.node(owner.node).kind == "UnionType" {
+            return Type::Union(owner, arguments);
+        }
         let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
@@ -933,7 +958,7 @@ impl Resolver<'_> {
             (Type::Nominal(a, _), Type::Nominal(b, _)) if a == b => Some(5),
             (Type::Nominal(_, base), value) if value.untyped() => Self::type_score(base, value),
             (Type::Procedure(_), Type::Procedure(_)) => Some(1), // Odin checks complete calling signatures.
-            (Type::Union(_), _) => Some(0), // Native union injection is checked by Odin.
+            (Type::Union(..), _) => Some(0), // Native union injection is checked by Odin.
             _ if expected == actual => Some(5),
             _ => None,
         }
@@ -1047,7 +1072,7 @@ impl Resolver<'_> {
                         );
                     }
                 }
-                if let Type::Record(_, arguments) = actual {
+                if let Type::Record(_, arguments) | Type::Union(_, arguments) = actual {
                     for (arg, (_, typ)) in s.group(annotation.node, "args").iter().zip(arguments) {
                         self.bind_shape(
                             Ref {
@@ -1141,7 +1166,7 @@ impl Resolver<'_> {
         if n.kind == "Procedure" {
             return vec![callee];
         }
-        if n.kind == "Paren" {
+        if matches!(n.kind.as_str(), "Paren" | "HelperType") {
             return s
                 .role(callee.node, "expr")
                 .map(|node| {

@@ -6,8 +6,15 @@ Their calls stay inside the original branch/argument/loop; declarations do no wo
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import re
+
+
+@dataclass(frozen=True)
+class Capture:
+    value: str
+    reference: str | None = None
 
 
 class Expressions:
@@ -30,7 +37,7 @@ class Expressions:
 
     def module(self, name, path=None):
         alias = self.source.prefix + name
-        self.modules[alias] = path or 'thor:' + name
+        self.modules[alias] = path or getattr(self.source,'support_collection','thor') + ':' + name
         return alias
 
     def imports(self):
@@ -117,13 +124,29 @@ class Expressions:
         # Evaluate addresses only at the call site. User expressions, including
         # all side effects, remain in the helper body in their source order.
         refs=[self.reference_capture(symbol) for symbol,_ in variables.values()]
-        params=[f'{s.prefix}capture_{i}: {"^" if refs[i] else ""}${s.prefix}Capture_{i}' for i in range(len(variables))]
-        args=[f'&({s.render(child)})' if refs[i] else s.render(child) for i,(_,child) in enumerate(variables.values())]
-        args=[s.mapping.wrap(arg,s.path,node.start,node.end,'debug-capture') for arg in args]
+        # Infer the complete capture type. Native SOA row references
+        # support dereferencing but do not match an ordinary ^$T.
+        params=[f'{s.prefix}capture_{i}: ${s.prefix}Capture_{i}' for i in range(len(variables))]
+        args=[]
+        for i,(symbol,child) in enumerate(variables.values()):
+            symbol_key=self.symbol_key(symbol)
+            capture=next((scope[symbol_key] for scope in reversed(self.captures) if symbol_key in scope),None)
+            # Forward an existing reference. Reborrowing a dereferenced SOA
+            # row is invalid in Odin, and ordinary pointers can pass directly.
+            if capture is not None and capture.reference is not None:
+                argument=capture.reference
+            else:
+                value=s.render(child)
+                argument=f'&({value})' if refs[i] else value
+            args.append(s.mapping.wrap(argument,s.path,node.start,node.end,'debug-capture'))
         if lifetime:
             params.append(self.fstrings.parameter())
             args.append(lifetime.pointer)
-        aliases={k:f'({s.prefix}capture_{i}{"^" if refs[i] else ""})' for i,k in enumerate(variables)}
+        from . import branch_locations
+        branch_capture = branch_locations.capture_helper(self, node, params, args)
+        aliases={k:Capture(f'({s.prefix}capture_{i}{"^" if refs[i] else ""})',
+                           f'{s.prefix}capture_{i}' if refs[i] else None)
+                 for i,k in enumerate(variables)}
         if result is False:
             result_type=None
         elif isinstance(result, tuple):
@@ -143,6 +166,8 @@ class Expressions:
         if key not in self.helpers:
             self.helpers[key]='' # Nested helpers may refer back through type queries.
             self.captures.append(aliases)
+            if branch_capture:
+                s.branch_captures.append(branch_capture)
             try:
                 hint = (tuple(Hint(s,node,typ or s.prefix+f'Result_{i}') for i,typ in enumerate(result))
                         if isinstance(result,tuple) else Hint(s,node,s.prefix+'Result') if result is None else None)
@@ -161,6 +186,8 @@ class Expressions:
                     body=builder(hint)
             finally:
                 self.captures.pop()
+                if branch_capture:
+                    s.branch_captures.pop()
             convention=' "odin"' if self.has_context(node) and not self.switches.global_context and not contextless else ' "contextless"'
             if comprehension_query and not any(a.kind=='Procedure' for a in node.ancestors()):
                 # Package-level type queries have no caller context. These
@@ -314,7 +341,7 @@ class Expressions:
                 key=self.symbol_key(symbol)
                 for aliases in reversed(self.captures):
                     if key in aliases:
-                        return aliases[key]
+                        return aliases[key].value
         if not s.thor:
             return None
         if n.kind == 'OrPanic':
@@ -463,6 +490,9 @@ class Expressions:
     def writes(self,node):
         if node in self.addresses: return True
         for parent in node.ancestors():
+            if parent.kind in {'Index','Slice','Deref'}:
+                typ=self.shape(parent.role('expr'))
+                if typ and typ.kind in {'slice','dynamic','pointer'}:return False
             if parent.kind=='Assignment':
                 if parent.parent and parent.parent.kind == 'TypeSwitch':
                     return any(name.kind == 'Unary' and name.data.get('op') == '&'
@@ -533,6 +563,12 @@ class Expressions:
             value=s.constant_int(bound)
             if value is not None: return value<0
             typ=self.shape(bound)
+            symbol=s.resolver.symbol(bound)
+            if typ.kind=='scalar' and typ.name in {'int','i8','i16','i32','u8','u16','u32'} and symbol and symbol.index==0 and symbol.declaration.kind=='Range' and symbol.node.kind=='Ident':
+                interval=symbol.declaration.role('expr')
+                if interval and interval.kind=='Binary' and interval.data.get('op')=='..<':
+                    start=interval.source.constant_int(interval.role('left'))
+                    if start is not None and start>=0:return False
             if bound.kind == 'ImplicitSelector' or typ.kind == 'enum': return False
             if typ.kind=='scalar' and typ.name.startswith('u128'):return True
             return not (typ.kind=='scalar' and typ.name.startswith('u'))
@@ -561,6 +597,12 @@ class Expressions:
             # context; there are no duplicated runtime evaluations here.
             if n.kind=='Index': return f'({b})[{normalized(bounds[0])}]'
             return f'({b})[{normalized(bounds[0])}:{normalized(bounds[1])}]'
+        symbol=s.resolver.symbol(base)
+        if (n.kind=='Index' and typ.kind=='array' and typ.length is not None and symbol
+                and symbol.declaration.kind=='Range' and symbol.index==0
+                and symbol.node.kind=='Unary' and symbol.node.data.get('op')=='&'):
+            value=s.render(bounds[0])
+            return f'{s.render(base)}[{sequence}.normalize({typ.length},{value})]'
         pointer=n.kind=='Index' and self.writes(n)
         b=s.render(base)
         if n.kind=='Index':

@@ -13,6 +13,10 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+#[path = "vet_unused.rs"]
+mod unused;
+
+pub const CHECKS: &[&str] = &["immutable", "pure", "unused", "semicolon"];
 #[derive(Clone, Debug)]
 pub struct Fix {
     file: usize,
@@ -31,6 +35,8 @@ impl Fix {
     fn message(&self) -> String {
         if self.rule == "immutable" {
             format!("Declare '{}' immutable with ':>'.", self.names)
+        } else if self.rule == "semicolon" {
+            "Unnecessary semicolon.".into()
         } else {
             format!("Procedure '{}' can be declared with 'fn'.", self.names)
         }
@@ -44,7 +50,7 @@ impl Fix {
             .fold(14695981039346656037u64, |h, b| {
                 (h ^ u64::from(*b)).wrapping_mul(1099511628211)
             });
-        json!({"type":"warning","stage":"vet","code":if self.rule=="immutable"{"thor/prefer-immutable"}else{"thor/prefer-fn"},
+        json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", _=>"thor/prefer-fn"},
             "pos":position(source,self.highlight),"msgs":[self.message()],
             "fix":{"pos":position(source,self.span),"text":self.replacement,"snapshot":format!("{hash:016x}")}})
     }
@@ -105,8 +111,8 @@ fn possible(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -
         Type::Anonymous(fields) => fields
             .iter()
             .all(|(_, typ)| possible(typ, resolver, &mut seen.clone())),
-        Type::Union(owner) => resolver
-            .union_variants(*owner)
+        Type::Union(..) => resolver
+            .union_variants(typ)
             .iter()
             .all(|typ| possible(typ, resolver, &mut seen.clone())),
         _ => true,
@@ -134,8 +140,8 @@ fn owned(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -> b
             .record_fields(typ)
             .iter()
             .any(|(_, typ)| owned(typ, resolver, &mut seen.clone())),
-        Type::Union(owner) => resolver
-            .union_variants(*owner)
+        Type::Union(..) => resolver
+            .union_variants(typ)
             .iter()
             .any(|typ| owned(typ, resolver, &mut seen.clone())),
         _ => false,
@@ -170,7 +176,36 @@ fn field_types(resolver: &mut Resolver<'_>, signature: Ref, role: &str) -> Vec<T
         })
         .collect()
 }
+// A correction lives in source shared by future targets and #config values.
+// Current-target validation cannot establish every inactive implementation.
+fn portable_body(resolver: &mut Resolver<'_>, root: Ref) -> bool {
+    let mut pending = vec![root];
+    let mut seen = HashSet::new();
+    while let Some(procedure) = pending.pop() {
+        if !seen.insert(procedure) { continue; }
+        let source = &resolver.sources[procedure.file];
+        if source.info["target_specific"] == true || source.info["file_tags"].as_array()
+            .into_iter().flatten().filter_map(Value::as_str).any(|tag| tag.starts_with("#+build")) {
+            return false;
+        }
+        for node in source.descendants(procedure.node) {
+            if matches!(source.node(node).kind.as_str(), "When" | "WhenExpr" | "CompileSwitch" | "CompileSwitchExpr") {
+                return false;
+            }
+            if source.node(node).kind == "Call" {
+                if let Some(callee) = source.role(node, "callee") {
+                    pending.extend(resolver.candidates(Ref {file:procedure.file,node:callee}));
+                }
+            }
+        }
+    }
+    true
+}
+
 pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
+    if !checks.iter().any(|check| matches!(check.as_str(), "immutable" | "pure")) {
+        return vec![];
+    }
     let root = if project.options.entry.is_file() {
         project.options.entry.parent().unwrap()
     } else {
@@ -181,11 +216,13 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
     resolver.prepare_contexts();
     crate::lower::prime_logical_constants(&mut resolver);
     let mut result = vec![];
+    let mut portable = std::collections::HashMap::new();
     for (file, source) in project.sources.iter().enumerate() {
         if !source.thor || source.excluded || !source.path.starts_with(root) {
             continue;
         }
         let mut written = BTreeSet::new();
+        let mut mutated = BTreeSet::new();
         for (i, node) in source.nodes.iter().enumerate() {
             let id = NodeId(i);
             let targets = if node.kind == "Assignment" && node.op != "in" {
@@ -205,6 +242,9 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
             for node in targets {
                 if let Some(declaration) = binding(&resolver, Ref { file, node }) {
                     written.insert(declaration);
+                    if matches!(source.node(id).kind.as_str(), "Assignment" | "IncDec") {
+                        mutated.insert(declaration);
+                    }
                 }
             }
         }
@@ -250,10 +290,34 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                     .ancestors(id)
                     .any(|id| source.node(id).kind == "Procedure")
             {
+                let owner = source.ancestors(id).find(|owner| source.node(*owner).kind == "Procedure").unwrap();
+                let types = names.iter().map(|name| resolver.type_of(Ref {file,node:*name})).collect::<Vec<_>>();
+                if types.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
+                    || !possible(typ, &mut resolver, &mut HashSet::new())) {
+                    let owner = Ref {file,node:owner};
+                    if !*portable.entry(owner).or_insert_with(|| portable_body(&mut resolver, owner)) { continue; }
+                }
+                // Returning a readonly alias changes an API used by callers
+                // outside this entry point. Keep that ownership choice explicit.
+                if types.iter().any(|typ| resolver.frozen_slice_storage(typ)) {
+                    let signature = source.role(owner, "type").unwrap_or(owner);
+                    let outputs = field_types(&mut resolver, Ref {file,node:signature}, "results");
+                    if outputs.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
+                        || !possible(typ, &mut resolver, &mut HashSet::new())) { continue; }
+                }
+                let generic_local = source.ancestors(id).filter(|owner| source.node(*owner).kind == "Procedure")
+                    .any(|owner| !crate::specialization::parameters(Ref {file,node:owner}, &resolver).is_empty());
+                // A check of this entry point cannot establish write access for
+                // every future specialization of a shared generic body.
+                let independent = !generic_local || names.iter().all(|name| {
+                    let typ = resolver.type_of(Ref {file,node:*name});
+                    !owned(&typ, &mut resolver, &mut HashSet::new())
+                        && possible(&typ, &mut resolver, &mut HashSet::new())
+                });
                 if let Some(span) = node
                     .spans
                     .get("separator")
-                    .filter(|span| source.slice(**span) == "=")
+                    .filter(|span| independent && source.slice(**span) == "=")
                 {
                     result.push(Fix {
                         file,
@@ -309,12 +373,20 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
             {
                 continue;
             }
+            let input_fields = source.role(signature.node, "params")
+                .map(|params| source.node(params).children.as_slice()).unwrap_or_default();
+            if input_fields.iter().filter(|field| source.node(**field).kind == "Field")
+                .zip(&inputs).any(|(field,typ)| mutated.contains(&Ref {file,node:*field})
+                    && owned(typ, &mut resolver, &mut HashSet::new())) {
+                continue;
+            }
             // The existing checker rejects direct I/O and transitive effects;
             // full native checking below remains authoritative for every fix.
             let purity = crate::purity::Purity::analyze_from(&mut resolver, &[procedure]);
             if purity.faults.values().any(|faults| !faults.is_empty()) || !purity.gaps.is_empty() {
                 continue;
             }
+            if !*portable.entry(procedure).or_insert_with(|| portable_body(&mut resolver, procedure)) { continue; }
             let start = source.node(proc).span.start;
             if source.raw.get(start..start + 4) == Some("proc") {
                 result.push(Fix {
@@ -395,13 +467,18 @@ impl Drop for Scratch {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+enum Validation {
+    Passed,
+    Failed(Vec<Value>),
+}
 struct Validator<'a> {
     project: &'a Project,
     directory: &'a Path,
     compiler: PathBuf,
 }
 impl Validator<'_> {
-    fn check(&self, fixes: &[Fix]) -> Result<bool> {
+    fn check(&self, fixes: &[Fix]) -> Result<Validation> {
+        crate::profile::count("vet.validation_checks", 1);
         let mut overlays = self
             .project
             .options
@@ -424,7 +501,7 @@ impl Validator<'_> {
         let mut command = Command::new(&self.compiler);
         command
             .env("THOR_ROOT", &self.project.options.root)
-            .arg("check")
+            .arg(if self.project.frontend.test { "build" } else { "check" })
             .arg(&self.project.options.entry)
             .arg("--odin")
             .arg(&self.project.options.odin)
@@ -446,36 +523,94 @@ impl Validator<'_> {
         if self.project.options.no_cache {
             command.arg("--no-cache");
         }
+        if self.project.options.odin_compatible {
+            command.arg("--odin-compatible");
+        }
         command.args(self.project.options.flags.iter().filter(|flag| {
+            let name = flag.trim_start_matches('-').split(':').next().unwrap_or_default();
+            let action = if self.project.frontend.test { "build" } else { "check" };
+            let supported = crate::cli::catalog().native_flags.iter().find(|info| info.name == name)
+                .is_none_or(|info| info.commands.iter().any(|command| command == action));
             !flag.starts_with("-out:")
+                && supported
+                && (crate::cli::helper_flag(flag)
+                    || self.project.frontend.test && flag.as_str() == "-all-packages")
                 && !flag.starts_with("-build-mode:")
-                && ![
-                    "-warnings-as-errors",
-                    "-ignore-warnings",
-                    "-keep-executable",
-                ]
-                .contains(&flag.as_str())
+                && flag.as_str() != "-keep-executable"
         }));
         if self.project.frontend.test {
-            command.arg("-build-mode:test");
+            command.arg("-build-mode:test").arg(format!("-out:{}", self.directory.join("test-probe").display()));
         }
         let result = command.output()?;
         if !result.status.success() {
-            let packet: Value = serde_json::from_slice(&result.stderr)
-                .map_err(|_| Error::new("Thor vet could not validate its proposed corrections."))?;
+            let packet: Value = serde_json::from_slice(&result.stderr).map_err(|_| {
+                Error::new(format!(
+                    "Thor vet could not validate its proposed corrections (exit {}).\n{}{}",
+                    result.status,
+                    String::from_utf8_lossy(&result.stdout),
+                    String::from_utf8_lossy(&result.stderr)
+                ))
+            })?;
             if let Some(failure) = packet["errors"]
                 .as_array()
                 .into_iter()
                 .flatten()
-                .find(|error| error["stage"] == "toolchain")
+                .find(|error| error["stage"] == "toolchain"
+                    && !crate::compiler_output::has_source_errors(&packet))
             {
                 return Err(Error::new(format!(
                     "Thor vet validation failed in the native toolchain. {}",
                     failure["msgs"][0].as_str().unwrap_or_default()
                 )));
             }
+            return Ok(Validation::Failed(packet["errors"].as_array().cloned().unwrap_or_default()));
         }
-        Ok(result.status.success())
+        Ok(Validation::Passed)
+    }
+    fn blocked_immutable(&self, fix: &Fix, combined: &[Fix], errors: &[Value]) -> bool {
+        if fix.rule != "immutable" { return false; }
+        let source = &self.project.sources[fix.file];
+        let delta = combined.iter().filter(|edit| edit.file == fix.file && edit.span.end <= fix.highlight.start)
+            .map(|edit| edit.replacement.len() as isize - edit.span.len() as isize).sum::<isize>();
+        let Some(start) = fix.highlight.start.checked_add_signed(delta) else { return false; };
+        let Some(end) = fix.highlight.end.checked_add_signed(delta) else { return false; };
+        errors.iter().filter(|error| error["type"] == "error")
+            .flat_map(|error| error["related"].as_array().into_iter().flatten())
+            .any(|related| related["message"] == "Read-only view declared here."
+                && related["pos"]["file"].as_str().is_some_and(|path| Path::new(path) == source.path)
+                && related["pos"]["offset"].as_u64().is_some_and(|offset| (start..end).contains(&(offset as usize))))
+    }
+    fn blocked_pure(&self, fix: &Fix, combined: &[Fix], errors: &[Value]) -> bool {
+        if fix.rule != "pure" { return false; }
+        let source = &self.project.sources[fix.file];
+        let delta = combined.iter().filter(|edit| edit.file == fix.file && edit.span.end <= fix.span.start)
+            .map(|edit| edit.replacement.len() as isize - edit.span.len() as isize).sum::<isize>();
+        let Some(start) = fix.span.start.checked_add_signed(delta) else { return false; };
+        let rooted = errors.iter().filter(|error| error["type"] == "error")
+            .flat_map(|error| error["related"].as_array().into_iter().flatten())
+            .any(|related| related["message"].as_str().is_some_and(|message|
+                    message.starts_with("fn '") && message.contains("requires its entire call chain to be pure"))
+                && related["pos"]["file"].as_str().is_some_and(|path| Path::new(path) == source.path)
+                && related["pos"]["offset"].as_u64() == Some(start as u64));
+        if rooted { return true; }
+        let Some(procedure) = source.nodes.iter().find(|node| node.kind == "Procedure"
+            && node.span.start == fix.span.start) else { return false; };
+        let shifted = |offset: usize| offset.checked_add_signed(combined.iter()
+            .filter(|edit| edit.file == fix.file && edit.span.end <= offset)
+            .map(|edit| edit.replacement.len() as isize - edit.span.len() as isize).sum());
+        let Some(end) = shifted(procedure.span.end) else { return false; };
+        errors.iter().any(|error| error["type"] == "error"
+            && error["msgs"].as_array().is_some_and(|messages| messages.iter()
+                .any(|message| message.as_str().is_some_and(|message| message.starts_with("Pure "))))
+            && error["pos"]["file"].as_str().is_some_and(|path| Path::new(path) == source.path)
+            && error["pos"]["offset"].as_u64().is_some_and(|offset| {
+                let offset = offset as usize;
+                (start..end).contains(&offset) && !source.nodes.iter().any(|node|
+                    node.kind == "Procedure" && node.span.start > procedure.span.start
+                        && node.span.end <= procedure.span.end
+                        && shifted(node.span.start).zip(shifted(node.span.end))
+                            .is_some_and(|(start,end)| (start..end).contains(&offset)))
+            }))
     }
     fn select(&self, proposed: &[Fix], accepted: &mut Vec<Fix>) -> Result<()> {
         if proposed.is_empty() {
@@ -483,12 +618,28 @@ impl Validator<'_> {
         }
         let mut combined = accepted.clone();
         combined.extend_from_slice(proposed);
-        if self.check(&combined)? {
-            accepted.extend_from_slice(proposed);
-        } else if proposed.len() > 1 {
-            let middle = proposed.len() / 2;
-            self.select(&proposed[..middle], accepted)?;
-            self.select(&proposed[middle..], accepted)?;
+        match self.check(&combined)? {
+            Validation::Passed => accepted.extend_from_slice(proposed),
+            Validation::Failed(errors) => {
+                // Readonly seeds and pure call-chain roots identify the exact
+                // proposed declarations responsible for a failure. Reject those
+                // declarations before retrying the remaining batch.
+                let remaining = proposed.iter().filter(|fix| !self.blocked_immutable(fix, &combined, &errors)
+                    && !self.blocked_pure(fix, &combined, &errors))
+                    .cloned().collect::<Vec<_>>();
+                if remaining.len() < proposed.len() {
+                    crate::profile::count("vet.corrections_rejected", (proposed.len() - remaining.len()) as u64);
+                    let readonly = proposed.iter().filter(|fix| fix.rule == "immutable").count()
+                        - remaining.iter().filter(|fix| fix.rule == "immutable").count();
+                    crate::profile::count("vet.readonly_corrections_rejected", readonly as u64);
+                    crate::profile::count("vet.pure_corrections_rejected", (proposed.len() - remaining.len() - readonly) as u64);
+                    self.select(&remaining, accepted)?;
+                } else if proposed.len() > 1 {
+                    let middle = proposed.len() / 2;
+                    self.select(&proposed[..middle], accepted)?;
+                    self.select(&proposed[middle..], accepted)?;
+                }
+            }
         }
         Ok(())
     }
@@ -534,6 +685,13 @@ impl Staged {
         }
         Err(Error::new("Could not stage a vet correction."))
     }
+}
+pub(crate) fn apply_source_edits(edits: &[(usize, Span, String)], sources: &[Source]) -> Result<()> {
+    let fixes = edits.iter().map(|(file, span, replacement)| Fix {
+        file: *file, span: *span, replacement: replacement.clone(),
+        rule: "source-cleanup", names: String::new(), highlight: *span,
+    }).collect::<Vec<_>>();
+    apply(&fixes, sources)
 }
 fn apply(fixes: &[Fix], sources: &[Source]) -> Result<()> {
     apply_with(fixes, sources, |from, to| fs::rename(from, to))
@@ -598,9 +756,71 @@ pub fn run(
     checks: &[String],
     apply_requested: bool,
     ask: bool,
+    existing: &mut Vec<Value>,
 ) -> Result<Vec<Value>> {
-    let proposed = candidates(project, checks);
-    let mut accepted = vec![];
+    let usage = if checks
+        .iter()
+        .any(|check| matches!(check.as_str(), "unused" | "immutable"))
+    {
+        unused::analyze(project)
+    } else {
+        unused::Analysis::default()
+    };
+    let mut exempt_offsets = BTreeMap::<PathBuf, BTreeSet<usize>>::new();
+    for at in usage.immutable_exemptions {
+        let source = &project.sources[at.file];
+        exempt_offsets
+            .entry(source.path.clone())
+            .or_default()
+            .insert(source.node(at.node).span.start);
+    }
+    let proposed = candidates(project, checks)
+        .into_iter()
+        .filter(|fix| {
+            fix.rule != "immutable"
+                || exempt_offsets
+                    .get(&project.sources[fix.file].path)
+                    .is_none_or(|offsets| {
+                        offsets
+                            .range(fix.highlight.start..fix.highlight.end)
+                            .next()
+                            .is_none()
+                    })
+        })
+        .collect::<Vec<_>>();
+    let mut findings = if checks.iter().any(|check| check == "unused") {
+        usage.findings
+    } else {
+        vec![]
+    };
+    let unused = findings
+        .iter()
+        .map(|finding| {
+            (
+                finding["pos"]["file"].clone(),
+                finding["pos"]["offset"].clone(),
+                finding["msgs"].clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    existing.retain(|finding| {
+        finding["type"] != "warning"
+            || !unused.contains(&(
+                finding["pos"]["file"].clone(),
+                finding["pos"]["offset"].clone(),
+                finding["msgs"].clone(),
+            ))
+    });
+    let mut accepted = if checks.iter().any(|check| check == "semicolon") {
+        crate::source_tools::semicolon_edits(project, true)?
+            .into_iter()
+            .map(|(file, span, replacement)| Fix {
+                file, span, replacement, rule: "semicolon", names: String::new(), highlight: span,
+            })
+            .collect()
+    } else {
+        vec![]
+    };
     if !proposed.is_empty() {
         let scratch = Scratch::new()?;
         Validator {
@@ -630,14 +850,45 @@ pub fn run(
         }
         if confirmed {
             apply(&accepted, &project.sources)?;
+            let updated = revisions(&accepted, &project.sources);
+            for finding in &mut findings {
+                let path = Path::new(finding["pos"]["file"].as_str().unwrap());
+                let Some(raw) = updated.get(path) else {
+                    continue;
+                };
+                let raw = std::str::from_utf8(raw).expect("vet edits preserve UTF-8");
+                let fixes = accepted
+                    .iter()
+                    .filter(|fix| project.sources[fix.file].path == path)
+                    .collect::<Vec<_>>();
+                let pos = finding["pos"].as_object_mut().unwrap();
+                for (key, line_key, column_key) in [
+                    ("offset", "line", "column"),
+                    ("end_offset", "end_line", "end_column"),
+                ] {
+                    let old = pos[key].as_u64().unwrap() as usize;
+                    let delta = fixes
+                        .iter()
+                        .filter(|fix| fix.span.end <= old)
+                        .map(|fix| fix.replacement.len() as isize - fix.span.len() as isize)
+                        .sum::<isize>();
+                    let offset = old
+                        .checked_add_signed(delta)
+                        .expect("edits preserve source positions");
+                    let before = &raw[..offset];
+                    let line = before.bytes().filter(|byte| *byte == b'\n').count() + 1;
+                    let column = before.rsplit('\n').next().unwrap().encode_utf16().count() + 1;
+                    pos.insert(key.into(), json!(offset));
+                    pos.insert(line_key.into(), json!(line));
+                    pos.insert(column_key.into(), json!(column));
+                }
+            }
             println!("Applied {} corrections.", accepted.len());
-            return Ok(vec![]);
+            return Ok(findings);
         }
     }
-    Ok(accepted
-        .iter()
-        .map(|fix| fix.diagnostic(&project.sources))
-        .collect())
+    findings.extend(accepted.iter().map(|fix| fix.diagnostic(&project.sources)));
+    Ok(findings)
 }
 
 #[cfg(test)]

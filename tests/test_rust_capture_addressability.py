@@ -9,6 +9,65 @@ class RustCaptureAddressTests(unittest.TestCase):
     compare=native.RustCompilerTests.compare
     program=native.RustCompilerTests.program
 
+    def test_soa_row_references_support_comparisons_through_builtin_and_library_aliases(self):
+        body = '''numbers:=[3]int{1,2,3};words:=[2]string{"one","two"}
+values:=ZIP(number=numbers[:],word=words[:])
+for &row,index in values {
+    if row.number!=index+1 || row.word!=words[index] {panic("SOA comparison")}
+    row.number+=10
+}
+if (numbers!=[3]int{11,12,3}) {panic("SOA reference mutation")}
+'''
+        for callee in ('soa_zip', 'basic.zip', 'zip'):
+            source = self.program(body.replace('ZIP', callee), 'import "thor:basic" / zip\n')
+            for flags in ([], native.UNCHECKED):
+                with self.subTest(callee=callee, flags=flags):
+                    self.compare(source, flags=flags, expected='')
+
+    def test_soa_row_references_survive_nested_helpers_and_indexed_writes(self):
+        source = self.program('''numbers:=[2]int{1,2};words:=[2]string{"one","two"}
+samples:=[2][3]int{{1,2,3},{4,5,6}}
+values:=basic.zip(number=numbers[:],word=words[:],samples=samples[:])
+for &row,index in values {
+    text:=f"{row.word}:{switch {case row.number>0:row.samples[-1]**2;case:0}}"
+    expected:=switch index {case 0:"one:9";case:"two:36"}
+    if text!=expected {panic("nested SOA expression")}
+    delete(text)
+    row.samples[-1]=switch {case row.number in [1,2]:row.samples[-1]+10;case:0}
+    row.number=switch {case row.word=="one":row.number+10;case:row.number+20}
+}
+if numbers[0]!=11 || numbers[1]!=22 || samples[0][2]!=13 || samples[1][2]!=16 {
+    panic("nested SOA mutation")
+}
+''', 'import "thor:basic"\n')
+        for flags in ([], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(source, flags=flags, expected='')
+
+    def test_ordinary_pointer_and_local_captures_preserve_shared_mutation_order(self):
+        source = self.program('''value:=1;pointer:=&value
+text:=f"{bump(pointer)}:{switch {case true:bump(&value);case:0}}:{value}"
+if text!="2:3:3" || value!=3 {panic("capture aliasing or evaluation order")}
+delete(text)
+''', 'bump::proc(value:^int)->int{value^+=1;return value^}\n')
+        for flags in ([], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(source, flags=flags, expected='')
+
+    def test_generic_indexed_switch_assignments_render_inside_their_capture_scope(self):
+        source = self.program('''row:=Row{[3]int{1,2,3}};calls:=0
+update(&row,&calls)
+if row.data[2]!=13 || calls!=1 {panic("indexed switch capture or repeated destination")}
+''', '''Row::struct{data:[3]int}
+position::proc(calls:^int)->int{calls^+=1;return -1}
+update::proc(row:$T,calls:^int){
+    row.data[position(calls)]=switch {case row.data[0]==1:row.data[-1]+10;case:0}
+}
+''')
+        for flags in ([], native.UNCHECKED):
+            with self.subTest(flags=flags):
+                self.compare(source, flags=flags, expected='')
+
     def test_projected_value_parameters_support_runtime_indices(self):
         for declaration,body in [('using row:Row',''),('row:Row','using row;')]:
             prefix='''import "core:fmt"

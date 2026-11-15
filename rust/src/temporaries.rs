@@ -14,6 +14,7 @@ impl Lower<'_, '_> {
         format!("{}owned_{label}_{}", self.prefix, self.temporary_serial)
     }
     fn temporary_math(&mut self, id: NodeId) -> bool {
+        if !self.sets_enabled() { return false; }
         let node = self.source.node(id);
         if node.kind != "Binary" || !matches!(node.op.as_str(), "|" | "&" | "-" | "~") {
             return false;
@@ -330,7 +331,7 @@ impl Lower<'_, '_> {
             let input=if sets {this.g(format!("{}Result",this.prefix),id)}else{this.native_type(left)?};
             let hint=this.temporary_hint(input);
             let mut a=this.temporary_evaluate(left,&mut code,Some(hint.clone()))?;
-            let b=this.temporary_evaluate(right,&mut code,if matches!(this.source.node(right).kind.as_str(),"ImplicitSelector"|"Literal"){Some(hint)}else{None})?;
+            let b=this.temporary_evaluate(right,&mut code,Some(hint))?;
             let result=this.temporary_name("result");
             let known=matches!(this.typ(left),Type::Set(_))||matches!(this.typ(right),Type::Set(_));
             let module=this.module("sets");

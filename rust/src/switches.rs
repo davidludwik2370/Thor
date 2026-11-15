@@ -1681,6 +1681,14 @@ impl Lower<'_, '_> {
         if !matches!(s.node(id).kind.as_str(), "SwitchExpr" | "CompileSwitchExpr") {
             return Ok(None);
         }
+        // Enter an indexed assignment's capture scope before rendering its
+        // switch result and type hints. Otherwise they retain caller locals
+        // that are out of scope inside the assignment helper.
+        if s.node(owner).kind == "Assignment" {
+            if let Some(code) = self.access_assignment(owner, constant)? {
+                return Ok(Some(code));
+            }
+        }
         let hints = self.statement_hints(owner)?;
         let cases = self.cases(id)?;
         let skip = cases
@@ -1688,11 +1696,6 @@ impl Lower<'_, '_> {
             .any(|case| s.node(case.result).kind == "SwitchBreak");
         if skip && (s.node(owner).kind != "Assignment" || s.node(owner).op != "=") {
             return Ok(Some(self.error_token(id,"break in a switch expression requires an ordinary = assignment to existing destinations.")));
-        }
-        if skip {
-            if let Some(code) = self.access_assignment(owner, constant)? {
-                return Ok(Some(code));
-            }
         }
         if let Some(problem) = self.switch_problem(id, hints.len())? {
             let global = s.node(owner).kind == "Declaration"

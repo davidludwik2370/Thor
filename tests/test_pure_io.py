@@ -122,6 +122,7 @@ work::fn(n:int)->int{return fmt.print(n)}
         collection=root/'support';package=collection/'basic';package.mkdir(parents=True)
         (package/'main.odin').write_text('package basic\nprint::proc(n:int)->int{return n+1}\n')
         shutil.copytree(base.ROOT/'runtime/pure',collection/'pure')
+        shutil.copytree(base.ROOT/'runtime/typeinfo',collection/'typeinfo')
         shutil.copytree(base.ROOT/'runtime/sets',collection/'sets')
         self.invoke(self.program('n:=3;if work(n)!=4 {panic("custom basic")}', '''import "thor:basic"
 work::fn(n:int)->int{return basic.print(n)}

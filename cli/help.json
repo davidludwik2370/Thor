@@ -1,0 +1,2223 @@
+{
+  "commands": [
+    {
+      "name": "new",
+      "description": "Create a project and VS Code configuration",
+      "source": false
+    },
+    {
+      "name": "migrate",
+      "description": "Copy an Odin project or translate compiler commands",
+      "source": false
+    },
+    {
+      "name": "build",
+      "description": "Build an executable, library or other artifact",
+      "source": true
+    },
+    {
+      "name": "run",
+      "description": "Build and run a program",
+      "source": true
+    },
+    {
+      "name": "check",
+      "description": "Check a project without building an artifact",
+      "source": true
+    },
+    {
+      "name": "test",
+      "description": "Build and run tests",
+      "source": true
+    },
+    {
+      "name": "vet",
+      "description": "Check conventions and optionally apply corrections",
+      "source": true
+    },
+    {
+      "name": "publish",
+      "description": "Package a native application",
+      "source": true
+    },
+    {
+      "name": "doc",
+      "description": "Show or export original-source documentation",
+      "source": true
+    },
+    {
+      "name": "strip-semicolon",
+      "description": "Remove unnecessary semicolons from project sources",
+      "source": true
+    },
+    {
+      "name": "transpile",
+      "description": "Generate Odin source",
+      "source": true
+    },
+    {
+      "name": "ast",
+      "description": "Print the parsed syntax tree as JSON",
+      "source": true
+    },
+    {
+      "name": "bundle",
+      "description": "Bundle a prepared Android directory",
+      "source": false
+    },
+    {
+      "name": "version",
+      "description": "Print the Thor version",
+      "source": false
+    },
+    {
+      "name": "root",
+      "description": "Print the Thor installation directory",
+      "source": false
+    },
+    {
+      "name": "report",
+      "description": "Print toolchain and system information",
+      "source": false
+    },
+    {
+      "name": "help",
+      "description": "Show standard or full command help",
+      "source": false
+    }
+  ],
+  "sections": [
+    {
+      "commands": [
+        "migrate"
+      ],
+      "text": "Project migration: migrate\n  thor migrate <directory>      Copy an Odin project into ./<directory-name>\n  --output-dir PATH            Parent directory receiving <directory-name>\n                               Default current directory\n  --command 'odin ...'         Translate an invocation (repeatable)\n                               Without a directory, prints commands only\n  --dry-run                    Build-validate the copy, then discard it\n  --odin PATH                  Select the Odin compiler\n  -define:NAME=VALUE           Match the original build configuration\n  -collection:NAME=PATH        Resolve custom packages relative to the source project\n  -target:OS_ARCH              Validate the selected native target\n"
+    },
+    {
+      "commands": [
+        "transpile",
+        "check",
+        "build",
+        "run",
+        "test",
+        "vet",
+        "publish",
+        "ast"
+      ],
+      "text": "Compiler and diagnostics: transpile, check, build, run, test, vet, publish, ast\n  --odin PATH                  Select the Odin compiler (also THOR_ODIN)\n  --diagnostic-format FORMAT   Choose diagnostic output\n                                 text    Human-readable messages (default)\n                                 json    Structured messages on stderr\n  --raw-diagnostics            Show original Odin diagnostics\n  --overlay PATH               Read editor source replacements from a JSON file\n"
+    },
+    {
+      "commands": [
+        "transpile",
+        "check",
+        "build",
+        "run",
+        "test",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "text": "Generated files: transpile, check, build, run, test, vet, publish, doc, strip-semicolon\n  --output-dir PATH            Choose the generated Odin/build directory\n                               Default .thor-rust-build/<source> in the working directory\n  --source-maps                Keep source maps with generated Odin files\n                               Transpile and debug builds keep maps automatically\n"
+    },
+    {
+      "commands": [
+        "transpile",
+        "check",
+        "build",
+        "run",
+        "test",
+        "vet",
+        "publish",
+        "ast",
+        "doc",
+        "strip-semicolon"
+      ],
+      "text": "Caching: transpile, check, build, run, test, vet, publish, ast, doc, strip-semicolon\n  --cache-dir PATH             Choose the parser and compile-time result cache\n                               Default .thor-cache beside the entry package\n  --no-cache                   Bypass parser and compile-time result caches\n  --clear-cache                Clear managed parser and evaluation entries first\n"
+    },
+    {
+      "commands": [
+        "transpile",
+        "check",
+        "build",
+        "run",
+        "test",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "text": "Compile-time execution: transpile, check, build, run, test, vet, publish, doc, strip-semicolon\n  --run-timeout SEC            Limit each compile-time execution in seconds\n                               0 means unlimited (default)\n  --cache-report               Print compile-time cache counters as JSON\n"
+    },
+    {
+      "commands": [
+        "check",
+        "build",
+        "run",
+        "test",
+        "vet",
+        "publish"
+      ],
+      "text": "Thor conventions: check, build, run, test, vet, publish\n  --vet[=CHECKS]               Check immutable,pure,unused,semicolon (default all)\n                                 immutable    Suggest immutable declarations\n                                 pure         Suggest eligible procs become fn\n                                 unused       Report unused local bindings/parameters\n                                 semicolon    Report unnecessary semicolons\n                               Select multiple checks with commas\n                               thor vet enables all four checks by default\n                               Findings are errors for build; warnings otherwise\n"
+    },
+    {
+      "commands": [
+        "vet"
+      ],
+      "text": "Corrections: vet only\n  --apply                      Apply verified corrections automatically\n  --ask                        Preview corrections and ask before applying\n                               Choose one of --apply or --ask\n"
+    },
+    {
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "publish"
+      ],
+      "text": "Artifact options: build, run, test, publish\n  -out:PATH                    Choose the artifact path\n                               Build defaults to ./<working-directory-name>\n  -o:MODE                      Set optimization\n                                 none          Disable optimization (debug default)\n                                 minimal       Minimal optimization (normal default)\n                                 size          Optimize for smaller executables\n                                 speed         Optimize for speed (publish default)\n                                 aggressive    Enable more aggressive optimization\n  -debug                       Generate debugger information with Thor locations\n                               Native macOS enables tracking and AddressSanitizer\n  --no-sanitize                Disable automatic debug AddressSanitizer\n                               Explicit Odin sanitizer flags still apply\n"
+    },
+    {
+      "commands": [
+        "build",
+        "run",
+        "publish"
+      ],
+      "text": "Allocation tracking: build, run, publish\n  --track-allocations MODE     Choose tracking for native macOS executables\n                                 auto     Basic with -debug (default)\n                                 off      Disable allocation tracking\n                                 basic    Report leaks and allocation violations\n                                 trace    Also collect allocation call stacks (-debug)\n                               Tests use Odin's test allocation tracker\n"
+    },
+    {
+      "commands": [
+        "run",
+        "test"
+      ],
+      "text": "Program arguments: run, test\n  -- arguments                 Pass remaining arguments to the program/test runner\n"
+    },
+    {
+      "commands": [
+        "publish"
+      ],
+      "text": "Application packaging: publish only\n  --app-name NAME              Set the application name (default executable name)\n  --app-id ID                  Set the reverse-domain application identifier\n  --app-version VERSION        Set the version (default 0.1.0)\n  --app-type TYPE              Choose how the application launches\n                                 gui        Open without a terminal (default)\n                                 console    Launch with a terminal\n  --app-icon PATH              Choose a project-relative PNG or ICO icon\n                               Default assets/icon.png or assets/icon.ico\n  --app-resource PATH          Include a project resource file/directory (repeatable)\n  --app-library PATH           Bundle a native library/plugin (repeatable)\n  --publish-dir PATH           Choose the application package destination\n                               Default working directory, or parent of -out:PATH\n"
+    },
+    {
+      "commands": [
+        "new"
+      ],
+      "text": "Project creation: new only\n  --parent PATH                Choose the project parent (default working directory)\n  --template PATH              Choose the starter .thor source\n                               Default templates/main.thor in the Thor installation\n  --open                       Open the new project in VS Code\n  --no-open                    Create without opening VS Code (default)\n  --gitignore                  Also create a .gitignore for build files and caches\n  --odin PATH                  Set the Odin executable for the debug build task\n"
+    },
+    {
+      "commands": [
+        "doc"
+      ],
+      "text": "Documentation: doc only\n  -short                       Show abbreviated documentation\n  -in-source-order             Preserve source declaration order\n  -all-packages                Include imported packages\n  -doc-format                  Export the .odin-doc interchange format\n  -out:PATH                    Choose the documentation export path\n"
+    },
+    {
+      "commands": [
+        "strip-semicolon"
+      ],
+      "text": "Source cleanup: strip-semicolon only\n  -keep-temp-files             Keep backups of edited project files\n                               Original project sources are checked before editing\n"
+    },
+    {
+      "commands": [
+        "bundle"
+      ],
+      "text": "Android bundling: bundle only\n  thor bundle android [directory] [options]\n                               Bundle an existing Android output directory\n  -android-keystore:PATH        Select the signing keystore\n  -android-keystore-alias:NAME  Select the signing key\n  -android-keystore-password:TEXT\n                               Supply the keystore password\n                               Omit to use the native packager prompt\n"
+    },
+    {
+      "commands": [
+        "doc",
+        "strip-semicolon"
+      ],
+      "text": "Compiler and diagnostics: doc, strip-semicolon\n  --odin PATH                  Select the Odin compiler (also THOR_ODIN)\n  --diagnostic-format FORMAT   Choose text (default) or JSON diagnostics\n  --overlay PATH               Read editor source replacements (doc only)\n"
+    }
+  ],
+  "native_flags": [
+    {
+      "name": "file",
+      "syntax": "-file",
+      "description": "Select a self-contained file input. Thor detects file inputs automatically and accepts this spelling for compatibility.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "out",
+      "syntax": "-out:<filepath>",
+      "description": "Choose the output artifact path. For doc -doc-format this is the .odin-doc export base name; its extension is optional.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "publish",
+        "doc"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "o",
+      "syntax": "-o:<string>",
+      "description": "Sets the optimization mode for compilation.\nAvailable options:\n\t-o:none\n\t-o:minimal\n\t-o:size\n\t-o:speed\n\t-o:aggressive (use this with caution)\nThe default is -o:minimal. If -debug is set, the default is -o:none.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "show-timings",
+      "syntax": "-show-timings",
+      "description": "Show Thor preparation, lowering and native compilation timings.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "show-more-timings",
+      "syntax": "-show-more-timings",
+      "description": "Shows an advanced overview of the timings of different stages within the compiler in milliseconds.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "show-import-graph",
+      "syntax": "-show-import-graph",
+      "description": "Shows dot graph text format of the import graph of a project.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "export-timings",
+      "syntax": "-export-timings:<format>",
+      "description": "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.\nAvailable options:\n\t-export-timings:json   Exports compile time stats to JSON.\n\t-export-timings:csv    Exports compile time stats to CSV.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "export-timings-file",
+      "syntax": "-export-timings-file:<filename>",
+      "description": "Specifies the filename for `-export-timings`.\nExample: -export-timings-file:timings.json",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "export-dependencies",
+      "syntax": "-export-dependencies:<format>",
+      "description": "Export original source and resource dependencies. Formats are make (Makefile rules) and json (structured data). Requires -export-dependencies-file.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "export-dependencies-file",
+      "syntax": "-export-dependencies-file:<filename>",
+      "description": "Specifies the filename for `-export-dependencies`.\nExample: -export-dependencies-file:dependencies.d",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "show-unused",
+      "syntax": "-show-unused",
+      "description": "Shows unused package declarations within the current project.",
+      "commands": [
+        "check"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "show-unused-with-location",
+      "syntax": "-show-unused-with-location",
+      "description": "Shows unused package declarations within the current project with the declarations source location.",
+      "commands": [
+        "check"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "show-system-calls",
+      "syntax": "-show-system-calls",
+      "description": "Prints the whole command and arguments for calls to external tools like linker and assembler.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "thread-count",
+      "syntax": "-thread-count:<integer>",
+      "description": "Limit Thor worker threads and native compiler threads. Must be a positive integer.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "Integer",
+      "internal": false
+    },
+    {
+      "name": "keep-temp-files",
+      "syntax": "-keep-temp-files",
+      "description": "Keeps the temporary files generated during stripping the unneeded semicolons from files.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "collection",
+      "syntax": "-collection:<name>=<filepath>",
+      "description": "Defines a library collection used for imports and foreign imports.\nExample: -collection:shared=dir/to/shared\nUsage in Code:\n\timport \"shared:foo\"\n\tforeign import lib \"shared:libfoo.a\"",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "define",
+      "syntax": "-define:<name>=<value>",
+      "description": "Defines a scalar boolean, integer or string as global constant.\nExample: -define:SPAM=123\nUsage in code:\n\t#config(SPAM, default_value)",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "build-mode",
+      "syntax": "-build-mode:<mode>",
+      "description": "Sets the build mode.\nAvailable options:\n\t-build-mode:exe         Builds as an executable.\n\t-build-mode:test        Builds as an executable that executes tests.\n\t-build-mode:dll         Builds as a dynamically linked library.\n\t-build-mode:shared      Builds as a dynamically linked library.\n\t-build-mode:dynamic     Builds as a dynamically linked library.\n\t-build-mode:lib         Builds as a statically linked library.\n\t-build-mode:static      Builds as a statically linked library.\n\t-build-mode:obj         Builds as an object file.\n\t-build-mode:object      Builds as an object file.\n\t-build-mode:assembly    Builds as an assembly file.\n\t-build-mode:assembler   Builds as an assembly file.\n\t-build-mode:asm         Builds as an assembly file.\n\t-build-mode:llvm-ir     Builds as an LLVM IR file.\n\t-build-mode:llvm        Builds as an LLVM IR file.\nrun and publish require exe; test requires test. Other modes are available through build.\nLLVM IR uses an output directory. Object and assembly modes can produce multiple units; use -use-single-module for one unit.\nvet accepts test to check and correct test declarations without running tests.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "publish",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "keep-executable",
+      "syntax": "-keep-executable",
+      "description": "Keep the executable generated by `thor test` or `thor run` after running it. We clean it up by default.\nIf you build your program or test using `thor build`, the compiler does not automatically execute\nthe resulting program, and this option is not applicable.",
+      "commands": [
+        "build",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "target",
+      "syntax": "-target:<string>",
+      "description": "Sets the target for the executable to be built in.\nExamples:\n\t-target:linux_amd64\n\t-target:windows_amd64\n\t-target:\"?\" for a list",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "subtarget",
+      "syntax": "-subtarget:<subtarget>",
+      "description": "[Darwin, Linux and Freestanding ARM32 only]\nAvailable subtargets:\n\t-subtarget:iphone\n\t-subtarget:iphonesimulator\n\t-subtarget:android\n\t-subtarget:playdate",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "debug",
+      "syntax": "-debug",
+      "description": "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'. Sets -o:none by default.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "disable-assert",
+      "syntax": "-disable-assert",
+      "description": "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-bounds-check",
+      "syntax": "-no-bounds-check",
+      "description": "Disables bounds checking program wide.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "webkit-switch-workaround",
+      "syntax": "-webkit-switch-workaround",
+      "description": "Constrains 'typeid' values to 63 bits to avoid an OMG JIT crash in WebKit when running WASM builds.\nOnly needed for 'js_wasm32'/'js_wasm64p32' targets run in Safari/WebKit. See: https://github.com/odin-lang/Odin/issues/6810",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-type-assert",
+      "syntax": "-no-type-assert",
+      "description": "Disables type assertion checking program wide.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "lifetime-markers",
+      "syntax": "-lifetime-markers",
+      "description": "Emits lifetime markers for named locals, so that locals from\nnon-overlapping scopes may reuse stack.\nRequires '-o:size' or above; no effect with '-sanitize:address'.\nWarning: this applies to every package in the build; using the address\nof a local after the local's declaring scope ended can miscompile.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-thread-local",
+      "syntax": "-no-thread-local",
+      "description": "Ignores @thread_local attribute, effectively treating the program as if it is single-threaded.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-dynamic-literals",
+      "syntax": "-no-dynamic-literals",
+      "description": "Disallow dynamic collection literals.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "dynamic-literals",
+      "syntax": "-dynamic-literals",
+      "description": "Enable dynamic collection literals.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-crt",
+      "syntax": "-no-crt",
+      "description": "Disables automatic linking with the C Run Time.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-rpath",
+      "syntax": "-no-rpath",
+      "description": "Disables automatic addition of an rpath linked to the executable directory.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-entry-point",
+      "syntax": "-no-entry-point",
+      "description": "Removes default requirement of an entry point (e.g. main procedure).",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-escape-analysis",
+      "syntax": "-no-escape-analysis",
+      "description": "Disables the escape analysis of stack memory, except in files with '#+analysis escape'.\nWhere it is disabled, by this or by '#+analysis !escape', only returning the address of a local or similar is an error.\nCannot be used with -vet-nil-deref or -vet-uninitialized.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-atomic-analysis",
+      "syntax": "-no-atomic-analysis",
+      "description": "Disables the analysis of atomic memory orderings, except in files with '#+analysis atomic'.\nIt warns where what is written with release ordering is only loaded with relaxed ordering, or the reverse.\nCannot be used with -vet-atomic-access.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "linker",
+      "syntax": "-linker:<string>",
+      "description": "Specify the linker to use.\nChoices:\n\tdefault\n\tlld\n\tradlink\n\tmold",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "use-separate-modules",
+      "syntax": "-use-separate-modules",
+      "description": "The backend generates multiple build units which are then linked together.\nThis is the default behaviour for '-o:none' and '-o:minimal' builds.\nNormally, a single build unit is generated for a standard project for '-o:speed' or '-o:size'.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "use-single-module",
+      "syntax": "-use-single-module",
+      "description": "The backend generates only a single build unit.\nThis is the default behaviour for '-o:speed' or '-o:size'.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-threaded-checker",
+      "syntax": "-no-threaded-checker",
+      "description": "Disables multithreading in the semantic checker stage.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "show-debug-messages",
+      "syntax": "-show-debug-messages",
+      "description": "Print native compiler debugging messages.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "did-you-mean-limit",
+      "syntax": "-did-you-mean-limit:<integer>",
+      "description": "Sets the maximum number of suggestions the compiler provides.\nMust be an integer >0.\nIf not set, the default limit is 10.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "Integer",
+      "internal": false
+    },
+    {
+      "name": "show-defineables",
+      "syntax": "-show-defineables",
+      "description": "Shows an overview of all the #config/#defined usages in the project.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "export-defineables",
+      "syntax": "-export-defineables:<filename>",
+      "description": "Exports an overview of all the #config/#defined usages in CSV format to the given file path.\nExample: -export-defineables:defineables.csv",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "ignore-unused-defineables",
+      "syntax": "-ignore-unused-defineables",
+      "description": "Silence warning/error if a -define doesn't have at least one #config/#defined usage.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "vet",
+      "syntax": "-vet",
+      "description": "Enable Odin’s bundled native vet checks. These policies report errors.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "The native bundle includes checks that misread generated helpers. Use --vet for Thor convention checks, or select supported native checks individually."
+    },
+    {
+      "name": "vet-unused",
+      "syntax": "-vet-unused",
+      "description": "Checks for unused declarations (variables and imports).",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated helpers and imports make native unused checks unreliable. Use --vet=unused for original Thor local bindings."
+    },
+    {
+      "name": "vet-unused-variables",
+      "syntax": "-vet-unused-variables",
+      "description": "Checks for unused variable declarations.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated helper declarations can be reported as unused. Use --vet=unused for original Thor local bindings."
+    },
+    {
+      "name": "vet-unused-procedures",
+      "syntax": "-vet-unused-procedures",
+      "description": "Checks for unused procedures.\nMust be used with -vet-packages or specified on a per file with +vet tags.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated helper procedures can be reported as unused."
+    },
+    {
+      "name": "vet-unused-imports",
+      "syntax": "-vet-unused-imports",
+      "description": "Checks for unused import declarations.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated imports and aliases do not preserve native import usage checks."
+    },
+    {
+      "name": "vet-shadowing",
+      "syntax": "-vet-shadowing",
+      "description": "Checks for variable shadowing within procedures.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated comprehension bindings and capture scopes do not preserve native shadowing checks."
+    },
+    {
+      "name": "vet-using-stmt",
+      "syntax": "-vet-using-stmt",
+      "description": "Checks for the use of 'using' as a statement.\n'using' is considered bad practice outside of immediate refactoring.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Thor automatically enables using statements; the generated feature tag overrides this native policy."
+    },
+    {
+      "name": "vet-using-param",
+      "syntax": "-vet-using-param",
+      "description": "Checks for the use of 'using' on procedure parameters.\n'using' is considered bad practice outside of immediate refactoring.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Thor automatically enables using parameters; the generated feature tag overrides this native policy."
+    },
+    {
+      "name": "vet-style",
+      "syntax": "-vet-style",
+      "description": "Errs on missing trailing commas followed by a newline.\nErrs on deprecated syntax.\nDoes not err on unneeded tokens (unlike -strict-style).",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated native constraints and support code do not follow this source-style policy."
+    },
+    {
+      "name": "vet-semicolon",
+      "syntax": "-vet-semicolon",
+      "description": "Errs on unneeded semicolons.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "vet-cast",
+      "syntax": "-vet-cast",
+      "description": "Errs on casting a value to its own type or using `transmute` rather than `cast`.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated generic helpers can hide redundant casts from native checking."
+    },
+    {
+      "name": "vet-tabs",
+      "syntax": "-vet-tabs",
+      "description": "Errs when the use of tabs has not been used for indentation.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated code uses its own indentation, so native indentation checks cannot inspect original Thor formatting."
+    },
+    {
+      "name": "vet-when-shadowing",
+      "syntax": "-vet-when-shadowing",
+      "description": "Checks for declarations within a global 'when' that shadow a builtin or package-level name.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "vet-nil-deref",
+      "syntax": "-vet-nil-deref",
+      "description": "Errs on dereferencing a pointer, or calling a procedure value, which is nil on every path reaching it.\nA pointer made through an explicit conversion to 'rawptr' or 'uintptr', or a 'transmute', is never assumed to be nil.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated captures can hide nil dereferences from native flow analysis."
+    },
+    {
+      "name": "vet-uninitialized",
+      "syntax": "-vet-uninitialized",
+      "description": "Errs on reading a variable declared with '---', or a part of it, before anything is stored in it on every path reaching it.\nTaking its address, e.g. to pass it to a procedure which fills it in, counts as storing into it.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated captures can hide uninitialized reads from native flow analysis."
+    },
+    {
+      "name": "vet-atomic-access",
+      "syntax": "-vet-atomic-access",
+      "description": "Errs on a plain read of a variable or field which is accessed atomically elsewhere, except in procedures which take a lock.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "Generated captures can hide source accesses from native atomic-access analysis."
+    },
+    {
+      "name": "vet-packages",
+      "syntax": "-vet-packages:<comma-separated-strings>",
+      "description": "Sets which packages by name will be vetted.\nFiles with specific +vet tags will not be ignored if they are not in the packages set.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "custom-attribute",
+      "syntax": "-custom-attribute:<string>",
+      "description": "Add a custom attribute which will be ignored if it is unknown.\nThis can be used with metaprogramming tools.\nExamples:\n\t-custom-attribute:my_tag\n\t-custom-attribute:my_tag,the_other_thing\n\t-custom-attribute:my_tag -custom-attribute:the_other_thing",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "ignore-unknown-attributes",
+      "syntax": "-ignore-unknown-attributes",
+      "description": "Ignores unknown attributes.\nThis can be used with metaprogramming tools.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "extra-linker-flags",
+      "syntax": "-extra-linker-flags:<string>",
+      "description": "Adds extra linker specific flags in a string.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "extra-assembler-flags",
+      "syntax": "-extra-assembler-flags:<string>",
+      "description": "Adds extra assembler specific flags in a string.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "microarch",
+      "syntax": "-microarch:<string>",
+      "description": "Specifies the specific micro-architecture for the build in a string.\nExamples:\n\t-microarch:sandybridge\n\t-microarch:native\n\t-microarch:\"?\" for a list",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "target-features",
+      "syntax": "-target-features:<string>",
+      "description": "Specifies CPU features to enable on top of the enabled features implied by -microarch.\nExamples:\n\t-target-features:atomics\n\t-target-features:\"sse2,aes\"\n\t-target-features:\"?\" for a list",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "strict-target-features",
+      "syntax": "-strict-target-features",
+      "description": "Makes @(enable_target_features=\"...\") behave the same way as @(require_target_features=\"...\").\nThis enforces that all generated code uses features supported by the combination of -target, -microarch, and -target-features.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "minimum-os-version",
+      "syntax": "-minimum-os-version:<string>",
+      "description": "Sets the minimum OS version targeted by the application.\nDefault: -minimum-os-version:11.0.0\nOnly used when target is Darwin or subtarget is Android, if given, linking mismatched versions will emit a warning.\n",
+      "commands": [
+        "build",
+        "bundle",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "reloc-mode",
+      "syntax": "-reloc-mode:<string>",
+      "description": "Specifies the reloc mode.\nAvailable options:\n\t-reloc-mode:default\n\t-reloc-mode:static\n\t-reloc-mode:pic\n\t-reloc-mode:dynamic-no-pic",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "stack-protector",
+      "syntax": "-stack-protector:<string>",
+      "description": "Specifies the stack protector.\nAvailable options:\n\t-stack-protector:none\n\t-stack-protector:base\n\t-stack-protector:all\n\t-stack-protector:strong",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "disable-red-zone",
+      "syntax": "-disable-red-zone",
+      "description": "Disables red zone on a supported freestanding target.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "disable-unwind",
+      "syntax": "-disable-unwind",
+      "description": "Disable unwind information.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "disallow-do",
+      "syntax": "-disallow-do",
+      "description": "Disallows the 'do' keyword in the project.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "default-to-nil-allocator",
+      "syntax": "-default-to-nil-allocator",
+      "description": "Sets the default allocator to be the nil_allocator, an allocator which does nothing.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "default-to-panic-allocator",
+      "syntax": "-default-to-panic-allocator",
+      "description": "Sets the default allocator to be the panic_allocator, an allocator which calls panic() on any allocation attempt.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "strict-style",
+      "syntax": "-strict-style",
+      "description": "This enforces parts of same style as the Odin compiler, prefer '-vet-style -vet-semicolon' if you do not want to match it exactly.\n\nErrs on unneeded tokens, such as unneeded semicolons.\nErrs on missing trailing commas followed by a newline.\nErrs on deprecated syntax.\nErrs when the attached-brace style is not adhered to (also known as 1TBS).\nErrs when 'case' labels are not in the same column as the associated 'switch' token.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false,
+      "thor_rejection": "This bundles native style and indentation checks that inspect generated formatting. Use --vet=semicolon to check original Thor terminators."
+    },
+    {
+      "name": "strict-style-packages",
+      "syntax": "-strict-style-packages:<comma-separated-strings>",
+      "description": "Sets which packages by name will be checked against with '-strict-style'.\nFiles with specific +vet tags will not be ignored if they are not in the packages set.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "foreign-error-procedures",
+      "syntax": "-foreign-error-procedures",
+      "description": "States that the error procedures used in the runtime are defined in a separate translation unit.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "no-rtti",
+      "syntax": "-no-rtti",
+      "description": "Disable runtime type information where the target permits it.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "disallow-rtti",
+      "syntax": "-disallow-rtti",
+      "description": "Compatibility spelling for -no-rtti.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "dynamic-map-calls",
+      "syntax": "-dynamic-map-calls",
+      "description": "Uses dynamic map calls to minimize code generation at the cost of runtime execution.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "obfuscate-source-code-locations",
+      "syntax": "-obfuscate-source-code-locations",
+      "description": "Compatibility spelling for -source-code-locations:obfuscated.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "source-code-locations",
+      "syntax": "-source-code-locations:<string>",
+      "description": "Processes the file and procedure strings, and line and column numbers, stored with a 'runtime.Source_Code_Location' value.\nAvailable options:\n\t-source-code-locations:normal\n\t-source-code-locations:obfuscated\n\t-source-code-locations:filename\n\t-source-code-locations:none\nThe default is -source-code-locations:normal.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "short",
+      "syntax": "-short",
+      "description": "Shows shortened documentation for the packages.",
+      "commands": [
+        "doc"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "in-source-order",
+      "syntax": "-in-source-order",
+      "description": "Shows documentation for the packages in source order within each file.",
+      "commands": [
+        "doc"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "all-packages",
+      "syntax": "-all-packages",
+      "description": "Include imported packages in documentation and test discovery. With vet, use -build-mode:test.",
+      "commands": [
+        "build",
+        "test",
+        "doc",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "doc-format",
+      "syntax": "-doc-format",
+      "description": "Generates documentation as the .odin-doc format (useful for external tooling).",
+      "commands": [
+        "doc"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "ignore-warnings",
+      "syntax": "-ignore-warnings",
+      "description": "Ignores warning messages.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "warnings-as-errors",
+      "syntax": "-warnings-as-errors",
+      "description": "Treats warning messages as error messages.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "terse-errors",
+      "syntax": "-terse-errors",
+      "description": "Prints a terse error message without showing the code on that line and the location in that line.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "verbose-errors",
+      "syntax": "-verbose-errors",
+      "description": "Request additional compiler diagnostic detail.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "json-errors",
+      "syntax": "-json-errors",
+      "description": "Prints the error messages as json to stderr.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "error-pos-style",
+      "syntax": "-error-pos-style:<string>",
+      "description": "Available options:\n\t-error-pos-style:unix      file/path:45:3:\n\t-error-pos-style:thor      file/path(45:3)\n\t-error-pos-style:default   (Defaults to 'odin'.)",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "max-error-count",
+      "syntax": "-max-error-count:<integer>",
+      "description": "Sets the maximum number of errors that can be displayed before the compiler terminates.\nMust be an integer >0.\nIf not set, the default max error count is 36.",
+      "commands": [
+        "build",
+        "run",
+        "test",
+        "check",
+        "vet",
+        "publish",
+        "doc",
+        "strip-semicolon"
+      ],
+      "kind": "Integer",
+      "internal": false
+    },
+    {
+      "name": "min-link-libs",
+      "syntax": "-min-link-libs",
+      "description": "If set, the number of linked libraries will be minimized to prevent duplications.\nThis is useful for so called \"dumb\" linkers compared to \"smart\" linkers.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "export-linked-libs-file",
+      "syntax": "-export-linked-libs-file:VALUE",
+      "description": "Write the linked native library paths to a file.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "print-linker-flags",
+      "syntax": "-print-linker-flags",
+      "description": "Prints the all of the flags/arguments that will be passed to the linker.",
+      "commands": [
+        "build"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "integer-division-by-zero",
+      "syntax": "-integer-division-by-zero:<string>",
+      "description": "Specifies the default behaviour for integer division by zero.\nAvailable Options:\n\t-integer-division-by-zero:trap        Trap on division/modulo/remainder by zero\n\t-integer-division-by-zero:zero        x/0 == 0 and x%0 == x and x%%0 == x\n\t-integer-division-by-zero:self        x/0 == x and x%0 == 0 and x%%0 == 0\n\t-integer-division-by-zero:all-bits    x/0 == ~T(0) and x%0 == x and x%%0 == x",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "build-diagnostics",
+      "syntax": "-build-diagnostics",
+      "description": "Emit native compiler build diagnostics.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "bedrock",
+      "syntax": "-bedrock",
+      "description": "Disables numerous features. List of disabled features:\n\t`map` types\n\t128-bit integer types\n\truntime type information (-no-rtti)\n\tnon-constant global variables (-disable-non-constant-globals)\n\t@(init) @(fini) (-disable-init-fini)\n\tAnything Objective-C related\n\tThe default paths to the library collections 'core' and 'vendor'",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "disable-non-constant-globals",
+      "syntax": "-disable-non-constant-globals",
+      "description": "Disables any global variables which are not initialized with global constants",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "disable-init-fini",
+      "syntax": "-disable-init-fini",
+      "description": "Disables the ability to use @(init) and @(fini) procedures",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "internal-fast-isel",
+      "syntax": "-internal-fast-isel",
+      "description": "Use the experimental LLVM fast instruction selector. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-ignore-lazy",
+      "syntax": "-internal-ignore-lazy",
+      "description": "Disable lazy procedure generation in the native compiler. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-ignore-llvm-build",
+      "syntax": "-internal-ignore-llvm-build",
+      "description": "Skip LLVM module construction in the native compiler. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-ignore-panic",
+      "syntax": "-internal-ignore-panic",
+      "description": "Ignore native panic paths; intended for compiler investigations only. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-module-per-file",
+      "syntax": "-internal-module-per-file",
+      "description": "Generate a separate LLVM module for each input file. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-cached",
+      "syntax": "-internal-cached",
+      "description": "Enable the native compiler’s experimental object caching. This is separate from Thor’s compile-time result cache. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-no-inline",
+      "syntax": "-internal-no-inline",
+      "description": "Disable native procedure inlining for compiler investigations. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-by-value",
+      "syntax": "-internal-by-value",
+      "description": "Use the experimental native by-value calling convention. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-weak-monomorphization",
+      "syntax": "-internal-weak-monomorphization",
+      "description": "Use weak linkage for native polymorphic procedure specializations. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-ignore-llvm-verification",
+      "syntax": "-internal-ignore-llvm-verification",
+      "description": "Skip verification of generated LLVM modules. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-llvm-no-sroa",
+      "syntax": "-internal-llvm-no-sroa",
+      "description": "Disable LLVM scalar replacement of aggregate storage. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-enable-rvo",
+      "syntax": "-internal-enable-rvo",
+      "description": "Enable experimental native return-value optimization. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "bundle",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-global-entity-graph",
+      "syntax": "-internal-global-entity-graph",
+      "description": "Use the native compiler’s experimental global entity graph. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "internal-shuffle-global-entities",
+      "syntax": "-internal-shuffle-global-entities:N",
+      "description": "Shuffle native global entities using the supplied integer seed. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "Integer",
+      "internal": true
+    },
+    {
+      "name": "internal-check-global-edges",
+      "syntax": "-internal-check-global-edges",
+      "description": "Validate edges in the native compiler’s global entity graph. Compiler-development option; availability and behavior depend on the selected toolchain.",
+      "commands": [
+        "build",
+        "check",
+        "doc",
+        "publish",
+        "run",
+        "strip-semicolon",
+        "test",
+        "vet"
+      ],
+      "kind": "None",
+      "internal": true
+    },
+    {
+      "name": "sanitize",
+      "syntax": "-sanitize:<string>",
+      "description": "Enables sanitization analysis.\nAvailable options:\n\t-sanitize:address\n\t-sanitize:memory\n\t-sanitize:thread",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "lto",
+      "syntax": "-lto:<string>",
+      "description": "States that the project is to be build with link-time optimizations.\nThis also enables '-use-separate-modules' (if not already set) and `-linker:lld\nChoices:\n\tthin       (one module per package)\n\tthin-files (one module file)",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "ignore-vs-search",
+      "syntax": "-ignore-vs-search",
+      "description": "Skip Visual Studio library-path discovery on Windows.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "None",
+      "internal": false
+    },
+    {
+      "name": "resource",
+      "syntax": "-resource:VALUE",
+      "description": "Select a Windows resource file.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "pdb-name",
+      "syntax": "-pdb-name:VALUE",
+      "description": "Choose the Windows debugging database filename.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "subsystem",
+      "syntax": "-subsystem:VALUE",
+      "description": "Select the Windows subsystem. Values are console and windows.",
+      "commands": [
+        "build",
+        "publish",
+        "run",
+        "test"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "android-keystore",
+      "syntax": "-android-keystore:<string>",
+      "description": "Specifies the keystore file to use to sign the apk.",
+      "commands": [
+        "bundle"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "android-keystore-alias",
+      "syntax": "-android-keystore-alias:<string>",
+      "description": "Specifies the key alias to use when signing the apk\nCan be omitted if the keystore only contains one key",
+      "commands": [
+        "bundle"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "android-keystore-password",
+      "syntax": "-android-keystore-password:<string>",
+      "description": "Sets the password to use to unlock the keystore\nIf this is omitted, the terminal will prompt you to provide it.",
+      "commands": [
+        "bundle"
+      ],
+      "kind": "String",
+      "internal": false
+    },
+    {
+      "name": "windows-sdk-root",
+      "syntax": "-windows-sdk-root:<string>",
+      "description": "Path to the root directory of the Windows SDK for cross-linking.\nRequires '-linker:lld' flag and 'lld-link' installation.\nExample: -windows-sdk-root:~/windows-sdk",
+      "commands": [
+        "build",
+        "publish"
+      ],
+      "kind": "String",
+      "internal": false
+    }
+  ],
+  "native_catalog_version": "dev-2026-10:8169255b9"
+}

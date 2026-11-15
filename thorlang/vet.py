@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextlib
+from bisect import bisect_left
 from dataclasses import dataclass
 import io
 import json
@@ -11,9 +12,9 @@ import stat
 import tempfile
 
 from .compiler import ThorError
-from .sourcemap import Origin
+from .sourcemap import Origin, position
 
-CHECKS = ('immutable', 'pure')
+CHECKS = ('immutable', 'pure', 'unused', 'semicolon')
 
 
 @dataclass(frozen=True)
@@ -28,14 +29,21 @@ class Fix:
     highlight_end: int
 
     def diagnostic(self, adapter):
-        message = (f"Declare '{self.names}' immutable with ':>'." if self.rule == 'immutable'
-                   else f"Procedure '{self.names}' can be declared with 'fn'.")
+        if self.rule == 'semicolon':
+            message = 'Unnecessary semicolon.'
+            code = 'thor/unnecessary-semicolon'
+        elif self.rule == 'immutable':
+            message = f"Declare '{self.names}' immutable with ':>'."
+            code = 'thor/prefer-immutable'
+        else:
+            message = f"Procedure '{self.names}' can be declared with 'fn'."
+            code = 'thor/prefer-fn'
         if not hasattr(self.source, 'vet_snapshot'):
             digest = 14695981039346656037
             for byte in self.source.raw:
                 digest = ((digest ^ byte)*1099511628211) & ((1 << 64)-1)
             self.source.vet_snapshot = f'{digest:016x}'
-        return {'type': 'warning', 'stage': 'vet', 'code': 'thor/prefer-'+('immutable' if self.rule == 'immutable' else 'fn'),
+        return {'type': 'warning', 'stage': 'vet', 'code': code,
                 'pos': adapter.locate(Origin(str(self.source.path), self.highlight_start, self.highlight_end)),
                 'msgs': [message],
                 'fix': {'pos': adapter.locate(Origin(str(self.source.path), self.start, self.end)),
@@ -64,14 +72,30 @@ def possible_pure_type(typ, resolver, seen=None):
     if typ.kind=='struct' and typ.node:
         if typ.node.data.get('op')=='raw_union':return False
         return all(possible_pure_type(resolver.type_node(field.role('type'),typ.substitutions),resolver,seen.copy())
-                   for field in typ.node.role('fields').children if field.kind=='Field')
+                   for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
     if typ.kind=='union' and typ.node:
         return all(possible_pure_type(resolver.type_node(variant,typ.substitutions),resolver,seen.copy())
                    for variant in typ.node.group('variants'))
     return True
 
 
+def portable_body(project, root):
+    pending=[root];seen=set()
+    while pending:
+        procedure=pending.pop()
+        if procedure in seen:continue
+        seen.add(procedure);source=procedure.source
+        if source.info.get('target_specific') or any(tag.startswith('#+build') for tag in source.info.get('file_tags',[])):
+            return False
+        for node in project.purity.walk(procedure):
+            if node.kind in {'When','WhenExpr','CompileSwitch','CompileSwitchExpr'}:return False
+            if node.kind=='Call':pending.extend(project.purity.targets(node))
+    return True
+
+
 def candidates(project, checks):
+    if not {'immutable', 'pure'}.intersection(checks):
+        return []
     root = project.entry.parent if project.file_entry else project.entry
     result = []
     resolver = project.resolver
@@ -79,6 +103,7 @@ def candidates(project, checks):
         if not source.thor or source.excluded or not source.path.is_relative_to(root):
             continue
         written = set()
+        mutated = set()
         for node in source.nodes:
             targets = []
             if node.kind == 'Assignment' and node.data['op'] != 'in':
@@ -91,6 +116,7 @@ def candidates(project, checks):
                 symbol = binding(target, resolver)
                 if symbol:
                     written.add(symbol.declaration)
+                    if node.kind in {'Assignment','IncDec'}:mutated.add(symbol.declaration)
         for node in source.nodes:
             if (node.kind != 'Declaration' or node.group('attributes')
                     or any(parent.kind in {'When', 'CompileSwitch', 'CompileSwitchExpr'} for parent in node.ancestors())):
@@ -102,8 +128,20 @@ def candidates(project, checks):
             if ('immutable' in checks and node.data.get('mutable') and not node.data.get('immutable')
                     and node.group('values') and node not in written
                     and any(parent.kind == 'Procedure' for parent in node.ancestors())):
+                generic_local=any(parent.kind=='Procedure' and resolver.generic_parameters(parent.role('type'))
+                                  for parent in node.ancestors())
+                types=[resolver.type_of(name) for name in names]
+                if any(project.purity.owned_type(typ) or not possible_pure_type(typ,resolver) for typ in types):
+                    owner=next(parent for parent in node.ancestors() if parent.kind=='Procedure')
+                    if not portable_body(project,owner):continue
+                owner=next(parent for parent in node.ancestors() if parent.kind=='Procedure')
+                if any(resolver.frozen_slice_storage(typ) for typ in types):
+                    outputs=[resolver.type_node(annotation) for _,annotation in resolver.fields(owner.role('type').role('results'))]
+                    if any(project.purity.owned_type(typ) or not possible_pure_type(typ,resolver) for typ in outputs):continue
+                independent=not generic_local or all(not project.purity.owned_type(typ)
+                    and possible_pure_type(typ,resolver) for typ in types)
                 separator = node.data.get('roles', {}).get('separator')
-                if separator and source.raw[separator[0]:separator[1]] == b'=':
+                if independent and separator and source.raw[separator[0]:separator[1]] == b'=':
                     result.append(Fix(source, *separator, b'>', 'immutable', label, names[0].start, names[-1].end))
             values = node.group('values')
             if ('pure' not in checks or len(values) != 1 or values[0].kind != 'Procedure'
@@ -123,14 +161,18 @@ def candidates(project, checks):
             # and allocation decisions explicit for reference-bearing results.
             if any(typ.kind in {'unknown', 'generic'} or project.purity.owned_type(typ) for typ in outputs):
                 continue
-            inputs=[field_type(field) for field in signature.role('params').children if field.kind=='Field']
+            input_fields=[field for field in signature.role('params').children if field.kind=='Field']
+            inputs=[field_type(field) for field in input_fields]
             if any(not possible_pure_type(typ,resolver) for typ in [*inputs,*outputs]):continue
+            if any(field in mutated and project.purity.owned_type(typ)
+                   for field,typ in zip(input_fields,inputs)):continue
             if any(n.kind=='Call' and project.purity.io_call(n) for n in project.purity.walk(proc)):continue
             # Reuse purity's source analysis to discard known violations before
             # asking the complete compiler to validate the proposed conversion.
             project.purity.analyze(proc)
             if proc in project.purity.contracts or any(project.purity.owner(site) is proc for site in project.purity.problems):
                 continue
+            if not portable_body(project,proc):continue
             if source.raw[proc.start:proc.start+4] == b'proc':
                 result.append(Fix(source, proc.start, proc.start+4, b'fn', 'pure', label, names[0].start, names[0].end))
     return sorted(result, key=lambda fix: (fix.rule != 'immutable', str(fix.source.path), fix.start))
@@ -153,10 +195,15 @@ class Validator:
     def __init__(self, project, options, flags, directory):
         self.project, self.options = project, options
         self.directory = Path(directory)
-        self.flags = [flag for flag in flags if not flag.startswith(('-out:', '-build-mode:'))
-                      and flag not in {'-warnings-as-errors', '-ignore-warnings', '-keep-executable'}]
+        from .cli import CATALOG, helper_flag
+        action = 'build' if project.test else 'check'
+        excluded = {flag['name'] for flag in CATALOG['native_flags'] if action not in flag['commands']}
+        self.flags = [flag for flag in flags if (helper_flag(flag) or project.test and flag=='-all-packages')
+                      and not flag.startswith(('-out:', '-build-mode:'))
+                      and flag.lstrip('-').split(':', 1)[0] not in excluded
+                      and flag != '-keep-executable']
         if project.test:
-            self.flags.append('-build-mode:test')
+            self.flags.extend(['-build-mode:test', '-out:'+str(self.directory/'test-probe')])
 
     def check(self, fixes):
         from .driver import _main
@@ -168,7 +215,7 @@ class Validator:
             replacements[str(path)] = str(snapshot)
         overlay = self.directory/'overlay.json'
         overlay.write_text(json.dumps({'Replace': replacements}))
-        command = ['check', str(self.project.entry), '--odin', self.options.odin,
+        command = ['build' if self.project.test else 'check', str(self.project.entry), '--odin', self.options.odin,
                    '--overlay', str(overlay), '--output-dir', str(self.directory/'output'),
                    '--cache-dir', str(self.project.cache_directory), '--run-timeout', str(self.options.run_timeout),
                    '-json-errors', *self.flags]
@@ -177,6 +224,7 @@ class Validator:
         output, errors = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
             status = _main(command)
+        self.errors=[]
         if status:
             try:
                 diagnostics = json.loads(errors.getvalue())['errors']
@@ -185,17 +233,47 @@ class Validator:
             failure = next((item for item in diagnostics if item.get('stage') == 'toolchain'), None)
             if failure:
                 raise ThorError('Thor vet validation failed in the native toolchain. '+failure['msgs'][0])
+            self.errors=diagnostics
         return status == 0
+
+    def blocked_pure(self,fix,combined):
+        if fix.rule!='pure':return False
+        start=fix.start+sum(len(edit.text)-(edit.end-edit.start) for edit in combined
+            if edit.source is fix.source and edit.end<=fix.start)
+        rooted=any(note.get('message','').startswith("fn '")
+            and 'requires its entire call chain to be pure' in note['message']
+            and note.get('pos',{}).get('file')==str(fix.source.path)
+            and note['pos'].get('offset')==start
+            for error in self.errors if error.get('type')=='error' for note in error.get('related',[]))
+        if rooted:return True
+        procedure=next((node for node in fix.source.nodes if node.kind=='Procedure' and node.start==fix.start),None)
+        if procedure is None:return False
+        def shifted(offset):
+            return offset+sum(len(edit.text)-(edit.end-edit.start) for edit in combined
+                if edit.source is fix.source and edit.end<=offset)
+        for error in self.errors:
+            pos=error.get('pos',{});offset=pos.get('offset',-1)
+            if (error.get('type')!='error' or pos.get('file')!=str(fix.source.path)
+                    or not any(message.startswith('Pure ') for message in error.get('msgs',[]))
+                    or not start<=offset<shifted(procedure.end)):continue
+            nested=any(node.kind=='Procedure' and procedure.start<node.start and node.end<=procedure.end
+                and shifted(node.start)<=offset<shifted(node.end) for node in fix.source.nodes)
+            if not nested:return True
+        return False
 
     def select(self, proposed, accepted):
         if not proposed:
             return
-        if self.check([*accepted, *proposed]):
+        combined=[*accepted,*proposed]
+        if self.check(combined):
             accepted.extend(proposed)
-        elif len(proposed) > 1:
-            middle = len(proposed)//2
-            self.select(proposed[:middle], accepted)
-            self.select(proposed[middle:], accepted)
+        else:
+            remaining=[fix for fix in proposed if not self.blocked_pure(fix,combined)]
+            if len(remaining)<len(proposed):self.select(remaining,accepted)
+            elif len(proposed)>1:
+                middle = len(proposed)//2
+                self.select(proposed[:middle], accepted)
+                self.select(proposed[middle:], accepted)
 
 
 def apply(fixes):
@@ -227,10 +305,33 @@ def apply(fixes):
             temporary.unlink(missing_ok=True)
 
 
-def run(project, options, flags):
+def run(project, options, flags, native_errors=None):
     checks = CHECKS if options.vet is None else tuple(options.vet.split(','))
-    proposed = candidates(project, checks)
-    accepted = []
+    from .vet_unused import analyze
+    unused_findings, immutable_exemptions = analyze(project) if {'unused', 'immutable'}.intersection(checks) else ([], [])
+    exempt_offsets = {}
+    for node in immutable_exemptions:
+        exempt_offsets.setdefault(str(node.source.path), []).append(node.start)
+    for offsets in exempt_offsets.values():
+        offsets.sort()
+
+    def exempt_declaration(fix):
+        if fix.rule != 'immutable':
+            return False
+        offsets = exempt_offsets.get(str(fix.source.path), ())
+        index = bisect_left(offsets, fix.highlight_start)
+        return index < len(offsets) and offsets[index] < fix.highlight_end
+
+    proposed = [fix for fix in candidates(project, checks) if not exempt_declaration(fix)]
+    findings = unused_findings if 'unused' in checks else []
+    if native_errors is not None:
+        reported = {(finding['pos']['file'], finding['pos']['offset'], tuple(finding['msgs']))
+                    for finding in findings}
+        native_errors[:] = [finding for finding in native_errors if finding['type'] != 'warning'
+                            or ((finding.get('pos') or {}).get('file'),
+                                (finding.get('pos') or {}).get('offset'), tuple(finding['msgs'])) not in reported]
+    from .source_tools import semicolon_edits
+    accepted = semicolon_edits(project, thor_only=True) if 'semicolon' in checks else []
     if proposed:
         with tempfile.TemporaryDirectory(prefix='thor-vet-') as directory:
             Validator(project, options, flags, directory).select(proposed, accepted)
@@ -248,7 +349,19 @@ def run(project, options, flags):
             confirmed = answer.strip().lower() in {'y', 'yes'}
         if confirmed:
             apply(accepted)
+            updated = revisions(accepted)
+            project.vet_updated_sources = {str(path): raw for path, raw in updated.items()}
+            for finding in findings:
+                pos = finding['pos']
+                path = Path(pos['file'])
+                if path not in updated:
+                    continue
+                fixes = [fix for fix in accepted if fix.source.path == path]
+                for key, line, column in [('offset','line','column'), ('end_offset','end_line','end_column')]:
+                    old = pos[key]
+                    pos[key] += sum(len(fix.text)-(fix.end-fix.start) for fix in fixes if fix.end <= old)
+                    pos[line], pos[column] = position(updated[path], pos[key])
             print(f'Applied {len(accepted)} corrections.')
-            return []
+            return findings
     adapter = project.diagnostic_adapter()
-    return [fix.diagnostic(adapter) for fix in accepted]
+    return [*findings, *(fix.diagnostic(adapter) for fix in accepted)]

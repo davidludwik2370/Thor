@@ -17,7 +17,7 @@ import tempfile
 
 from .compiler import ThorError, unquote
 from .diagnostics import Diagnostics, backend_error_flags
-from .backend import run as run_backend
+from .backend import run as run_backend, run_process
 from .semantics import descendants
 from .sourcemap import Origin
 from . import values
@@ -25,7 +25,7 @@ from .specialization import Specializations, Unresolved, type_code
 
 
 class Evaluator:
-    def __init__(self,project,odin,timeout=5,cache=None):
+    def __init__(self,project,odin,timeout=0,cache=None):
         self.p=project;self.odin=odin;self.timeout=timeout
         self.results={};self.busy=set();self.guard_busy=set();self.skipped=set();self.unchecked=set()
         self.r=project.resolver;self.purity=project.purity
@@ -607,7 +607,8 @@ class Evaluator:
                     key=node,b.condition,code
                     pending.setdefault(key,[]).append(b)
         if not pending:return
-        flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:')) and f!='-keep-executable']
+        from .cli import helper_flag
+        flags=[f for f in self.p.flags if helper_flag(f) and not f.startswith(('-out:','-build-mode:')) and f!='-keep-executable']
         probe=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays={p:s.raw for p,s in self.p.sources.items()},cache_frontend=self.p.cache_frontend,cache_directory=self.p.cache_directory,use_shared=False)
         def copy(node):return next((n for n in probe.sources[node.source.path].by_span.get((node.start,node.end),[]) if n.kind==node.kind),None)
         old_p=self.p
@@ -827,7 +828,10 @@ class Evaluator:
             if cached is not None:
                 self.execution_records[n]=(failed_prepared,keep,procedures)
                 return cached
-        flags=[f for f in self.p.flags if not f.startswith(('-out:','-build-mode:','-vet','-target:')) and f not in {'-keep-executable','-no-entry-point'}]
+        from .cli import helper_flag
+        flags=[f for f in self.p.flags if helper_flag(f) and not f.startswith(('-out:','-build-mode:','-vet','-target:')) and f not in {'-keep-executable','-no-entry-point'}]
+        if any(flag.startswith('-define:') for flag in flags) and '-ignore-unused-defineables' not in flags:
+            flags.append('-ignore-unused-defineables')
         overlays={path:s.raw for path,s in self.p.sources.items()}
         helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays,cache_frontend=self.p.cache_frontend,cache_directory=self.p.cache_directory,use_shared=False)
         helper.discover(self.root/'runtime'/'eval')
@@ -1066,7 +1070,7 @@ class Evaluator:
                 return unpack(cached)
             helper.write()
             emitted_inputs = dict(helper.generated)
-            try:built=run_backend(helper,command,capture_output=True,timeout=max(30,self.timeout))
+            try:built=run_backend(helper,command,capture_output=True,timeout=max(30,self.timeout) if self.timeout else None)
             except subprocess.TimeoutExpired:self.fail(error_site,label+' helper compilation timed out.')
             except OSError as exc:self.fail(error_site,f'{label} could not start the helper compiler: {exc.strerror or type(exc).__name__}.')
             diagnostics=Diagnostics(helper.sources,helper.maps,helper.generated)
@@ -1100,7 +1104,7 @@ class Evaluator:
                     from .driver import backend_failure
                     detail=' '.join(backend_failure(built.returncode)['msgs'])
                 self.fail(error_site,f'{label} helper compilation failed (exit {built.returncode}).'+(' '+detail if detail else ''))
-            try:result=subprocess.run([str(executable)],capture_output=True,timeout=self.timeout)
+            try:result=run_process([str(executable)],capture_output=True,timeout=self.timeout or None)
             except subprocess.TimeoutExpired:self.fail(error_site,f'{label} execution exceeded the {self.timeout:g} second timeout.')
             except OSError as exc:self.fail(error_site,f'{label} could not start the evaluation helper: {exc.strerror or type(exc).__name__}.')
             if result.returncode:

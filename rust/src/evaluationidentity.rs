@@ -14,7 +14,7 @@ fn owner(typ: &Type) -> Option<Ref> {
         | Type::Struct(at)
         | Type::Record(at, _)
         | Type::Enum(at)
-        | Type::Union(at) => Some(*at),
+        | Type::Union(at, _) => Some(*at),
         Type::Array { elem, .. }
         | Type::Pointer(elem)
         | Type::Slice(elem)
@@ -86,8 +86,9 @@ impl Project {
         options.output = None;
         options
             .flags
-            .retain(|flag| !flag.starts_with("-out:") && flag != "-keep-executable");
+            .retain(|flag| !flag.starts_with("-out:") && flag != "-keep-executable" && crate::cli::helper_flag(flag));
         Ok(Self {
+            timings: BTreeMap::new(),
             publish_layout: None,
             native_override: None,
             collected_diagnostics: None,

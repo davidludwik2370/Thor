@@ -39,7 +39,7 @@ class VetTests(unittest.TestCase):
         return json.loads(result.stderr)['errors']
 
     def test_default_reports_without_asking_or_editing_and_rules_are_selectable(self):
-        text = 'package main\nget::proc(x:int)->int{return x+1}\nmain::proc(){value:=get(6);_=value}\n'
+        text = 'package main\nget::proc(x:int)->int{return x+1}\nmain::proc(){value:=get(6);if value!=7{panic("result")}}\n'
         self.write(text)
         errors = self.findings()
         self.assertEqual([item['code'] for item in errors], ['thor/prefer-immutable', 'thor/prefer-fn'])
@@ -52,10 +52,18 @@ class VetTests(unittest.TestCase):
 
     def test_build_flag_warnings_and_strict_enforcement(self):
         self.write('package main\nimport "core:fmt"\nmain::proc(){x:=7;fmt.println(x)}\n')
-        self.findings('--vet', command='build')
+        errors = self.findings('--vet', command='build', status=1)
+        self.assertEqual([item['type'] for item in errors], ['error'])
+        ignored = self.findings('--vet', '-ignore-warnings', command='build', status=1)
+        self.assertEqual(ignored, errors)
+        warnings = self.findings('--vet', command='check')
+        self.assertEqual([item['type'] for item in warnings], ['warning'])
+        self.write('package main\nimport "core:fmt"\nmain::proc(){x:>7;fmt.println(x)}\n')
+        self.assertEqual(self.findings('--vet', command='build'), [])
         executable = self.root/(self.root.name+('.exe' if os.name == 'nt' else ''))
         result = subprocess.run([str(executable)], capture_output=True, text=True)
         self.assertEqual((result.returncode,result.stdout.strip()), (0,'7'))
+        self.write('package main\nimport "core:fmt"\nmain::proc(){x:=7;fmt.println(x)}\n')
         errors = self.findings('-warnings-as-errors', status=1)
         self.assertTrue(all(item['type'] == 'error' for item in errors))
         self.assertEqual(self.findings('-ignore-warnings'), [])
@@ -75,7 +83,7 @@ class VetTests(unittest.TestCase):
         self.assertEqual(list(self.app.glob('.thor-vet-*')), [])
 
     def test_ask_yes_no_empty_and_eof(self):
-        text = 'package main\nmain::proc(){x:=1;_=x}\n'
+        text = 'package main\nmain::proc(){x:=1;if x!=1{panic("result")}}\n'
         for answer, changes in [('y\n',True),(' YES \n',True),('n\n',False),('\n',False),('',False)]:
             with self.subTest(answer=answer):
                 self.write(text)
@@ -221,7 +229,7 @@ main::proc(){if work(Record{[]int{1}},Choice(true))!=9{panic("result")}}
         self.invoke('-o:speed','-disable-assert','-no-bounds-check','-no-type-assert',command='run')
 
     def test_vet_flag_before_source_and_large_valid_batches(self):
-        body = '\n'.join(f'value_{index}:={index};_=value_{index}' for index in range(80))
+        body = '\n'.join(f'value_{index}:={index};if value_{index}!={index}{{panic("result")}}' for index in range(80))
         self.write('package main\nmain::proc(){\n'+body+'\n}\n')
         result = subprocess.run([str(ROOT/'thor'),'check','--vet',str(self.app),'-json-errors'],
                                 capture_output=True,text=True,timeout=90)
@@ -233,7 +241,7 @@ main::proc(){if work(Record{[]int{1}},Choice(true))!=9{panic("result")}}
         (self.app/'lib/lib.odin').write_text('package lib\nget::proc()->int{return 1}\n')
         inactive = self.app/('ignored_windows.thor' if os.name != 'nt' else 'ignored_linux.thor')
         inactive.write_text('package main\nnot valid\n')
-        self.write('package main\nimport "lib"\nmain::proc(){value:=lib.get();_=value}\n')
+        self.write('package main\nimport "lib"\nmain::proc(){value:=lib.get();if value!=1{panic("result")}}\n')
         errors = self.findings()
         self.assertEqual(len(errors), 1, errors)
         self.assertEqual(errors[0]['code'], 'thor/prefer-immutable')

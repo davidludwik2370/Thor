@@ -44,8 +44,30 @@ impl Project {
         });
         let warnings_as_errors = command.get_args().any(|arg| arg == "-warnings-as-errors");
         let mut warnings = vec![];
+        let mut single_module = command.get_args().any(|arg| arg == "-use-single-module");
         loop {
             let mut result = run(command)?;
+            if !result.stderr.is_empty() && result.status.code().is_some() {
+                let flags = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+                let packet = crate::compiler_output::decode(&result.stderr, result.status.success(), crate::compiler_output::reporting(&flags));
+                if !single_module && !result.status.success()
+                    && crate::compiler_output::generic_module_collision(&packet) {
+                    let arguments = command.get_args().filter(|arg| *arg != "-use-separate-modules")
+                        .map(std::ffi::OsStr::to_os_string).collect::<Vec<_>>();
+                    let mut retry = Command::new(command.get_program());
+                    retry.args(arguments).arg("-use-single-module");
+                    if let Some(directory) = command.get_current_dir() { retry.current_dir(directory); }
+                    for (name, value) in command.get_envs() {
+                        if let Some(value) = value { retry.env(name, value); }
+                        else { retry.env_remove(name); }
+                    }
+                    *command = retry;
+                    single_module = true;
+                    crate::profile::count("backend.generic_module_retries", 1);
+                    continue;
+                }
+                result.stderr = serde_json::to_vec(&packet)?;
+            }
             if result.status.success()
                 || result.status.code().is_none()
                 || result.timed_out
@@ -225,7 +247,9 @@ impl Project {
             }
             warnings.extend(current);
             if warnings_as_errors || remaining.iter().any(|error| error["type"] == "error") {
-                result.stderr = serde_json::to_vec(&json!({"errors":remaining}))?;
+                let mut remaining_packet = json!({"errors":remaining});
+                if let Some(information) = packet.get("information") { remaining_packet["information"] = information.clone(); }
+                result.stderr = serde_json::to_vec(&remaining_packet)?;
                 return Ok(finish(result, &warnings));
             }
             for (path, (_, edits, _)) in files {

@@ -38,9 +38,14 @@ mod runtimeview;
 mod sdkmirror;
 #[path = "filelowering.rs"]
 mod filelowering;
+#[path = "nativechecks.rs"]
+mod nativechecks;
 
 #[derive(Clone)]
 pub struct Options {
+    pub odin_compatible: bool,
+    /// Internal source-policy validation uses a syntax-preserving native view.
+    pub native_policy_probe: bool,
     pub command: String,
     pub entry: PathBuf,
     pub output: Option<PathBuf>,
@@ -56,6 +61,7 @@ pub struct Options {
     pub no_sanitize: bool,
     pub overlays: BTreeMap<PathBuf, String>,
     pub editor_info: bool,
+    /// Zero leaves compile-time helper compilation and execution unlimited.
     pub run_timeout: std::time::Duration,
     pub clear_cache: bool,
     pub cache_report: bool,
@@ -109,6 +115,7 @@ pub struct Project {
     pub errors: HashMap<String, String>,
     pub editor_info: Vec<Value>,
     pub evaluated: BTreeMap<crate::semantics::Ref, Value>,
+    pub timings: BTreeMap<&'static str, f64>,
     pub specialized: crate::specialization::Cases,
     pub evaluation_scheduled: bool,
     pub evaluation_skips: BTreeMap<crate::semantics::Ref, bool>,
@@ -249,7 +256,7 @@ impl Project {
                 "a source file must have a .thor or .odin extension",
             ));
         }
-        let (parser, odin) = bootstrap(&options.root, &options.odin)?;
+        let (parser, odin, odin_root) = bootstrap(&options.root, &options.odin)?;
         let cache = options
             .cache
             .clone()
@@ -274,16 +281,19 @@ impl Project {
             .and_then(|target| target.split_once('_'))
             .map(|(os, arch)| (os.into(), arch.into()));
         let frontend = Frontend {
+            odin_syntax: options.native_policy_probe,
             normalized_cache: true,
             fingerprint: sha256(&fs::read(&parser)?),
             executable: parser,
             odin,
+            odin_root,
             cache_dir: if options.no_cache { None } else { Some(cache) },
             test,
             target,
             project_name: options
                 .entry
-                .file_stem()
+                .parent().filter(|_|file_entry).unwrap_or(&options.entry)
+                .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned(),
@@ -317,8 +327,8 @@ impl Project {
             memory: crate::memory::Memory::select(
                 &options.command,
                 &options.flags,
-                &options.tracking,
-                options.no_sanitize,
+                if options.odin_compatible && options.tracking == "auto" { "off" } else { &options.tracking },
+                options.no_sanitize || options.odin_compatible,
             )?,
             options,
             frontend,
@@ -328,6 +338,7 @@ impl Project {
             errors: HashMap::new(),
             editor_info: vec![],
             evaluated: BTreeMap::new(),
+            timings: BTreeMap::new(),
             specialized: BTreeMap::new(),
             evaluation_scheduled: false,
             evaluation_skips: BTreeMap::new(),
@@ -379,9 +390,17 @@ impl Project {
                 }
             }
         }
+        let mut support="__thor_runtime".to_string();
+        while project.collections.contains_key(&support) {support.push('_');}
+        project.collections.insert(support.clone(),project.options.root.join("runtime"));
         for source in &mut project.sources {
             source.collection_roots = project.collections.clone();
+            if source.path.starts_with(project.options.root.join("runtime")) {
+                source.collection_roots.insert("thor".into(),project.options.root.join("runtime"));
+            }
+            source.support_collection=support.clone();
         }
+        crate::cli::validate_native_checks(&project)?;
         Ok(project)
     }
     fn discover(&mut self, entry: &Path, visited: &mut HashSet<PathBuf>) -> Result<()> {
@@ -412,15 +431,16 @@ impl Project {
                 && path != self.options.entry
                 && path.parent() != Some(self.options.entry.as_path());
             if source.excluded {
+                self.sources.push(source);
                 continue;
             }
             for node in &source.nodes {
                 if node.kind == "Import" {
                     let import = unquote(&node.op)?;
                     let directory = if let Some((collection, suffix)) = import.split_once(':') {
-                        self.collections
-                            .get(collection)
-                            .map(|base| base.join(suffix))
+                        if collection=="thor" && path.starts_with(self.options.root.join("runtime")) {
+                            Some(self.options.root.join("runtime").join(suffix))
+                        } else {self.collections.get(collection).map(|base|base.join(suffix))}
                     } else {
                         Some(path.parent().unwrap().join(import))
                     };
@@ -919,7 +939,8 @@ impl Project {
                 .get("base")
                 .is_some_and(|base| package == base.join("runtime"))
             {
-                vec![package.join("core.odin")]
+                ["core.odin", "core_builtin.odin"].into_iter()
+                    .map(|name| package.join(name)).filter(|path| path.is_file()).collect()
             } else {
                 // The imported SDK is a library even when the project's entry
                 // package is being tested. Its own *_test files are not inputs.
@@ -971,13 +992,18 @@ impl Project {
         let mut result = vec![];
         result.extend(self.memory.extra.iter().cloned());
         for flag in &self.options.flags {
-            if !flag.starts_with("-collection:")
-                && !matches!(flag.as_str(), "-json-errors" | "-keep-executable")
+            if !(flag.starts_with("-collection:")
+                || matches!(flag.as_str(), "-json-errors" | "-keep-executable")
+                || self.options.command == "strip-semicolon" && flag == "-keep-temp-files")
             {
                 result.push(flag.clone());
             }
         }
+        let support=self.sources.first().and_then(|source|self.collections.get(&source.support_collection));
         for (name, base) in &self.collections {
+            // SDK adaptation can replace the support root. Shared libraries
+            // and synthetic imports must use that same view of nominal types.
+            let base=if name=="thor" {support.unwrap_or(base)}else{base};
             let base = if *base == self.options.root.join("runtime") {
                 &self.backend_runtime
             } else {
@@ -1000,16 +1026,37 @@ impl Project {
                 result.push(format!("-define:THOR_APP_SOURCE_ROOT={}", root.display()));
             }
         }
+        if crate::cli::checks_requested(&result) {
+            crate::cli::check_scopes(self, &mut result);
+        }
+        if nativechecks::active(self) {
+            result.retain(|flag| !nativechecks::checking_flag(flag));
+        }
         result
+    }
+    /// The native package basename is observable through Odin builtins and tags.
+    /// Keep that basename even when --output-dir chooses an unrelated directory.
+    fn generated_relative(&self, path: &Path) -> Result<PathBuf> {
+        let relative=path.strip_prefix(&self.common).map_err(|_|Error::new("source outside project root"))?;
+        Ok(if self.destination.file_name()!=self.common.file_name() {
+            PathBuf::from(self.common.file_name().unwrap_or_default()).join(relative)
+        } else {relative.to_path_buf()})
     }
     pub fn compile(&mut self, target: &Path) -> Result<i32> {
         let _phase = crate::profile::span("backend.final");
+        let (policy_status, policy_diagnostics) = nativechecks::validate(self)?;
+        if policy_status != 0 {
+            self.report_details(&policy_diagnostics, "");
+            return Ok(policy_status);
+        }
         let action = self.options.command.clone();
         let action = action.as_str();
         let mut command = Command::new(&self.frontend.odin);
         command.envs(&self.native_environment);
         command
-            .arg(if action == "vet" {
+            .arg(if action == "vet" && self.frontend.test {
+                "build"
+            } else if action == "vet" || action == "strip-semicolon" {
                 "check"
             } else if matches!(action, "run" | "test" | "publish") {
                 "build"
@@ -1033,6 +1080,10 @@ impl Project {
             .find_map(|flag| flag.strip_prefix("-out:"));
         let binary = if let Some(path) = explicit {
             absolute(Path::new(path))?
+        } else if action == "build" && effective_flags.iter().any(|flag| matches!(flag.as_str(), "-build-mode:llvm" | "-build-mode:llvm-ir")) {
+            env::current_dir()?
+        } else if self.options.odin_compatible && matches!(action, "build" | "run" | "test") {
+            crate::native_compat::default_output(&self.options.entry, self.file_entry, &effective_flags)?
         } else if action == "build" {
             let cwd = env::current_dir()?;
             let name = cwd.file_name().unwrap_or_default().to_string_lossy();
@@ -1047,11 +1098,14 @@ impl Project {
                 self.options.root.join("thor"),
                 self.options.root.join("thor-rust"),
             ]
-            .contains(&binary)
+            .iter().any(|launcher| crate::cli::same_file(&binary, launcher))
         {
             return Err(Error::new("The default output would overwrite a Thor launcher; choose another name with -out:name."));
         }
         if matches!(action, "build" | "run" | "test") && explicit.is_none() {
+            command.arg(format!("-out:{}", binary.display()));
+        }
+        if action == "vet" && self.frontend.test && explicit.is_none() {
             command.arg(format!("-out:{}", binary.display()));
         }
         if action == "test" {
@@ -1066,6 +1120,7 @@ impl Project {
         {
             command.arg("-max-error-count:1000");
         }
+        let started = std::time::Instant::now();
         let output = if self.options.raw_diagnostics {
             let status = command
                 .stdout(Stdio::inherit())
@@ -1090,6 +1145,23 @@ impl Project {
                 })
             })?
         };
+        self.timings.insert("native", started.elapsed().as_secs_f64());
+        let packet = crate::compiler_output::decode(&output.stderr, output.status.success(), crate::compiler_output::reporting(&self.options.flags));
+        if action == "vet" && self.frontend.test {
+            let _ = fs::remove_file(&binary);
+        }
+        let mut information = if output.status.code().is_none() { String::new() }
+            else { packet["information"].as_str().unwrap_or_default().to_string() };
+        if self.options.flags.iter().any(|flag| matches!(flag.as_str(), "-show-timings" | "-show-more-timings")) {
+            let mut summary = String::from("Thor compilation timings\n");
+            for (phase, seconds) in &self.timings { summary.push_str(&format!("  {phase:20} {:10.3} ms\n", seconds * 1000.0)); }
+            summary.push_str(&format!("  {:20} {:10.3} ms\n\n", "total", self.timings.values().sum::<f64>() * 1000.0));
+            information = summary + &information;
+        }
+        if !output.stdout.is_empty() && action != "doc" {
+            use std::io::Write;
+            std::io::stdout().write_all(self.remap_text(&String::from_utf8_lossy(&output.stdout)).as_bytes())?;
+        }
         let mut backend_status = output.status.code().unwrap_or(1);
         let mut errors = if output.status.code().is_none() {
             #[cfg(unix)]
@@ -1106,21 +1178,24 @@ impl Project {
                 .rsplit_once('(')
                 .and_then(|(_, suffix)| suffix.strip_suffix(')'))
                 .unwrap_or(&fallback);
-            let mut messages=vec![format!("Odin compiler terminated by {name} (signal {number}). This is a backend compiler failure; no source location was provided.")];
-            if !output.stderr.is_empty() {
-                messages.push(String::from_utf8_lossy(&output.stderr).trim().to_string());
-            }
-            vec![json!({"type":"error","stage":"toolchain","pos":null,"msgs":messages})]
-        } else if output.stderr.is_empty() {
-            vec![]
-        } else if let Ok(packet) = serde_json::from_slice::<Value>(&output.stderr) {
-            packet["errors"].as_array().cloned().unwrap_or_default()
+            let located = crate::compiler_output::has_source_errors(&packet);
+            let suffix = if located { "" } else { "; no source location was provided" };
+            let mut messages=vec![format!("Odin compiler terminated by {name} (signal {number}). This is a backend compiler failure{suffix}.")];
+            let detail = if located {
+                packet["information"].as_str().unwrap_or_default().trim().to_string()
+            } else {
+                String::from_utf8_lossy(&output.stderr).trim().to_string()
+            };
+            if !detail.is_empty() { messages.push(detail); }
+            let mut errors = if located {
+                packet["errors"].as_array().cloned().unwrap_or_default()
+            } else { vec![] };
+            errors.push(json!({"type":"error","stage":"toolchain","pos":null,"msgs":messages}));
+            errors
         } else {
-            vec![
-                json!({"type":if output.status.success(){"warning"}else{"error"},"stage":"toolchain","pos":null,
-                "msgs":[String::from_utf8_lossy(&output.stderr).trim()]}),
-            ]
+            packet["errors"].as_array().cloned().unwrap_or_default()
         };
+        errors.extend(policy_diagnostics);
         for source in &self.sources {
             errors.extend(
                 source.info["diagnostics"]
@@ -1130,23 +1205,44 @@ impl Project {
                     .cloned(),
             );
         }
+        let invalid_source = errors.iter().any(|error| error["type"] == "error" || error["type"] == "warning" && self.options.flags.iter().any(|flag| flag == "-warnings-as-errors"));
+        if output.status.success() && !invalid_source {
+            crate::source_tools::remap_exports(self)?;
+            if action == "strip-semicolon" { information.push_str(&crate::source_tools::strip_semicolons(self)?); }
+            if action == "doc" && !self.options.flags.iter().any(|flag| flag == "-doc-format") {
+                print!("{}", crate::source_tools::documentation(self, &String::from_utf8_lossy(&output.stdout)));
+            } else if action == "doc" {
+                crate::source_tools::remap_document(self, &String::from_utf8_lossy(&output.stdout))?;
+                print!("{}", String::from_utf8_lossy(&output.stdout));
+            }
+        }
         if output.status.success() && (action == "vet" || self.options.vet.is_some()) {
             let checks = self
                 .options
                 .vet
                 .clone()
-                .unwrap_or_else(|| vec!["immutable".into(), "pure".into()]);
-            errors.extend(crate::vet::run(
+                .unwrap_or_else(|| crate::vet::CHECKS.iter().map(|check| (*check).into()).collect());
+            let mut findings = crate::vet::run(
                 self,
                 &checks,
                 self.options.vet_apply,
                 self.options.vet_ask,
-            )?);
+                &mut errors,
+            )?;
+            if action == "build" {
+                for finding in &mut findings {
+                    finding["type"] = json!("error");
+                }
+            }
+            // Prefer the source-level vet code when Odin also reports the
+            // default single-declaration warning at the same original location.
+            findings.extend(errors);
+            errors = findings;
         }
         let reported_errors = if self.options.raw_diagnostics && errors.is_empty() {
             false
         } else {
-            self.report(&errors)
+            self.report_details(&errors, &information)
         };
         if !output.status.success() || reported_errors {
             return Ok(if backend_status == 0 {
@@ -1409,6 +1505,23 @@ impl Project {
         }
         result
     }
+    pub(crate) fn remap_text(&self, text: &str) -> String {
+        let mut text = self.remap_references(text);
+        let mut paths = BTreeMap::new();
+        for (path, (file, _)) in &self.outputs {
+            paths.insert(path.to_string_lossy().into_owned(), self.sources[*file].path.to_string_lossy().into_owned());
+            if let (Some(generated), Some(original)) = (path.parent(), self.sources[*file].path.parent()) {
+                paths.insert(generated.to_string_lossy().into_owned(), original.to_string_lossy().into_owned());
+            }
+        }
+        let mut paths = paths.into_iter().collect::<Vec<_>>();
+        paths.sort_by_key(|(path, _)| std::cmp::Reverse(path.len()));
+        for (generated, original) in paths {
+            text = text.replace(&generated.replace(' ', "\\ "), &original.replace(' ', "\\ "));
+            text = text.replace(&generated, &original);
+        }
+        text
+    }
     fn remap_references(&self, text: &str) -> String {
         let mut text = text.to_string();
         for (path, (file, emitted)) in &self.outputs {
@@ -1462,7 +1575,7 @@ impl Project {
         }
         text
     }
-    fn report(&self, errors: &[Value]) -> bool {
+    fn report_details(&self, errors: &[Value], information: &str) -> bool {
         let mut seen = BTreeSet::new();
         let errors = self
             .translate(errors)
@@ -1509,15 +1622,24 @@ impl Project {
         let failed = errors.iter().any(|error| error["type"] == "error");
         if let Some(collected) = &self.collected_diagnostics {
             collected.borrow_mut().extend(errors);
+            if !information.is_empty() {
+                if self.options.json { collected.borrow_mut().push(json!({"type":"info","stage":"compiler-information","text":information})); }
+                else { eprint!("{information}"); }
+            }
         } else if self.options.json {
             let mut packet = json!({"error_count":errors.iter().filter(|error|error["type"]=="error").count(),"errors":errors});
+            if !information.is_empty() { packet["information"] = json!(information); }
             if self.options.editor_info {
                 packet["slice_access"] = json!(self.editor_info);
             }
             eprintln!("{packet}");
         } else {
+            if !information.is_empty() { eprint!("{information}"); }
             for error in errors {
-                let raw=error["pos"]["file"].as_str().and_then(|file|self.sources.iter().find(|source|source.path==Path::new(file))).map(|source|source.raw.as_str());
+                // Vet corrections can replace the source before these remaining
+                // warnings are printed. Their positions already follow the edits.
+                let corrected = self.options.command == "vet" && (self.options.vet_apply || self.options.vet_ask);
+                let raw=error["pos"]["file"].as_str().filter(|_|!corrected).and_then(|file|self.sources.iter().find(|source|source.path==Path::new(file))).map(|source|source.raw.as_str());
                 eprintln!("{}",crate::diagnostic::text(&error,raw,self.options.flags.iter().any(|flag|flag=="-terse-errors"),self.options.flags.iter().any(|flag|flag=="-error-pos-style:unix")));
             }
         }

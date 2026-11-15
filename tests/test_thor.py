@@ -54,7 +54,7 @@ class ThorTests(unittest.TestCase):
 
     # T01: command behavior and ordinary Odin compatibility.
     def test_help_and_version(self):
-        for flag in ("--help", "--version"):
+        for flag in ("help", "version"):
             result = subprocess.run([str(THOR), flag], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0)
 

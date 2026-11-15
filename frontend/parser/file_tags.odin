@@ -124,7 +124,14 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 				groups_loop: for {
 					index_start := len(build_project_name_strings)
 
-					defer append(build_project_names, build_project_name_strings[index_start:])
+					// Groups must own their descriptor storage. The scratch array
+					// can grow again and is released before matching the tags.
+					defer {
+						items := build_project_name_strings[index_start:]
+						group := make([]string, len(items))
+						copy(group, items)
+						append(build_project_names, group)
+					}
 
 					for {
 						skip_whitespace(text, &i)
@@ -145,8 +152,6 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 						scan_value(text, &i)
 						append(build_project_name_strings, text[name_start:i])
 					}
-
-					append(build_project_names, build_project_name_strings[index_start:])
 				}
 			case "build":
 
@@ -263,6 +268,7 @@ match_build_tags :: proc(file_tags: File_Tags, target: Build_Target) -> bool {
 	for group in file_tags.build_project_name {
 		group_correct := true
 		for name in group {
+			if len(name) == 0 { continue }
 			if name[0] == '!' {
 				group_correct &&= target.project_name != name[1:]
 			} else {

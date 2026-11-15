@@ -209,6 +209,7 @@ parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
         for span,span_index in spans {
             nested := default_parser()
             nested.thor = true
+            nested.source_tools = p.source_tools
             nested.file = p.file
             nested.err, nested.warn = p.err,p.warn
             nested.allow_in_expr = true
@@ -226,6 +227,7 @@ parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
             }
             p.error_count += nested.error_count
             append(&p.edits,..nested.edits[:])
+            append(&p.optional_semicolons,..nested.optional_semicolons[:])
             append(&p.features,..nested.features[:])
             append(&args,expr)
         }

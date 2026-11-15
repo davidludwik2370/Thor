@@ -16,6 +16,13 @@ main :: proc() {
     // a prefix instead, write: import "thor:basic" / sorted, print
     basic.print("Thor basic helpers")
 
+    // Boolean reductions accept individual bools or an existing slice.
+    // Scanning stops at the first decisive value; arguments evaluate first.
+    checks :> []bool{true, false, true}
+    if !basic.and() || basic.or() { panic("empty boolean identities") }
+    if basic.and(..checks) || !basic.or(..checks) { panic("boolean reductions") }
+    basic.print("and/or:", basic.and(true, true), basic.or(false, true))
+
     // Use one growing arena for this block, including allocations inside called
     // helpers. Caller-scope cleanup also runs on early return/break/continue.
     // The allocator must be created directly in this scope, not in a switch arm.

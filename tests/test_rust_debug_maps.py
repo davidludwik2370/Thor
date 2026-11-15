@@ -28,7 +28,8 @@ class RustDebugMapTests(unittest.TestCase):
         script='''const {DebugMaps}=require(process.argv[1]);
 const maps=new DebugMaps(process.argv[2]);maps.verifyExecutable(process.argv[3]);
 const candidates=maps.candidates(process.argv[4],Number(process.argv[5]));
-const regions=[];for(const unit of maps.files.values())for(const row of unit.map.regions){
+const regions=[];for(const unit of maps.files.values())for(const row of [...unit.map.regions,
+ ...unit.map.segments.filter(row=>row[5]==='source-location-support').map(row=>[row[0],row[1],row[5]])]){
  const text=unit.bytes.subarray(row[0],row[1]).toString();
  const offset=row[0]+Buffer.byteLength(text.slice(0,text.search(/\S/)));
  const before=unit.bytes.subarray(0,offset).toString();
@@ -127,3 +128,21 @@ main::proc(){
         self.assertTrue(info['candidates'])
         info=self.inspect(manifest,binary,3)
         self.assertTrue(info['candidates'])
+
+    @unittest.skipUnless(shutil.which('node'), 'Node is required for the real map consumer')
+    def test_branch_location_support_keeps_user_breakpoints_and_internal_maps(self):
+        source='''package main
+import "core:fmt"
+main::proc(){
+    defer fmt.println(#branch_location)
+    value:=7
+    _=value
+    return
+}
+'''
+        manifest,_,binary=self.build(source)
+        info=self.inspect(manifest,binary,7)
+        self.assertTrue(info['candidates'],info)
+        support=[row for row in info['regions'] if row['kind']=='source-location-support']
+        self.assertTrue(support,info)
+        self.assertTrue(all(row['location']['internal'] for row in support),support)

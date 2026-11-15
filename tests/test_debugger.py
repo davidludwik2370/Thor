@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -111,6 +112,85 @@ class DAP:
 
 @unittest.skipUnless(backend_path() and shutil.which('node') and shutil.which('odin'), 'CodeLLDB, Node and Odin required')
 class DebuggerTests(unittest.TestCase):
+    def test_migrated_native_debug_command_keeps_breakpoints_and_step_into(self):
+        temporary=tempfile.TemporaryDirectory(prefix='thor-migrated-dap-')
+        self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name).resolve()
+        original=root/'original'/'sample'
+        original.mkdir(parents=True)
+        (original/'main.odin').write_text('''package main
+double :: proc(x: int) -> int {
+\treturn x*2
+}
+main :: proc() {
+\tvalue := 7
+\tdoubled := double(value)
+\tif doubled != 14 { panic("result") }
+}
+''')
+        directory=root/'converted'/'sample'
+        command=shlex.join(['odin','build',str(original),'-debug','-vet','-thread-count:1',
+            '-out:'+str(original/'program')])
+        migrated=subprocess.run([str(THOR),'migrate',str(original),'--output-dir',str(directory.parent),
+            '--command',command],cwd=root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(migrated.returncode,0,migrated.stdout+migrated.stderr)
+        corrected=subprocess.run([str(THOR),'vet',str(directory),'--apply','-thread-count:1'],
+            cwd=root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(corrected.returncode,0,corrected.stdout+corrected.stderr)
+        self.assertIn('double :: fn',(directory/'main.thor').read_text())
+        arguments=shlex.split(migrated.stdout)
+        arguments[0]=str(THOR)
+        built=subprocess.run([*arguments,'--output-dir',str(directory/'generated')],
+            cwd=root,capture_output=True,text=True,timeout=90)
+        self.assertEqual(built.returncode,0,built.stdout+built.stderr)
+        source=directory/'main.thor'
+        client=self.launch(directory,source,[7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        client.request('stepIn',{'threadId':thread})
+        thread,frame=self.frame(client)
+        if frame['source']['path']==str(source) and frame['line']==2:
+            client.request('next',{'threadId':thread})
+            thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),3),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'x','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
+    def test_deferred_branch_location_steps_into_original_user_call(self):
+        text='''package main
+import "base:runtime"
+observe::proc(loc:runtime.Source_Code_Location){
+    line:=loc.line
+    _=line
+}
+main::proc(){
+    defer observe(#branch_location)
+    value:=7
+    _=value
+    return
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[11])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),11),frame)
+        observed=[]
+        for _ in range(8):
+            client.request('stepIn',{'threadId':thread})
+            thread,frame=self.frame(client)
+            observed.append(frame)
+            if frame['name'].split('::')[-1]=='observe' and frame['line']==4:
+                break
+        self.assertEqual((frame['source'].get('path'),frame['line']),
+                         (str(source),4),observed)
+        self.assertEqual(frame['name'].split('::')[-1],'observe',observed)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'loc.line','context':'watch'})
+        self.assertEqual(value['result'],'11',value)
+        client.request('continue',{'threadId':thread})
+        client.event('terminated')
+
     def test_static_readonly_slice_literals_keep_source_breakpoints_and_values(self):
         text='''package main
 GLOBAL :> []int{1,2}

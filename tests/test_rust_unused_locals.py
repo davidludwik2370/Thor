@@ -53,11 +53,11 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
         self.warnings(source,flags=['-ignore-warnings'],count=0)
         self.compare(source,command='check',flags=['-json-errors','-warnings-as-errors'],fail='declared but not used')
         self.compare(self.program('unused:=1;value:=2;_=value'),command='check',
-                     flags=['-vet-unused-variables'],fail='declared but not used')
+                     flags=['-vet-unused-variables'],fail='Odin-only projects')
         self.compare(self.program('if true {unused:=1}','import "core:fmt"\n'),command='check',
-                     flags=['-vet-unused-imports'],fail="'fmt' declared but not used")
+                     flags=['-vet-unused-imports'],fail='Odin-only projects')
         self.compare(self.program('outer:=1;if true {outer:=2};_=outer'),command='check',
-                     flags=['-vet-shadowing'],fail='shadows declaration')
+                     flags=['-vet-shadowing'],fail='Odin-only projects')
 
     def test_native_selection_and_existing_block_rules_remain_unchanged(self):
         for body in ['when false {if true {unused:=missing}}','unused:=1','{unused:=1}',
@@ -99,6 +99,6 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
 
     def test_requested_procedure_vetting_stays_strict(self):
         self.compare(self.program('local::proc($T:typeid){};_=1'),command='check',
-                     flags=['-vet-unused-procedures','-vet-packages:main'],fail='declared but not used')
+                     flags=['-vet-unused-procedures','-vet-packages:main'],fail='Odin-only projects')
         self.compare('#+vet unused-procedures\n'+self.program('local::proc($T:typeid){};_=1'),
-                     command='check',fail='declared but not used')
+                     command='check',fail='supported only in Odin source files')

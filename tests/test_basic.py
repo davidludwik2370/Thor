@@ -11,6 +11,128 @@ class BasicTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_boolean_reductions_imports_truth_tables_and_sequence_spreading(self):
+        imports = [
+            ('import "thor:basic"', 'basic.and', 'basic.or'),
+            ('import logic "thor:basic"', 'logic.and', 'logic.or'),
+            ('import * "thor:basic"', 'and', 'or'),
+            ('import "thor:basic" / and, or', 'and', 'or'),
+            ('import _ "thor:basic" / and, or', 'and', 'or'),
+        ]
+        body = '''
+if !AND() || OR() {panic("empty identities")}
+if !AND(true) || AND(false) || !OR(true) || OR(false) {panic("single values")}
+for bits in 0..<8 {
+    a, b, c := bits&1!=0, bits&2!=0, bits&4!=0
+    if AND(a,b,c)!=(a&&b&&c) || OR(a,b,c)!=(a||b||c) {panic("truth table")}
+    flags := [3]bool{a,b,c}
+    if AND(..flags[:])!=(a&&b&&c) || OR(..flags[:])!=(a||b||c) {panic("array spread")}
+}
+empty: []bool
+if !AND(..empty) || OR(..empty) {panic("nil slice")}
+readonly :> []bool{true,false,true}
+if AND(..readonly) || !OR(..readonly) {panic("readonly slice")}
+flags := [4]bool{true,false,false,true}
+if !AND(..flags[:1]) || OR(..flags[1:3]) {panic("subslice")}
+if !AND(..flags[:0]) || OR(..flags[:0]) {panic("empty subslice")}
+if (flags!=[4]bool{true,false,false,true}) {panic("input mutation")}
+'''
+        for declaration, and_name, or_name in imports:
+            for flags in ([], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+                with self.subTest(declaration=declaration, flags=flags):
+                    self.invoke(self.program(body.replace('AND',and_name).replace('OR',or_name), declaration+'\n'),
+                                flags=flags)
+
+    def test_boolean_reductions_evaluate_arguments_once_and_support_pure_comptime_calls(self):
+        prefix = '''import "thor:basic"
+calls: int
+record :: proc(value: bool) -> bool {calls+=1;return value}
+both :: fn(a,b:bool)->bool{return basic.and(a,b)}
+either :: fn(a,b:bool)->bool{return basic.or(a,b)}
+EMPTY_AND :: #run basic.and()
+EMPTY_OR :: #run basic.or()
+KNOWN_AND :: #run basic.and(true,false,true)
+KNOWN_OR :: #run basic.or(false,true,false)
+'''
+        body = '''
+if !EMPTY_AND || EMPTY_OR || KNOWN_AND || !KNOWN_OR {panic("compile-time values")}
+if basic.and(record(false),record(true),record(true)) || calls!=3 {panic("and arguments")}
+calls=0
+if !basic.or(record(true),record(false),record(false)) || calls!=3 {panic("or arguments")}
+a,b:=calls>0,calls<0
+if both(a,b) || !either(a,b) {panic("pure calls")}
+'''
+        for flags in ([], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(self.program(body,prefix),flags=flags)
+
+    def test_boolean_reductions_reject_non_boolean_inputs(self):
+        for name in ('and', 'or'):
+            for value in ('1', '0', '1.0', '"true"', 'nil', '[]bool{true}', '..([]int{1,0})'):
+                with self.subTest(name=name, value=value):
+                    self.invoke(self.program('_=basic.'+name+'('+value+')', 'import "thor:basic"\n'),
+                                command='check',fail='Error:')
+
+    def test_boolean_reductions_are_available_to_native_odin_callers(self):
+        self.invoke(self.program('if !native() {panic("native boolean calls")}', ''), directory=True,
+                    files={'native.odin':'''package main
+import "thor:basic"
+native :: proc()->bool {
+    flags := [3]bool{true,false,true}
+    return basic.and() && !basic.or() && !basic.and(..flags[:]) && basic.or(..flags[:])
+}
+'''})
+
+    def test_zip_alias_imports_iteration_lengths_and_shared_columns(self):
+        imports = [
+            ('import "thor:basic"', 'basic.zip'),
+            ('import b "thor:basic"', 'b.zip'),
+            ('import * "thor:basic"', 'zip'),
+            ('import "thor:basic" / zip', 'zip'),
+            ('import _ "thor:basic" / zip', 'zip'),
+        ]
+        body = '''
+numbers := [3]int{1, 2, 3}
+words := [2]string{"one", "two"}
+flags := [3]bool{true, false, true}
+values := ZIP(number=numbers[:], word=words[:], flag=flags[:])
+if len(values)!=2 {panic("zip must use the shortest input")}
+for row,i in values {
+    if row.number!=i+1 || row.word!=words[i] || row.flag!=flags[i] {panic("zip changed row values")}
+}
+for &row in values {row.number+=10}
+if (numbers!=[3]int{11,12,3}) {panic("zip must share its input columns")}
+values.word[1]="changed"
+if words[1]!="changed" {panic("zip column writes must reach the input")}
+empty := ZIP(number=numbers[:0], word=words[:])
+single := ZIP(number=numbers[:])
+if len(empty)!=0 || len(single)!=3 {panic("zip empty or single input")}
+'''
+        for declaration, callee in imports:
+            for flags in ([], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+                with self.subTest(declaration=declaration, flags=flags):
+                    self.invoke(self.program(body.replace('ZIP', callee), declaration+'\n'), flags=flags)
+
+    def test_zip_alias_preserves_readonly_column_contracts(self):
+        helpers = '''
+read::proc(values:#soa[]$T)->int{return values.a[0]}
+write::proc(values:#soa[]$T){values.b[0]=9}
+'''
+        for declaration, callee in [('import "thor:basic"', 'basic.zip'),
+                                    ('import _ "thor:basic" / zip', 'zip')]:
+            prefix = declaration+'\n'+helpers
+            body = '''
+readonly :> []int{1}
+writable := []int{2}
+if read(ZIP(a=readonly))!=1 {panic("zip readonly read")}
+write(ZIP(a=readonly, b=writable))
+if writable[0]!=9 {panic("zip writable column")}
+'''.replace('ZIP', callee)
+            with self.subTest(declaration=declaration):
+                self.invoke(self.program(body, prefix))
+                self.invoke(self.program(body.replace('a=readonly, b=writable', 'a=writable, b=readonly'),
+                                         prefix), command='check', fail='read-only slice')
+
     def test_native_runtime_parameter_witnesses_are_emitted_with_original_maps(self):
         code=self.program('''
 values:=basic.to_set([3,1,3,2])

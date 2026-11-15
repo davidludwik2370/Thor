@@ -27,11 +27,11 @@ macro_rules! kinds {
     }
 }
 kinds! {
-    ArrayType, Assignment, Attribute, AutoCast, Binary, BitSetType, Block, Call,
+    ArrayType, Assignment, Attribute, AutoCast, Binary, BitFieldType, BitSetType, Block, Call,
     Case, Cast, CompileSwitch, CompileSwitchExpr, Comprehension, ComprehensionBody,
     Compound, Declaration, Defer, Deref, Directive, DistinctType, DynamicArrayType,
     Ellipsis, EnumType, ExpressionStatement, Field, FieldValue, Fields, File, For,
-    ForeignBlock, ForeignImport, Ident, If, Implicit, ImplicitSelector, Import,
+    ForeignBlock, ForeignImport, HelperType, Ident, If, Implicit, ImplicitSelector, Import,
     Index, Interpolation, Literal, MapType, MultiPointerType, OrBranch, OrElse,
     OrPanic, OrReturn, Other, Package, Paren, PointerType, PolyType, Procedure,
     ProcedureGroup, ProcedureType, Range, Return, Run, Selector, SetType, Slice,

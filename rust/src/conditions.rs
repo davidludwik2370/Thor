@@ -126,7 +126,7 @@ impl Resolver<'_> {
                                     matches!(base, Type::Struct(_) | Type::Record(..))
                                 }
                                 "type_is_map" => matches!(base, Type::Map { .. }),
-                                "type_is_union" => matches!(base, Type::Union(_)),
+                                "type_is_union" => matches!(base, Type::Union(..)),
                                 "type_is_enum" => matches!(base, Type::Enum(_)),
                                 "type_is_string" => matches!(base, Type::String { .. }),
                                 "type_is_integer" => {

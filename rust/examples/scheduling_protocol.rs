@@ -15,6 +15,8 @@ fn run() -> Result<(), thor_compiler::diagnostic::Error> {
         .cloned()
         .collect();
     let mut project = Project::new(Options {
+            native_policy_probe: false,
+            odin_compatible: false,
         command: "check".into(),
         entry: entry.into(),
         output: None,

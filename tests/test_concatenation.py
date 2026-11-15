@@ -194,7 +194,7 @@ when len([1] ++ [2])==2 {_=0} else {missing_selected()}
 
     def test_chain_lowers_to_one_intrinsic_without_evaluation_cache_or_runtime_helper(self):
         root,result=self.invoke(self.program('if ALL!=[1,2,3,4]{panic("value")}','ALL::[1] ++ ([2] ++ [3]) ++ [4]\n'),flags=['--cache-report'])
-        code=(root/'output/main.odin').read_text()
+        code=next((root/'output').rglob('main.odin')).read_text()
         self.assertEqual(code.count('.concatenate('),1,code)
         self.assertEqual(code.count('proc()'),1,code)
         self.assertEqual(json.loads(result.stdout)['thor_cache']['writes'],0)
@@ -250,7 +250,7 @@ delete(a);delete(b)
         first='['+','.join(str(i) for i in range(1000))+']'
         text=self.program('if len(ALL)!=1003 || ALL[1002]!=3 {panic("large chain")}','ALL::'+first+' ++ [1] ++ [2] ++ [3]\n')
         root,_=self.invoke(text)
-        code=(root/'output/main.odin').read_text()
+        code=next((root/'output').rglob('main.odin')).read_text()
         self.assertLess(len(code),12000)
         self.assertEqual(code.count('.concatenate('),1)
 

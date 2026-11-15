@@ -1519,11 +1519,8 @@ resolve_basic_directive :: proc(
 	bool,
 ) {
 	switch directive.name {
-	case "caller_location":
-		ident := new_type(ast.Ident, directive.pos, directive.end, ast_context.allocator)
-		ident.name = "Source_Code_Location"
-		set_ast_package_set_scoped(ast_context, ast_context.document_package)
-		return internal_resolve_type_identifier(ast_context, ident^)
+	case "caller_location", "branch_location":
+		return lookup("Source_Code_Location", indexer.runtime_package, directive.pos.file)
 	}
 
 	return {}, false

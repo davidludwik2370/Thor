@@ -131,6 +131,42 @@ class RustEvaluationKeyTests(unittest.TestCase):
         value=self.resources([self.source('#load("unknown:resource")')])
         self.assertIsNone(value)
 
+    def test_constant_resource_paths_track_aliases_concatenation_and_both_platform_branches(self):
+        assets=self.root/'assets';assets.mkdir()
+        first=assets/'first';first.write_text('first')
+        second=assets/'second';second.write_text('second')
+        path=self.root/'main.thor'
+        for directive in ['#load','#load_hash','#load_directory','#exists']:
+            with self.subTest(directive=directive):
+                path.write_text('package main\nROOT::"assets/"\n'
+                    'NAME::("first" when ODIN_OS==.Darwin else "second")\n'
+                    f'ALIAS::ROOT+NAME\nDATA::{directive}(ALIAS)\nmain::proc(){{}}\n')
+                before=self.run_native([{'op':'resources'}],sources=[path])['answers'][0]
+                self.assertIsInstance(before,str)
+                second.write_text(second.read_text()+'changed')
+                after=self.run_native([{'op':'resources'}],sources=[path])['answers'][0]
+                self.assertNotEqual(before,after)
+
+    def test_unresolved_shadowed_cyclic_and_unbounded_resource_paths_bypass(self):
+        path=self.root/'main.thor'
+        programs=[
+            'NAME::"file"\nwork::proc(NAME:string){_=#exists(NAME)}',
+            'work::proc($NAME:string="file"){_=#exists(NAME)}',
+            'A::B\nB::A\nDATA::#exists(A)',
+            'NAME::#config(RESOURCE,"file")\nDATA::#exists(NAME)',
+            'when ODIN_OS==.Darwin{NAME::"a"}else{NAME::"b"}\nDATA::#exists(NAME)',
+            'NAME::"file"\nwork::proc(){NAME:="other";_=#exists(NAME)}',
+            '\n'.join(f'PART{i}::("a{i}" when ODIN_DEBUG else "b{i}")' for i in range(7))+
+                '\nNAME::'+'+'.join(f'PART{i}' for i in range(7))+'\nDATA::#exists(NAME)',
+            'P0::"file"\n'+'\n'.join(f'P{i}::(P{i-1} when ODIN_DEBUG else P{i-1})' for i in range(1,20))+
+                '\nDATA::#exists(P19)',
+        ]
+        for program in programs:
+            with self.subTest(program=program):
+                path.write_text('package main\n'+program+'\nmain::proc(){}\n')
+                answer=self.run_native([{'op':'resources'}],sources=[path])['answers'][0]
+                self.assertIsNone(answer)
+
     def key_operation(self,compiler,support,destination=None):
         destination=destination or self.root/'helper'
         return dict(op='key',odin=str(compiler),root=str(support),destination=str(destination),

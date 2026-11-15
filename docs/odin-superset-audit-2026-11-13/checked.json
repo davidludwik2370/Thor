@@ -1,0 +1,4734 @@
+{
+  "odin": {
+    "status": 0,
+    "stdout": "odin version dev-2026-10:8169255b9\n",
+    "stderr": "",
+    "seconds": 0.0111
+  },
+  "thor": {
+    "status": 0,
+    "stdout": "Thor 0.41.6\n",
+    "stderr": "",
+    "seconds": 0.0134
+  },
+  "unchecked": false,
+  "work_dir": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2",
+  "cases": [
+    {
+      "name": "ordinary_names",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.131
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0691
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1272
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_fn",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.021
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0549
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1527
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_set",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.02
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0554
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1442
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_Integer",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0207
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0522
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3901
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_Rational",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0218
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0566
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3821
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_and",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0208
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0546
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.15
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_or",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0211
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0559
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1537
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_mut",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0221
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0604
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1495
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_run",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0213
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0566
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1493
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_f",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.021
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0567
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1516
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "local_or_panic",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0204
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(4:1): Error: expected a statement, got or_panic\n    or_panic:=7\n    ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(5:4): Error: expected an operand\n    if or_panic!=7 {panic(\"value\")}\n       ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(6:1): Error: expected an operand\n    }\n    ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(6:2): Error: expected '{', got 'newline'\n    }\n     ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(7:1): Error: expected '}', got 'EOF'\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(7:1): Error: expected '}', got 'EOF'\n",
+            "seconds": 0.0331
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(4:1): Error: expected a statement, got or_panic\n    or_panic:=7\n    ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(5:4): Error: expected an operand\n    if or_panic!=7 {panic(\"value\")}\n       ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(6:1): Error: expected an operand\n    }\n    ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(6:2): Error: expected '{', got 'newline'\n    }\n     ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/local_or_panic/main.thor(7:1): Error: expected '}', got 'EOF'\n",
+            "seconds": 0.0715
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "or_panic_field",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0209
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(2:14): Error: expected a type\n    Item::struct{or_panic:int}\n                 ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(2:14): Error: expected '}' after field list, got 'or_panic'\n    Item::struct{or_panic:int}\n                 ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(2:26): Error: expected a statement, got }\n    Item::struct{or_panic:int}\n                             ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(5:12): Error: expected an operand\n    item:=Item{or_panic=7};_=item.or_panic\n               ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(5:23): Error: expected a comma, got ;\n    item:=Item{or_panic=7};_=item.or_panic\n                          ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(5:24): Error: expected '}' after field list, got 'identifier'\n    item:=Item{or_panic=7};_=item.or_panic\n                           ^\n",
+            "seconds": 0.032
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(2:14): Error: expected a type\n    Item::struct{or_panic:int}\n                 ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(2:14): Error: expected '}' after field list, got 'or_panic'\n    Item::struct{or_panic:int}\n                 ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(2:26): Error: expected a statement, got }\n    Item::struct{or_panic:int}\n                             ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(5:12): Error: expected an operand\n    item:=Item{or_panic=7};_=item.or_panic\n               ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(5:23): Error: expected a comma, got ;\n    item:=Item{or_panic=7};_=item.or_panic\n                          ^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_field/main.thor(5:24): Error: expected '}' after field list, got 'identifier'\n    item:=Item{or_panic=7};_=item.or_panic\n                           ^\n",
+            "seconds": 0.0663
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "or_panic_parameter",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0223
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_parameter/main.thor(2:12): Error: expected a type\n    read::proc(or_panic:int)->int{return or_panic}\n               ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_parameter/main.thor(2:38): Error: expected an operand\n    read::proc(or_panic:int)->int{return or_panic}\n                                         ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_parameter/main.thor(7:1): Error: expected '}', got 'EOF'\n",
+            "seconds": 0.0329
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_parameter/main.thor(2:12): Error: expected a type\n    read::proc(or_panic:int)->int{return or_panic}\n               ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_parameter/main.thor(2:38): Error: expected an operand\n    read::proc(or_panic:int)->int{return or_panic}\n                                         ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_parameter/main.thor(7:1): Error: expected '}', got 'EOF'\n",
+            "seconds": 0.0666
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "or_panic_enum",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0201
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_enum/main.thor(2:12): Error: expected an operand\n    Kind::enum{or_panic}\n               ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_enum/main.thor(4:1): Error: expected '}' after field list, got 'identifier'\n    main :: proc() {\n    ^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_enum/main.thor(6:1): Error: expected a statement, got }\n    }\n    ^\n",
+            "seconds": 0.0332
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_enum/main.thor(2:12): Error: expected an operand\n    Kind::enum{or_panic}\n               ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_enum/main.thor(4:1): Error: expected '}' after field list, got 'identifier'\n    main :: proc() {\n    ^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_enum/main.thor(6:1): Error: expected a statement, got }\n    }\n    ^\n",
+            "seconds": 0.0758
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "or_panic_label",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0218
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_label/main.thor(4:1): Error: expected a statement, got or_panic\n    or_panic: for _ in 0..<1 {break or_panic}\n    ^^^^^^^^\n",
+            "seconds": 0.0339
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_label/main.thor(4:1): Error: expected a statement, got or_panic\n    or_panic: for _ in 0..<1 {break or_panic}\n    ^^^^^^^^\n",
+            "seconds": 0.066
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "or_panic_import",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1123
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_import/main.thor(2:8): Error: expected 'string' after import, got 'or_panic'\n    import or_panic \"core:fmt\"\n           ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_import/main.thor(3:14): Error: expected a statement, got or_panic\n    main::proc(){or_panic.println(\"ok\")}\n                 ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_import/main.thor(4:1): Error: expected '}', got 'EOF'\n",
+            "seconds": 0.0335
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_import/main.thor(2:8): Error: expected 'string' after import, got 'or_panic'\n    import or_panic \"core:fmt\"\n           ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_import/main.thor(3:14): Error: expected a statement, got or_panic\n    main::proc(){or_panic.println(\"ok\")}\n                 ^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/or_panic_import/main.thor(4:1): Error: expected '}', got 'EOF'\n",
+            "seconds": 0.0685
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_import",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.5586
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1397
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4524
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1832
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5512
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1852
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_import",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4148
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1394
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4429
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1579
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5453
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1372
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "big_type_names_shadowed",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1525
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1183
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1842
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1389
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5296
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1885
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "big_names_as_fields_and_parameters",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1547
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1443
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1907
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1399
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5345
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1819
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "keyword_text_in_comments_and_strings",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0211
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0553
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1068
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_call",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1509
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1937
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1866
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2261
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.282
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2413
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_call_then_block",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4117
+        },
+        "run": {
+          "status": 0,
+          "stdout": "called\nblock\n",
+          "stderr": "",
+          "seconds": 0.2173
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_call_then_block/main.thor(6:1): Error: procedure literal evaluated but not used\n    fn()\n    ^^\n",
+            "seconds": 0.0333
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_call_then_block/main.thor(6:1): Error: procedure literal evaluated but not used\n    fn()\n    ^^\n",
+            "seconds": 0.0667
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_initializer_then_block",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4063
+        },
+        "run": {
+          "status": 0,
+          "stdout": "7\n",
+          "stderr": "",
+          "seconds": 0.2783
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_initializer_then_block/main.thor(7:2): Error: Pure function 'x' cannot call 'fmt.println' because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.\n    {fmt.println(x)}\n     ^^^^^^^^^^^\n",
+            "seconds": 0.0951
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_initializer_then_block/main.thor(7:2): Error: Pure function 'x' cannot call 'fmt.println' because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.\n    {fmt.println(x)}\n     ^^^^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_initializer_then_block/main.thor(7:14): Error: Undeclared name: x\n    {fmt.println(x)}\n                 ^\n",
+            "seconds": 0.5093
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_call_semicolon_then_block",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4077
+        },
+        "run": {
+          "status": 0,
+          "stdout": "called\nblock\n",
+          "stderr": "",
+          "seconds": 0.2382
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4483
+          },
+          "run": {
+            "status": 0,
+            "stdout": "called\nblock\n",
+            "stderr": "",
+            "seconds": 0.246
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5449
+          },
+          "run": {
+            "status": 0,
+            "stdout": "called\nblock\n",
+            "stderr": "",
+            "seconds": 0.2085
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_condition",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4175
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1397
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4467
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.138
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5516
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.141
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_value_index",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1501
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1296
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1913
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.198
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3034
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1347
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_array_length",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0214
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/set_array_length/main.thor(5:13): Error: Expected a type for the argument 'T', got 0\n    values:[set[0]]int;_=values\n                ^\n",
+            "seconds": 0.0579
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/set_array_length/main.thor(5:13): Error: Expected a type for the argument 'T', got 0\n    values:[set[0]]int;_=values\n                ^\n",
+            "seconds": 0.1556
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_parenthesized_array_length",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0217
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0556
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1305
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_bool_condition",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4138
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1375
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/set_bool_condition/main.thor(6:8): Error: Expected a type for the argument 'T', got 0\n    if set[0]{fmt.println(\"ok\")}\n           ^\n",
+            "seconds": 0.1201
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/set_bool_condition/main.thor(6:8): Error: Expected a type for the argument 'T', got 0\n    if set[0]{fmt.println(\"ok\")}\n           ^\n",
+            "seconds": 0.2148
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_parenthesized_condition",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4092
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1358
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4536
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1383
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5592
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.2113
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_switch_condition",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4313
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1363
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/set_switch_condition/main.thor(6:12): Error: Expected a type for the argument 'T', got 0\n    switch set[0]{case true:fmt.println(\"ok\");case false:}\n               ^\n",
+            "seconds": 0.113
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/set_switch_condition/main.thor(6:12): Error: Expected a type for the argument 'T', got 0\n    switch set[0]{case true:fmt.println(\"ok\");case false:}\n               ^\n",
+            "seconds": 0.2175
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "set_field_condition",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4076
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.279
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.438
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1308
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5598
+          },
+          "run": {
+            "status": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "seconds": 0.1288
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "slice_parameter_mutation",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1537
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1228
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1895
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1419
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2991
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.187
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "slice_parameter_address",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1544
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.2749
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1934
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3365
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2946
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2525
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "promoted_pointer_concrete",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1556
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.3509
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1907
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3243
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2916
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1683
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "promoted_pointer_generic",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1576
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4058
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1923
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1811
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2845
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3693
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "promoted_pointer_shaped",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1555
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.2402
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1898
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3357
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2936
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2263
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "promoted_pointer_explicit",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1527
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1296
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1896
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.169
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2903
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2275
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "array_parameter_value_copy",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1556
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.2591
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1869
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1339
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2978
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1486
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "generic_array_parameter_copy",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1536
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1288
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1883
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1436
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3046
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2161
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "generic_slice_parameter_mutation",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1546
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1505
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1913
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2203
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3039
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1323
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "map_parameter_copy",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1624
+        },
+        "run": {
+          "status": -5,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/map_parameter_copy/main.odin(5:75) panic: map\n",
+          "seconds": 0.2161
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2346
+          },
+          "run": {
+            "status": -5,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/map_parameter_copy/rust-generated/main.odin(5:75) panic: map\n",
+            "seconds": 0.1731
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3346
+          },
+          "run": {
+            "status": -5,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/map_parameter_copy/python-generated/main.odin(5:75) panic: map\n",
+            "seconds": 0.1467
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "dynamic_pointer_parameter",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1612
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1174
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1973
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1383
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3082
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1275
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "contextless_indexing",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1499
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.12
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.195
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1239
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3036
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1413
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "using_parameter_array",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0249
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.0569
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1726
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "shadow_builtin_len",
+      "group": "hygiene",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1529
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1361
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1942
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1904
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3114
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2127
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "shadow_builtin_min",
+      "group": "hygiene",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1591
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1255
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1897
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2568
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3051
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1242
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "shadow_builtin_max",
+      "group": "hygiene",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1512
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1385
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.189
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1727
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3064
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.123
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "shadow_builtin_type_of",
+      "group": "hygiene",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1552
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1204
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1887
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1863
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3059
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1197
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "shadow_builtin_cap",
+      "group": "hygiene",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1533
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.2082
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1887
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.123
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3069
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1276
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "shadow_builtin_delete",
+      "group": "hygiene",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1536
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1189
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1889
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1923
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3109
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1225
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_bitset_membership",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1504
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1235
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1881
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2162
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2868
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1234
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_bitset_constant_membership",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1526
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1178
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1854
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2164
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2848
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1208
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_map_membership",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1647
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1179
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1965
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1931
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3524
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1203
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_map_record_keys",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1625
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1211
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1955
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1296
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3146
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2531
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_prefix_expansion",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1523
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1791
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1863
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1591
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2883
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1295
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_matrix_index",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1538
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1239
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1892
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1254
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2839
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1307
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_simd_index",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 1,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_simd_index/main.odin(4:42) Error: Cannot index 'values' of type '#simd[4]f32' \n\t... #simd[4]f32{1,2,3,4};index:=1;if values[index]!=2{panic(\"simd\")} \n\t                                     ^~~~~^ \n\tSuggestion: Use 'simd.extract' or 'simd.replace' instead depending on the situation \n",
+          "seconds": 0.0226
+        }
+      },
+      "engines": {},
+      "qualification": "not-native-valid"
+    },
+    {
+      "name": "native_enumerated_array",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1569
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1285
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1863
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1183
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3007
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1202
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_optional_map_lookup",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1583
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1187
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1954
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1244
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3134
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1289
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_optional_type_assertion",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1697
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.123
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1979
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1213
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3006
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1202
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_range_and_enum_iteration",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1563
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1542
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1863
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1241
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2847
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1257
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_slice_subviews",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1518
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1551
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1921
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1201
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3098
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1197
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_procedure_parameter_generic_default",
+      "group": "defaults",
+      "odin": {
+        "compile": {
+          "status": 1,
+          "stdout": "",
+          "stderr": "Error: Unspecialized polymorphic procedure '' \n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_procedure_parameter_generic_default/main.odin(2:72) Error: Cannot assign value 'callback(value)' of type '$U' to 'int' in return statement \n\t... lback:=proc(item:$U)->U{return item})->T{return callback(value)} \n\t                                                    ^~~~~~~~~~~~~~^ \n\t/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_procedure_parameter_generic_default/main.odin(5:4) instantiated as 'call($T=int, $U=int)' \n",
+          "seconds": 0.0212
+        }
+      },
+      "engines": {},
+      "qualification": "not-native-valid"
+    },
+    {
+      "name": "native_procedure_parameter_typed_generic_default",
+      "group": "defaults",
+      "odin": {
+        "compile": {
+          "status": 1,
+          "stdout": "",
+          "stderr": "Error: Unspecialized polymorphic procedure '' \n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_procedure_parameter_typed_generic_default/main.odin(2:46) Error: Cannot assign value 'proc(item: $U) -> U {...} /* main:main.odin!58 */' of type 'proc($U) -> $U' to 'proc(int) -> int' in parameter value \n\t... m:T)->T=proc(item:$U)->U{return item})->T{return callback(value ... \n\t            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~^ \n\tNote: The signature type do not match whatsoever \n\t      Expected: proc(int) -> int \n\t      Got:      proc($U) -> $U \n\tNote: The signature type do not match whatsoever \n\t      Expected: proc(int) -> int \n\t      Got:      proc(invalid type) -> invalid type \n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_procedure_parameter_typed_generic_default/main.odin(2:56) Error: '$U' is not a type \n\t... :T)->T=proc(item:$U)->U{return item})->T{return callback(value)} \n\t                     ^^ \n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_procedure_parameter_typed_generic_default/main.odin(2:57) Error: Invalid use of a polymorphic parameter '$U' \n\t... :T)->T=proc(item:$U)->U{return item})->T{return callback(value)} \n\t                      ^ \n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_procedure_parameter_typed_generic_default/main.odin(2:61) Error: Undeclared name: U \n\t... :T)->T=proc(item:$U)->U{return item})->T{return callback(value)} \n\t                          ^ \n",
+          "seconds": 0.0224
+        }
+      },
+      "engines": {},
+      "qualification": "not-native-valid"
+    },
+    {
+      "name": "native_procedure_parameter_plain_default",
+      "group": "defaults",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1517
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.3484
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1871
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1223
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2807
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1166
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "caller_location",
+      "group": "source_identity",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4232
+        },
+        "run": {
+          "status": 0,
+          "stdout": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/caller_location/main.odin 6 1 7\n",
+          "stderr": "",
+          "seconds": 0.2427
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4457
+          },
+          "run": {
+            "status": 0,
+            "stdout": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/caller_location/rust-generated/main.odin 6 1 7\n",
+            "stderr": "",
+            "seconds": 0.1348
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5417
+          },
+          "run": {
+            "status": 0,
+            "stdout": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/caller_location/python-generated/main.odin 6 1 7\n",
+            "stderr": "",
+            "seconds": 0.1256
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "source_directives",
+      "group": "source_identity",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4146
+        },
+        "run": {
+          "status": 0,
+          "stdout": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/source_directives/main.odin\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/source_directives/\n5\nmain\n",
+          "stderr": "",
+          "seconds": 0.1555
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4443
+          },
+          "run": {
+            "status": 0,
+            "stdout": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/source_directives/rust-generated/main.odin\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/source_directives/rust-generated/\n5\nmain\n",
+            "stderr": "",
+            "seconds": 0.1384
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5447
+          },
+          "run": {
+            "status": 0,
+            "stdout": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/source_directives/python-generated/main.odin\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/source_directives/python-generated/\n5\nmain\n",
+            "stderr": "",
+            "seconds": 0.1331
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "source_line_after_native_access",
+      "group": "source_identity",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4045
+        },
+        "run": {
+          "status": 0,
+          "stdout": "7 7 main\n",
+          "stderr": "",
+          "seconds": 0.5538
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4391
+          },
+          "run": {
+            "status": 0,
+            "stdout": "7 13 main\n",
+            "stderr": "",
+            "seconds": 0.141
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5608
+          },
+          "run": {
+            "status": 0,
+            "stdout": "7 19 main\n",
+            "stderr": "",
+            "seconds": 0.4719
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "source_procedure_inside_native_index",
+      "group": "source_identity",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4146
+        },
+        "run": {
+          "status": 0,
+          "stdout": "3\n",
+          "stderr": "",
+          "seconds": 0.1589
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4467
+          },
+          "run": {
+            "status": 0,
+            "stdout": "7\n",
+            "stderr": "",
+            "seconds": 0.1227
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5504
+          },
+          "run": {
+            "status": 0,
+            "stdout": "7\n",
+            "stderr": "",
+            "seconds": 0.1739
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_literal",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4075
+        },
+        "run": {
+          "status": 0,
+          "stdout": "resource contents\n",
+          "stderr": "",
+          "seconds": 0.2251
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4546
+          },
+          "run": {
+            "status": 0,
+            "stdout": "resource contents\n",
+            "stderr": "",
+            "seconds": 0.1717
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5302
+          },
+          "run": {
+            "status": 0,
+            "stdout": "resource contents\n",
+            "stderr": "",
+            "seconds": 0.1413
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_constant",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4047
+        },
+        "run": {
+          "status": 0,
+          "stdout": "resource contents\n",
+          "stderr": "",
+          "seconds": 0.1631
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_constant/main.thor(4:7): Error: Failed to `#load` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_constant/rust-generated//payload.txt; invalid file or cannot be found\n    DATA::#load(PATH,string)\n          ^\n",
+            "seconds": 0.1173
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_constant/main.thor(4:7): Error: Failed to `#load` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_constant/python-generated//payload.txt; invalid file or cannot be found\n    DATA::#load(PATH,string)\n          ^\n",
+            "seconds": 0.2185
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_concatenation",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4018
+        },
+        "run": {
+          "status": 0,
+          "stdout": "resource contents\n",
+          "stderr": "",
+          "seconds": 0.1215
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_concatenation/main.thor(4:7): Error: Failed to `#load` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_concatenation/rust-generated//payload.txt; invalid file or cannot be found\n    DATA::#load(\"payload\"+\".txt\",string)\n          ^\n",
+            "seconds": 0.1154
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_concatenation/main.thor(4:7): Error: Failed to `#load` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_concatenation/python-generated//payload.txt; invalid file or cannot be found\n    DATA::#load(\"payload\"+\".txt\",string)\n          ^\n",
+            "seconds": 0.2097
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_directory",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.3993
+        },
+        "run": {
+          "status": 0,
+          "stdout": "resource contents\n",
+          "stderr": "",
+          "seconds": 0.1317
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory/main.thor(4:7): Error: Failed to `#load` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory/rust-generated//payload.txt; invalid file or cannot be found\n    DATA::#load(#directory+\"/payload.txt\",string)\n          ^\n",
+            "seconds": 0.1148
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory/main.thor(4:7): Error: Failed to `#load` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory/python-generated//payload.txt; invalid file or cannot be found\n    DATA::#load(#directory+\"/payload.txt\",string)\n          ^\n",
+            "seconds": 0.207
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "exists_constant",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4081
+        },
+        "run": {
+          "status": 0,
+          "stdout": "true\n",
+          "stderr": "",
+          "seconds": 0.2981
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4444
+          },
+          "run": {
+            "status": 0,
+            "stdout": "false\n",
+            "stderr": "",
+            "seconds": 0.2784
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5707
+          },
+          "run": {
+            "status": 0,
+            "stdout": "false\n",
+            "stderr": "",
+            "seconds": 0.2767
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "negative_runtime_index",
+      "group": "intentional",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4229
+        },
+        "run": {
+          "status": -5,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/negative_runtime_index/main.odin(5:50) Bounds check failed: -1 is out of range 0..<2\n",
+          "seconds": 0.3036
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4799
+          },
+          "run": {
+            "status": 0,
+            "stdout": "7\n",
+            "stderr": "",
+            "seconds": 0.1396
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5572
+          },
+          "run": {
+            "status": 0,
+            "stdout": "7\n",
+            "stderr": "",
+            "seconds": 0.1931
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "negative_runtime_slice",
+      "group": "intentional",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4083
+        },
+        "run": {
+          "status": -5,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/negative_runtime_slice/main.odin(5:49) Invalid slice indices: -1:2 is out of range 0..<2\n",
+          "seconds": 0.1417
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4742
+          },
+          "run": {
+            "status": 0,
+            "stdout": "[7]\n",
+            "stderr": "",
+            "seconds": 0.2173
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5658
+          },
+          "run": {
+            "status": 0,
+            "stdout": "[7]\n",
+            "stderr": "",
+            "seconds": 0.1335
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_vet_file_tag",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0213
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_vet_file_tag/main.thor(1:1): Error: #+vet unused is supported only in Odin source files. Generated helpers and imports make native unused checks unreliable. Use --vet=unused for original Thor local bindings.\n    #+vet unused\n    ^^^^^^^^^^^^\n",
+            "seconds": 0.0357
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_vet_file_tag/main.thor(1:1): Error: #+vet unused is supported only in Odin source files. Generated helpers and imports make native unused checks unreliable. Use --vet=unused for original Thor local bindings.\n    #+vet unused\n    ^^^^^^^^^^^^\n",
+            "seconds": 0.0787
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_vet_flag",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.022
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: -vet is supported only for Odin-only projects. The native bundle includes checks that misread generated helpers. Use --vet for Thor convention checks, or select supported native checks individually. Remove -vet for projects containing Thor source.\n",
+            "seconds": 0.0346
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: -vet is supported only for Odin-only projects. The native bundle includes checks that misread generated helpers. Use --vet for Thor convention checks, or select supported native checks individually. Remove -vet for projects containing Thor source.\n",
+            "seconds": 0.0766
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_strict_style_flag",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0216
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: -strict-style is supported only for Odin-only projects. This bundles native style and indentation checks that inspect generated formatting. Use --vet=semicolon to check original Thor terminators. Remove -strict-style for projects containing Thor source.\n",
+            "seconds": 0.0344
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: -strict-style is supported only for Odin-only projects. This bundles native style and indentation checks that inspect generated formatting. Use --vet=semicolon to check original Thor terminators. Remove -strict-style for projects containing Thor source.\n",
+            "seconds": 0.0755
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "default_allocator_in_debug",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.5301
+        },
+        "run": {
+          "status": 0,
+          "stdout": "true\n",
+          "stderr": "",
+          "seconds": 0.133
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.6719
+          },
+          "run": {
+            "status": 0,
+            "stdout": "false\n",
+            "stderr": "",
+            "seconds": 0.3676
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.7912
+          },
+          "run": {
+            "status": 0,
+            "stdout": "false\n",
+            "stderr": "",
+            "seconds": 0.1728
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "Integer_import_alias",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4092
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1321
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/Integer_import_alias/main.thor(5:1): Error: Type 'Thor expression.Integer' has no field 'println'\n    Integer.println(\"ok\")\n    ^^^^^^^\n",
+            "seconds": 0.1258
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/Integer_import_alias/main.thor(5:1): Error: Type 'Integer' has no field 'println'\n    Integer.println(\"ok\")\n    ^^^^^^^\n",
+            "seconds": 0.485
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "Rational_import_alias",
+      "group": "identifiers",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4282
+        },
+        "run": {
+          "status": 0,
+          "stdout": "ok\n",
+          "stderr": "",
+          "seconds": 0.1323
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/Rational_import_alias/main.thor(5:1): Error: Type 'Thor expression.Rational' has no field 'println'\n    Rational.println(\"ok\")\n    ^^^^^^^^\n",
+            "seconds": 0.1253
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/Rational_import_alias/main.thor(5:1): Error: Type 'Rational' has no field 'println'\n    Rational.println(\"ok\")\n    ^^^^^^^^\n",
+            "seconds": 0.4575
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_initializer_silent_type_change",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4065
+        },
+        "run": {
+          "status": 0,
+          "stdout": "int\n",
+          "stderr": "",
+          "seconds": 0.1499
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5041
+          },
+          "run": {
+            "status": 0,
+            "stdout": "proc()\n",
+            "stderr": "",
+            "seconds": 0.2095
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.6513
+          },
+          "run": {
+            "status": 0,
+            "stdout": "proc()\n",
+            "stderr": "",
+            "seconds": 0.206
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "caller_expression_native_access",
+      "group": "source_identity",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.3989
+        },
+        "run": {
+          "status": 0,
+          "stdout": "values[index]\n",
+          "stderr": "",
+          "seconds": 0.1451
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4489
+          },
+          "run": {
+            "status": 0,
+            "stdout": "__thor_eb580b4f4063_access_157_170(&(values), &(index), type_of(__thor_eb580b4f4063_sequence.element(values)))\n",
+            "stderr": "",
+            "seconds": 0.161
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5517
+          },
+          "run": {
+            "status": 0,
+            "stdout": "__thor_eb580b4f4063_access_157_170(&(values), &(index), type_of(__thor_eb580b4f4063_sequence.element(values)))\n",
+            "stderr": "",
+            "seconds": 0.2316
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_hash_constant",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4108
+        },
+        "run": {
+          "status": 0,
+          "stdout": "7582200489857336593\n",
+          "stderr": "",
+          "seconds": 0.1332
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_hash_constant/main.thor(4:7): Error: Failed to `#load_hash` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_hash_constant/rust-generated//payload.txt; invalid file or cannot be found\n    DATA::#load_hash(PATH,\"fnv64a\")\n          ^\n",
+            "seconds": 0.1164
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_hash_constant/main.thor(4:7): Error: Failed to `#load_hash` file: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_hash_constant/python-generated//payload.txt; invalid file or cannot be found\n    DATA::#load_hash(PATH,\"fnv64a\")\n          ^\n",
+            "seconds": 0.2146
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_directory_constant",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4121
+        },
+        "run": {
+          "status": 0,
+          "stdout": "2\n",
+          "stderr": "",
+          "seconds": 0.1361
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:23): Error: load_directory error - path does not exist: assets\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                          ^^^^^^^^^^^^^^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:61): Error: Expected a constant boolean condition in ternary when expression\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                                                                ^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:61): Error: 'type_of(Thor expression(entries))' is not a type\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                                                                ^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:61): Error: 'type_of' of polymorphic type cannot be determined\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                                                                ^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:61): Error: Cannot determine polymorphic type from parameter: 'invalid type' to '$T'\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                                                                ^^^^^^^\n",
+            "seconds": 0.1154
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:23): Error: load_directory error - path does not exist: assets\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                          ^^^^^^^^^^^^^^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:57): Error: 'type_of(Thor expression(entries))' is not a type\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                                                            ^^^^^^^^^^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/load_directory_constant/main.thor(4:61): Error: Cannot determine polymorphic type from parameter: 'invalid type' to '$T'\n    main::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n                                                                ^^^^^^^\n",
+            "seconds": 0.2177
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_absolute_constant",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4032
+        },
+        "run": {
+          "status": 0,
+          "stdout": "resource contents\n",
+          "stderr": "",
+          "seconds": 0.2048
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4437
+          },
+          "run": {
+            "status": 0,
+            "stdout": "resource contents\n",
+            "stderr": "",
+            "seconds": 0.1361
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5348
+          },
+          "run": {
+            "status": 0,
+            "stdout": "resource contents\n",
+            "stderr": "",
+            "seconds": 0.1393
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_increment_not_supported",
+      "group": "non_native_controls",
+      "odin": {
+        "compile": {
+          "status": 1,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_increment_not_supported/main.odin(4:7) Syntax Error: Postfix '++' statement is not supported \n\tx:=0;x++;_=x \n\t      ^ \n",
+          "seconds": 0.0175
+        }
+      },
+      "engines": {},
+      "qualification": "not-native-valid"
+    },
+    {
+      "name": "native_infix_power_not_supported",
+      "group": "non_native_controls",
+      "odin": {
+        "compile": {
+          "status": 1,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_infix_power_not_supported/main.odin(4:4) Syntax Error: Expected ';', got ** \n\t_=2**3 \n\t   ^ \n",
+          "seconds": 0.0192
+        }
+      },
+      "engines": {},
+      "qualification": "not-native-valid"
+    },
+    {
+      "name": "native_infix_concat_not_supported",
+      "group": "non_native_controls",
+      "odin": {
+        "compile": {
+          "status": 1,
+          "stdout": "",
+          "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_infix_concat_not_supported/main.odin(4:14) Syntax Error: Postfix '++' operator is not supported \n\t_=[2]int{1,2}++[2]int{3,4} \n\t             ^ \n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/native_infix_concat_not_supported/main.odin(4:19) Syntax Error: Expected ';', got identifier \n\t_=[2]int{1,2}++[2]int{3,4} \n\t                  ^ \n",
+          "seconds": 0.019
+        }
+      },
+      "engines": {},
+      "qualification": "not-native-valid"
+    },
+    {
+      "name": "native_simd_extract",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1505
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1235
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1907
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2018
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2888
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1313
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "load_directory_literal",
+      "group": "resources",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4097
+        },
+        "run": {
+          "status": 0,
+          "stdout": "2\n",
+          "stderr": "",
+          "seconds": 0.1268
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.442
+          },
+          "run": {
+            "status": 0,
+            "stdout": "2\n",
+            "stderr": "",
+            "seconds": 0.178
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5558
+          },
+          "run": {
+            "status": 0,
+            "stdout": "2\n",
+            "stderr": "",
+            "seconds": 0.1687
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "compiler_root_identity",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4051
+        },
+        "run": {
+          "status": 0,
+          "stdout": "/Users/davidludwik/Odin/Odin/\ncompiler_root_identity\n",
+          "stderr": "",
+          "seconds": 0.139
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4434
+          },
+          "run": {
+            "status": 0,
+            "stdout": "/Users/davidludwik/Odin/Odin/\nrust-generated\n",
+            "stderr": "",
+            "seconds": 0.1252
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5468
+          },
+          "run": {
+            "status": 0,
+            "stdout": "/Users/davidludwik/Odin/Odin/\npython-generated\n",
+            "stderr": "",
+            "seconds": 0.1405
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "custom_thor_collection_simple",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0224
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.056
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1051
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "custom_thor_collection_index",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1541
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.133
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/custom_thor_collection_index/main.thor(1:1): Error: Syntax Error: Path does not exist: thor:sequence\n    package main\n    ^\n",
+            "seconds": 0.0538
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/custom_thor_collection_index/main.thor(1:1): Error: imported package does not exist: /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/custom_thor_collection_index/custom/sets\n    package main\n    ^\n",
+            "seconds": 0.0735
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_rodata_copy",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.155
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1215
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1934
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.18
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.312
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2136
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_static_local_storage",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1516
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1352
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.191
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1187
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3106
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1296
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_deferred_calls",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1505
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1216
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1856
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.14
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.286
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.127
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_reference_iteration",
+      "group": "storage",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1558
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1301
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1912
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1264
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3083
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2501
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "native_literal_cstring_concat",
+      "group": "operators",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1559
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.379
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.1886
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.3285
+          },
+          "comparison": "same"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2838
+          },
+          "run": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.2406
+          },
+          "comparison": "same"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "fn_call_arrow_receiver",
+      "group": "contextual",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4104
+        },
+        "run": {
+          "status": 0,
+          "stdout": "7\n",
+          "stderr": "",
+          "seconds": 0.1306
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_call_arrow_receiver/main.thor(6:17): Error: A pure fn requires a body\n    main::proc(){x:=fn()->read();fmt.println(x)}\n                    ^^\n",
+            "seconds": 0.0327
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/fn_call_arrow_receiver/main.thor(6:17): Error: A pure fn requires a body\n    main::proc(){x:=fn()->read();fmt.println(x)}\n                    ^^\n",
+            "seconds": 0.0684
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "build_project_tag_file",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0225
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: invalid frontend output for /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/build_project_tag_file/main.thor: /Users/davidludwik/Thor/frontend/parser/file_tags.odin(266:12) Bounds check failed: 0 is out of range 0..<0\n\n",
+            "seconds": 0.0461
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: /Users/davidludwik/Thor/frontend/parser/file_tags.odin(266:12) Bounds check failed: 0 is out of range 0..<0\n",
+            "seconds": 0.1013
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "build_project_tag_directory",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.0224
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: invalid frontend output for /private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/build_project_tag_directory/main.thor: /Users/davidludwik/Thor/frontend/parser/file_tags.odin(266:12) Bounds check failed: 0 is out of range 0..<0\n\n",
+            "seconds": 0.0792
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "thor Error: /Users/davidludwik/Thor/frontend/parser/file_tags.odin(266:12) Bounds check failed: 0 is out of range 0..<0\n",
+            "seconds": 0.0871
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "compiler_project_name_directory",
+      "group": "tooling",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.428
+        },
+        "run": {
+          "status": 0,
+          "stdout": "compiler_project_name_directory\n",
+          "stderr": "",
+          "seconds": 0.2792
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.4513
+          },
+          "run": {
+            "status": 0,
+            "stdout": "rust-generated\n",
+            "stderr": "",
+            "seconds": 0.136
+          },
+          "comparison": "runtime-difference"
+        },
+        "python": {
+          "compile": {
+            "status": 0,
+            "stdout": "",
+            "stderr": "",
+            "seconds": 0.5442
+          },
+          "run": {
+            "status": 0,
+            "stdout": "python-generated\n",
+            "stderr": "",
+            "seconds": 0.1326
+          },
+          "comparison": "runtime-difference"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "array_parenthesized_element",
+      "group": "native_type_syntax",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4557
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.4904
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_parenthesized_element/main.thor(2:4): Error: Cannot call a non-procedure: '[2]' of type '[1]int'\n    A::[2](int)\n       ^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_parenthesized_element/main.thor(3:16): Error: 'A' is not a type\n    main::proc(){v:A;_=v}\n                   ^\n",
+            "seconds": 0.087
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_parenthesized_element/main.thor(2:4): Error: Cannot call a non-procedure: '[2]' of type '[1]int'\n    A::[2](int)\n       ^^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_parenthesized_element/main.thor(3:16): Error: 'A' is not a type\n    main::proc(){v:A;_=v}\n                   ^\n",
+            "seconds": 0.2401
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "slice_parenthesized_element",
+      "group": "native_type_syntax",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1495
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.2022
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/slice_parenthesized_element/main.thor(2:4): Error: An empty array literal needs an element type from its context.\n    A::[](int)\n       ^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/slice_parenthesized_element/main.thor(3:16): Error: 'A' is not a type\n    main::proc(){v:A;_=v}\n                   ^\n",
+            "seconds": 0.0669
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/slice_parenthesized_element/main.thor(2:4): Error: An empty array literal needs an element type from its context.\n    A::[](int)\n       ^^\n/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/slice_parenthesized_element/main.thor(3:16): Error: 'A' is not a type\n    main::proc(){v:A;_=v}\n                   ^\n",
+            "seconds": 0.1517
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "array_bitfield_element",
+      "group": "native_type_syntax",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1501
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1539
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_bitfield_element/main.thor(2:7): Error: expected a statement, got bit_field\n    A::[2]bit_field u8{value:u8|1}\n          ^^^^^^^^^\n",
+            "seconds": 0.0314
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_bitfield_element/main.thor(2:7): Error: expected a statement, got bit_field\n    A::[2]bit_field u8{value:u8|1}\n          ^^^^^^^^^\n",
+            "seconds": 0.0636
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    },
+    {
+      "name": "array_parenthesized_literal",
+      "group": "native_type_syntax",
+      "odin": {
+        "compile": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1454
+        },
+        "run": {
+          "status": 0,
+          "stdout": "",
+          "stderr": "",
+          "seconds": 0.1451
+        }
+      },
+      "engines": {
+        "rust": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_parenthesized_literal/main.thor(2:17): Error: Cannot call a non-procedure: '[2]' of type '[1]int'\n    main::proc(){v:=[2](int){1,2};_=v}\n                    ^^^\n",
+            "seconds": 0.0542
+          },
+          "comparison": "rejected"
+        },
+        "python": {
+          "compile": {
+            "status": 1,
+            "stdout": "",
+            "stderr": "/private/var/folders/fp/n1gx728j76s84hd1c_htbxwr0000gn/T/thor-superset-audit-a5oa7gp2/array_parenthesized_literal/main.thor(2:17): Error: Cannot call a non-procedure: '[2]' of type '[1]int'\n    main::proc(){v:=[2](int){1,2};_=v}\n                    ^^^\n",
+            "seconds": 0.1457
+          },
+          "comparison": "rejected"
+        }
+      },
+      "qualification": "native-valid"
+    }
+  ]
+}

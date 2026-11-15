@@ -150,6 +150,37 @@ generic::proc($T:typeid)->int{return #run work(size_of(T))}
         self.assertGreater(self.count(warm,'evaluation.request_hits'),0)
         self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
 
+    def test_constant_resource_paths_reuse_results_and_revalidate_all_branches(self):
+        asset=self.app/'asset.txt'
+        other=self.app/'other.txt'
+        asset.write_text('abc')
+        other.write_text('other')
+        prefix='''NAME::("asset.txt" when #config(USE_ASSET,true) else "other.txt")
+ALIAS::NAME
+DATA::#load(ALIAS)
+PRESENT::#exists("missing" when ODIN_OS==.Darwin else "other-missing")
+work::proc()->int{return len(DATA)}
+'''
+        for flags in [[],native.UNCHECKED]:
+            with self.subTest(flags=flags):
+                self.source.write_text(self.program('if (#run work())!=3{panic("data")}',prefix))
+                self.profile(flags=flags)
+                warm=self.profile(flags=flags)
+                self.assertGreater(self.count(warm,'evaluation.request_hits'),0)
+                self.assertEqual(self.count(warm,'evaluation.helper_preparations'),0)
+                other.write_text(other.read_text()+'changed')
+                changed=self.profile(flags=flags)
+                self.assertGreater(self.count(changed,'evaluation.helper_compilations'),0)
+                selected=self.program('if (#run work())!=len(DATA){panic("selected data")}',prefix)
+                self.source.write_text(selected)
+                self.profile(flags=[*flags,'-define:USE_ASSET=false'])
+                warm=self.profile(flags=[*flags,'-define:USE_ASSET=false'])
+                self.assertGreater(self.count(warm,'evaluation.request_hits'),0)
+                asset.write_text('new data')
+                self.source.write_text(self.program('if (#run work())!=8{panic("changed data")}',prefix))
+                self.profile(flags=flags)
+                asset.write_text('abc')
+
     def test_owned_cached_results_still_materialize_independently(self):
         self.source.write_text(self.program('''
 a:=#run values();b:=#run values()

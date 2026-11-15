@@ -2,6 +2,7 @@
 package thor_graph
 
 import "base:runtime"
+import "thor:typeinfo"
 import "core:os"
 import "core:slice"
 import "core:sync"
@@ -89,11 +90,11 @@ leaf :: proc(info:^runtime.Type_Info)->bool {
     // map values of these types have no addressable value cells to relocate.
     if info.size==0 {return true}
     #partial switch item in runtime.type_info_base(info).variant {
-    case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,
-         runtime.Type_Info_Complex,runtime.Type_Info_Quaternion,runtime.Type_Info_Enum,runtime.Type_Info_Bit_Set,
-         runtime.Type_Info_Type_Id,runtime.Type_Info_Simd_Vector,runtime.Type_Info_Matrix,runtime.Type_Info_Bit_Field:
+    case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
+         typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set,
+         typeinfo.Type_Info_Type_Id,typeinfo.Type_Info_Simd_Vector,typeinfo.Type_Info_Matrix,typeinfo.Type_Info_Bit_Field:
         return true
-    case runtime.Type_Info_Struct:return item.field_count==0
+    case typeinfo.Type_Info_Struct:return item.field_count==0
     }
     return false
 }
@@ -121,26 +122,26 @@ validate_schema :: proc(s:^State,root:^runtime.Type_Info)->bool {
         if !put(s,&seen,info.id,true) {return false}
         if unsupported_resource(info) {return fail(s,.Unsupported_Type)}
         #partial switch item in info.variant {
-        case runtime.Type_Info_Named:push(s,&work,item.base)
-        case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,
-             runtime.Type_Info_Complex,runtime.Type_Info_Quaternion,runtime.Type_Info_Enum,runtime.Type_Info_Bit_Set,
-             runtime.Type_Info_Type_Id,runtime.Type_Info_Simd_Vector,runtime.Type_Info_Matrix,runtime.Type_Info_Bit_Field:
-        case runtime.Type_Info_Pointer:
+        case typeinfo.Type_Info_Named:push(s,&work,item.base)
+        case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,
+             typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion,typeinfo.Type_Info_Enum,typeinfo.Type_Info_Bit_Set,
+             typeinfo.Type_Info_Type_Id,typeinfo.Type_Info_Simd_Vector,typeinfo.Type_Info_Matrix,typeinfo.Type_Info_Bit_Field:
+        case typeinfo.Type_Info_Pointer:
             if item.elem==nil {return fail(s,.Unsupported_Type)}
             push(s,&work,item.elem)
-        case runtime.Type_Info_String:
+        case typeinfo.Type_Info_String:
             if item.is_cstring {return fail(s,.Unsupported_Type)}
-        case runtime.Type_Info_Slice:push(s,&work,item.elem)
-        case runtime.Type_Info_Dynamic_Array:push(s,&work,item.elem)
-        case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:push(s,&work,item.elem)
-        case runtime.Type_Info_Array:push(s,&work,item.elem)
-        case runtime.Type_Info_Enumerated_Array:push(s,&work,item.elem)
-        case runtime.Type_Info_Struct:
+        case typeinfo.Type_Info_Slice:push(s,&work,item.elem)
+        case typeinfo.Type_Info_Dynamic_Array:push(s,&work,item.elem)
+        case typeinfo.Type_Info_Fixed_Capacity_Dynamic_Array:push(s,&work,item.elem)
+        case typeinfo.Type_Info_Array:push(s,&work,item.elem)
+        case typeinfo.Type_Info_Enumerated_Array:push(s,&work,item.elem)
+        case typeinfo.Type_Info_Struct:
             if .raw_union in item.flags || item.soa_kind!=.None {return fail(s,.Unsupported_Type)}
             for i in 0..<int(item.field_count) {push(s,&work,item.types[i])}
-        case runtime.Type_Info_Union:
+        case typeinfo.Type_Info_Union:
             for variant in item.variants {push(s,&work,variant)}
-        case runtime.Type_Info_Map:
+        case typeinfo.Type_Info_Map:
             push(s,&work,item.key);push(s,&work,item.value)
         case:return fail(s,.Unsupported_Type)
         }
@@ -160,13 +161,13 @@ sequence :: proc(s:^State,p:rawptr,count,stride:int,elem:^runtime.Type_Info) {
     if s.error!=.None || leaf(elem) {return}
     for i in 0..<count {enqueue(s,offset(p,i*stride),elem);if s.error!=.None {return}}
 }
-active_variant :: proc(s:^State,p:rawptr,info:runtime.Type_Info_Union)->^runtime.Type_Info {
+active_variant :: proc(s:^State,p:rawptr,info:typeinfo.Type_Info_Union)->^runtime.Type_Info {
     if len(info.variants)==0 {return nil}
     // A single pointer variant is represented by the pointer alone. Some Odin
     // versions still populate tag_type for this representation.
     pure_maybe:=false
     if len(info.variants)==1 {
-        _,pure_maybe=runtime.type_info_base(info.variants[0]).variant.(runtime.Type_Info_Pointer)
+        _,pure_maybe=runtime.type_info_base(info.variants[0]).variant.(typeinfo.Type_Info_Pointer)
     }
     if pure_maybe {
         if load(p,rawptr)==nil {return nil}
@@ -191,20 +192,20 @@ discover :: proc(s:^State) {
     for index:=0;index<len(s.tasks)&&s.error==.None;index+=1 {
         task:=s.tasks[index];p:=task.source
         #partial switch item in runtime.type_info_base(task.info).variant {
-        case runtime.Type_Info_Pointer:
+        case typeinfo.Type_Info_Pointer:
             target:=load(p,rawptr)
             if target!=nil {add_region(s,target,item.elem.size,item.elem.align,item.elem.size);enqueue(s,target,item.elem)}
-        case runtime.Type_Info_String:
+        case typeinfo.Type_Info_String:
             value:=load(p,runtime.Raw_Slice)
             width:=2 if item.encoding==.UTF_16 else 1
             size:=span_size(s,value.len,width)
             if value.data!=nil {add_region(s,value.data,size,width,size)} else if value.len!=0 {fail(s,.Invalid_Data)}
-        case runtime.Type_Info_Slice:
+        case typeinfo.Type_Info_Slice:
             value:=load(p,runtime.Raw_Slice)
             size:=span_size(s,value.len,item.elem_size)
             if value.data!=nil {add_region(s,value.data,size,item.elem.align,size);sequence(s,value.data,value.len,item.elem_size,item.elem)}
             else if value.len!=0&&item.elem_size!=0 {fail(s,.Invalid_Data)}
-        case runtime.Type_Info_Dynamic_Array:
+        case typeinfo.Type_Info_Dynamic_Array:
             value:=load(p,runtime.Raw_Dynamic_Array)
             if value.len<0 || value.cap<value.len {fail(s,.Invalid_Data);continue}
             size:=span_size(s,value.cap,item.elem_size)
@@ -212,23 +213,23 @@ discover :: proc(s:^State) {
             if s.freeing&&value.data!=nil&&(value.allocator.procedure!=s.allocator.procedure||value.allocator.data!=s.allocator.data) {fail(s,.Invalid_Allocator);continue}
             if value.data!=nil {add_region(s,value.data,size,item.elem.align,used);sequence(s,value.data,value.len,item.elem_size,item.elem)}
             else if value.cap!=0&&item.elem_size!=0 {fail(s,.Invalid_Data)}
-        case runtime.Type_Info_Array:sequence(s,p,item.count,item.elem_size,item.elem)
-        case runtime.Type_Info_Enumerated_Array:sequence(s,p,item.count,item.elem_size,item.elem)
-        case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:
+        case typeinfo.Type_Info_Array:sequence(s,p,item.count,item.elem_size,item.elem)
+        case typeinfo.Type_Info_Enumerated_Array:sequence(s,p,item.count,item.elem_size,item.elem)
+        case typeinfo.Type_Info_Fixed_Capacity_Dynamic_Array:
             count:=load(offset(p,int(item.len_offset)),int)
             if count<0||count>item.capacity {fail(s,.Invalid_Data);continue}
             sequence(s,p,count,item.elem_size,item.elem)
-        case runtime.Type_Info_Struct:
+        case typeinfo.Type_Info_Struct:
             for i in 0..<int(item.field_count) {enqueue(s,offset(p,int(item.offsets[i])),item.types[i])}
-        case runtime.Type_Info_Union:
+        case typeinfo.Type_Info_Union:
             variant:=active_variant(s,p,item)
             if variant!=nil {enqueue(s,p,variant)}
-        case runtime.Type_Info_Map:discover_map(s,p,item)
+        case typeinfo.Type_Info_Map:discover_map(s,p,item)
         }
     }
 }
 
-discover_map :: proc(s:^State,p:rawptr,info:runtime.Type_Info_Map) {
+discover_map :: proc(s:^State,p:rawptr,info:typeinfo.Type_Info_Map) {
     value:=load(p,runtime.Raw_Map)
     base:=runtime.map_data(value)
     if base==0 {if value.len!=0 {fail(s,.Invalid_Data)};return}
@@ -351,24 +352,24 @@ allocate_groups :: proc(s:^State) {
 
 patch_header :: proc(s:^State,dst,src:rawptr,info:^runtime.Type_Info,allow_cells:bool) {
     #partial switch item in runtime.type_info_base(info).variant {
-    case runtime.Type_Info_Pointer:
+    case typeinfo.Type_Info_Pointer:
         original:=load(src,rawptr)
         store(dst,translate(s,uintptr(original),item.elem.size,allow_cells))
-    case runtime.Type_Info_String:
+    case typeinfo.Type_Info_String:
         value:=load(src,runtime.Raw_Slice)
         width:=2 if item.encoding==.UTF_16 else 1
         value.data=translate(s,uintptr(value.data),span_size(s,value.len,width),allow_cells)
         store(dst,value)
-    case runtime.Type_Info_Slice:
+    case typeinfo.Type_Info_Slice:
         value:=load(src,runtime.Raw_Slice)
         value.data=translate(s,uintptr(value.data),span_size(s,value.len,item.elem_size),allow_cells)
         store(dst,value)
-    case runtime.Type_Info_Dynamic_Array:
+    case typeinfo.Type_Info_Dynamic_Array:
         value:=load(src,runtime.Raw_Dynamic_Array)
         value.data=translate(s,uintptr(value.data),span_size(s,value.cap,item.elem_size),allow_cells)
         value.allocator=s.allocator
         store(dst,value)
-    case runtime.Type_Info_Map:
+    case typeinfo.Type_Info_Map:
         value:=load(src,runtime.Raw_Map)
         if base:=runtime.map_data(value);base!=0 {
             table:=s.tables[s.table_indices[base]]
@@ -386,13 +387,13 @@ patch_key :: proc(s:^State,dst,src:rawptr,info:^runtime.Type_Info) {
         task:=work[i]
         out:=offset(dst,int(uintptr(task.source)-uintptr(src)))
         #partial switch item in runtime.type_info_base(task.info).variant {
-        case runtime.Type_Info_Struct:
+        case typeinfo.Type_Info_Struct:
             for j in 0..<int(item.field_count) {push(s,&work,Task{offset(task.source,int(item.offsets[j])),item.types[j]})}
-        case runtime.Type_Info_Array:
+        case typeinfo.Type_Info_Array:
             for j in 0..<item.count {push(s,&work,Task{offset(task.source,j*item.elem_size),item.elem})}
-        case runtime.Type_Info_Enumerated_Array:
+        case typeinfo.Type_Info_Enumerated_Array:
             for j in 0..<item.count {push(s,&work,Task{offset(task.source,j*item.elem_size),item.elem})}
-        case runtime.Type_Info_Union:
+        case typeinfo.Type_Info_Union:
             variant:=active_variant(s,task.source,item)
             if variant!=nil {push(s,&work,Task{task.source,variant})}
         case:patch_header(s,out,task.source,task.info,false)

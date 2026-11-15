@@ -197,9 +197,14 @@ its own implementation.
 
 Mutable callbacks and procedure parameters do not borrow the access contract of
 their initializer or default expression. A slice returned by an unresolved
-callback/foreign body is conservatively a read-only view: bind it with `:>` and
-clone it for writable access. A fixed immutable alias of an inspectable reader
-retains that reader's precise contract.
+callback/foreign body is conservatively a read-only view when a Thor view can
+escape a procedure or reside in global storage. Bind that result with `:>` and
+clone it for writable access. Local views inside procedures with value-only
+results cannot be captured by Odin procedure literals, so they preserve ordinary
+callback/foreign return permissions elsewhere. Writable escapes from those
+local views are still checked at their use. A fixed immutable alias of an inspectable reader
+retains that reader's precise contract. Immutable inline arrays and inline record fields also count as protected
+storage when a returned slice can expose them.
 
 Reference-containing map/Set keys are a conservative boundary: inserting a
 pointer or record that carries a read-only slice reference is rejected rather

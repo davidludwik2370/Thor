@@ -244,7 +244,7 @@ main :: proc() {
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('heap-use-after-free', result.stderr)
         self.assertNotIn('.thor:', result.stderr)
-        generated = (self.output/'main.odin').read_text()
+        generated = next(self.output.rglob('main.odin')).read_text()
         work = generated[generated.index('work :: proc'):generated.index('main :: proc')]
         self.assertNotIn('_debug_entry', work)
         # A comment mentioning the hook must not disable automatic mapping.
@@ -373,7 +373,7 @@ main :: proc() { _ = helper.allocate() }
             manifest = self.build(source, flags)
             self.assertNotIn('memory_debug', manifest)
             self.assertNotIn('-sanitize:address', manifest['odin_flags'])
-            generated = (self.output/'main.odin').read_text()
+            generated = next(self.output.rglob('main.odin')).read_text()
             self.assertNotIn('memory_', generated)
             self.assertNotIn('__thor_map', generated)
         self.assertEqual(self.run_program().returncode, 0)

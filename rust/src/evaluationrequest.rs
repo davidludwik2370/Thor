@@ -88,7 +88,7 @@ impl Project {
             .options
             .flags
             .iter()
-            .filter(|flag| !flag.starts_with("-out:") && flag.as_str() != "-keep-executable")
+            .filter(|flag| !flag.starts_with("-out:") && flag.as_str() != "-keep-executable" && crate::cli::helper_flag(flag))
             .collect::<Vec<_>>();
         Some(sha256(&canonical(
             &json!({"schema":1,"identity":identity,"resources":resources,

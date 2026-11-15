@@ -111,6 +111,7 @@ class SliceAccess:
         self.recursive=False
         self.recursive_pending=set()
         self.full_contracts=False
+        self.opaque_readonly=None
         self.readonly_access={}
         for source in project.sources.values():
             source.slice_access=self
@@ -285,7 +286,7 @@ class SliceAccess:
     @staticmethod
     def struct_names(typ):
         if typ.members:return list(typ.members)
-        fields=typ.node.role('fields') if typ.node else None
+        fields=(typ.node.role('fields') or typ.node) if typ.node else None
         return [name.text for field in fields.children if field.kind=='Field' for name in field.group('names')] if fields else []
 
     def same_type(self,a,b,depth=0):
@@ -322,7 +323,7 @@ class SliceAccess:
             if len(steps)>16:
                 result.data.add(Origin(index,aspect='all'));return result
             result.locations.add((index,steps))
-            if typ.kind in {'slice','generic','unknown','union'}:result.data.add(Origin(index,steps))
+            if typ.kind in {'slice','generic','unknown'} or typ.kind=='union' and self.contains_slice(typ):result.data.add(Origin(index,steps))
         return result
 
     def qualify(self,value,origins):
@@ -409,7 +410,7 @@ class SliceAccess:
         seen={} if seen is None else seen
         if id(value) in seen:return seen[id(value)]
         result=self.copied(value);seen[id(value)]=result
-        if result.typ.kind in {'slice','generic','unknown','union'}:return self.qualify(result,{Origin(seed=seed)})
+        if result.typ.kind in {'slice','generic','unknown'} or result.typ.kind=='union' and self.contains_slice(result.typ):return self.qualify(result,{Origin(seed=seed)})
         if result.typ.kind in {'struct','array','fixed'}:result.storage.add(Origin(seed=seed,aspect='inline'))
         if result.typ.kind=='struct':
             for name in self.struct_names(result.typ):result.fields[name]=self.freeze(self.member(result,name),seed,seen)
@@ -556,7 +557,7 @@ class SliceAccess:
             if arg.kind=='Unary' and arg.data.get('op')=='**':
                 base=self.eval(arg.role('expr'),context)
                 if base.typ.kind=='struct' and base.typ.node:
-                    for field in base.typ.node.role('fields').children:
+                    for field in (base.typ.node.role('fields') or base.typ.node).children:
                         if field.kind=='Field':
                             for name in field.group('names'):positional.append((arg,self.member(base,name.text)))
                 elif base.typ.kind in {'array','fixed'} and isinstance(base.typ.length,int):
@@ -773,7 +774,7 @@ class SliceAccess:
                         expanded=expr.kind=='Unary' and expr.data.get('op')=='**' or ellipsis and expr.start>=ellipsis[1]
                         incoming=self.eval(expr,context)
                         if expanded and incoming.typ.kind=='struct' and incoming.typ.node:
-                            elements=[self.member(incoming,name.text) for field in incoming.typ.node.role('fields').children if field.kind=='Field' for name in field.group('names')]
+                            elements=[self.member(incoming,name.text) for field in (incoming.typ.node.role('fields') or incoming.typ.node).children if field.kind=='Field' for name in field.group('names')]
                         else:elements=[self.item(incoming)] if expanded else [incoming]
                         for element in elements:self.write(self.item(target),self.copied(element),context,node)
                 return self.copied(self.item(target)) if builtin.startswith('pop') else Value(self.type(node,context))
@@ -848,14 +849,28 @@ class SliceAccess:
         if symbol.value and symbol.value.kind in {'Ident','Selector','Paren'}:return self.indirect_callee(symbol.value,seen)
         return False
 
+    def has_readonly_views(self):
+        if self.opaque_readonly is None:
+            def escapes(declaration):
+                procedure=next((node for node in declaration.ancestors() if node.kind=='Procedure'),None)
+                if procedure is None:return True
+                return any(self.contains_slice(self.r.type_node(annotation))
+                    for _,annotation in self.r.fields(procedure.role('type').role('results')))
+            self.opaque_readonly=any(self.r.frozen_slice_storage(self.r.type_of(name))
+                for source in self.project.sources.values() for declaration in source.nodes
+                if declaration.data.get('immutable') and escapes(declaration)
+                for name in declaration.group('names') if name.text!='_')
+        return self.opaque_readonly
+
     def opaque_result(self,typ,node,seen=None):
-        """An erased callback cannot promise that returned slice storage is writable."""
+        """An erased callback cannot promise that existing Thor views are writable."""
+        if not self.has_readonly_views():return Value(typ)
         if typ.kind in {'unknown','generic'} or not self.contains_slice(typ):return Value(typ)
         seen={} if seen is None else seen
         key=self.type_key(typ)
         if key in seen:return seen[key]
         result=Value(typ);seen[key]=result
-        if typ.kind in {'slice','union'}:result.data.add(Origin(seed=node))
+        if typ.kind=='slice' or typ.kind=='union' and self.contains_slice(typ):result.data.add(Origin(seed=node))
         if typ.kind=='pointer':result.target=self.opaque_result(typ.elem or Type(),node,seen)
         elif typ.kind in {'slice','array','fixed','dynamic','map','set'}:result.element=self.opaque_result(typ.elem or Type(),node,seen)
         elif typ.kind=='struct':
@@ -920,7 +935,9 @@ class SliceAccess:
         local_checks=bool(target.source.info.get('immutables') and self.r.generic_parameters(signature)
                           and any(n.kind=='Declaration' and n.data.get('immutable')
                                   for n in self.project.purity.walk(target)))
-        if not any(self.references(value) for value in bindings) and not result_references and not local_checks:
+        inspect_result=result_references and (self.has_readonly_views()
+            or context.checked or self.project.purity.pure(target))
+        if not any(self.references(value) for value in bindings) and not inspect_result and not local_checks:
             return self.fresh_call_results(node,context,Value(self.type(node,context)))
         substitutions=dict(context.substitutions)
         substitutions.update({key:self.substitute_type(value,context.substitutions) if isinstance(value,Type) else value
@@ -973,7 +990,7 @@ class SliceAccess:
         if typ.kind=='struct' and typ.node and typ.node not in seen:
             seen.add(typ.node)
             return any(self.contains_slice(self.r.type_node(field.role('type'),typ.substitutions),seen)
-                       for field in typ.node.role('fields').children if field.kind=='Field')
+                       for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
         if typ.kind=='union' and typ.node and typ.node not in seen:
             seen.add(typ.node)
             return any(self.contains_slice(self.r.type_node(variant,typ.substitutions),seen) for variant in typ.node.group('variants'))
@@ -983,6 +1000,7 @@ class SliceAccess:
         if node is None:return Value()
         if node.kind=='Call':return self.call(node,context)
         typ=self.type(node,context)
+        if node.kind in {'Procedure','ProcedureType'}:return Value(typ)
         if node.kind=='Ident' or node.kind=='Selector' and self.r.symbol(node) is not None:
             symbol=self.r.symbol(node)
             if symbol and symbol.projection:
@@ -1046,7 +1064,7 @@ class SliceAccess:
         if node.kind=='Compound':
             value=Value(typ);fields=[]
             if typ.kind=='struct' and typ.node:
-                fields=[name.text for field in typ.node.role('fields').children if field.kind=='Field' for name in field.group('names')]
+                fields=[name.text for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field' for name in field.group('names')]
             for index,element in enumerate(node.group('elems')):
                 if typ.kind=='map' and element.kind=='FieldValue':
                     key=element.role('field')

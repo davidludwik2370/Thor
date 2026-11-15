@@ -21,6 +21,9 @@ def headers(project):
     result=[]
     for source in project.sources.values():
         if NativeSources.support(source):continue
+        if source.excluded:
+            result.append([str(source.path),True,''])
+            continue
         spans=[]
         for node in source.nodes:
             if node.kind!='Declaration' or source.scope(node).kind!='File':continue

@@ -177,6 +177,17 @@ mod process_tests {
     use super::*;
 
     #[test]
+    fn zero_timeout_waits_for_successful_helper_output() {
+        let result = capture(
+            Command::new("/bin/sh").args(["-c", "sleep 0.05; printf done"]),
+            Duration::ZERO,
+        ).expect("capture unlimited helper process");
+        if !result.status.success() || result.timed_out || result.stdout != b"done" {
+            panic!("unlimited helper did not complete successfully");
+        }
+    }
+
+    #[test]
     fn inherited_pipes_do_not_extend_a_helper_deadline_or_keep_children_alive() {
         for script in ["sleep 2 & wait", "sleep 2 & exit 0"] {
             let started = Instant::now();
@@ -196,6 +207,7 @@ mod process_tests {
     }
 }
 
+/// Capture a helper with an optional deadline. A zero duration is unlimited.
 pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captured> {
     // Toolchain identity queries can run before a helper directory is created.
     // Their children need the same signal-driven cleanup as evaluation itself.
@@ -223,7 +235,7 @@ pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Captur
             break status;
         }
         let cancelled = evaluation_cancelled();
-        if cancelled || start.elapsed() >= timeout {
+        if cancelled || (!timeout.is_zero() && start.elapsed() >= timeout) {
             timed_out = !cancelled;
             let _ = child.kill();
             break child.wait()?;
@@ -275,7 +287,7 @@ impl Project {
             .parent()
             .ok_or_else(|| Error::new("evaluation source has no package"))?
             .to_path_buf();
-        let flags = self
+        let mut flags: Vec<_> = self
             .options
             .flags
             .iter()
@@ -284,9 +296,15 @@ impl Project {
                     .iter()
                     .any(|prefix| flag.starts_with(prefix))
                     && !matches!(flag.as_str(), "-keep-executable" | "-no-entry-point")
+                    && crate::cli::helper_flag(flag)
             })
             .cloned()
             .collect();
+        if flags.iter().any(|flag| flag.starts_with("-define:"))
+            && !flags.iter().any(|flag| flag == "-ignore-unused-defineables")
+        {
+            flags.push("-ignore-unused-defineables".into());
+        }
         let mut sources = self.sources.clone();
         let mode = self
             .options
@@ -376,10 +394,13 @@ impl Project {
             }
         }
         Ok(Self {
+            timings: BTreeMap::new(),
             publish_layout: None,
             native_override: None,
             collected_diagnostics: None,
             options: Options {
+                odin_compatible: self.options.odin_compatible,
+                native_policy_probe: false,
                 command: "build".into(),
                 entry,
                 output: None,
@@ -395,7 +416,7 @@ impl Project {
                 no_sanitize: true,
                 overlays: self.options.overlays.clone(),
                 editor_info: false,
-                run_timeout: std::time::Duration::from_secs(5),
+                run_timeout: self.options.run_timeout,
                 clear_cache: false,
                 cache_report: false,
                 raw_diagnostics: false,
@@ -577,9 +598,14 @@ impl Project {
         }
         crate::profile::count("evaluation.helper_compilations", 1);
         let _backend = crate::profile::span("evaluation.helper_backend");
+        let compile_timeout = if timeout.is_zero() {
+            Duration::ZERO
+        } else {
+            timeout.max(Duration::from_secs(30))
+        };
         let built = helper
             .run_backend(&mut command, |command| {
-                capture(command, timeout.max(Duration::from_secs(30)))
+                capture(command, compile_timeout)
             })
             .map_err(|error| {
                 fail(format!(

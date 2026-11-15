@@ -3,15 +3,121 @@ use crate::{
     ast::{NodeId, Source},
     digest::sha256,
     lower::unquote,
+    semantics::{Ref, Resolver},
 };
 use serde_json::{json, Value};
 use std::{
+    collections::BTreeSet,
     env, fs, io,
     path::{Component, Path, PathBuf},
 };
 
 pub fn file_digest(path: &Path) -> io::Result<String> {
     fs::read(path).map(|data| sha256(&data))
+}
+/// Enumerate every path in a bounded, source-local constant string expression.
+/// Both conditional branches are dependencies, so this needs no target guesses.
+/// Unknown expressions keep the optional result cache disabled.
+fn resource_names<'a>(
+    source: &'a Source,
+    node: NodeId,
+    resolver: &mut Option<Resolver<'a>>,
+    seen: &mut BTreeSet<NodeId>,
+    budget: &mut usize,
+) -> Option<BTreeSet<String>> {
+    *budget = budget.checked_sub(1)?;
+    if !seen.insert(node) || seen.len() > 64 {
+        return None;
+    }
+    let child = |role| source.role(node, role);
+    let values = match source.node(node).kind.as_str() {
+        "Literal" => BTreeSet::from([unquote(source.text(node)).ok()?]),
+        "Paren" => resource_names(source, child("expr")?, resolver, seen, budget)?,
+        "Ident" => {
+            let value = {
+                let context =
+                    resolver.get_or_insert_with(|| Resolver::new(std::slice::from_ref(source)));
+                let symbol = &context.symbols[context.symbol(Ref { file: 0, node })?];
+                if !symbol.constant
+                    || symbol.reference.file != 0
+                    || source.node(symbol.reference.node).kind != "Declaration"
+                    || source.ancestors(symbol.reference.node).any(|ancestor| {
+                        matches!(
+                            source.node(ancestor).kind.as_str(),
+                            "When" | "CompileSwitch"
+                        )
+                    })
+                {
+                    return None;
+                }
+                symbol.value?
+            };
+            resource_names(source, value, resolver, seen, budget)?
+        }
+        "Ternary" | "WhenExpr" => {
+            let mut values =
+                resource_names(source, child("x")?, resolver, &mut seen.clone(), budget)?;
+            values.extend(resource_names(
+                source,
+                child("y")?,
+                resolver,
+                &mut seen.clone(),
+                budget,
+            )?);
+            values
+        }
+        "Binary" if source.node(node).op == "+" => {
+            let left = resource_names(source, child("left")?, resolver, &mut seen.clone(), budget)?;
+            let right =
+                resource_names(source, child("right")?, resolver, &mut seen.clone(), budget)?;
+            if left.len().checked_mul(right.len())? > 64 {
+                return None;
+            }
+            let size = right.len() * left.iter().map(String::len).sum::<usize>()
+                + left.len() * right.iter().map(String::len).sum::<usize>();
+            if size > 1024 * 1024 {
+                return None;
+            }
+            left.iter()
+                .flat_map(|left| right.iter().map(move |right| format!("{left}{right}")))
+                .collect()
+        }
+        _ => return None,
+    };
+    (values.len() <= 64 && values.iter().map(String::len).sum::<usize>() <= 1024 * 1024)
+        .then_some(values)
+}
+
+pub fn source_resources(source: &Source) -> Option<Vec<(&str, PathBuf)>> {
+    let mut resources = vec![];
+    let mut resolver = None;
+    for (index, _) in source
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| node.kind == "Call")
+    {
+        let call = NodeId(index);
+        let Some(callee) = source.role(call, "callee") else {
+            continue;
+        };
+        let name = source.text(callee);
+        if !["#load", "#load_hash", "#load_directory", "#exists"].contains(&name) {
+            continue;
+        }
+        let arg = *source.group(call, "args").first()?;
+        for name_path in
+            resource_names(source, arg, &mut resolver, &mut BTreeSet::new(), &mut 4096)?
+        {
+            let path = if let Some((collection, suffix)) = name_path.split_once(':') {
+                source.collection_roots.get(collection)?.join(suffix)
+            } else {
+                source.path.parent()?.join(name_path)
+            };
+            resources.push((name, path));
+        }
+    }
+    Some(resources)
 }
 pub fn signature(path: &Path) -> io::Result<Option<Value>> {
     let metadata = match fs::metadata(path) {
@@ -259,38 +365,11 @@ impl Inputs {
         if source_file {
             self.file(&source.path, Some(source.raw.as_bytes()), true);
         }
-        for (index, _) in source
-            .nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, node)| node.kind == "Call")
-        {
-            let Some(callee) = source.role(NodeId(index), "callee") else {
-                continue;
-            };
-            let name = source.text(callee);
-            if !["#load", "#load_hash", "#load_directory", "#exists"].contains(&name) {
-                continue;
-            }
-            let path = source
-                .group(NodeId(index), "args")
-                .first()
-                .filter(|arg| source.node(**arg).kind == "Literal")
-                .and_then(|arg| unquote(source.text(*arg)).ok())
-                .and_then(|name| {
-                    if let Some((collection, suffix)) = name.split_once(':') {
-                        source
-                            .collection_roots
-                            .get(collection)
-                            .map(|root| root.join(suffix))
-                    } else {
-                        Some(source.path.parent().unwrap().join(name))
-                    }
-                });
-            let Some(path) = path else {
-                self.usable = false;
-                continue;
-            };
+        let Some(resources) = source_resources(source) else {
+            self.usable = false;
+            return;
+        };
+        for (name, path) in resources {
             self.binding(&path);
             let path = match resolve(&path) {
                 Ok(path) => path,

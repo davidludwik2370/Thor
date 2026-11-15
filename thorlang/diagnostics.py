@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
+import sys
 
 from .sourcemap import Origin, position
 
@@ -637,14 +639,21 @@ class Diagnostics:
                     for element in elements)
                 and any(message.startswith('Cannot convert untyped value ') for message in diagnostic['msgs']))
 
-    def text(self, diagnostic, *, terse=False, unix=False):
+    def text(self, diagnostic, *, terse=False, unix=False, color=None):
+        if color is None:
+            color = (sys.stderr.isatty() and not os.environ.get('NO_COLOR')
+                     and os.environ.get('TERM') != 'dumb' and os.environ.get('CLICOLOR') != '0')
         pos = diagnostic.get("pos")
         location = "thor"
         if pos:
             location = (f'{pos["file"]}:{pos["line"]}:{pos["column"]}:' if unix
                         else f'{pos["file"]}({pos["line"]}:{pos["column"]}):')
         severity = diagnostic["type"].capitalize()
-        output = [f'{location} {severity}: ' + "\n".join(diagnostic["msgs"])]
+        code = {'Error': '31', 'Warning': '33'}.get(severity) if color else None
+        def style(text):
+            return f'\x1b[{code}m{text}\x1b[0m' if code else text
+        label = style(severity+':')
+        output = [f'{location} {label} ' + "\n".join(diagnostic["msgs"])]
         if pos and not terse:
             raw = self.read(pos["file"])
             lines = raw.decode("utf-8", errors="replace").splitlines()
@@ -652,9 +661,9 @@ class Diagnostics:
                 line = lines[pos["line"] - 1]
                 prefix = raw[:pos["offset"]].rsplit(b"\n", 1)[-1].decode("utf-8", errors="replace")
                 width = max(1, len(raw[pos["offset"]:pos["end_offset"]].split(b"\n", 1)[0].decode("utf-8", errors="replace").expandtabs(4)))
-                output.extend(["    " + line.expandtabs(4), "    " + " " * len(prefix.expandtabs(4)) + "^" * width])
+                output.extend(["    " + line.expandtabs(4), "    " + " " * len(prefix.expandtabs(4)) + style("^" * width)])
         for related in diagnostic.get('related', []):
-            output.append(self.text({'type': 'note', 'pos': related['pos'], 'msgs': [related['message']]}, terse=terse, unix=unix))
+            output.append(self.text({'type': 'note', 'pos': related['pos'], 'msgs': [related['message']]}, terse=terse, unix=unix, color=color))
         return "\n".join(output)
 
 

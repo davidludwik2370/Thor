@@ -86,7 +86,7 @@ pub enum Type {
         length: Option<i128>,
     },
     Enum(Ref),
-    Union(Ref),
+    Union(Ref, Vec<(String, Type)>),
     Procedure(Ref),
 }
 impl Type {
@@ -125,6 +125,16 @@ impl Type {
             Self::Fixed { elem, .. } => Some(elem),
             Self::Map { value, .. } => Some(value),
             _ => None,
+        }
+    }
+    pub fn indexed_element(&self) -> Option<&Type> {
+        match self {
+            // Pointer and multi-pointer shapes share this representation.
+            // Let Odin resolve implicit collection dereferencing until the
+            // representation can distinguish it from multi-pointer indexing.
+            Self::Pointer(_) => None,
+            Self::Nominal(_, base) => base.indexed_element(),
+            _ => self.element(),
         }
     }
     pub fn is_sequence(&self) -> bool {
@@ -234,6 +244,7 @@ pub struct Resolver<'a> {
     pub evaluated: BTreeMap<Ref, serde_json::Value>,
     pub logical_constants: BTreeMap<Ref,serde_json::Value>,
     logical_activation: std::cell::OnceCell<bool>,
+    pub(crate) set_activation: std::cell::OnceCell<bool>,
     pub bound_types: BTreeMap<(Ref, String), Type>,
     pub bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
@@ -383,6 +394,7 @@ impl<'a> Resolver<'a> {
             evaluated: BTreeMap::new(),
             logical_constants: BTreeMap::new(),
             logical_activation: std::cell::OnceCell::new(),
+            set_activation: std::cell::OnceCell::new(),
             bound_types: BTreeMap::new(),
             bound_constants: BTreeMap::new(),
             using_symbols: HashMap::new(),
@@ -416,13 +428,13 @@ impl<'a> Resolver<'a> {
                         let signature = source.ancestors(id).find(|id| {
                             matches!(
                                 source.node(*id).kind.as_str(),
-                                "ProcedureType" | "StructType"
+                                "ProcedureType" | "StructType" | "BitFieldType"
                             )
                         });
                         let Some(signature) = signature else {
                             continue;
                         };
-                        if source.node(signature).kind == "StructType" {
+                        if matches!(source.node(signature).kind.as_str(), "StructType" | "BitFieldType") {
                             if source.node(id).parent != source.role(signature, "params") {
                                 continue;
                             }
@@ -959,7 +971,7 @@ impl<'a> Resolver<'a> {
                 return None;
             }
             symbol.name.as_str()
-        } else if source.thor && source.node(r.node).kind == "Ident" {
+        } else if source.thor && self.logical_type_position(r) {
             source.text(r.node)
         } else {
             return None;
@@ -1171,6 +1183,14 @@ impl<'a> Resolver<'a> {
         }
         result
     }
+    pub(crate) fn file_private_declaration(&self, declaration: Ref) -> bool {
+        let source = &self.sources[declaration.file];
+        self.attributes(declaration).iter().any(|(name,value)| name == "private"
+            && value.is_some_and(|value| crate::lower::unquote(self.sources[value.file].text(value.node))
+                .ok().as_deref() == Some("file")))
+            || source.info["file_tags"].as_array().into_iter().flatten().filter_map(|tag|tag.as_str())
+                .any(|tag| tag.contains("private") && tag.split_whitespace().any(|word|word == "file"))
+    }
     pub fn private_call_reason(&self, callee: Ref) -> Option<String> {
         let symbol = &self.symbols[self.symbol(callee)?];
         let owner = &self.sources[symbol.reference.file];
@@ -1257,6 +1277,13 @@ impl<'a> Resolver<'a> {
         let n = s.node(r.node);
         let child = |name: &str| s.role(r.node, name).map(|node| Ref { file: r.file, node });
         match n.kind.as_str() {
+            "Implicit" if s.text(r.node) == "context" => self
+                .package_symbol(r, "base:runtime", "Context")
+                .and_then(|symbol| self.symbols[symbol].value.map(|node| Ref {
+                    file: self.symbols[symbol].reference.file, node,
+                }))
+                .map(|declaration| self.type_of(declaration))
+                .unwrap_or(Type::Unknown),
             "Interpolation" => Type::String {
                 name: "string".into(),
                 untyped: false,
@@ -1341,11 +1368,24 @@ impl<'a> Resolver<'a> {
                     }
                 }
                 let text = s.text(r.node);
+                // Maybe is an implicit Odin runtime builtin, unless a lexical
+                // declaration above has already supplied its type.
+                if text == "Maybe" {
+                    return self.package_symbol(r, "base:runtime", text)
+                        .and_then(|symbol| self.symbols[symbol].value.map(|node| Ref {
+                            file: self.symbols[symbol].reference.file, node,
+                        }))
+                        .map(|declaration| self.type_of(declaration))
+                        .unwrap_or(Type::Unknown);
+                }
                 if text == "true" || text == "false" {
                     return Type::Scalar {
                         name: "bool".into(),
                         untyped: true,
                     };
+                }
+                if let Some(primitive) = self.primitive(r) {
+                    return primitive;
                 }
                 if text == "string" || text == "cstring" {
                     return Type::String {
@@ -1375,7 +1415,7 @@ impl<'a> Resolver<'a> {
                 }
                 Type::Unknown
             }
-            "Paren" | "AutoCast" | "Unary" | "Run" => {
+            "Paren" | "HelperType" | "AutoCast" | "Unary" | "Run" => {
                 let typ = child("expr")
                     .map(|r| self.type_of(r))
                     .unwrap_or(Type::Unknown);
@@ -1388,9 +1428,13 @@ impl<'a> Resolver<'a> {
             "Cast" | "TypeAssertion" => child("type")
                 .map(|r| self.type_of(r))
                 .unwrap_or(Type::Unknown),
-            "Deref" | "Index" => child("expr")
+            "Deref" => child("expr")
                 .map(|r| self.type_of(r))
                 .and_then(|t| t.element().cloned())
+                .unwrap_or(Type::Unknown),
+            "Index" => child("expr")
+                .map(|r| self.type_of(r))
+                .and_then(|t| t.indexed_element().cloned())
                 .unwrap_or(Type::Unknown),
             "Slice" => {
                 let typ = child("expr")
@@ -1398,6 +1442,7 @@ impl<'a> Resolver<'a> {
                     .unwrap_or(Type::Unknown);
                 match typ {
                     Type::String { .. } => typ,
+                    Type::Pointer(_) | Type::Soa(_) => Type::Unknown,
                     _ => Type::Slice(Box::new(typ.element().cloned().unwrap_or(Type::Unknown))),
                 }
             }
@@ -1412,6 +1457,8 @@ impl<'a> Resolver<'a> {
                         elem,
                         length: self.constant_int(len),
                     }
+                } else if n.op == "soa" {
+                    Type::Soa(elem)
                 } else {
                     Type::Slice(elem)
                 }
@@ -1480,7 +1527,8 @@ impl<'a> Resolver<'a> {
                     .map(|node| self.type_of(Ref { file: r.file, node }))
                     .unwrap_or(Type::Unknown),
             )),
-            "StructType" => Type::Struct(r),
+            "StructType" | "BitFieldType" => Type::Struct(r),
+            "BitSetType" => Type::Nominal(r, Box::new(Type::scalar("bit_set"))),
             "DistinctType" => Type::Nominal(
                 r,
                 Box::new(
@@ -1489,7 +1537,7 @@ impl<'a> Resolver<'a> {
                         .unwrap_or(Type::Unknown),
                 ),
             ),
-            "UnionType" => Type::Union(r),
+            "UnionType" => Type::Union(r, vec![]),
             "EnumType" => Type::Enum(r),
             "PolyType" => child("specialization")
                 .map(|target| self.type_of(target))
@@ -1659,7 +1707,7 @@ impl<'a> Resolver<'a> {
                             Type::Unknown
                         }
                     }
-                    Type::Struct(_) | Type::Record(..) => {
+                    Type::Struct(_) | Type::Record(..) | Type::Union(..) => {
                         self.specialized_type(r, &Substitutions::new())
                     }
                     Type::Unknown => self.specialized_result(r, 0, &Substitutions::new()),

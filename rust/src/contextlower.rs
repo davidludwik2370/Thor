@@ -127,16 +127,35 @@ impl Lower<'_, '_> {
             }
             Type::Enum(owner)
             | Type::Struct(owner)
-            | Type::Union(owner)
+            | Type::Union(owner, _)
             | Type::Nominal(owner, _) => {
                 let source = &self.resolver.sources[owner.file];
                 let declaration = source
                     .ancestors(owner.node)
                     .find(|node| source.node(*node).kind == "Declaration")?;
+                if owner.file != self.file && self.resolver.file_private_declaration(Ref {file:owner.file,node:declaration}) {
+                    return None;
+                }
                 let name = source
                     .text(*source.group(declaration, "names").first()?)
                     .to_string();
-                format!("{}{name}", self.context_package(*owner)?)
+                let mut name = format!("{}{name}", self.context_package(*owner)?);
+                if let Type::Union(_, bindings) = typ {
+                    if let Some(params) = source.role(owner.node, "params") {
+                        let parameters = source.node(params).children.iter()
+                            .flat_map(|field| source.group(*field, "names"))
+                            .map(|node| source.text(*node).trim_start_matches('$').to_string())
+                            .collect::<Vec<_>>();
+                        let arguments = parameters.iter().map(|parameter| {
+                            let typ = bindings.iter().find(|(name, _)| name == parameter)?.1.clone();
+                            self.context_type(&typ)
+                        }).collect::<Option<Vec<_>>>()?;
+                        name.push('(');
+                        name.push_str(&arguments.join(","));
+                        name.push(')');
+                    }
+                }
+                name
             }
             _ => return None,
         })

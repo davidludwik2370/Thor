@@ -22,6 +22,8 @@ Info :: struct {
     diverging: bool,
     optional_ok: bool,
     optional_allocator_error: bool,
+    bounds_check: int,
+    type_assert_check: int,
     roles: map[string]Span,
     lists: map[string][]Span,
 }
@@ -29,6 +31,7 @@ Output :: struct {
     odin_root: string,
     private: bool,
     private_file: bool,
+    target_specific: bool,
     excluded: bool,
     nodes: [dynamic]Info,
     edits: [dynamic]parser.Edit,
@@ -38,10 +41,13 @@ Output :: struct {
     immutables: [dynamic][2]int,
     mut_parameters: [dynamic][3]int,
     do_tokens: [dynamic]Span,
+    optional_semicolons: [dynamic]Span,
     selection_tags: [dynamic]Span,
     file_tags: [dynamic]string,
     features: []parser.Feature,
     declaration_separators: [dynamic][3]int,
+    migration_identifiers: [dynamic]Span,
+    migration_file_tags: [dynamic]Span,
 }
 Parse_Error :: struct {
     pos: tokenizer.Pos,
@@ -77,7 +83,7 @@ filename_excluded :: proc(path: string, target: parser.Build_Target) -> bool {
     if arch1 != .Unknown { return arch1 != target.arch }
     return false
 }
-Walk_State :: struct {out: ^Output, stack: [dynamic]int}
+Walk_State :: struct {out: ^Output, stack: [dynamic]int, migration: bool}
 span :: proc(n: ^ast.Node) -> Span {
     if n == nil { return {-1, -1} }
     return {n.pos.offset, n.end.offset}
@@ -95,6 +101,10 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     }
     info := Info{kind="Other", start=node.pos.offset, end=node.end.offset, parent=-1,
                  roles=make(map[string]Span), lists=make(map[string][]Span)}
+    if .Bounds_Check in node.state_flags { info.bounds_check = 1 }
+    if .No_Bounds_Check in node.state_flags { info.bounds_check = -1 }
+    if .Type_Assert in node.state_flags { info.type_assert_check = 1 }
+    if .No_Type_Assert in node.state_flags { info.type_assert_check = -1 }
     if len(state.stack) > 0 { info.parent = state.stack[len(state.stack)-1] }
     #partial switch n in node.derived {
     case ^ast.File:
@@ -175,6 +185,8 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Proc_Type:
         info.kind = "ProcedureType"; info.roles["params"] = span(n.params); info.roles["results"] = span(n.results)
         info.diverging = n.diverging
+        if .Bounds_Check in n.tags { info.bounds_check = 1 }
+        if .No_Bounds_Check in n.tags { info.bounds_check = -1 }
         info.optional_ok = .Optional_Ok in n.tags || .Optional_Allocator_Error in n.tags
         info.optional_allocator_error = .Optional_Allocator_Error in n.tags
         if cc,ok:=n.calling_convention.(string);ok {info.calling_convention=strings.trim(cc,"\"`")}
@@ -212,7 +224,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         if n.is_raw_union {info.op="raw_union"}
         info.lists["where"] = spans(n.where_clauses)
     case ^ast.Union_Type:
-        info.kind = "UnionType"; info.lists["where"] = spans(n.where_clauses)
+        info.kind = "UnionType"; info.roles["params"] = span(n.poly_params); info.lists["where"] = spans(n.where_clauses)
         info.lists["variants"]=spans(n.variants)
     case ^ast.When_Stmt:
         info.kind = "When"; info.roles["cond"] = span(n.cond)
@@ -246,7 +258,22 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["init"] = span(n.init)
         if n.label!=nil{info.start=n.label.pos.offset}
         info.roles["expr"] = span(n.expr); info.roles["body"] = span(n.body)
-    case ^ast.Switch_Stmt: info.kind = "Switch"
+    case ^ast.Unroll_Range_Stmt:
+        info.kind = "Range"
+        bindings := make([]Span, 1 + int(n.val1 != nil))
+        bindings[0] = span(n.val0)
+        if n.val1 != nil { bindings[1] = span(n.val1) }
+        info.lists["names"] = bindings
+        info.lists["bindings"] = bindings
+        info.roles["expr"] = span(n.expr)
+        info.roles["body"] = span(n.body)
+        info.op = "unroll"
+    case ^ast.Switch_Stmt:
+        info.kind = "Switch"
+        if state.migration {
+            info.roles["expr"] = span(n.cond)
+            info.roles["init"] = span(n.init); info.roles["body"] = span(n.body)
+        }
     case ^ast.Type_Switch_Stmt:
         info.kind = "TypeSwitch"
         info.roles["body"]=span(n.body)
@@ -272,7 +299,21 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Multi_Pointer_Type: info.kind = "MultiPointerType"; info.roles["elem"] = span(n.elem)
     case ^ast.Typeid_Type: info.kind = "TypeidType"
     case ^ast.Map_Type: info.kind = "MapType"; info.roles["key"] = span(n.key); info.roles["value"] = span(n.value)
-    case ^ast.Bit_Set_Type: info.kind = "BitSetType"
+    case ^ast.Bit_Set_Type:
+        info.kind = "BitSetType"
+        info.roles["elem"] = span(n.elem)
+    case ^ast.Bit_Field_Type:
+        info.kind = "BitFieldType"
+        info.lists["fields"] = make([]Span, len(n.fields))
+        for field, i in n.fields { info.lists["fields"][i] = span(field) }
+        info.roles["base"] = span(n.backing_type)
+    case ^ast.Bit_Field_Field:
+        info.kind = "Field"
+        info.lists["names"] = make([]Span, 1)
+        info.lists["names"][0] = span(n.name)
+        info.roles["type"] = span(n.type)
+    case ^ast.Helper_Type:
+        info.kind = "HelperType"; info.roles["expr"] = span(n.type)
     case ^ast.Distinct_Type:
         info.kind = "DistinctType"; info.roles["type"] = span(n.type)
     case ^ast.Using_Stmt: info.kind = "Using"; info.lists["values"] = spans(n.list)
@@ -292,7 +333,7 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
 main :: proc() {
     if len(os.args) < 2 { fmt.eprintln("usage: thor-frontend FILE [--odin]"); os.exit(2) }
     data: []u8
-    from_stdin := false
+    from_stdin, source_tools, migration := false, false, false
     for arg in os.args[2:] { if arg == "--stdin" { from_stdin = true } }
     if from_stdin {
         input := make([dynamic]u8)
@@ -313,13 +354,17 @@ main :: proc() {
     file.fullpath = os.args[1]
     package_mode, test_mode := false, false
     project_name := ""
+    odin_root := ODIN_ROOT
     target := parser.Build_Target{os=ODIN_OS, arch=ODIN_ARCH}
     thor := true
     for arg in os.args[2:] {
         if arg == "--package" { package_mode = true }
+        if arg == "--source-tools" { source_tools = true }
+        if arg == "--migration" { migration = true; thor = false; test_mode = true }
         if arg == "--test" { test_mode = true }
         if arg == "--odin" { thor = false }
         if strings.has_prefix(arg, "--project-name=") { project_name = strings.trim_prefix(arg, "--project-name=") }
+        if strings.has_prefix(arg, "--odin-root=") { odin_root = strings.trim_prefix(arg, "--odin-root=") }
         if strings.has_prefix(arg, "--target-os=") { target.os, _ = parser.get_build_os_from_string(strings.trim_prefix(arg, "--target-os=")) }
         if strings.has_prefix(arg, "--target-arch=") { target.arch = parser.get_build_arch_from_string(strings.trim_prefix(arg, "--target-arch=")) }
     }
@@ -339,9 +384,10 @@ main :: proc() {
     if !parser.match_build_tags(tags, target) {
         excluded = true
     }
-    if excluded { fmt.println("{\"excluded\":true,\"nodes\":[]}"); return }
+    if excluded && !migration { fmt.println("{\"excluded\":true,\"nodes\":[]}"); return }
     p := parser.default_parser()
     p.thor = thor
+    p.source_tools = source_tools
     p.err = collect_error
     p.warn = collect_warning
     ok := parser.parse_file(&p, file)
@@ -360,9 +406,16 @@ main :: proc() {
         fmt.println(string(encoded))
         os.exit(1)
     }
+    if source_tools {
+        encoded, json_err := json.marshal(struct{optional_semicolons: [][2]int}{p.optional_semicolons[:]})
+        if json_err != nil { fmt.eprintln(json_err); os.exit(1) }
+        fmt.println(string(encoded))
+        return
+    }
     file.end.offset = len(data)
-    out := Output{odin_root=ODIN_ROOT, private=tags.private!=.Public, private_file=tags.private==.File,
-                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,mut_parameters=p.mut_parameters,features=p.features[:],declaration_separators=p.declaration_separators}
+    out := Output{odin_root=odin_root, private=tags.private!=.Public, private_file=tags.private==.File,
+                  target_specific=filename_excluded(os.args[1],{os=.Unknown,arch=.Unknown}),
+                  edits=p.edits, selections=p.selections, diagnostics=parse_errors[:], immutables=p.immutables,mut_parameters=p.mut_parameters,features=p.features[:],declaration_separators=p.declaration_separators,optional_semicolons=p.optional_semicolons}
     for tag in file.tags {
         append(&out.file_tags, tag.text)
         text := strings.trim_space(tag.text)
@@ -377,11 +430,17 @@ main :: proc() {
         token := tokenizer.scan(&lexer)
         if token.kind == .EOF { break }
         if token.kind == .Do { append(&out.do_tokens, Span{token.pos.offset, token.pos.offset+len(token.text)}) }
+        if migration && token.kind == .Ident {
+            append(&out.migration_identifiers, Span{token.pos.offset, token.pos.offset+len(token.text)})
+        }
+        if migration && token.kind == .File_Tag {
+            append(&out.migration_file_tags, Span{token.pos.offset, token.pos.offset+len(token.text)})
+        }
     }
     for group in file.comments {
         for t in group.list { append(&out.comments, Span{t.pos.offset, t.pos.offset+len(t.text)}) }
     }
-    state := Walk_State{out=&out}
+    state := Walk_State{out=&out, migration=migration}
     visitor := ast.Visitor{visit=visit, data=&state}
     ast.walk(&visitor, file)
     encoded, json_err := json.marshal(out)

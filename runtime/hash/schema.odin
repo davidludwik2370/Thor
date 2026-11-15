@@ -2,6 +2,7 @@
 package thor_hash
 
 import "base:runtime"
+import "thor:typeinfo"
 import "core:os"
 import "core:net"
 import "core:sync"
@@ -26,7 +27,7 @@ resource :: proc(info:^runtime.Type_Info)->bool {
 base :: proc(info:^runtime.Type_Info)->^runtime.Type_Info {
     info:=info
     for info!=nil {
-        item,ok:=info.variant.(runtime.Type_Info_Named)
+        item,ok:=info.variant.(typeinfo.Type_Info_Named)
         if !ok {return info}
         if resource(info)||info.id==typeid_of(big.Integer)||info.id==typeid_of(big.Rational) {return info}
         info=item.base
@@ -38,37 +39,37 @@ validate :: proc(s:^State,info:^runtime.Type_Info) {
     info:=base(info)
     if info==nil {fail(s,.Unsupported_Type);return}
     if info.id==typeid_of(big.Integer)||info.id==typeid_of(big.Rational) {return}
-    if _,named:=info.variant.(runtime.Type_Info_Named);named {fail(s,.Unsupported_Type,info);return}
+    if _,named:=info.variant.(typeinfo.Type_Info_Named);named {fail(s,.Unsupported_Type,info);return}
     for id in s.schemas[:s.schema_count] {if id==info.id {return}}
     if s.schema_count==MAX_DEPTH {fail(s,.Too_Deep,info);return}
     s.schemas[s.schema_count]=info.id;s.schema_count+=1
     defer s.schema_count-=1
     #partial switch item in info.variant {
-    case runtime.Type_Info_Boolean,runtime.Type_Info_Integer,runtime.Type_Info_Rune,runtime.Type_Info_Float,runtime.Type_Info_Bit_Set:
+    case typeinfo.Type_Info_Boolean,typeinfo.Type_Info_Integer,typeinfo.Type_Info_Rune,typeinfo.Type_Info_Float,typeinfo.Type_Info_Bit_Set:
         if info.size<1||info.size>16 {fail(s,.Unsupported_Type,info)}
-    case runtime.Type_Info_Complex,runtime.Type_Info_Quaternion:
+    case typeinfo.Type_Info_Complex,typeinfo.Type_Info_Quaternion:
         if info.size<4||info.size>32 {fail(s,.Unsupported_Type,info)}
-    case runtime.Type_Info_Type_Id,runtime.Type_Info_Pointer,runtime.Type_Info_Multi_Pointer,
-         runtime.Type_Info_String,runtime.Type_Info_Any:
-    case runtime.Type_Info_Enum:validate(s,item.base)
-    case runtime.Type_Info_Slice:validate(s,item.elem)
-    case runtime.Type_Info_Dynamic_Array:validate(s,item.elem)
-    case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:validate(s,item.elem)
-    case runtime.Type_Info_Array:validate(s,item.elem)
-    case runtime.Type_Info_Simd_Vector:validate(s,item.elem)
-    case runtime.Type_Info_Enumerated_Array:
+    case typeinfo.Type_Info_Type_Id,typeinfo.Type_Info_Pointer,typeinfo.Type_Info_Multi_Pointer,
+         typeinfo.Type_Info_String,typeinfo.Type_Info_Any:
+    case typeinfo.Type_Info_Enum:validate(s,item.base)
+    case typeinfo.Type_Info_Slice:validate(s,item.elem)
+    case typeinfo.Type_Info_Dynamic_Array:validate(s,item.elem)
+    case typeinfo.Type_Info_Fixed_Capacity_Dynamic_Array:validate(s,item.elem)
+    case typeinfo.Type_Info_Array:validate(s,item.elem)
+    case typeinfo.Type_Info_Simd_Vector:validate(s,item.elem)
+    case typeinfo.Type_Info_Enumerated_Array:
         validate(s,item.elem)
-    case runtime.Type_Info_Matrix:validate(s,item.elem)
-    case runtime.Type_Info_Struct:
+    case typeinfo.Type_Info_Matrix:validate(s,item.elem)
+    case typeinfo.Type_Info_Struct:
         if .raw_union in item.flags||item.soa_kind!=.None {fail(s,.Unsupported_Type,info);return}
         for i in 0..<int(item.field_count) {
             if !push_path(s,Path{name=item.names[i]}) {return}
             validate(s,item.types[i]);s.depth-=1
             if s.failure.error!=.None {return}
         }
-    case runtime.Type_Info_Union:
+    case typeinfo.Type_Info_Union:
         for variant in item.variants {validate(s,variant);if s.failure.error!=.None {return}}
-    case runtime.Type_Info_Bit_Field:
+    case typeinfo.Type_Info_Bit_Field:
         if item.backing_type.size>16 {fail(s,.Unsupported_Type,info);return}
         for i in 0..<item.field_count {validate(s,item.types[i])}
     case:fail(s,.Unsupported_Type,info)
@@ -77,6 +78,6 @@ validate :: proc(s:^State,info:^runtime.Type_Info) {
 byte_element :: proc(info:^runtime.Type_Info)->bool {
     info:=base(info)
     if info==nil {return false}
-    item,ok:=info.variant.(runtime.Type_Info_Integer)
+    item,ok:=info.variant.(typeinfo.Type_Info_Integer)
     return ok&&!item.signed&&info.size==1
 }

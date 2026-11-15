@@ -109,12 +109,14 @@ class Client:
                     raise AssertionError(value['error'])
                 return value.get('result')
 
-    def diagnostic(self, uri, *, empty=False, code=None, contains=None):
+    def diagnostic(self, uri, *, empty=False, code=None, contains=None, snapshot=None):
         def matching(value):
             return (value.get('method') == 'textDocument/publishDiagnostics'
                     and value['params'].get('uri') == uri
                     and (not empty or not value['params']['diagnostics'])
                     and (code is None or any(d.get('code') == code for d in value['params']['diagnostics']))
+                    and (snapshot is None or any((d.get('data') or {}).get('snapshot') == snapshot
+                                                 for d in value['params']['diagnostics']))
                     and (contains is None or any(contains in d['message'] for d in value['params']['diagnostics'])))
         deadline = time.monotonic() + 15
         while True:

@@ -193,6 +193,31 @@ class RustEvaluationInputTests(unittest.TestCase):
                 packet=self.compare([{'op':'source','path':str(path)}])
                 self.assertFalse(packet['usable'])
 
+    def test_constant_resource_snapshots_watch_all_paths_and_symlink_bindings(self):
+        first=self.root/'first';first.write_text('first')
+        second=self.root/'second';second.write_text('second')
+        link=self.root/'link';link.symlink_to(first)
+        path=self.root/'main.thor'
+        path.write_text('package main\nNAME::("link" when ODIN_OS==.Darwin else "missing")\n'
+                        'ALIAS::NAME\nDATA::#exists(ALIAS)\nmain::proc(){}\n')
+        operations=[{'op':'source','path':str(path)}]
+        packet=self.run_native(operations)
+        self.assertTrue(packet['usable'])
+        self.assertTrue(packet['valid'])
+        self.assertIn(str(first),packet['data']['files'])
+        self.assertIn(str(self.root/'missing'),packet['data']['files'])
+        (self.root/'missing').write_text('appeared')
+        changed=self.run_native([],packet['data'])
+        self.assertFalse(changed['valid'])
+        packet=self.run_native(operations)
+        link.unlink();link.symlink_to(second)
+        changed=self.run_native([],packet['data'])
+        self.assertFalse(changed['valid'])
+        packet=self.run_native(operations)
+        second.write_text('changed content')
+        changed=self.run_native([],packet['data'])
+        self.assertFalse(changed['valid'])
+
     def test_source_overlay_and_skipping_source_content(self):
         path=self.source('#exists("missing")')
         raw=path.read_text()+'// unsaved edit\n'

@@ -28,11 +28,7 @@ impl Job {
                 })
                 .ok_or_else(|| Error::new("adapted SDK file has no output path"))?
         } else {
-            source
-                .path
-                .strip_prefix(&project.common)
-                .map_err(|_| Error::new("source outside project root"))?
-                .with_extension("odin")
+            project.generated_relative(&source.path)?.with_extension("odin")
         };
         if project.evaluation.is_some()
             && relative
@@ -82,9 +78,7 @@ impl Job {
                 if project.sources.iter().any(|unit| {
                     !unit.shared_native && unit.path.parent() == Some(directory.as_path())
                 }) {
-                    let relative = directory
-                        .strip_prefix(&project.common)
-                        .map_err(|_| Error::new("adapted import outside project root"))?;
+                    let relative = project.generated_relative(&directory)?;
                     let suffix = if relative.as_os_str().is_empty() {
                         ".".to_string()
                     } else {
@@ -104,11 +98,7 @@ impl Job {
                     sdk.output(directory)
                         .ok_or_else(|| Error::new("evaluation SDK package has no output"))?
                 } else {
-                    project.destination.join(
-                        directory.strip_prefix(&project.common).map_err(|_| {
-                            Error::new("evaluation dependency outside project root")
-                        })?,
-                    )
+                    project.destination.join(project.generated_relative(directory)?)
                 };
                 let suffix = generated
                     .strip_prefix(&project.destination)

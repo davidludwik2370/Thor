@@ -137,6 +137,12 @@ impl Resolver<'_> {
                     };
                     for entry in owners {
                         let owner_source = &self.sources[entry.owner.file];
+                        let declaration = owner_source.node(entry.declaration.node);
+                        if scope != NodeId(0) && entry.declaration.file == reference.file
+                            && (declaration.kind == "Using" || declaration.kind == "Declaration" && declaration.mutable)
+                            && declaration.span.end > s.node(reference.node).span.start {
+                            continue;
+                        }
                         if !self.active_definition(entry.declaration) {
                             continue;
                         }

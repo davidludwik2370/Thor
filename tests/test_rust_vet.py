@@ -18,7 +18,7 @@ class RustVetTests(unittest.TestCase):
         return result
 
     def test_options_before_source_and_large_batches(self):
-        body='\n'.join(f'value_{index}:={index};_=value_{index}' for index in range(80))
+        body='\n'.join(f'value_{index}:={index};if value_{index}!={index}{{panic("result")}}' for index in range(80))
         self.write('package main\nmain::proc(){\n'+body+'\n}\n')
         result=subprocess.run([str(native.RUST),'check','--vet',str(self.app),'-json-errors',
                                '--output-dir',str(self.output)],capture_output=True,text=True,timeout=90)
@@ -26,7 +26,7 @@ class RustVetTests(unittest.TestCase):
         self.assertEqual(len(json.loads(result.stderr)['errors']),80)
 
     def test_fix_payload_matches_reference_byte_offsets_and_hash(self):
-        text='// 😀\npackage main\nget::proc(x:int)->int{return x+1}\nmain::proc(){x/*comment*/:=get(1);_=x}\n'
+        text='// 😀\npackage main\nget::proc(x:int)->int{return x+1}\nmain::proc(){x/*comment*/:=get(1);if x!=2{panic("result")}}\n'
         self.write(text)
         python=subprocess.run([str(native.PYTHON),'vet',str(self.app),'-json-errors',
             '--output-dir',str(self.root/'python')],capture_output=True,text=True,cwd=self.root,timeout=90)

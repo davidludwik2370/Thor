@@ -25,9 +25,11 @@ fn run(request: &Value) -> Value {
     let mut sources = vec![];
     if let Some(paths) = request["sources"].as_array() {
         let frontend = Frontend {
+            odin_syntax: false,
             executable: request["frontend"].as_str().unwrap().into(),
             fingerprint: String::new(),
             odin: "odin".into(),
+            odin_root: request["odin_root"].as_str().unwrap_or_default().into(),
             cache_dir: None,
             normalized_cache: false,
             test: false,

@@ -15,7 +15,7 @@ class UsingDefaultTests(unittest.TestCase):
 
     def generated(self, source, **kwargs):
         root,_ = self.invoke(source, **kwargs)
-        return (root/'output/main.odin').read_text()
+        return next((root/'output').rglob('main.odin')).read_text()
 
     def test_standalone_record_pointer_multiple_and_package_statements(self):
         source=self.program('''
@@ -118,7 +118,7 @@ value:="#+feature using-stmt";_=value
             'lib/other.thor':'package lib\nHolder::struct{using record:Record}\n'})
         files={path.name:path.read_text() for path in (root/'output').rglob('*.odin') if path.name in {'main.odin','other.odin'}}
         self.assertTrue(any(text.startswith('#+feature using-stmt') for text in files.values()),files)
-        self.assertNotIn('#+feature using-stmt',(root/'output/main.odin').read_text())
+        self.assertNotIn('#+feature using-stmt',next((root/'output').rglob('main.odin')).read_text())
         other=next(path for path in (root/'output').rglob('other.odin'))
         self.assertNotIn('#+feature using-stmt',other.read_text())
 
@@ -140,10 +140,10 @@ AUTO::read(Record{4})
             with self.subTest(bom=bool(bom)):
                 source=bom+'// 😀 original header\r\npackage main\r\nR::struct{x:int}\r\nmain::proc(){r:=R{4};using r;assert(x==4)}\r\n'
                 entry,output,_,_=diagnostic_base.DiagnosticTests.invoke(self,source,success=True,flags=['-debug'])
-                raw=(output/'main.odin').read_bytes()
+                raw=next(output.rglob('main.odin')).read_bytes()
                 self.assertEqual(entry.read_bytes(),source.encode())
                 self.assertTrue(raw.startswith(bom.encode()+b'#+feature using-stmt\r\n'))
-                packet=json.loads((output/'main.odin.map.json').read_text())
+                packet=json.loads(next(output.rglob('main.odin.map.json')).read_text())
                 self.assertEqual(packet['sources'][str(entry)],source)
                 mapping=SourceMap(packet['segments'])
                 self.assertEqual(mapping.lookup(len(bom.encode())).kind,'support')
@@ -155,7 +155,7 @@ AUTO::read(Record{4})
     def test_edits_add_and_remove_the_automatic_feature_without_stale_cache(self):
         original=self.program('r:=R{4};assert(r.x==4)','R::struct{x:int}\n')
         root,_=self.invoke(original,command='check')
-        entry=root/'input/main.thor';output=root/'output/main.odin'
+        entry=root/'input/main.thor';output=next((root/'output').rglob('main.odin'))
         using=original.replace('assert(r.x==4)','using r;assert(x==4)')
         for text,enabled in [(using,True),(original,False),(using,True)]:
             entry.write_text(text)

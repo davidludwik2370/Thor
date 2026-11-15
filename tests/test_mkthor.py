@@ -157,7 +157,7 @@ class ProjectTemplateTests(unittest.TestCase):
             self.assertEqual(new.call_args.args[0][-2:],['--parent','/tmp/elsewhere'])
 
     def test_new_help_is_available_without_compiling(self):
-        for args in [['new','--help'],['--help']]:
+        for args in [['help','new'],['help']]:
             result=subprocess.run([str(ROOT/'thor'),*args],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn('new',result.stdout)

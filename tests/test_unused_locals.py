@@ -65,11 +65,11 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
         _, result = self.invoke(source, command='check', flags=['-json-errors', '-warnings-as-errors'], fail='declared but not used')
         self.assertEqual(json.loads(result.stderr)['errors'][0]['type'], 'error')
         self.invoke(self.program('unused:=1;value:=2;_=value'), command='check',
-                    flags=['-vet-unused-variables'], fail='declared but not used')
+                    flags=['-vet-unused-variables'], fail='Odin-only projects')
         self.invoke(self.program('if true {unused:=1}', 'import "core:fmt"\n'),
-                    command='check', flags=['-vet-unused-imports'], fail="'fmt' declared but not used")
+                    command='check', flags=['-vet-unused-imports'], fail='Odin-only projects')
         self.invoke(self.program('outer:=1;if true {outer:=2};_=outer'),
-                    command='check', flags=['-vet-shadowing'], fail='shadows declaration')
+                    command='check', flags=['-vet-shadowing'], fail='Odin-only projects')
 
     def test_native_selection_and_existing_unused_rules(self):
         for body in ['when false {if true {unused:=missing}}',
@@ -131,9 +131,9 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
 
     def test_requested_procedure_vetting_stays_strict(self):
         self.invoke(self.program('local::proc($T:typeid){};_=1'), command='check',
-                    flags=['-vet-unused-procedures', '-vet-packages:main'], fail='declared but not used')
+                    flags=['-vet-unused-procedures', '-vet-packages:main'], fail='Odin-only projects')
         self.invoke('#+vet unused-procedures\n'+self.program('local::proc($T:typeid){};_=1'),
-                    command='check', fail='declared but not used')
+                    command='check', fail='supported only in Odin source files')
 
     def test_clean_backend_success_keeps_one_compiler_invocation(self):
         result = subprocess.CompletedProcess(['odin', 'check', '.'], 0, stderr=b'')

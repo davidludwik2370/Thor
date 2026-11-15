@@ -194,7 +194,7 @@ assert("x"*3 == "xxx")
     def test_generated_size_is_logarithmic_and_needs_no_execution_cache(self):
         root,result=self.invoke(self.program('assert(len(TEXT)==1000000)','TEXT::"x"*1000000\n'),flags=['--cache-report'])
         self.assertEqual(json.loads(result.stdout)['thor_cache']['writes'],0)
-        generated=(root/'output/main.odin').read_text()
+        generated=next((root/'output').rglob('main.odin')).read_text()
         self.assertLess(len(generated),30000)
         self.assertNotIn('strings.repeat',generated)
 

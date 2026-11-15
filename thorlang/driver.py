@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +12,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 from .compiler import Source, ThorError, unquote
 from .diagnostics import Diagnostics, payload, backend_error_flags
@@ -83,6 +85,10 @@ class Project:
                 if not separator:
                     raise ThorError(f"invalid collection flag: {flag}")
                 self.collections[name] = Path(value).resolve()
+        self.support_collection='__thor_runtime'
+        while self.support_collection in self.collections:self.support_collection+='_'
+        self.collections[self.support_collection]=ROOT/'runtime'
+        self.default_collections.add(self.support_collection)
         self.sources = {}
         self.packages = {}
         self._visited = set()
@@ -90,12 +96,15 @@ class Project:
         if not self.sources:
             raise ThorError(f"no .thor or .odin sources found: {self.entry}")
         roots = [self.entry.parent if self.file_entry else self.entry]
-        roots += [p.parent for p in self.sources if not (use_shared and p.is_relative_to(ROOT/'runtime') and 'thor' in self.default_collections)]
+        roots += [p.parent for p in self.sources if not (use_shared and p.is_relative_to(ROOT/'runtime'))]
         roots += [p for name,p in self.collections.items() if not(use_shared and name in self.default_collections)]
         self.common = Path(os.path.commonpath(roots))
         for source in self.sources.values():
             source.project = self.packages
-            source.collections = self.collections
+            source.collections = dict(self.collections)
+            if source.path.is_relative_to(ROOT/'runtime'):source.collections['thor']=ROOT/'runtime'
+            source.support_collection=self.support_collection
+            source.compiler_flags=self.flags
         from .imports import prepare
         prepare(self)
         self.resolver = Resolver(list(self.sources.values()))
@@ -131,8 +140,11 @@ class Project:
             if path in self.sources:
                 continue
             source = Source(path, self.frontend, thor=path.suffix == ".thor", package=entry.is_dir(),
-                            test=self.test, project_name=self.entry.stem, mapping=self.mapping,
+                            test=self.test, project_name=(self.entry.parent if self.file_entry else self.entry).name, mapping=self.mapping,
                             raw=self.overlays.get(path), target=self.target,cache=self.cache_frontend,cache_dir=self.cache_directory)
+            for namespace,imported in list(source.imports.items()):
+                if namespace.startswith(source.prefix) and imported.startswith('thor:'):
+                    source.imports[namespace]=self.support_collection+imported[len('thor'):]
             self.sources[path] = source
             self.packages.setdefault(path.parent, []).append(source)
         for path in paths:
@@ -145,7 +157,7 @@ class Project:
                     if name == "thor" and name not in self.collections:
                         self.collections[name] = ROOT / "runtime"
                         self.default_collections.add(name)
-                    base = self.collections.get(name)
+                    base = ROOT/'runtime' if name=='thor' and path.is_relative_to(ROOT/'runtime') else self.collections.get(name)
                     if base is None:
                         source.error(f"unknown library collection {name!r}", 0, 0)
                     dependency = base / relative
@@ -199,7 +211,7 @@ class Project:
         runtime=Runtime(self,ROOT) if self.use_shared and not self.purity.eval_mode else None
         context_sources={declaration.source for declaration,_ in self.resolver.wrappers}
         runtime_base=ROOT/'runtime'
-        if runtime and 'thor' in self.default_collections:
+        if runtime:
             runtime_base=runtime.prepare(with_basic=any(runtime.eligible(source) and not
                 (path==self.entry if self.file_entry else path.parent==self.entry) for path,source in self.sources.items()))
         local_runtime=set()
@@ -224,7 +236,7 @@ class Project:
             else:
                 relative = (Path(self.pure_sdk_subdir)/path.relative_to(self.pure_sdk_root)
                         if getattr(source,'native_inspected',False) and getattr(self,'pure_sdk_collections',None)
-                        else path.relative_to(self.common)).with_suffix(".odin")
+                        else self.generated_relative(destination,path)).with_suffix(".odin")
             relative=relative.with_suffix('.odin')
             if relative.as_posix() in generated:
                 raise ThorError(f"generated filename collision: {relative}")
@@ -240,14 +252,18 @@ class Project:
                 runtime_base=destination/'.thor-runtime'
             self.backend_collections['thor']=runtime_base if runtime else destination/self.collections['thor'].relative_to(self.common)
         self.runtime_alias=(runtime.directory,ROOT/'runtime') if runtime and runtime.directory else None
+        if not runtime and any(path.is_relative_to(ROOT/'runtime') for path in self.sources):
+            runtime_base=destination/self.generated_relative(destination,ROOT/'runtime')
+        self.backend_collections['thor']=runtime_base
+        self.backend_collections[self.support_collection]=runtime_base
         directories={path.parent:output.parent for path,output in self.outputs.items()}
         def import_path(source,path):
-            if path.startswith('thor:') and 'thor' in self.default_collections:return path
+            if path.startswith('thor:') and ('thor' in self.default_collections or source.path.is_relative_to(ROOT/'runtime')):return path
             original=source.import_dir(path)
             target=directories.get(original)
             return os.path.relpath(target,self.outputs[source.path].parent).replace(os.sep,'/') if target else path
         for path,source,relative in regular:
-            if runtime:source.backend_import=import_path
+            source.backend_import=import_path
             native_support=(path.suffix=='.odin' and path.is_relative_to(ROOT/'runtime') and not source.edits
                 and not source.run_values and not any(self.purity.checked(n) for n in source.nodes if n.kind=='Procedure'))
             if native_support and source not in context_sources:
@@ -275,6 +291,10 @@ class Project:
         self.manifest = manifest
         if materialize:self.write()
         return self.outputs[self.entry] if self.file_entry else directories[self.entry]
+
+    def generated_relative(self,destination,path):
+        relative=path.relative_to(self.common)
+        return Path(self.common.name)/relative if destination.name!=self.common.name else relative
 
     def write(self):
         destination=self.destination
@@ -321,6 +341,8 @@ class Project:
                 result.append(flag)
         for name in self.default_collections:
             result.append(f"-collection:{name}={self.backend_collections[name]}")
+        if 'thor' not in self.collections:result.append(f"-collection:thor={self.backend_collections['thor']}")
+        if self.support_collection not in self.default_collections:result.append(f"-collection:{self.support_collection}={self.backend_collections[self.support_collection]}")
         for source in [*self.sources.values(),*getattr(self,'sdk_sources',{}).values()]:
             for name, directory in source.asset_collections.items():
                 result.append(f"-collection:{name}={directory}")
@@ -334,6 +356,8 @@ class Project:
             else:
                 root = self.entry.parent if self.file_entry else self.entry
                 result.append('-define:THOR_APP_SOURCE_ROOT=' + str(root))
+        from .cli import check_scopes
+        check_scopes(self, result)
         return result
 
     def diagnostic_adapter(self):
@@ -343,31 +367,47 @@ class Project:
 
 
 def _main(argv=None):
+    from .vet import CHECKS
     argv = list(sys.argv[1:] if argv is None else argv)
+    from . import cli
+    early = cli.early(argv, VERSION)
+    if early is not None:
+        return early
     if argv and argv[0] == 'new':
         from .project_template import main as new_project
         return new_project(argv[1:])
+    compiler_arguments = argv[:argv.index('--') if '--' in argv else len(argv)]
+    if argv and (argv[0] == 'migrate' or '--odin-compatible' in compiler_arguments
+                 or argv[0] == 'vet' and '-build-mode:test' in compiler_arguments):
+        # Migration and explicit Odin command compatibility use shared Rust
+        # tooling, including test-build vet corrections. Ordinary Python
+        # lowering remains an independent reference.
+        native = ROOT/'rust/target/release/thor-rust'
+        if not native.is_file():
+            raise ThorError('Migration and Odin-compatible commands require the native tool executable. Build rust/Cargo.toml with cargo build --release')
+        return subprocess.run([str(native), *argv]).returncode
     runtime_args = []
     if "--" in argv:
         boundary = argv.index("--")
         runtime_args, argv = argv[boundary + 1:], argv[:boundary]
-    parser = argparse.ArgumentParser(prog="thor", description="Thor T01-T23: compile additive Odin syntax to Odin.",
-                                     epilog="Create a project with thor new NAME; see thor new --help for creation options.")
+    parser = argparse.ArgumentParser(prog="thor", add_help=False, description="Thor T01-T23: compile additive Odin syntax to Odin.",
+                                     epilog="Create a project with thor new NAME; see thor help new for creation options.")
     parser.add_argument("--version", action="version", version=f"Thor {VERSION}")
-    parser.add_argument("command", choices=["transpile", "check", "build", "run", "test", "publish", "new", "vet"])
-    parser.add_argument("source", help="a .thor/.odin file or package directory")
+    parser.add_argument("command", choices=[c["name"] for c in cli.CATALOG["commands"] if c["source"]])
+    parser.add_argument("source", nargs="?", help="a .thor/.odin file or package directory (default: .)")
     parser.add_argument("--output-dir", type=Path, help="directory for generated Odin (default: .thor-build/<source>)")
     parser.add_argument("--odin", default=os.environ.get("THOR_ODIN", "odin"), help="Odin compiler executable")
     parser.add_argument("--diagnostic-format", choices=["text", "json"], default="text")
     parser.add_argument("--overlay", type=Path, help="editor overlay JSON: {\"Replace\": {original: replacement_file}}")
+    parser.add_argument("--source-maps", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--raw-diagnostics", action="store_true", help="show unmodified Odin diagnostics for transpiler debugging")
     parser.add_argument('--editor-info',action='store_true',help=argparse.SUPPRESS)
-    parser.add_argument('--vet', nargs='?', const='immutable,pure', metavar='CHECKS',
-                        help='enable Thor convention checks (default: immutable,pure)')
+    parser.add_argument('--vet', nargs='?', const=','.join(CHECKS), metavar='CHECKS',
+                        help='enable Thor convention checks (default: immutable,pure,unused,semicolon)')
     corrections = parser.add_mutually_exclusive_group()
     corrections.add_argument('--apply', action='store_true', help='apply verified corrections with thor vet')
     corrections.add_argument('--ask', action='store_true', help='preview and confirm corrections with thor vet')
-    parser.add_argument("--run-timeout",type=float,default=5,help="maximum seconds for each native #run execution (default: 5)")
+    parser.add_argument("--run-timeout",type=float,default=0,help="maximum seconds for each native #run execution; 0 means unlimited (default: 0)")
     parser.add_argument('--cache-dir',type=Path,help='cache root (default: .thor-cache beside the entry package)')
     parser.add_argument('--no-cache',action='store_true',help='bypass compile-time result and per-file parser caching')
     parser.add_argument('--clear-cache',action='store_true',help='clear compile-time result and per-file parser entries before compiling')
@@ -384,8 +424,13 @@ def _main(argv=None):
     packaging.add_argument('--app-resource', action='append', default=[], help='additional project-relative resource file/directory; repeatable')
     packaging.add_argument('--app-library', action='append', default=[], help='additional native library/plugin; repeatable')
     packaging.add_argument('--publish-dir', type=Path, help='package destination (default: current directory, or parent of -out:)')
-    argv = ['--vet=immutable,pure' if argument == '--vet' else argument for argument in argv]
+    argv = ['--vet='+','.join(CHECKS) if argument == '--vet' else argument for argument in argv]
     options, flags = parser.parse_known_args(argv)
+    # argparse can leave an optional positional after intervening flags in the
+    # remainder. Recover that explicit source before validating Odin flags.
+    if options.source is None:
+        source_index = next((index for index, flag in enumerate(flags) if not flag.startswith('-')), None)
+        options.source = flags.pop(source_index) if source_index is not None else '.'
     if (options.apply or options.ask) and options.command != 'vet':
         parser.error('--apply and --ask are only supported by thor vet')
     if (options.apply or options.ask) and options.overlay:
@@ -393,7 +438,7 @@ def _main(argv=None):
     if options.vet is not None:
         from .vet import CHECKS
         if not options.vet or any(check not in CHECKS for check in options.vet.split(',')):
-            parser.error('Thor vet checks must be selected from immutable,pure')
+            parser.error('Thor vet checks must be selected from '+','.join(CHECKS))
         if options.command == 'transpile':
             parser.error('--vet requires native checking. Run thor vet.')
     if options.raw_diagnostics and (options.command == 'vet' or options.vet is not None):
@@ -402,7 +447,8 @@ def _main(argv=None):
             ('app_name', 'app_id', 'app_version', 'app_icon', 'app_type', 'publish_dir'))
             or options.app_resource or options.app_library):
         parser.error('application packaging options are only supported by thor publish')
-    if not 0<options.run_timeout<=300:parser.error('--run-timeout must be greater than 0 and at most 300 seconds')
+    if not math.isfinite(options.run_timeout) or options.run_timeout < 0:
+        parser.error('--run-timeout requires a finite, nonnegative number of seconds; 0 means unlimited')
     if any(not flag.startswith("-") for flag in flags):
         parser.error("unexpected argument; runtime arguments must follow --")
     if runtime_args and options.command not in {"run", "test"}:
@@ -413,8 +459,9 @@ def _main(argv=None):
     flags = [f for f in flags if f != "-json-errors"]
     reported_errors = False
     publish_diagnostics = []
+    publish_information = []
 
-    def report(errors):
+    def report(errors, information=""):
         nonlocal reported_errors
         normalized, seen = [], set()
         for error in errors:
@@ -433,11 +480,14 @@ def _main(argv=None):
         if json_output:
             if options.command == 'publish':
                 publish_diagnostics.extend(errors)
+                if information: publish_information.append(information)
             else:
                 output=payload(errors)
+                if information: output["information"] = information
                 if options.editor_info and project is not None:output['slice_access']=project.slice_access.editor_info()
                 print(json.dumps(output, ensure_ascii=False), file=sys.stderr)
         else:
+            if information: print(information, end="" if information.endswith("\n") else "\n", file=sys.stderr)
             for error in errors:
                 print(diagnostics.text(error, terse="-terse-errors" in flags,
                                        unix="-error-pos-style:unix" in flags), file=sys.stderr)
@@ -449,10 +499,17 @@ def _main(argv=None):
             for original, replacement in json.loads(options.overlay.read_text())["Replace"].items():
                 overlays[Path(original).resolve()] = Path(replacement).read_bytes()
         diagnostics = Diagnostics(overlays=overlays)
+        entry = Path(options.source).resolve()
+        try:
+            cli.normalize(options, flags, entry, overlays)
+        except ValueError as exc:
+            parser.error(str(exc))
         odin = shutil.which(options.odin)
         if odin is None:
             raise ThorError(f"Odin compiler not found: {options.odin}; set THOR_ODIN or use --odin")
-        entry = Path(options.source).resolve()
+        listing = cli.query(flags, odin)
+        if listing is not None: return listing
+        entry=cli.resolve_entry(Path(options.source), flags, odin)
         if options.command == 'publish':
             from .publishing import Publisher
             publisher = Publisher.prepare(entry, flags, options)
@@ -477,8 +534,15 @@ def _main(argv=None):
             if options.clear_cache:
                 from . import parsecache
                 parsecache.clear(frontend,cache_root)
+            preparing = time.monotonic()
             project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
                               cache_frontend=not options.no_cache,cache_directory=cache_root)
+            cli.validate_native_checks(project, options.command, flags)
+            preparation = time.monotonic()-preparing
+            if options.command == 'ast':
+                print(json.dumps({'version':1,'sources':[{'path':str(source.path),'frontend':source.info} for source in project.sources.values()]}))
+                return 0
+            lowering = time.monotonic()
             project.slice_access.enabled|=options.editor_info
             project.slice_access.full_contracts=options.editor_info
             if publisher:
@@ -493,7 +557,7 @@ def _main(argv=None):
                 memory = MemoryDebug.select('build' if publisher else options.command, flags, options.track_allocations, options.no_sanitize)
                 if memory.enabled:
                     memory.prepare(project, ROOT)
-            target = project.emit(destination,persist_maps=options.command=='transpile' or '-debug' in flags,
+            target = project.emit(destination,persist_maps=options.command=='transpile' or options.source_maps or '-debug' in flags,
                                   materialize=not (memory and memory.enabled))
             if memory and memory.enabled:
                 memory.finish(project)
@@ -502,6 +566,7 @@ def _main(argv=None):
             frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
         finally:
             if options.cache_report:print(json.dumps({'thor_cache':cache.stats,'thor_prepared_hits':cache.prepared_hits}),flush=True)
+        lowering = time.monotonic()-lowering
         if options.command == "transpile":
             if frontend_diagnostics or json_output:
                 report(frontend_diagnostics)
@@ -509,12 +574,13 @@ def _main(argv=None):
             return 1 if reported_errors else 0
         # Keep the running program's streams interactive and entirely separate
         # from structured compiler output (including test runner output).
-        native_command = ('check' if options.command == 'vet' else
+        native_command = ('check' if options.command in {'vet','strip-semicolon'} else
                           "build" if options.command in {"run", "test", "publish"} else options.command)
         command = [odin, native_command, str(target)]
         if project.file_entry:
             command.append("-file")
         native_flags = project.odin_flags()
+        if options.command == 'strip-semicolon': native_flags = [f for f in native_flags if f != '-keep-temp-files']
         if publisher:
             native_flags = publisher.native_flags(native_flags, Path(publish_scratch.name))
         command.extend(native_flags)
@@ -523,7 +589,8 @@ def _main(argv=None):
         if os.name == 'nt':
             binary_name += '.exe'
         explicit_output = next((f[len("-out:"):] for f in flags if f.startswith("-out:")), None)
-        executable = Path(explicit_output if explicit_output is not None else binary_directory / binary_name).resolve()
+        implicit_output = binary_directory if any(flag in {'-build-mode:llvm','-build-mode:llvm-ir'} for flag in flags) else binary_directory / binary_name
+        executable = Path(explicit_output if explicit_output is not None else implicit_output).resolve()
         if publisher:
             # Use a simple toolchain output name; the final package can safely
             # contain display/executable names Odin rejects in its -out parser.
@@ -537,6 +604,7 @@ def _main(argv=None):
             command.append(f"-out:{executable}")
         if options.command == "test":
             command.append("-build-mode:test")
+        native_started = time.monotonic()
         if options.raw_diagnostics:
             if frontend_diagnostics:
                 report(frontend_diagnostics)
@@ -547,16 +615,55 @@ def _main(argv=None):
             command.append("-json-errors")
             command.extend(backend_error_flags(command))
             from .backend import run as run_backend
-            result = run_backend(project, command, stderr=subprocess.PIPE,
+            result = run_backend(project, command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 env={**os.environ,'ODIN_ROOT':str(project.sdk_backend_root)} if project.sdk_backend_root else None)
-            if result.returncode == 0 and (options.command == 'vet' or options.vet is not None):
+            from .source_tools import remap_text, documentation, remap_exports, remap_document, strip_semicolons
+            information = ''
+            if any(f in {'-show-timings','-show-more-timings'} for f in flags):
+                timings = {'preparation':preparation, 'lowering':lowering, 'native':time.monotonic()-native_started}
+                information += 'Thor compilation timings\n'+''.join(f'  {phase:20} {timings[phase]*1000:10.3f} ms\n' for phase in sorted(timings))+f'  {"total":20} {sum(timings.values())*1000:10.3f} ms\n\n'
+            if result.stdout and options.command != 'doc': print(remap_text(project,result.stdout.decode(errors='replace')), end='', flush=True)
+            invalid_source=any(d['type']=='error' or d['type']=='warning' and '-warnings-as-errors' in flags for d in frontend_diagnostics)
+            if not result.returncode and not invalid_source:
+                remap_exports(project, flags)
+                if options.command == 'strip-semicolon': information += strip_semicolons(project,flags)
+                if options.command == 'doc':
+                    text = result.stdout.decode(errors='replace')
+                    if '-doc-format' in flags:
+                        remap_document(project,text)
+                        print(text,end='')
+                    else: print(documentation(project,text, '-short' in flags),end='')
+            if result.stderr and result.returncode >= 0:
+                packet = json.loads(result.stderr)
+                information += packet.get('information','')
+            if result.returncode == 0 and (options.command == 'vet'  or options.vet is not None):
                 from .vet import run as vet
-                frontend_diagnostics.extend(vet(project, options, flags))
+                try:
+                    native = json.loads(result.stderr) if result.stderr else None
+                except ValueError:
+                    native = None
+                findings = vet(project, options, flags, native.get('errors', []) if native else None)
+                if options.command == 'build':
+                    findings = [{**finding, 'type':'error'} for finding in findings]
+                frontend_diagnostics.extend(findings)
+                diagnostics.raw.update(getattr(project, 'vet_updated_sources', {}))
+                if native is not None:
+                    result.stderr = json.dumps(native).encode()
             if result.returncode < 0:
+                from .backend import decode
+                packet=decode(result.stderr,False,False)
+                located=any(item.get('type')=='error' and (item.get('pos') or {}).get('file')
+                            for item in packet.get('errors',[]))
                 error = backend_failure(result.returncode)
-                if result.stderr:
-                    error['msgs'].append(result.stderr.decode(errors='replace').strip())
-                report([*frontend_diagnostics, error])
+                if located:
+                    error['msgs'][0]=error['msgs'][0].replace('; no source location was provided','')
+                    detail=packet.get('information','').strip()
+                    native=diagnostics.translate(packet.get('errors',[]))
+                else:
+                    detail=result.stderr.decode(errors='replace').strip()
+                    native=[]
+                if detail:error['msgs'].append(detail)
+                report([*frontend_diagnostics, *native, error])
             elif result.stderr:
                 try:
                     native = json.loads(result.stderr)
@@ -565,9 +672,9 @@ def _main(argv=None):
                     report([*frontend_diagnostics, {"type": "error" if result.returncode else "warning", "stage": "toolchain",
                              "pos": None, "msgs": [result.stderr.decode(errors="replace").strip()]}])
                 else:
-                    report([*frontend_diagnostics, *diagnostics.translate(native.get("errors", []))])
-            elif json_output or frontend_diagnostics:
-                report(frontend_diagnostics)
+                    report([*frontend_diagnostics, *diagnostics.translate(native.get("errors", []))], information)
+            elif json_output or frontend_diagnostics or information:
+                report(frontend_diagnostics, information)
         backend_status = 128-result.returncode if result.returncode < 0 else result.returncode
         if publisher and not result.returncode and not reported_errors:
             output = publisher.package(executable, Path(publish_scratch.name))
@@ -595,7 +702,9 @@ def _main(argv=None):
         if publish_scratch is not None:
             publish_scratch.cleanup()
         if json_output and options.command == 'publish':
-            print(json.dumps(payload(publish_diagnostics), ensure_ascii=False), file=sys.stderr)
+            packet=payload(publish_diagnostics)
+            if publish_information: packet['information']=''.join(publish_information)
+            print(json.dumps(packet, ensure_ascii=False), file=sys.stderr)
 
 
 class CompilationCancelled(BaseException):pass

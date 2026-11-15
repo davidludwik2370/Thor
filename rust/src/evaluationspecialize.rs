@@ -19,11 +19,11 @@ impl Scheduler<'_> {
             | Type::Struct(at)
             | Type::Record(at, _)
             | Type::Enum(at)
-            | Type::Union(at) => *at,
+            | Type::Union(at, _) => *at,
             _ => return Ok(String::new()),
         };
         let mut bindings = self.specializations.relevant(at, &self.resolver);
-        if let Type::Record(_, captures) = typ {
+        if let Type::Record(_, captures) | Type::Union(_, captures) = typ {
             let context = captures.iter().cloned().collect();
             for (name, typ) in captures {
                 let Some(index) = self.resolver.lookup(at, name) else {

@@ -26,6 +26,7 @@ READ_ONLY_NATIVE = {
     'intrinsics.type_is_enumerated_array', 'intrinsics.type_is_slice',
     'intrinsics.type_is_dynamic_array',
     'intrinsics.type_is_fixed_capacity_dynamic_array',
+    'intrinsics.type_is_pointer', 'intrinsics.type_is_multi_pointer',
 }
 
 
@@ -169,11 +170,12 @@ class AssertionHygieneTests(unittest.TestCase):
             tagged.write_text('package main\nPoint::struct{x,y:f32}\nMode::enum u8{Read=1,Alias=Read,Write}\nmain::proc(){values:#soa[]Point;lanes:#simd[4]f32;_=values;_=lanes}\n')
             paths.append(tagged)
             for path in [*paths, invalid]:
-                args = [str(path), '--test']
-                ordinary = subprocess.run([str(self.frontend), *args], capture_output=True, timeout=30)
-                unchecked = subprocess.run([str(binary), *args], capture_output=True, timeout=30)
-                self.assertEqual(unchecked.returncode, ordinary.returncode, str(path))
-                self.assertEqual(json.loads(unchecked.stdout), json.loads(ordinary.stdout), str(path))
+                for mode in [[], ['--source-tools']]:
+                    args = [str(path), '--test', *mode]
+                    ordinary = subprocess.run([str(self.frontend), *args], capture_output=True, timeout=30)
+                    unchecked = subprocess.run([str(binary), *args], capture_output=True, timeout=30)
+                    self.assertEqual(unchecked.returncode, ordinary.returncode, str(path))
+                    self.assertEqual(json.loads(unchecked.stdout), json.loads(ordinary.stdout), str(path))
 
     def test_python_optimized_compiler_preserves_build_and_program_work(self):
         with tempfile.TemporaryDirectory(prefix='thor-python-noassert-') as directory:

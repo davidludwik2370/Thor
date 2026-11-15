@@ -1,6 +1,8 @@
 //! Independent native compiler. Python is a differential oracle, never a runtime dependency.
 #![forbid(unsafe_code)]
 pub mod ast;
+pub mod cli;
+pub mod compiler_output;
 pub mod bigconstantvalue;
 pub mod bigstatic;
 pub mod bigvalues;
@@ -22,6 +24,8 @@ pub mod frontend;
 pub mod kind;
 pub mod lower;
 pub mod memory;
+pub mod migrate;
+mod native_compat;
 pub mod permissions;
 mod permissioncache;
 mod parallel;
@@ -39,3 +43,5 @@ pub mod vet;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod publishing;
+
+mod source_tools;

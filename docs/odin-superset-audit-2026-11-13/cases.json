@@ -1,0 +1,689 @@
+[
+  {
+    "name": "ordinary_names",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nfn,set,f,mut,run,and,or,all:=1,2,3,4,5,6,7,8\n_=fn;_=set;_=f;_=mut;_=run;_=and;_=or;_=all\n}\n"
+  },
+  {
+    "name": "local_fn",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nfn:=7\nif fn!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_set",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nset:=7\nif set!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_Integer",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nInteger:=7\nif Integer!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_Rational",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nRational:=7\nif Rational!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_and",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nand:=7\nif and!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_or",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nor:=7\nif or!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_mut",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nmut:=7\nif mut!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_run",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nrun:=7\nif run!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_f",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nf:=7\nif f!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "local_or_panic",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nor_panic:=7\nif or_panic!=7 {panic(\"value\")}\n}\n"
+  },
+  {
+    "name": "or_panic_field",
+    "group": "identifiers",
+    "source": "package main\nItem::struct{or_panic:int}\n\nmain :: proc() {\nitem:=Item{or_panic=7};_=item.or_panic\n}\n"
+  },
+  {
+    "name": "or_panic_parameter",
+    "group": "identifiers",
+    "source": "package main\nread::proc(or_panic:int)->int{return or_panic}\n\nmain :: proc() {\n_=read(7)\n}\n"
+  },
+  {
+    "name": "or_panic_enum",
+    "group": "identifiers",
+    "source": "package main\nKind::enum{or_panic}\n\nmain :: proc() {\n_=Kind.or_panic\n}\n"
+  },
+  {
+    "name": "or_panic_label",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\nor_panic: for _ in 0..<1 {break or_panic}\n}\n"
+  },
+  {
+    "name": "or_panic_import",
+    "group": "identifiers",
+    "source": "package main\nimport or_panic \"core:fmt\"\nmain::proc(){or_panic.println(\"ok\")}\n"
+  },
+  {
+    "name": "fn_import",
+    "group": "identifiers",
+    "source": "package main\nimport fn \"core:fmt\"\n\nmain :: proc() {\nfn.println(\"ok\")\n}\n",
+    "run": true
+  },
+  {
+    "name": "set_import",
+    "group": "identifiers",
+    "source": "package main\nimport set \"core:fmt\"\n\nmain :: proc() {\nset.println(\"ok\")\n}\n",
+    "run": true
+  },
+  {
+    "name": "big_type_names_shadowed",
+    "group": "identifiers",
+    "source": "package main\nInteger::struct{value:int}\nRational::int\n\nmain :: proc() {\nx:=Integer{5};y:=Rational(2);if x.value!=5||y!=2{panic(\"shadow\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "big_names_as_fields_and_parameters",
+    "group": "identifiers",
+    "source": "package main\nItem::struct{Integer,Rational:int}\nread::proc(Integer,Rational:int)->int{return Integer+Rational}\n\nmain :: proc() {\nitem:=Item{Integer=1,Rational=2};if read(item.Integer,item.Rational)!=3{panic(\"names\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "keyword_text_in_comments_and_strings",
+    "group": "identifiers",
+    "source": "package main\n\nmain :: proc() {\ntext:=\"fn set or_panic Integer Rational\";_=text\n// or_panic() set[int] fn()\n\n}\n"
+  },
+  {
+    "name": "fn_call",
+    "group": "contextual",
+    "source": "package main\nfn::proc(){}\n\nmain :: proc() {\nfn()\n}\n",
+    "run": true
+  },
+  {
+    "name": "fn_call_then_block",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nfn::proc(){fmt.println(\"called\")}\n\nmain :: proc() {\nfn()\n{fmt.println(\"block\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "fn_initializer_then_block",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nfn::proc()->int{return 7}\n\nmain :: proc() {\nx:=fn()\n{fmt.println(x)}\n}\n",
+    "run": true
+  },
+  {
+    "name": "fn_call_semicolon_then_block",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nfn::proc(){fmt.println(\"called\")}\n\nmain :: proc() {\nfn();\n{fmt.println(\"block\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "fn_condition",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nfn::proc()->bool{return true}\n\nmain :: proc() {\nif fn(){fmt.println(\"ok\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "set_value_index",
+    "group": "contextual",
+    "source": "package main\nset::[2]int{3,4}\n\nmain :: proc() {\nif set[0]!=3{panic(\"index\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "set_array_length",
+    "group": "contextual",
+    "source": "package main\nset::[2]int{3,4}\n\nmain :: proc() {\nvalues:[set[0]]int;_=values\n}\n"
+  },
+  {
+    "name": "set_parenthesized_array_length",
+    "group": "contextual",
+    "source": "package main\nset::[2]int{3,4}\n\nmain :: proc() {\nvalues:[(set)[0]]int;_=values\n}\n"
+  },
+  {
+    "name": "set_bool_condition",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nset:=[1]bool{true}\n\nmain :: proc() {\nif set[0]{fmt.println(\"ok\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "set_parenthesized_condition",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nset:=[1]bool{true}\n\nmain :: proc() {\nif (set[0]){fmt.println(\"ok\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "set_switch_condition",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nset:=[1]bool{true}\n\nmain :: proc() {\nswitch set[0]{case true:fmt.println(\"ok\");case false:}\n}\n",
+    "run": true
+  },
+  {
+    "name": "set_field_condition",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nItem::struct{set:[1]bool}\n\nmain :: proc() {\nitem:=Item{set={true}};if item.set[0]{fmt.println(\"ok\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "slice_parameter_mutation",
+    "group": "storage",
+    "source": "package main\nchange::proc(items:[]int){items[0]=7}\n\nmain :: proc() {\nitems:=[2]int{1,2};change(items[:]);if items[0]!=7{panic(\"slice\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "slice_parameter_address",
+    "group": "storage",
+    "source": "package main\nchange::proc(items:[]int){p:=&items[0];p^=7}\n\nmain :: proc() {\nitems:=[2]int{1,2};change(items[:]);if items[0]!=7{panic(\"slice\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "promoted_pointer_concrete",
+    "group": "storage",
+    "source": "package main\nPoint::struct{x:int}\nWrapper::struct{using pointer:^Point}\nchange::proc(value:Wrapper){value.x=7}\n\nmain :: proc() {\npoint:=Point{1};change(Wrapper{&point});if point.x!=7{panic(\"pointee\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "promoted_pointer_generic",
+    "group": "storage",
+    "source": "package main\nPoint::struct{x:int}\nWrapper::struct{using pointer:^Point}\nchange::proc(value:$T){value.x=7}\n\nmain :: proc() {\npoint:=Point{1};change(Wrapper{&point});if point.x!=7{panic(\"pointee\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "promoted_pointer_shaped",
+    "group": "storage",
+    "source": "package main\nPoint::struct{x:int}\nWrapper::struct{using pointer:^Point}\nchange::proc(value:$T/Wrapper){value.x=7}\n\nmain :: proc() {\npoint:=Point{1};change(Wrapper{&point});if point.x!=7{panic(\"pointee\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "promoted_pointer_explicit",
+    "group": "storage",
+    "source": "package main\nPoint::struct{x:int}\nWrapper::struct{using pointer:^Point}\nchange::proc(value:$T){value.pointer.x=7}\n\nmain :: proc() {\npoint:=Point{1};change(Wrapper{&point});if point.x!=7{panic(\"pointee\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "array_parameter_value_copy",
+    "group": "storage",
+    "source": "package main\nchange::proc(input:[2]int)->int{input:=input;input[0]=7;return input[0]}\n\nmain :: proc() {\ninput:=[2]int{1,2};if change(input)!=7||input[0]!=1{panic(\"copy\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "generic_array_parameter_copy",
+    "group": "storage",
+    "source": "package main\nchange::proc(input:$T)->int{input:=input;input[0]=7;return input[0]}\n\nmain :: proc() {\ninput:=[2]int{1,2};if change(input)!=7||input[0]!=1{panic(\"copy\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "generic_slice_parameter_mutation",
+    "group": "storage",
+    "source": "package main\nchange::proc(input:$T){input[0]=7}\n\nmain :: proc() {\ninput:=[2]int{1,2};change(input[:]);if input[0]!=7{panic(\"slice\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "map_parameter_copy",
+    "group": "storage",
+    "source": "package main\nchange::proc(input:map[int]int){input:=input;input[1]=7}\n\nmain :: proc() {\ninput:=make(map[int]int);defer delete(input);change(input);if input[1]!=7{panic(\"map\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "dynamic_pointer_parameter",
+    "group": "storage",
+    "source": "package main\nchange::proc(input:^[dynamic]int){append(input,7)}\n\nmain :: proc() {\ninput:[dynamic]int;defer delete(input);change(&input);if len(input)!=1||input[0]!=7{panic(\"dynamic\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "contextless_indexing",
+    "group": "storage",
+    "source": "package main\nread::proc \"contextless\"(items:[]int,index:int)->int{return items[index]}\n\nmain :: proc() {\nitems:=[2]int{3,7};if read(items[:],1)!=7{panic(\"contextless\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "using_parameter_array",
+    "group": "storage",
+    "source": "#+feature using-stmt\npackage main\nRecord::struct{items:[2]int}\nread::proc(using record:Record,index:int)->int{return items[index]}\n\nmain :: proc() {\nrecord:=Record{{1,7}};if read(record,1)!=7{panic(\"using\")}\n}\n"
+  },
+  {
+    "name": "shadow_builtin_len",
+    "group": "hygiene",
+    "source": "package main\nlen::proc(value:int)->int{return value+10}\n\nmain :: proc() {\nitems:=[2]int{3,7};index:=1;if items[index]!=7||len(2)!=12{panic(\"hygiene\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "shadow_builtin_min",
+    "group": "hygiene",
+    "source": "package main\nmin::proc(value:int)->int{return value+10}\n\nmain :: proc() {\nitems:=[2]int{3,7};index:=1;if items[index]!=7||min(2)!=12{panic(\"hygiene\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "shadow_builtin_max",
+    "group": "hygiene",
+    "source": "package main\nmax::proc(value:int)->int{return value+10}\n\nmain :: proc() {\nitems:=[2]int{3,7};index:=1;if items[index]!=7||max(2)!=12{panic(\"hygiene\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "shadow_builtin_type_of",
+    "group": "hygiene",
+    "source": "package main\ntype_of::proc(value:int)->int{return value+10}\n\nmain :: proc() {\nitems:=[2]int{3,7};index:=1;if items[index]!=7||type_of(2)!=12{panic(\"hygiene\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "shadow_builtin_cap",
+    "group": "hygiene",
+    "source": "package main\ncap::proc(value:int)->int{return value+10}\n\nmain :: proc() {\nitems:=[2]int{3,7};index:=1;if items[index]!=7||cap(2)!=12{panic(\"hygiene\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "shadow_builtin_delete",
+    "group": "hygiene",
+    "source": "package main\ndelete::proc(value:int)->int{return value+10}\n\nmain :: proc() {\nitems:=[2]int{3,7};index:=1;if items[index]!=7||delete(2)!=12{panic(\"hygiene\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "native_bitset_membership",
+    "group": "operators",
+    "source": "package main\nKind::enum{A,B}\nFlags::bit_set[Kind]\n\nmain :: proc() {\nflags:=Flags{.A};if Kind.A not_in flags||Kind.B in flags{panic(\"membership\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_bitset_constant_membership",
+    "group": "operators",
+    "source": "package main\nKind::enum{A,B}\nFlags::bit_set[Kind]\nVALUES::Flags{.A}\nFOUND::Kind.A in VALUES\n\nmain :: proc() {\nif !FOUND{panic(\"membership\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_map_membership",
+    "group": "operators",
+    "source": "package main\n\nmain :: proc() {\nvalues:=make(map[int]int);defer delete(values);values[-1]=7;if -1 not_in values||0 in values||values[-1]!=7{panic(\"map keys\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "native_map_record_keys",
+    "group": "operators",
+    "source": "package main\nKey::struct{x,y:int}\n\nmain :: proc() {\nvalues:=make(map[Key]int);defer delete(values);key:=Key{1,2};values[key]=7;if key not_in values||values[key]!=7{panic(\"map key\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_prefix_expansion",
+    "group": "operators",
+    "source": "package main\n\nmain :: proc() {\nvalues:=[2]int{3,7};a,b:=**values;if a!=3||b!=7{panic(\"expansion\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "native_matrix_index",
+    "group": "operators",
+    "source": "package main\n\nmain :: proc() {\nvalues:matrix[2,2]int;values[0,1]=7;if values[0,1]!=7{panic(\"matrix\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "native_simd_index",
+    "group": "operators",
+    "source": "package main\n\nmain :: proc() {\nvalues:=#simd[4]f32{1,2,3,4};index:=1;if values[index]!=2{panic(\"simd\")} \n}\n",
+    "run": true
+  },
+  {
+    "name": "native_enumerated_array",
+    "group": "operators",
+    "source": "package main\nKind::enum{A,B}\n\nmain :: proc() {\nvalues:=[Kind]int{.A=3,.B=7};index:=Kind.B;if values[index]!=7{panic(\"enum array\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_optional_map_lookup",
+    "group": "operators",
+    "source": "package main\n\nmain :: proc() {\nvalues:=make(map[int]int);defer delete(values);values[1]=7;v,ok:=values[1];missing,found:=values[2];if v!=7||!ok||missing!=0||found{panic(\"optional\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_optional_type_assertion",
+    "group": "operators",
+    "source": "package main\nChoice::union{int,string}\n\nmain :: proc() {\nvalue:Choice=7;x,ok:=value.(int);if !ok||x!=7{panic(\"assertion\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_range_and_enum_iteration",
+    "group": "operators",
+    "source": "package main\nKind::enum{A,B}\n\nmain :: proc() {\ntotal:=0;for n in 1..=3{total+=n};count:=0;for value in Kind{count+=1;_=value};if total!=6||count!=2{panic(\"iteration\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_slice_subviews",
+    "group": "operators",
+    "source": "package main\n\nmain :: proc() {\ndata:=[3]int{1,2,3};low,high:=1,3;view:=data[low:high];view[0]=7;if data[1]!=7{panic(\"slice view\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_procedure_parameter_generic_default",
+    "group": "defaults",
+    "source": "package main\ncall::proc(value:$T,callback:=proc(item:$U)->U{return item})->T{return callback(value)}\n\nmain :: proc() {\nif call(7)!=7{panic(\"callback\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_procedure_parameter_typed_generic_default",
+    "group": "defaults",
+    "source": "package main\ncall::proc(value:$T,callback:proc(item:T)->T=proc(item:$U)->U{return item})->T{return callback(value)}\n\nmain :: proc() {\nif call(7)!=7{panic(\"callback\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_procedure_parameter_plain_default",
+    "group": "defaults",
+    "source": "package main\ncall::proc(value:int,callback:=proc(item:int)->int{return item+1})->int{return callback(value)}\n\nmain :: proc() {\nif call(7)!=8{panic(\"callback\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "caller_location",
+    "group": "source_identity",
+    "source": "package main\nimport \"core:fmt\"\nreport::proc(x:int,loc:=#caller_location){fmt.println(loc.file_path,loc.line,loc.column,x)}\n\nmain :: proc() {\nreport(7)\n}\n",
+    "run": true
+  },
+  {
+    "name": "source_directives",
+    "group": "source_identity",
+    "source": "package main\nimport \"core:fmt\"\n\nmain :: proc() {\nfmt.println(#file);fmt.println(#directory);fmt.println(#line);fmt.println(#procedure)\n}\n",
+    "run": true
+  },
+  {
+    "name": "source_line_after_native_access",
+    "group": "source_identity",
+    "source": "package main\nimport \"core:fmt\"\n\nmain :: proc() {\nvalues:=[2]int{3,7};index:=1\nx:=values[index]\nfmt.println(x,#line,#procedure)\n}\n",
+    "run": true
+  },
+  {
+    "name": "source_procedure_inside_native_index",
+    "group": "source_identity",
+    "source": "package main\nimport \"core:fmt\"\n\nmain :: proc() {\nvalues:=[2]int{3,7};name:=#procedure\nfmt.println(values[int(#procedure!=name)])\n}\n",
+    "run": true
+  },
+  {
+    "name": "load_literal",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"payload.txt\"\nDATA::#load(\"payload.txt\",string)\n\nmain :: proc() {\nfmt.println(DATA)\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true
+  },
+  {
+    "name": "load_constant",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"payload.txt\"\nDATA::#load(PATH,string)\n\nmain :: proc() {\nfmt.println(DATA)\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true
+  },
+  {
+    "name": "load_concatenation",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"payload.txt\"\nDATA::#load(\"payload\"+\".txt\",string)\n\nmain :: proc() {\nfmt.println(DATA)\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true
+  },
+  {
+    "name": "load_directory",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"payload.txt\"\nDATA::#load(#directory+\"/payload.txt\",string)\n\nmain :: proc() {\nfmt.println(DATA)\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true
+  },
+  {
+    "name": "exists_constant",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"payload.txt\"\n\nmain :: proc() {\nfmt.println(#exists(PATH))\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true
+  },
+  {
+    "name": "negative_runtime_index",
+    "group": "intentional",
+    "source": "package main\nimport \"core:fmt\"\n\nmain :: proc() {\nvalues:=[2]int{3,7};index:=-1;fmt.println(values[index])\n}\n",
+    "run": true,
+    "checked_only": true
+  },
+  {
+    "name": "negative_runtime_slice",
+    "group": "intentional",
+    "source": "package main\nimport \"core:fmt\"\n\nmain :: proc() {\nvalues:=[2]int{3,7};index:=-1;fmt.println(values[index:])\n}\n",
+    "run": true,
+    "checked_only": true
+  },
+  {
+    "name": "native_vet_file_tag",
+    "group": "tooling",
+    "source": "#+vet unused\npackage main\nmain::proc(){}\n"
+  },
+  {
+    "name": "native_vet_flag",
+    "group": "tooling",
+    "source": "package main\n\nmain :: proc() {\n_=1\n}\n",
+    "flags": [
+      "-vet"
+    ]
+  },
+  {
+    "name": "native_strict_style_flag",
+    "group": "tooling",
+    "source": "package main\n\nmain :: proc() {\n_=1\n}\n",
+    "flags": [
+      "-strict-style"
+    ]
+  },
+  {
+    "name": "default_allocator_in_debug",
+    "group": "tooling",
+    "source": "package main\nimport \"core:fmt\"\nimport \"base:runtime\"\n\nmain :: proc() {\nfmt.println(context.allocator.procedure==runtime.default_allocator_proc)\n}\n",
+    "run": true,
+    "flags": [
+      "-debug"
+    ]
+  },
+  {
+    "name": "Integer_import_alias",
+    "group": "identifiers",
+    "source": "package main\nimport Integer \"core:fmt\"\n\nmain::proc(){\nInteger.println(\"ok\")\n}\n",
+    "run": true
+  },
+  {
+    "name": "Rational_import_alias",
+    "group": "identifiers",
+    "source": "package main\nimport Rational \"core:fmt\"\n\nmain::proc(){\nRational.println(\"ok\")\n}\n",
+    "run": true
+  },
+  {
+    "name": "fn_initializer_silent_type_change",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nfn::proc()->int{return 7}\n\nmain::proc(){\nx:=fn()\n{}\nfmt.println(typeid_of(type_of(x)))\n}\n",
+    "run": true
+  },
+  {
+    "name": "caller_expression_native_access",
+    "group": "source_identity",
+    "source": "package main\nimport \"core:fmt\"\nreport::proc(value:int,text:=#caller_expression(value)){fmt.println(text)}\n\nmain::proc(){\nvalues:=[2]int{3,7};index:=1\nreport(values[index])\n}\n",
+    "run": true
+  },
+  {
+    "name": "load_hash_constant",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"payload.txt\"\nDATA::#load_hash(PATH,\"fnv64a\")\n\nmain::proc(){\nfmt.println(DATA)\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true
+  },
+  {
+    "name": "load_directory_constant",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"assets\"\nmain::proc(){entries:=#load_directory(PATH);fmt.println(len(entries))}\n",
+    "files": {
+      "assets/a.txt": "one",
+      "assets/b.txt": "two"
+    },
+    "run": true
+  },
+  {
+    "name": "load_absolute_constant",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\nPATH::\"ABSOLUTE_PAYLOAD\"\nDATA::#load(PATH,string)\n\nmain::proc(){\nfmt.println(DATA)\n}\n",
+    "files": {
+      "payload.txt": "resource contents"
+    },
+    "run": true,
+    "absolute_payload": true
+  },
+  {
+    "name": "native_increment_not_supported",
+    "group": "non_native_controls",
+    "source": "package main\n\nmain::proc(){\nx:=0;x++;_=x\n}\n"
+  },
+  {
+    "name": "native_infix_power_not_supported",
+    "group": "non_native_controls",
+    "source": "package main\n\nmain::proc(){\n_=2**3\n}\n"
+  },
+  {
+    "name": "native_infix_concat_not_supported",
+    "group": "non_native_controls",
+    "source": "package main\n\nmain::proc(){\n_=[2]int{1,2}++[2]int{3,4}\n}\n"
+  },
+  {
+    "name": "native_simd_extract",
+    "group": "operators",
+    "source": "package main\nimport \"core:simd\"\n\nmain::proc(){\nvalues:=#simd[4]f32{1,2,3,4};if simd.extract(values,1)!=2{panic(\"simd\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "load_directory_literal",
+    "group": "resources",
+    "source": "package main\nimport \"core:fmt\"\n\nmain::proc(){\nentries:=#load_directory(\"assets\");fmt.println(len(entries))\n}\n",
+    "files": {
+      "assets/a.txt": "one",
+      "assets/b.txt": "two"
+    },
+    "run": true
+  },
+  {
+    "name": "compiler_root_identity",
+    "group": "tooling",
+    "source": "package main\nimport \"core:fmt\"\n\nmain::proc(){\nfmt.println(ODIN_ROOT);fmt.println(ODIN_BUILD_PROJECT_NAME)\n}\n",
+    "run": true
+  },
+  {
+    "name": "custom_thor_collection_simple",
+    "group": "tooling",
+    "source": "package main\n\nmain::proc(){\n_=1\n}\n",
+    "files": {
+      "custom/.keep": ""
+    },
+    "flags": [
+      "-collection:thor:PLACEHOLDER"
+    ]
+  },
+  {
+    "name": "custom_thor_collection_index",
+    "group": "tooling",
+    "source": "package main\n\nmain::proc(){\nvalues:=[2]int{3,7};index:=1;if values[index]!=7{panic(\"index\")} \n}\n",
+    "files": {
+      "custom/.keep": ""
+    },
+    "flags": [
+      "-collection:thor:PLACEHOLDER"
+    ],
+    "run": true
+  },
+  {
+    "name": "native_rodata_copy",
+    "group": "storage",
+    "source": "package main\n@(rodata) VALUES:=[2]int{1,2}\n\nmain::proc(){\ncopy:=VALUES;copy[0]=7;if copy[0]!=7||VALUES[0]!=1{panic(\"rodata copy\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_static_local_storage",
+    "group": "storage",
+    "source": "package main\nnext::proc(index:int)->int{@(static) values:[2]int;values[index]+=1;return values[index]}\n\nmain::proc(){\nif next(0)!=1||next(0)!=2{panic(\"static local\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_deferred_calls",
+    "group": "storage",
+    "source": "package main\nincrement::proc(value:^int){value^+=1}\n\nmain::proc(){\ncounter:=0;{defer increment(&counter);increment(&counter)};if counter!=2{panic(\"defer\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_reference_iteration",
+    "group": "storage",
+    "source": "package main\n\nmain::proc(){\nvalues:=[2]int{1,2};for &value in values{value+=1};if values[0]!=2||values[1]!=3{panic(\"iteration\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "native_literal_cstring_concat",
+    "group": "operators",
+    "source": "package main\naccept::proc(text:cstring)->int{return len(text)}\n\nmain::proc(){\nif accept(\"one\"+\"two\")!=6{panic(\"cstring\")}\n}\n",
+    "run": true
+  },
+  {
+    "name": "fn_call_arrow_receiver",
+    "group": "contextual",
+    "source": "package main\nimport \"core:fmt\"\nItem::struct{value:int,read:proc(item:Item)->int}\nread::proc(item:Item)->int{return item.value}\nfn::proc()->Item{return Item{7,read}}\nmain::proc(){x:=fn()->read();fmt.println(x)}\n",
+    "run": true
+  },
+  {
+    "name": "build_project_tag_file",
+    "group": "tooling",
+    "directory_entry": false,
+    "source": "#+build-project-name build_project_tag_file\npackage main\nmain::proc(){}\n"
+  },
+  {
+    "name": "build_project_tag_directory",
+    "group": "tooling",
+    "directory_entry": true,
+    "source": "#+build-project-name build_project_tag_directory\npackage main\nmain::proc(){}\n"
+  },
+  {
+    "name": "compiler_project_name_directory",
+    "group": "tooling",
+    "directory_entry": true,
+    "run": true,
+    "source": "package main\nimport \"core:fmt\"\nmain::proc(){fmt.println(ODIN_BUILD_PROJECT_NAME)}\n"
+  },
+  {
+    "name": "array_parenthesized_element",
+    "group": "native_type_syntax",
+    "source": "package main\nA::[2](int)\nmain::proc(){v:A;_=v}\n",
+    "run": true
+  },
+  {
+    "name": "slice_parenthesized_element",
+    "group": "native_type_syntax",
+    "source": "package main\nA::[](int)\nmain::proc(){v:A;_=v}\n",
+    "run": true
+  },
+  {
+    "name": "array_bitfield_element",
+    "group": "native_type_syntax",
+    "source": "package main\nA::[2]bit_field u8{value:u8|1}\nmain::proc(){v:A;_=v}\n",
+    "run": true
+  },
+  {
+    "name": "array_parenthesized_literal",
+    "group": "native_type_syntax",
+    "source": "package main\nmain::proc(){v:=[2](int){1,2};_=v}\n",
+    "run": true
+  }
+]

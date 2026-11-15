@@ -21,6 +21,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .parent()
         .ok_or("compiler root")?;
     let mut project = Project::new(Options {
+            native_policy_probe: false,
+            odin_compatible: false,
         command: "check".into(),
         entry: entry.into(),
         output: None,

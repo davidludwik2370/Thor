@@ -35,6 +35,8 @@ enum Aspect {
     Storage,
     Inline,
     All,
+    // Resolve a particular subtree against the caller's argument graph.
+    References,
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Origin {
@@ -95,6 +97,13 @@ struct Effect {
     reason: String,
     related: Vec<Ref>,
     changes_storage: bool,
+}
+impl Effect {
+    fn covers(&self, other: &Self) -> bool {
+        (!other.changes_storage || self.changes_storage)
+            && (!self.deleting || other.deleting)
+            && (self.unresolved.is_none() || self.unresolved == other.unresolved)
+    }
 }
 #[derive(Clone, PartialEq, Eq)]
 struct GraphState {
@@ -176,6 +185,7 @@ pub struct Privileges<'a, 'r> {
     uncertain: Option<Ref>,
     deleting: bool,
     discovering: bool,
+    opaque_readonly: bool,
     library_names: std::cell::RefCell<HashMap<Ref, Option<(String, String)>>>,
     reuse: Option<SummaryCache>,
     fact_events: Vec<cached::FactEvent>,
@@ -189,6 +199,7 @@ struct SummaryKey {
     bindings: Vec<(String, Type)>,
     contract: bool,
     checked: bool,
+    opaque_readonly: bool,
 }
 impl<'a, 'r> Privileges<'a, 'r> {
     fn new(r: &'r mut Resolver<'a>, flags: &[String], discovering: bool) -> Self {
@@ -209,6 +220,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             uncertain: None,
             deleting: false,
             discovering,
+            opaque_readonly: true,
             library_names: std::cell::RefCell::new(HashMap::new()),
             reuse: None, fact_events: vec![],
             type_properties: HashMap::new(),
@@ -261,6 +273,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let mut this = Self::new(r, flags, discovering);
         this.reuse = cache.as_deref().cloned();
         this.annotations();
+        this.opaque_readonly = this.has_readonly_views();
         let procedures = this
             .r
             .sources
@@ -671,12 +684,30 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.values.push(Value::new(self.r.shared_type(typ)));
         id
     }
+    fn has_slice_data(&mut self, typ: &Type) -> bool {
+        reference_data(typ) && (!matches!(base_type(typ), Type::Union(..))
+            || self.type_property(typ, queries::Property::Slice))
+    }
     fn fresh(&mut self, typ: Type, path: Option<Path>) -> V {
+        let data = self.has_slice_data(&typ)
+            || self.pure_depth > 0 && matches!(base_type(&typ), Type::Union(..));
         let id = self.value(typ);
         self.values[id].path = path.clone();
-        if let Some(path) = path {
+        if let Some(mut path) = path {
+            if path.steps.len() > 16 {
+                // Match Python's finite symbolic-path domain across calls.
+                // A widened origin conservatively covers the whole parameter.
+                path.steps = Shared::new();
+                self.values[id].data.insert(Origin {
+                    path,
+                    aspect: Aspect::All,
+                    seed: None,
+                });
+                crate::profile::count("permissions.widened_paths", 1);
+                return id;
+            }
             self.values[id].locations.insert(path.clone());
-            if reference_data(&self.values[id].typ)
+            if data
                 || self.pure_depth > 0
                     && matches!(base_type(&self.values[id].typ), Type::String { .. })
             {
@@ -980,7 +1011,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             aspect: Aspect::Data,
             seed: Some(seed),
         };
-        if reference_data(&self.values[v].typ) {
+        if self.has_slice_data(&self.values[v].typ.owned()) {
             self.values[v].data.insert(origin.clone());
             self.values[v].storage.insert(origin.clone());
         }
@@ -1011,12 +1042,24 @@ impl<'a, 'r> Privileges<'a, 'r> {
     }
     fn refs(&mut self, v: V) -> Origins {
         let _phase = crate::profile::span("permissions.references");
-        self.refs_seen(v, &mut HashSet::new(), 0)
+        self.refs_seen(v, &mut HashSet::new(), &mut HashSet::new(), 0)
     }
-    fn refs_seen(&mut self, v: V, seen: &mut HashSet<V>, depth: usize) -> Origins {
-        let value=&self.values[v];
-        if value.path.is_none() && value.data.is_empty() && value.storage.is_empty()
-            && value.fields.is_empty() && value.element.is_none() && value.target.is_none() && value.base.is_none() {
+    fn refs_seen(
+        &mut self,
+        v: V,
+        seen: &mut HashSet<V>,
+        types: &mut HashSet<(crate::semantics::TypeId, usize)>,
+        depth: usize,
+    ) -> Origins {
+        let value = &self.values[v];
+        if value.path.is_none()
+            && value.data.is_empty()
+            && value.storage.is_empty()
+            && value.fields.is_empty()
+            && value.element.is_none()
+            && value.target.is_none()
+            && value.base.is_none()
+        {
             crate::profile::count("permissions.origin_free_leaves", 1);
             return Origins::new();
         }
@@ -1024,50 +1067,69 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return Origins::new();
         }
         let mut result = self.values[v].data.clone();
-        if depth > 16 {
-            if let Some(path) = self.values[v].path.clone() {
+        if result.iter().any(|origin| origin.aspect == Aspect::All) {
+            return result;
+        }
+        let shape = self.values[v]
+            .path
+            .as_ref()
+            .map(|path| (self.values[v].typ.id(), path.index));
+        let recursive = shape.is_some_and(|shape| !types.insert(shape));
+        if (depth > 16 && shape.is_some()) || recursive {
+            if let Some(mut path) = self.values[v].path.clone() {
+                path.steps = Shared::new();
                 result.insert(Origin {
                     path,
                     aspect: Aspect::All,
                     seed: None,
                 });
             }
+            if !recursive {
+                if let Some(shape) = shape {
+                    types.remove(&shape);
+                }
+            }
+            if recursive {
+                crate::profile::count("permissions.recursive_reference_paths", 1);
+            }
             return result;
         }
+        // Keep unopened parameter subtrees symbolic. Existing children still
+        // carry assignments and seeds introduced while checking this body.
+        let mut covered = None;
         if self.values[v].path.is_some()
             && self.type_property(&self.values[v].typ.owned(), queries::Property::Slice)
         {
-            match base_type(&self.values[v].typ).clone() {
-                Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
-                    let fields = self.record_fields(&self.values[v].typ.clone());
-                    for (name, _) in fields.iter() {
-                        self.member(v, name);
-                    }
-                }
-                Type::Array { .. }
-                | Type::Fixed { .. }
-                | Type::Slice(_)
-                | Type::Dynamic(_)
-                | Type::Map { .. }
-                | Type::Set(_) => {
-                    self.item(v);
-                }
-                Type::Pointer(_) => {
-                    self.deref(v);
-                }
-                Type::Soa(elem) => {
-                    for (name, _) in self.record_fields(&elem).iter() {
-                        self.member(v, name);
-                    }
-                }
-                _ => {}
-            }
+            let path = self.values[v].path.clone().unwrap();
+            result.insert(Origin {
+                path: path.clone(),
+                aspect: Aspect::References,
+                seed: None,
+            });
+            covered = Some(path);
+            crate::profile::count("permissions.deferred_reference_paths", 1);
         }
         let mut children = self.values[v].fields.values().copied().collect::<Vec<_>>();
         children.extend(self.values[v].element);
         children.extend(self.values[v].target);
         for child in children {
-            result.extend(self.refs_seen(child, seen, depth + 1));
+            let references = self.refs_seen(child, seen, types, depth + 1);
+            result.extend(
+                references
+                    .iter()
+                    .filter(|origin| {
+                        !covered.as_ref().is_some_and(|path| {
+                            origin.seed.is_none()
+                                && matches!(origin.aspect, Aspect::Data | Aspect::References)
+                                && origin.path.index == path.index
+                                && origin.path.steps.starts_with(&path.steps)
+                        })
+                    })
+                    .cloned(),
+            );
+        }
+        if let Some(shape) = shape {
+            types.remove(&shape);
         }
         result
     }
@@ -1089,13 +1151,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self.record_fields(typ)
                 .iter()
                 .any(|(_, typ)| self.contains_slice(typ, seen)),
-            Type::Union(owner) => {
-                let variants = self.group(*owner, "variants");
-                variants.into_iter().any(|r| {
-                    let typ = self.specialized_type(r, &Substitutions::new());
-                    self.contains_slice(&typ, seen)
-                })
-            }
+            Type::Union(..) => self.r.union_variants(typ).iter()
+                .any(|variant| self.contains_slice(variant, seen)),
             _ => false,
         }
     }
@@ -1115,9 +1172,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self.record_fields(typ)
                 .iter()
                 .any(|(_, typ)| self.unresolved_value_type(typ, seen)),
-            Type::Union(owner) => self
+            Type::Union(..) => self
                 .r
-                .union_variants(*owner)
+                .union_variants(typ)
                 .iter()
                 .any(|typ| self.unresolved_value_type(typ, seen)),
             _ => false,
@@ -1180,12 +1237,24 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     changes_storage,
                 };
                 let effects = &mut self.contexts[c].effects;
+                if matches!(origin.aspect, Aspect::Data | Aspect::References) {
+                    let all = Origin { path: Path { index: origin.path.index, steps: Shared::new() },
+                        aspect: Aspect::All, seed: None };
+                    if effects.get(&all).is_some_and(|effect| effect.covers(&incoming)) {
+                        continue;
+                    }
+                }
                 if !effects.contains_key(&origin)
                     || effects.get(&origin).is_some_and(|old| {
                         (!old.changes_storage && incoming.changes_storage)
                             || (old.deleting && !incoming.deleting && incoming.changes_storage)
                     })
                 {
+                    if origin.aspect == Aspect::All {
+                        effects.retain(|previous, effect| previous.path.index != origin.path.index
+                            || !matches!(previous.aspect, Aspect::Data | Aspect::References)
+                            || !incoming.covers(effect));
+                    }
                     effects.insert(origin, incoming);
                     self.changed = true;
                 }
@@ -1213,6 +1282,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return self.refs(*v);
         }
         let v = self.follow(*v, &origin.path.steps);
+        if origin.aspect == Aspect::References {
+            return self.refs(v);
+        }
         if origin.aspect == Aspect::Data {
             self.values[v].data.clone()
         } else {
@@ -1339,6 +1411,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             checked: self.pure_depth > 0,
+            opaque_readonly: self.opaque_readonly,
         };
         if let Some(c) = self.summaries.get(&key).copied() {
             if let Some(caller) = caller {
@@ -1808,6 +1881,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 id
             }
+            "Procedure" | "ProcedureType" => self.value(typ),
             "Compound" => {
                 let id = self.value(typ.clone());
                 let fields = self.record_fields(&typ);
@@ -2943,7 +3017,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .s(candidate)
                     .descendants(candidate.node)
                     .any(|id| self.s(candidate).node(id).immutable);
-            if !has_references && !result_references && !local_checks {
+            let inspect_result = result_references && (self.opaque_readonly
+                || self.pure_depth > 0 || self.s(candidate).node(candidate.node).data["pure"] == true);
+            // Without escaping read-only storage or qualified arguments, a
+            // reference-shaped result cannot acquire a read-only qualifier.
+            // Avoid materializing an unrelated parser/allocator object graph.
+            if !has_references && !inspect_result && !local_checks {
                 for (index, (_, annotation)) in result_fields.into_iter().enumerate() {
                     let typ = annotation
                         .map(|r| self.specialized_type(r, &substitutions))
@@ -3080,12 +3159,16 @@ impl<'a, 'r> Privileges<'a, 'r> {
         result
     }
     fn opaque_result(&mut self, typ: Type, seed: Ref, seen: &mut HashMap<Type, V>) -> V {
+        // An erased call can hide existing Thor views. When the project has
+        // none, retain ordinary Odin callback/foreign return permissions.
+        if !self.opaque_readonly { return self.value(typ); }
         if let Some(v) = seen.get(&typ) {
             return *v;
         }
         let id = self.value(typ.clone());
         seen.insert(typ.clone(), id);
-        if matches!(base_type(&typ), Type::Slice(_) | Type::Union(_)) {
+        if matches!(base_type(&typ), Type::Slice(_) | Type::Union(..))
+            && self.has_slice_data(&typ) {
             self.values[id].data.insert(Origin {
                 path: Path {
                     index: 0,
@@ -3309,7 +3392,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                                 matches!(base_type(&typ), Type::Struct(_) | Type::Record(..))
                             }
                             "map" => matches!(base_type(&typ), Type::Map { .. }),
-                            "union" => matches!(base_type(&typ), Type::Union(_)),
+                            "union" => matches!(base_type(&typ), Type::Union(..)),
                             "enum" => matches!(base_type(&typ), Type::Enum(_)),
                             "string" => matches!(base_type(&typ), Type::String { .. }),
                             "integer" => {
@@ -3399,7 +3482,7 @@ fn writable_alias(typ: &Type) -> bool {
 fn reference_data(typ: &Type) -> bool {
     matches!(
         base_type(typ),
-        Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic | Type::Union(_)
+        Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic | Type::Union(..)
     )
 }
 fn references_type(typ: &Type) -> bool {
@@ -3413,7 +3496,7 @@ fn references_type(typ: &Type) -> bool {
             | Type::Pointer(_)
             | Type::Unknown
             | Type::Generic
-            | Type::Union(_)
+            | Type::Union(..)
     )
 }
 fn opaque(typ: &Type) -> bool {
@@ -3484,6 +3567,45 @@ const FMT_READERS: &[&str] = &[
 #[cfg(test)]
 mod graph_tests {
     use super::*;
+
+    #[test]
+    fn deep_symbolic_paths_widen_without_recording_unbounded_stores() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        let path = Path { index: 3, steps: vec![Step::Deref; 17].into() };
+        let value = analysis.fresh(Type::Slice(Box::new(Type::scalar("int"))), Some(path));
+        if !analysis.values[value].locations.is_empty() { panic!("unbounded store path"); }
+        let origins = &analysis.values[value].data;
+        if origins.len() != 1 || !origins.iter().any(|origin| origin.aspect == Aspect::All
+            && origin.path.index == 3 && origin.path.steps.is_empty()) {
+            panic!("deep reference was not widened to its parameter");
+        }
+    }
+
+    #[test]
+    fn whole_parameter_effects_cover_only_equally_strong_data_requirements() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        analysis.contexts.push(Context::new(None, Substitutions::new()));
+        let site = Ref { file: 0, node: NodeId(0) };
+        let data = Origin { path: Path { index: 0, steps: vec![Step::Field("data".into())].into() },
+            aspect: Aspect::Data, seed: None };
+        let strong = Origin { path: Path { index: 0, steps: vec![Step::Field("strong".into())].into() },
+            aspect: Aspect::Data, seed: None };
+        let storage = Origin { aspect: Aspect::Storage, ..data.clone() };
+        let all = Origin { path: Path { index: 0, steps: Shared::new() }, aspect: Aspect::All, seed: None };
+        analysis.require_effect([data.clone()].into(), site, 0, "inspect", vec![], false);
+        analysis.require_effect([strong.clone()].into(), site, 0, "modify", vec![], true);
+        analysis.require_effect([storage.clone()].into(), site, 0, "address", vec![], false);
+        analysis.require_effect([all.clone()].into(), site, 0, "inspect all", vec![], false);
+        analysis.require_effect([data.clone()].into(), site, 0, "inspect again", vec![], false);
+        let effects = &analysis.contexts[0].effects;
+        if effects.len() != 3 || effects.contains_key(&data)
+            || !effects.contains_key(&all) || !effects.contains_key(&strong)
+            || !effects.contains_key(&storage) {
+            panic!("effect coalescing lost an independent storage requirement");
+        }
+    }
 
     #[test]
     fn direct_graph_comparison_matches_full_snapshot_equality_with_cycles_and_aliases() {

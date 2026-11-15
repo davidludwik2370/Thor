@@ -141,6 +141,38 @@ class RustScalarExecutionTests(unittest.TestCase):
         self.assertEqual(changed['cache']['scalar_reused'],0)
         self.assertEqual(changed['results'][0][1]['value'],'7')
 
+    def test_build_tag_edits_that_activate_native_files_invalidate_site(self):
+        library=self.root/'sdk/sample';library.mkdir(parents=True)
+        (library/'sample.odin').write_text('package sample\nwork::proc()->int{return 6}\n')
+        inactive=library/'tagged.odin'
+        inactive.write_text('#+ignore\npackage sample\nUNUSED::1\n')
+        self.source.write_text('package main\nimport lib "extras:sample"\nVALUE::#run lib.work()\nmain::proc(){_=VALUE}\n')
+        flags=['-debug','-collection:extras='+str(library.parent)]
+        self.invoke(flags=flags);self.discard_prepared()
+        warm=self.invoke(flags=flags)
+        self.assertGreater(warm['cache']['scalar_reused'],0)
+        inactive.write_text('package sample\nUNUSED::1\n')
+        changed=self.invoke(flags=flags)
+        self.assertEqual(changed['cache']['scalar_reused'],0)
+        self.assertEqual(changed['results'][0][1]['value'],'6')
+
+    def test_python_interface_fingerprints_recheck_excluded_file_activation(self):
+        from types import SimpleNamespace
+        from thorlang.compiler import Source
+        from thorlang.scalarcache import headers
+        path=self.root/'tagged.odin'
+        def fingerprint():
+            source=Source(path,self.frontend,thor=False,package=True,cache=False)
+            return headers(SimpleNamespace(sources={path:source}))
+        path.write_text('#+ignore\npackage sample\nVALUE::1\n')
+        before=fingerprint()
+        path.write_text('#+ignore\npackage sample\nVALUE::2\n')
+        inactive=fingerprint()
+        self.assertEqual(inactive,before)
+        path.write_text('package sample\nVALUE::2\n')
+        active=fingerprint()
+        self.assertNotEqual(active,before)
+
 
 if __name__=='__main__':
     unittest.main()

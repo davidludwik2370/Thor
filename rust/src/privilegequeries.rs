@@ -10,6 +10,40 @@ pub(super) enum Property {
 }
 
 impl Privileges<'_, '_> {
+    pub(super) fn has_readonly_views(&mut self) -> bool {
+        let declarations = self.r.sources.iter().enumerate().flat_map(|(file, source)| {
+            source.nodes.iter().enumerate().filter(|(_, node)| node.immutable)
+                .flat_map(move |(index, _)| source.group(NodeId(index), "names").iter()
+                    .filter(|node| source.text(**node) != "_")
+                    .map(move |node| Ref { file, node: *node }))
+        }).collect::<Vec<_>>();
+        declarations.into_iter().any(|name| {
+            // Odin procedure literals cannot capture caller locals. A local
+            // view cannot hide in a callback's result unless its procedure can
+            // return reference-bearing data. Writable escapes are checked at
+            // the operation that attempts them.
+            let source = self.s(name);
+            if let Some(procedure) = source.ancestors(name.node)
+                .find(|node| source.node(*node).kind == "Procedure") {
+                let signature = source.role(procedure, "type").unwrap_or(procedure);
+                let results = self.r.fields(Ref {file:name.file,node:signature}, "results");
+                let can_escape = results.into_iter().any(|(_, annotation)| {
+                    let typ = annotation.map(|node| self.r.type_of(node)).unwrap_or(Type::Unknown);
+                    self.type_property(&typ, Property::Slice)
+                });
+                if !can_escape { return false; }
+            }
+            let typ = self.r.type_of(name);
+            let sensitive = self.r.frozen_slice_storage(&typ);
+            if sensitive {
+                crate::profile::event("permissions.readonly_storage", || serde_json::json!({
+                    "file": self.s(name).path, "offset": self.s(name).node(name.node).span.start,
+                    "type": typ,
+                }));
+            }
+            sensitive
+        })
+    }
     pub(super) fn needs_root(&mut self, proc: Ref) -> bool {
         let _phase = crate::profile::span("permissions.root_selection");
         let source = self.s(proc);
@@ -189,7 +223,7 @@ impl Privileges<'_, '_> {
             | Type::Soa(_)
             | Type::Unknown
             | Type::Generic
-            | Type::Union(_) => true,
+            | Type::Union(..) => true,
             Type::Scalar { name, .. } if matches!(name.as_str(), "any" | "rawptr") => true,
             Type::Array { elem, .. } | Type::Fixed { elem, .. } => {
                 self.root_reference_type(elem, seen)

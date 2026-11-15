@@ -11,6 +11,34 @@ class SliceCopyHardeningTLSTests(unittest.TestCase):
     hover=base.TLSTests.hover
     semantic_spans=base.TLSTests.semantic_spans
 
+    def test_soa_row_comparisons_and_unsaved_errors_keep_original_locations(self):
+        text='''// 😀 original source
+package main
+import "thor:basic"
+main::proc(){
+    numbers:=[2]int{1,2};words:=[2]string{"one","two"}
+    values:=basic.zip(number=numbers[:],word=words[:])
+    for &row,index in values {
+        if row.number!=index+1 || row.word!=words[index] {panic("SOA comparison")}
+        row.number+=10
+    }
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        broken=text.replace('index+1','index+missing')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+                    'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(path.as_uri(),contains='Undeclared name: missing')
+        self.assertTrue(any(error['range']['start']==self.position(broken,'missing',0)
+                            for error in errors),errors)
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':3},
+                    'contentChanges':[{'text':text}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
     def test_inline_copies_have_mutable_properties_and_readonly_nested_views(self):
         text='''// 😀 original source
 package main

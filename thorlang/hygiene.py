@@ -15,6 +15,7 @@ BUILTINS = {
     'raw_data', 'expand_values', 'soa_zip', 'soa_unzip',
 }
 TOKEN = re.compile(rb'//[^\r\n]*|/\*|"(?:\\[\s\S]|[^"\\])*"|\'(?:\\[\s\S]|[^\'\\])*\'|`[^`]*`|'
+                   rb'0[bodzxh][0-9a-fA-F_]+|(?:[0-9][0-9_]*(?:\.(?!\.)[0-9_]*)?|\.[0-9][0-9_]*)(?:[eE][+-]?[0-9a-fA-F_]+)?[ijk]?|'
                    rb'[A-Za-z_\x80-\xff][A-Za-z_0-9\x80-\xff]*|\s+|[\s\S]')
 
 

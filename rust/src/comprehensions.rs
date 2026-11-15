@@ -118,7 +118,10 @@ impl Lower<'_, '_> {
                 };
                 aliases.insert(
                     symbol,
-                    Code::concat([self.g("(", *name), typ, self.g("){}", *name)]),
+                    Capture {
+                        value: Code::concat([self.g("(", *name), typ, self.g("){}", *name)]),
+                        reference: None,
+                    },
                 );
             }
         }

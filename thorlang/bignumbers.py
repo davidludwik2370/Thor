@@ -39,7 +39,9 @@ class BigNumbers:
         if self.activation[0]!=len(sources):
             from .semantics import BIG_TYPES_SOURCE
             internal={BIG_TYPES_SOURCE.parent.parent/name for name in ['pure','eval','format']}
-            self.activation=(len(sources),any('thor:big' in source.imports.values() and source.path.parent not in internal for source in sources))
+            self.activation=(len(sources),any(source.path.parent not in internal and
+                any(path.endswith(':big') and source.import_dir(path)==BIG_TYPES_SOURCE.parent
+                    for path in source.imports.values()) for source in sources))
         return self.activation[1]
 
     def mapped(self,node,code,kind='big-number'):

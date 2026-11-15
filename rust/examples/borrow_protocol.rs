@@ -76,14 +76,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .ok_or("compiler root")?;
-    let (parser, odin) = frontend::bootstrap(
+    let (parser, odin, odin_root) = frontend::bootstrap(
         root,
         &std::env::var("THOR_ODIN").unwrap_or_else(|_| "odin".into()),
     )?;
     let frontend = Frontend {
+            odin_syntax: false,
         executable: parser,
         fingerprint: String::new(),
         odin,
+        odin_root,
         cache_dir: None,
         normalized_cache: false,
         test: false,
@@ -92,6 +94,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     let sources = if std::env::args().any(|arg| arg == "--project") {
         let mut project = Project::new(Options {
+            native_policy_probe: false,
+            odin_compatible: false,
             command: "check".into(),
             entry: entry.clone().into(),
             output: None,

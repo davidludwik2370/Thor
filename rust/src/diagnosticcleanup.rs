@@ -12,7 +12,35 @@ use std::{collections::BTreeSet, path::Path};
 fn word(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte >= 128
 }
-fn tokens(raw: &str) -> Vec<&str> {
+fn number_end(raw: &[u8], start: usize) -> usize {
+    let mut end = start;
+    if raw[start] == b'0' && raw.get(start + 1).is_some_and(|b| b"bodzxh".contains(b)) {
+        end += 2;
+        while raw.get(end).is_some_and(|b| b.is_ascii_hexdigit() || *b == b'_') {
+            end += 1;
+        }
+        return end;
+    }
+    while raw.get(end).is_some_and(|b| b.is_ascii_digit() || *b == b'_') {
+        end += 1;
+    }
+    if raw.get(end) == Some(&b'.') && raw.get(end + 1) != Some(&b'.') {
+        end += 1;
+        while raw.get(end).is_some_and(|b| b.is_ascii_digit() || *b == b'_') {
+            end += 1;
+        }
+    }
+    if raw.get(end).is_some_and(|b| b"eE".contains(b)) {
+        end += 1;
+        if raw.get(end).is_some_and(|b| b"+-".contains(b)) { end += 1; }
+        while raw.get(end).is_some_and(|b| b.is_ascii_hexdigit() || *b == b'_') {
+            end += 1;
+        }
+    }
+    if raw.get(end).is_some_and(|b| b"ijk".contains(b)) { end += 1; }
+    end
+}
+pub(crate) fn tokens(raw: &str) -> Vec<&str> {
     let b = raw.as_bytes();
     let mut out = vec![];
     let mut i = 0;
@@ -58,6 +86,9 @@ fn tokens(raw: &str) -> Vec<&str> {
                     i += 1;
                 }
             }
+        } else if b[i].is_ascii_digit()
+            || b[i] == b'.' && b.get(i + 1).is_some_and(u8::is_ascii_digit) {
+            i = number_end(b, i);
         } else if b[i].is_ascii_alphabetic() || b[i] == b'_' || b[i] >= 128 {
             i += 1;
             while i < b.len() && word(b[i]) {
@@ -1116,6 +1147,11 @@ const FORMAT_CONTRACTS:&[&str]=&[
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn numeric_tokens_keep_native_boundaries() {
+        let parsed = tokens("12345 -12 .75 1_000.25e-12 0x1e+3 0h3f800000 2i 1..=2");
+        assert_eq!(parsed, vec!["12345", "-", "12", ".75", "1_000.25e-12", "0x1e", "+", "3", "0h3f800000", "2i", "1", ".", ".", "=", "2"]);
+    }
     #[test]
     fn recorded_token_restoration_preserves_literals_and_boundaries() {
         let raw = "__thor_helper(a, \"a  b\")";

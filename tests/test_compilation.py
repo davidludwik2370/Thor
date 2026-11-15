@@ -201,7 +201,7 @@ main::proc(){}
         self.write('package main\nmain::proc(){value:=[1,2];assert(value[0]==1)}\n')
         self.checked(flags=['-debug'])
         self.checked(flags=['-debug'])
-        source = self.output/'main.odin'
+        source = next(self.output.rglob('main.odin'))
         for path in [source, Path(str(source)+'.map.json'), self.output/'thor-manifest.json']:
             original = path.read_bytes()
             # A valid ownership manifest with a changed entry is recoverable;

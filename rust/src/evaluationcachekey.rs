@@ -2,9 +2,8 @@
 //! result keys cover emitted dependencies, flags and observable resource inputs.
 use super::*;
 use crate::{
-    ast::{NodeId, Source},
+    ast::Source,
     evaluationinputs::{self, Inputs},
-    lower::unquote,
 };
 use std::{collections::BTreeMap, process::Command, time::Duration};
 pub struct HelperCode<'a> {
@@ -131,30 +130,7 @@ impl EvaluationCache {
     pub fn resources(sources: &[Source]) -> Option<String> {
         let mut digest = vec![];
         for source in sources.iter().filter(|source| !source.excluded) {
-            for (index, _) in source
-                .nodes
-                .iter()
-                .enumerate()
-                .filter(|(_, node)| node.kind == "Call")
-            {
-                let call = NodeId(index);
-                let Some(callee) = source.role(call, "callee") else {
-                    continue;
-                };
-                let name = source.text(callee);
-                if !["#load", "#load_hash", "#load_directory", "#exists"].contains(&name) {
-                    continue;
-                }
-                let arg = source
-                    .group(call, "args")
-                    .first()
-                    .filter(|arg| source.node(**arg).kind == "Literal")?;
-                let name_path = unquote(source.text(*arg)).ok()?;
-                let path = if let Some((collection, suffix)) = name_path.split_once(':') {
-                    source.collection_roots.get(collection)?.join(suffix)
-                } else {
-                    source.path.parent()?.join(name_path)
-                };
+            for (name, path) in evaluationinputs::source_resources(source)? {
                 let path = evaluationinputs::resolve(&path).ok()?;
                 digest.extend(canonical(&json!(path.to_string_lossy())));
                 if path.is_dir() {

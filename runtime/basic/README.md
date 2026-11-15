@@ -64,13 +64,20 @@ Compile-time array/slice concatenation uses the language's `A ++ B` operator.
 | `split(text, sep="\n", allocator=...)` | Allocate a slice of borrowed string views into `text`. |
 | `join(values, sep="", allocator=...)` | Allocate a joined string. |
 | `to_set(values, allocator=...)`, `to_slice(set, allocator=...)` | Allocate independent containers; element copies are shallow and set order is unspecified. Also exported by `thor:sets`. |
+| `zip(a=first, b=second, ...)` | Alias for `soa_zip`. Return an allocation-free structure-of-arrays view of named slices, with the shortest input's length. Columns share their inputs' storage and slice permissions. |
 | `filter(values, predicate, allocator=...)` | Allocate a slice of matching elements in input order. The predicate runs once per element; copies are shallow. Empty/no-match inputs yield an empty slice. |
+| `and(a, b, ...)`, `or(a, b, ...)` | Reduce boolean arguments, stopping at the first false/true respectively. Empty calls return true/false. Spread a slice with `and(..flags)` or `or(..flags)`; no allocation. |
 | `sum(values)` | Sum a numeric slice with Odin's arithmetic/overflow rules; empty input returns the element type's zero value. Supports distinct numeric, complex and quaternion types. |
 | `range(end)`, `range(start, end)`, `range(start, end, step)` | Allocate a half-open `[]int`, with a default start of zero and step of one. Descending ranges need a negative step. Zero step, equal bounds and the wrong direction yield an empty slice. Bounds/count arithmetic is widened before allocation. |
 | `chr(code_point)` | Return one Unicode scalar as a `rune`, without allocating. Negative, surrogate and out-of-range values assert. |
 | `ord(value)` | Return a single-rune/single-code-point string's Unicode value, or the byte from a one-element `[]u8`. Empty/multiple/invalid input asserts. A combining sequence such as `"e\u0301"` has two code points. |
 | `random(T, lo=..., hi=..., gen=...)` | Sample integer/float values with both bounds inclusive. Omitted bounds are `min(T)`/`max(T)`; explicit zero stays zero. Requires ordered bounds and finite floats. Uses `context.random_generator` unless `gen` is supplied. |
 | `table(rows, max_col_width=0, float_format="%.2f")` | Allocate an ASCII-bordered table from a slice of structs. Field tags override headings; numeric values align right, other values and headings left. |
+
+`and` and `or` accept boolean values, with no Python-style truthiness. Their
+loops return as soon as the result is known. As with ordinary procedure calls,
+all argument expressions are evaluated before entering the procedure. Use
+`&&` and `||` when evaluating the expressions themselves must short-circuit.
 
 Allocating helpers default to `context.allocator`. Delete each owned result once
 using its allocator. For `split`, delete the outer slice and keep the input text

@@ -96,6 +96,21 @@ pub struct Node {
     pub data: Value,
 }
 
+// Default wire flags do not need per-node tree-map entries. Keep conventions
+// on signatures/foreign blocks, where an empty string has contextual meaning.
+fn compact_defaults(kind: &str, metadata: &mut serde_json::Map<String, Value>) {
+    for key in ["using_field", "variadic", "diverging", "optional_ok", "optional_allocator_error"] {
+        if metadata.get(key) == Some(&Value::Bool(false)) { metadata.remove(key); }
+    }
+    for key in ["bounds_check", "type_assert_check"] {
+        if metadata.get(key).and_then(Value::as_i64) == Some(0) { metadata.remove(key); }
+    }
+    if !matches!(kind, "ProcedureType" | "ForeignBlock")
+        && metadata.get("calling_convention").and_then(Value::as_str) == Some("") {
+        metadata.remove("calling_convention");
+    }
+}
+
 #[derive(Default, Deserialize)]
 struct WireNode {
     kind: Option<Kind>,
@@ -144,6 +159,7 @@ pub struct Source {
     pub edits: Vec<Edit>,
     pub shared_native: bool,
     pub collection_roots: BTreeMap<String, PathBuf>,
+    pub support_collection: String,
 }
 /// Parsed syntax is immutable. Helper projects share it while retaining their
 /// own edits, package views and collection bindings.
@@ -160,6 +176,8 @@ pub struct SourceSyntax {
     pub excluded: bool,
     pub thor: bool,
     protocol: Arc<[u8]>,
+    protocol_compressed: bool,
+    pub(crate) migration_identifiers: Option<Arc<[Span]>>,
     protocol_overrides: HashMap<NodeId, WireOverrides>,
     line_starts: Vec<usize>,
     by_span: HashMap<Span, PackedSlice<NodeId>>,
@@ -176,6 +194,31 @@ impl Source {
     }
     pub fn from_frontend(path: PathBuf, raw: String, info: Value, thor: bool) -> Result<Self> {
         Self::from_frontend_bytes(path, raw, &serde_json::to_vec(&info)?, thor)
+    }
+    /// Migration keeps many independent packages resident for name resolution.
+    /// Preserve the complete wire output in compressed storage and omit only
+    /// default extension flags whose semantic queries already default to zero.
+    pub(crate) fn from_migration_bytes(path: PathBuf, raw: String, packet: &[u8]) -> Result<Self> {
+        use std::io::Write;
+        let mut source = Self::from_frontend_bytes(path, raw, packet, false)?;
+        let syntax = Arc::get_mut(&mut source.syntax).expect("new migration syntax is unshared");
+        if let Some(spans) = syntax.info.as_object_mut().expect("source metadata").remove("migration_identifiers") {
+            syntax.migration_identifiers = Some(spans.as_array().into_iter().flatten()
+                .filter_map(Span::from_wire).collect::<Vec<_>>().into());
+        }
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        encoder.write_all(&syntax.protocol)?;
+        syntax.protocol = encoder.finish()?.into();
+        syntax.protocol_compressed = true;
+        Ok(source)
+    }
+    fn protocol_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
+        if !self.protocol_compressed { return std::borrow::Cow::Borrowed(&self.protocol); }
+        use std::io::Read;
+        let mut raw = Vec::new();
+        let result = flate2::read::GzDecoder::new(&*self.protocol).read_to_end(&mut raw);
+        result.expect("validated internal migration protocol");
+        std::borrow::Cow::Owned(raw)
     }
     pub(crate) fn from_frontend_bytes(
         path: PathBuf, raw: String, packet: &[u8], thor: bool,
@@ -437,6 +480,7 @@ impl Source {
             let data = node.data.as_object_mut().expect("node extension metadata");
             let roles = data.remove("roles");
             let lists = data.remove("lists");
+            compact_defaults(node.kind.as_str(), data);
             if changed_roles[index] || changed_lists[index] {
                 protocol_overrides.insert(NodeId(index), WireOverrides {
                     roles: changed_roles[index].then_some(roles).flatten(),
@@ -516,6 +560,8 @@ impl Source {
             excluded,
             thor,
             protocol: Arc::from(packet),
+            protocol_compressed: false,
+            migration_identifiers: None,
             protocol_overrides,
             line_starts,
             by_span,
@@ -525,6 +571,7 @@ impl Source {
             edits,
             shared_native: false,
             collection_roots: BTreeMap::new(),
+            support_collection: "thor".into(),
         })
     }
     pub fn node(&self, id: NodeId) -> &Node {
@@ -532,8 +579,11 @@ impl Source {
     }
     pub fn frontend_info(&self) -> Value {
         let mut info = self.info.clone();
-        let mut protocol: Value = serde_json::from_slice(&self.protocol)
+        let mut protocol: Value = serde_json::from_slice(&self.protocol_bytes())
             .expect("validated frontend protocol");
+        if self.migration_identifiers.is_some() {
+            info["migration_identifiers"] = protocol["migration_identifiers"].take();
+        }
         let mut rows = protocol["nodes"].as_array_mut()
             .map(std::mem::take).expect("validated frontend node rows");
         if rows.is_empty() {
@@ -664,6 +714,34 @@ mod tests {
             json!({"nodes":nodes,"edits":[],"features":[],"selections":[]}),
             true,
         )
+    }
+    #[test]
+    fn compact_migration_syntax_preserves_wire_output_semantics_and_cache_roundtrips() {
+        let rows = (0..200).map(|index| json!({"kind":if index==0 {"File"} else {"Ident"},
+            "start":0,"end":1,"parent":if index==0 {-1} else {0},"name":if index==0 {""} else {"x"},
+            "using_field":false,"variadic":false,"diverging":false,"optional_ok":false,
+            "optional_allocator_error":false,"bounds_check":0,"type_assert_check":0,
+            "calling_convention":"","roles":{},"lists":{}})).collect::<Vec<_>>();
+        let packet = serde_json::to_vec(&json!({"nodes":rows,"features":[],"edits":[],"selections":[],
+            "migration_identifiers":[[0,1],[0,1]]})).unwrap();
+        let ordinary = Source::from_frontend_bytes("/example.odin".into(),"x".into(),&packet,false).unwrap();
+        let compact = Source::from_migration_bytes("/example.odin".into(),"x".into(),&packet).unwrap();
+        let original_info = ordinary.frontend_info();
+        let compact_info = compact.frontend_info();
+        let cached = cache::write(&compact,"migration");
+        let restored = cache::read(compact.path.clone(),compact.raw.clone(),false,"migration",&cached).unwrap();
+        let restored_info = restored.frontend_info();
+        if !compact.protocol_compressed || compact.protocol.len() >= packet.len()/4
+            || original_info != compact_info || compact_info != restored_info {
+            panic!("compact migration syntax lost wire or cache behavior");
+        }
+        if compact.node(NodeId(1)).data["using_field"] == true
+            || compact.node(NodeId(1)).data["bounds_check"].as_i64().unwrap_or_default() != 0
+            || compact.text(NodeId(1)) != ordinary.text(NodeId(1))
+            || !compact.node(NodeId(1)).data.as_object().is_some_and(|data| data.is_empty())
+            || !ordinary.node(NodeId(1)).data.as_object().is_some_and(|data| data.is_empty()) {
+            panic!("compact migration syntax changed semantic defaults");
+        }
     }
     #[test]
     fn helper_sources_share_syntax_but_own_their_edits_and_collections() {

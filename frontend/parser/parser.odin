@@ -20,6 +20,8 @@ Flags :: distinct bit_set[Flag; u32]
 
 Parser :: struct {
 	thor: bool,
+	source_tools: bool,
+	optional_semicolons: [dynamic][2]int,
 	edits: [dynamic]Edit,
 	selections: [dynamic]Selection,
 	immutables: [dynamic][2]int,
@@ -218,6 +220,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		return false
 	}
 	
+	if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 	pkg_name := expect_token_after(p, .Ident, "package")
 	if pkg_name.kind == .Ident {
 		switch name := pkg_name.text; {
@@ -646,14 +649,28 @@ expect_semicolon_newline_error :: proc(p: ^Parser, token: tokenizer.Token, s: ^a
 }
 
 
+record_optional_semicolon :: proc(p: ^Parser) {
+    if !p.source_tools || p.peeking || p.prev_tok.text != ";" { return }
+    previous, current := p.prev_tok, p.curr_tok
+    if current.pos.line > previous.pos.line ||
+        current.kind == .Close_Brace || current.kind == .Close_Paren || current.kind == .EOF {
+        offset := previous.pos.offset
+        if len(p.optional_semicolons) == 0 || p.optional_semicolons[len(p.optional_semicolons)-1][0] != offset {
+            append(&p.optional_semicolons, [2]int{offset, offset+1})
+        }
+    }
+}
+
 expect_semicolon :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 	if allow_token(p, .Semicolon) {
+        record_optional_semicolon(p)
 		expect_semicolon_newline_error(p, p.prev_tok, node)
 		return true
 	}
 
 	prev := p.prev_tok
 	if prev.kind == .Semicolon {
+        record_optional_semicolon(p)
 		expect_semicolon_newline_error(p, p.prev_tok, node)
 		return true
 	}
@@ -707,6 +724,7 @@ new_blank_ident :: proc(p: ^Parser, pos: tokenizer.Pos) -> ^ast.Ident {
 
 parse_ident :: proc(p: ^Parser) -> ^ast.Ident {
 	tok := p.curr_tok
+	if p.thor && tok.text == "or_panic" { tok.kind = .Ident }
 	pos := tok.pos
 	name := "_"
 	if tok.kind == .Ident {
@@ -1000,7 +1018,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				if p.curr_tok.text != ";" {
 					error(p, p.curr_tok.pos, "Expected ';', got %s", tokenizer.token_to_string(p.curr_tok))
 				} else {
-					expect_semicolon(p, nil)
+                    expect_token(p, .Semicolon)
 				}
 
 				if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
@@ -1149,6 +1167,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind: tokenizer.Token_Kind, docs: ^ast.Comment_Group) -> ^ast.Stmt {
 	elems: [dynamic]^ast.Expr
+	if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 
 	open, close: tokenizer.Token
 
@@ -2503,7 +2522,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			hp.type = type
 			return hp
 
-		case "file", "directory", "line", "procedure", "caller_location":
+		case "file", "directory", "line", "procedure", "caller_location", "branch_location":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			bd.tok  = tok
 			bd.name = name.text
@@ -2838,8 +2857,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		if p.thor && !p.allow_type {
 			type_follows := false
 			#partial switch p.curr_tok.kind {
-			case .Ident, .Typeid, .Pointer, .Open_Bracket, .Struct, .Union, .Enum,
-			     .Map, .Proc, .Dollar, .Distinct, .Matrix, .Bit_Set, .Hash:
+			case .Ident, .Typeid, .Pointer, .Open_Bracket, .Open_Paren, .Struct, .Union, .Enum,
+			     .Map, .Proc, .Dollar, .Distinct, .Matrix, .Bit_Set, .Bit_Field, .Hash:
 				type_follows = true
 			}
 			if literal || (!type_follows && (count == nil || len(elems) > 0)) {
@@ -3290,6 +3309,7 @@ parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
 	elems: [dynamic]^ast.Expr
 
 	for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+		if p.thor && p.curr_tok.text == "or_panic" && peek_token_kind(p, .Eq) { p.curr_tok.kind = .Ident }
 		elem := parse_value(p)
 		if p.curr_tok.kind == .Eq {
 			eq := expect_token(p, .Eq)
@@ -3361,7 +3381,22 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 			ellipsis = expect_token(p, .Ellipsis)
 		}
 
+		// Configuration keys are metadata, including parenthesized reserved names.
+		configuration_key := false
+		if p.thor && len(args) == 0 {
+			#partial switch directive in ast.unparen_expr(operand).derived_expr {
+			case ^ast.Basic_Directive:
+				configuration_key = directive.name == "config"
+			}
+		}
+		previous_thor := p.tok.thor
+		if p.thor && p.curr_tok.text == "or_panic" && peek_token_kind(p, .Eq) { p.curr_tok.kind = .Ident }
+		if configuration_key {
+			p.tok.thor = false
+			if p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
+		}
 		arg := parse_expr(p, false)
+		p.tok.thor = previous_thor
 		if p.curr_tok.kind == .Eq {
 			eq := expect_token(p, .Eq)
 
@@ -3516,6 +3551,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 		case .Period:
 			tok := expect_token(p, .Period)
+			if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 			#partial switch p.curr_tok.kind {
 			case .Ident:
 				field := parse_ident(p)
@@ -3559,6 +3595,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 		case .Arrow_Right:
 			tok := expect_token(p, .Arrow_Right)
+			if p.thor && p.curr_tok.text == "or_panic" { p.curr_tok.kind = .Ident }
 			#partial switch p.curr_tok.kind {
 			case .Ident:
 				field := parse_ident(p)

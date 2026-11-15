@@ -234,13 +234,9 @@ fn parse(args: &[String], root: &Path) -> std::result::Result<Config, String> {
     Ok(config)
 }
 fn usage() {
-    eprintln!("usage: thor new [-h] [--parent PARENT] [--open | --no-open] [--template TEMPLATE] [--gitignore] [--odin ODIN] name");
+    eprintln!("usage: thor new [--parent PARENT] [--open | --no-open] [--template TEMPLATE] [--gitignore] [--odin ODIN] name");
 }
 pub fn main(args: &[String], root: &Path) -> Result<i32> {
-    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        println!("Create a minimal Thor project; mkthor is a convenience wrapper around new.\n\nUsage: thor new NAME [--parent PATH] [--open | --no-open] [--template PATH] [--gitignore] [--odin PATH]");
-        return Ok(0);
-    }
     let config = match parse(args, root) {
         Ok(config) => config,
         Err(error) => {

@@ -1,0 +1,3913 @@
+[
+  {
+    "repo": "NateTheGreatt/odecs",
+    "commit": "e3ca0a5832c3bde119be92c722d98d690ea9f499",
+    "commands": [
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin"
+  },
+  {
+    "repo": "GuilHartt/muninn",
+    "commit": "7f11f779b54f8cfa8a78b7f2a01abc374e249af5",
+    "commands": [
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin"
+  },
+  {
+    "repo": "atomicptr/anima",
+    "commit": "07fb1860327197b030ce97cff2cf42d198c58557",
+    "commands": [
+      {
+        "name": "anima",
+        "args": [
+          "test",
+          "{tree}/anima",
+          "-vet",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/anima",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ]
+  },
+  {
+    "repo": "benjamindblock/odin-mustache",
+    "commit": "74990df9ce498acb2fca51264c137c5a8d80898d",
+    "commands": [
+      {
+        "name": ".",
+        "args": [
+          "test",
+          "{tree}/.",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/.",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ]
+  },
+  {
+    "repo": "Up05/toml_parser",
+    "commit": "10aee3739d1a144efe79e95d8a094e9c1563bb03",
+    "commands": [
+      {
+        "name": ".",
+        "args": [
+          "test",
+          "{tree}/.",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "decoder",
+        "args": [
+          "build",
+          "{tree}/.",
+          "-thread-count:1",
+          "-out:{artifact}"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/.",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ]
+  },
+  {
+    "repo": "blob1807/odin-aseprite",
+    "commit": "071a983cce302505bd14cc6e01e6736cc57a15cf",
+    "commands": [
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "tests",
+        "compare_native_test_failures": true
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin",
+    "patch": "aseprite-relative-fixtures.patch"
+  },
+  {
+    "repo": "odin-engine/ode_ecs",
+    "commit": "87e27c0271b3cb268ad02c41c44e8a9ce10fc337",
+    "commands": [
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "tests-serialization",
+        "args": [
+          "test",
+          "{tree}/tests/serialization",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "src",
+        "args": [
+          "test",
+          "{tree}/src",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "src-ode_core-tests",
+        "args": [
+          "test",
+          "{tree}/src/ode_core/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "src-ode_core-tests-maps",
+        "args": [
+          "test",
+          "{tree}/src/ode_core/tests/maps",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "src-ode_kdl-tests",
+        "args": [
+          "test",
+          "{tree}/src/ode_kdl/tests",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/serialization",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/ode_core/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/ode_core/tests/maps",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/ode_kdl/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ]
+  },
+  {
+    "repo": "Huseynteymurzade28/hnoss",
+    "commit": "0eec982209e77a13b5cd24890c6a5ea2f7c33080",
+    "commands": [
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-vet",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin"
+  },
+  {
+    "repo": "foldcat/oasync",
+    "commit": "c109f69142bfb699a52298ef08306ff5862f4e7f",
+    "commands": [
+      {
+        "name": ".",
+        "args": [
+          "test",
+          "{tree}/.",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-no-threaded-checker"
+        ],
+        "cwd": ".",
+        "timeout": 180,
+        "skip_repeated_runtime": true,
+        "runtime_note": "Unmodified native repetitions include bad frees and scheduler crashes. Compiled tests are retained for debugger-supervised execution."
+      },
+      {
+        "name": ".-compile",
+        "args": [
+          "build",
+          "{tree}/.",
+          "-build-mode:test",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-no-threaded-checker"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/.",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin"
+  },
+  {
+    "repo": "ariaghora/anvil",
+    "commit": "f370b58f1366dccb6f9a6e792dda3992bc7b5cef",
+    "commands": [
+      {
+        "name": "anvil-tensor",
+        "args": [
+          "test",
+          "{tree}/anvil/tensor",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-no-threaded-checker"
+        ],
+        "cwd": ".",
+        "timeout": 90
+      },
+      {
+        "name": "anvil-nn",
+        "args": [
+          "test",
+          "{tree}/anvil/nn",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-no-threaded-checker"
+        ],
+        "cwd": ".",
+        "timeout": 90
+      },
+      {
+        "name": "anvil-models-flux",
+        "args": [
+          "test",
+          "{tree}/anvil/models/flux",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-no-threaded-checker"
+        ],
+        "cwd": ".",
+        "timeout": 90
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/anvil/tensor",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/anvil/nn",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/anvil/models/flux",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/odin/odin-lang__Odin/odin",
+    "patch": "anvil-using-feature.patch"
+  },
+  {
+    "repo": "karl-zylinski/karl2d",
+    "commit": "72fe518ebdc8da33b7a4b65e5779cada7df43d14",
+    "commands": [
+      {
+        "name": "tests-coordinate_system",
+        "args": [
+          "test",
+          "{tree}/tests/coordinate_system",
+          "-define:KARL2D_RENDER_BACKEND=nil",
+          "-define:KARL2D_AUDIO_BACKEND=nil",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "skip_repeated_runtime": true,
+        "runtime_note": "Native AppKit initialization aborts on the test worker thread on macOS."
+      },
+      {
+        "name": "tests-memory_leak",
+        "args": [
+          "test",
+          "{tree}/tests/memory_leak",
+          "-define:KARL2D_RENDER_BACKEND=nil",
+          "-define:KARL2D_AUDIO_BACKEND=nil",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "skip_repeated_runtime": true,
+        "runtime_note": "Native AppKit initialization aborts on the test worker thread on macOS."
+      },
+      {
+        "name": "api-verifier",
+        "args": [
+          "run",
+          "{tree}/tools/api_verifier",
+          "-thread-count:1",
+          "-out:{artifact}"
+        ],
+        "cwd": "{source}"
+      },
+      {
+        "name": "tests-coordinate_system-compile",
+        "args": [
+          "build",
+          "{tree}/tests/coordinate_system",
+          "-build-mode:test",
+          "-define:KARL2D_RENDER_BACKEND=nil",
+          "-define:KARL2D_AUDIO_BACKEND=nil",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "tests-memory_leak-compile",
+        "args": [
+          "build",
+          "{tree}/tests/memory_leak",
+          "-build-mode:test",
+          "-define:KARL2D_RENDER_BACKEND=nil",
+          "-define:KARL2D_AUDIO_BACKEND=nil",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests/coordinate_system",
+        "-define:KARL2D_RENDER_BACKEND=nil",
+        "-define:KARL2D_AUDIO_BACKEND=nil",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/memory_leak",
+        "-define:KARL2D_RENDER_BACKEND=nil",
+        "-define:KARL2D_AUDIO_BACKEND=nil",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/odin/odin-lang__Odin/odin"
+  },
+  {
+    "repo": "pmbanugo/tina",
+    "commit": "d129f67d42686286c83783734874e2349b27600d",
+    "commands": [
+      {
+        "name": "native",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-all-packages",
+          "-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "simulation",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-all-packages",
+          "-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true",
+          "-define:TINA_SIM=true",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-all-packages",
+        "-thread-count:1",
+        "-build-mode:test"
+      ],
+      [
+        "{tree}/tests",
+        "-all-packages",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-define:TINA_SIM=true"
+      ]
+    ]
+  },
+  {
+    "repo": "BuLEEto/Skald",
+    "commit": "5625c75ec6c06b06bffbea21154f0d853a7dd1d9",
+    "commands": [
+      {
+        "name": "skald",
+        "args": [
+          "test",
+          "{tree}/skald",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/skald",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "environment": {
+      "THOR_INTEGRATION_MAX_RSS_MB": "12288"
+    }
+  },
+  {
+    "repo": "DanielGavin/ols",
+    "commit": "9b9711592bed66266311c361dd7a307ecc87025b",
+    "commands": [
+      {
+        "name": "server-tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-collection:src={tree}/src",
+          "-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "tests"
+      },
+      {
+        "name": "release",
+        "args": [
+          "build",
+          "{tree}/src",
+          "-collection:src={tree}/src",
+          "-define:VERSION=integration",
+          "-o:speed",
+          "-no-bounds-check",
+          "-thread-count:1",
+          "-out:{artifact}"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-collection:src={tree}/src",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "odin": "{work}/odin/odin-lang__Odin/odin",
+    "environment": {
+      "OLS_BUILTIN_FOLDER": "{source}/builtin",
+      "THOR_INTEGRATION_MAX_RSS_MB": "12288"
+    }
+  },
+  {
+    "repo": "kvist-lang/kvist",
+    "commit": "742f15846f40045477446e60a290c6b2c967125e",
+    "commands": [
+      {
+        "name": "tests",
+        "args": [
+          "test",
+          "{tree}/tests",
+          "-define:ODIN_TEST_LOG_LEVEL=warning",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "{source}",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "src-cli-kvist",
+        "args": [
+          "test",
+          "{tree}/src/cli/kvist",
+          "-define:ODIN_TEST_LOG_LEVEL=warning",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "{source}",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "src-odin-kvist_repl",
+        "args": [
+          "test",
+          "{tree}/src/odin/kvist_repl",
+          "-define:ODIN_TEST_LOG_LEVEL=warning",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "{source}",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "src-odin-kvist_repl_plan",
+        "args": [
+          "test",
+          "{tree}/src/odin/kvist_repl_plan",
+          "-define:ODIN_TEST_LOG_LEVEL=warning",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "{source}",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "src-odin-kvist_repl_program",
+        "args": [
+          "test",
+          "{tree}/src/odin/kvist_repl_program",
+          "-define:ODIN_TEST_LOG_LEVEL=warning",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "{source}",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "cli",
+        "args": [
+          "build",
+          "{tree}/src/cli/kvist",
+          "-o:speed",
+          "-thread-count:1",
+          "-out:{artifact}"
+        ],
+        "cwd": "{source}"
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/cli/kvist",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/odin/kvist_repl",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/odin/kvist_repl_plan",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/src/odin/kvist_repl_program",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "environment": {
+      "KVIST_ROOT": "{source}/src/kvist",
+      "THOR_INTEGRATION_MAX_RSS_MB": "8192"
+    },
+    "odin": "{work}/toolchains/dev-2026-08/odin-macos-arm64-nightly+2026-08-06/odin",
+    "translate_runtime_commands": true
+  },
+  {
+    "repo": "BuLEEto/Runa",
+    "commit": "ff8c008d0abba918408792bb587ce5a858fb2552",
+    "commands": [
+      {
+        "name": "tests-parse",
+        "args": [
+          "test",
+          "{tree}/tests/parse",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-runa",
+        "args": [
+          "test",
+          "{tree}/tests/runa",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-raster",
+        "args": [
+          "test",
+          "{tree}/tests/raster",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-atlas",
+        "args": [
+          "test",
+          "{tree}/tests/atlas",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-linebreak",
+        "args": [
+          "test",
+          "{tree}/tests/linebreak",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-bidi",
+        "args": [
+          "test",
+          "{tree}/tests/bidi",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-itemize",
+        "args": [
+          "test",
+          "{tree}/tests/itemize",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-normalize",
+        "args": [
+          "test",
+          "{tree}/tests/normalize",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-shape",
+        "args": [
+          "test",
+          "{tree}/tests/shape",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "tests-golden",
+        "args": [
+          "test",
+          "{tree}/tests/golden",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "thai",
+        "args": [
+          "test",
+          "{tree}/tests/linebreak",
+          "-define:RUNA_THAI_DICT=true",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": ".",
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "shape-ci-reph",
+        "args": [
+          "test",
+          "{tree}/tests/shape",
+          "-define:ODIN_TEST_NAMES=shape_test.test_devanagari_lone_reph,shape_test.test_devanagari_reph_punct_order_robust",
+          "-thread-count:1",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-out:{artifact}"
+        ],
+        "compare_native_test_failures": true
+      },
+      {
+        "name": "shape-ci-joining",
+        "args": [
+          "test",
+          "{tree}/tests/shape",
+          "-define:ODIN_TEST_NAMES=shape_test.test_joining_type_transparent_marks,shape_test.test_arabic_join_state_mark_is_transparent,shape_test.test_arabic_join_state_multiple_marks_transparent,shape_test.test_arabic_join_state_zwnj_still_breaks,shape_test.test_transparent_table_matches_ucd",
+          "-thread-count:1",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1",
+          "-out:{artifact}"
+        ],
+        "compare_native_test_failures": true
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests/parse",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/runa",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/raster",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/atlas",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/linebreak",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/bidi",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/itemize",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/normalize",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/shape",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ],
+      [
+        "{tree}/tests/golden",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ]
+  },
+  {
+    "repo": "Samudevv/runic",
+    "commit": "36a441b2c2e38246f7cea939ef3084d4499bb9da",
+    "commands": [
+      {
+        "name": ".",
+        "args": [
+          "test",
+          "{tree}/.",
+          "-all-packages",
+          "-vet",
+          "-warnings-as-errors",
+          "-collection:root={tree}",
+          "-collection:shared={tree}/shared",
+          "-debug",
+          "-define:YAML_STATIC=false",
+          "-extra-linker-flags:-L/opt/homebrew/opt/llvm@19/lib",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "{source}"
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/.",
+        "-all-packages",
+        "-collection:root={tree}",
+        "-collection:shared={tree}/shared",
+        "-debug",
+        "-define:YAML_STATIC=false",
+        "-extra-linker-flags:-L/opt/homebrew/opt/llvm@19/lib",
+        "-thread-count:1",
+        "-build-mode:test"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin",
+    "environment": {
+      "THOR_INTEGRATION_MAX_RSS_MB": "8192"
+    }
+  },
+  {
+    "repo": "dresswithpockets/odin-godot",
+    "commit": "93395901a76f62a9f2adff76c2eb38a185d91513",
+    "commands": [
+      {
+        "name": "bindgen-names",
+        "args": [
+          "test",
+          "{tree}/bindgen/names",
+          "-thread-count:1",
+          "-define:ODIN_TEST_THREADS=1",
+          "-define:ODIN_TEST_FANCY=false",
+          "-keep-executable",
+          "-out:{artifact}"
+        ]
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/bindgen/names",
+        "-build-mode:test",
+        "-all-packages",
+        "-thread-count:1"
+      ]
+    ],
+    "odin": "{work}/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin"
+  },
+  {
+    "repo": "krig/LISP",
+    "commit": "bd9537c4007e6345da34b286b8e3810edc20a70b",
+    "commands": [
+      {
+        "name": "interpreter",
+        "args": [
+          "build",
+          "{tree}/komplodin.odin",
+          "-file",
+          "-vet",
+          "-strict-style",
+          "-vet-unused",
+          "-debug",
+          "-thread-count:1",
+          "-out:{artifact}"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "scheme-test",
+        "args": [
+          "run",
+          "{tree}/komplodin.odin",
+          "-file",
+          "-debug",
+          "-vet",
+          "-strict-style",
+          "-vet-unused",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "--",
+          "{tree}/tests/test.scm"
+        ],
+        "exact_output": true
+      },
+      {
+        "name": "scheme-lisp15",
+        "args": [
+          "run",
+          "{tree}/komplodin.odin",
+          "-file",
+          "-debug",
+          "-vet",
+          "-strict-style",
+          "-vet-unused",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "--",
+          "{tree}/tests/lisp15.scm"
+        ],
+        "exact_output": true
+      },
+      {
+        "name": "scheme-exp",
+        "args": [
+          "run",
+          "{tree}/komplodin.odin",
+          "-file",
+          "-debug",
+          "-vet",
+          "-strict-style",
+          "-vet-unused",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "--",
+          "{tree}/tests/exp.scm"
+        ],
+        "exact_output": true
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/komplodin.thor",
+        "-file",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages"
+      ]
+    ],
+    "patch": "lisp-current-os-import.patch"
+  },
+  {
+    "repo": "hubastard/speedrun",
+    "commit": "19bcdb7d5a073429595fd12bebbe547c82db31a4",
+    "commands": [
+      {
+        "name": "host",
+        "args": [
+          "build",
+          "{tree}/host",
+          "-o:speed",
+          "-define:SPEEDRUN_VERSION=integration",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-define:ANDROID_AGENT=false"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/host",
+        "-thread-count:1",
+        "-build-mode:test",
+        "-all-packages",
+        "-define:ANDROID_AGENT=false",
+        "-define:SPEEDRUN_VERSION=integration"
+      ]
+    ],
+    "environment": {
+      "THOR_INTEGRATION_MAX_RSS_MB": "8192"
+    }
+  },
+  {
+    "repo": "odin-lang/Odin",
+    "commit": "537fac56cfee40cd51967d509ef089aa0a71444b",
+    "commands": [
+      {
+        "name": "core-normal",
+        "args": [
+          "test",
+          "{tree}/tests/core/normal.odin",
+          "-file",
+          "-all-packages",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-vet-style",
+          "-warnings-as-errors",
+          "-disallow-do",
+          "-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "core-speed",
+        "args": [
+          "test",
+          "{tree}/tests/core/speed.odin",
+          "-file",
+          "-all-packages",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-vet-style",
+          "-warnings-as-errors",
+          "-disallow-do",
+          "-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true",
+          "-o:speed",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "internal",
+        "args": [
+          "test",
+          "{tree}/tests/internal",
+          "-all-packages",
+          "-vet",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "vendor",
+        "args": [
+          "test",
+          "{tree}/tests/vendor",
+          "-all-packages",
+          "-vet",
+          "-extra-linker-flags:-L/opt/homebrew/opt/lua/lib",
+          "-thread-count:1",
+          "-out:{artifact}",
+          "-keep-executable",
+          "-define:ODIN_TEST_FANCY=false",
+          "-define:ODIN_TEST_THREADS=1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/tests/core/normal.thor",
+        "-file",
+        "-all-packages",
+        "-thread-count:1",
+        "-build-mode:test"
+      ],
+      [
+        "{tree}/tests/core/speed.thor",
+        "-file",
+        "-all-packages",
+        "-thread-count:1",
+        "-build-mode:test"
+      ]
+    ],
+    "odin": "{work}/odin/odin-lang__Odin/odin",
+    "initial_commands": [
+      "internal"
+    ],
+    "environment": {
+      "THOR_INTEGRATION_MAX_RSS_MB": "12288"
+    },
+    "source_fixtures": [
+      "tests/core/os/file.odin",
+      "tests/core/sys/posix/posix.odin",
+      "tests/core/sys/posix/structs.odin",
+      "tests/core/sys/kqueue/structs.odin"
+    ]
+  },
+  {
+    "repo": "odin-lang/examples",
+    "commit": "5d24fd4388552d2bd6baf830230dcd045cd7187d",
+    "commands": [
+      {
+        "name": "absolute_beginners-native",
+        "args": [
+          "check",
+          "{tree}/absolute_beginners",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "command_line_arguments-native",
+        "args": [
+          "check",
+          "{tree}/command_line_arguments",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "dir_info-native",
+        "args": [
+          "check",
+          "{tree}/dir_info",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "dynamic_arrays-native",
+        "args": [
+          "check",
+          "{tree}/dynamic_arrays",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "maps-native",
+        "args": [
+          "check",
+          "{tree}/maps",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "strings-native",
+        "args": [
+          "check",
+          "{tree}/strings",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "console-raw_console-native",
+        "args": [
+          "check",
+          "{tree}/console/raw_console",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "console-raw_console-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/console/raw_console",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "console-read_console_input-native",
+        "args": [
+          "check",
+          "{tree}/console/read_console_input",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "code_generation-native",
+        "args": [
+          "check",
+          "{tree}/code_generation",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "code_generation-generate_image_info-native",
+        "args": [
+          "check",
+          "{tree}/code_generation/generate_image_info",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "arena_allocator-native",
+        "args": [
+          "check",
+          "{tree}/arena_allocator",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "directx-d3d12_triangle_sdl2-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/directx/d3d12_triangle_sdl2",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "glfw-window-native",
+        "args": [
+          "check",
+          "{tree}/glfw/window",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "json-load_json-native",
+        "args": [
+          "check",
+          "{tree}/json/load_json",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "json-load_json_unmarshal-native",
+        "args": [
+          "check",
+          "{tree}/json/load_json_unmarshal",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "json-write_json_marshal-native",
+        "args": [
+          "check",
+          "{tree}/json/write_json_marshal",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "thread-basics-native",
+        "args": [
+          "check",
+          "{tree}/thread/basics",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "thread-sync_mutex-native",
+        "args": [
+          "check",
+          "{tree}/thread/sync_mutex",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "thread-pool-basic-native",
+        "args": [
+          "check",
+          "{tree}/thread/pool/basic",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "lua-global_variables-native",
+        "args": [
+          "check",
+          "{tree}/lua/global_variables",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "lua-hellope_lua-native",
+        "args": [
+          "check",
+          "{tree}/lua/hellope_lua",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "math-noise-draw_texture-native",
+        "args": [
+          "check",
+          "{tree}/math/noise/draw_texture",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "math-rand-markov-native",
+        "args": [
+          "check",
+          "{tree}/math/rand/markov",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-game_of_life-native",
+        "args": [
+          "check",
+          "{tree}/raylib/game_of_life",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-log-native",
+        "args": [
+          "check",
+          "{tree}/raylib/log",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-microui-native",
+        "args": [
+          "check",
+          "{tree}/raylib/microui",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-examples_template.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/examples_template.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shaders-shaders_mesh_instancing.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shaders/shaders_mesh_instancing.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_basic_shapes.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_basic_shapes.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_bouncing_ball.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_bouncing_ball.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_colors_palette.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_colors_palette.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_logo_raylib_anim.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_logo_raylib_anim.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_following_eyes.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_following_eyes.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_rectangle_scaling.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_rectangle_scaling.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_collision_area.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_collision_area.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-shapes-shapes_logo_raylib.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/shapes/shapes_logo_raylib.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-text-text_codepoints_loading.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/text/text_codepoints_loading.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-textures-textures_gif_player.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/textures/textures_gif_player.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-textures-textures_bunnymark.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/textures/textures_bunnymark.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-textures-textures_npatch_drawing.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/textures/textures_npatch_drawing.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-textures-textures_background_scrolling.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/textures/textures_background_scrolling.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-textures-textures_blend_modes.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/textures/textures_blend_modes.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-tetroid-native",
+        "args": [
+          "check",
+          "{tree}/raylib/tetroid",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-box2d-native",
+        "args": [
+          "check",
+          "{tree}/raylib/box2d",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_3d_camera_fps.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_3d_camera_fps.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_basic_window.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_basic_window.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-models-models_loading_iqm.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/models/models_loading_iqm.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_3d_camera_mode.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_3d_camera_mode.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_input_mouse_wheel.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_input_mouse_wheel.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_window_should_close.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_window_should_close.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_input_keys.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_input_keys.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_input_mouse.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_input_mouse.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_world_screen.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_world_screen.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_3d_camera_free.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_3d_camera_free.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_render_texture.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_render_texture.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_scissor_test.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_scissor_test.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-core-core_random_values.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/core/core_random_values.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-models-models_orthographic_projection.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/models/models_orthographic_projection.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-models-models_geometric_shapes.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/models/models_geometric_shapes.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-audio-audio_music_stream.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/audio/audio_music_stream.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-audio-audio_sound_loading.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/audio/audio_sound_loading.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "raylib-ports-audio-audio_module_playing.odin-native",
+        "args": [
+          "check",
+          "{tree}/raylib/ports/audio/audio_module_playing.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "directx-d3d11_minimal_sdl2-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/directx/d3d11_minimal_sdl2",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "directx-d3d11_minimal_sdl3-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/directx/d3d11_minimal_sdl3",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "opengl-minimal_sdl2-native",
+        "args": [
+          "check",
+          "{tree}/opengl/minimal_sdl2",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "vulkan-triangle_glfw-native",
+        "args": [
+          "check",
+          "{tree}/vulkan/triangle_glfw",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-minimal_sdl2-native",
+        "args": [
+          "check",
+          "{tree}/metal/minimal_sdl2",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-00-window-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/00-window",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-01-primitive-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/01-primitive",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-02-argbuffers-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/02-argbuffers",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-02-argbuffers-no-sdl-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/02-argbuffers-no-sdl",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-03-animation-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/03-animation",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-04-instancing-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/04-instancing",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-05-perspective-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/05-perspective",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-06-lighting-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/06-lighting",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-07-texturing-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/07-texturing",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-08-compute-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/08-compute",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "metal-learn_metal-09-compute-to-render-native",
+        "args": [
+          "check",
+          "{tree}/metal/learn_metal/09-compute-to-render",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "sdl2-chase_in_space-native",
+        "args": [
+          "check",
+          "{tree}/sdl2/chase_in_space",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "sdl2-hellope-native",
+        "args": [
+          "check",
+          "{tree}/sdl2/hellope",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "sdl2-microui-native",
+        "args": [
+          "check",
+          "{tree}/sdl2/microui",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "sdl3-microui-native",
+        "args": [
+          "check",
+          "{tree}/sdl3/microui",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "sdl3-gpu-native",
+        "args": [
+          "check",
+          "{tree}/sdl3/gpu",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "simd-approaches-native",
+        "args": [
+          "check",
+          "{tree}/simd/approaches",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "simd-basic-sum-native",
+        "args": [
+          "check",
+          "{tree}/simd/basic-sum",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "simd-motion-native",
+        "args": [
+          "check",
+          "{tree}/simd/motion",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "slices-prefer_to_pass_slices-native",
+        "args": [
+          "check",
+          "{tree}/slices/prefer_to_pass_slices",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wasm-js_wasm32-native",
+        "args": [
+          "check",
+          "{tree}/wasm/js_wasm32",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wasm-webgl-webgl_triangle-js_wasm32",
+        "args": [
+          "check",
+          "{tree}/wasm/webgl/webgl_triangle",
+          "-target:js_wasm32",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wgpu-microui-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/wgpu/microui",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wgpu-microui-js_wasm32",
+        "args": [
+          "check",
+          "{tree}/wgpu/microui",
+          "-target:js_wasm32",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wgpu-glfw-triangle-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/wgpu/glfw-triangle",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wgpu-glfw-triangle-js_wasm32",
+        "args": [
+          "check",
+          "{tree}/wgpu/glfw-triangle",
+          "-target:js_wasm32",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wgpu-sdl3-triangle-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/wgpu/sdl3-triangle",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "wgpu-sdl3-triangle-js_wasm32",
+        "args": [
+          "check",
+          "{tree}/wgpu/sdl3-triangle",
+          "-target:js_wasm32",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "win32-game_of_life-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/win32/game_of_life",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "win32-open_window-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/win32/open_window",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "win32-embedded_manifest-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/win32/embedded_manifest",
+          "-target:windows_amd64",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nanovg-example.odin-native",
+        "args": [
+          "check",
+          "{tree}/nanovg/example.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nanovg-fbo.odin-native",
+        "args": [
+          "check",
+          "{tree}/nanovg/fbo.odin",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-context-native",
+        "args": [
+          "check",
+          "{tree}/nbio/context",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-game-loop-native",
+        "args": [
+          "check",
+          "{tree}/nbio/game-loop",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-no-callbacks-native",
+        "args": [
+          "check",
+          "{tree}/nbio/no-callbacks",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-sendfile-native",
+        "args": [
+          "check",
+          "{tree}/nbio/sendfile",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-tcp-echo-native",
+        "args": [
+          "check",
+          "{tree}/nbio/tcp-echo",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-udp-echo-native",
+        "args": [
+          "check",
+          "{tree}/nbio/udp-echo",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "nbio-workers-native",
+        "args": [
+          "check",
+          "{tree}/nbio/workers",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "net-tcp_echo_server-client-native",
+        "args": [
+          "check",
+          "{tree}/net/tcp_echo_server/client",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "net-tcp_echo_server-server-native",
+        "args": [
+          "check",
+          "{tree}/net/tcp_echo_server/server",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "net-udp_echo_server-client-native",
+        "args": [
+          "check",
+          "{tree}/net/udp_echo_server/client",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "net-udp_echo_server-server-native",
+        "args": [
+          "check",
+          "{tree}/net/udp_echo_server/server",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "miniaudio-ports-simple_playback.odin-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/miniaudio/ports/simple_playback.odin",
+          "-target:windows_amd64",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "miniaudio-ports-engine_effects.odin-windows_amd64",
+        "args": [
+          "check",
+          "{tree}/miniaudio/ports/engine_effects.odin",
+          "-target:windows_amd64",
+          "-file",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "text_edit-native",
+        "args": [
+          "check",
+          "{tree}/text_edit",
+          "-vet",
+          "-vet-tabs",
+          "-strict-style",
+          "-warnings-as-errors",
+          "-thread-count:1"
+        ],
+        "cwd": "."
+      }
+    ],
+    "vet": [
+      [
+        "{tree}/absolute_beginners",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/command_line_arguments",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/dir_info",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/dynamic_arrays",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/maps",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/strings",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/console/raw_console",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/console/raw_console",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/console/read_console_input",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/code_generation",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/code_generation/generate_image_info",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/arena_allocator",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/directx/d3d12_triangle_sdl2",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/glfw/window",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/json/load_json",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/json/load_json_unmarshal",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/json/write_json_marshal",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/thread/basics",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/thread/sync_mutex",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/thread/pool/basic",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/lua/global_variables",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/lua/hellope_lua",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/math/noise/draw_texture",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/math/rand/markov",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/game_of_life",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/log",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/microui",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/examples_template.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shaders/shaders_mesh_instancing.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_basic_shapes.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_bouncing_ball.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_colors_palette.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_logo_raylib_anim.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_following_eyes.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_rectangle_scaling.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_collision_area.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/shapes/shapes_logo_raylib.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/text/text_codepoints_loading.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/textures/textures_gif_player.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/textures/textures_bunnymark.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/textures/textures_npatch_drawing.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/textures/textures_background_scrolling.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/textures/textures_blend_modes.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/tetroid",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/box2d",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_3d_camera_fps.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_basic_window.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/models/models_loading_iqm.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_3d_camera_mode.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_input_mouse_wheel.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_window_should_close.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_input_keys.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_input_mouse.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_world_screen.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_3d_camera_free.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_render_texture.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_scissor_test.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/core/core_random_values.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/models/models_orthographic_projection.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/models/models_geometric_shapes.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/audio/audio_music_stream.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/audio/audio_sound_loading.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/raylib/ports/audio/audio_module_playing.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/directx/d3d11_minimal_sdl2",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/directx/d3d11_minimal_sdl3",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/opengl/minimal_sdl2",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/vulkan/triangle_glfw",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/minimal_sdl2",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/00-window",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/01-primitive",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/02-argbuffers",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/02-argbuffers-no-sdl",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/03-animation",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/04-instancing",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/05-perspective",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/06-lighting",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/07-texturing",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/08-compute",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/metal/learn_metal/09-compute-to-render",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/sdl2/chase_in_space",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/sdl2/hellope",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/sdl2/microui",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/sdl3/microui",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/sdl3/gpu",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/simd/approaches",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/simd/basic-sum",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/simd/motion",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/slices/prefer_to_pass_slices",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wasm/js_wasm32",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wasm/webgl/webgl_triangle",
+        "-target:js_wasm32",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wgpu/microui",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wgpu/microui",
+        "-target:js_wasm32",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wgpu/glfw-triangle",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wgpu/glfw-triangle",
+        "-target:js_wasm32",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wgpu/sdl3-triangle",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/wgpu/sdl3-triangle",
+        "-target:js_wasm32",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/win32/game_of_life",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/win32/open_window",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/win32/embedded_manifest",
+        "-target:windows_amd64",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nanovg/example.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nanovg/fbo.thor",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/context",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/game-loop",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/no-callbacks",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/sendfile",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/tcp-echo",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/udp-echo",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/nbio/workers",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/net/tcp_echo_server/client",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/net/tcp_echo_server/server",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/net/udp_echo_server/client",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/net/udp_echo_server/server",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/miniaudio/ports/simple_playback.thor",
+        "-target:windows_amd64",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/miniaudio/ports/engine_effects.thor",
+        "-target:windows_amd64",
+        "-file",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ],
+      [
+        "{tree}/text_edit",
+        "-vet",
+        "-vet-tabs",
+        "-strict-style",
+        "-warnings-as-errors",
+        "-thread-count:1"
+      ]
+    ],
+    "odin": "{work}/odin/odin-lang__Odin/odin",
+    "initial_commands": [
+      "absolute_beginners-native"
+    ]
+  }
+]

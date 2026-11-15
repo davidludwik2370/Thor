@@ -55,7 +55,7 @@ def open_project(project):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog='thor new', description=__doc__)
+    parser = argparse.ArgumentParser(prog='thor new', add_help=False, description=__doc__)
     parser.add_argument('name', help='new project folder and source filename')
     parser.add_argument('--parent', type=Path, default=Path.cwd(), help='parent directory (default: current directory)')
     opening = parser.add_mutually_exclusive_group()

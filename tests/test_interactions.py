@@ -104,7 +104,7 @@ main::proc(){value:=VALUE;{value:=3;assert(value==3)};assert(value==2&&selected(
         with tempfile.TemporaryDirectory(prefix='thor-cancellation-') as directory:
             root=Path(directory);scratch=root/'scratch';scratch.mkdir()
             source=root/'main.thor';source.write_text('package main\nspin::fn()->int{for{};return 0}\nVALUE::spin()\nmain::proc(){_=VALUE}\n')
-            process=subprocess.Popen([str(base.THOR),'check',str(source),'--no-cache','--run-timeout','60','--output-dir',str(root/'out')],
+            process=subprocess.Popen([str(base.THOR),'check',str(source),'--no-cache','--run-timeout','0','--output-dir',str(root/'out')],
                 stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'TMPDIR':str(scratch)})
             try:
                 deadline=time.monotonic()+15

@@ -721,7 +721,7 @@ main::proc(){
                     self.assertIn(str(entry), result.stderr)
                     self.assertNotIn('^', result.stderr)
                 else:
-                    self.assertIn(str(output / 'main.odin'), result.stderr)
+                    self.assertIn(str(next(output.rglob('main.odin'))), result.stderr)
 
     def test_missing_import_has_a_source_range(self):
         self.at('package main\nimport "nonexistent"\nmain :: proc(){}\n', 'import', message='imported package does not exist')
@@ -771,10 +771,10 @@ main::proc(){
 
     def test_source_map_sidecar_is_complete_and_round_trips(self):
         entry, output, _, _ = self.invoke('package main\nmain :: proc(){ a := [1,2]; _ = a }\n', success=True,flags=['-debug'])
-        data = json.loads((output / 'main.odin.map.json').read_text())
+        data = json.loads(next(output.rglob('main.odin.map.json')).read_text())
         self.assertEqual(data['version'], 1)
         self.assertEqual(data['sources'][str(entry)], entry.read_text())
-        raw = (output / 'main.odin').read_bytes()
+        raw = next(output.rglob('main.odin')).read_bytes()
         segments = data['segments']
         self.assertEqual(segments[0][0], 0)
         self.assertEqual(segments[-1][1], len(raw))

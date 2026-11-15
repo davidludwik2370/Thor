@@ -21,6 +21,7 @@ pub(crate) struct ResolverSeed {
     evaluated: BTreeMap<Ref, serde_json::Value>,
     logical_constants: BTreeMap<Ref, serde_json::Value>,
     logical_activation: Option<bool>,
+    set_activation: Option<bool>,
     bound_types: BTreeMap<(Ref, String), Type>,
     bound_constants: BTreeMap<(Ref, String), (Type, serde_json::Value)>,
     using_symbols: HashMap<Ref, usize>,
@@ -62,6 +63,7 @@ impl<'a> Resolver<'a> {
             evaluated: self.evaluated,
             logical_constants: self.logical_constants,
             logical_activation: self.logical_activation.get().copied(),
+            set_activation: self.set_activation.get().copied(),
             bound_types: self.bound_types,
             bound_constants: self.bound_constants,
             using_symbols: self.using_symbols,
@@ -96,6 +98,7 @@ impl ResolverSeed {
             immutable_markers: self.markers, flags: self.flags, evaluated: self.evaluated,
             logical_constants: self.logical_constants,
             logical_activation: self.logical_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
+            set_activation: self.set_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
             bound_types: self.bound_types, bound_constants: self.bound_constants,
             using_symbols: self.using_symbols, contexts_ready: self.contexts_ready,
         }
@@ -129,6 +132,7 @@ impl ResolverSeed {
                 .logical_activation
                 .map(std::cell::OnceCell::from)
                 .unwrap_or_default(),
+            set_activation: self.set_activation.map(std::cell::OnceCell::from).unwrap_or_default(),
             bound_types: self.bound_types.clone(),
             bound_constants: self.bound_constants.clone(),
             using_symbols: self.using_symbols.clone(),

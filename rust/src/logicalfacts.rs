@@ -1,6 +1,18 @@
 //! Reference activation and operator routing shared by lowering and scheduling.
 use super::*;
 impl Resolver<'_> {
+    pub(crate) fn logical_type_position(&self, r: Ref) -> bool {
+        let source = &self.sources[r.file];
+        let node = source.node(r.node);
+        if node.kind != "Ident" { return false; }
+        !node.parent.is_some_and(|parent| {
+            let owner = source.node(parent);
+            matches!(owner.kind.as_str(), "EnumType" | "ImplicitSelector" | "File")
+                || matches!(owner.kind.as_str(), "Selector" | "FieldValue")
+                    && source.role(parent, "field") == Some(r.node)
+                || owner.kind == "Field" && source.group(parent, "names").contains(&r.node)
+        })
+    }
     pub(crate) fn logical_enabled(&self, file: usize) -> bool {
         self.sources[file].thor
             && *self.logical_activation.get_or_init(|| {
@@ -20,6 +32,7 @@ impl Resolver<'_> {
                                 || source.thor
                                     && node.kind == "Ident"
                                     && matches!(source.text(NodeId(index)), "Integer" | "Rational")
+                                    && self.logical_type_position(Ref { file, node: NodeId(index) })
                                     && self
                                         .symbol(Ref {
                                             file,

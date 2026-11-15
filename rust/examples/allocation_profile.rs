@@ -89,6 +89,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let flags = arguments.collect();
     let started = Instant::now();
     let mut project = Project::new(Options {
+            native_policy_probe: false,
+            odin_compatible: false,
         command: "transpile".into(),
         entry,
         output: Some(output),

@@ -38,7 +38,7 @@ function byteOffset(unit, line, column = 1, native = false) {
 }
 const generatedKinds = new Set(['expression-helper', 'support', 'import', 'pure-contract',
     'pure-type-validator', 'pure-procedure', 'membership-helper', 'switch-validation', 'immutable', 'run-helper', 'debug-capture', 'memory-debug', 'typed-loop-check',
-    'sequence-dispatch','sequence-type','sequence-index','sequence-lower','sequence-upper']);
+    'sequence-dispatch','sequence-type','sequence-index','sequence-lower','sequence-upper','source-location-support']);
 
 function typeQueryRanges(bytes, regions = []) {
     // Generated type witnesses repeat source expressions without executing

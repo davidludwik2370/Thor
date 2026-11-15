@@ -16,9 +16,11 @@ use std::{
 
 #[derive(Clone)]
 pub struct Frontend {
+    pub odin_syntax: bool,
     pub executable: PathBuf,
     pub fingerprint: String,
     pub odin: PathBuf,
+    pub odin_root: String,
     pub cache_dir: Option<PathBuf>,
     pub normalized_cache: bool,
     pub test: bool,
@@ -84,15 +86,24 @@ fn odin_sources(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     }
     Ok(())
 }
-pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf)> {
+pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf, String)> {
     let _phase = crate::profile::span("parser.bootstrap");
     let odin = executable(odin)?;
     let version = Command::new(&odin).arg("version").output()?;
     if !version.status.success() {
         return Err(Error::new("could not query Odin version"));
     }
+    let sdk = Command::new(&odin).arg("root").output()?;
+    if !sdk.status.success() { return Err(Error::new("could not query Odin SDK root")); }
+    let odin_root = String::from_utf8_lossy(&sdk.stdout).trim().to_string();
+    let builder = if let Some(name) = env::var_os("THOR_FRONTEND_ODIN") {
+        executable(&name.to_string_lossy())?
+    } else { odin.clone() };
     let mut bytes = odin.to_string_lossy().as_bytes().to_vec();
+    bytes.extend_from_slice(b"frontend-bootstrap-custom-synchronizes-v1");
     bytes.extend_from_slice(&version.stdout);
+    bytes.extend_from_slice(builder.to_string_lossy().as_bytes());
+    if builder != odin { bytes.extend_from_slice(&Command::new(&builder).arg("version").output()?.stdout); }
     let source_root = root.join("frontend");
     let mut files = vec![];
     odin_sources(&source_root, &mut files)?;
@@ -115,10 +126,11 @@ pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf)> {
         let work = directory.join(format!("rust-frontend-{}-{}", std::process::id(), unique()));
         fs::create_dir(&work)?;
         let intermediate = work.join(format!("frontend{}", env::consts::EXE_SUFFIX));
-        let result = Command::new(&odin)
+        let result = Command::new(&builder)
             .arg("build")
             .arg(source_root)
             .arg("-o:speed")
+            .arg("-custom-attribute:synchronizes")
             .arg(format!("-out:{}", intermediate.display()))
             .status();
         let result = match result {
@@ -131,7 +143,7 @@ pub fn bootstrap(root: &Path, odin: &str) -> Result<(PathBuf, PathBuf)> {
         let _ = fs::remove_dir_all(work);
         result?;
     }
-    Ok((binary, odin))
+    Ok((binary, odin, odin_root))
 }
 fn unique() -> String {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -224,8 +236,11 @@ impl Frontend {
         };
         let raw = std::str::from_utf8(&bytes)
             .map_err(|_| Error::new(format!("source is not UTF-8: {}", path.display())))?;
-        let thor = path.extension().is_some_and(|ext| ext == "thor");
+        let thor = !self.odin_syntax && path.extension().is_some_and(|ext| ext == "thor");
         let mut args = vec![path.to_string_lossy().into_owned()];
+        if !self.odin_root.is_empty() {
+            args.push(format!("--odin-root={}", self.odin_root));
+        }
         if !thor {
             args.push("--odin".into());
         }

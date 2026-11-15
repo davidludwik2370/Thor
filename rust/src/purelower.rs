@@ -214,7 +214,8 @@ impl Lower<'_, '_> {
                     } else {
                         format!("{type_of}({value})")
                     };
-                    let validator = self.pure_validator(root.node);
+                    let parameter_type = self.typ(name);
+                    let validator = self.pure_validator_for(root.node, parameter_type);
                     let token = self.pure_type_site(
                         site,
                         root.node,
@@ -230,7 +231,8 @@ impl Lower<'_, '_> {
         for (index, result) in results.into_iter().enumerate() {
             if let Some(site) = result.annotation.or(result.default) {
                 let typ = self.pure_result_type(&result)?;
-                let validator = self.pure_validator(root.node);
+                let result_type = self.resolver.specialized_type(self.reference(site), &crate::semantics::Substitutions::new());
+                let validator = self.pure_validator_for(root.node, result_type);
                 let token = self.pure_type_site(
                     site,
                     root.node,
@@ -524,9 +526,9 @@ impl Lower<'_, '_> {
                 .record_fields(typ)
                 .iter()
                 .any(|(_, typ)| self.pure_owns(typ, seen)),
-            Type::Union(owner) => self
+            Type::Union(..) => self
                 .resolver
-                .union_variants(*owner)
+                .union_variants(typ)
                 .iter()
                 .any(|typ| self.pure_owns(typ, seen)),
             Type::BigInteger

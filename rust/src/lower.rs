@@ -63,6 +63,10 @@ mod switches;
 mod typedloops;
 #[path = "temporaries.rs"]
 mod temporaries;
+#[path = "sourceidentity.rs"]
+mod sourceidentity;
+#[path = "branchlocations.rs"]
+mod branchlocations;
 
 #[derive(Clone, Debug)]
 pub struct Hint {
@@ -71,6 +75,11 @@ pub struct Hint {
     pub semantic: Option<Type>,
     pub element_only: bool,
     pub plain_array: bool,
+}
+#[derive(Clone)]
+struct Capture {
+    value: Code,
+    reference: Option<Code>,
 }
 pub struct Lower<'a, 'r> {
     pub source: &'a Source,
@@ -85,10 +94,13 @@ pub struct Lower<'a, 'r> {
     checked_targets: BTreeMap<NodeId, Vec<Ref>>,
     emitting_variants: HashSet<NodeId>,
     mutating_params: HashSet<NodeId>,
-    captures: Vec<HashMap<usize, Code>>,
+    captures: Vec<HashMap<usize, Capture>>,
     fstring_plans: HashMap<NodeId, HashSet<NodeId>>,
     fstring_frames: Vec<(String, HashSet<NodeId>)>,
     fstring_busy: HashSet<NodeId>,
+    resource_busy: HashSet<NodeId>,
+    branch_captures: Vec<(NodeId, String)>,
+    branch_procedures: HashSet<NodeId>,
     querying: usize,
     logical: bignumbers::State,
     temporary_serial: usize,
@@ -163,6 +175,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             fstring_plans: HashMap::new(),
             fstring_frames: vec![],
             fstring_busy: HashSet::new(),
+            resource_busy: HashSet::new(),
+            branch_captures: vec![],
+            branch_procedures: HashSet::new(),
             querying: 0,
             logical: bignumbers::State::default(),
             temporary_serial: 0,
@@ -442,7 +457,8 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
     fn module(&mut self, name: &str) -> String {
         let alias = format!("{}{name}", self.prefix);
-        self.modules.insert(alias.clone(), format!("thor:{name}"));
+        let collection=&self.source.support_collection;
+        self.modules.insert(alias.clone(), format!("{collection}:{name}"));
         alias
     }
     fn native(&mut self, name: &str) -> String {
@@ -496,6 +512,15 @@ impl<'a, 'r> Lower<'a, 'r> {
             let storage = self.native_storage()?;
             let mut replacements = storage.replacements;
             replacements.extend(self.native_default_guards());
+            for i in 0..self.source.nodes.len() {
+                let id=NodeId(i);
+                if let Some(code)=self.source_directive(id) {replacements.push((self.source.node(id).span,code));}
+                else if self.resource_argument(id) && self.source.node(id).kind!="Literal" {
+                    replacements.retain(|(span,_)| !self.source.node(id).span.contains(*span));
+                    let code=self.render(id,None,true)?;
+                    replacements.push((self.source.node(id).span,code));
+                }
+            }
             if let Some(view) = &self.evaluation {
                 for (id, value) in &view.values {
                     if view.retains(self.source, *id) {
@@ -526,7 +551,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             inserts.extend(storage.inserts);
             for index in 0..self.source.nodes.len() {
                 let call=NodeId(index);
-                if self.source.node(call).kind=="Call" {inserts.extend(self.default_arguments(call)?);}
+                if self.source.node(call).kind=="Call" {inserts.extend(self.default_arguments(call)?);inserts.extend(self.caller_arguments(call)?);}
             }
             for (declaration, parts) in &self.declaration_helpers {
                 inserts.push((
@@ -567,7 +592,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 ));
             }
             return Ok((
-                Code::concat(code).finish(),
+                self.finish_branch_locations(Code::concat(code).finish()),
                 std::mem::take(&mut self.errors),
             ));
         }
@@ -612,7 +637,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             ));
         }
         Ok((
-            Code::concat(code).finish(),
+            self.finish_branch_locations(Code::concat(code).finish()),
             std::mem::take(&mut self.errors),
         ))
     }
@@ -895,6 +920,15 @@ impl<'a, 'r> Lower<'a, 'r> {
         let result = self.render_inner(id, expected, constant);
         self.checked_mode = old;
         let mut code = result?.annotated(self.source.node(id).kind.as_str());
+        let node = self.source.node(id);
+        if node.kind == "Assignment"
+            && (node.data["bounds_check"].as_i64().unwrap_or_default() != 0
+                || node.data["type_assert_check"].as_i64().unwrap_or_default() != 0)
+        {
+            // A statement directive can precede a native assignment or block,
+            // while an assignment helper is a call statement.
+            code = Code::concat([self.g("{\n", id), code, self.g("\n}", id)]);
+        }
         if self.source.node(id).parent.is_some_and(|parent| {
             self.source.node(parent).kind == "Call" && self.source.role(parent, "callee") == Some(id)
         }) {
@@ -923,6 +957,23 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
 
     fn render_inner(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
+        if self.source.node(id).kind == "Ident" && self.source.node(id).parent.is_some_and(|parent| self.source.node(parent).kind == "Attribute"
+            || self.source.node(parent).kind == "FieldValue" && self.source.role(parent, "field") == Some(id)
+                && self.source.ancestors(parent).any(|owner| self.source.node(owner).kind == "Attribute")) {
+            return Ok(self.copy(self.source.node(id).span));
+        }
+        if self.source.node(id).parent.is_some_and(|parent| {
+            self.source.node(parent).kind == "Call"
+                && self.source.role(parent, "callee").is_some_and(|callee| self.source.text(callee) == "#config")
+                && self.source.group(parent, "args").first() == Some(&id)
+        }) {
+            return Ok(self.copy(self.source.node(id).span));
+        }
+        if self.resource_argument(id) && self.source.node(id).kind!="Literal" && self.resource_busy.insert(id) {
+            let code=self.render_inner(id,expected,constant);
+            self.resource_busy.remove(&id);
+            return code.map(|code|self.original_resource(id,code));
+        }
         if let Some(message) = self.blocked.get(&id).cloned() {
             return Ok(self.error_token(id, &message));
         }
@@ -937,7 +988,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 self.evaluated_busy.insert(id);
                 let result = self.specialized_result(id, expected, constant);
                 self.evaluated_busy.remove(&id);
-                return result;
+                return result.map(|code| code.expansion(&self.source.path, self.source.node(id).span));
             }
             if self.evaluation_scheduled
                 && self.source.node(id).kind == "Run"
@@ -957,9 +1008,10 @@ impl<'a, 'r> Lower<'a, 'r> {
                 self.evaluated_busy.insert(id);
                 let result = self.evaluation_result(id, &value, constant);
                 self.evaluated_busy.remove(&id);
-                return result;
+                return result.map(|code| code.expansion(&self.source.path, self.source.node(id).span));
             }
         }
+        if let Some(code)=self.source_directive(id) {return Ok(code);}
         if self.checked_mode {
             if let Some(name) = self.pure_ignored.get(&id) {
                 return Ok(self.g(name, id));
@@ -1219,8 +1271,8 @@ impl<'a, 'r> Lower<'a, 'r> {
         if kind == "Ident" {
             if let Some(symbol) = self.capture_variable(id) {
                 for captures in self.captures.iter().rev() {
-                    if let Some(code) = captures.get(&symbol) {
-                        return Ok(code.at_use(&self.source.path, node.span));
+                    if let Some(capture) = captures.get(&symbol) {
+                        return Ok(capture.value.at_use(&self.source.path, node.span));
                     }
                 }
             }
@@ -1582,7 +1634,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                 code,
             ));
         }
-        let mut inserts = if kind=="Call" {self.default_arguments(id)?}else{vec![]};
+        let mut inserts = if kind=="Call" {let mut parts=self.default_arguments(id)?;parts.extend(self.caller_arguments(id)?);parts}else{vec![]};
         if let Some(attribute) = readonly_data {
             inserts.push((node.span.start, self.gen(attribute, node.span, "readonly-data")));
         }
@@ -1843,6 +1895,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             let name=format!("{helper}_set");
             names.push(name.clone());
             parts.push_str(&format!("\n@(private=\"file\")\n{name} :: proc \"contextless\"(values:{sets}.Set($E),value:E)->bool{{return value in values.table}}\n"));
+            let pointer = format!("{helper}_pointer");
+            names.push(pointer.clone());
+            parts.push_str(&format!("\n@(private=\"file\")\n{pointer} :: proc \"contextless\"(values:^$C,value:$E)->bool{{return {helper}(values^,value)}}\n"));
             parts.push_str(&format!(
                 "\n@(private=\"file\")\n{helper} :: proc{{{}}}\n",
                 names.join(", ")
@@ -2302,23 +2357,37 @@ impl<'a, 'r> Lower<'a, 'r> {
         for (i, (symbol, child)) in variables.iter().enumerate() {
             let byref=self.reference_capture(*symbol);
             let parameter = format!("{}capture_{i}", self.prefix);
+            // Infer the complete capture type. Native SOA row references
+            // support dereferencing but do not match an ordinary ^$T.
             params.push(format!(
-                "{parameter}: {}${}Capture_{i}",
-                if byref { "^" } else { "" },
+                "{parameter}: ${}Capture_{i}",
                 self.prefix
             ));
-            let argument = self.render(*child, None, false)?;
-            args.push((if byref {
-                Code::concat([self.g("&(", id), argument, self.g(")", id)])
+            let reference = self.captures.iter().rev()
+                .find_map(|scope| scope.get(symbol))
+                .and_then(|capture| capture.reference.clone());
+            // Forward an existing reference. Reborrowing a dereferenced SOA
+            // row is invalid in Odin, and ordinary pointers can pass directly.
+            let argument = if let Some(reference) = reference {
+                reference.at_use(&self.source.path, self.source.node(*child).span)
             } else {
-                argument
-            }).region(&self.source.path, span, "debug-capture"));
+                let value = self.render(*child, None, false)?;
+                if byref {
+                    Code::concat([self.g("&(", id), value, self.g(")", id)])
+                } else {
+                    value
+                }
+            };
+            args.push(argument.region(&self.source.path, span, "debug-capture"));
             aliases.insert(
                 *symbol,
-                self.g(
-                    format!("({parameter}{})", if byref { "^" } else { "" }),
-                    *child,
-                ),
+                Capture {
+                    value: self.g(
+                        format!("({parameter}{})", if byref { "^" } else { "" }),
+                        *child,
+                    ),
+                    reference: byref.then(|| self.g(&parameter, *child)),
+                },
             );
         }
         if let Some((pointer, _)) = self.fstring_frames.last() {
@@ -2327,6 +2396,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             params.push(format!("{pointer}: ^{module}.Scope"));
             args.push(self.g(pointer, id));
         }
+        let branch_capture = self.capture_branch_location(id, &mut params, &mut args);
         let returns = if let Some(result) = result {
             if let Some(count) = result
                 .strip_prefix("tuple:")
@@ -2363,6 +2433,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         if !self.helpers.contains_key(&key) {
             self.helpers.insert(key.clone(), self.g("", id));
             self.captures.push(aliases);
+            if let Some(capture) = &branch_capture {
+                self.branch_captures.push(capture.clone());
+            }
             let mut cleanup = None;
             for child in std::iter::once(id).chain(self.source.descendants(id)) {
                 if self.source.node(child).kind != "Call" {
@@ -2410,7 +2483,20 @@ impl<'a, 'r> Lower<'a, 'r> {
                 build(self)
             };
             self.captures.pop();
+            if branch_capture.is_some() {
+                self.branch_captures.pop();
+            }
             let body = body?;
+            let bounds = match self.checking_state(id, "bounds_check") {
+                -1 => "#no_bounds_check ",
+                1 => "#bounds_check ",
+                _ => "",
+            };
+            let body = match self.checking_state(id, "type_assert_check") {
+                -1 => Code::concat([self.g("#no_type_assert {\n", id), body, self.g("\n}", id)]),
+                1 => Code::concat([self.g("#type_assert {\n", id), body, self.g("\n}", id)]),
+                _ => body,
+            };
             let private = if owner.0 == 0 {
                 "@(private=\"file\")\n"
             } else {
@@ -2432,7 +2518,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             };
             let header = self.g(
                 format!(
-                    "\n{private}{name} :: proc \"{convention}\"({}){returns} {}{{\n",
+                    "\n{private}{name} :: proc \"{convention}\"({}){returns} {bounds}{}{{\n",
                     params.join(", "),
                     if flavor == "extrema_optional" || flavor == "fstring_optional_ok" {
                         "#optional_ok "

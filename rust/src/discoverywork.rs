@@ -34,10 +34,9 @@ impl Work {
             crate::profile::count("discovery.source_scans", 1);
             for (index, node) in source.nodes.iter().enumerate() {
                 let reference = Ref {file, node:NodeId(index)};
-                if !source.shared_native && !source.path.starts_with(runtime)
-                    && (matches!(node.kind.as_str(), "Selector" | "Call")
-                        || node.kind == "Ident" && resolver.expression_reference(reference)) {
-                    self.queries.push(reference);
+                if !source.shared_native && !source.path.starts_with(runtime) && node.immutable {
+                    self.queries.extend(source.group(reference.node, "names").iter()
+                        .map(|node| Ref {file, node:*node}));
                 }
                 if node.data["pure"] == true { self.roots.push(reference); }
                 if node.kind == "Run" {

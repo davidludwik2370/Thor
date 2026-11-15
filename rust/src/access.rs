@@ -2,6 +2,19 @@
 use super::*;
 
 impl Lower<'_, '_> {
+    pub(super) fn checking_state(&self, id: NodeId, key: &str) -> i64 {
+        for site in std::iter::once(id).chain(self.source.ancestors(id)) {
+            let node = self.source.node(site);
+            let state = node.data[key].as_i64().unwrap_or_default();
+            if state != 0 { return state; }
+            if node.kind == "Procedure" {
+                return self.source.role(site, "type")
+                    .and_then(|typ| self.source.node(typ).data[key].as_i64())
+                    .unwrap_or_default();
+            }
+        }
+        0
+    }
     /// Reference Expressions.reference_capture follows projected storage owners.
     pub(super) fn reference_capture(&mut self,index:usize)->bool{
         let mut index=index;let mut seen=HashSet::new();
@@ -33,7 +46,26 @@ impl Lower<'_, '_> {
         if self.source.node(id).kind == "ImplicitSelector" {
             return false;
         }
-        match self.typ(id) {
+        let typ = self.typ(id);
+        if let Some(symbol) = self.resolver.symbol(self.reference(id)).filter(|_|
+            matches!(&typ, Type::Scalar {name,..} if matches!(name.as_str(), "int" | "i8" | "i16" | "i32" | "u8" | "u16" | "u32"))) {
+            let symbol = self.resolver.symbols[symbol].clone();
+            let source = &self.resolver.sources[symbol.reference.file];
+            if source.node(symbol.reference.node).kind == "Range" && symbol.index == 0
+                && source.node(symbol.name_node).kind == "Ident" {
+                if let Some(interval) = source.role(symbol.reference.node, "expr") {
+                    if source.node(interval).kind == "Binary" && source.node(interval).op == "..<" {
+                        if let Some(start) = source.role(interval, "left") {
+                            if self.resolver.constant_int(Ref {file:symbol.reference.file,node:start})
+                                .is_some_and(|start| start >= 0) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        match typ {
             Type::Enum(_) => false,
             Type::Scalar { name, .. } if name.starts_with('u') && !name.starts_with("u128") => {
                 false
@@ -73,13 +105,25 @@ impl Lower<'_, '_> {
         let m = format!("{}meta", self.prefix);
         Ok(format!("(({m}.type_is_array({typ}) && !{m}.type_is_enumerated_array({typ})) || {m}.type_is_slice({typ}) || {m}.type_is_dynamic_array({typ}) || {m}.type_is_fixed_capacity_dynamic_array({typ}) || {m}.type_is_string({typ}))"))
     }
-    pub(super) fn write_access(&self, id: NodeId) -> bool {
+    pub(super) fn write_access(&mut self, id: NodeId) -> bool {
         if self.address_nodes.contains(&id) {
             return true;
         }
         for parent in self.source.ancestors(id) {
             if self.address_nodes.contains(&parent) {
                 return true;
+            }
+            if matches!(self.source.node(parent).kind.as_str(), "Index" | "Slice" | "Deref") {
+                if let Some(base) = self.source.role(parent, "expr") {
+                    let typ = self.typ(base);
+                    let mut shape = &typ;
+                    while let Type::Nominal(_, inner) | Type::Soa(inner) = shape { shape = inner; }
+                    if matches!(shape, Type::Slice(_) | Type::Dynamic(_) | Type::Pointer(_)) {
+                        // Writing through a copied reference header leaves its
+                        // containing value unchanged.
+                        return false;
+                    }
+                }
             }
             let node = self.source.node(parent);
             match node.kind.as_str() {
@@ -208,6 +252,12 @@ impl Lower<'_, '_> {
     }
     pub(super) fn access(&mut self, id: NodeId, constant: bool) -> Result<Option<Code>> {
         let base = self.role(id, "expr")?;
+        if self.source.ancestors(id).take_while(|parent| {
+            matches!(self.source.node(*parent).kind.as_str(), "Paren" | "TypeAssertion" | "Unary")
+        }).any(|parent| self.source.node(parent).kind == "TypeAssertion"
+            && self.source.node(parent).parent.is_some_and(|owner| self.source.node(owner).kind == "Unary" && self.source.node(owner).op == "&")) {
+            return Ok(None);
+        }
         if self.index_uses_type_operand(id) {
             return Ok(None);
         }
@@ -229,6 +279,16 @@ impl Lower<'_, '_> {
         } else {
             vec![self.source.role(id, "low"), self.source.role(id, "high")]
         };
+        if index && bounds[0].is_some_and(|mut key| {
+            while self.source.node(key).kind == "Paren" {
+                let Some(inner) = self.source.role(key, "expr") else { break; };
+                key = inner;
+            }
+            self.source.node(key).kind == "Compound" && self.source.role(key, "type").is_none()
+        }) {
+            // Untyped composite keys obtain their type from the native map.
+            return Ok(None);
+        }
         if !bounds
             .iter()
             .flatten()
@@ -295,11 +355,50 @@ impl Lower<'_, '_> {
             code.push(self.g("]", id));
             return Ok(Some(Code::concat(code)));
         }
+        if index {
+            if let Some(symbol) = self.resolver.symbol(self.reference(base)) {
+                let symbol = &self.resolver.symbols[symbol];
+                let source = &self.resolver.sources[symbol.reference.file];
+                let by_reference_row = source.node(symbol.reference.node).kind == "Range"
+                    && symbol.index == 0 && source.node(symbol.name_node).kind == "Unary"
+                    && source.node(symbol.name_node).op == "&";
+                let mut shape = &typ;
+                while let Type::Nominal(_, inner) = shape {shape = inner;}
+                if let Type::Array {length:Some(length), ..} = shape {
+                    if by_reference_row {
+                        // Native SOA array rows use a proxy lvalue. Keep its
+                        // index syntax intact instead of reborrowing the row
+                        // inside a generated procedure.
+                        let length = *length;
+                        let original = self.render(base, None, false)?;
+                        let bound = bounds[0].unwrap();
+                        let value = self.render(bound, None, false)?;
+                        let sequence = self.module("sequence");
+                        return Ok(Some(Code::concat([
+                            original,
+                            self.g(format!("[{sequence}.normalize({length},"), id),
+                            value,
+                            self.g(format!(",{},checked={})]",self.source_location(bound),
+                                self.checking_state(id,"bounds_check") != -1),id),
+                        ])));
+                    }
+                }
+            }
+        }
         let pointer = index && self.write_access(id);
         let module = self.module("sequence");
         let original = self.query_value(base)?;
         let type_of = self.native("type_of");
-        let result = if index {
+        let result = if pointer {
+            // Infer the element type without taking an address in an
+            // unevaluated witness. Nested polymorphic accesses can otherwise
+            // require their pointer type before Odin has inferred it.
+            Code::concat([
+                self.g(format!("^{type_of}({module}.element("), id),
+                original,
+                self.g("))", id),
+            ])
+        } else if index {
             Code::concat([
                 self.g(format!("{type_of}({module}.element("), id),
                 original,
@@ -317,7 +416,7 @@ impl Lower<'_, '_> {
         let (name, mut args) = self.closed(
             id,
             if pointer { "address" } else { "access" },
-            Some(if pointer { "^" } else { "" }),
+            Some(""),
             |this| {
                 let addr=this.addressable(base)?;
                 let typ = this.typ(base);
@@ -388,7 +487,7 @@ impl Lower<'_, '_> {
                         }
                         if let Some(bound) = bound {
                             normalized.push(this.gen(
-                                format!("{module}.normalize({len}({v}),{p}bound_{i},{})",this.source_location(*bound)),
+                                format!("{module}.normalize({len}({v}),{p}bound_{i},{},checked={})",this.source_location(*bound),this.checking_state(id,"bounds_check") != -1),
                                 this.source.node(*bound).span,
                                 "sequence-bound",
                             ));
@@ -486,15 +585,14 @@ impl Lower<'_, '_> {
             return Ok(None);
         }
         let lhs = self.source.group(id, "lhs").to_vec();
-        let indices = lhs
-            .iter()
-            .flat_map(|lhs| std::iter::once(*lhs).chain(self.source.descendants(*lhs)))
-            .filter(|child| self.source.node(*child).kind == "Index")
-            .collect::<Vec<_>>();
+        let indices = lhs.iter().flat_map(|lhs| self.assignment_indices(*lhs)).collect::<Vec<_>>();
         let mut generic = vec![];
         for index in indices {
             let base = self.role(index, "expr")?;
-            if self.typ(base).is_unknown() {
+            let key = self.role(index, "index")?;
+            if self.typ(base).is_unknown() && self.needs_bound(key)
+                && self.source.node(key).kind != "Compound"
+            {
                 generic.push(index);
             }
         }
@@ -504,6 +602,9 @@ impl Lower<'_, '_> {
         let post = self.source.node(id).parent.is_some_and(|parent| {
             self.source.node(parent).kind == "For" && self.source.role(parent, "post") == Some(id)
         });
+        if !post {
+            return self.inline_assignment(id, constant).map(Some);
+        }
         let (name, args) = self.closed(
             id,
             "assignment",
@@ -526,6 +627,232 @@ impl Lower<'_, '_> {
         } else {
             call
         }))
+    }
+    fn assignment_indices(&self, mut target: NodeId) -> Vec<NodeId> {
+        let mut indices = vec![];
+        loop {
+            match self.source.node(target).kind.as_str() {
+                "Index" => indices.push(target),
+                "Selector" | "Deref" | "Paren" | "TypeAssertion" => {}
+                _ => break,
+            }
+            let Some(base) = self.source.role(target, "expr") else {
+                break;
+            };
+            target = base;
+        }
+        indices.reverse();
+        indices
+    }
+    fn assignment_reference(&mut self, id: NodeId) -> bool {
+        let node = self.source.node(id);
+        if let Some(symbol) = self.resolver.symbol(self.reference(id)) {
+            return !self.resolver.symbols[symbol].constant && self.reference_capture(symbol);
+        }
+        match node.kind.as_str() {
+            "Ident" => self
+                .resolver
+                .symbol(self.reference(id))
+                .is_some_and(|symbol| {
+                    !self.resolver.symbols[symbol].constant && self.reference_capture(symbol)
+                }),
+            "Deref" => true,
+            "Index" => self.switch_replacements.contains_key(&id),
+            "Implicit" if self.source.text(id) == "context" => true,
+            "Paren" => self
+                .source
+                .role(id, "expr")
+                .is_some_and(|base| self.assignment_reference(base)),
+            "Selector" => self.source.role(id, "expr").is_some_and(|base| {
+                let typ = self.typ(base);
+                let mut shape = &typ;
+                while let Type::Nominal(_, inner) = shape {
+                    shape = inner;
+                }
+                matches!(shape, Type::Pointer(_)) || self.assignment_reference(base)
+            }),
+            _ => false,
+        }
+    }
+    fn inline_assignment(&mut self, id: NodeId, constant: bool) -> Result<Code> {
+        if let Some(block) = self.source.node(id).parent.filter(|parent| {
+            self.source.node(*parent).kind == "Block"
+                && self.source.raw.as_bytes()[self.source.node(*parent).span.start] != b'{'
+        }) {
+            self.convert_do(block);
+        }
+        let module = self.module("sequence");
+        let mut parts = vec![self.g("{\n", id)];
+        let mut replacements = vec![];
+        for lhs in self.source.group(id, "lhs").to_vec() {
+            for index in self.assignment_indices(lhs) {
+                if self.switch_replacements.contains_key(&index) {
+                    continue;
+                }
+                let base = self.role(index, "expr")?;
+                let key = self.role(index, "index")?;
+                let name = self.temporary_name("assignment_base");
+                let mut reference = self.assignment_reference(base);
+                let writable = self.addressable(base)?;
+                let typ = self.native_type(base)?;
+                let mut owner = base;
+                while matches!(self.source.node(owner).kind.as_str(), "Selector" | "Paren") {
+                    owner = self.role(owner, "expr")?;
+                }
+                let mut capture = None;
+                if !reference && owner != base {
+                    let namespace = self.source.node(owner).kind == "Ident"
+                        && !self
+                            .resolver
+                            .namespace_imports(self.file, self.source.text(owner))
+                            .is_empty();
+                    if !namespace {
+                        let owner_name = self.temporary_name("assignment_storage");
+                        parts.extend([
+                            self.g(format!("{owner_name} := "), owner),
+                            self.render(owner, None, constant)?,
+                            self.g("\n", owner),
+                        ]);
+                        capture = Some(
+                            self.switch_replacements
+                                .insert(owner, self.g(owner_name, owner)),
+                        );
+                        reference = true;
+                    }
+                }
+                let original = self.render(base, None, constant);
+                if let Some(previous) = capture {
+                    if let Some(previous) = previous {
+                        self.switch_replacements.insert(owner, previous);
+                    } else {
+                        self.switch_replacements.remove(&owner);
+                    }
+                }
+                let original = original?;
+                parts.extend([
+                    self.g(format!("{module}.validate_assignment_base("), index),
+                    typ,
+                    self.g(
+                        format!(
+                            ",{writable})\n{name} := {}",
+                            if reference {
+                                format!("{module}.capture_reference(&(")
+                            } else {
+                                String::new()
+                            }
+                        ),
+                        index,
+                    ),
+                    original,
+                    self.g(if reference { "))\n" } else { "\n" }, index),
+                ]);
+                let key_name = self.temporary_name("assignment_index");
+                let implicit = self.source.node(key).kind == "Compound"
+                    && self.source.role(key, "type").is_none();
+                if implicit {
+                    let type_of = self.native("type_of");
+                    parts.extend([
+                        self.g(
+                            format!("{key_name}: {type_of}({module}.map_key({name})) = "),
+                            key,
+                        ),
+                        self.render(key, None, constant)?,
+                        self.g("\n", key),
+                    ]);
+                } else {
+                    parts.extend([
+                        self.g(
+                            format!("{key_name} := {module}.assignment_bound({name},"),
+                            key,
+                        ),
+                        self.render(key, None, constant)?,
+                        self.g(
+                            format!(
+                                ",{},checked={})\n",
+                                self.source_location(key),
+                                self.checking_state(id, "bounds_check") != -1
+                            ),
+                            key,
+                        ),
+                    ]);
+                }
+                let replacement = self.g(format!("{name}[{key_name}]"), index);
+                replacements.push((index, self.switch_replacements.insert(index, replacement)));
+            }
+            let mut target = lhs;
+            while self.source.node(target).kind == "Paren" {
+                target = self.role(target, "expr")?;
+            }
+            let kind = self.source.node(target).kind.as_str();
+            let owner = (kind == "Selector")
+                .then(|| self.source.role(target, "expr"))
+                .flatten();
+            let namespace = owner.is_some_and(|base| {
+                self.source.node(base).kind == "Ident"
+                    && self.resolver.symbol(self.reference(base)).is_none()
+                    && !self
+                        .resolver
+                        .namespace_imports(self.file, self.source.text(base))
+                        .is_empty()
+            });
+            if let Some(owner) =
+                owner.filter(|_| !namespace && !self.switch_replacements.contains_key(&lhs))
+            {
+                let name = self.temporary_name("assignment_owner");
+                let typ = self.native_type(owner)?;
+                let writable = self.addressable(owner)?;
+                let reference = self.assignment_reference(owner);
+                parts.extend([
+                    self.g(format!("{module}.validate_assignment_field("), lhs),
+                    typ,
+                    self.g(
+                        format!(
+                            ",{writable})\n{name} := {}",
+                            if reference {
+                                format!("{module}.capture_field_reference(&(")
+                            } else {
+                                String::new()
+                            }
+                        ),
+                        lhs,
+                    ),
+                    self.render(owner, None, constant)?,
+                    self.g(if reference { "))\n" } else { "\n" }, lhs),
+                ]);
+                let field = self.source.text(self.role(target, "field")?);
+                replacements.push((
+                    lhs,
+                    self.switch_replacements
+                        .insert(lhs, self.g(format!("{name}.{field}"), lhs)),
+                ));
+            } else if !matches!(kind, "Ident" | "Index")
+                && !self.switch_replacements.contains_key(&lhs)
+            {
+                let name = self.temporary_name("assignment_target");
+                parts.extend([
+                    self.g(format!("{name} := &("), lhs),
+                    self.render(lhs, None, constant)?,
+                    self.g(")\n", lhs),
+                ]);
+                replacements.push((
+                    lhs,
+                    self.switch_replacements
+                        .insert(lhs, self.g(format!("{name}^"), lhs)),
+                ));
+            }
+        }
+        self.assigning.insert(id);
+        let body = self.render(id, None, constant);
+        self.assigning.remove(&id);
+        for (index, old) in replacements.into_iter().rev() {
+            if let Some(old) = old {
+                self.switch_replacements.insert(index, old);
+            } else {
+                self.switch_replacements.remove(&index);
+            }
+        }
+        parts.extend([body?, self.g("\n}", id)]);
+        Ok(Code::concat(parts))
     }
     fn assignment_branches(
         &mut self,

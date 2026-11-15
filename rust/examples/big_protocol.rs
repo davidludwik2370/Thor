@@ -32,6 +32,8 @@ fn resolve(request: &Value) -> bigvalues::Result<Value> {
     }
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let mut project = Project::new(Options {
+            native_policy_probe: false,
+            odin_compatible: false,
         command: "check".into(),
         entry: request["file"]
             .as_str()

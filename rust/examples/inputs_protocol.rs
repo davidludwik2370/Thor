@@ -59,10 +59,12 @@ fn run(request: &Value) -> Value {
             }
             "source" => {
                 let frontend = Frontend {
+            odin_syntax: false,
                     executable: request["frontend"].as_str().unwrap().into(),
                     fingerprint: String::new(),
                     odin: PathBuf::from("odin"),
-                    cache_dir: None,
+                    odin_root: request["odin_root"].as_str().unwrap_or_default().into(),
+            cache_dir: None,
                     normalized_cache: false,
                     test: false,
                     target: None,

@@ -96,8 +96,19 @@ compile-time execution must not be weakened to make an unsupported case compile.
 - Basic Thor errors and raw Odin diagnostics against generated files are adequate
   for v1. Failed parsing, checking, helper execution, or compilation must produce
   a nonzero exit status. Keep generated files available for investigating errors.
-- Source-location expressions and runtime traces may identify generated Odin in
-  v1. Retaining source spans now does not require implementing full remapping.
+- Preserve original file/directory/line/procedure directives and `#location`.
+  Supply omitted `#caller_location` and `#caller_expression` defaults from the
+  original call, including calls moved into generated helpers. Respect native
+  source-location display flags. Debug builds additionally map runtime traces.
+- Preserve native `#branch_location` inside `defer`, reporting the original
+  Thor location of the return, loop exit, or scope exit that executes the defer.
+  Generated expression helpers carry the native exit location into the helper.
+  Honor the same source-location display flags as the other location directives.
+- Keep the entry package's original directory basename in generated layouts so
+  `ODIN_BUILD_PROJECT_NAME` and build-project-name tags retain their meaning.
+  Resolve resource expressions relative to their original source file, including
+  constant parameters/configuration and collection paths. Compiler support
+  imports must not capture a user-provided `thor` collection.
 
 
 2. SELECTIVE IMPORTS
@@ -635,6 +646,9 @@ Anonymous expression lifetimes (also applies to Set expressions):
   C/system/contextless callbacks can use nonallocating features without context;
   allocation requires an explicit context in those callbacks. String defaults
   containing convention names must not affect this decision.
+- Infer complete native types for helper captures, including SOA row references.
+  Reference captures must preserve shared storage and evaluation order through
+  nested helpers, comparisons, formatting and writes.
 
 
 12. PURE FUNCTIONS AND ALLOCATION
@@ -796,8 +810,10 @@ Examples:
   supported aggregate types, and exact floating-point representations, including
   special values and negative zero. Never embed helper-process memory addresses.
 - Serialize before helper storage is released. A helper crash, compilation error,
-  invalid result, allocation failure, or timeout is a compilation failure. Use
-  bounded execution with a configurable timeout and an actionable basic message.
+  invalid result, allocation failure, or configured timeout is a compilation failure.
+  Execution is unlimited by default. `--run-timeout 0` also selects unlimited
+  execution. A positive value sets a per-execution deadline in seconds,
+  with an actionable diagnostic when exceeded.
 - Preserve the execution request as the primary location and attach an original
   inner failure location when supplied by the helper. Retain those related notes
   through CLI JSON and TLS. Name process signals without guessing an unknown cause.

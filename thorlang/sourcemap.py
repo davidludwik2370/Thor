@@ -67,6 +67,7 @@ class MappingBuilder:
                 if not origin.exact and not identity and origin.kind in {
                     'array','Binary','Ternary','Ident','pure-call-target','Index','Slice',
                     'SwitchExpr','CompileSwitchExpr','Interpolation','Call','Deref','Unary',
+                    'Run','compile-time-result',
                 }:
                     expansions.append([opened, offset, origin.file, origin.start, origin.end])
                 if self.debug and origin.kind in {"expression-helper", "debug-capture", "source-call-target"}:

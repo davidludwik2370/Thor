@@ -1155,9 +1155,9 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .record_fields(t)
                 .iter()
                 .any(|(_, t)| self.unsafe_storage(t, seen)),
-            Type::Union(owner) => self
+            Type::Union(..) => self
                 .r
-                .union_variants(*owner)
+                .union_variants(t)
                 .iter()
                 .any(|typ| self.unsafe_storage(typ, seen)),
             _ => false,
@@ -1180,9 +1180,9 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .record_fields(t)
                 .iter()
                 .any(|(_, t)| self.pointers(t, seen)),
-            Type::Union(owner) => self
+            Type::Union(..) => self
                 .r
-                .union_variants(*owner)
+                .union_variants(t)
                 .iter()
                 .any(|typ| self.pointers(typ, seen)),
             _ => false,

@@ -22,6 +22,7 @@ class Comprehensions:
         return node if node.kind=='Binary' and node.data['op'] in {'..','..<','..='} else None
 
     def bindings(self,node):
+        from .expressions import Capture
         s=self.s;e=s.expressions;loop=node.role('loop');source=node.role('expr')
         interval=self.interval(source)
         if interval:
@@ -46,7 +47,7 @@ class Comprehensions:
             annotation=loop.role('index_type' if i else 'value_type')
             typ=s.render(annotation) if annotation else types[i]
             value=f'({typ}){{}}'
-            aliases[e.symbol_key(symbol)]=value
+            aliases[e.symbol_key(symbol)]=Capture(value)
         return aliases
 
     @contextmanager

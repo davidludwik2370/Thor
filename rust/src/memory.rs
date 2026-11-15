@@ -11,12 +11,22 @@ use std::{
     env,
     path::{Path, PathBuf},
 };
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Memory {
     pub tracking: String,
     pub address: bool,
     pub extra: Vec<String>,
     pub symbolizer: String,
+}
+impl Default for Memory {
+    fn default() -> Self {
+        Self {
+            tracking: "off".into(),
+            address: false,
+            extra: vec![],
+            symbolizer: String::new(),
+        }
+    }
 }
 impl Memory {
     pub fn select(

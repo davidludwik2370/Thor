@@ -36,6 +36,12 @@ The [October compatibility audit](docs/compatibility-audit-2026-10-29/README.md)
 records the original failures and their regression cases; the compiler preserves
 native range/type operands, enum indices, SOA iteration and storage rules while
 adding Thor's syntax.
+The [November compatibility fixes](docs/odin-superset-audit-2026-11-13/fixes.md)
+cover native type parsing, resource expressions, source introspection, project
+identity, and user collection names in both compiler implementations.
+Use `thor migrate /path/to/odin/project` to create a validated Thor copy.
+The [migration guide](docs/odin-migration.md) explains keyword renames,
+configuration, and review notices.
 
 Collection comprehensions construct slices, dynamic arrays, sets and maps,
 with filtered compile-time fixed arrays and one-level `..` unpacking. See the
@@ -279,7 +285,7 @@ Thor uses Odin as its native backend. For a single-file build:
    calls, is evaluated. This can compile and run temporary native Odin helpers;
    successful results can be reused from the evaluation cache.
 3. Thor writes generated `.odin` files, source maps and a manifest into
-   `.thor-build/my_file/`. Imported project packages are mirrored there too.
+   the hidden build directory. Imported project packages are mirrored there too.
 4. Thor invokes Odin on the generated file, automatically supplying `-file` for
    a single-file input. Odin performs native checking, code generation and linking.
 5. Thor translates compiler diagnostics back to the original source locations.
@@ -297,6 +303,13 @@ requires a different output name, such as `-out:demo-program`, to protect the
 existing `thor` launcher.
 `run` and `test` keep their temporary executables under the generated output tree.
 Odin's other native build modes can be selected with `-build-mode:...`.
+
+The source path defaults to `.` for commands that operate on existing source:
+`thor build`, `thor run -debug`, `thor vet --apply` and `thor test` use the current
+working directory. Explicit file and directory paths still work, including with
+options before the path. Thor does not search parent directories for a project.
+`thor run -- argument1 argument2` passes those arguments to the current project's
+program. Bare `thor` shows help, and `thor new` requires a project name.
 
 | Thor command | Work after parsing and compile-time evaluation |
 | --- | --- |
@@ -378,10 +391,17 @@ calculations too. `--no-cache` bypasses both result and parser caches.
 `--no-transpile-cache` option was removed with the whole-project cache.
 
 Thor's own options use long names, such as `--output-dir`, `--odin`,
-`--run-timeout`, `--no-cache`, and `--cache-report`. Run `./thor --help` for the
-complete list. `--odin /path/to/odin` or `THOR_ODIN` selects the Odin executable.
-The `--run-timeout` option bounds compile-time helper execution, not your final
-program's runtime.
+`--run-timeout`, `--no-cache`, and `--cache-report`. Run `./thor` for a short
+overview and common options, `./thor help` for the usual Thor options grouped by
+command, or `./thor help build` for one command’s options. Add `-full` to include
+all compatible native compiler options: `./thor help -full` or
+`./thor help build -full`. Odin’s `-help` spelling remains accepted; `-h` and
+`--help` have been removed. [The CLI guide](docs/cli.md) describes command
+compatibility, source-facing tools, and reporting.
+`--odin /path/to/odin` or `THOR_ODIN` selects the Odin executable.
+Compile-time helper execution is unlimited by default. `--run-timeout 0`
+explicitly selects unlimited execution. A positive value, such as
+`--run-timeout 10`, sets a deadline for each compile-time execution.
 
 Arguments after `--` are passed to the executable by `run` or `test`:
 
@@ -551,8 +571,8 @@ explicitly requested with `--apply` or confirmed through `--ask`.
 thor vet .                         # Report findings
 thor vet . --apply                 # Apply verified corrections
 thor vet . --ask                   # Preview corrections and ask once [y/N]
-thor build . --vet                 # Build with convention warnings
-thor vet . --vet=immutable,pure    # Select checks
+thor build . --vet                 # Require Thor convention checks to pass
+thor vet . --vet=unused            # Select checks (comma-separated)
 thor vet . -warnings-as-errors     # Require corrections for a successful check
 ```
 
@@ -560,11 +580,56 @@ The `immutable` check suggests `:>` for initialized local bindings whose uses
 permit immutability. Grouped declarations qualify together. The `pure` check
 suggests `fn` for eligible procedures, including their transitive calls and
 signature requirements. Findings have stable `thor/prefer-immutable` and
-`thor/prefer-fn` diagnostic codes. `-ignore-warnings` hides the warnings.
-Odin's single-dash `-vet` flags select its native checks.
+`thor/prefer-fn` diagnostic codes. The `unused` check reports unused local
+variables, immutable bindings, local constants, loop/type-switch/comprehension
+bindings, and procedure parameters with the `thor/unused` code. All four checks
+are enabled by default for `thor vet` and `--vet`. `_` and explicit `_ = value`
+uses indicate intentional discards. Member names, named argument labels, and
+shadowed bindings are distinguished from actual uses. Named return values and
+parameter names in procedure-type declarations are part of their signatures.
+Package-level declarations and struct fields are outside this local-binding check.
+Assignments alone do not count as uses, including `x += 1` and simple arithmetic
+self-updates such as `x = x + 1`. Passing a value to any function counts as use,
+even when that function ignores its parameter; unused parameters are checked in
+their own bodies. Writing through pointer or slice parameters counts as use
+because it can change the caller's data, as do writes through `for &value` and
+reference type-switch bindings. Conditions, returns, address-taking and explicit
+`_ = value` discards also count. This is a conservative local check:
+it does not trace unused values through other bindings or report overwritten
+initializers when the binding is subsequently used.
+Unused findings have no automatic edit: initializer effects and allocations must
+be reviewed before removing a declaration. `--apply` and `--ask` preserve these
+findings while applying the other verified corrections.
+Unused bindings take priority over immutable suggestions. A declaration with an
+unused name receives no immutable suggestion or conversion, including when a
+group contains both used and unused names. After those names are used or removed,
+the remaining declaration can qualify for an immutable suggestion. This also
+applies when selecting only the `immutable` check.
+Bindings used only in explicit `_ = name` discards receive no immutable
+suggestions, automatic conversions, or TLS quick fixes. Any other use of the
+binding makes it eligible for immutable advice again, regardless of the
+discard's position. Expressions such as `_ = name + 1` count as ordinary uses.
+The `semicolon` check reports unnecessary statement terminators with the
+`thor/unnecessary-semicolon` code. A semicolon at the end of a line or before a
+closing brace can be removed. Semicolons separating statements on one line,
+loop/control-header clauses, and fixed-capacity type syntax remain required.
+The parser identifies optional terminators, including inside f-string expressions.
+`--vet=semicolon` selects this check alone. `--apply`, `--ask`, and TLS quick fixes
+remove the flagged token while preserving comments and line endings.
+`-ignore-warnings` hides warnings from standalone `vet` and editor checks.
+`thor build --vet` treats its convention findings as errors, so this flag does
+not suppress them. Native `-vet-when-shadowing` and `-vet-semicolon` also support
+Thor source. Other native vet policies require
+an Odin-only project because generated code can create false findings or hide
+original source issues. See [CLI compatibility](docs/cli.md) for the complete
+policy and supported alternatives.
 
 Vetting examines project `.thor` files beneath the selected package directory,
-using the active target and build flags. The initial checks conservatively skip
+using the active target and build flags. Unused warnings use original source
+bindings so generated helper arguments and ownership cleanup cannot hide unused
+values. Known inactive `when` arms and excluded files are skipped. For unresolved
+generic/native compile-time conditions, potential uses are retained and warnings
+inside uncertain arms are omitted. The correction checks conservatively skip
 conditional declarations, uninitialized locals, generic procedure conversions,
 attributed procedures and the entry point. Procedures returning owned or
 reference-bearing data also require manual review, since `fn` can change result
@@ -586,6 +651,10 @@ Enable `"tls.vet": true` in VS Code to see the same warnings and quick fixes on
 unsaved text. TLS offers a correction for the document snapshot that was checked.
 
 ## Compiler diagnostics
+
+In a terminal, diagnostic labels and source underlines are red for errors and
+yellow for warnings. Redirected output and JSON diagnostics remain plain text.
+Set `NO_COLOR=1`, `CLICOLOR=0`, or `TERM=dumb` to disable terminal colors.
 
 `check`, `build`, `run`, and `test` report errors against original `.thor` files
 (or original `.odin` dependencies), with source snippets and underlines. Parser,
@@ -731,7 +800,7 @@ use its own locations.
 | T17 | Expression-local helpers preserve lazy branches, operand order, nested arguments, loop reevaluation and assignment storage. |
 | T18 | Declared `fn` purity, transitive read-only inputs, verified direct calls, recursive/generic functions, and internal scratch allocation. |
 | T19 | Versioned contents-only value serialization and typed reconstruction, including wide integers, exact floats, enums, arrays, records and unions. |
-| T20 | Explicit native `#run` execution, verified dependency closures, dependent constants, selected/lazy paths, mapped failures and bounded execution. |
+| T20 | Explicit native `#run` execution, verified dependency closures, dependent constants, selected/lazy paths, mapped failures and optional execution deadlines. |
 | T21 | Persistent contents-only result cache, transitive/configuration/toolchain/resource invalidation, atomic publication, corruption recovery and cache controls. |
 | T22 | Scratch cleanup and independently owned string/slice results, deep aggregate promotion, recursive cleanup and fresh runtime `#run` materialization. |
 | T23 | Automatic known-argument `fn` folding, forward/dependent constants, generic specialization scheduling, selected/lazy paths and fresh folded runtime results. |
@@ -1206,6 +1275,8 @@ The emitter uses named procedures with explicit lexical inputs, rather than
 closures (which Odin does not provide). Calls stay at the original expression
 site; declarations do no work. The same source maps cover helper bodies and their
 instantiations, so errors point back to fields, arms, elements and accesses.
+Expressions inside `for &row` over SOA views preserve native row references,
+including nested helpers and writes to the original columns.
 Nonallocating helpers also work inside native C/system/contextless procedures;
 allocating features require a context, which such callbacks can assign explicitly.
 
@@ -1214,6 +1285,11 @@ allocating features require a context, which such callbacks can assign explicitl
 ```sh
 python3 -m unittest discover -s tests -v
 ```
+
+The opt-in [upstream integration run](docs/upstream-integration.md) compares
+pinned Odin projects, migrated Thor copies and vet-corrected copies. Its
+[runner instructions](tests/integration/README.md) document dependencies and
+resource limits.
 
 The suite compiles and runs actual generated programs with Odin. It checks
 accepted programs, rejection behavior, evaluation counts/order, import privacy
@@ -1500,8 +1576,11 @@ Run the [commented native-call walkthrough](examples/native_run/demo.thor) with
 Helpers preserve the original defines, `ODIN_TEST` and `ODIN_BUILD_MODE`, including
 dependencies in test-tagged files. Cross-target
 evaluation is rejected. Compilation errors map to original source; execution failures
-point to the original call or `#run` expression. Helpers are deleted after use. Execution defaults
-to five seconds per helper; set `--run-timeout 10` to change it (maximum 300).
+point to the original call or `#run` expression. Helpers are deleted after use.
+Helper compilation and execution have no deadline by default or with
+`--run-timeout 0`. Positive limits set a deadline in seconds, for
+example `--run-timeout 0.5`. With a positive execution limit, helper compilation
+allows at least 30 seconds.
 Independent-call batching remains future work.
 
 Successful helper results are cached in `.thor-cache/eval-v1` beside the entry
