@@ -963,6 +963,9 @@ impl<'a> Resolver<'a> {
         let source = &self.sources[r.file];
         let name = if let Some(index) = self.symbol(r) {
             let symbol = &self.symbols[index];
+            if !matches!(symbol.name.as_str(), "Integer" | "Rational") {
+                return None;
+            }
             let owner = &self.sources[symbol.reference.file];
             let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .parent()?
@@ -1013,14 +1016,30 @@ impl<'a> Resolver<'a> {
     }
     pub fn primitive(&self, r: Ref) -> Option<Type> {
         let source = &self.sources[r.file];
-        let name = if source.node(r.node).kind == "Ident" {
-            if self.symbol(r).is_some() {
-                return None;
-            }
-            source.text(r.node)
-        } else if source.node(r.node).kind == "Selector" {
+        let name = match source.node(r.node).kind.as_str() {
+            "Ident" => source.text(r.node),
+            "Selector" => source.text(source.role(r.node, "field")?),
+            _ => return None,
+        };
+        let typ = if matches!(name, "string" | "cstring" | "string16" | "cstring16") {
+            Type::String { name: name.into(), untyped: false }
+        } else if matches!(name,
+            "bool" | "b8" | "b16" | "b32" | "b64" | "int" | "uint" | "uintptr"
+            | "rawptr" | "any" | "rune" | "byte" | "i8" | "i16" | "i32" | "i64"
+            | "i128" | "u8" | "u16" | "u32" | "u64" | "u128" | "f16" | "f32"
+            | "f64" | "complex32" | "complex64" | "complex128" | "quaternion64"
+            | "quaternion128" | "quaternion256")
+        {
+            Type::scalar(name)
+        } else {
+            return None;
+        };
+        // Most expression names cannot denote a primitive. Only resolve names
+        // after the spelling matches, retaining ordinary lexical shadowing.
+        if source.node(r.node).kind == "Ident" {
+            if self.symbol(r).is_some() { return None; }
+        } else {
             let owner = source.role(r.node, "expr")?;
-            let field = source.role(r.node, "field")?;
             if source.node(owner).kind != "Ident"
                 || self
                     .lookup(
@@ -1046,54 +1065,8 @@ impl<'a> Resolver<'a> {
             }) {
                 return None;
             }
-            source.text(field)
-        } else {
-            return None;
-        };
-        if matches!(name, "string" | "cstring" | "string16" | "cstring16") {
-            return Some(Type::String {
-                name: name.into(),
-                untyped: false,
-            });
         }
-        if matches!(
-            name,
-            "bool"
-                | "b8"
-                | "b16"
-                | "b32"
-                | "b64"
-                | "int"
-                | "uint"
-                | "uintptr"
-                | "rawptr"
-                | "any"
-                | "rune"
-                | "byte"
-                | "i8"
-                | "i16"
-                | "i32"
-                | "i64"
-                | "i128"
-                | "u8"
-                | "u16"
-                | "u32"
-                | "u64"
-                | "u128"
-                | "f16"
-                | "f32"
-                | "f64"
-                | "complex32"
-                | "complex64"
-                | "complex128"
-                | "quaternion64"
-                | "quaternion128"
-                | "quaternion256"
-        ) {
-            Some(Type::scalar(name))
-        } else {
-            None
-        }
+        Some(typ)
     }
     pub fn standard_library(&self, r: Ref, path: &str) -> bool {
         let Some((collection, suffix)) = path.split_once(':') else {

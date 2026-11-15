@@ -13,6 +13,7 @@ pub(super) struct NameIndex {
     pub using: Vec<Vec<NodeId>>,
     pub promotions: Vec<Vec<NodeId>>,
     pub expression_names: Vec<Vec<NodeId>>,
+    pub contextual_calls: Vec<Vec<NodeId>>,
     pub signatures: HashMap<Ref, std::sync::OnceLock<Arc<signaturelayout::SignatureLayout>>>,
     heads: Vec<Vec<NodeId>>,
     parents: Vec<Vec<NodeId>>,
@@ -28,6 +29,7 @@ impl NameIndex {
             using: vec![],
             promotions: vec![],
             expression_names: vec![],
+            contextual_calls: vec![],
             signatures: HashMap::new(),
             heads: vec![],
             parents: vec![],
@@ -37,6 +39,7 @@ impl NameIndex {
     }
     pub fn append(&mut self, sources: &[Source], start: usize) {
         for (file, source) in sources.iter().enumerate().skip(start) {
+            crate::profile::count("resolver.context_candidate_scans", source.nodes.len() as u64);
             let directory = source.path.parent().unwrap_or(&source.path).to_path_buf();
             let next = self.packages.len();
             let package = *self.packages.entry(directory).or_insert(next);
@@ -52,6 +55,7 @@ impl NameIndex {
             let mut using = vec![];
             let mut promotions = vec![];
             let mut expression_names = vec![];
+            let mut contextual_calls = vec![];
             for (n, node) in source.nodes.iter().enumerate() {
                 let id = NodeId(n);
                 if matches!(node.kind.as_str(), "ProcedureType" | "StructType") {
@@ -62,6 +66,13 @@ impl NameIndex {
                 parents.push(parent);
                 if expression_name(source, id) {
                     expression_names.push(id);
+                }
+                if node.kind == "Call" && source.group(id, "args").iter().any(|arg|
+                    std::iter::once(*arg).chain(source.descendants(*arg)).any(|node|
+                        source.node(node).kind == "Compound" && source.node(node).spans.get("open")
+                            .is_some_and(|span| source.slice(*span) == "[")))
+                {
+                    contextual_calls.push(id);
                 }
                 if node.kind == "Using" {
                     using.push(id);
@@ -89,6 +100,7 @@ impl NameIndex {
             self.using.push(using);
             self.promotions.push(promotions);
             self.expression_names.push(expression_names);
+            self.contextual_calls.push(contextual_calls);
         }
     }
     pub fn scopes(&self, reference: Ref) -> impl Iterator<Item = NodeId> + '_ {
@@ -96,6 +108,41 @@ impl NameIndex {
             Some(self.heads[reference.file][reference.node.0]),
             move |id| (id.0 != 0).then(|| self.parents[reference.file][id.0]),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn source(path: &str) -> Source {
+        Source::from_frontend(path.into(), "take([1])".into(), json!({
+            "nodes":[
+                {"kind":"File","start":0,"end":9,"parent":-1},
+                {"kind":"Call","start":0,"end":9,"parent":0,"roles":{"callee":[0,4]},"lists":{"args":[[5,8]]}},
+                {"kind":"Ident","start":0,"end":4,"parent":1},
+                {"kind":"Compound","start":5,"end":8,"parent":1,"roles":{"open":[5,6]}},
+                {"kind":"Literal","start":6,"end":7,"parent":3}
+            ],"features":[],"edits":[],"selections":[]
+        }), true).unwrap()
+    }
+
+    #[test]
+    fn contextual_candidates_survive_resets_and_extend_with_new_syntax() {
+        let mut sources = vec![source("/project/main.thor")];
+        let mut resolver = Resolver::new(&sources);
+        if resolver.index.contextual_calls != vec![vec![NodeId(1)]] {
+            panic!("contextual array call was omitted");
+        }
+        resolver.set_evaluations(BTreeMap::new());
+        let index = resolver.syntax_index();
+        drop(resolver);
+        sources.push(source("/dependency/lib.thor"));
+        let extended = Resolver::extend_index(&sources, &[], index, 1);
+        if extended.index.contextual_calls != vec![vec![NodeId(1)], vec![NodeId(1)]] {
+            panic!("syntax extension changed contextual call candidates");
+        }
     }
 }
 

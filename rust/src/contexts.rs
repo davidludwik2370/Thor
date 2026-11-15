@@ -25,17 +25,12 @@ impl Resolver<'_> {
             .iter()
             .enumerate()
             .filter(|(_, s)| !s.shared_native)
-            .flat_map(|(file, s)| {
-                s.nodes
+            .flat_map(|(file, _)| {
+                self.index.contextual_calls[file]
                     .iter()
-                    .enumerate()
-                    .filter(|(id, n)| n.kind == "Call" && s.group(NodeId(*id), "args").iter().any(|arg|
-                        std::iter::once(*arg).chain(s.descendants(*arg)).any(|node|
-                            s.node(node).kind == "Compound" && s.node(node).spans.get("open")
-                                .is_some_and(|span| s.slice(*span) == "["))))
-                    .map(move |(node, _)| Ref {
+                    .map(move |node| Ref {
                         file,
-                        node: NodeId(node),
+                        node: *node,
                     })
             })
             .collect::<Vec<_>>();

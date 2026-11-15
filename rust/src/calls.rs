@@ -205,7 +205,7 @@ impl Resolver<'_> {
             bindings.extend(self.constant_parameter_bindings(signature, &sites, context));
             let mut score = 0;
             let mut valid = true;
-            for ((_, annotation), group) in fields.iter().zip(&arguments) {
+            for (index, ((_, annotation), group)) in fields.iter().zip(&arguments).enumerate() {
                 if let Some(annotation) = annotation {
                     let formal = &self.sources[annotation.file];
                     let variadic = formal.node(annotation.node).kind == "Ellipsis";
@@ -226,13 +226,16 @@ impl Resolver<'_> {
                         } else {
                             *annotation
                         };
-                        let type_operand = self.denotes_type(*arg);
                         if self.sources[annotation.file].node(annotation.node).kind == "TypeidType"
                         {
-                            score += if type_operand { 5 } else { 0 };
+                            score += if self.denotes_type(*arg) { 5 } else { 0 };
                             continue;
                         }
-                        let typ = if type_operand {
+                        let typ = if !variadic {
+                            // An ordinary parameter has one arranged argument.
+                            // Its type was already resolved for binding above.
+                            types[index].clone()
+                        } else if self.denotes_type(*arg) {
                             Type::Scalar {
                                 name: "typeid".into(),
                                 untyped: false,
