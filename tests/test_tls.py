@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = ROOT / 'tls' / 'bin' / ('tls.exe' if os.name == 'nt' else 'tls')
@@ -109,7 +110,7 @@ class Client:
                     raise AssertionError(value['error'])
                 return value.get('result')
 
-    def diagnostic(self, uri, *, empty=False, code=None, contains=None, snapshot=None):
+    def diagnostic(self, uri, *, empty=False, code=None, contains=None, snapshot=None, timeout=45):
         def matching(value):
             return (value.get('method') == 'textDocument/publishDiagnostics'
                     and value['params'].get('uri') == uri
@@ -118,13 +119,22 @@ class Client:
                     and (snapshot is None or any((d.get('data') or {}).get('snapshot') == snapshot
                                                  for d in value['params']['diagnostics']))
                     and (contains is None or any(contains in d['message'] for d in value['params']['diagnostics'])))
-        deadline = time.monotonic() + 15
+        # Bounded #run execution permits at least 30 seconds for helper
+        # compilation. Leave time for that checker result and its notification.
+        deadline = time.monotonic() + timeout
         while True:
             for value in self.notifications:
                 if matching(value):
                     self.notifications.remove(value)
                     return value['params']['diagnostics']
-            self.next(max(0.01, deadline - time.monotonic()))
+            try:
+                self.next(max(0.01, deadline - time.monotonic()))
+            except queue.Empty:
+                reports = [value['params']['diagnostics'] for value in self.notifications
+                           if value.get('method') == 'textDocument/publishDiagnostics'
+                           and value['params'].get('uri') == uri]
+                raise AssertionError('Timed out waiting for matching diagnostics. '
+                                     'Recent reports '+json.dumps(reports[-3:])[:4000]) from None
 
     def close(self):
         if self.process.poll() is None:
@@ -139,6 +149,17 @@ class Client:
         self.process.stdout.close()
         self.reader.join(timeout=1)
         self.log.close()
+
+
+class ClientTimeoutTests(unittest.TestCase):
+    def test_diagnostic_timeout_reports_unexpected_diagnostics(self):
+        client = Client.__new__(Client)
+        uri = 'file:///fixture/main.thor'
+        client.notifications = [{'method':'textDocument/publishDiagnostics',
+                                 'params':{'uri':uri,'diagnostics':[{'message':'compiler failed'}]}}]
+        with patch.object(client, 'next', side_effect=queue.Empty):
+            with self.assertRaisesRegex(AssertionError, 'compiler failed'):
+                client.diagnostic(uri, empty=True)
 
 
 class TLSTests(unittest.TestCase):
