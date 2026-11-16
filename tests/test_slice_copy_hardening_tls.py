@@ -11,6 +11,25 @@ class SliceCopyHardeningTLSTests(unittest.TestCase):
     hover=base.TLSTests.hover
     semantic_spans=base.TLSTests.semantic_spans
 
+    def test_generic_scalar_result_declarations_keep_their_resolved_types(self):
+        text='''package main
+Id::distinct int
+Status::enum{ok}
+Box::struct($T:typeid){id:Id,value:T}
+attach::proc(box:^Box($T))->(Id,Status){return box.id,.ok}
+prepare::proc(box:^Box($T)){
+    id,status :> attach(box)
+    copy:=id
+    box.id=copy
+    _=status
+}
+main::proc(){values:=[1]int{7};box:=Box([]int){Id(9),values[:]};prepare(&box)}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        hover=self.hover(client,path,text,'id,status')['contents']['value']
+        self.assertIn('Id',hover)
+
     def test_soa_row_comparisons_and_unsaved_errors_keep_original_locations(self):
         text='''// 😀 original source
 package main
