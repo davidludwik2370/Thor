@@ -6,26 +6,37 @@ package ols_builtin
 @builtin len :: proc(array: Array_Type) -> int ---
 @builtin cap :: proc(array: Array_Type) -> int ---
 
+// Return each struct field or fixed-array element as a separate result.
 @builtin expand_values   :: proc(value: Struct_Or_Array) -> (A, B, C, ..) ---
+// Pack values into a fixed array when their types match, or a struct with v0, v1, ... fields.
 @builtin compress_values :: proc(values: ..) -> Struct_Or_Array_Like_Type ---
+// Combine named or positional slice columns into an SOA slice, using the shortest column length.
 @builtin soa_zip :: proc(arrays: ..) -> Soa_Slice ---
+// Return the SOA slice's original columns as separate slices in field order.
+@builtin soa_unzip :: proc(array: Soa_Slice) -> (Slices, ..) ---
 
-@builtin size_of      :: proc($T: typeid) -> int ---
-@builtin align_of     :: proc($T: typeid) -> int ---
+// Return the size in bytes of a type or the type of a value.
+@builtin size_of      :: proc(value_or_type: expr) -> int ---
+// Return the alignment in bytes of a type or the type of a value.
+@builtin align_of     :: proc(value_or_type: expr) -> int ---
+// Produce the operand's type without evaluating its runtime value.
 @builtin type_of      :: proc(x: expr) -> type ---
-@builtin type_info_of :: proc($T: typeid) -> ^runtime.Type_Info ---
-@builtin typeid_of    :: proc($T: typeid) -> typeid ---
+// Return runtime metadata for a type or a runtime typeid.
+@builtin type_info_of :: proc(type_or_id: typeid) -> ^runtime.Type_Info ---
+// Return the typeid of a type or value.
+@builtin typeid_of    :: proc(value_or_type: expr) -> typeid ---
 
-@builtin offset_of_selector :: proc(selector: $T) -> uintptr ---
-@builtin offset_of_member   :: proc($T: typeid, member: $M) -> uintptr ---
-
-@builtin offset_of :: proc{offset_of_selector, offset_of_member}
+// Accept a field selector, or a type followed by its field name.
+@builtin offset_of :: proc(value_or_type: expr, member: Field_Name = nil) -> uintptr ---
 
 @builtin offset_of_by_string :: proc($T: typeid, member: string) -> uintptr ---
 
+// Select constant indices from a fixed array or SIMD vector. The result has one element per index.
 @builtin swizzle :: proc(x: [N]T, indices: ..int) -> [len(indices)]T ---
 
+// Construct a complex number. f16, f32 and f64 components produce complex32, complex64 and complex128.
 @builtin complex    :: proc(real, imag: Float) -> Complex_Type ---
+// Construct a quaternion from named real, imag, jmag and kmag components of one float type.
 @builtin quaternion :: proc(real, imag, jmag, kmag: Float) -> Quaternion_Type --- // fields must be named
 @builtin real       :: proc(value: Complex_Or_Quaternion) -> Float ---
 @builtin imag       :: proc(value: Complex_Or_Quaternion) -> Float ---
@@ -35,7 +46,8 @@ package ols_builtin
 
 @builtin min   :: proc(values: ..T) -> T ---
 @builtin max   :: proc(values: ..T) -> T ---
-@builtin abs   :: proc(value: T) -> T ---
+// Return the absolute value or magnitude. Complex and quaternion inputs produce their component float type.
+@builtin abs   :: proc(value: Number) -> Real_Number ---
 @builtin clamp :: proc(value, minimum, maximum: T) -> T ---
 
 @builtin unreachable :: proc() -> ! ---
@@ -45,9 +57,15 @@ package ols_builtin
 @(private="file") _raw_data_fixed   :: proc(value: ^[dynamic; $N]$E) -> [^]E ---
 @(private="file") _raw_data_array   :: proc(value: ^[$N]$E)      -> [^]E    ---
 @(private="file") _raw_data_simd    :: proc(value: ^#simd[$N]$E) -> [^]E    ---
+@(private="file") _raw_data_matrix  :: proc(value: ^matrix[$R,$C]$E) -> [^]E ---
+@(private="file") _raw_data_multi_fixed :: proc(value: [^][dynamic; $N]$E) -> [^]E ---
+@(private="file") _raw_data_multi_array :: proc(value: [^][$N]$E) -> [^]E ---
+@(private="file") _raw_data_multi_simd :: proc(value: [^]#simd[$N]$E) -> [^]E ---
+@(private="file") _raw_data_multi_matrix :: proc(value: [^]matrix[$R,$C]$E) -> [^]E ---
 @(private="file") _raw_data_string  :: proc(value: string)       -> [^]byte ---
+@(private="file") _raw_data_string16 :: proc(value: string16) -> [^]u16 ---
 // raw_data is a built-in procedure which returns the underlying data of a built-in data type as a Multi-Pointer.
-@builtin raw_data :: proc{_raw_data_slice, _raw_data_dynamic, _raw_data_fixed, _raw_data_array, _raw_data_simd, _raw_data_string}
+@builtin raw_data :: proc{_raw_data_slice, _raw_data_dynamic, _raw_data_fixed, _raw_data_array, _raw_data_simd, _raw_data_matrix, _raw_data_multi_fixed, _raw_data_multi_array, _raw_data_multi_simd, _raw_data_multi_matrix, _raw_data_string, _raw_data_string16}
 
 /*
 	This is interally from the compiler

@@ -714,6 +714,12 @@ are_same_size :: proc(ast_context: ^AstContext, a, b: ^ast.Expr) -> bool {
 			if _, ok := b_symbol.value.(SymbolPolyTypeValue); ok {
 				return true
 			}
+			if _, enum_index := a_symbol.value.(SymbolEnumValue); enum_index {
+				if _, other_enum := b_symbol.value.(SymbolEnumValue); other_enum {
+					return is_symbol_same_typed(ast_context, a_symbol, b_symbol)
+				}
+				return false
+			}
 			if a_len, ok := a_symbol.value.(SymbolUntypedValue); ok && a_len.type == .Integer {
 				if b_len, ok := b_symbol.value.(SymbolUntypedValue); ok && b_len.type == .Integer {
 					return a_len.tok.text == b_len.tok.text
@@ -1699,6 +1705,9 @@ resolve_value_type_expression :: proc(ast_context: ^AstContext, expr: ^ast.Expr)
 	case ^ast.Paren_Expr:
 		return resolve_value_type_expression(ast_context, v.expr)
 	case ^ast.Call_Expr:
+		call_context := ast_context^
+		call_context.call = v
+		ast_context := &call_context
 		callee := Symbol{}
 		if name,ok:=v.expr.derived.(^ast.Ident);ok&&name.pos.offset==name.end.offset{
 			ok:=internal_resolve_type_expression(ast_context,v,&callee)
@@ -1707,6 +1716,7 @@ resolve_value_type_expression :: proc(ast_context: ^AstContext, expr: ^ast.Expr)
 		if !internal_resolve_type_expression(ast_context, v.expr, &callee) {
 			return {}, false
 		}
+		if builtin_proc_name(callee) == "type_of" { return resolve_type_of_call(ast_context, v) }
 		#partial switch _ in callee.value{
 		case SymbolStructValue,SymbolUnionValue,SymbolBasicValue:
 			ok:=internal_resolve_type_expression(ast_context,v,&callee)
@@ -2222,23 +2232,7 @@ resolve_call_expr :: proc(ast_context: ^AstContext, v: ^ast.Call_Expr) -> (Symbo
 	symbol := Symbol{}
 	// The function being called may be a local variable
 	ast_context.use_locals = true
-	if ident, ok := v.expr.derived.(^ast.Ident); ok && len(v.args) >= 1 {
-		switch ident.name {
-		case "type_of":
-			ast_context.call = nil
-			ok = internal_resolve_type_expression(ast_context, v.args[0], &symbol)
-			// The operand may carry variable/mutability flags, but type_of
-			// itself denotes its type rather than another value of that type.
-			symbol.flags -= {.Variable, .Mutable, .Immutable, .Parameter}
-			symbol.type = .Type
-			#partial switch _ in symbol.value {
-			case SymbolStructValue, SymbolBitFieldValue: symbol.type = .Struct
-			case SymbolEnumValue, SymbolUnionValue, SymbolBitSetValue: symbol.type = .Enum
-			case SymbolProcedureValue: symbol.type = .Type_Function
-			}
-			return symbol, ok
-		}
-	} else if call, ok := v.expr.derived.(^ast.Call_Expr); ok {
+	if call, ok := v.expr.derived.(^ast.Call_Expr); ok {
 		// handle the case where we immediately call a proc returned by another proc
 		// in this case we don't want to resolve all possibilities for a proc overload
 		ast_context.resolve_specific_overload = true
@@ -2259,6 +2253,7 @@ resolve_call_expr :: proc(ast_context: ^AstContext, v: ^ast.Call_Expr) -> (Symbo
 	}
 
 	ok := internal_resolve_type_expression(ast_context, v.expr, &symbol)
+	if ok && builtin_proc_name(symbol) == "type_of" { return resolve_type_of_call(ast_context, v) }
 	if ok {
 		symbol = contextualize_objc_call_symbol(ast_context, symbol, v)
 	}
@@ -2954,13 +2949,12 @@ resolve_identifier_expr :: proc(
 		ast_context.call = cast(^ast.Call_Expr)orig_expr
 		defer ast_context.call = old_call
 
-		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.name=="type_of" {
-			symbol,ok=resolve_call_expr(ast_context,v)
-		} else if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
+		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
 			ok=internal_resolve_type_expression(ast_context,v,&symbol)
 		} else if _, ok = v.expr.derived.(^ast.Basic_Directive); ok {
 			symbol, ok = resolve_call_directive(ast_context, v)
 		} else if ok = internal_resolve_type_expression(ast_context, v.expr, &symbol); ok {
+			if builtin_proc_name(symbol) == "type_of" { return resolve_type_of_call(ast_context, v) }
 			#partial switch _ in symbol.value {
 			case SymbolStructValue, SymbolUnionValue, SymbolBasicValue:
 				ok=internal_resolve_type_expression(ast_context,v,&symbol)
@@ -3024,13 +3018,13 @@ is_type_alias_call :: proc(ast_context: ^AstContext, expr: ^ast.Expr) -> bool {
 	}
 	call := expr.derived.(^ast.Call_Expr) or_return
 	if name, ok := call.expr.derived.(^ast.Ident); ok {
-		if name.name == "type_of" { return true }
 		if name.pos.offset == name.end.offset { return false }
 	}
 	alias_context := ast_context^
 	alias_context.call = nil
 	callee, found := resolve_type_expression(&alias_context, call.expr)
 	if !found { return false }
+	if builtin_proc_name(callee) == "type_of" { return true }
 	#partial switch value in callee.value {
 	case SymbolStructValue: return value.poly != nil
 	case SymbolUnionValue: return value.poly != nil

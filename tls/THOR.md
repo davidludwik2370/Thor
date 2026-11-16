@@ -36,6 +36,16 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 
 ## Current support
 
+- Resolve the 27 global compiler builtins through direct calls, local aliases
+  and package re-exports. Result inference covers array/SIMD swizzles, SOA column
+  extraction, nested packing/expansion, type-producing `type_of` aliases and
+  runtime type metadata. Numeric and string results retain their actual types,
+  including imaginary literals and enum-indexed array bounds. `raw_data` also
+  handles wide strings, matrices and multi-pointers to supported containers.
+  Runtime builtin allocation and container procedures use their native generic
+  declarations. Regression tests exercise hover, completion, unsaved updates,
+  shadowing and checked/unchecked Odin and Thor programs.
+
 - Infer `soa_zip` results and aliases such as `thor:basic.zip` from the caller's
   slice columns. Hover and field completion show the anonymous row's named or
   positional fields in loops and indexed values, including imported types and

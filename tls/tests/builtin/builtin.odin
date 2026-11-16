@@ -7,6 +7,7 @@ package ols_builtin
 @builtin expand_values   :: proc(value: Struct_Or_Array) -> (A, B, C, ..) ---
 @builtin compress_values :: proc(values: ..) -> Struct_Or_Array_Like_Type ---
 @builtin soa_zip :: proc(arrays: ..) -> Soa_Slice ---
+@builtin soa_unzip :: proc(array: Soa_Slice) -> (Slices, ..) ---
 
 size_of      :: proc($T: typeid) -> int ---
 @builtin align_of     :: proc($T: typeid) -> int ---
@@ -14,10 +15,7 @@ size_of      :: proc($T: typeid) -> int ---
 @builtin type_info_of :: proc($T: typeid) -> ^runtime.Type_Info ---
 @builtin typeid_of    :: proc($T: typeid) -> typeid ---
 
-offset_of_selector :: proc(selector: $T) -> uintptr ---
-offset_of_member   :: proc($T: typeid, member: $M) -> uintptr ---
-
-@builtin offset_of :: proc{offset_of_selector, offset_of_member}
+@builtin offset_of :: proc(value_or_type: expr, member: Field_Name = nil) -> uintptr ---
 
 @builtin offset_of_by_string :: proc($T: typeid, member: string) -> uintptr ---
 
@@ -35,6 +33,22 @@ conj       :: proc(value: Complex_Or_Quaternion) -> Complex_Or_Quaternion ---
 @builtin max   :: proc(values: ..T) -> T ---
 @builtin abs   :: proc(value: T) -> T ---
 @builtin clamp :: proc(value, minimum, maximum: T) -> T ---
+
+@builtin unreachable :: proc() -> ! ---
+
+@(private="file") _raw_data_slice   :: proc(value: []$E)         -> [^]E    ---
+@(private="file") _raw_data_dynamic :: proc(value: [dynamic]$E)  -> [^]E    ---
+@(private="file") _raw_data_fixed   :: proc(value: ^[dynamic; $N]$E) -> [^]E ---
+@(private="file") _raw_data_array   :: proc(value: ^[$N]$E)      -> [^]E    ---
+@(private="file") _raw_data_simd    :: proc(value: ^#simd[$N]$E) -> [^]E    ---
+@(private="file") _raw_data_matrix  :: proc(value: ^matrix[$R,$C]$E) -> [^]E ---
+@(private="file") _raw_data_multi_fixed :: proc(value: [^][dynamic; $N]$E) -> [^]E ---
+@(private="file") _raw_data_multi_array :: proc(value: [^][$N]$E) -> [^]E ---
+@(private="file") _raw_data_multi_simd :: proc(value: [^]#simd[$N]$E) -> [^]E ---
+@(private="file") _raw_data_multi_matrix :: proc(value: [^]matrix[$R,$C]$E) -> [^]E ---
+@(private="file") _raw_data_string  :: proc(value: string)       -> [^]byte ---
+@(private="file") _raw_data_string16 :: proc(value: string16) -> [^]u16 ---
+@builtin raw_data :: proc{_raw_data_slice, _raw_data_dynamic, _raw_data_fixed, _raw_data_array, _raw_data_simd, _raw_data_matrix, _raw_data_multi_fixed, _raw_data_multi_array, _raw_data_multi_simd, _raw_data_multi_matrix, _raw_data_string, _raw_data_string16}
 
 /*
 	This is interally from the compiler

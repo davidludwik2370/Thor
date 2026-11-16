@@ -6,6 +6,34 @@ import "core:odin/tokenizer"
 import "core:strconv"
 import "core:strings"
 
+// Alias names and packages change during lookup. The original builtin identity
+// belongs to the resolved declaration, including for parenthesized re-exports.
+builtin_proc_name :: proc(symbol: Symbol) -> string {
+	if procedure, found := symbol.value.(SymbolProcedureValue); found && procedure.builtin_name != "" {
+		return procedure.builtin_name
+	}
+	if symbol.pkg == "$builtin" { return symbol.name }
+	return ""
+}
+
+resolve_type_of_call :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -> (Symbol, bool) {
+	if len(call.args) != 1 { return {}, false }
+	argument_context := ast_context^
+	argument_context.call = nil
+	argument_context.use_locals = true
+	argument_context.current_package = get_package_from_node(call)
+	symbol, found := resolve_value_type_expression(&argument_context, call.args[0])
+	if !found { return {}, false }
+	symbol.flags -= {.Variable, .Mutable, .Immutable, .Parameter}
+	symbol.type = .Type
+	#partial switch _ in symbol.value {
+	case SymbolStructValue, SymbolBitFieldValue: symbol.type = .Struct
+	case SymbolEnumValue, SymbolUnionValue, SymbolBitSetValue: symbol.type = .Enum
+	case SymbolProcedureValue: symbol.type = .Type_Function
+	}
+	return symbol, true
+}
+
 // Preserve the original call AST: only Thor's builtin spread forms gain an
 // element result and, for '..', an optional boolean result.
 thor_extrema_return :: proc(ast_context: ^AstContext, symbol: Symbol, call: ^ast.Call_Expr) -> (element: ^ast.Expr, optional: bool, ok: bool) {
@@ -64,10 +92,8 @@ check_builtin_proc_return_type :: proc(
 	bool,
 ) {
 	if element, _, found := thor_extrema_return(ast_context, symbol, call); found { return element, true }
-	procedure, builtin := symbol.value.(SymbolProcedureValue)
-	if symbol.pkg == "$builtin" || builtin && procedure.builtin_name != "" {
-		name := symbol.name
-		if procedure.builtin_name != "" { name = procedure.builtin_name }
+	name := builtin_proc_name(symbol)
+	if name != "" {
 		// Resolving an imported callee changes package/local lookup settings;
 		// its arguments still belong to the caller's lexical scope.
 		argument_context := ast_context^
@@ -77,7 +103,47 @@ check_builtin_proc_return_type :: proc(
 		switch name {
 		case "soa_zip":
 			return soa_zip_return_type(ast_context, call)
+		case "soa_unzip":
+			return soa_unzip_return_type(ast_context, call)
+		case "swizzle":
+			if len(call.args) < 3 { return nil, false }
+			column, found := resolve_value_type_expression(ast_context, call.args[0])
+			if !found || column.pointers != 0 { return nil, false }
+			array, found_array := column.value.(SymbolFixedArrayValue)
+			if !found_array { return nil, false }
+			if .Simd not_in column.flags {
+				length := get_return_expr(ast_context, array.len, false)
+				if literal, found := length.derived.(^ast.Basic_Lit); found {
+					if count, parsed := strconv.parse_int(literal.tok.text, 0); parsed && count == len(call.args)-1 {
+						return get_return_expr(ast_context, call.args[0], is_mutable), true
+					}
+				}
+			}
+			result := new_type(ast.Array_Type, call.pos, call.end, ast_context.allocator)
+			result.elem = array.expr
+			count := new_type(ast.Basic_Lit, call.pos, call.end, ast_context.allocator)
+			count.tok = {kind=.Integer, text=fmt.aprintf("%d", len(call.args)-1, allocator=ast_context.allocator)}
+			result.len = count
+			if .Simd in column.flags {
+				tag := new_type(ast.Basic_Directive, call.pos, call.pos, ast_context.allocator)
+				tag.name = "simd"
+				result.tag = tag
+			}
+			return result, true
+		case "type_info_of":
+			return make_symbol_type_reference(ast_context, Symbol{name="Type_Info", pkg=indexer.runtime_package, pointers=1}, call), true
+		case "type_of":
+			if len(call.args) == 1 { return get_return_expr(ast_context, call.args[0], true), true }
 		case "max", "min":
+			if len(call.args) == 1 {
+				if value, found := resolve_value_type_expression(ast_context, call.args[0]); found {
+					if array, found_array := value.value.(SymbolFixedArrayValue); found_array {
+						if index, found_index := resolve_value_type_expression(ast_context, array.len); found_index {
+							if _, is_enum := index.value.(SymbolEnumValue); is_enum { return array.len, true }
+						}
+					}
+				}
+			}
 			curr_candidate: ^ast.Basic_Lit
 			curr_value := 0.0
 			for arg, i in call.args {
@@ -210,12 +276,10 @@ check_builtin_proc_return_type :: proc(
 			types := make([]string, args_len, context.temp_allocator)
 
 			for i in 0 ..< args_len {
-				if expr, typ, r_amt, ok := get_expr_return_value(ast_context, call.args[i], false); ok {
-					if r_amt >= 1 {
-						contains_proc_return = true
-					}
+				if expr, typ, r_amt, ok := get_expr_return_value(ast_context, call.args[i]); ok {
 					if r_amt >= 2 {
-						flattened_len += r_amt
+						contains_proc_return = true
+						flattened_len += r_amt-1
 					}
 					exprs[i] = expr
 					types[i] = typ
@@ -331,6 +395,43 @@ soa_zip_return_type :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -> (
 }
 
 @(private = "file")
+soa_unzip_return_type :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -> (^ast.Expr, bool) {
+	if len(call.args) != 1 { return nil, false }
+	container, found := resolve_value_type_expression(ast_context, call.args[0])
+	if !found || .Soa not_in container.flags || container.pointers != 0 { return nil, false }
+	slice, found_slice := container.value.(SymbolSliceValue)
+	if !found_slice { return nil, false }
+	row: Symbol
+	found_row := internal_resolve_type_expression(ast_context, slice.expr, &row)
+	if !found_row { return nil, false }
+	fields, found_fields := row.value.(SymbolStructValue)
+	if !found_fields { return nil, false }
+	results := make([dynamic]^ast.Expr, ast_context.allocator)
+	for field, index in fields.types {
+		if index < len(fields.from_usings) && fields.from_usings[index] != -1 { continue }
+		column := new_type(ast.Array_Type, call.pos, call.end, ast_context.allocator)
+		column.elem = field
+		append(&results, column)
+	}
+	return make_result_call(call, results[:], ast_context.allocator), true
+}
+
+@(private = "file")
+make_result_call :: proc(source: ^ast.Expr, results: []^ast.Expr, allocator := context.temp_allocator) -> ^ast.Call_Expr {
+	call := new_type(ast.Call_Expr, source.pos, source.end, allocator)
+	type := new_type(ast.Proc_Type, source.pos, source.end, allocator)
+	type.results = new_type(ast.Field_List, source.pos, source.end, allocator)
+	type.results.list = make([]^ast.Field, len(results), allocator)
+	for result, index in results {
+		field := new_type(ast.Field, source.pos, source.end, allocator)
+		field.type = result
+		type.results.list[index] = field
+	}
+	call.expr = type
+	return call
+}
+
+@(private = "file")
 builtin_numeric_component :: proc(name: string) -> string {
 	switch name {
 	case "complex32", "quaternion64": return "f16"
@@ -346,6 +447,13 @@ get_return_expr :: proc(ast_context: ^AstContext, expr: ^ast.Expr, is_mutable: b
 		return get_return_expr(ast_context, v.value, is_mutable)
 	}
 	if symbol, ok := resolve_value_type_expression(ast_context, expr); ok {
+		#partial switch _ in symbol.value {
+		case SymbolFixedArrayValue, SymbolMatrixValue:
+			if symbol.type_expr != nil { return symbol.type_expr }
+			if symbol.value_expr != nil {
+				if literal, found := symbol.value_expr.derived.(^ast.Comp_Lit); found && literal.type != nil { return literal.type }
+			}
+		}
 		if v, ok := symbol.value.(SymbolBasicValue); ok {
 			return v.ident
 		} else if v, ok := symbol.value.(SymbolUntypedValue); ok {
@@ -361,11 +469,7 @@ get_return_expr :: proc(ast_context: ^AstContext, expr: ^ast.Expr, is_mutable: b
 convert_candidate :: proc(candidate: ^ast.Basic_Lit, is_mutable: bool) -> ^ast.Expr {
 	if is_mutable {
 		ident := new_type(ast.Ident, candidate.pos, candidate.end, context.temp_allocator)
-		if candidate.tok.kind == .Integer {
-			ident.name = "int"
-		} else {
-			ident.name = "f64"
-		}
+		ident.name = token_kind_to_str(candidate.tok)
 		return ident
 	}
 
@@ -473,11 +577,8 @@ compare_basic_lit_value :: proc(a, b: f64, name: string) -> bool {
 token_kind_to_str :: proc(tok: tokenizer.Token) -> string {
 	#partial switch tok.kind {
 	case .Imag:
-		if v, ok := strconv.parse_complex64(tok.text); ok {
-			return "complex64"
-		} else {
-			return "quaternion64"
-		}
+		if strings.has_suffix(tok.text, "j") || strings.has_suffix(tok.text, "k") { return "quaternion256" }
+		return "complex128"
 	case .Integer:
 		return "int"
 	case .Float:
@@ -497,7 +598,6 @@ token_kind_to_str :: proc(tok: tokenizer.Token) -> string {
 get_expr_return_value :: proc(
 	ast_context: ^AstContext,
 	n: ^ast.Expr,
-	is_proc_return: bool,
 	allocator := context.temp_allocator,
 ) -> (
 	^ast.Expr,
@@ -507,22 +607,30 @@ get_expr_return_value :: proc(
 ) {
 	#partial switch i in n.derived {
 	case ^ast.Call_Expr:
-		if s, s_ok := resolve_call_expr(ast_context, i); s_ok {
-			if v, v_ok := s.value.(SymbolProcedureValue); v_ok {
-				ast_context.call = i
-				if g, g_ok := resolve_generic_function_symbol(
-					ast_context,
-					v.orig_arg_types,
-					v.orig_return_types,
-					v.inlining,
-					s,
-				); g_ok {
-					return get_symbol_return_value(ast_context, i, g, true, allocator)
+		call_context := ast_context^
+		call_context.call = i
+		callee, found := resolve_call_expr(&call_context, i)
+		if !found { return nil, "", 0, false }
+		if _, procedure := callee.value.(SymbolProcedureValue); !procedure {
+			return get_expr_return_value(&call_context, i.expr, allocator)
+		}
+		results := get_proc_return_types(&call_context, callee, i, true)
+		if len(results) == 0 { return nil, "", 0, false }
+		for &result in results {
+			if value, found := resolve_value_type_expression(&call_context, result); found {
+				if untyped, found_untyped := value.value.(SymbolUntypedValue); found_untyped {
+					ident := new_type(ast.Ident, result.pos, result.end, allocator)
+					ident.name = token_kind_to_str(untyped.tok)
+					result = ident
 				}
 			}
 		}
-
-		return get_expr_return_value(ast_context, i.expr, true, allocator)
+		if len(results) == 1 {
+			return results[0], node_to_string(results[0]), 1, true
+		}
+		tuple := new_type(ast.Comp_Lit, n.pos, n.end, allocator)
+		tuple.elems = results
+		return tuple, node_to_string(tuple), len(results), true
 
 	case ^ast.Basic_Lit:
 		ident := new_type(ast.Ident, n.pos, n.end, allocator)
@@ -531,7 +639,7 @@ get_expr_return_value :: proc(
 
 	case:
 		if v, v_ok := resolve_type_expression(ast_context, n); v_ok {
-			return get_symbol_return_value(ast_context, n, v, is_proc_return, allocator)
+			return get_symbol_return_value(ast_context, n, v, allocator)
 		}
 	}
 
@@ -543,7 +651,6 @@ get_symbol_return_value :: proc(
 	ast_context: ^AstContext,
 	n: ^ast.Expr,
 	symbol: Symbol,
-	is_proc_return: bool,
 	allocator := context.temp_allocator,
 ) -> (
 	expr: ^ast.Expr,
@@ -570,52 +677,14 @@ get_symbol_return_value :: proc(
 		}
 
 		untyped = .Variable in symbol.flags && .Mutable in symbol.flags == false ? true : false
-		expr = symbol_to_expr(symbol, ast_context.fullpath)
-		bl := expr.derived.(^ast.Basic_Lit) or_return
-		bl.tok.text = token_kind_to_str(bl.tok)
-		expr = wrap_pointer(bl, symbol.pointers)
+		ident := new_type(ast.Ident, n.pos, n.end, allocator)
+		ident.name = token_kind_to_str(sym_val.tok)
+		expr = wrap_pointer(ident, symbol.pointers)
 		name := untyped ? fmt.tprintf("u %v", node_to_string(&expr.expr_base)) : node_to_string(&expr.expr_base)
 		return expr, name, 0, true
 
 
 	case SymbolProcedureValue:
-		if symbol.name == "" {
-			ident := new_type(ast.Ident, n.pos, n.end, allocator)
-			ident.name = "nil"
-			return ident, ident.name, 0, true
-		}
-
-		if is_proc_return {
-			return_len = len(sym_val.return_types)
-
-			if return_len == 1 {
-				expr, str, _ = get_expr_return_value(
-					ast_context,
-					sym_val.return_types[0].type,
-					is_proc_return,
-					allocator,
-				) or_return
-
-				return expr, str, 1, true
-			}
-
-			cl := new_type(ast.Comp_Lit, n.pos, n.end, allocator)
-			cl.elems = make([]^ast.Expr, return_len, allocator)
-
-			for i in 0 ..< return_len {
-				val, _, _ := get_expr_return_value(
-					ast_context,
-					sym_val.return_types[i].type,
-					is_proc_return,
-					allocator,
-				) or_return
-
-				cl.elems[i] = val
-			}
-
-			return cl, node_to_string(&expr.expr_base), return_len, true
-		}
-
 		expr = symbol_to_expr(symbol, ast_context.fullpath, allocator)
 		return expr, node_to_string(expr), 0, true
 
@@ -651,52 +720,29 @@ expand_values :: proc(
 	ce: ^ast.Call_Expr,
 	ok: bool,
 ) {
-	new_expr, _, _ := get_expr_return_value(ast_context, expr, false, allocator) or_return
+	value, found := resolve_value_type_expression(ast_context, expr)
+	if !found || value.pointers != 0 { return nil, false }
 	expanded_exprs := make([dynamic]^ast.Expr, allocator)
 
-	#partial switch v in new_expr.derived {
-	case ^ast.Array_Type:
-		if v.len == nil {
+	#partial switch v in value.value {
+	case SymbolFixedArrayValue:
+		length_expr := get_return_expr(ast_context, v.len, false)
+		if literal, found := length_expr.derived.(^ast.Basic_Lit); found {
+			length := strconv.parse_int(literal.tok.text, 0) or_return
+			for _ in 0 ..< length {
+				append(&expanded_exprs, v.expr)
+			}
+		} else {
 			return nil, false
 		}
-		if l, l_ok := v.len.derived.(^ast.Basic_Lit); l_ok {
-			length := strconv.parse_int(l.tok.text, 10) or_return
-			for _ in 0 ..< length {
-				append(&expanded_exprs, v.elem)
-			}
-		}
-	case ^ast.Struct_Type:
-		for &elem in v.fields.list {
-			for &_ in elem.names {
-				append(&expanded_exprs, elem.type)
-			}
-		}
-	case ^ast.Ident:
-		if s, s_ok := struct_type_from_identifier(ast_context, v^); s_ok {
-			for &elem in s.fields.list {
-				for &_ in elem.names {
-					append(&expanded_exprs, elem.type)
-				}
-			}
+	case SymbolStructValue:
+		for field, index in v.types {
+			if index < len(v.from_usings) && v.from_usings[index] != -1 { continue }
+			append(&expanded_exprs, field)
 		}
 	case:
 		return nil, false
 	}
 
-	ce = new_type(ast.Call_Expr, expr.pos, expr.end, allocator)
-	pt := new_type(ast.Proc_Type, expr.pos, expr.end, allocator)
-	pt.results = new_type(ast.Field_List, expr.pos, expr.end, allocator)
-	pt.results.list = make([]^ast.Field, len(expanded_exprs), allocator)
-
-	for i in 0 ..< len(expanded_exprs) {
-		f := new_type(ast.Field, expr.pos, expr.end, allocator)
-		f.type = expanded_exprs[i]
-		pt.results.list[i] = f
-	}
-
-	ce.expr = pt
-	ce.derived_expr = pt
-	ce.derived = ce
-
-	return ce, true
+	return make_result_call(expr, expanded_exprs[:], allocator), true
 }
