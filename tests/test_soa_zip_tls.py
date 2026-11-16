@@ -11,6 +11,102 @@ class SoaZipTLSTests(unittest.TestCase):
     open = base.TLSTests.open
     position = staticmethod(base.TLSTests.position)
     hover = base.TLSTests.hover
+    semantic_spans = base.TLSTests.semantic_spans
+
+    def assert_column_modifiers(self, client, path, text, expected):
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        spans=self.semantic_spans(client,path,text)
+        for name,immutable in expected.items():
+            fields=[span for span in spans if span[2]=='property' and span[3]==name]
+            self.assertTrue(fields,name)
+            for field in fields:
+                self.assertEqual(bool(field[4]&readonly),immutable,(name,field))
+
+    def test_named_column_modifiers_follow_the_view_and_each_input_through_aliases(self):
+        for imports,alias,callee in [
+            ('','','soa_zip'),
+            ('','zip::soa_zip\nagain::(zip)\n','again'),
+            ('import "thor:basic"','','basic.zip'),
+            ('import b "thor:basic"','','b.zip'),
+            ('import * "thor:basic"','','zip'),
+            ('import _ "thor:basic" / zip','','zip'),
+        ]:
+            with self.subTest(callee=callee):
+                text='''// 😀 original column positions
+package main
+IMPORTS
+main::proc(){
+    ALIAS
+    readonly_values:>[]int{1}
+    mutable_values:=[]int{2}
+    mixed:=CALLEE(protected_column=readonly_values,editable_column=mutable_values)
+    frozen:>(CALLEE(frozen_column=mutable_values))
+    _=mixed;_=frozen
+}
+'''.replace('IMPORTS',imports).replace('ALIAS',alias).replace('CALLEE',callee)
+                client,path=self.open(text,compiler=False)
+                self.assert_column_modifiers(client,path,text,{
+                    'protected_column':True,'editable_column':False,'frozen_column':True})
+
+    def test_named_column_modifiers_preserve_provenance_copies_and_shallow_boundaries(self):
+        text='''package main
+import "core:slice"
+import * "thor:basic"
+Holder::struct{items:[]int}
+identity::proc(values:[]int)->[]int{return values}
+count_rows::proc(rows:#soa[]$T)->int{return len(rows)}
+main::proc(){
+    Kind::enum{a}
+    mutable_kinds:=[]Kind{.a}
+    immutable_kinds:>[]Kind{.a}
+    immutable_values:>[]int{1}
+    mutable_values:=[]int{2}
+    fixed_values:>[1]int{3}
+    dynamic_values:>[dynamic]int{}
+    holder:=Holder{mutable_values}
+    pointer:>&holder
+    frozen_holder:>Holder{mutable_values}
+    copied_holder:=frozen_holder
+    view:=zip(
+        forwarded_column=identity(immutable_values),
+        copied_column=copied_holder.items,
+        fixed_column=fixed_values[:],
+        dynamic_column=dynamic_values[:],
+        pointer_column=pointer.items,
+        fresh_column=slice.clone(immutable_values),
+        mutable_enum_column=mutable_kinds,
+        immutable_enum_column=immutable_kinds,
+    )
+    choice:=true
+    chosen:>choice ? soa_zip(branch_column=mutable_values) : soa_zip(branch_column=mutable_values)
+    count:>count_rows(soa_zip(temporary_column=mutable_values))
+    {
+        soa_zip::proc(ordinary_argument:[]int)->int{return len(ordinary_argument)}
+        ordinary:>soa_zip(ordinary_argument=mutable_values)
+        _=ordinary
+    }
+    _=view;_=chosen;_=count
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assert_column_modifiers(client,path,text,{
+            'forwarded_column':True,'copied_column':True,'fixed_column':True,
+            'dynamic_column':False,'pointer_column':False,'fresh_column':False,
+            'mutable_enum_column':False,'immutable_enum_column':True,
+            'branch_column':True,'temporary_column':False,'ordinary_argument':False})
+
+    def test_named_column_modifiers_refresh_after_unsaved_mutability_changes(self):
+        text='package main\nmain::proc(){values:=[]int{1};rows:=soa_zip(column=values);_=rows}\n'
+        client,path=self.open(text,compiler=False)
+        variants=[(text,False),(text.replace('values:=','values:>'),True),
+                  (text.replace('rows:=','rows:>'),True),(text,False)]
+        for version,(changed,immutable) in enumerate(variants,1):
+            if version>1:
+                client.send('textDocument/didChange',{
+                    'textDocument':{'uri':path.as_uri(),'version':version},'contentChanges':[{'text':changed}]})
+            self.assert_column_modifiers(client,path,changed,{'column':immutable})
+        self.assertEqual(path.read_text(),text)
 
     def complete(self, client, path, text, needle):
         result = client.request('textDocument/completion', {

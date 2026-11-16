@@ -126,6 +126,8 @@ SemanticTokenBuilder :: struct {
 	symbols:       SymbolAndNodeMap,
 	src:           string,
 	call_target:   ^ast.Node,
+	immutable_value: ^ast.Expr,
+	readonly_offsets: map[int]bool,
 }
 
 SemanticTokenEntry :: struct {
@@ -159,6 +161,7 @@ get_semantic_tokens :: proc(
 		entries = make([dynamic]SemanticTokenEntry, 0, 2000, context.temp_allocator),
 		symbols = symbols,
 		src     = ast_context.file.src,
+		readonly_offsets = thor_slice_readonly_offsets(document.fullpath, document.text[:document.used_text]),
 	}
 
 	margin := 20
@@ -349,7 +352,25 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		builder.call_target = callee
 		if name,ok:=n.expr.derived.(^ast.Ident);!ok||name.pos.offset!=name.end.offset{visit_node(n.expr, builder)}
 		builder.call_target = previous
-		visit_nodes(n.args, builder)
+		callee_symbol, found := builder.symbols[cast(uintptr)callee]
+		if found && builtin_proc_name(callee_symbol.symbol) == "soa_zip" {
+			immutable_result := semantic_zip_result_is_readonly(n, builder.immutable_value)
+			for argument in n.args {
+				if field, named := argument.derived.(^ast.Field_Value); named {
+					modifiers: SemanticTokenModifiers
+					if immutable_result || builder.readonly_offsets[field.field.pos.offset] ||
+					   semantic_zip_column_is_readonly(field.value, builder) {
+						modifiers += {.ReadOnly}
+					}
+					write_semantic_node(builder, field.field, .Property, modifiers)
+					visit_node(field.value, builder)
+				} else {
+					visit_node(argument, builder)
+				}
+			}
+		} else {
+			visit_nodes(n.args, builder)
+		}
 	case ^ast.Implicit_Selector_Expr:
 		write_semantic_node(builder, n.field, .EnumMember)
 	case ^ast.Array_Type:
@@ -385,7 +406,9 @@ visit_node :: proc(node: ^ast.Node, builder: ^SemanticTokenBuilder) {
 		visit_node(n.elem, builder)
 	case ^ast.Field_Value:
 		if ident, ok := n.field.derived.(^ast.Ident); ok {
-			write_semantic_node(builder, n.field, .Property)
+			modifiers: SemanticTokenModifiers
+			if builder.readonly_offsets[ident.pos.offset] { modifiers += {.ReadOnly} }
+			write_semantic_node(builder, n.field, .Property, modifiers)
 		} else {
 			visit_node(n.field, builder)
 		}
@@ -486,7 +509,63 @@ visit_value_decl :: proc(value_decl: ast.Value_Decl, builder: ^SemanticTokenBuil
 	}
 
 	visit_node(value_decl.type, builder)
-	visit_nodes(value_decl.values, builder)
+	previous_value := builder.immutable_value
+	for value in value_decl.values {
+		builder.immutable_value = nil
+		if .ReadOnly in modifiers { builder.immutable_value = value }
+		visit_node(value, builder)
+	}
+	builder.immutable_value = previous_value
+}
+
+// Only follow expressions that forward the constructed view. An immutable
+// result from an unrelated outer call does not freeze that call's arguments.
+semantic_zip_result_is_readonly :: proc(call: ^ast.Call_Expr, value: ^ast.Expr, depth := 0) -> bool {
+	if value == nil || depth >= 64 { return false }
+	value := ast.unparen_expr(value)
+	if value == call { return true }
+	#partial switch n in value.derived {
+	case ^ast.Ternary_If_Expr:
+		return semantic_zip_result_is_readonly(call, n.x, depth+1) ||
+		       semantic_zip_result_is_readonly(call, n.y, depth+1)
+	case ^ast.Ternary_When_Expr:
+		return semantic_zip_result_is_readonly(call, n.x, depth+1) ||
+		       semantic_zip_result_is_readonly(call, n.y, depth+1)
+	case ^ast.Type_Cast:
+		return semantic_zip_result_is_readonly(call, n.expr, depth+1)
+	case ^ast.Auto_Cast:
+		return semantic_zip_result_is_readonly(call, n.expr, depth+1)
+	case ^ast.Slice_Expr:
+		return semantic_zip_result_is_readonly(call, n.expr, depth+1)
+	}
+	return false
+}
+
+// Use the semantic map already resolved for this document. Header immutability
+// stops at pointers, maps and dynamic arrays, whose targets stay writable.
+semantic_zip_column_is_readonly :: proc(value: ^ast.Expr, builder: ^SemanticTokenBuilder, depth := 0) -> bool {
+	if value == nil || depth >= 64 { return false }
+	value := ast.unparen_expr(value)
+	entry, found := builder.symbols[cast(uintptr)value]
+	if found {
+		if entry.symbol.pointers > 0 { return false }
+		#partial switch _ in entry.symbol.value {
+		case SymbolMultiPointerValue, SymbolMapValue, SymbolDynamicArrayValue:
+			return false
+		}
+	}
+	#partial switch n in value.derived {
+	case ^ast.Ident:
+		return found && (.Immutable in entry.symbol.flags ||
+		       .CompileTime in entry.symbol.flags && .Mutable not_in entry.symbol.flags && .Parameter not_in entry.symbol.flags)
+	case ^ast.Selector_Expr:
+		return semantic_zip_column_is_readonly(n.expr, builder, depth+1)
+	case ^ast.Index_Expr:
+		return semantic_zip_column_is_readonly(n.expr, builder, depth+1)
+	case ^ast.Slice_Expr:
+		return semantic_zip_column_is_readonly(n.expr, builder, depth+1)
+	}
+	return false
 }
 
 visit_label :: proc(label: ^ast.Expr, builder: ^SemanticTokenBuilder) {
@@ -687,7 +766,7 @@ visit_ident :: proc(
 	}
 
 	modifiers := modifiers
-	if thor_slice_storage_readonly(ident.pos.file, ident.pos.offset) { modifiers += {.ReadOnly} }
+	if builder.readonly_offsets[ident.pos.offset] { modifiers += {.ReadOnly} }
 
 	if .Builtin in symbol.flags {
 		modifiers += {.DefaultLibrary}

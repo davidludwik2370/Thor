@@ -51,6 +51,11 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   positional fields in loops and indexed values, including imported types and
   generic column results. Unsaved column edits refresh the inferred fields, and
   completion works while a row selector is incomplete.
+  Named column labels carry readonly semantic tokens for an immutable zip view
+  or a readonly input column. Mixed column permissions and aliases retain their
+  individual colors, including compiler-proven readonly references through
+  copied records and helper results. Semantic responses share one validated
+  snapshot of compiler permission offsets.
 
 - Complete public package members after `/` or `,` in selective imports, including
   partial names, multiline/commented lists, relative and collection imports,

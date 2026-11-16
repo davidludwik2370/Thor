@@ -775,6 +775,9 @@ class SliceAccess:
                 for index,(arg,value) in enumerate(zip(args,values)):
                     name=arg.role('field').text if arg.kind=='FieldValue' else f'_{index}'
                     result.fields[name]=self.copied(value)
+                    if arg.kind=='FieldValue' and any(origin.seed is not None for origin in value.data):
+                        field=arg.role('field')
+                        self.readonly_access.setdefault(str(node.source.path),set()).add(field.start)
                     result.data.update(value.data)
                 return result
             if builtin=='soa_unzip' and values:

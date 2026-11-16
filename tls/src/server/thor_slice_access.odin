@@ -72,15 +72,16 @@ thor_slice_access_hints :: proc(document: ^Document, range: common.Range) -> []I
     return hints[:]
 }
 
-thor_slice_storage_readonly :: proc(file: string, offset: int) -> bool {
+thor_slice_readonly_offsets :: proc(file: string, source: []u8) -> map[int]bool {
     sync.lock(&thor_slice_mutex)
     defer sync.unlock(&thor_slice_mutex)
     info, found := thor_slice_info[file]
-    if !found { return false }
-    if document := &document_storage.documents[file]; document != nil {
-        if hash.fnv64a(document.text[:document.used_text]) != info.source_hash { return false }
-    }
-    return info.readonly_access[offset]
+    if !found || hash.fnv64a(source) != info.source_hash { return nil }
+    // A semantic-token response owns one snapshot. The compiler can publish a
+    // newer map concurrently, and the source hash is checked once per response.
+    offsets := make(map[int]bool, len(info.readonly_access), context.temp_allocator)
+    for offset, readonly in info.readonly_access { offsets[offset] = readonly }
+    return offsets
 }
 
 thor_delete_slice_info :: proc() {

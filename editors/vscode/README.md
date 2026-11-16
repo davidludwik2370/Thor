@@ -284,13 +284,20 @@ the selector to return to the theme's fallback, or adjust it when changing theme
 Struct member accesses also carry `property.readonly` when they refer to
 immutable value storage. This includes value parameters, `:>` structs, nested
 structs, fixed-array elements, and value-loop bindings. A pointer field itself
-can be readonly while fields of its pointee remain mutable. Slice/dynamic-array
-elements and reference-loop bindings likewise retain mutable member colors.
+can be readonly while fields of its pointee remain mutable. Slice elements use
+their view's permissions. Dynamic-array targets and writable reference-loop
+bindings retain mutable member colors.
 Struct field declarations stay neutral: the same type can have both mutable and
 immutable instances. A mutable copy (`copy := frozen`) and its fields use the
 mutable color even when the original instance is immutable.
 To explicitly match Dark Modern's immutable blue, add
 `"property.readonly:thor": "#4FC1FF"` alongside the parameter rule above.
+
+Named column labels in `soa_zip` and its aliases, including `basic.zip`, use
+this same readonly blue when the result is immutable or the column borrows a
+readonly input. A mutable zip can display different colors for its individual
+columns. Fresh mutable clones and pointer/dynamic-array targets keep their
+writable colors.
 
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS
 and the transpiler share the Thor parser, keeping their accepted syntax aligned.

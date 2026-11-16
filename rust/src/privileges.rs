@@ -2854,6 +2854,11 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             .unwrap_or(Type::Unknown);
                         fields.push((name.clone(), typ));
                         columns.insert(name, *value);
+                        if self.values[*value].data.iter().any(|origin| origin.seed.is_some()) {
+                            if let Some(field) = self.role(*arg, "field") {
+                                self.fact_event(cached::FactEvent::Readonly(field));
+                            }
+                        }
                     }
                     let result = self.value(Type::Soa(Box::new(Type::Anonymous(fields))));
                     self.values[result].fields = columns.into();
