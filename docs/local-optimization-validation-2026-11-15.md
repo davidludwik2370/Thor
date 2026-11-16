@@ -14,7 +14,7 @@ quiet measurements appear at the end of this report.
 
 The largest fixture still spends approximately 12 seconds lowering in the
 instrumented profile. Whole-SDK migration used the Mac-produced portable source
-on Linux because the migration's 10.5 GiB peak exceeds the VM's memory.
+on Linux because the migration's 10.2 GiB peak exceeds the VM's memory.
 The Linux baseline, builds, vet checks and test executions are native.
 Windows validation remains deferred. Reference-sensitive output-owner vet edits
 require manual review.
