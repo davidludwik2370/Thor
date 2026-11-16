@@ -521,8 +521,9 @@ class SliceAccess:
                 setattr(target,key,getattr(incoming,key))
             context.strong_updates=True
             return
-        self.changed|=(target.base or target).merge(value)
+        self.changed|=(target.base or target).merge(self.copied(value))
         for location in target.locations:
+            if value.path==location and not value.data and not value.storage:continue
             if location not in context.stores:context.stores[location]=self.copied(value);self.changed=True
             else:self.changed|=context.stores[location].merge(self.copied(value))
 
@@ -615,6 +616,26 @@ class SliceAccess:
                 tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.substitutions.items())),
                 tuple((name,SliceAccess.type_key(value,depth+1)) for name,value in sorted(typ.members.items())))
 
+    def identity_result(self,proc,index):
+        parameters=[(field,name.text.lstrip('$')) for name,field in self.parameters(proc)]
+        parameter=None
+        for returned in self.project.purity.walk(proc):
+            if returned.kind!='Return' or next((node for node in returned.ancestors()
+                    if node.kind=='Procedure'),None) is not proc:
+                continue
+            values=returned.group('values')
+            if index>=len(values):return None
+            value=values[index]
+            while value.kind=='Paren':value=value.role('expr')
+            symbol=self.r.symbol(value)
+            if value.text=='nil' and symbol is None:continue
+            if value.kind!='Ident' or symbol is None:return None
+            candidate=(symbol.declaration,symbol.name)
+            if candidate not in parameters:return None
+            if parameter is not None and candidate!=parameter:return None
+            parameter=candidate
+        return parameter
+
     def summary(self,proc,substitutions,caller=None,*,contract=True):
         checked=bool(caller and caller.checked) or self.project.purity.pure(proc) or self.project.purity.eval_mode and proc in self.project.purity.active
         key=proc,tuple(sorted((name,self.type_key(typ)) for name,typ in substitutions.items())),contract,checked
@@ -636,9 +657,15 @@ class SliceAccess:
         result_fields=proc.role('type').role('results')
         for name,typ_node in self.r.fields(result_fields):
             typ=self.r.type_node(typ_node,substitutions)
-            result=Value(typ);context.results.append(result)
+            result=Value(typ)
             field=next((field for field in result_fields.children if field.kind=='Field' and any(n.text==name and n.data.get('name')!='_' for n in field.group('names'))),None)
             key=(field,name) if field and name else None
+            if key is None and typ.kind in {'slice','soa','dynamic','map','set','pointer','unknown','generic','union'}:
+                parameter=self.identity_result(proc,len(context.results))
+                if parameter in context.env:
+                    result=self.copied(context.env[parameter])
+                    result.typ=typ
+            context.results.append(result)
             context.named_results.append(key)
             if key:context.env[key]=result
         context.active=True;self.depth+=1
@@ -983,6 +1010,7 @@ class SliceAccess:
             incoming=self.instantiate(stored,bindings,instances)
             self.changed|=(out.base or out).merge(incoming)
             for location in out.locations:
+                if incoming.path==location and not incoming.data and not incoming.storage:continue
                 if location not in context.stores:context.stores[location]=self.copied(incoming);self.changed=True
                 else:self.changed|=context.stores[location].merge(self.copied(incoming))
         result=Value(self.type(node,context))

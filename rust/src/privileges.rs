@@ -1533,6 +1533,32 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
     }
+    fn identity_result(&mut self, procedure: Ref, index: usize) -> Option<usize> {
+        let signature = self.role(procedure, "type").unwrap_or(procedure);
+        let parameters = self.params(signature).iter()
+            .map(|(name, _)| self.r.symbol(*name)).collect::<Vec<_>>();
+        let returns = self.s(procedure).descendants(procedure.node)
+            .filter(|node| self.s(procedure).node(*node).kind == "Return")
+            .filter(|node| self.s(procedure).ancestors(*node)
+                .find(|ancestor| self.s(procedure).node(*ancestor).kind == "Procedure")
+                == Some(procedure.node))
+            .map(|node| Ref { file: procedure.file, node }).collect::<Vec<_>>();
+        let mut parameter = None;
+        for returned in returns {
+            let values = self.group(returned, "values");
+            let mut value = *values.get(index)?;
+            while self.kind(value) == "Paren" { value = self.role(value, "expr")?; }
+            if self.s(value).text(value.node) == "nil" && self.r.symbol(value).is_none() {
+                continue;
+            }
+            if self.kind(value) != "Ident" { return None; }
+            let symbol = self.r.symbol(value)?;
+            let candidate = parameters.iter().position(|item| *item == Some(symbol))?;
+            if parameter.is_some_and(|old| old != candidate) { return None; }
+            parameter = Some(candidate);
+        }
+        parameter
+    }
     fn summary(
         &mut self,
         proc: Ref,
@@ -1632,7 +1658,18 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 } else {
                     names.into_iter().map(Some).collect()
                 } {
-                    let v = self.value(typ.clone());
+                    let v = if name.is_none() && references_type(&typ) {
+                        // This proof is independent of recursive summary order.
+                        // Every return names the same immutable parameter or nil.
+                        let index = self.contexts[c].results.len();
+                        let input = self.identity_result(proc, index)
+                            .and_then(|index| self.params(sig).get(index).copied())
+                            .and_then(|(name, _)| self.r.symbol(name))
+                            .and_then(|symbol| self.contexts[c].env.get(&symbol).copied());
+                        input.map(|value| self.copied(value))
+                            .unwrap_or_else(|| self.value(typ.clone()))
+                    } else { self.value(typ.clone()) };
+                    self.values[v].typ = self.r.shared_type(typ.clone());
                     let symbol = name.and_then(|name| self.r.symbol(name));
                     self.contexts[c].results.push(v);
                     self.contexts[c].named.push(symbol);
@@ -2635,7 +2672,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.values[target].storage = storage;
         } else {
             let dst = self.values[target].base.unwrap_or(target);
-            self.merge(dst, v);
+            // A value assignment keeps the destination's writable location.
+            let incoming = self.copied(v);
+            self.merge(dst, incoming);
         }
         self.record_stores(target, v, c);
     }
@@ -2644,6 +2683,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let typ = self.values[v].typ.owned();
         if !self.type_property(&typ, queries::Property::Slice) { return; }
         for path in self.values[target].locations.clone() {
+            // Descendant writes have separate stores. Replaying an unchanged
+            // argument projection would expand recursive paths indefinitely.
+            let source = &self.values[v];
+            if source.path.as_ref() == Some(&path)
+                && source.data.is_empty() && source.storage.is_empty() {
+                crate::profile::count("permissions.identity_stores_skipped", 1);
+                continue;
+            }
             let v = self.copied(v);
             if let Some(old) = self.contexts[c].stores.get(&path).copied() {
                 self.merge(old, v);
@@ -3770,6 +3817,7 @@ const FMT_READERS: &[&str] = &[
 
 #[cfg(test)]
 mod graph_tests {
+    use crate::ast::Source;
     use super::*;
 
     #[test]
@@ -3897,6 +3945,62 @@ mod graph_tests {
         }
         compact_origins(&mut origins);
         if origins != [parent].into() { panic!("subtree compaction retained covered data paths"); }
+    }
+
+    #[test]
+    fn assigning_a_header_keeps_destination_locations_and_shared_referenced_data() {
+        let text = "target";
+        let source = Source::from_frontend("/header-write.thor".into(), text.into(),
+            serde_json::json!({"nodes":[
+                {"kind":"File","start":0,"end":text.len(),"parent":-1},
+                {"kind":"Ident","start":0,"end":text.len(),"parent":0}
+            ],"features":[],"edits":[],"selections":[]}), true).unwrap();
+        let sources = [source];
+        let mut resolver = Resolver::new(&sources);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        analysis.contexts.push(Context::new(None, Substitutions::new()));
+        let left = Path { qualified:true, index:0, steps:Shared::new() };
+        let right = Path { qualified:true, index:1, steps:Shared::new() };
+        let typ = Type::Slice(Box::new(Type::scalar("int")));
+        let target = analysis.fresh(typ.clone(), Some(left.clone()));
+        let value = analysis.fresh(typ, Some(right.clone()));
+        let element = analysis.item(value);
+        analysis.write(target,value,0,Ref { file:0,node:NodeId(1) },false);
+        if analysis.values[target].locations != [left.clone()].into()
+            || analysis.contexts[0].stores.keys().cloned().collect::<Vec<_>>() != vec![left] {
+            panic!("header assignment copied the source's writable location");
+        }
+        let original_data = analysis.values[element].base.unwrap_or(element);
+        let copied_element = analysis.values[target].element.unwrap();
+        let copied_data = analysis.values[copied_element].base.unwrap_or(copied_element);
+        if copied_data != original_data
+            || analysis.values[value].locations != [right.clone()].into()
+            || !analysis.values[target].data.iter().any(|origin| origin.path==right) {
+            panic!("header assignment lost shared data or source permissions");
+        }
+    }
+
+    #[test]
+    fn identity_store_elision_retains_qualifier_and_alias_stores() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        analysis.contexts.push(Context::new(None, Substitutions::new()));
+        let typ = Type::Slice(Box::new(Type::scalar("int")));
+        let path = Path { qualified: false, index: 0, steps: Shared::new() };
+        let target = analysis.fresh(typ.clone(), Some(path.clone()));
+        let identity = analysis.copied(target);
+        analysis.record_stores(target, identity, 0);
+        if !analysis.contexts[0].stores.is_empty() { panic!("identity created an output store"); }
+        let other = analysis.fresh(typ, Some(Path { index: 1, ..path.clone() }));
+        analysis.record_stores(target, other, 0);
+        if !analysis.contexts[0].stores.contains_key(&path) { panic!("alias store was discarded"); }
+        let seed = Ref { file: 0, node: NodeId(0) };
+        let readonly = analysis.freeze(target, seed);
+        analysis.record_stores(target, readonly, 0);
+        let stored = analysis.contexts[0].stores[&path];
+        if !analysis.refs(stored).iter().any(|origin| origin.seed == Some(seed)) {
+            panic!("qualifier store was discarded");
+        }
     }
 
     #[test]

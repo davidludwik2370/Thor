@@ -128,6 +128,58 @@ node.right.values[0]=9
 ''','\n'.join(prefix))
         self.check(invalid,command='check',error='read-only slice')
 
+    def test_recursive_identity_output_stores_stabilize(self):
+        prefix='''GLOBAL:>[]int{7}
+Node::union{^Leaf,^Group,^Pair}
+Leaf::struct{values:[]int}
+Group::struct{inner:Node}
+Pair::struct{left,right:Node}
+walk::proc(node:Node)->Node{
+    ignored::proc()->[]int{return make([]int,1)};_=ignored
+    if node==nil{return nil}
+    #partial switch part in node{
+    case ^Group: part.inner=walk(part.inner)
+    case ^Pair: part.left=walk(part.left);part.right=walk(part.right)
+    case:
+    }
+    return node
+}
+'''
+        body='''_=GLOBAL;group:=new_clone(Group{});node:=Node(group)
+result:=walk(node)
+if result!=node{panic("identity output changed")}
+free(group)
+'''
+        for flags in (['-debug'],native.UNCHECKED):
+            counts=self.check(self.program(body,prefix),flags=flags)
+            self.assertGreater(counts.get('permissions.identity_stores_skipped',0),0,counts)
+            self.assertLess(counts.get('permissions.values',0),10000,counts)
+
+    def test_identity_result_proofs_preserve_shadowed_and_alternative_returns(self):
+        prefix='''fresh::proc(values:[]int)->[]int{
+    {values:=make([]int,1);return values}
+}
+choose::proc(left,right:[]int,flag:bool)->[]int{
+    if flag{return left};return right
+}
+'''
+        code=self.program('''values:>[]int{7};copy:=fresh(values)
+defer delete(copy);copy[0]=9
+if copy[0]!=9{panic("shadowed return was not independent")}
+''',prefix)
+        for flags in (['-debug'],native.UNCHECKED):
+            self.check(code,flags=flags)
+        for arguments in ('view,values[:]','values[:],view'):
+            code=self.program('values:=[1]int{7};view:>values[:];copy:=choose('
+                +arguments+',true);_=copy',prefix)
+            self.check(code,command='check',error='read-only slice')
+
+    def test_nil_returns_retain_explicit_readonly_views(self):
+        code=self.program('copy:=view();_=copy',
+            'view::proc()->[]int{values:[]int > nil;return values}')
+        for flags in (['-debug'],native.UNCHECKED):
+            self.check(code,flags=flags,command='build',error='read-only slice')
+
     def test_scalar_helper_interfaces_keep_their_own_global_store_checks(self):
         code=self.program('row:Row;forward(&row)','''Row::struct{items:[]int}
 GLOBAL:Row

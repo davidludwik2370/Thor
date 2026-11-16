@@ -69,6 +69,25 @@ b::proc(values:[]int,n:int){if n>0{a(values,n-1)}}
                 self.assertEqual(bool(value.data),expected=='slice')
                 self.assertFalse(context.env[declaration,'status'].data)
 
+    def test_identity_return_proofs_use_symbols_and_ignore_nested_procedures(self):
+        project=self.project(self.program('marker:>0;_=marker','''identity::proc(values:[]int)->[]int{
+    ignored::proc()->[]int{return make([]int,1)};_=ignored
+    if len(values)==0{return nil};return (values)
+}
+shadowed::proc(values:[]int)->[]int{{values:=make([]int,1);return values}}
+alternatives::proc(left,right:[]int,flag:bool)->[]int{if flag{return left};return right}
+'''))
+        analysis=project.slice_access
+        source=next(iter(project.sources.values()))
+        procedures={node.parent.group('names')[0].text:node for node in source.nodes
+                    if node.kind=='Procedure' and node.parent.kind=='Declaration'}
+        result=analysis.identity_result(procedures['identity'],0)
+        self.assertIsNotNone(result)
+        self.assertEqual(result[1],'values')
+        for name in ('shadowed','alternatives'):
+            result=analysis.identity_result(procedures[name],0)
+            self.assertIsNone(result,name)
+
     def test_reference_output_stores_stabilize_through_forwarding_calls(self):
         prefix='''Row::struct{items:[]int}
 fill::proc(out:^Row){view :> []int{7};out^=Row{view}}
