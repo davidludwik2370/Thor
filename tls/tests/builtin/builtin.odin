@@ -4,8 +4,9 @@ package ols_builtin
 @builtin len :: proc(array: Array_Type) -> int ---
 @builtin cap :: proc(array: Array_Type) -> int ---
 
-@builtin expand_values   :: proc(value: Struct_Or_Array) -> (A, B, C, ...) ---
-@builtin compress_values :: proc(values: ...) -> Struct_Or_Array_Like_Type ---
+@builtin expand_values   :: proc(value: Struct_Or_Array) -> (A, B, C, ..) ---
+@builtin compress_values :: proc(values: ..) -> Struct_Or_Array_Like_Type ---
+@builtin soa_zip :: proc(arrays: ..) -> Soa_Slice ---
 
 size_of      :: proc($T: typeid) -> int ---
 @builtin align_of     :: proc($T: typeid) -> int ---

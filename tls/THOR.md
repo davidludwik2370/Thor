@@ -36,6 +36,12 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 
 ## Current support
 
+- Infer `soa_zip` results and aliases such as `thor:basic.zip` from the caller's
+  slice columns. Hover and field completion show the anonymous row's named or
+  positional fields in loops and indexed values, including imported types and
+  generic column results. Unsaved column edits refresh the inferred fields, and
+  completion works while a row selector is incomplete.
+
 - Complete public package members after `/` or `,` in selective imports, including
   partial names, multiline/commented lists, relative and collection imports,
   explicit aliases and `import _`. Suggestions reuse namespace-member fuzzy

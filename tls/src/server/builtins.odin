@@ -75,6 +75,8 @@ check_builtin_proc_return_type :: proc(
 		argument_context.current_package = get_package_from_node(call)
 		ast_context := &argument_context
 		switch name {
+		case "soa_zip":
+			return soa_zip_return_type(ast_context, call)
 		case "max", "min":
 			curr_candidate: ^ast.Basic_Lit
 			curr_value := 0.0
@@ -287,6 +289,45 @@ check_builtin_proc_return_type :: proc(
 	}
 
 	return nil, false
+}
+
+@(private = "file")
+soa_zip_return_type :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -> (^ast.Expr, bool) {
+	if len(call.args) == 0 { return nil, false }
+	row := new_type(ast.Struct_Type, call.pos, call.end, ast_context.allocator)
+	row.fields = new_type(ast.Field_List, call.pos, call.end, ast_context.allocator)
+	row.fields.list = make([]^ast.Field, len(call.args), ast_context.allocator)
+	for argument, index in call.args {
+		value := ast.unparen_expr(argument)
+		name: ^ast.Ident
+		if named, found := value.derived.(^ast.Field_Value); found {
+			field, valid := named.field.derived.(^ast.Ident)
+			if !valid { return nil, false }
+			name = field
+			value = named.value
+		} else {
+			name = new_type(ast.Ident, argument.pos, argument.end, ast_context.allocator)
+			name.name = fmt.aprintf("_%d", index, allocator = ast_context.allocator)
+		}
+		column_context := ast_context^
+		if column_call, found := get_completed_call(value); found { column_context.call = column_call }
+		column, found := resolve_value_type_expression(&column_context, value)
+		if !found || column.pointers != 0 || .Soa in column.flags { return nil, false }
+		slice, is_slice := column.value.(SymbolSliceValue)
+		if !is_slice { return nil, false }
+		field := new_type(ast.Field, argument.pos, argument.end, ast_context.allocator)
+		field.names = make([]^ast.Expr, 1, ast_context.allocator)
+		field.names[0] = name
+		// Preserve the column element's original file and generic specialization.
+		field.type = slice.expr
+		row.fields.list[index] = field
+	}
+	result := new_type(ast.Array_Type, call.pos, call.end, ast_context.allocator)
+	result.elem = row
+	tag := new_type(ast.Basic_Directive, call.pos, call.pos, ast_context.allocator)
+	tag.name = "soa"
+	result.tag = tag
+	return result, true
 }
 
 @(private = "file")
