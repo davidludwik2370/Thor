@@ -160,6 +160,12 @@ example, showing a Set as `set[string]` in a hover is a server presentation rule
 Recognizing string text inside nested fstrings also requires correct grammar
 rules. A change may therefore belong in the server, the grammar, or both.
 
+VS Code pairs opening quotes after `f` and `f!`, including backtick strings.
+Typing `f"{` produces `f"{}"` with the cursor inside the braces. Curly braces
+also pair inside ordinary strings. Comments suppress pairing, and the editor's
+auto-closing preferences control the behavior. The focused typing check runs
+with `python3 tools/test_vscode.py --scope auto-closing` from the repository root.
+
 Comments are explicitly excluded from bracket pairing/colorization, including
 nested block comments and comments inside interpolated expressions. Code brackets
 remain active when the surrounding code is uncommented. After an extension

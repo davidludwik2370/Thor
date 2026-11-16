@@ -25,7 +25,6 @@
       "open": "{",
       "close": "}",
       "notIn": [
-        "string",
         "comment"
       ]
     },
@@ -40,6 +39,38 @@
     {
       "open": "(",
       "close": ")",
+      "notIn": [
+        "string",
+        "comment"
+      ]
+    },
+    {
+      "open": "f\"",
+      "close": "\"",
+      "notIn": [
+        "string",
+        "comment"
+      ]
+    },
+    {
+      "open": "f!\"",
+      "close": "\"",
+      "notIn": [
+        "string",
+        "comment"
+      ]
+    },
+    {
+      "open": "f`",
+      "close": "`",
+      "notIn": [
+        "string",
+        "comment"
+      ]
+    },
+    {
+      "open": "f!`",
+      "close": "`",
       "notIn": [
         "string",
         "comment"

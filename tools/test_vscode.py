@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--code', default=shutil.which('code') or '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code')
     parser.add_argument('--standalone-run', action='store_true', help='test running a file with no workspace folder')
-    parser.add_argument('--scope', choices=['full','slice-access'], default='full', help='select the full editor suite or slice access checks')
+    parser.add_argument('--scope', choices=['full','slice-access','auto-closing'], default='full', help='select the full editor suite or focused checks')
     parser.add_argument('--interactive-typing', action='store_true', help='also exercise the suggestion widget; requires a foreground editor window')
     options = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='thor-vscode-') as directory:
@@ -25,6 +25,8 @@ def main():
         # and generated SDK copies elsewhere in the repository are unrelated.
         target=ROOT/'demo'
         suite='vscode.js'
+        if options.scope == 'auto-closing':
+            suite='auto-closing-vscode.js'
         if options.standalone_run:
             target=temporary/'standalone file.thor'
             target.write_text('package main\nimport "core:os"\nmain::proc(){err:=os.write_entire_file("standalone-run.txt", []u8{\'o\',\'k\'});assert(err == nil)}\n')
