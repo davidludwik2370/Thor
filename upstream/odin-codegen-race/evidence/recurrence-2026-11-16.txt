@@ -1,0 +1,34 @@
+The final macOS full-suite repeat reached the same native backend crash while
+compiling the wide-u128 constant-parameter #run helper.
+
+Test
+  tests.test_rust_numeric_evaluation.RustNumericEvaluationTests.test_wide_unsigned_native_constant_parameter
+
+Native compiler
+  Odin revision 8169255b97b85d6a08691d99764f51fb01f92b5a
+  macOS ARM64, LLVM 18
+
+Exception
+  EXC_BAD_ACCESS, SIGSEGV, null address
+
+Faulting stack
+  alloc_cstring(gbAllocator, String)
+  lb_type_internal(lbModule*, Type*)
+  lb_type(lbModule*, Type*)
+  lb_type_internal(lbModule*, Type*)
+  lb_type(lbModule*, Type*)
+  lb_type_internal_for_procedures_raw(lbModule*, Type*)
+  lb_create_procedure(lbModule*, Entity*, bool)
+  lb_generate_procedures_and_types_per_module(void*)
+  thread_pool_wait(ThreadPool*)
+  lb_generate_code(lbGenerator*)
+  main
+
+The original machine-local report is
+  ~/Library/Logs/DiagnosticReports/odin-2026-11-16-012037.ips
+
+The semantic regression fixture now passes -thread-count:1 to both frontends,
+matching the existing workaround in the earlier ASan fixture. The compiler's
+default flags and native upstream sources remain unchanged. Isolated repeats
+and the complete current regression rerun are recorded in the local validation
+report.

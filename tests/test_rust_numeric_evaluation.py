@@ -43,7 +43,8 @@ class RustNumericEvaluationTests(unittest.TestCase):
     def test_wide_unsigned_native_constant_parameter(self):
         self.compare(self.program('fmt.println(generic(340282366920938463463374607431768211455))',
             'import "core:fmt"\nwork::proc(n:u128)->u128{return n-1}\n'
-            'generic::proc($N:u128)->u128{return #run work(N)}'),output='340282366920938463463374607431768211454\n')
+            'generic::proc($N:u128)->u128{return #run work(N)}'),flags=['-thread-count:1'],
+            output='340282366920938463463374607431768211454\n')
 
     def test_typed_integer_and_floating_powers_keep_native_execution(self):
         self.compare(self.program('small:i8=3;fmt.println(small**i8(2),VALUE,FLOAT)',
