@@ -96,6 +96,56 @@ main::proc(){
             offset=len(text[:text.index(needle)+needle.index(word)].encode())
             self.assertEqual(properties.get(offset),(word,expected),properties)
 
+    def test_using_field_colors_follow_the_same_storage_as_explicit_selectors(self):
+        cases=[
+            ('parameter', 'using input', True),
+            ('pointer', 'using pointer', False),
+            ('embedded_value', 'using by_value', True),
+            ('embedded_pointer', 'using by_pointer', False),
+            ('frozen', 'frozen:>input;using frozen', True),
+            ('copy', 'frozen:>input;copy:=frozen;using copy', False),
+            ('declaration', 'using frozen:>Leaf{1}', True),
+            ('typed_declaration', 'using local:Leaf=Leaf{1}', False),
+            ('mutable_declaration', 'using local:=Leaf{1}', False),
+            ('pointer_declaration', 'using local:>pointer', False),
+            ('nested', 'outer:>Outer{input};using outer;using inner', True),
+            ('shadow', 'using input;value:=value', False),
+        ]
+        blocks=[]
+        for tag,setup,_ in cases:
+            blocks.append('{'+setup+';_=value // '+tag+'\n_=f"'+tag+' {value}"}\n')
+        text='''// 😀 source positions
+package main
+Leaf::struct{value:int}
+Outer::struct{inner:Leaf}
+ByValue::struct{using leaf:Leaf}
+ByPointer::struct{using leaf:^Leaf}
+inspect::proc(input:Leaf,pointer:^Leaf,by_value:ByValue,by_pointer:ByPointer){
+'''+''.join(blocks)+'''
+    items:=[1]Leaf{{1}}
+    for item in items {using item;_=value // value_loop
+        _=f"value_loop {value}"}
+    for &item in items {using item;_=value // reference_loop
+        _=f"reference_loop {value}"}
+}
+Bits::bit_field u8{value:u8|8}
+read_bits::proc(using bits:Bits){_=value // bits
+    _=f"bits {value}"}
+main::proc(){}
+'''
+        client,path=self.open(text,compiler=False)
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        spans=self.semantic_spans(client,path,text)
+        by_start={start:(word,bool(flags&readonly)) for start,_,_,word,flags in spans}
+        expected=[(tag,immutable) for tag,_,immutable in cases]+[
+            ('value_loop',True),('reference_loop',False),('bits',True)]
+        for tag,immutable in expected:
+            for fragment in ('value // '+tag,tag+' {value}'):
+                start=text.index(fragment)
+                field=0 if fragment.startswith('value //') else fragment.rindex('value')
+                offset=len(text[:start+field].encode())
+                self.assertEqual(by_start.get(offset),('value',immutable),(tag,fragment,by_start))
+
     def test_refresh_responses_do_not_crash_the_server(self):
         text='package main\nwork::proc(a:[]int){a[0]=1}\nmain::proc(){}\n'
         client,path=self.open(text,refresh=True)

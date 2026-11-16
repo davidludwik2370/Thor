@@ -299,6 +299,10 @@ readonly input. A mutable zip can display different colors for its individual
 columns. Fresh mutable clones and pointer/dynamic-array targets keep their
 writable colors.
 
+Fields exposed by `using` preserve the same readonly color as explicit member
+accesses, both in ordinary expressions and inside f-string interpolations.
+Mutable copies and fields reached through pointers keep their writable colors.
+
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS
 and the transpiler share the Thor parser, keeping their accepted syntax aligned.
 TLS uses its own partial semantic resolver for interactive features; the Thor

@@ -395,11 +395,12 @@ get_locals_value_decl :: proc(file: ast.File, value_decl: ast.Value_Decl, ast_co
 	}
 
 	if value_decl.is_using {
+		readonly := !value_decl.is_mutable || thor_is_immutable(value_decl.attributes[:])
 		if value_decl.type != nil {
-			get_locals_using(value_decl.type, ast_context)
+			get_locals_using(value_decl.type, ast_context, readonly)
 		} else {
 			for expr in value_decl.values {
-				get_locals_using(expr, ast_context)
+				get_locals_using(expr, ast_context, readonly)
 			}
 		}
 	}
@@ -670,8 +671,11 @@ get_locals_block_stmt :: proc(
 	}
 }
 
-get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext) {
+get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext, readonly_binding: Maybe(bool) = nil) {
 	if symbol, expr, ok := unwrap_procedure_until_struct_bit_field_or_package(ast_context, expr); ok {
+		// A declaration/parameter can supply a type expression rather than its
+		// binding. Use its explicit permissions; otherwise inspect the value once.
+		readonly := readonly_binding.(bool) or_else semantic_field_is_readonly(ast_context, expr)
 		#partial switch v in symbol.value {
 		case SymbolPackageValue:
 			if ident, ok := expr.derived.(^ast.Ident); ok {
@@ -683,6 +687,11 @@ get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext) {
 				selector.expr = expr
 				selector.field = new_type(ast.Ident, v.types[i].pos, v.types[i].end, ast_context.allocator)
 				selector.field.name = name
+				// A promoted name aliases the field's storage; it is not a
+				// mutable copy of that field. Preserve the same shallow access
+				// permissions as an explicit selector, including in f-strings.
+				flags: bit_set[LocalFlag] = {.Mutable}
+				if readonly && semantic_field_is_value_storage(ast_context, symbol, name, i) { flags += {.ReadOnlyBinding} }
 				store_local(
 					ast_context,
 					expr,
@@ -691,7 +700,7 @@ get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext) {
 					name,
 					false,
 					ast_context.non_mutable_only,
-					{.Mutable},
+					flags,
 					"",
 					false,
 				)
@@ -702,6 +711,8 @@ get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext) {
 				selector.expr = expr
 				selector.field = new_type(ast.Ident, v.types[i].pos, v.types[i].end, ast_context.allocator)
 				selector.field.name = name
+				flags: bit_set[LocalFlag] = {.Mutable}
+				if readonly && symbol.pointers == 0 { flags += {.ReadOnlyBinding} }
 				store_local(
 					ast_context,
 					expr,
@@ -710,7 +721,7 @@ get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext) {
 					name,
 					false,
 					ast_context.non_mutable_only,
-					{.Mutable},
+					flags,
 					"",
 					false,
 				)
@@ -1312,10 +1323,7 @@ get_locals_proc_param_and_results :: proc(
 					)
 
 					if .Using in arg.flags {
-						using_stmt: ast.Using_Stmt
-						using_stmt.list = make([]^ast.Expr, 1, context.temp_allocator)
-						using_stmt.list[0] = arg.type
-						get_locals_using_stmt(using_stmt, ast_context)
+						get_locals_using(arg.type, ast_context, true)
 					}
 				} else {
 					str := get_ast_node_string(name, file.src)

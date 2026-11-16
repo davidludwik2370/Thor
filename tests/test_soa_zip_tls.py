@@ -264,20 +264,30 @@ main::proc(){
         text='''package main
 import * "thor:basic"
 main::proc(){
-    names:>[]string{"Tim"};ages:>[]int{22}
-    people:>zip(name=names,age=ages)
+    Gender::enum{male,female}
+    names:>[]string{"Tim"};ages:>[]int{22};genders:>[]Gender{.male}
+    people:>zip(name=names,age=ages,gender=genders)
     for person in people{
         using person
-        print(f"{name} is {age}")
+        print(name,age,gender)
+        print(f"{name} is a {age} year old {gender}")
     }
 }
 '''
         client,path=self.open(text)
         client.diagnostic(path.as_uri(),empty=True)
-        for needle,typ in [('{name}','string'),('{age}','int')]:
+        for needle,typ in [('{name}','string'),('{age}','int'),('{gender}','Gender')]:
             hover=self.hover(client,path,text,needle)
             self.assertIsNotNone(hover,needle)
             self.assertIn(typ,hover['contents']['value'])
+        readonly=1 << client.capabilities['semanticTokensProvider']['legend']['tokenModifiers'].index('readonly')
+        spans=self.semantic_spans(client,path,text)
+        by_start={start:(kind,word,bool(modifiers&readonly)) for start,_,kind,word,modifiers in spans}
+        for fragment in ('print(name,age,gender)','{name}','{age}','{gender}'):
+            for name in ('name','age','gender'):
+                if name not in fragment:continue
+                offset=len(text[:text.index(fragment)+fragment.index(name)].encode())
+                self.assertEqual(by_start.get(offset),('variable',name,True),(fragment,by_start))
 
 
 if __name__ == '__main__':

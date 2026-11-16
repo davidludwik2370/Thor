@@ -56,6 +56,10 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   individual colors, including compiler-proven readonly references through
   copied records and helper results. Semantic responses share one validated
   snapshot of compiler permission offsets.
+  Fields promoted by `using` retain their value storage's readonly tokens in
+  plain expressions and f-string interpolations, including zipped rows, value
+  parameters, nested records and bit fields. Pointer boundaries and independent
+  mutable copies retain writable tokens.
 
 - Complete public package members after `/` or `,` in selective imports, including
   partial names, multiline/commented lists, relative and collection imports,

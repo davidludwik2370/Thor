@@ -685,6 +685,30 @@ visit_import_decl :: proc(decl: ^ast.Import_Decl, builder: ^SemanticTokenBuilder
 	}
 }
 
+// Reuse the already resolved record when checking implicit embedded pointers.
+// `using` and explicit selectors must stop readonly propagation at the same edge.
+semantic_field_is_value_storage :: proc(ast_context: ^AstContext, base: Symbol, name: string, field_index := -1) -> bool {
+	if base.pointers > 0 { return false }
+	if record, ok := base.value.(SymbolStructValue); ok {
+		// `using` already walks the fields; accept its index to avoid rescanning
+		// the whole record for each promoted name.
+		i := field_index
+		if i < 0 {
+			for field_name, index in record.names {
+				if field_name == name { i = index; break }
+			}
+		}
+		if i < 0 { return true }
+		for index := i; index < len(record.from_usings) && record.from_usings[index] != -1; {
+			index = record.from_usings[index]
+			if index < 0 || index >= len(record.types) { return false }
+			parent: Symbol
+			if !internal_resolve_type_expression(ast_context, record.types[index], &parent) || parent.pointers > 0 { return false }
+		}
+	}
+	return true
+}
+
 // Follow value storage until a shallow reference boundary. This only supplies
 // presentation metadata; it must not change type checking or binding lookup.
 semantic_field_is_readonly :: proc(
@@ -709,20 +733,8 @@ semantic_field_is_readonly :: proc(
 		return !require_immutable && (.ReadOnlyBinding in symbol.flags || .Mutable not_in symbol.flags)
 	case ^ast.Selector_Expr:
 		base: Symbol
-		if !internal_resolve_type_expression(ast_context, n.expr, &base) || base.pointers > 0 { return false }
-		if record, ok := base.value.(SymbolStructValue); ok {
-			for name, i in record.names {
-				if n.field == nil || name != n.field.name { continue }
-				// Promoted fields can cross an implicit `using ^Record` pointer.
-				for index := i; index < len(record.from_usings) && record.from_usings[index] != -1; {
-					index = record.from_usings[index]
-					if index < 0 || index >= len(record.types) { return false }
-					parent: Symbol
-					if !internal_resolve_type_expression(ast_context, record.types[index], &parent) || parent.pointers > 0 { return false }
-				}
-				break
-			}
-		}
+		if !internal_resolve_type_expression(ast_context, n.expr, &base) { return false }
+		if n.field == nil || !semantic_field_is_value_storage(ast_context, base, n.field.name) { return false }
 		return semantic_field_is_readonly(ast_context, n.expr, require_immutable, depth+1)
 	case ^ast.Index_Expr:
 		base: Symbol
