@@ -385,3 +385,14 @@ The serial clean Linux Kvist rerun passed all 1,004 full-suite cases and its
 SDK baselines and migrated LLVM 22 builds passed 1,410 core-normal, 359 core-speed,
 254 internal and 43 vendor tests. The native SDK source revision remains pinned
 at 537fac56cfee40cd51967d509ef089aa0a71444b. Final vetted SDK validation is active.
+
+
+The full regression pass also reached a performance assertion that predated
+output-view checking. A trace confirmed that the new query needs the previously
+unloaded `core:mem` namespace to inspect `mem.zero_slice`. The regression now
+checks exactly one bounded discovery retry for that case and zero retries when
+the namespace is already loaded through a type dependency. Both paths retain
+checked and unchecked runtime verdicts. A scalar helper's invalid global
+read-only store remains covered. The CLI vet/test probe fixture now uses a
+scalar local, keeping its immutable advice independent of the
+conservative reference-output ownership policy.

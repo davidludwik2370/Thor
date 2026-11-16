@@ -69,19 +69,30 @@ thor_efficiency_update::proc(ctx:^Thor_Efficiency_Context)->int{
 }
 ''',
         })
-        self.source.write_text(self.program('''
+        for preloaded in (False,True):
+            prefix='import math "core:math"\n'
+            check=''
+            if preloaded:
+                prefix+='import "core:mem"\nimport "core:strconv"\nALLOCATOR_BYTES::size_of(mem.Allocator)\nPARSER_BYTES::size_of(type_of(strconv.parse_int))\n'
+                check='if ALLOCATOR_BYTES<=0||PARSER_BYTES<=0 {panic("dependency shape")}\n'
+            self.source.write_text(self.program(check+'''
 values:=[]int{1,2};ctx:=math.Thor_Efficiency_Context{values}
 answer:>math.thor_efficiency_update(&ctx)
 if answer!=7||values[0]!=0 {panic("context")}
-''','import math "core:math"\n'))
-        for flags in [[],native.UNCHECKED]:
-            profile=self.root/'context-profile.json'
-            result=self.invoke('rust',flags=['--overlay',str(overlay),*flags],
-                               env={**os.environ,'THOR_PROFILE':str(profile)})
-            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-            counters=json.loads(profile.read_text())['counters']
-            self.assertEqual(counters.get('permissions.dependency_retries',0),0,counters)
-            self.assertEqual(counters.get('permissions.analyses',0),1,counters)
+''',prefix))
+            for flags in [[],native.UNCHECKED]:
+                with self.subTest(preloaded=preloaded,flags=flags):
+                    profile=self.root/'context-profile.json'
+                    result=self.invoke('rust',flags=['--overlay',str(overlay),*flags],
+                                       env={**os.environ,'THOR_PROFILE':str(profile)})
+                    self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                    counters=json.loads(profile.read_text())['counters']
+                    # The output-view check needs mem.zero_slice's body. An
+                    # unseen namespace requires one bounded discovery retry.
+                    retries=0 if preloaded else 1
+                    self.assertEqual(counters.get('permissions.dependency_retries',0),retries,counters)
+                    self.assertEqual(counters.get('permissions.analyses',0),retries+1,counters)
+                    self.assertLessEqual(counters.get('permissions.summaries_built',0),retries+1,counters)
 
     def test_scalar_only_pointer_records_do_not_prefetch_unrelated_namespaces(self):
         counts=[]

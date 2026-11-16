@@ -128,6 +128,14 @@ node.right.values[0]=9
 ''','\n'.join(prefix))
         self.check(invalid,command='check',error='read-only slice')
 
+    def test_scalar_helper_interfaces_keep_their_own_global_store_checks(self):
+        code=self.program('row:Row;forward(&row)','''Row::struct{items:[]int}
+GLOBAL:Row
+scalar::proc()->int{view:>[]int{7};GLOBAL=Row{view};return 7}
+forward::proc(out:^Row){_=scalar();out^=GLOBAL}
+''')
+        self.check(code,command='check',error='read-only slice')
+
     def test_scalar_output_writes_do_not_acquire_slice_output_contracts(self):
         prefix=['GLOBAL:>0','Row::struct{count:int,values:[]int}',
                 'leaf::proc(out:^Row,n:int){value:>n+1;out.count=value}']

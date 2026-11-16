@@ -242,8 +242,8 @@ import "core:testing"
 main :: proc() {}
 @(test) smoke :: proc(t: ^testing.T) {
     _=t
-    values := [1,2]
-    if values[0]!=1 { panic("values") }
+    value := 1
+    if value!=1 { panic("values") }
     err := os.write_entire_file("executed-tests.txt", "ok")
     if err!=nil { panic("write") }
 }
@@ -251,7 +251,7 @@ main :: proc() {}
         for engine in ['python','rust']:
             marker=self.app/'executed-tests.txt';marker.unlink(missing_ok=True)
             result=self.call(engine,'test','--vet=immutable')
-            self.assertIn("Declare 'values' immutable",result.stderr)
+            self.assertIn("Declare 'value' immutable",result.stderr)
             self.assertEqual(marker.read_text(),'ok')
 
     def test_collection_documentation_and_mapped_errors_remain_source_facing(self):
