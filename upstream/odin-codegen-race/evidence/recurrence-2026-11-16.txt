@@ -29,6 +29,5 @@ The original machine-local report is
 
 The semantic regression fixture now passes -thread-count:1 to both frontends,
 matching the existing workaround in the earlier ASan fixture. The compiler's
-default flags and native upstream sources remain unchanged. Isolated repeats
-and the complete current regression rerun are recorded in the local validation
-report.
+default flags and native upstream sources remain unchanged. Five isolated single-worker repeats passed afterward. The complete current
+regression rerun is recorded in the local validation report.

@@ -42,3 +42,8 @@ selected traces and structured results rather than unrelated sanitizer output.
 The November 15 integration-hardening run repeated the null-source string
 signature with length 22 in a native `#run` helper compilation. The extracted
 record is in `recurrence-2026-11-15.txt`.
+
+The November 16 full-suite repeat reached the same `alloc_cstring` /
+`lb_type_internal` backend signature while compiling the wide-u128 `#run`
+helper. `recurrence-2026-11-16.txt` records the selected native stack. The
+single-worker semantic fixture passed five isolated repeats afterward.
