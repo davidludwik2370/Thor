@@ -45,6 +45,7 @@ impl Privileges<'_, '_> {
         let nodes = self.s(current).descendants(current.node).collect::<Vec<_>>();
         for node in nodes {
             let reference = Ref { file: current.file, node };
+            if !self.r.active_definition(reference) { continue; }
             let source = self.s(current);
             if source.ancestors(node).find(|id| source.node(*id).kind == "Procedure")
                 .is_some_and(|id| id != current.node) { continue; }

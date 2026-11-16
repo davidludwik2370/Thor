@@ -94,6 +94,76 @@ if answer!=7||values[0]!=0 {panic("context")}
                     self.assertEqual(counters.get('permissions.analyses',0),retries+1,counters)
                     self.assertLessEqual(counters.get('permissions.summaries_built',0),retries+1,counters)
 
+    def test_output_view_queries_keep_inactive_sdk_branches_unloaded(self):
+        overlay=self.sdk_overlay({
+            'core/math/thor_efficiency_inactive_view.odin':'''package math
+import "core:time"
+Thor_Efficiency_View::struct{values:[]int}
+thor_efficiency_store_view::proc(out:^Thor_Efficiency_View){
+    when #config(THOR_TEST_EXTRA_DEPENDENCY,false){
+        time.sleep(0)
+    }
+    out.values=make([]int,1)
+}
+''',
+        })
+        self.source.write_text(self.program('''marker :> 0;_=marker
+out:math.Thor_Efficiency_View
+math.thor_efficiency_store_view(&out)
+out.values[0]=9
+if out.values[0]!=9{panic("owned output")}
+delete(out.values)
+''','import math "core:math"\n'))
+        for selected in (False,True):
+            for flags in ([],native.UNCHECKED):
+                profile=self.root/'inactive-view-profile.json'
+                defines=['-define:THOR_TEST_EXTRA_DEPENDENCY=true'] if selected else []
+                result=self.invoke('rust',flags=['--overlay',str(overlay),*defines,*flags],
+                    env={**os.environ,'THOR_PROFILE':str(profile)})
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                counters=json.loads(profile.read_text())['counters']
+                retries=counters.get('permissions.dependency_retries',0)
+                if selected:self.assertGreater(retries,0,counters)
+                else:self.assertEqual(retries,0,counters)
+
+    def test_generic_view_branches_keep_instantiation_dependent_outputs(self):
+        prefix='''Row::struct{values:[]int}
+fill::proc(out:^Row,$READONLY:bool){
+    when READONLY{view :> []int{7};out.values=view}
+    else{out.values=make([]int,1)}
+}
+'''
+        for flags in ([],native.UNCHECKED):
+            self.source.write_text(self.program('''out:Row;fill(&out,false)
+out.values[0]=9
+if out.values[0]!=9{panic("owned generic output")}
+delete(out.values)
+''',prefix))
+            result=self.invoke('rust',flags=flags)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.source.write_text(self.program('out:Row;fill(&out,true);out.values[0]=9',prefix))
+            result=self.invoke('rust',command='build',flags=flags)
+            self.assertNotEqual(result.returncode,0,result.stdout)
+            self.assertIn('read-only slice',result.stderr)
+
+    def test_native_boolean_names_respect_lexical_shadowing(self):
+        prefix='''GLOBAL :> []int{7}
+read::proc()->int{
+    ODIN_DEBUG::true
+    ODIN_VALGRIND_SUPPORT::true
+    when !ODIN_DEBUG||!ODIN_VALGRIND_SUPPORT{GLOBAL[0]=9}
+    return GLOBAL[0]
+}
+'''
+        for flags in (['-debug'],native.UNCHECKED):
+            self.source.write_text(self.program('if read()!=7{panic("shadowed native booleans")}',prefix))
+            result=self.invoke('rust',flags=flags)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.source.write_text(self.program('_=read()',prefix.replace('::true','::false')))
+            result=self.invoke('rust',command='build',flags=flags)
+            self.assertNotEqual(result.returncode,0,result.stdout)
+            self.assertIn('read-only slice',result.stderr)
+
     def test_scalar_only_pointer_records_do_not_prefetch_unrelated_namespaces(self):
         counts=[]
         for attempt in range(2):

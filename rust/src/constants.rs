@@ -310,8 +310,8 @@ impl Resolver<'_> {
             }
             "Ident" if s.text(r.node) == "true" => Some(Constant::Boolean(true)),
             "Ident" if s.text(r.node) == "false" => Some(Constant::Boolean(false)),
-            "Ident" if s.text(r.node) == "ODIN_DEBUG" => {
-                Some(Constant::Boolean(self.flags.iter().any(|flag| flag == "-debug")))
+            "Ident" if matches!(s.text(r.node), "ODIN_DEBUG" | "ODIN_VALGRIND_SUPPORT") => {
+                self.native_boolean(r).map(Constant::Boolean)
             }
             "Literal" if s.text(r.node).starts_with('"') => crate::lower::unquote(s.text(r.node))
                 .ok()

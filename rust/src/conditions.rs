@@ -33,7 +33,27 @@ fn type_identity(typ: Type) -> Type {
         other => other,
     }
 }
+
 impl Resolver<'_> {
+    pub(crate) fn native_boolean(&self, reference: Ref) -> Option<bool> {
+        let source = &self.sources[reference.file];
+        let name = source.text(reference.node);
+        if !matches!(name, "ODIN_DEBUG" | "ODIN_VALGRIND_SUPPORT")
+            || self.symbol(reference).is_some() { return None; }
+        match name {
+            "ODIN_DEBUG" => Some(self.flags.iter().any(|flag| flag == "-debug")),
+            "ODIN_VALGRIND_SUPPORT" => {
+                let target = self.flags.iter().find_map(|flag| flag.strip_prefix("-target:"))
+                    .and_then(|target| target.split_once('_'));
+                let host_arch = if cfg!(target_arch = "x86_64") { "amd64" }
+                    else { std::env::consts::ARCH };
+                let (os, arch) = target.unwrap_or((std::env::consts::OS, host_arch));
+                // Odin exposes Valgrind intrinsics on non-Windows amd64 targets.
+                Some(os != "windows" && arch == "amd64")
+            }
+            _ => None,
+        }
+    }
     pub fn context_condition(&mut self, r: Ref, bindings: &Substitutions) -> Option<bool> {
         self.context_condition_seen(r, bindings, &mut HashSet::new())
     }
@@ -231,5 +251,34 @@ impl Resolver<'_> {
         )
         .then(|| self.library_alias_seen(value, path, seen))
         .flatten()
+    }
+}
+
+#[cfg(test)]
+mod native_boolean_tests {
+    use super::*;
+    #[test]
+    fn valgrind_support_uses_the_selected_native_target() {
+        let text = "ODIN_VALGRIND_SUPPORT";
+        let source = Source::from_frontend("/native-target.thor".into(), text.into(),
+            serde_json::json!({"nodes":[
+                {"kind":"File","start":0,"end":text.len(),"parent":-1},
+                {"kind":"Ident","start":0,"end":text.len(),"parent":0}
+            ],"features":[],"edits":[],"selections":[]}), true).unwrap();
+        let sources = [source];
+        let reference = Ref { file:0, node:NodeId(1) };
+        for (target, expected) in [("linux_amd64",true),("darwin_amd64",true),
+            ("windows_amd64",false),("linux_arm64",false),("darwin_arm64",false),
+            ("freestanding_amd64",true),("js_wasm32",false),("wasi_wasm32",false)] {
+            let mut resolver = Resolver::new(&sources);
+            resolver.flags = vec![format!("-target:{target}")];
+            let condition = resolver.condition(reference);
+            let contextual = resolver.context_condition(reference,&Substitutions::new());
+            let constant = resolver.constant_value(reference,&Substitutions::new(),None);
+            if condition != Some(expected) || contextual != Some(expected)
+                || !matches!(constant,Some(Constant::Boolean(value)) if value==expected) {
+                panic!("native Boolean disagrees with selected target {target}");
+            }
+        }
     }
 }

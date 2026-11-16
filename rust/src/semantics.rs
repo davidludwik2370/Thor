@@ -854,8 +854,7 @@ impl<'a> Resolver<'a> {
             "Ident" => match s.text(r.node) {
                 "true" => Some(true),
                 "false" => Some(false),
-                "ODIN_DEBUG" => Some(self.flags.iter().any(|f| f == "-debug")),
-                _ => self.symbol(r).and_then(|id| {
+                _ => self.native_boolean(r).or_else(|| self.symbol(r).and_then(|id| {
                     let symbol = &self.symbols[id];
                     if symbol.constant {
                         symbol.value.and_then(|node| {
@@ -867,7 +866,7 @@ impl<'a> Resolver<'a> {
                     } else {
                         None
                     }
-                }),
+                })),
             },
             "Unary" if n.op == "!" => self.condition(role("expr")?).map(|x| !x),
             "Call" => {

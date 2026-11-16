@@ -384,7 +384,8 @@ The serial clean Linux Kvist rerun passed all 1,004 full-suite cases and its
 22, 17, 2 and 2 entry-point suites, together with the CLI build. Native Linux
 SDK baselines and migrated LLVM 22 builds passed 1,410 core-normal, 359 core-speed,
 254 internal and 43 vendor tests. The native SDK source revision remains pinned
-at 537fac56cfee40cd51967d509ef089aa0a71444b. Final vetted SDK validation is active.
+at 537fac56cfee40cd51967d509ef089aa0a71444b. Vetted SDK validation passed the
+same four suites. The subsequent current-compiler matrix repeats those checks.
 
 
 The full regression pass also reached a performance assertion that predated
@@ -404,3 +405,56 @@ launches it, producing a transient missing-executable error. The test harness
 now accepts `THOR_TEST_PREBUILT=1` after a single prebuild. Ordinary standalone
 setup keeps its Cargo build. Missing prebuilt executables fail explicitly.
 Migration setup honors the same mode. Unit tests cover all three paths.
+
+
+## Validation boundaries
+
+The upstream matrix retains 22 projects and 175 native recipes. Platform and
+native-baseline availability determine which comparisons execute. Native failures
+in Aseprite, Tina and Runa remain recorded with their case verdicts. Anvil Flux,
+flaky headless Karl2D graphics and the Mac oasync runtime controls retain their
+unavailable-runtime classifications and applicable compile checks. The preserved
+reports distinguish these outcomes from successful runtime comparisons.
+
+The native Odin SDK comparison uses pristine source revision
+`537fac56cfee40cd51967d509ef089aa0a71444b` with LLVM 22.1.7 on Mac and LLVM
+22.1.8 on Linux. Other Linux functional regressions use the matching October
+`8169255` backend and the stable `537fac5` frontend. Kvist uses its pinned August
+compiler and a 128 MiB stack after its native default-stack recursion failure.
+These choices retain the upstream source and tests.
+
+The whole-SDK migration reached a measured 10,468.8 MiB process-tree peak on Mac.
+Its portable migrated source output was transferred to Linux because that peak
+exceeds the local VM's memory. The SDK baseline, migrated builds, vet validation
+and vetted tests execute natively on Linux. The other projects' migration stages
+also execute on Linux. This leaves whole-SDK migration itself unverified within
+the smaller VM.
+
+Windows validation remains deferred. All reported Linux execution uses the local
+Ubuntu ARM64 VM. The performance records distinguish project-cache-cold runs,
+warm runs, final native backend compilation and Thor's own analysis/lowering.
+Global tool and parser caches may already be populated during a project-cache-cold
+measurement.
+
+
+## Inactive native branches and resolver reuse
+
+The final controlled warm comparison exposed a regression after output-view
+hardening. Skald took 33.065 and 33.187 seconds, compared with 28.586 and 28.214
+seconds in the saved baseline. The profile recorded a missing
+`core:sys/valgrind` package after discovery had already attempted to load it.
+Its ARM64 files are excluded. The view-source query had followed inactive native
+branches, keeping an outstanding import request that prevented resolver metadata
+from being cached.
+
+View-source queries now follow known `when` selections. Unresolved generic
+branches retain both possibilities. Native Boolean facts share target-aware
+`ODIN_VALGRIND_SUPPORT` handling between ordinary conditions and contextual
+constant evaluation. Odin exposes that support on non-Windows amd64 targets.
+Lexically declared names retain their own values, including a local `ODIN_DEBUG`.
+
+The regression fixture first reproduced an unnecessary SDK dependency retry with
+the saved release compiler. It verifies zero retries for the inactive branch and
+normal dependency discovery after enabling its configuration flag. Additional
+checked/unchecked fixtures retain generic output-view rejection and native-name
+shadowing. The native unit regression checks eight target combinations.
