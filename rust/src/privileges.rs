@@ -26,6 +26,9 @@ enum Step {
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Path {
+    // Location tracking also applies to writable arguments. Qualification is
+    // enabled only when a caller supplies borrowed data, or checks a contract.
+    qualified: bool,
     index: usize,
     steps: Shared<Vec<Step>>,
 }
@@ -694,7 +697,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let id = self.value(typ);
         self.values[id].path = path.clone();
         if let Some(mut path) = path {
-            if path.steps.len() > 16 {
+            if path.qualified && path.steps.len() > 16 {
                 // Match Python's finite symbolic-path domain across calls.
                 // A widened origin conservatively covers the whole parameter.
                 path.steps = Shared::new();
@@ -707,9 +710,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 return id;
             }
             self.values[id].locations.insert(path.clone());
-            if data
-                || self.pure_depth > 0
-                    && matches!(base_type(&self.values[id].typ), Type::String { .. })
+            if path.qualified
+                && (data || self.pure_depth > 0
+                    && matches!(base_type(&self.values[id].typ), Type::String { .. }))
             {
                 self.values[id].data.insert(Origin {
                     path,
@@ -927,7 +930,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .unwrap_or(Type::Unknown),
             path.clone(),
         );
-        if let Some(path) = path {
+        if let Some(path) = path.filter(|path| path.qualified) {
             self.values[id].storage.insert(Origin {
                 path,
                 aspect: Aspect::Storage,
@@ -1019,6 +1022,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         let origin = Origin {
             path: Path {
+                qualified: true,
                 index: 0,
                 steps: Shared::new(),
             },
@@ -1066,7 +1070,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         depth: usize,
     ) -> Origins {
         let value = &self.values[v];
-        if value.path.is_none()
+        if value.path.as_ref().is_none_or(|path| !path.qualified)
             && value.data.is_empty()
             && value.storage.is_empty()
             && value.fields.is_empty()
@@ -1094,6 +1098,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         let shape = self.values[v]
             .path
             .as_ref()
+            .filter(|path| path.qualified)
             .map(|path| (self.values[v].typ.id(), path.index));
         let recursive = shape.is_some_and(|shape| !types.insert(shape));
         if (depth > 16 && shape.is_some()) || recursive {
@@ -1118,7 +1123,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         // Keep unopened parameter subtrees symbolic. Existing children still
         // carry assignments and seeds introduced while checking this body.
         let mut covered = None;
-        if self.values[v].path.is_some()
+        if self.values[v].path.as_ref().is_some_and(|path| path.qualified)
             && self.type_property(&self.values[v].typ.owned(), queries::Property::Slice)
         {
             let path = self.values[v].path.clone().unwrap();
@@ -1259,7 +1264,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 };
                 let effects = &mut self.contexts[c].effects;
                 if matches!(origin.aspect, Aspect::Data | Aspect::References) {
-                    let all = Origin { path: Path { index: origin.path.index, steps: Shared::new() },
+                    let all = Origin { path: Path { qualified: true, index: origin.path.index, steps: Shared::new() },
                         aspect: Aspect::All, seed: None };
                     if effects.get(&all).is_some_and(|effect| effect.covers(&incoming)) {
                         continue;
@@ -1484,7 +1489,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 });
             let v = self.fresh(
                 typ,
-                contract.then_some(Path {
+                Some(Path {
+                    qualified: contract,
                     index,
                     steps: Shared::new(),
                 }),
@@ -1496,6 +1502,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.require(
                     [Origin {
                         path: Path {
+                            qualified: true,
                             index,
                             steps: Shared::new(),
                         },
@@ -1557,6 +1564,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.require(
                     [Origin {
                         path: Path {
+                            qualified: true,
                             index,
                             steps: Shared::new(),
                         },
@@ -1594,6 +1602,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.require(
                 [Origin {
                     path: Path {
+                        qualified: true,
                         index,
                         steps: Shared::new(),
                     },
@@ -3099,7 +3108,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             if self.s(candidate).node(candidate.node).data["pure"] == true {
                 self.pure_depth += 1;
             }
-            let summary = self.summary(candidate, substitutions, Some(c), true);
+            let contract = has_references || self.pure_depth > 0;
+            let summary = self.summary(candidate, substitutions, Some(c), contract);
             self.note_callee(summary);
             self.pure_depth = old_depth;
             let effects = self.contexts[summary].effects.clone();
@@ -3230,6 +3240,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             && self.has_slice_data(&typ) {
             self.values[id].data.insert(Origin {
                 path: Path {
+                    qualified: true,
                     index: 0,
                     steps: Shared::new(),
                 },
@@ -3628,10 +3639,38 @@ mod graph_tests {
     use super::*;
 
     #[test]
+    fn writable_parameters_keep_output_locations_without_borrowed_origins() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        let typ = Type::Pointer(Box::new(Type::Slice(Box::new(Type::scalar("int")))));
+        let parameter = analysis.fresh(typ.clone(), Some(Path {
+            qualified: false, index: 0, steps: Shared::new(),
+        }));
+        let target = analysis.deref(parameter);
+        let references = analysis.refs(parameter);
+        if !references.is_empty() || !analysis.values[target].storage.is_empty()
+            || analysis.values[target].locations.len() != 1 {
+            panic!("writable parameter lost its output location or gained a borrow");
+        }
+        let seed = Ref { file: 0, node: NodeId(0) };
+        let readonly = analysis.freeze(target, seed);
+        let actual = analysis.value(typ);
+        let result = analysis.instantiate(readonly, &[actual], &mut HashMap::new(), 0);
+        let references = analysis.refs(result);
+        if !references.iter().any(|origin| origin.seed == Some(seed)) {
+            panic!("callee-created readonly view lost its qualifier");
+        }
+        let references = analysis.refs(actual);
+        if !references.is_empty() {
+            panic!("returned view changed the caller's original access");
+        }
+    }
+
+    #[test]
     fn deep_symbolic_paths_widen_without_recording_unbounded_stores() {
         let mut resolver = Resolver::new(&[]);
         let mut analysis = Privileges::new(&mut resolver, &[], false);
-        let path = Path { index: 3, steps: vec![Step::Deref; 17].into() };
+        let path = Path { qualified: true, index: 3, steps: vec![Step::Deref; 17].into() };
         let value = analysis.fresh(Type::Slice(Box::new(Type::scalar("int"))), Some(path));
         if !analysis.values[value].locations.is_empty() { panic!("unbounded store path"); }
         let origins = &analysis.values[value].data;
@@ -3647,12 +3686,12 @@ mod graph_tests {
         let mut analysis = Privileges::new(&mut resolver, &[], false);
         analysis.contexts.push(Context::new(None, Substitutions::new()));
         let site = Ref { file: 0, node: NodeId(0) };
-        let data = Origin { path: Path { index: 0, steps: vec![Step::Field("data".into())].into() },
+        let data = Origin { path: Path { qualified: true, index: 0, steps: vec![Step::Field("data".into())].into() },
             aspect: Aspect::Data, seed: None };
-        let strong = Origin { path: Path { index: 0, steps: vec![Step::Field("strong".into())].into() },
+        let strong = Origin { path: Path { qualified: true, index: 0, steps: vec![Step::Field("strong".into())].into() },
             aspect: Aspect::Data, seed: None };
         let storage = Origin { aspect: Aspect::Storage, ..data.clone() };
-        let all = Origin { path: Path { index: 0, steps: Shared::new() }, aspect: Aspect::All, seed: None };
+        let all = Origin { path: Path { qualified: true, index: 0, steps: Shared::new() }, aspect: Aspect::All, seed: None };
         analysis.require_effect([data.clone()].into(), site, 0, "inspect", vec![], false);
         analysis.require_effect([strong.clone()].into(), site, 0, "modify", vec![], true);
         analysis.require_effect([storage.clone()].into(), site, 0, "address", vec![], false);
@@ -3676,7 +3715,7 @@ mod graph_tests {
             analysis.contexts[0].env.insert(n, value);
         }
         let site = Ref { file: 0, node: NodeId(0) };
-        let origin = Origin { path: Path { index: 0, steps: Shared::new() }, aspect: Aspect::Data, seed: Some(site) };
+        let origin = Origin { path: Path { qualified: true, index: 0, steps: Shared::new() }, aspect: Aspect::Data, seed: Some(site) };
         // A cycle and shared child make numeric arena IDs insufficient for equality.
         analysis.values[0].target = Some(0);
         analysis.values[1].fields.insert("shared".into(), 0);

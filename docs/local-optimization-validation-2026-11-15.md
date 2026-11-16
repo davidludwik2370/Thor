@@ -276,3 +276,35 @@ binaries also passed unchanged control runs. The matrix retains the evidence and
 marks those runtime fixtures unavailable. Its native, migrated and vetted
 compilation checks and API verifier remain enabled. TOML conformance matched
 all 583 passing cases and 98 upstream skips across all three stages on both hosts.
+
+The cold permission-analysis memory failure was resolved by separating parameter
+storage locations from borrowed-access qualifiers. Calls whose arguments carry
+no borrowed data reuse a writable-input summary. Output locations, callee-created
+views, returned aliases and the full returned-object graph remain tracked.
+Pure-call and editor contract checks retain their borrowed-input analysis.
+The final change removes the earlier experimental graph pruning and collection
+approaches. An isolated run completed all 1,078 OLS tests with a measured compiler
+peak of 593 MiB, after the original input exceeded the 5 GiB limit. The production
+compiler also passed the OLS, Speedrun and 1,407-test SDK normal comparisons.
+
+All 159 focused production checks passed, including assertion hygiene. The 89
+Rust unit tests passed. New regressions cover writable parameter locations,
+callee-created returned views and recursive builders with shared returned
+storage. The builder's abstract summaries dropped from 38 to 20 and its value
+count from 6,038 to 2,788 in the controlled fixture. The tests check bounded work,
+runtime aliases and rejected writes in checked and unchecked configurations.
+
+Linux SDK preparation additionally required native kb_text_shape and OpenEXRCore
+3.5.0 libraries, libcurl development files and the SDK image assets under the
+selected Odin root. The SDK migration itself peaked at 10,468.8 MiB on Mac. Its
+verified portable output was transferred to the 7.65 GiB Linux VM, retaining
+the failed native-Linux migration attempts in the report. The native Linux
+migrated builds passed 359 core-speed, 254 internal and 43 vendor tests. A normal
+native Odin build exceeded the VM command budget with LLVM 18. A matching-major
+LLVM 22 backend is being checked before closing that configuration.
+
+A native Kvist control reproduced the full-suite crash under GDB. The stack
+contains repeated `macro_eval_expr`/`macro_eval_sequence` frames in
+`macroexpand_deep_recursion_reports_a_bounded_error`. Its other native entry
+points and their converted comparisons passed. The complete native control
+stack is retained with the local validation evidence.

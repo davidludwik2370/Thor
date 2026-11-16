@@ -104,6 +104,30 @@ write::proc{generic,scalar}
         counts=self.check(code)
         self.assertGreater(counts.get('permissions.explicit_roots',0),0,counts)
 
+    def test_writable_recursive_builders_keep_shared_returned_storage(self):
+        prefix=['GLOBAL:>[]int{7}', 'Node::struct{values:[]int,left,right:^Node}',
+            'leaf::proc(values:[]int)->^Node{return new_clone(Node{values=values})}']
+        for index in range(18):
+            callee='leaf' if index==0 else f'layer_{index-1}'
+            prefix.append(f'''layer_{index}::proc(values:[]int)->^Node{{
+    child:={callee}(values)
+    return new_clone(Node{{values=values,left=child,right=child}})
+}}''')
+        body='''_=GLOBAL;values:=[1]int{7};node:=layer_17(values[:])
+if node.left!=node.right||node.values[0]!=7{panic("builder aliases")}
+for node!=nil{next:=node.left;free(node);node=next}
+'''
+        code=self.program(body,'\n'.join(prefix))
+        for flags in (['-debug'],native.UNCHECKED):
+            counts=self.check(code,flags=flags)
+            self.assertLessEqual(counts.get('permissions.summaries_built',0),24,counts)
+            self.assertLess(counts.get('permissions.values',0),3500,counts)
+        invalid=self.program('''values:=[1]int{7};node:=layer_17(values[:])
+node.left^=Node{values=GLOBAL}
+node.right.values[0]=9
+''','\n'.join(prefix))
+        self.check(invalid,command='check',error='read-only slice')
+
     def test_type_property_reuse_keeps_generic_slice_and_inline_values_distinct(self):
         code=self.program('''a:=[1]int{7};view:>a[:]
 for _ in 0..<8{if first(a)!=7||first(view)!=7{panic("types")}}
