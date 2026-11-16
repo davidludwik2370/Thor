@@ -405,7 +405,8 @@ def run_locked(project, args, source, directory):
     if args.stage in ('all', 'vetted'):
         vetted = WORK / 'vetted' / slug
         if not vetted.exists():
-            shutil.copytree(tree, vetted, ignore=shutil.ignore_patterns('.thor-cache', '.thor-build'))
+            shutil.copytree(tree, vetted, ignore=shutil.ignore_patterns(
+                '.thor-cache', '.thor-build', '.thor-rust-build'))
         vet_results = []
         for index, recipe in enumerate(project.get('vet', [])):
             values = {'tree': str(vetted), 'source': str(source), 'work': str(WORK), 'root': str(ROOT)}

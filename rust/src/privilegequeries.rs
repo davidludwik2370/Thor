@@ -11,6 +11,78 @@ pub(super) enum Property {
 }
 
 impl Privileges<'_, '_> {
+    pub(super) fn can_introduce_view(&mut self, procedure: Ref) -> bool {
+        let _phase = crate::profile::span("permissions.view_sources");
+        if let Some(value) = self.view_sources.get(&procedure) { return *value; }
+        let mut pending = vec![procedure];
+        let mut visited = HashSet::new();
+        while let Some(current) = pending.pop() {
+            if self.discovering && self.r.has_demanded_packages() { return false; }
+            if !visited.insert(current) { continue; }
+            if let Some(value) = self.view_sources.get(&current) {
+                if *value { self.view_sources.insert(procedure, true); return true; }
+                continue;
+            }
+            let (local, callees) = self.view_body(current);
+            if local {
+                self.view_sources.insert(procedure, true);
+                return true;
+            }
+            pending.extend(callees);
+        }
+        // Every visited body's complete reachable closure was examined.
+        // Cache negatives together so cycles cannot hide a later source.
+        if !self.r.has_demanded_packages() {
+            for current in visited { self.view_sources.insert(current, false); }
+        }
+        false
+    }
+    fn view_body(&mut self, current: Ref) -> (bool, Vec<Ref>) {
+        if let Some(body) = self.view_bodies.get(&current) { return body.clone(); }
+        crate::profile::count("permissions.view_bodies", 1);
+        let mut local = false;
+        let mut callees = Vec::new();
+        let nodes = self.s(current).descendants(current.node).collect::<Vec<_>>();
+        for node in nodes {
+            let reference = Ref { file: current.file, node };
+            let source = self.s(current);
+            if source.ancestors(node).find(|id| source.node(*id).kind == "Procedure")
+                .is_some_and(|id| id != current.node) { continue; }
+            let mut names = if source.node(node).immutable {
+                source.group(node, "names").iter().copied()
+                    .map(|node| Ref { file: current.file, node }).collect::<Vec<_>>()
+            } else { Vec::new() };
+            if source.node(node).kind == "Ident"
+                && self.global_view_names.contains(source.text(node)) {
+                if let Some(symbol) = self.r.symbol(reference) {
+                    let symbol = &self.r.symbols[symbol];
+                    if symbol.immutable && self.r.sources[symbol.reference.file]
+                        .node(symbol.scope).kind == "File" {
+                        names.push(Ref { file: symbol.reference.file, node: symbol.name_node });
+                    }
+                }
+            }
+            for name in names {
+                let typ = self.r.type_of(name);
+                if self.r.frozen_slice_storage(&typ) {
+                    local = true;
+                    break;
+                }
+            }
+            if local { break; }
+            if self.kind(reference) != "Call" { continue; }
+            let Some(callee) = self.role(reference, "callee") else { continue; };
+            if self.builtin_name(callee, &mut HashSet::new()).is_some()
+                || self.r.denotes_type(callee) { continue; }
+            callees.extend(self.r.candidates(callee));
+            if self.discovering && self.r.has_demanded_packages() { break; }
+        }
+        let body = (local, callees);
+        if !self.r.has_demanded_packages() {
+            self.view_bodies.insert(current, body.clone());
+        }
+        body
+    }
     pub(super) fn has_readonly_views(&mut self) -> bool {
         let declarations = self.r.sources.iter().enumerate().flat_map(|(file, source)| {
             source.nodes.iter().enumerate().filter(|(_, node)| node.immutable)

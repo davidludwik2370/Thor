@@ -308,3 +308,39 @@ contains repeated `macro_eval_expr`/`macro_eval_sequence` frames in
 `macroexpand_deep_recursion_reports_a_bounded_error`. Its other native entry
 points and their converted comparisons passed. The complete native control
 stack is retained with the local validation evidence.
+
+## Output-parameter hardening
+
+The final review found a preexisting gap in void calls that construct a local
+read-only slice and store a containing record through an output parameter.
+The compiler now propagates those stores through forwarding procedures.
+Call summaries share one graph-instantiation memo across output stores and
+returned values. Return snapshots preserve referenced storage already exposed
+through output parameters while detaching independent local return facts.
+This also covers an allocation shared by multiple output parameters and a
+return value. Both frontends have the corresponding correctness changes.
+
+Additional output inspection uses cached reachable-body facts. Scalar writes
+skip slice-permission store propagation, and unchanged call-store merges reuse
+existing facts. Dependency discovery stops an incomplete view-source query
+before the normal dependency retry. Existing returned-object graph checks
+continue to inspect their complete graph.
+
+Automatic immutable corrections now use the same conservative ownership policy
+for reference-capable output parameters as for reference-bearing results.
+Reference-sensitive locals in these procedures require manual review. Scalar
+output parameters support ordinary immutable advice. This is a vet policy
+choice. Explicit source declarations retain the language's normal checks.
+The Speedrun matrix exposed a previously accepted conversion of a decoded image
+slice whose view could escape through its output object.
+
+Regressions cover direct and forwarded stores, declaration order, maps, arrays,
+dynamic arrays, cycles, imported producers, shared output/result allocations,
+independent owned replacements, bounded abstract work, and unsaved TLS recovery
+with original Unicode source positions. Runtime checks include checked and
+unchecked builds. The focused Mac run passed 178 tests, the Python-reference
+copy/analysis run passed 43, and the vet/runner run passed 49.
+
+The integration runner also excludes `.thor-rust-build` when creating a vetted
+source copy. A regression verifies the source copy excludes managed outputs
+from both compiler implementations.

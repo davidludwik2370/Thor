@@ -176,6 +176,23 @@ fn field_types(resolver: &mut Resolver<'_>, signature: Ref, role: &str) -> Vec<T
         })
         .collect()
 }
+fn reference_output(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -> bool {
+    if !seen.insert(typ.clone()) { return false; }
+    match typ {
+        Type::Nominal(_, base) => reference_output(base, resolver, seen),
+        Type::Pointer(base) | Type::Slice(base) | Type::Dynamic(base) | Type::Soa(base)
+        | Type::Set(base) | Type::Map { value: base, .. } =>
+            owned(base, resolver, &mut HashSet::new())
+                || !possible(base, resolver, &mut HashSet::new()),
+        Type::Array { elem, .. } | Type::Fixed { elem, .. } => reference_output(elem, resolver, seen),
+        Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)
+            .iter().any(|(_, field)| reference_output(field, resolver, seen)),
+        Type::Union(..) => resolver.union_variants(typ)
+            .iter().any(|variant| reference_output(variant, resolver, seen)),
+        Type::Unknown | Type::Generic => true,
+        _ => false,
+    }
+}
 // A correction lives in source shared by future targets and #config values.
 // Current-target validation cannot establish every inactive implementation.
 #[derive(Default)]
@@ -336,6 +353,12 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                     let outputs = field_types(&mut resolver, Ref {file,node:signature}, "results");
                     if outputs.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
                         || !possible(typ, &mut resolver, &mut HashSet::new())) { continue; }
+                    // Output parameters can expose the same ownership contract
+                    // as a returned alias to callers outside this entry point.
+                    let inputs = field_types(&mut resolver, Ref {file,node:signature}, "params");
+                    if inputs.iter().any(|typ| reference_output(typ, &mut resolver, &mut HashSet::new())) {
+                        continue;
+                    }
                 }
                 let generic_local = source.ancestors(id).filter(|owner| source.node(*owner).kind == "Procedure")
                     .any(|owner| !crate::specialization::parameters(Ref {file,node:owner}, &resolver).is_empty());

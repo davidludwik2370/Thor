@@ -79,6 +79,28 @@ def possible_pure_type(typ, resolver, seen=None):
     return True
 
 
+def reference_output(typ, project, seen=None):
+    seen=set() if seen is None else seen
+    key=typ.kind,typ.node
+    if key in seen:return False
+    seen.add(key)
+    if typ.kind in {'unknown','generic'}:return True
+    if typ.kind in {'pointer','slice','dynamic','map','set'}:
+        if typ.elem is None:return True
+        return project.purity.owned_type(typ.elem) or not possible_pure_type(typ.elem,project.resolver)
+    if typ.kind in {'array','fixed'}:return reference_output(typ.elem,project,seen)
+    if typ.kind=='struct':
+        fields=list(typ.members.values())
+        if not fields and typ.node:
+            fields=[project.resolver.type_node(field.role('type'),typ.substitutions)
+                    for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field']
+        return any(reference_output(field,project,seen) for field in fields)
+    if typ.kind=='union' and typ.node:
+        return any(reference_output(project.resolver.type_node(variant,typ.substitutions),project,seen)
+                   for variant in typ.node.group('variants'))
+    return False
+
+
 def portable_body(project, root):
     pending=[root];seen=set()
     while pending:
@@ -138,6 +160,9 @@ def candidates(project, checks):
                 if any(resolver.frozen_slice_storage(typ) for typ in types):
                     outputs=[resolver.type_node(annotation) for _,annotation in resolver.fields(owner.role('type').role('results'))]
                     if any(project.purity.owned_type(typ) or not possible_pure_type(typ,resolver) for typ in outputs):continue
+                    inputs=[resolver.type_node(field.role('type')) if field.role('type') else resolver.type_of(field.role('default'))
+                            for field in owner.role('type').role('params').children if field.kind=='Field']
+                    if any(reference_output(typ,project) for typ in inputs):continue
                 independent=not generic_local or all(not project.purity.owned_type(typ)
                     and possible_pure_type(typ,resolver) for typ in types)
                 separator = node.data.get('roles', {}).get('separator')

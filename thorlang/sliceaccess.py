@@ -641,10 +641,11 @@ class SliceAccess:
                 previous=self.changed;self.changed=False
                 self.statement(proc.role('body'),context)
                 changed=self.changed;self.changed|=previous
-                if context.strong_updates:
-                    current=self.state(context)
-                    if current==state:break
-                    state=current
+                # Output-store replay can create equivalent temporary copies.
+                # Compare the completed graph before scheduling another visit.
+                current=self.state(context)
+                if current==state:break
+                state=current
                 if not changed:break
             else:
                 for index,(name,_) in enumerate(params):
@@ -941,7 +942,8 @@ class SliceAccess:
             or context.checked or self.project.purity.pure(target)
             or any(self.nested_slice(self.r.type_node(annotation,plan.substitutions))
                    for _,annotation in self.r.fields(signature.role('results'))))
-        if not any(self.references(value) for value in bindings) and not inspect_result and not local_checks:
+        slice_storage=any(self.contains_slice(value.typ) for value in bindings)
+        if not any(self.references(value) for value in bindings) and not slice_storage and not inspect_result and not local_checks:
             return self.fresh_call_results(node,context,Value(self.type(node,context)))
         substitutions=dict(context.substitutions)
         substitutions.update({key:self.substitute_type(value,context.substitutions) if isinstance(value,Type) else value
@@ -962,23 +964,23 @@ class SliceAccess:
             site=sites[origin.index] if origin.index<len(sites) else node
             self.require(origins,site,context,'pass a read-only slice to '+repr(callee.text)+': it may '+reason,
                          [operation,*chain])
+        instances={}
         for (index,path),stored in list(summary.stores.items()):
             if index>=len(bindings):continue
             out=bindings[index]
             for step in path:out=self.member(out,step[1]) if step[0]=='field' else self.item(out) if step[0]=='item' else self.deref(out)
-            incoming=self.instantiate(stored,bindings)
+            incoming=self.instantiate(stored,bindings,instances)
             self.changed|=(out.base or out).merge(incoming)
             for location in out.locations:
-                if location not in context.stores:context.stores[location]=incoming;self.changed=True
-                else:self.changed|=context.stores[location].merge(incoming)
+                if location not in context.stores:context.stores[location]=self.copied(incoming);self.changed=True
+                else:self.changed|=context.stores[location].merge(self.copied(incoming))
         result=Value(self.type(node,context))
         if summary.results:
             # Declared fn results cross the existing deep-copy boundary: their
             # owned result storage is independent even when the source body
             # returned an input view. Ordinary proc results remain shallow.
-            seen={}
             independent=self.project.purity.pure(target) or context.checked and self.project.purity.wraps(target)
-            results=[Value(value.typ) if independent else self.instantiate(value,bindings,seen)
+            results=[Value(value.typ) if independent else self.instantiate(value,bindings,instances)
                      for value in summary.results]
             context.expressions[node,'results']=results
             result=results[0]
@@ -1336,7 +1338,14 @@ class SliceAccess:
                 for index,key in enumerate(context.named_results):
                     if key:self.changed|=context.results[index].merge(self.copied(context.env[key]))
             returned=self.expression_results(values[0],context,len(context.results)) if len(values)==1 else [self.eval(value,context) for value in values]
-            copies={};snapshots={} # Keep copies alive while the snapshot memo uses identity keys.
+            copies={};snapshots={}
+            pending=list(context.stores.values())
+            while pending:
+                value=pending.pop()
+                if id(value) in snapshots:continue
+                snapshots[id(value)]=value
+                pending.extend(value.fields.values())
+                pending.extend(child for child in (value.element,value.target,value.base) if child is not None)
             for index,value in enumerate(returned):
                 incoming=self.snapshot(self.copied(value,copies),snapshots)
                 while len(context.results)<=index:context.results.append(Value(incoming.typ))

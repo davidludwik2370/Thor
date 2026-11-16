@@ -197,6 +197,77 @@ factory::proc()->([]Row,[]Row){values:=make([]Row,1);return values,values}
 '''
         self.check('a,b:=factory();readonly :> []int{1};a[0]=Row{readonly};b[0].items[0]=9',prefix,writable=False)
 
+    def test_void_output_calls_propagate_locally_created_readonly_views(self):
+        shapes=[('^Row','out^=Row{view}','row:Row','&row','row.items'),
+                ('^map[int]Row','out^[0]=Row{view}','row:=make(map[int]Row)','&row','row[0].items'),
+                ('^[1]Row','out^[0]=Row{view}','row:[1]Row','&row','row[0].items'),
+                ('^[dynamic]Row','append(out,Row{view})','row:[dynamic]Row','&row','row[0].items')]
+        for typ,store,declaration,argument,member in shapes:
+            helpers=f'''Row::struct{{items:[]int}}
+fill::proc(out:{typ}){{view :> []int{{7}};{store}}}
+forward::proc(out:{typ}){{fill(out)}}
+outer::proc(out:{typ}){{forward(out)}}
+'''
+            for callee in ('fill','outer'):
+                for definitions_first in (True,False):
+                    with self.subTest(type=typ,callee=callee,definitions_first=definitions_first):
+                        body=f'{declaration};{callee}({argument});{member}[0]=9'
+                        text=self.program(body,helpers if definitions_first else '')
+                        if not definitions_first:text+='\n'+helpers
+                        _,result=self.invoke(text,command='check',fail='read-only slice')
+                        self.assertIn(member+'[0]=9',result.stderr)
+                self.check(f'{declaration};{callee}({argument});_={member}[0]',helpers)
+
+    def test_void_output_calls_keep_owned_replacements_writable(self):
+        prefix='''Row::struct{items:[]int}
+fill::proc(out:^Row){values:=make([]int,1);values[0]=7;out^=Row{values}}
+forward::proc(out:^Row){fill(out)}
+'''
+        body='''row:Row;forward(&row);defer delete(row.items)
+if row.items[0]!=7{panic("output initialization")}
+row.items[0]=9
+if row.items[0]!=9{panic("output mutation")}
+'''
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):self.invoke(self.program(body,prefix),flags=flags)
+
+    def test_output_stores_and_results_share_the_same_instantiated_alias_graph(self):
+        prefix='''DATA :> []int{7}
+Node::struct{items:[]int}
+create::proc(left,right:^^Node)->^Node{node:=new_clone(Node{});left^=node;right^=node;return node}
+'''
+        for alias in ('right','result'):
+            with self.subTest(alias=alias):
+                self.check('left,right:^Node;result:=create(&left,&right);left^=Node{DATA};'
+                           +alias+'.items[0]=9;_=result',prefix,writable=False)
+        body='''left,right:^Node;result:=create(&left,&right)
+defer free(left)
+left^=Node{make([]int,1)};defer delete(left.items)
+right.items[0]=9
+if left!=right||right!=result||result.items[0]!=9{panic("output and result aliases")}
+'''
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            self.invoke(self.program(body,prefix),flags=flags)
+
+    def test_void_output_view_sources_survive_cycles_globals_and_imports(self):
+        prefixes=['''Row::struct{items:[]int}
+fill::proc(out:^Row,n:int){if n>0{forward(out,n-1)}else{view :> []int{7};out^=Row{view}}}
+forward::proc(out:^Row,n:int){fill(out,n)}
+''', '''Row::struct{items:[]int}
+DATA :> []int{7}
+fill::proc(out:^Row,n:int){out^=Row{DATA};_=n}
+''']
+        for prefix in prefixes:
+            with self.subTest(prefix=prefix):
+                self.check('row:Row;fill(&row,2);row.items[0]=9',prefix,writable=False)
+                self.check('row:Row;fill(&row,2);_=row.items[0]',prefix)
+        library='''package library
+Row::struct{items:[]int}
+fill::proc(out:^Row){view :> []int{7};out^=Row{view}}
+'''
+        text=self.program('row:library.Row;library.fill(&row);row.items[0]=9','import "library"\n')
+        self.invoke(text,command='check',files={'library/library.thor':library},fail='read-only slice')
+
     def test_returned_nested_reference_aliases_preserve_shared_and_independent_storage(self):
         row='Row::struct{items:[]int}\n'
         self.check('a:=factory();b:=a;readonly:>[]int{1};a[0]=Row{readonly};b[0].items[0]=9',

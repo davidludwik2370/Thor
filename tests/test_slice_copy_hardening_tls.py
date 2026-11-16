@@ -30,6 +30,25 @@ main::proc(){values:=[1]int{7};box:=Box([]int){Id(9),values[:]};prepare(&box)}
         hover=self.hover(client,path,text,'id,status')['contents']['value']
         self.assertIn('Id',hover)
 
+    def test_void_output_view_permissions_report_the_caller_write_and_recover(self):
+        text='''// 😀 original source
+package main
+Row::struct{items:[]int}
+fill::proc(out:^Row){view :> []int{7};out^=Row{view}}
+forward::proc(out:^Row){fill(out)}
+main::proc(){row:Row;forward(&row);/* 😀 */row.items[0]=9}
+'''
+        client,path=self.open(text)
+        errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+        self.assertTrue(any(error['range']['start']==self.position(text,'row.items[0]=9',0)
+                            for error in errors),errors)
+        corrected=text.replace('row.items[0]=9','_=row.items[0]')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+                    'contentChanges':[{'text':corrected}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
     def test_soa_row_comparisons_and_unsaved_errors_keep_original_locations(self):
         text='''// 😀 original source
 package main

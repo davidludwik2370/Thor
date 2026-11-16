@@ -101,6 +101,7 @@ CASES=[
 'ask_yes_no_empty_and_eof',
 'mutation_address_escape_group_and_loop_requirements',
 'slice_aliases_calls_and_mutation_contracts_use_full_checker',
+'reference_output_parameters_keep_local_ownership_choices_explicit',
 'purity_includes_transitive_helpers_input_mutation_and_global_state',
 'generic_and_attributed_procedures_and_existing_fn_are_conservative',
 'owned_results_keep_aliasing_and_allocation_decisions_explicit',

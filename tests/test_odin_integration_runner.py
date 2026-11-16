@@ -12,6 +12,23 @@ from tests.integration import run_odin_projects as runner
 
 
 class IntegrationRunnerTests(unittest.TestCase):
+    def test_vetted_copies_exclude_managed_outputs_from_both_compilers(self):
+        with tempfile.TemporaryDirectory(prefix='thor-integration-copy-') as directory:
+            root=Path(directory);source=root/'odin/sample__project';source.mkdir(parents=True)
+            migrated=root/'migrated/sample__project';migrated.mkdir(parents=True)
+            (migrated/'main.thor').write_text('package main\nmain::proc(){}\n')
+            for name in ('.thor-cache','.thor-build','.thor-rust-build'):
+                cache=migrated/name;cache.mkdir();(cache/'generated.odin').write_text('generated')
+            results=root/'results/sample__project';results.mkdir(parents=True)
+            project={'repo':'sample/project','commit':'revision','commands':[],'vet':[]}
+            args=SimpleNamespace(stage='vetted',thor=Path('/compiler'),odin='/odin',timeout=1,fresh=False)
+            with patch.object(runner,'WORK',root), \
+                    patch.object(runner.subprocess,'check_output',side_effect=['revision\n','version\n']):
+                runner.run_locked(project,args,source,results)
+            vetted=root/'vetted/sample__project'
+            self.assertEqual((vetted/'main.thor').read_text(),(migrated/'main.thor').read_text())
+            self.assertEqual(sorted(path.name for path in vetted.iterdir()),['main.thor'])
+
     def test_style_recipes_allow_findings_while_builds_keep_warning_policy(self):
         projects=json.loads(runner.MANIFEST.read_text())
         examples=next(project for project in projects if project['repo']=='odin-lang/examples')

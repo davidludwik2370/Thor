@@ -193,6 +193,9 @@ pub struct Privileges<'a, 'r> {
     reuse: Option<SummaryCache>,
     fact_events: Vec<cached::FactEvent>,
     type_properties: HashMap<(crate::semantics::TypeId, queries::Property), bool>,
+    view_sources: HashMap<Ref, bool>,
+    view_bodies: HashMap<Ref, (bool, Vec<Ref>)>,
+    global_view_names: HashSet<String>,
     work: HashMap<(C, Ref), work::Dependencies>,
     work_weight: usize,
 }
@@ -206,6 +209,9 @@ struct SummaryKey {
 }
 impl<'a, 'r> Privileges<'a, 'r> {
     fn new(r: &'r mut Resolver<'a>, flags: &[String], discovering: bool) -> Self {
+        let global_view_names = r.symbols.iter().filter(|symbol| {
+            symbol.immutable && r.sources[symbol.reference.file].node(symbol.scope).kind == "File"
+        }).map(|symbol| symbol.name.clone()).collect();
         Self {
             r,
             values: work::Values::default(),
@@ -227,6 +233,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             library_names: std::cell::RefCell::new(HashMap::new()),
             reuse: None, fact_events: vec![],
             type_properties: HashMap::new(),
+            view_sources: HashMap::new(),
+            view_bodies: HashMap::new(),
+            global_view_names,
             work: HashMap::new(), work_weight: 0,
         }
     }
@@ -944,9 +953,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.copy_seen(v, &mut HashMap::new())
     }
     fn snapshot(&mut self, v: V, seen: &mut HashMap<V, V>) -> V {
-        if let Some(result) = seen.get(&v) {
-            return *result;
-        }
+        if let Some(result) = seen.get(&v) { return *result; }
         let old = self.values[v].clone();
         let result = self.value(old.typ.clone());
         seen.insert(v, result);
@@ -2299,9 +2306,19 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 } else {
                     args.into_iter().map(|r| self.eval(r, c)).collect()
                 };
+                // Preserve storage shared with output parameters. Independent
+                // return facts still detach from transient local rebindings.
                 let mut snapshots = HashMap::new();
+                let mut pending = self.contexts[c].stores.values().copied().collect::<Vec<_>>();
+                while let Some(value) = pending.pop() {
+                    if snapshots.insert(value, value).is_some() { continue; }
+                    let value = &self.values[value];
+                    pending.extend(value.fields.values().copied());
+                    pending.extend([value.element, value.target, value.base].into_iter().flatten());
+                }
+                let mut copies = HashMap::new();
                 for (index, v) in values.into_iter().enumerate() {
-                    let v = self.copied(v);
+                    let v = self.copy_seen(v, &mut copies);
                     let v = self.snapshot(v, &mut snapshots);
                     if let Some(old) = self.contexts[c].results.get(index).copied() {
                         self.merge(old, v);
@@ -2517,6 +2534,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
             let dst = self.values[target].base.unwrap_or(target);
             self.merge(dst, v);
         }
+        self.record_stores(target, v, c);
+    }
+    fn record_stores(&mut self, target: V, v: V, c: C) {
+        if self.values[target].locations.is_empty() { return; }
+        let typ = self.values[v].typ.owned();
+        if !self.type_property(&typ, queries::Property::Slice) { return; }
         for path in self.values[target].locations.clone() {
             let v = self.copied(v);
             if let Some(old) = self.contexts[c].stores.get(&path).copied() {
@@ -3087,10 +3110,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     let typ = self.specialized_type(node, &substitutions);
                     self.type_property(&typ, queries::Property::NestedSlice)
                 })));
-            // Without escaping read-only storage or qualified arguments, a
-            // reference-shaped result cannot acquire a read-only qualifier.
-            // Avoid materializing an unrelated parser/allocator object graph.
-            if !has_references && !inspect_result && !local_checks {
+            let output_view = !has_references && !inspect_result && !local_checks
+                && bound.iter().any(|value| {
+                    let typ = self.values[*value].typ.owned();
+                    self.type_property(&typ, queries::Property::Slice)
+                }) && self.can_introduce_view(candidate);
+            // A callee can introduce a read-only view through writable output
+            // storage even when its arguments initially carry no qualifiers.
+            if !has_references && !output_view && !inspect_result && !local_checks {
                 for (index, (_, annotation)) in result_fields.into_iter().enumerate() {
                     let typ = annotation
                         .map(|r| self.specialized_type(r, &substitutions))
@@ -3141,18 +3168,20 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.deleting = previous_deleting;
             }
             let stores = self.contexts[summary].stores.clone();
+            let mut instances = HashMap::new();
 
             for (path, stored) in stores {
                 if let Some(out) = bound.get(path.index) {
                     let out = self.follow(*out, &path.steps);
-                    let incoming = self.instantiate(stored, &bound, &mut HashMap::new(), 0);
+                    let incoming = self.instantiate(stored, &bound, &mut instances, 0);
                     let target = self.values[out].base.unwrap_or(out);
-                    self.merge(target, incoming);
+                    if self.merge(target, incoming) {
+                        self.record_stores(out, incoming, c);
+                    }
                 }
             }
             let outputs = self.contexts[summary].results.clone();
 
-            let mut instances = HashMap::new();
             for (index, output) in outputs.into_iter().enumerate() {
                 let output = if self.s(candidate).node(candidate.node).data["pure"] == true
                     || old_depth > 0

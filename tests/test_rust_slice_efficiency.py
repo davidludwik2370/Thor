@@ -128,6 +128,33 @@ node.right.values[0]=9
 ''','\n'.join(prefix))
         self.check(invalid,command='check',error='read-only slice')
 
+    def test_scalar_output_writes_do_not_acquire_slice_output_contracts(self):
+        prefix=['GLOBAL:>0','Row::struct{count:int,values:[]int}',
+                'leaf::proc(out:^Row,n:int){value:>n+1;out.count=value}']
+        prefix.extend(f'forward_{index}::proc(out:^Row,n:int){{leaf(out,n)}}' for index in range(50))
+        body='_=GLOBAL;row:Row;'+''.join(f'forward_{index}(&row,{index});' for index in range(50))
+        body+='if row.count!=50{panic("scalar output")}'
+        for flags in (['-debug'],native.UNCHECKED):
+            counts=self.check(self.program(body,'\n'.join(prefix)),flags=flags)
+            self.assertLessEqual(counts.get('permissions.summaries_built',0),8,counts)
+            self.assertLessEqual(counts.get('permissions.view_bodies',0),60,counts)
+
+    def test_output_parameters_and_results_reuse_one_shared_graph_instance(self):
+        prefix=['DATA:>[]int{7}','Node::struct{items:[]int,left,right:^Node}',
+                'leaf::proc()->^Node{return new_clone(Node{})}']
+        for index in range(8):
+            callee='leaf' if index==0 else f'layer_{index-1}'
+            prefix.append(f'layer_{index}::proc()->^Node{{child:={callee}();return new_clone(Node{{left=child,right=child}})}}')
+        names=[f'out_{index}' for index in range(20)]
+        prefix.append('create::proc('+','.join(names)+':^^Node)->^Node{node:=layer_7();'
+                      +''.join(name+'^=node;' for name in names)+'return node}')
+        body=','.join(names)+':^Node;node:=create('+','.join('&'+name for name in names)+');'
+        body+='if '+'||'.join(name+'!=node' for name in names)+'{panic("shared outputs")};'
+        body+='for node!=nil{next:=node.left;free(node);node=next}'
+        for flags in (['-debug'],native.UNCHECKED):
+            counts=self.check(self.program(body,'\n'.join(prefix)),flags=flags)
+            self.assertLess(counts.get('permissions.values',0),10000,counts)
+
     def test_type_property_reuse_keeps_generic_slice_and_inline_values_distinct(self):
         code=self.program('''a:=[1]int{7};view:>a[:]
 for _ in 0..<8{if first(a)!=7||first(view)!=7{panic("types")}}

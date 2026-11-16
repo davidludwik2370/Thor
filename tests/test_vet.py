@@ -132,6 +132,26 @@ main::proc(){
         self.assertIn('alias:=', changed)
         self.assertIn('source:>', changed)
 
+    def test_reference_output_parameters_keep_local_ownership_choices_explicit(self):
+        for signature,store,body in [('^Row','out^=Row{items}','row:Row;store(&row);defer delete(row.items)'),
+                                     ('Sink','out.target^=Row{items}','row:Row;store(Sink{&row});defer delete(row.items)')]:
+            with self.subTest(signature=signature):
+                text='package main\nRow::struct{items:[]int}\nSink::struct{target:^Row}\n'
+                text+=f'store::proc(out:{signature}){{items:=[x+7 for x in 0..<1];{store}}}\n'
+                text+='main::proc(){'+body+';if row.items[0]!=7{panic("output")}}\n'
+                self.write(text)
+                self.assertEqual(self.findings('--vet=immutable'),[])
+                self.invoke('--vet=immutable','--apply')
+                self.assertIn('items:=',self.source.read_text())
+                self.invoke(command='run')
+        self.write('''package main
+store::proc(out:^int){items:=[]int{out^+7};defer delete(items);out^=items[0]}
+main::proc(){value:int;store(&value);if value!=7{panic("scalar output")}}
+''')
+        findings=self.findings('--vet=immutable')
+        self.assertEqual(len(findings),1,findings)
+        self.assertIn("'items'",findings[0]['msgs'][0])
+
     def test_purity_includes_transitive_helpers_input_mutation_and_global_state(self):
         self.write('''package main
 import "core:fmt"

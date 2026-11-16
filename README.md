@@ -636,6 +636,11 @@ reference-bearing data also require manual review, since `fn` can change result
 ownership and allocation behavior. Converting a procedure to `fn` enables its
 normal automatic compile-time evaluation with known arguments.
 
+Immutable corrections preserve ownership choices across API results and
+reference-capable output parameters. Reference-sensitive locals in these
+procedures require manual review. Scalar output parameters support ordinary
+immutable advice.
+
 Proposed corrections are validated together through normal Thor checking using
 temporary source overlays. Additional analysis runs for `thor vet` and `--vet`.
 Procedures with definitely unsupported public `fn` parameter/result types or
@@ -1057,6 +1062,9 @@ copy_values :: proc(source, #mut destination: []int) {
 ```
 
 TLS displays inferred `#mut` in grey and includes requirements in hover text.
+Resolved calls propagate read-only views stored through output parameters,
+including forwarding procedures. Output storage and returned values preserve
+their shared references.
 See [the complete slice access contract](docs/slice-access.md) and the commented
 [slice access demo](examples/slice_access/demo.thor).
 

@@ -69,6 +69,21 @@ b::proc(values:[]int,n:int){if n>0{a(values,n-1)}}
                 self.assertEqual(bool(value.data),expected=='slice')
                 self.assertFalse(context.env[declaration,'status'].data)
 
+    def test_reference_output_stores_stabilize_through_forwarding_calls(self):
+        prefix='''Row::struct{items:[]int}
+fill::proc(out:^Row){view :> []int{7};out^=Row{view}}
+forward::proc(out:^Row){fill(out)}
+outer::proc(out:^Row){forward(out)}
+'''
+        for access,invalid in [('_=row.items[0]',False),('row.items[0]=9',True)]:
+            with self.subTest(access=access):
+                project=self.project(self.program('row:Row;outer(&row);'+access,prefix))
+                project.slice_access.prepare()
+                issues=[node.text for context in project.slice_access.summaries.values()
+                        for node,_ in context.issues]
+                self.assertEqual(bool(issues),invalid,issues)
+                if invalid:self.assertIn('row.items[0]',issues)
+
     def test_recursive_argument_rotation_preserves_both_mutation_requirements(self):
         prefix='''a::proc(left,right:[]int,n:int){if n>0{b(right,left,n-1)}else{left[0]=9}}
 b::proc(left,right:[]int,n:int){if n>0{a(left,right,n-1)}}
