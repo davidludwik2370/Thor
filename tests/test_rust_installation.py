@@ -11,8 +11,41 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from tests import test_rust_compiler as native
+
+
+class NativeTestSetupTests(unittest.TestCase):
+    def test_prebuilt_setup_keeps_the_published_executable_in_place(self):
+        with tempfile.TemporaryDirectory(prefix='thor-prebuilt-setup-') as directory:
+            binary=Path(directory)/'compiler'
+            binary.write_bytes(b'prebuilt fixture')
+            with patch.object(native,'RUST',binary), patch.dict(os.environ,{'THOR_TEST_PREBUILT':'1'}), \
+                    patch.object(native.subprocess,'run') as build:
+                native.RustCompilerTests.setUpClass()
+                from tests import test_migrate as migration
+                with patch.object(migration,'COMPILER',binary):
+                    migration.MigrationTests.setUpClass()
+            build.assert_not_called()
+            self.assertEqual(binary.read_bytes(),b'prebuilt fixture')
+
+    def test_missing_prebuilt_compiler_is_an_error(self):
+        with tempfile.TemporaryDirectory(prefix='thor-prebuilt-missing-') as directory:
+            with patch.object(native,'RUST',Path(directory)/'missing'), \
+                    patch.dict(os.environ,{'THOR_TEST_PREBUILT':'1'}), \
+                    patch.object(native.subprocess,'run') as build:
+                with self.assertRaisesRegex(RuntimeError,'Prebuilt test compiler is missing'):
+                    native.RustCompilerTests.setUpClass()
+            build.assert_not_called()
+
+    def test_ordinary_setup_still_builds_the_compiler(self):
+        with patch.dict(os.environ,{'THOR_TEST_PREBUILT':'0'}), \
+                patch.object(native.shutil,'which',return_value='cargo'), \
+                patch.object(native.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'','')) as build:
+            native.RustCompilerTests.setUpClass()
+        build.assert_called_once()
+        self.assertIn('--release',build.call_args.args[0])
 
 
 @unittest.skipIf(os.name == 'nt', 'POSIX installation and dependency sentinels')

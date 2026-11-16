@@ -396,3 +396,11 @@ checked and unchecked runtime verdicts. A scalar helper's invalid global
 read-only store remains covered. The CLI vet/test probe fixture now uses a
 scalar local, keeping its immutable advice independent of the
 conservative reference-output ownership policy.
+
+
+Parallel module orchestration exposed a publication race in repeated Cargo
+setup. Cargo can refresh the public executable path while another module
+launches it, producing a transient missing-executable error. The test harness
+now accepts `THOR_TEST_PREBUILT=1` after a single prebuild. Ordinary standalone
+setup keeps its Cargo build. Missing prebuilt executables fail explicitly.
+Migration setup honors the same mode. Unit tests cover all three paths.

@@ -17,7 +17,8 @@ UNCHECKED = ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert
 class MigrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if 'THOR_MIGRATE_TEST_COMPILER' not in os.environ:
+        from tests.test_rust_compiler import using_prebuilt_compiler
+        if 'THOR_MIGRATE_TEST_COMPILER' not in os.environ and not using_prebuilt_compiler(COMPILER):
             build = subprocess.run(['cargo','build','--release','--locked','--offline','--manifest-path',str(ROOT/'rust/Cargo.toml')],
                                    capture_output=True,text=True,timeout=180)
             if build.returncode:

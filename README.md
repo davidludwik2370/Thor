@@ -1294,6 +1294,12 @@ allocating features require a context, which such callbacks can assign explicitl
 python3 -m unittest discover -s tests -v
 ```
 
+When running test modules in parallel, build the release compiler once and set
+`THOR_TEST_PREBUILT=1` for every worker. This keeps Cargo setup from replacing the
+shared executable during another worker's launch. A missing prebuilt compiler
+is an error. Ordinary sequential test setup continues to build with Cargo.
+
+
 The opt-in [upstream integration run](docs/upstream-integration.md) compares
 pinned Odin projects, migrated Thor copies and vet-corrected copies. Its
 [runner instructions](tests/integration/README.md) document dependencies and

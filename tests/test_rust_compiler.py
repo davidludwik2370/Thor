@@ -18,9 +18,19 @@ RUST = ROOT / 'rust/target/release/thor-rust'
 UNCHECKED = ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']
 
 
+def using_prebuilt_compiler(binary):
+    if os.environ.get('THOR_TEST_PREBUILT') != '1':
+        return False
+    if not binary.is_file():
+        raise RuntimeError(f'Prebuilt test compiler is missing: {binary}. Build the release compiler first.')
+    return True
+
+
 class RustCompilerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if using_prebuilt_compiler(RUST):
+            return
         if shutil.which('cargo') is None:
             raise unittest.SkipTest('Rust compiler tests require Cargo')
         result = subprocess.run(['cargo', 'build', '--release', '--locked', '--offline',
