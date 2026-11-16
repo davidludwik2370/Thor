@@ -137,7 +137,7 @@ main::proc(){n:=7;_=bad(n)}
         for broken,corrected,message in cases:
             with self.subTest(message=message):
                 text='// 😀\npackage main\n'+broken+'\n'
-                client,main=self.open(text,checker_args='--run-timeout 0.2' if message=='timeout' else '')
+                client,main=self.open(text,checker_args='--run-timeout 1' if message=='timeout' else '')
                 errors=client.diagnostic(main.as_uri(),contains=message)
                 self.assertTrue(all(e['range']['start']['line']>1 for e in errors),errors)
                 fixed=text.replace(broken,corrected)
