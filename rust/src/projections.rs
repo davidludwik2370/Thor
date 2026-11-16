@@ -82,24 +82,26 @@ impl Resolver<'_> {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+        let using_files = using.keys().map(|(file, _)| *file).collect::<HashSet<_>>();
         let references = self
             .index
             .expression_names
             .iter()
             .enumerate()
+            .filter(|(file, _)| using_files.contains(file)
+                || !package_using[self.index.package_for[*file]].is_empty())
             .flat_map(|(file, nodes)| nodes.iter().map(move |node| Ref { file, node: *node }))
             .filter_map(|reference| {
-                let scopes = self.index.scopes(reference).collect::<Vec<_>>();
-                scopes
-                    .iter()
+                crate::profile::count("projection.scope_queries", 1);
+                let visible = self.index.scopes(reference)
                     .any(|scope| {
-                        if *scope == NodeId(0) {
+                        if scope == NodeId(0) {
                             !package_using[self.index.package_for[reference.file]].is_empty()
                         } else {
-                            using.contains_key(&(reference.file, *scope))
+                            using.contains_key(&(reference.file, scope))
                         }
-                    })
-                    .then_some((reference, scopes))
+                    });
+                visible.then(|| (reference, self.index.scopes(reference).collect::<Vec<_>>()))
             })
             .collect::<Vec<_>>();
         let mut projected: HashMap<(Ref, String), usize> = HashMap::new();

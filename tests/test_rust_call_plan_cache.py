@@ -66,6 +66,36 @@ array_total::proc(x:[2]i8)->int{return int(x[0]+x[1])}
                 result,_=self.profile(code,flags)
                 self.assertEqual(result.returncode,0,result.stderr)
 
+    def test_conditional_identity_lookup_uses_the_declaring_scope(self):
+        prefix='''
+when #config(FIRST,true){choose::(proc(value:int)->int{return value+1})}
+else{choose::(proc(value:int)->int{return value+2})}
+fallback::proc(value:any)->int{return 99}
+dispatch::proc{choose,fallback}
+outer::proc(value:int)->int{
+    when #config(FIRST,true){choose::(proc(value:int)->int{return value+3})}
+    else{choose::(proc(value:int)->int{return value+4})}
+    dispatch::proc{choose,fallback}
+    return dispatch(value)
+}
+'''
+        for first in (True,False):
+            body=f'''marker:>0;_=marker;value:=7
+if dispatch(value)!={8 if first else 9}||outer(value)!={10 if first else 11}{{
+    panic("conditional scope")
+}}
+'''
+            for flags in (['-debug'],native.UNCHECKED):
+                counts=[]
+                for size in (0,200):
+                    unused='\n'.join(f'unused_{n}::proc(x:int)->int{{return x+{n}}}' for n in range(size))
+                    result,profile=self.profile(self.program(body,prefix+unused),
+                        [*flags,f'-define:FIRST={str(first).lower()}'])
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    counts.append(profile.get('resolver.conditional_identity_candidates',0))
+                self.assertGreater(counts[0],0)
+                self.assertEqual(counts[0],counts[1])
+
     def test_writes_through_generic_aliases_are_still_rejected(self):
         code=self.program('items:=[1]int{3};view:>items[:];alias:>identity(view);write(alias)','''
 identity::proc(x:$T)->T{return x}

@@ -186,3 +186,74 @@ overlap. Detailed logs and historical comparison executables remain locally in
 `thor_test/artifacts/optimization/`. Reproduce the corpus measurements with
 `python3 thor_test/measure_optimization.py --repeats 5`; ordinary build output
 locations and names are unchanged.
+
+
+## SDK discovery follow-up on November 16
+
+This pass keeps completed call resolutions across compatible SDK discovery
+retries. The retained plans contain stable syntax references and type
+substitutions. The existing planner supplies their completeness checks.
+Appending files to an existing namespace, adding Thor source, changing syntax,
+source views, collection roots, flags or logical-number activation resets this
+reuse. Generic bindings, evaluated values and contextual witnesses exclude a
+resolver from this transfer. Record shapes and permission effects receive their
+usual analysis against the enlarged source graph.
+
+Using projections now restrict scope queries to files with relevant using
+owners or package-level projections. Scope vectors are allocated after a
+visible owner is found. Conditional overload identity lookup uses the declaring
+scope's existing name index. Its search cost is independent of unrelated
+symbols in other procedures or packages.
+
+A broader nested-inference memoization experiment increased recursive type
+resolution work in the large fixture and was removed. The retained changes use
+the original call-plan cache eligibility rules.
+
+Paired warm Skald runs use the same native compiler, optimization flags,
+single-worker backend and fixed test seed. The lowering figures include
+profiling. Mac figures average two pairs. Linux figures average three pairs.
+The ordinary command measurements have profiling disabled and average two
+pairs on each host.
+
+| Measurement | Mac before | Mac after | Linux before | Linux after |
+| --- | --- | --- | --- | --- |
+| Warm lowering | 11.89 s | 10.98 s | 11.26 s | 10.29 s |
+| Ordinary optimized test build | 22.47 s | 21.50 s | 26.03 s | 25.36 s |
+
+Each run preserves all 108 test names and verdicts. On both hosts, all 122
+emitted Odin files match byte-for-byte between the saved compiler and the
+updated compiler. The optimized executable text sections also match exactly,
+covering Mach-O `__TEXT,__text` on Mac and ELF `.text` on Linux.
+
+The 600-procedure control keeps optimized Thor builds at 0.441–0.499 seconds
+against native Odin's 0.395–0.398 seconds on Mac. Its updated warm transpile
+samples take 0.074–0.132 seconds. The 32-call scalar control retains a single
+cold helper compilation and warm builds of 0.390–0.398 seconds. These short
+wall-time measurements include process startup and monitoring granularity.
+
+Focused checks cover namespace readiness, ordinary and contextual overloads,
+parenthesized procedure values, lexical shadowing, checked and unchecked native
+runs, using projections and readonly aliases. New regression checks exercise
+closed-call transfer invalidation and ensure unrelated source growth adds no
+using-scope queries or conditional-identity candidates. All 51 focused tests
+and all 96 Rust unit tests pass.
+
+The final full gate passes all 214 Python test modules on both hosts. Each host
+completes 3,692 tests, with four existing skips on Mac and 67 platform or
+configuration skips on Linux. The 96 Rust units also pass in Mac release mode.
+All 142 editor JavaScript tests pass on each host. Checked and unchecked native
+fixtures, assertion hygiene, TLS diagnostics, debugger mappings, compile-time
+execution and cache invalidation are included in the compiler gate.
+
+Linux timing runs use a three-CPU quota. Functional validation uses up to five
+CPUs and a six-GiB container limit. The final run records zero out-of-memory
+or out-of-memory-kill events.
+
+The large workload still spends roughly 11 seconds lowering. Call planning and
+repeated permission discovery remain significant costs. These changes provide
+command-local analysis reuse without additional generated files.
+
+Detailed local evidence is under
+`integration-projects/results/performance-followup/remaining-analysis`, including
+paired profiles, generated-source hashes, executable-text hashes, the discarded
+experiment and the regression logs.

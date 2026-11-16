@@ -28,6 +28,7 @@ pub use projections::Projection;
 #[path = "typefacts.rs"]
 mod typefacts;
 pub use calls::CallPlan;
+pub(crate) use calls::ClosedCalls;
 pub use contexts::{ContextHint, ParameterWitness};
 pub use typefacts::Substitutions;
 #[path = "typepool.rs"]
@@ -259,7 +260,7 @@ pub struct Resolver<'a> {
 /// same resolver. Binding/evaluation changes invalidate the entire table.
 #[derive(Default)]
 struct Metadata {
-    calls: HashMap<Ref, HashMap<Substitutions, Vec<CallPlan>>>,
+    calls: ClosedCalls,
     specialized: HashMap<Ref, HashMap<Substitutions, Type>>,
     fields: HashMap<TypeId, RecordFields>,
     members: HashMap<TypeId, HashMap<String, Type>>,

@@ -16,6 +16,28 @@ class RustSemanticEfficiencyTests(unittest.TestCase):
     def generated(self):
         return next((self.root/'rust').rglob('main.odin')).read_text()
 
+    def test_using_scope_queries_skip_unrelated_files(self):
+        library=self.app/'library';library.mkdir()
+        self.source.write_text(self.program('''
+if read(Row{7})!=7||library.answer()!=9{panic("using file boundary")}
+''','''import "library"
+Row::struct{value:int}
+read::proc(using row:Row)->int{return value}
+'''))
+        counts=[]
+        for size in (0,200):
+            (library/'library.thor').write_text('package library\nanswer::proc()->int{return 9}\n'+
+                '\n'.join(f'unused_{n}::proc(x:int)->int{{return x+{n}}}' for n in range(size)))
+            profile=self.root/'projection-profile.json'
+            result=self.invoke('rust',command='check',
+                env={**os.environ,'THOR_PROFILE':str(profile)})
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            counts.append(json.loads(profile.read_text())['counters']['projection.scope_queries'])
+        self.assertEqual(counts[0],counts[1])
+        for flags in (['-debug'],native.UNCHECKED):
+            result=self.invoke('rust',flags=flags)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def sdk_overlay(self, entries):
         sdk=Path(subprocess.check_output([os.environ.get('THOR_ODIN','odin'),'root'],text=True).strip()).resolve()
         replacements={}
@@ -93,6 +115,8 @@ if answer!=7||values[0]!=0 {panic("context")}
                     self.assertEqual(counters.get('permissions.dependency_retries',0),retries,counters)
                     self.assertEqual(counters.get('permissions.analyses',0),retries+1,counters)
                     self.assertLessEqual(counters.get('permissions.summaries_built',0),retries+1,counters)
+                    if not preloaded:
+                        self.assertGreater(counters.get('discovery.call_plan_reuses',0),0,counters)
 
     def test_output_view_queries_keep_inactive_sdk_branches_unloaded(self):
         overlay=self.sdk_overlay({

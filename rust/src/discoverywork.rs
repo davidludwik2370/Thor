@@ -1,6 +1,6 @@
 //! Discovery worklists survive append-only loading of new SDK namespaces.
-//! Only closed positive type queries are retained. Record shapes and effects
-//! are always checked again against the enlarged graph.
+//! Closed positive types and call plans survive independent namespace appends.
+//! Record shapes and effects are checked again against the enlarged graph.
 use crate::{ast::{NodeId, Source}, semantics::{Ref, Resolver, Type}};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -10,6 +10,9 @@ pub(super) struct Work {
     sources: Vec<Source>,
     queries: Vec<Ref>,
     complete: HashMap<Ref, Type>,
+    calls: crate::semantics::ClosedCalls,
+    flags: Vec<String>,
+    logical_mode: bool,
     pub roots: Vec<Ref>,
     pub requests: Vec<Ref>,
 }
@@ -25,10 +28,18 @@ impl Work {
         sources[count..].iter().all(|source| !source.thor
             && source.path.parent().is_none_or(|path|!packages.contains(path)))
     }
-    pub fn update(&mut self, resolver: &Resolver<'_>, runtime: &Path) {
-        if !self.extends(resolver.sources) {
+    pub fn update(&mut self, resolver: &mut Resolver<'_>, runtime: &Path) {
+        let logical_mode = resolver.sources.iter().position(|source|source.thor)
+            .is_some_and(|file|resolver.logical_enabled(file));
+        if !self.extends(resolver.sources) || self.flags != resolver.flags || self.logical_mode != logical_mode {
             *self = Self::default();
             crate::profile::count("discovery.worklist_resets", 1);
+        }
+        if Self::ordinary(resolver) {
+            crate::profile::count("discovery.call_plan_reuses", self.calls.values().map(|contexts|contexts.len() as u64).sum());
+            resolver.adopt_closed_calls(std::mem::take(&mut self.calls));
+        } else {
+            self.calls.clear();
         }
         for (file, source) in resolver.sources.iter().enumerate().skip(self.sources.len()) {
             crate::profile::count("discovery.source_scans", 1);
@@ -47,11 +58,19 @@ impl Work {
             }
         }
         self.sources = resolver.sources.to_vec();
+        self.flags = resolver.flags.clone();
+        self.logical_mode = logical_mode;
+    }
+    pub fn retain_calls(&mut self, resolver: &mut Resolver<'_>) {
+        if Self::ordinary(resolver) { self.calls = resolver.take_closed_calls(); }
+    }
+    fn ordinary(resolver: &Resolver<'_>) -> bool {
+        resolver.bound_types.is_empty() && resolver.bound_constants.is_empty()
+            && resolver.evaluated.is_empty() && resolver.logical_constants.is_empty()
+            && resolver.context_hints.is_empty() && resolver.parameter_witnesses.is_empty()
     }
     pub fn types(&mut self, resolver: &mut Resolver<'_>) -> Vec<Type> {
-        let ordinary = resolver.bound_types.is_empty() && resolver.bound_constants.is_empty()
-            && resolver.evaluated.is_empty() && resolver.logical_constants.is_empty()
-            && resolver.context_hints.is_empty() && resolver.parameter_witnesses.is_empty();
+        let ordinary = Self::ordinary(resolver);
         if !ordinary { self.complete.clear(); }
         self.queries.iter().map(|query| {
             if let Some(typ) = self.complete.get(query) {
@@ -96,5 +115,43 @@ mod tests {
         if work.extends(&changed) { panic!("source view change ignored"); }
         changed = old.clone(); changed[0].collection_roots.insert("core".into(),"/new".into());
         if work.extends(&changed) { panic!("collection change ignored"); }
+    }
+
+    #[test]
+    fn closed_calls_move_only_between_compatible_unbound_graphs() {
+        use crate::semantics::{CallPlan, Substitutions};
+        let sources = vec![source("/project/main.thor",true)];
+        let site = Ref {file:0,node:NodeId(0)};
+        for change in 0..9 {
+            let mut work = Work {sources:sources.clone(), ..Work::default()};
+            work.calls.entry(site).or_default().insert(Substitutions::new(),vec![CallPlan {
+                procedure:site, signature:site, arguments:vec![], bindings:Substitutions::new(),
+            }]);
+            if change == 8 { work.logical_mode = true; }
+            let mut next = sources.clone();
+            match change {
+                1 => next.push(source("/project/extra.odin",false)),
+                2 => next.push(source("/other/extra.thor",true)),
+                3 => next[0] = source("/project/main.thor",true),
+                4 => next[0].shared_native = true,
+                _ => next.push(source("/sdk/extra.odin",false)),
+            }
+            let flags = if change == 5 { vec!["-debug".into()] } else { vec![] };
+            let mut resolver = Resolver::with_flags(&next,&flags);
+            if change == 6 { resolver.bound_types.insert((site,"T".into()),Type::scalar("int")); }
+            if change == 7 { resolver.evaluated.insert(site,serde_json::json!(7)); }
+            work.update(&mut resolver,Path::new("/runtime"));
+            let adopted = resolver.take_closed_calls();
+            if adopted.contains_key(&site) != (change == 0) {
+                panic!("closed calls crossed incompatible graph change {change}");
+            }
+            if change == 0 {
+                resolver.adopt_closed_calls(adopted);
+                work.retain_calls(&mut resolver);
+                if !work.calls.contains_key(&site) || !resolver.take_closed_calls().is_empty() {
+                    panic!("closed calls were not transferred for the next pass");
+                }
+            }
+        }
     }
 }

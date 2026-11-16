@@ -9,8 +9,19 @@ pub struct CallPlan {
     pub arguments: Vec<Vec<Ref>>,
     pub bindings: Substitutions,
 }
+pub(crate) type ClosedCalls = HashMap<Ref, HashMap<Substitutions, Vec<CallPlan>>>;
 
 impl Resolver<'_> {
+    pub(crate) fn take_closed_calls(&mut self) -> ClosedCalls {
+        self.metadata.as_mut().map(|metadata| std::mem::take(&mut metadata.calls)).unwrap_or_default()
+    }
+    pub(crate) fn adopt_closed_calls(&mut self, calls: ClosedCalls) {
+        if let Some(metadata) = &mut self.metadata {
+            for (site, contexts) in calls {
+                metadata.calls.entry(site).or_default().extend(contexts);
+            }
+        }
+    }
     fn spread_types(&mut self, arg: Ref, context: &Substitutions) -> Option<Vec<Type>> {
         let source = &self.sources[arg.file];
         if source.node(arg.node).kind != "Unary" || source.node(arg.node).op != "**" {

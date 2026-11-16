@@ -1142,10 +1142,17 @@ impl Resolver<'_> {
         if self.enclosing_when(declaration).is_none() {
             return procedure;
         }
-        let Some(symbol) = self
-            .symbols
-            .iter()
-            .find(|symbol| symbol.reference == declaration && symbol.value == Some(value))
+        let declaration_scope = Ref {file: procedure.file, node: super::scope(source, declaration.node)};
+        let Some(symbol) = self.scopes.get(&declaration_scope)
+            .into_iter()
+            .flat_map(|names| source.group(declaration.node, "names").iter()
+                .filter_map(|name| names.get(source.text(*name))))
+            .flatten()
+            .map(|index| &self.symbols[*index])
+            .find(|symbol| {
+                crate::profile::count("resolver.conditional_identity_candidates", 1);
+                symbol.reference == declaration && symbol.value == Some(value)
+            })
         else {
             return procedure;
         };

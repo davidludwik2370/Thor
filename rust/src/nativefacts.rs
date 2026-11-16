@@ -137,7 +137,7 @@ impl Project {
         loop {
             let mut resolver = self.resolver();
             resolver.begin_symbol_queries();
-            work.update(&resolver, &self.options.root.join("runtime"));
+            work.update(&mut resolver, &self.options.root.join("runtime"));
             let types = work.types(&mut resolver);
             let record_packages = Self::discover_record_dependencies(&mut resolver, types);
             let mut roots = work.roots.clone();
@@ -221,6 +221,7 @@ impl Project {
             crate::profile::event("analysis.import_demands", || serde_json::json!(
                 demands.iter().map(|d| (&self.sources[d.file].path,&d.path,&d.name)).collect::<Vec<_>>()));
             crate::profile::event("analysis.call_dependencies", || serde_json::json!({"packages":packages,"sources":self.sources.len()}));
+            work.retain_calls(&mut resolver);
             crate::profile::destroy("analysis.resolver_teardown", resolver);
             self.discover_type_facts_from(packages)?;
             // Follow only declarations behind names this analysis requested.
