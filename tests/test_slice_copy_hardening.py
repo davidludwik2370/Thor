@@ -67,6 +67,25 @@ forward::proc(values:[]int,$mode:Mode){use(values,mode)}
             with self.subTest(small=flag):
                 self.check('original :> Number(7);copy:=original;_=copy',prefix,flags=['-define:SMALL='+flag])
 
+    def test_generic_multi_result_ids_keep_their_scalar_copy_semantics(self):
+        prefix='''Id::distinct int
+Status::enum{ok}
+Box::struct($T:typeid){id:Id,value:T}
+attach::proc(box:^Box($T))->(Id,Status){return box.id,.ok}
+prepare::proc(box:^Box($T)){
+    id,status :> attach(box)
+    copy:=id
+    box.id=copy
+    _=status
+}
+'''
+        body='''values:=[1]int{7};box:=Box([]int){Id(9),values[:]}
+prepare(&box)
+if box.id!=9||box.value[0]!=7{panic("generic scalar result")}
+'''
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            self.invoke(self.program(body,prefix),flags=flags)
+
     def test_conditionally_selected_reference_types_do_not_erase_views(self):
         prefix='Value::[]int when #config(REFERENCE,true) else int\n'
         self.check('value :> Value{1};copy:=value;_=copy',prefix,writable=False,flags=['-define:REFERENCE=true'])

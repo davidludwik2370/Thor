@@ -2154,6 +2154,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         let typ = self.specialized_type(annotation, &bindings);
                         self.values[v].typ = self.r.shared_type(typ);
                     }
+                    if self.values[v].typ.is_unknown() {
+                        // Recursive/discovery summaries can still contain an
+                        // unknown result after its declaration has been typed.
+                        let inferred = self.specialized_type(name, &self.contexts[c].bindings.clone());
+                        if !inferred.is_unknown() {
+                            v = self.narrow(v, inferred);
+                        }
+                    }
                     if self.s(r).node(r.node).immutable {
                         v = self.freeze(v, name)
                     } else if self.s(r).node(r.node).mutable {

@@ -54,9 +54,14 @@ def vet_baselines(tokens, commands, values):
         return path.with_suffix('.thor') if path.suffix == '.odin' else path
 
     def configuration(arguments):
+        # These runner settings control test presentation and scheduling. Vet
+        # recipes select the same tested package without running its test loop.
+        harness_defines = ('-define:ODIN_TEST_FANCY=', '-define:ODIN_TEST_THREADS=',
+                          '-define:ODIN_TEST_JSON_REPORT=', '-define:ODIN_TEST_RANDOM_SEED=')
         return sorted(argument for argument in arguments
-            if argument.startswith(('-target:', '-define:', '-collection:'))
-            or argument in ('-file', '-no-entry-point'))
+            if (argument.startswith(('-target:', '-define:', '-collection:'))
+                or argument in ('-file', '-no-entry-point'))
+            and not argument.startswith(harness_defines))
 
     target = source_path(tokens[0])
     flags = configuration(tokens[1:])
@@ -304,8 +309,14 @@ def run_locked(project, args, source, directory):
         for index, recipe in enumerate(project['commands']):
             if recipe.get('skip_repeated_runtime'):
                 previous = next((result for result in report.get(stage, []) if result['name'] == recipe['name']), None)
-                results.append({**(previous or {'name':recipe['name'], 'status':'native-runtime-unavailable'}),
-                    'runtime_note':recipe['runtime_note']})
+                result = {'name':recipe['name'], 'status':'native-runtime-unavailable',
+                    'runtime_note':recipe['runtime_note']}
+                if previous:
+                    result['previous_status'] = previous.get('previous_status', previous['status'])
+                    for stream in ('stdout', 'stderr'):
+                        if stream in previous:
+                            result[stream] = previous[stream]
+                results.append(result)
                 continue
             artifact = directory / f'{stage}-{index}-program'
             values = {'source': str(source), 'tree': str(tree), 'artifact': str(artifact),

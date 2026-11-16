@@ -46,6 +46,28 @@ class IntegrationRunnerTests(unittest.TestCase):
         self.assertIn(b'"#file"',actual)
         self.assertTrue(actual.endswith(b'a:="/native/example.odin"; b:="/native"\r\n'))
 
+    def test_unavailable_runtime_keeps_evidence_without_reusing_its_old_verdict(self):
+        with tempfile.TemporaryDirectory(prefix='thor-integration-unavailable-') as directory:
+            root=Path(directory);source=root/'odin/sample__project';source.mkdir(parents=True)
+            (root/'vetted/sample__project').mkdir(parents=True)
+            results=root/'results/sample__project';results.mkdir(parents=True)
+            original={'baseline':[], 'vetted':[{'name':'graphics','status':1,
+                'matches_baseline':False,'stdout':'/saved/stdout','stderr':'/saved/stderr'}]}
+            (results/'report.json').write_text(json.dumps(original))
+            project={'repo':'sample/project','commit':'revision','commands':[{
+                'name':'graphics','args':['test','{tree}'],'skip_repeated_runtime':True,
+                'runtime_note':'Unchanged native graphics initialization is intermittent.'}]}
+            args=SimpleNamespace(stage='verify',thor=Path('/compiler'),odin='/odin',timeout=1,fresh=False)
+            with patch.object(runner,'WORK',root), \
+                    patch.object(runner.subprocess,'check_output',side_effect=['revision\n','version\n']), \
+                    patch.object(runner,'execute',side_effect=AssertionError('unavailable runtime executed')):
+                runner.run_locked(project,args,source,results)
+            result=json.loads((results/'report.json').read_text())['vetted'][0]
+            self.assertEqual(result['status'],'native-runtime-unavailable')
+            self.assertEqual(result['previous_status'],1)
+            self.assertEqual(result['stderr'],'/saved/stderr')
+            self.assertNotIn('matches_baseline',result)
+
     def test_case_results_compare_equal_after_json_roundtrip(self):
         packet = {'total': 2, 'success': 1, 'packages': {
             'sample': [{'name': 'a', 'success': True}, {'name': 'b', 'success': False}]}}
@@ -72,6 +94,17 @@ class IntegrationRunnerTests(unittest.TestCase):
             with self.subTest(flags=flags):
                 selected = runner.vet_baselines(['/example/main.thor','-file',*flags],commands,values)
                 self.assertEqual([command['name'] for command in selected],[name])
+
+    def test_vet_baseline_matching_ignores_runner_test_settings(self):
+        commands = [{'name':'tests', 'args':['test','{tree}/tests',
+            '-define:ODIN_TEST_FANCY=false', '-define:ODIN_TEST_THREADS=1',
+            '-define:ODIN_TEST_JSON_REPORT=/tmp/results.json',
+            '-define:ODIN_TEST_RANDOM_SEED=582019', '-define:MODE=2']}]
+        selected = runner.vet_baselines(['/example/tests','-build-mode:test','-define:MODE=2'],
+            commands,{'tree':'/example'})
+        self.assertEqual(selected,commands)
+        self.assertEqual(runner.vet_baselines(['/example/tests','-build-mode:test'],
+            commands,{'tree':'/example'}),[])
 
     def test_process_memory_includes_descendants_and_excludes_other_processes(self):
         snapshot = 'PID PPID RSS\n10 1 100\n11 10 200\n12 11 300\n13 1 900\n'

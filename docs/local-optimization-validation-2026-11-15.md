@@ -251,3 +251,28 @@ recursive procedure summaries and abstract result-graph instantiation. An
 isolated diagnostic build is testing arena lifetime changes before any production
 change is applied. The ordinary compiler and regression-suite binaries remain
 unchanged during that experiment.
+
+The Linux matrix exposed an independent scalar false positive in ode_ecs after
+vet converted a generic multi-result declaration to `:>`. The permission summary
+still held an unknown placeholder for a distinct-integer ID, while declaration
+typing already resolved its scalar type. Both frontends now refine an unknown
+declaration value from that resolved type before freezing its permissions. A
+forced-placeholder reference test covers scalar and slice results, and the
+normal entry-point regression covers generic multi-result IDs in checked and
+unchecked builds. All 64 targeted Mac checks passed. The affected 283-test
+ode_ecs suite also passed with the converted declaration retained.
+
+Integration baseline selection now ignores the runner's test-presentation,
+scheduling, report-path and random-seed defines while retaining project defines
+and target selection. This lets an unavailable native Anvil Flux baseline also
+skip its style pass. A separate runner regression preserves previous runtime
+failure logs when a fixture is marked unavailable, without carrying its obsolete
+comparison verdict forward.
+
+The native Linux karl2d coordinate tests are intermittent under Xvfb. Nine of
+twenty unchanged native binary runs failed during graphics initialization, with
+the subsequent tests observing its unfinished initialization state. Converted
+binaries also passed unchanged control runs. The matrix retains the evidence and
+marks those runtime fixtures unavailable. Its native, migrated and vetted
+compilation checks and API verifier remain enabled. TOML conformance matched
+all 583 passing cases and 98 upstream skips across all three stages on both hosts.

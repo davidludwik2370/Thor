@@ -1287,6 +1287,10 @@ class SliceAccess:
                 value=self.copied(incoming)
                 typ=self.r.type_node(node.role('type'),context.substitutions) if node.role('type') else value.typ
                 value.typ=self.substitute_type(typ,context.substitutions)
+                if value.typ.kind in {'unknown','generic'}:
+                    inferred=self.substitute_type(self.r.type_of(name),context.substitutions)
+                    if inferred.kind not in {'unknown','generic'}:
+                        value=self.narrowed(value,inferred)
                 if node.data.get('immutable'):value=self.freeze(value,name)
                 elif value.typ.kind in {'slice','generic','unknown'}:
                     self.require(value.data,rhs or name,context,'create a writable slice alias; use :> or copy the backing storage with core:slice.clone')

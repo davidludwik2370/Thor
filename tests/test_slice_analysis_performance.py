@@ -13,7 +13,7 @@ from tests import test_thor as base
 from thorlang.compiler import Source
 from thorlang.driver import Project, frontend_binary, _main
 from thorlang.semantics import Type, Resolver
-from thorlang.sliceaccess import SliceAccess
+from thorlang.sliceaccess import SliceAccess, Summary, Value, Origin
 
 
 class SliceAnalysisPerformanceTests(unittest.TestCase):
@@ -49,6 +49,25 @@ b::proc(values:[]int,n:int){if n>0{a(values,n-1)}}
         self.assertFalse(any(name.startswith('independent_') for name in counts),counts)
         self.assertNotIn('fresh',counts)
         self.assertLessEqual(max(counts.values()),4,counts)
+
+    def test_typed_declarations_refine_unknown_discovery_results_before_freezing(self):
+        for annotation, literal, expected in [('Id','Id(7)','scalar'),
+                                               ('[]int','[]int{7}','slice')]:
+            with self.subTest(annotation=annotation):
+                project=self.project(self.program('value, status :> produce();_=value;_=status',
+                    f'Id::distinct int\nproduce::proc()->({annotation},int){{return {literal},0}}\n'))
+                source=next(iter(project.sources.values()))
+                declaration=next(node for node in source.nodes if node.kind=='Declaration'
+                    and [name.text for name in node.group('names')]==['value','status'])
+                name=declaration.group('names')[0]
+                context=Summary(None,{})
+                placeholder=Value(data={Origin(seed=name)})
+                with patch.object(project.slice_access,'expression_results',return_value=[placeholder,Value()]):
+                    project.slice_access.statement(declaration,context)
+                value=context.env[declaration,'value']
+                self.assertEqual(value.typ.kind,expected)
+                self.assertEqual(bool(value.data),expected=='slice')
+                self.assertFalse(context.env[declaration,'status'].data)
 
     def test_recursive_argument_rotation_preserves_both_mutation_requirements(self):
         prefix='''a::proc(left,right:[]int,n:int){if n>0{b(right,left,n-1)}else{left[0]=9}}
