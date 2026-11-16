@@ -31,6 +31,25 @@ pub struct Error {
     pub exit_status: u8,
 }
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Complete a copied word without widening an explicit expression or a
+/// synthetic source-map range. Work is bounded by the adjacent word.
+pub(crate) fn whole_word_span(raw: &str, span: Span) -> Span {
+    let Some(first) = raw.get(span.start..).and_then(|rest| rest.chars().next()) else {
+        return span;
+    };
+    let word = |ch: char| ch.is_alphanumeric() || ch == '_';
+    if !word(first) { return span; }
+    let mut start = span.start;
+    for ch in raw[..start].chars().rev() {
+        if !word(ch) { break; }
+        start -= ch.len_utf8();
+    }
+    let end = start + raw[start..].chars().take_while(|ch| word(*ch))
+        .map(char::len_utf8).sum::<usize>();
+    if span.end <= end { Span::new(start, end) } else { span }
+}
+
 impl Error {
     pub fn new(message: impl Into<String>) -> Self {
         Self {

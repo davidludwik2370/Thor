@@ -10,6 +10,27 @@ import sys
 from .sourcemap import Origin, position
 
 
+def whole_word_span(raw, start, end):
+    """Complete a copied word with a scan of its adjacent bytes only."""
+    def word_byte(byte):
+        return byte >= 128 or byte == ord('_') or chr(byte).isalnum()
+
+    if not 0 <= start < len(raw) or not word_byte(raw[start]):
+        return start, end
+    first, last = start, start
+    while first and word_byte(raw[first-1]):
+        first -= 1
+    while last < len(raw) and word_byte(raw[last]):
+        last += 1
+    text = raw[first:last].decode('utf-8', errors='replace')
+    for match in re.finditer(r'\w+', text):
+        low = first + len(text[:match.start()].encode())
+        high = first + len(text[:match.end()].encode())
+        if low <= start < high and end <= high:
+            return low, high
+    return start, end
+
+
 def backend_error_flags(flags):
     """Leave room for native helper cascades before source-level deduplication.
 
@@ -150,6 +171,9 @@ class Diagnostics:
                     token = re.match(r"\w+|.", raw[offset:].decode("utf-8", errors="replace"))
                     end = pos.get("end_offset", offset + (len(token[0].encode()) if token else 0))
                     origin = Origin(file, offset, end)
+            if origin and origin.exact:
+                start,end=whole_word_span(self.read(origin.file),origin.start,origin.end)
+                origin=Origin(origin.file,start,end,origin.kind,origin.exact)
             # The same blocked operation may be rendered inside a type witness
             # and the runtime helper. The token identifies its precise source
             # site even when the generated span maps to the whole expression.

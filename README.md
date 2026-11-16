@@ -668,6 +668,9 @@ unsaved text. TLS offers a correction for the document snapshot that was checked
 
 In a terminal, diagnostic labels and source underlines are red for errors and
 yellow for warnings. Redirected output and JSON diagnostics remain plain text.
+Native point or partial-word diagnostics underline the complete keyword or
+identifier in the original source. Expression diagnostics use their mapped
+expression boundaries, and editor positions account for UTF-16 columns.
 Set `NO_COLOR=1`, `CLICOLOR=0`, or `TERM=dumb` to disable terminal colors.
 
 `check`, `build`, `run`, and `test` report errors against original `.thor` files

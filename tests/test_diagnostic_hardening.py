@@ -9,13 +9,38 @@ from tests import test_thor as base
 from thorlang.hygiene import qualify
 from thorlang.sourcemap import MappingBuilder
 from thorlang.sourcemap import SourceMap
-from thorlang.diagnostics import Diagnostics, backend_error_flags
+from thorlang.diagnostics import Diagnostics, backend_error_flags, whole_word_span
 
 
 class DiagnosticHardeningTests(unittest.TestCase):
     compiler = diagnostics.DiagnosticTests.compiler
     invoke=diagnostics.DiagnosticTests.invoke
     at=diagnostics.DiagnosticTests.at
+
+    def test_partial_copied_word_ranges_preserve_unicode_and_expression_boundaries(self):
+        raw='/* 😀 */ using naïve_name + other'.encode()
+        for word in ['using','naïve_name']:
+            start=raw.index(word.encode())
+            for offset in [start,start+2]:
+                span=whole_word_span(raw,offset,offset+1)
+                self.assertEqual(span,(start,start+len(word.encode())))
+        start=raw.index('naïve_name'.encode())
+        span=whole_word_span(raw,start,len(raw))
+        self.assertEqual(span,(start,len(raw)))
+        for start,end in [(0,1),(len(raw),len(raw)),(raw.index(b'+'),raw.index(b'+')+1)]:
+            span=whole_word_span(raw,start,end)
+            self.assertEqual(span,(start,end))
+
+    def test_exact_mapping_expands_native_points_but_keeps_generated_expression_ranges(self):
+        original=b'using value'
+        renderer=Diagnostics(maps={'/copied.odin':SourceMap([[0,len(original),'/source.thor',0,len(original),'source',True]]),
+                                   '/helper.odin':SourceMap([[0,6,'/source.thor',1,3,'generated',False]])},
+                             generated={'/copied.odin':original,'/helper.odin':b'helper'})
+        renderer.raw['/source.thor']=original
+        for file,expected in [('/copied.odin',(0,5)),('/helper.odin',(1,3))]:
+            native={'type':'error','pos':{'file':file,'offset':0,'line':1,'column':1,'end_column':2},'msgs':['invalid use']}
+            errors=renderer.translate([native])
+            self.assertEqual((errors[0]['pos']['offset'],errors[0]['pos']['end_offset']),expected,errors)
 
     def test_expression_restoration_preserves_literal_values_and_real_type_names(self):
         original=b'folded_constant values[i]'

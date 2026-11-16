@@ -338,12 +338,16 @@ impl Frontend {
                 } else {
                     rest.chars().next().map_or(0, char::len_utf8)
                 };
-                let end = error["pos"]["end_offset"]
+                let mut end = error["pos"]["end_offset"]
                     .as_u64()
                     .map(|n| n as usize)
                     .unwrap_or(offset + length)
-                    .min(raw.len());
+                    .max(offset).min(raw.len());
+                while !raw.is_char_boundary(end) { end += 1; }
+                let span = crate::diagnostic::whole_word_span(&raw, crate::ast::Span::new(offset, end));
+                let (offset, end) = (span.start, span.end);
                 let before = &raw[..offset];
+                error["pos"]["offset"] = serde_json::json!(offset);
                 error["pos"]["line"] =
                     serde_json::json!(before.bytes().filter(|ch| *ch == b'\n').count() + 1);
                 error["pos"]["column"] = serde_json::json!(
@@ -356,6 +360,9 @@ impl Frontend {
                         + 1
                 );
                 error["pos"]["end_offset"] = serde_json::json!(end);
+                let before_end = &raw[..end];
+                error["pos"]["end_line"] = serde_json::json!(before_end.bytes().filter(|ch| *ch == b'\n').count() + 1);
+                error["pos"]["end_column"] = serde_json::json!(before_end.rsplit('\n').next().unwrap_or("").encode_utf16().count() + 1);
             }
             return Err(Error {
                 message: String::from_utf8_lossy(&stderr).trim().to_string(),

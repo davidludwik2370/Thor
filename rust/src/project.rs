@@ -1349,8 +1349,12 @@ impl Project {
             let file=error["pos"]["file"].as_str().map(PathBuf::from);
             if let Some((index,emitted))=file.as_ref().and_then(|file|self.outputs.get(file)){
                 let offset=error["pos"]["offset"].as_u64().unwrap_or(0) as usize;
-                let length=error["pos"]["end_column"].as_u64().unwrap_or(0).saturating_sub(error["pos"]["column"].as_u64().unwrap_or(0)) as usize;
-                if let Some(origin)=emitted.lookup(offset,length){
+                let count=error["pos"]["end_column"].as_u64().unwrap_or(0).saturating_sub(error["pos"]["column"].as_u64().unwrap_or(0)) as usize;
+                let length=emitted.text.get(offset..).map(|rest|rest.chars().take(count.max(1)).map(char::len_utf8).sum()).unwrap_or(1);
+                if let Some(mut origin)=emitted.lookup(offset,length){
+                    if origin.exact && self.sources[*index].path == Path::new(&origin.file) {
+                        origin.span = crate::diagnostic::whole_word_span(&self.sources[*index].raw, origin.span);
+                    }
                     let source=&self.sources[*index];let (line,column)=source.position(origin.span.start);let (end_line,end_column)=source.position(origin.span.end);
                     if error["msgs"][0].as_str().is_some_and(|message|message.contains("'where' clause")) {
                         for (first,last,expression) in &emitted.expansions {

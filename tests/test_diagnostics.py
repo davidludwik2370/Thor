@@ -57,6 +57,20 @@ class MapTests(unittest.TestCase):
 class DiagnosticTests(unittest.TestCase):
     compiler = ROOT / 'thor'
 
+    def test_native_keyword_diagnostics_cover_the_complete_word(self):
+        for keyword,body in [('using','value:=1;using value'),('break','break'),
+                             ('continue','continue'),('fallthrough','fallthrough')]:
+            for flags in [[],['-disable-assert','-no-bounds-check','-no-type-assert']]:
+                with self.subTest(keyword=keyword,flags=flags):
+                    source='// café 😀\r\npackage main\r\nmain::proc(){/* 😀 */ '+body+'}\r\n'
+                    _,_,errors,_=self.invoke(source,flags=flags)
+                    self.assertEqual(len(errors),1,errors)
+                    error=errors[0]
+                    start=source.encode().index(keyword.encode())
+                    self.assertEqual(error['pos']['offset'],start,error)
+                    self.assertEqual(error['pos']['end_offset'],start+len(keyword),error)
+                    self.assertEqual(error['pos']['end_column']-error['pos']['column'],len(keyword),error)
+
     def test_type_used_as_array_has_one_error_and_declaration_note(self):
         for operation in ['_=Rows[0]', 'i:=1;_=Rows[i]', 'i:=1;Rows[i]={1}',
                           'i:=1;Rows[i]+={1}', 'i:=-1;_=Rows[i:]', '_=Rows[:]']:

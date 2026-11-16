@@ -10,6 +10,23 @@ class DiagnosticHardeningTLSTests(unittest.TestCase):
     position=staticmethod(base.TLSTests.position)
     hover=base.TLSTests.hover
 
+    def test_native_keyword_ranges_cover_the_word_and_follow_unsaved_changes(self):
+        text='// café 😀\r\npackage main\r\nmain::proc(){/* 😀 */for person in [1,2,3]{using person}}\r\n'
+        client,main=self.open(text)
+        errors=client.diagnostic(main.as_uri(),contains="'using' can only be applied")
+        start=self.position(text,'using',0)
+        self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+5}})
+        changed=text.replace('using person','_=person')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        changed=text.replace('for person in [1,2,3]{using person}','continue')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(main.as_uri(),contains="'continue' only allowed")
+        start=self.position(changed,'continue',0)
+        self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+8}})
+
     def test_inferred_owned_result_defaults_keep_unsaved_diagnostic_locations(self):
         text='''// café 🌩
 package main
