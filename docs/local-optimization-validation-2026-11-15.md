@@ -5,6 +5,20 @@ baselines, warm lowering, vet analysis, cold compile-time work, full Linux
 regressions and editor coverage, upstream integration comparisons, then final
 regressions and documentation. Windows validation remains deferred.
 
+## Final outcome
+
+The seven-step local pass is complete across the verified Mac and Linux scope.
+Both platforms passed 214 Python modules and 95 Rust unit tests, followed by
+editor, debugger, browser and conformance validation. The final snapshot and
+quiet measurements appear at the end of this report.
+
+The largest fixture still spends approximately 12 seconds lowering in the
+instrumented profile. Whole-SDK migration used the Mac-produced portable source
+on Linux because the migration's 10.5 GiB peak exceeds the VM's memory.
+The Linux baseline, builds, vet checks and test executions are native.
+Windows validation remains deferred. Reference-sensitive output-owner vet edits
+require manual review.
+
 ## Baseline environment
 
 The Mac has 32 GiB of memory. The local Ubuntu 24.04 ARM64 container has three
@@ -70,7 +84,7 @@ Mac warm Skald samples took 14.878 and 15.189 seconds after these changes. Its
 call-planning self time was 4.725 seconds, compared with 9.8 seconds in the
 previous quiet profile. Context preparation self time fell from about 1.6
 seconds to 0.00022 seconds across 474 invocations. Native compilation accounted
-for 3.052 seconds in that sample. A final quiet paired comparison is pending.
+for 3.052 seconds in that sample. The final controlled comparisons appear below.
 
 The Mac and Linux selections each passed 60 regression tests, including checked
 and unchecked generic/default/variadic calls, lexical shadowing, conditional
@@ -196,7 +210,7 @@ cache hardening in the previous step.
 
 The independent upstream JSON-reporting SDK failure has a standalone reproducer
 and native control logs under `upstream/odin-testing-json-report`.
-The complete Mac and Linux functional suites remain in progress at this point.
+The first complete native Mac and Linux functional passes are recorded below.
 
 A native Mac ASan compilation of `runtime/format` also hit the previously
 recorded Odin type-name-cache race signature. The OS crash report names the Odin
@@ -301,7 +315,7 @@ verified portable output was transferred to the 7.65 GiB Linux VM, retaining
 the failed native-Linux migration attempts in the report. The native Linux
 migrated builds passed 359 core-speed, 254 internal and 43 vendor tests. A normal
 native Odin build exceeded the VM command budget with LLVM 18. A matching-major
-LLVM 22 backend is being checked before closing that configuration.
+LLVM 22 backend subsequently passed the complete normal comparison.
 
 A native Kvist control reproduced the full-suite crash under GDB. The stack
 contains repeated `macro_eval_expr`/`macro_eval_sequence` frames in
@@ -420,7 +434,8 @@ The native Odin SDK comparison uses pristine source revision
 `537fac56cfee40cd51967d509ef089aa0a71444b` with LLVM 22.1.7 on Mac and LLVM
 22.1.8 on Linux. Other Linux functional regressions use the matching October
 `8169255` backend and the stable `537fac5` frontend. Kvist uses its pinned August
-compiler and a 128 MiB stack after its native default-stack recursion failure.
+compiler. Its Linux runs use a 128 MiB stack after the native default-stack
+recursion failure.
 These choices retain the upstream source and tests.
 
 The whole-SDK migration reached a measured 10,468.8 MiB process-tree peak on Mac.
@@ -458,3 +473,197 @@ the saved release compiler. It verifies zero retries for the inactive branch and
 normal dependency discovery after enabling its configuration flag. Additional
 checked/unchecked fixtures retain generic output-view rejection and native-name
 shadowing. The native unit regression checks eight target combinations.
+
+
+## Earlier controlled measurements at 1e62096
+
+The earlier measured compiler checkpoint is `1e62096`. Each comparison uses the same current
+vetted Skald source and the same native compiler and flags for that host. Every
+Skald sample matches all 108 native test names and verdicts. Timing commands use
+one native compiler worker. The VM uses its original three-CPU allocation for
+these measurements. Mac and Linux timing runs execute sequentially, with the
+other host's validation jobs idle.
+
+| Workload | Mac before | Mac final | Linux before | Linux final |
+| --- | --- | --- | --- | --- |
+| 600-procedure warm transpile | 0.150 s | 0.090 s | 0.135 s | 0.077 s |
+| 32 independent scalar calls, first optimized build | 44.481 s | 1.936 s | 63.921 s | 2.356 s |
+| Skald project-cache-cold optimized test build | 154.078 s | 95.288 s | 200.378 s | 119.851 s |
+| Skald warm optimized test build | 28.214–28.586 s | 22.568–22.953 s | 31.684–31.770 s | 26.465–26.603 s |
+| Skald vet with warm original-call results | 245.340 s | 139.721 s | 241.027 s | 138.192 s |
+
+The scalar fixture prepares and compiles one helper for its 32 calls. The saved
+compiler prepares and compiles 32 helpers. Final warm scalar builds take
+0.380–0.383 seconds on Mac and 0.287–0.295 seconds on Linux.
+
+For the 600-procedure fixture, the final native/Thor optimized builds take
+0.385/0.482 seconds on Mac and 0.439/0.466 seconds on Linux. Native/Thor tests
+take 2.039/2.099 seconds on Mac and 2.859/2.898 seconds on Linux. Explicit runtime
+checks keep all verdicts enabled with assertions disabled.
+
+The large workload still has substantial Thor analysis/lowering cost. Its final
+warm Mac sample spends 11.430 seconds lowering and 10.847 seconds in the final
+native backend. The Linux sample spends 11.234 seconds lowering and 15.025 seconds in its native
+backend. Further reductions remain possible in semantic call planning and
+repeated discovery of transitive view-source dependencies. The large corpus
+still exceeds the requested sub-second lowering aspiration.
+
+The measured process-tree cold-build peaks are 2,259.2/2,735.6 MiB before/final
+on Mac and 2,376.6/2,172.9 MiB on Linux. Vet peaks are 3,032.8/3,604.1 MiB on Mac
+and 2,989.6/2,784.8 MiB on Linux. These include the compiler and its active native
+children. Samples shorter than the monitor interval can report zero RSS.
+
+The local evidence directories are `mac-final-paired` for the saved Mac control,
+`mac-conditional-final-paired` for the final Mac compiler, and
+`linux-conditional-final-paired` for the final Linux comparison. Each lies under
+`integration-projects/results/performance-followup`. The Linux JSON summaries
+were copied to the Mac, including their profiles and complete case verdicts.
+
+
+## Final recursive output-store hardening
+
+The post-timing 22-project repeats exposed excessive permission-analysis memory
+in the Speedrun host and SDK core-normal recipes. Both runners stopped the
+process trees at their configured memory limit. Linux's historical OOM-kill
+count remained four.
+
+The permission analyzer was recording unchanged parameter projections as
+output stores. Recursive callees repeatedly reconstructed those same stores
+under longer paths. Value assignment now copies the incoming header before
+merging its permissions into the destination, preserving the destination's
+writable location. Identity output stores are omitted after ordinary write
+validation. Descendant writes, new readonly qualifiers, and distinct aliases
+retain their own output stores.
+
+For procedures whose returns all name the same input parameter or nil, a
+symbol-checked proof initializes the result's existing parameter projection.
+Nested procedure returns are excluded. Shadowed locals and alternative input
+returns prevent this proof. This keeps recursive identity transformations
+bounded without depending on the order in which recursive results are visited.
+The Python reference follows the same rules.
+
+The reduced recursive-union fixture runs in checked and unchecked configurations
+and limits its abstract-value count. Additional tests cover empty readonly
+returns, local shadowing, alternative return aliases, assignment-header
+locations, concrete readonly stores, and distinct output aliases. A debug
+compiler builds Speedrun successfully in 60.069 seconds with a 1,180.5 MiB
+process-tree peak under the 3,072 MiB diagnostic budget.
+
+The final release reruns passed on both hosts. Speedrun completed in
+16.212 seconds on Mac and 20.633 seconds on Linux, with process-tree peaks of
+1,184.8 and 1,329.6 MiB. SDK core-normal matched all 1,407 Mac and 1,410 Linux
+case verdicts in 102.835 and 110.668 seconds. Its process-tree peaks were
+4,002.9 and 2,951.4 MiB. The SDK core-speed, internal and vendor comparisons also
+passed. These targeted reruns close the two failures in the preceding complete
+22-project repeats.
+
+
+## Final test-harness timing controls
+
+One final Mac recovery test used a 0.2-second execution budget for both an
+infinite-loop helper and its corrected helper that returns 7. Under concurrent
+validation, freshly built native Odin copies of the corrected helper exceeded
+that budget. A control measuring only the interval after process creation
+recorded up to 0.388 seconds, with all 20 programs returning 7 successfully.
+The recovery fixture now uses one second. Fractional deadlines retain their
+separate CLI and low-level process regressions.
+
+The shared diagnostic waiter now allows 45 seconds, covering the existing
+30-second minimum helper-compilation allowance and notification delivery.
+Unexpected diagnostic reports appear in timeout failures. Its isolated unit
+check verifies that evidence survives a failed wait. The failed 200-millisecond
+stress attempt and native controls remain in the local evidence directory.
+
+The wide-u128 helper test also reached the previously documented native Odin
+`alloc_cstring` / `lb_type_internal` code-generation race. The standalone
+upstream bundle includes the new selected stack and a refreshed archive.
+The semantic fixture uses one native worker and passed five isolated repeats.
+
+
+## Final verified snapshot
+
+Production compiler changes end at `85a54c1`. Subsequent commits record the
+upstream crash and harden the test harness. Both release compilers and all 13
+protocol fixtures were prebuilt before the parallel regression runs.
+
+| Validation | Mac ARM64 | Ubuntu 24.04 ARM64 |
+| --- | --- | --- |
+| Python modules | 214 | 214 |
+| Python tests | 3,690 | 3,690 |
+| Platform/configuration skips | 4 | 67 |
+| Rust unit tests | 95 | 95 |
+| Editor Node tests | 142 | 142 |
+| Real VS Code checks | 71 | 71 |
+| Standalone-file editor checks | 6 | 6 |
+| Chromium / Firefox journeys across three stages | 36 | 36 |
+| TOML conformance, each of three stages | 583 passed, 98 upstream skips | 583 passed, 98 upstream skips |
+
+All runnable checks passed, including native CodeLLDB stepping, watches,
+breakpoints, restart and clean exit. Checked and unchecked native paths retain
+explicit verdict checks. The Mac aggregate includes the successful full-module
+retry after the one-second recovery-fixture correction. Its initial failing
+record remains beside the final evidence. The corrected recovery method passed
+ten consecutive stressed repeats. Linux also passed a final 14-test
+recovery/assertion-hygiene selection.
+
+The complete 22-project matrices ran on both platforms. All available baseline
+comparisons match. Mac records 165 migrated and 165 vetted comparisons, and
+Linux records 155 migrated and 154 vetted comparisons. The final identity-store
+correction reran Speedrun and every SDK recipe. Other projects retain their
+preceding full-matrix comparisons. Native/platform exclusions and the
+Mac-produced SDK migration input remain as described in Validation boundaries.
+The Linux container's historical OOM-kill count remained four through final
+validation and measurements. Timing ended with its original three-CPU allowance.
+
+### Final quiet measurements
+
+The saved pre-task compiler is `3ad3dd1`. Each platform uses the same current
+vetted Skald source, native compiler, flags and single native worker for both
+implementations. Every Skald measurement matches all 108 case names and verdicts.
+Mac and Linux performance jobs run sequentially with functional validation idle.
+
+| Workload | Mac before | Mac final | Linux before | Linux final |
+| --- | --- | --- | --- | --- |
+| 600-procedure warm transpile | 0.150 s | 0.074 s | 0.135 s | 0.073 s |
+| 32 independent scalar calls, first optimized build | 44.481 s | 1.946 s | 63.921 s | 2.348 s |
+| Skald project-cache-cold optimized test build | 154.078 s | 95.363 s | 200.378 s | 122.234 s |
+| Skald warm optimized test build, profiling enabled | 28.214–28.586 s | 23.074–24.260 s | 31.684–31.770 s | 27.712–28.020 s |
+| Skald vet with warm original-call results | 245.340 s | 143.552 s | 241.027 s | 139.290 s |
+| Skald ordinary warm build/test, profiling disabled | 27.713 s | 22.222–22.615 s | 29.646 s | 25.658–26.096 s |
+
+The initial profiling-disabled control measurements took 150.124 seconds on Mac
+and 184.424 seconds on Linux. Those warm-up records remain in the evidence and
+are excluded from the ordinary warm comparison. The following control
+measurements supply that table row.
+
+The 32-call cold fixture compiles one helper. Its final warm builds take
+0.394–0.395 seconds on Mac and 0.282–0.328 seconds on Linux. The corresponding
+saved-compiler cold builds compile 32 helpers.
+
+On the 600-procedure fixture, native/Thor optimized builds take 0.399/0.461
+seconds on Mac and 0.443/0.496 seconds on Linux. Native/Thor test commands take
+2.111/2.169 seconds on Mac and 2.997/2.988 seconds on Linux. Short measurements
+are subject to process-monitor resolution and ordinary scheduling variation.
+
+The large workload retains substantial analysis cost. Its final warm profile
+records 12.119 seconds lowering and 11.836 seconds in the backend on Mac,
+and 11.869 seconds lowering and 15.494 seconds in the backend on Linux.
+Semantic call planning remains the largest exclusive analysis cost. The
+sub-second aspiration remains unmet for this SDK-heavy workload.
+
+Final cold-build process-tree peaks are 2,697.2 MiB on Mac and 2,108.9 MiB on
+Linux. Vet peaks are 2,989.2 and 2,783.4 MiB. The corresponding saved-compiler
+peaks were 2,259.2/2,376.6 MiB for cold builds and 3,032.8/2,989.6 MiB for vet.
+These include active native children. Brief commands can finish between monitor
+samples and report zero RSS.
+
+Final evidence is under `integration-projects/results/performance-followup` in
+`mac-identity-full-suite`, `linux-identity-full-suite`,
+`mac-identity-final-paired` and `linux-identity-final-paired`. Native matrix
+reports remain under each project's results directory. Earlier checkpoints,
+failed diagnostic probes and original native-control failures are retained.
+
+Windows remains deferred. Whole-SDK migration remains unverified within the
+smaller Linux VM. Its native Linux builds, vet checks and tests use the portable
+Mac-migrated source. Vet requires manual review for reference-sensitive locals
+whose data may escape through reference-bearing output parameters.

@@ -364,11 +364,12 @@ configuration-dependent versions remain in the project.
 
 Compile-time results live under `.thor-cache/eval-v1` beside the entry package
 (or the cache root selected by `--cache-dir` or `THOR_CACHE_DIR`). Records contain
-values and dependency metadata, not executable helpers. Dependency checks cover
+typed values and dependency metadata. Dependency checks cover
 called bodies, declarations, bindings, types, imports, attributes, library sources,
-resources and compiler configuration. A compiler/SDK identity record avoids
-rehashing the toolchain when its file metadata is unchanged; it is checked lazily
-when compile-time result reuse is needed.
+resources and compiler configuration. Toolchain contents are hashed once per
+invocation when compile-time result reuse needs their identity. Resource reuse
+checks file contents and directory membership, including same-size edits with
+unchanged timestamps.
 
 Verified scalar `#run` sites can reuse results before constructing temporary
 helpers. Adding an unrelated local variable or moving a call does not change its
@@ -1294,9 +1295,14 @@ allocating features require a context, which such callbacks can assign explicitl
 python3 -m unittest discover -s tests -v
 ```
 
-When running test modules in parallel, build the release compiler once and set
-`THOR_TEST_PREBUILT=1` for every worker. This keeps Cargo setup from replacing the
-shared executable during another worker's launch. A missing prebuilt compiler
+For parallel test workers, prebuild the compiler and protocol fixtures once.
+
+```sh
+cargo build --release --manifest-path rust/Cargo.toml --bin thor-rust --examples -j 2
+```
+
+Set `THOR_TEST_PREBUILT=1` for every worker. This keeps Cargo setup from replacing
+the shared executable during another worker's launch. A missing prebuilt compiler
 is an error. Ordinary sequential test setup continues to build with Cargo.
 
 
@@ -1567,8 +1573,8 @@ result and ownership constraints still apply. An optional second return value is
 ignored by a single-value `#run`; non-optional multiple results need a consumer
 that returns one supported value.
 
-Each ready evaluation is compiled in a temporary native helper containing only
-its required declarations/imports. User entry points, unrelated runtime globals
+Compile-time execution uses temporary native helpers containing only
+the required declarations/imports. User entry points, unrelated runtime globals
 and package initializers are excluded; referenced runtime storage is rejected.
 Only selected native overload implementations enter the helper, with private
 implementations kept behind public evaluation bridges. Native source failures
@@ -1595,7 +1601,12 @@ Helper compilation and execution have no deadline by default or with
 `--run-timeout 0`. Positive limits set a deadline in seconds, for
 example `--run-timeout 0.5`. With a positive execution limit, helper compilation
 allows at least 30 seconds.
-Independent-call batching remains future work.
+Independent automatic calls to global, non-generic `fn` declarations can share
+a helper in batches of up to 32 compatible scalar results. Each call retains its
+own result-cache key and scratch lifetime. Batch failures return to individual
+evaluation in source order. Explicit `#run`, conditional and loop execution,
+local captures, variadic calls and positive per-call deadlines keep individual
+helpers. Native helper compilation stays serial to bound memory use.
 
 Successful helper results are cached in `.thor-cache/eval-v1` beside the entry
 package. Keys include emitted transitive code/types/constants/arguments, native

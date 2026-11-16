@@ -1,18 +1,22 @@
 # Rust migration: independent native compiler
 
 The independent Rust implementation now passes the current reference acceptance
-corpus on macOS arm64. Type resolution, purity, compile-time execution and result
+corpus on macOS arm64 and Ubuntu 24.04 arm64. Type resolution, purity, compile-time execution and result
 caching are connected to the normal commands. `thor` now launches the prebuilt
 Rust compiler. `thor-rust` selects the same implementation, and `thor-python`
 retains the reference compiler.
 
 Rust remains experimental for inputs outside the verified corpus and native
-Windows/Linux hosts. Explicit migration guards still fail with exit status `3`.
+Windows hosts. Explicit migration guards still fail with exit status `3`.
 The measurements below record lowering costs and validation limits.
 
 The subsequent [compiler-efficiency follow-up](compiler-efficiency-2026-11.md)
 records the corpus-driven metadata, graph-allocation and import-frontier work,
 with current measurements and validation limits.
+
+The [local Mac and Linux follow-up](local-optimization-validation-2026-11-15.md)
+records the later analysis reuse, scalar-call batching, permission hardening,
+native upstream comparisons and editor/debugger validation.
 
 The reference baseline is commit `ca2df99`, also tagged
 `rust-migration-baseline-2026-11-08`. The Python implementation remains in

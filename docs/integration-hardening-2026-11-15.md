@@ -7,6 +7,10 @@ regressions and reporting bundles. Windows validation is deferred at the user's
 request. The retained Windows portability corrections still require a final
 native Windows run.
 
+The [local Mac and Linux follow-up](local-optimization-validation-2026-11-15.md)
+records the subsequent scalar-call batching, content-based cache validation,
+permission-analysis corrections and complete native Linux regression pass.
+
 ## Work reuse
 
 Compile-time evaluation now creates one immutable source inventory per source
@@ -35,8 +39,9 @@ key representation safely miss after the schema change.
 An experiment that cached additional nested call plans increased planning time
 and was removed before the final run. Independent source parsing and file
 lowering retain the existing bounded worker implementation. Compile-time helper
-execution retains dependency order. Further helper batching would need shared
-failure/location handling and limits for concurrent native compiler memory.
+execution retains dependency order. The subsequent local follow-up adds bounded
+independent scalar-call batching with source-ordered failure handling and serial
+native helper compilation.
 
 ## Correctness findings
 
