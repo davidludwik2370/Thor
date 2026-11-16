@@ -48,6 +48,33 @@ struct Origin {
     seed: Option<Ref>,
 }
 type Origins = Shared<BTreeSet<Origin>>;
+
+// A whole-parameter reference covers its descendant data paths. Keep storage
+// requirements and concrete readonly seeds, which have independent meanings.
+fn compact_origins(origins: &mut Origins) -> bool {
+    if origins.len() < 8 { return false; }
+    let whole = origins.iter().filter(|origin| origin.seed.is_none()
+        && origin.aspect == Aspect::All && origin.path.steps.is_empty())
+        .map(|origin| (origin.path.qualified, origin.path.index)).collect::<HashSet<_>>();
+    let references = origins.iter().filter(|origin| origin.seed.is_none()
+        && origin.aspect == Aspect::References).map(|origin| origin.path.clone())
+        .collect::<HashSet<_>>();
+    if whole.is_empty() && references.is_empty() { return false; }
+    let before = origins.len();
+    origins.retain(|origin| {
+        if origin.seed.is_some() || !matches!(origin.aspect, Aspect::Data | Aspect::References) {
+            return true;
+        }
+        if whole.contains(&(origin.path.qualified, origin.path.index)) { return false; }
+        let mut path = origin.path.clone();
+        if origin.aspect == Aspect::Data && references.contains(&path) { return false; }
+        while path.steps.pop().is_some() {
+            if references.contains(&path) { return false; }
+        }
+        true
+    });
+    origins.len() != before
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Value {
     typ: SharedType,
@@ -740,8 +767,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.values[id] = self.values[v].clone();
         self.values[id].base = Some(v);
         self.values[id].storage.extend(origins.iter().cloned());
+        compact_origins(&mut self.values[id].storage);
         if reference_data(&self.values[v].typ) {
             self.values[id].data.extend(origins.iter().cloned());
+            compact_origins(&mut self.values[id].data);
         }
         id
     }
@@ -770,6 +799,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             };
             let n = set.len();
             set.extend(source.iter().cloned());
+            change |= compact_origins(set);
             change |= n != set.len();
         }
         let n = self.values[dst].locations.len();
@@ -1100,6 +1130,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
         if result.iter().any(|origin| origin.aspect == Aspect::All) {
+            compact_origins(&mut result);
             return result;
         }
         let shape = self.values[v]
@@ -1164,6 +1195,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         if let Some(shape) = shape {
             types.remove(&shape);
         }
+        compact_origins(&mut result);
         result
     }
     fn contains_slice(&mut self, typ: &Type, seen: &mut HashSet<Type>) -> bool {
@@ -1336,46 +1368,107 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn instantiate(&mut self, v: V, args: &[V], seen: &mut HashMap<V, V>, depth: usize) -> V {
+        // Argument facts are read-only during one graph reconstruction. Share
+        // path prefixes here, then discard them before a caller applies stores.
+        self.instantiate_resolved(v, args, seen, &mut HashMap::new(), &mut HashMap::new(), depth)
+    }
+    fn resolve_path(&mut self, path: &Path, args: &[V], paths: &mut HashMap<Path, V>) -> Option<V> {
+        if let Some(value) = paths.get(path) { return Some(*value); }
+        let mut value = *args.get(path.index)?;
+        let mut prefix = Path { steps: Shared::new(), ..path.clone() };
+        for step in &path.steps {
+            prefix.steps.push(step.clone());
+            if let Some(existing) = paths.get(&prefix) {
+                value = *existing;
+            } else {
+                value = self.follow(value, std::slice::from_ref(step));
+                paths.insert(prefix.clone(), value);
+            }
+        }
+        paths.insert(path.clone(), value);
+        Some(value)
+    }
+    fn resolve_once(&mut self, origin: &Origin, args: &[V],
+        origins: &mut HashMap<Origin, Origins>, paths: &mut HashMap<Path, V>) -> Origins {
+        if let Some(value) = origins.get(origin) { return value.clone(); }
+        let result = if origin.seed.is_some() || origin.aspect == Aspect::All {
+            self.resolve(origin, args)
+        } else if let Some(value) = self.resolve_path(&origin.path, args, paths) {
+            match origin.aspect {
+                Aspect::References => self.refs(value),
+                Aspect::Data => self.values[value].data.clone(),
+                _ => {
+                    let mut storage = self.values[value].storage.clone();
+                    if let Some((Step::Field(_), prefix)) = origin.path.steps.split_last() {
+                        let parent = self.resolve_path(&Path { steps: prefix.to_vec().into(), ..origin.path.clone() }, args, paths);
+                        if parent.is_some_and(|parent| matches!(base_type(&self.values[parent].typ), Type::Soa(_))) {
+                            storage.extend(self.values[value].data.iter().cloned());
+                        }
+                    }
+                    storage
+                }
+            }
+        } else { Origins::new() };
+        origins.insert(origin.clone(), result.clone());
+        result
+    }
+    fn instantiate_resolved(&mut self, v: V, args: &[V], seen: &mut HashMap<V, V>,
+        origins: &mut HashMap<Origin, Origins>, paths: &mut HashMap<Path, V>, depth: usize) -> V {
         let _phase = (depth == 0).then(||crate::profile::span("permissions.instantiate"));
         if let Some(id) = seen.get(&v) {
             return *id;
         }
         let old = self.values[v].clone();
         if let Some(path) = &old.path {
-            if let Some(actual) = args.get(path.index) {
-                let actual = self.follow(*actual, &path.steps);
-                let id = self.copied(actual);
+            if let Some(actual) = self.resolve_path(path, args, paths) {
+                // A symbolic path may have been narrowed by a type switch.
+                // Reconstruct that projection against the caller's union.
+                let typ = old.typ.owned();
+                let id = if !typ.is_unknown() && typ != self.values[actual].typ.owned() {
+                    self.narrow(actual, typ)
+                } else {
+                    self.copied(actual)
+                };
                 seen.insert(v, id);
                 for origin in &old.data {
-                    let origins = self.resolve(origin, args);
-                    self.values[id].data.extend(origins.iter().cloned());
+                    let resolved = self.resolve_once(origin, args, origins, paths);
+                    self.values[id].data.extend(resolved.iter().cloned());
                 }
+                compact_origins(&mut self.values[id].data);
+                let mut storage = Origins::new();
+                for origin in &old.storage {
+                    storage.extend(self.resolve_once(origin, args, origins, paths));
+                }
+                let id = self.qualify(id, storage);
+                seen.insert(v, id);
                 return id;
             }
         }
         let id = self.value(old.typ);
         seen.insert(v, id);
         for origin in old.data.iter() {
-            let origins = self.resolve(origin, args);
-            self.values[id].data.extend(origins.iter().cloned());
+            let resolved = self.resolve_once(origin, args, origins, paths);
+            self.values[id].data.extend(resolved.iter().cloned());
         }
         for origin in old.storage.iter() {
-            let origins = self.resolve(origin, args);
-            self.values[id].storage.extend(origins);
+            let resolved = self.resolve_once(origin, args, origins, paths);
+            self.values[id].storage.extend(resolved);
         }
+        compact_origins(&mut self.values[id].data);
+        compact_origins(&mut self.values[id].storage);
         if depth > 16 {
             return id;
         }
         for (name, child) in old.fields.iter() {
-            let child = self.instantiate(*child, args, seen, depth + 1);
+            let child = self.instantiate_resolved(*child, args, seen, origins, paths, depth + 1);
             self.values[id].fields.insert(name.clone(), child);
         }
         if let Some(child) = old.element {
-            let child = self.instantiate(child, args, seen, depth + 1);
+            let child = self.instantiate_resolved(child, args, seen, origins, paths, depth + 1);
             self.values[id].element = Some(child);
         }
         if let Some(child) = old.target {
-            let child = self.instantiate(child, args, seen, depth + 1);
+            let child = self.instantiate_resolved(child, args, seen, origins, paths, depth + 1);
             self.values[id].target = Some(child);
         }
         id
@@ -2437,6 +2530,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
     fn narrow(&mut self, original: V, typ: Type) -> V {
         let result = self.copied(original);
         self.values[result].typ = self.r.shared_type(typ.clone());
+        if matches!(base_type(&typ), Type::Struct(_) | Type::Record(..) | Type::Anonymous(_)) {
+            let fields = self.record_fields(&typ);
+            self.values[result].fields.retain(|name, _| fields.iter().any(|(field, _)| field == name));
+            self.values[result].element = None;
+            self.values[result].target = None;
+        }
         if !reference_data(&typ) {
             self.values[result].data.clear();
         }
@@ -2448,6 +2547,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
             self.values[result].fields.clear();
             self.values[result].element = None;
             self.values[result].target = None;
+        }
+        if matches!(base_type(&typ), Type::Struct(_) | Type::Record(..)
+            | Type::Anonymous(_) | Type::Array { .. } | Type::Fixed { .. }) {
+            return self.qualify(result, self.values[original].data.clone());
         }
         result
     }
@@ -3196,6 +3299,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     results.push(output)
                 }
             }
+
+
         }
         if results.is_empty() {
             self.value(typ)
@@ -3693,6 +3798,105 @@ mod graph_tests {
         if !references.is_empty() {
             panic!("returned view changed the caller's original access");
         }
+    }
+
+    #[test]
+    fn instantiated_union_projections_keep_the_variant_and_shared_slice() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        let site = Ref { file: 0, node: NodeId(0) };
+        let slice = Type::Slice(Box::new(Type::scalar("int")));
+        let variant = Type::Anonymous(vec![("items".into(), slice.clone())]);
+        let actual = analysis.value(Type::Union(site, vec![]));
+        let items = analysis.value(slice);
+        let readonly = analysis.freeze(items, site);
+        analysis.values[actual].fields.insert("items".into(), readonly);
+        analysis.values[actual].fields.insert("other_variant_cycle".into(), actual);
+        let symbolic = analysis.fresh(variant.clone(), Some(Path {
+            qualified: false, index: 0, steps: Shared::new(),
+        }));
+        let result = analysis.instantiate(symbolic, &[actual], &mut HashMap::new(), 0);
+        if analysis.values[result].typ.owned() != variant
+            || analysis.values[result].fields.len() != 1 {
+            panic!("union projection reconstructed unrelated variants");
+        }
+        let child = analysis.member(result, "items");
+        let origins = analysis.refs(child);
+        if !origins.iter().any(|origin| origin.seed == Some(site)) {
+            panic!("union projection lost its shared slice permission");
+        }
+        if !analysis.values[actual].fields.contains_key("other_variant_cycle") {
+            panic!("narrowing changed the caller's original union");
+        }
+    }
+
+    #[test]
+    fn resolution_reuses_projections_within_a_read_phase_and_refreshes_after_writes() {
+        let mut resolver = Resolver::new(&[]);
+        let mut analysis = Privileges::new(&mut resolver, &[], false);
+        let site = Ref { file: 0, node: NodeId(0) };
+        let mut typ = Type::scalar("int");
+        for _ in 0..12 { typ = Type::Slice(Box::new(typ)); }
+        let actual = analysis.value(typ);
+        let readonly = analysis.freeze(actual, site);
+        let mut paths = HashMap::new();
+        let mut origins = HashMap::new();
+        let start = analysis.values.len();
+        for _ in 0..100 {
+            for depth in 1..12 {
+                let origin = Origin {
+                    path: Path { qualified: true, index: 0, steps: vec![Step::Item; depth].into() },
+                    aspect: Aspect::Data, seed: None,
+                };
+                let references = analysis.resolve_once(&origin, &[readonly], &mut origins, &mut paths);
+                if !references.iter().any(|origin| origin.seed == Some(site)) {
+                    panic!("cached projection lost its permission");
+                }
+            }
+        }
+        if analysis.values.len() - start > 32 {
+            panic!("repeated resolution rebuilt a shared path");
+        }
+        let symbolic = analysis.fresh(Type::Slice(Box::new(Type::scalar("int"))), Some(Path {
+            qualified: false, index: 0, steps: Shared::new(),
+        }));
+        let writable = analysis.value(Type::Slice(Box::new(Type::scalar("int"))));
+        let first = analysis.instantiate(symbolic, &[writable], &mut HashMap::new(), 0);
+        if !analysis.refs(first).is_empty() { panic!("writable input acquired a permission"); }
+        let frozen = analysis.freeze(writable, site);
+        analysis.merge(writable, frozen);
+        let second = analysis.instantiate(symbolic, &[writable], &mut HashMap::new(), 0);
+        if !analysis.refs(second).iter().any(|origin| origin.seed == Some(site)) {
+            panic!("resolution cache survived an intervening write");
+        }
+    }
+
+    #[test]
+    fn origin_compaction_preserves_storage_seeds_and_uncovered_parameters() {
+        let root = Path { qualified: true, index: 0, steps: Shared::new() };
+        let whole = Origin { path: root.clone(), aspect: Aspect::All, seed: None };
+        let storage = Origin { aspect: Aspect::Storage, ..whole.clone() };
+        let seed = Origin { seed: Some(Ref { file: 0, node: NodeId(0) }),
+            aspect: Aspect::Data, ..whole.clone() };
+        let other = Origin { path: Path { index: 1, ..root.clone() },
+            aspect: Aspect::Data, seed: None };
+        let mut origins: Origins = [whole.clone(), storage.clone(), seed.clone(), other.clone()].into();
+        for index in 0..12 {
+            origins.insert(Origin { path: Path { steps: vec![Step::Field(format!("child_{index}"))].into(),
+                ..root.clone() }, aspect: Aspect::Data, seed: None });
+        }
+        compact_origins(&mut origins);
+        if origins != [whole, storage, seed, other].into() {
+            panic!("whole-parameter compaction changed an independent requirement");
+        }
+        let parent = Origin { path: root.clone(), aspect: Aspect::References, seed: None };
+        let mut origins: Origins = [parent.clone()].into();
+        for index in 0..12 {
+            origins.insert(Origin { path: Path { steps: vec![Step::Field(format!("child_{index}"))].into(),
+                ..root.clone() }, aspect: if index % 2 == 0 { Aspect::Data } else { Aspect::References }, seed: None });
+        }
+        compact_origins(&mut origins);
+        if origins != [parent].into() { panic!("subtree compaction retained covered data paths"); }
     }
 
     #[test]

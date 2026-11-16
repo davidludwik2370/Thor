@@ -49,6 +49,32 @@ main::proc(){row:Row;forward(&row);/* 😀 */row.items[0]=9}
         client.diagnostic(path.as_uri(),empty=True)
         self.assertEqual(path.read_text(),text)
 
+    def test_union_output_views_keep_caller_locations_and_unsaved_recovery(self):
+        text='''// 😀 original source
+package main
+Row::struct{items:[]int}
+Other::struct{count:int}
+Choice::union{Row,Other}
+publish::proc(out:^Choice,input:Choice){
+ switch value in input {case Row:out^=value;case Other:out^=value}
+}
+main::proc(){
+ input:>Choice(Row{[]int{7}})
+ out:Choice;publish(&out,input)
+ switch value in out {case Row:/* 😀 */value.items[0]=9;case Other:}
+}
+'''
+        client,path=self.open(text)
+        errors=client.diagnostic(path.as_uri(),contains='read-only slice')
+        self.assertTrue(any(error['range']['start']==self.position(text,'value.items[0]=9',0)
+                            for error in errors),errors)
+        corrected=text.replace('value.items[0]=9','_=value.items[0]')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+                    'contentChanges':[{'text':corrected}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
     def test_soa_row_comparisons_and_unsaved_errors_keep_original_locations(self):
         text='''// 😀 original source
 package main

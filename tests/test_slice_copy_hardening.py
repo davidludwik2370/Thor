@@ -29,6 +29,45 @@ forward::proc(values:[]int,$mode:Mode){use(values,mode)}
         return self.invoke(self.program(body,prefix),command='check',flags=flags,
                            fail=None if writable else 'read-only slice')
 
+    def test_union_output_projections_preserve_variant_slice_access(self):
+        prefix='''Row::struct{items:[]int}
+Other::struct{next:^Choice}
+Choice::union{Row,Other}
+publish::proc(out:^Choice,input:Choice){
+ switch value in input {
+ case Row:out^=value
+ case Other:out^=value
+ }
+}
+forward::proc(out:^Choice,input:Choice){publish(out,input)}
+'''
+        for declaration, writable in [('input:=Choice(Row{[]int{7}})', True),
+                                      ('input:>Choice(Row{[]int{7}})', False)]:
+            for callee in ('publish','forward'):
+                with self.subTest(declaration=declaration,callee=callee):
+                    self.check(declaration+';out:Choice;'+callee+'(&out,input);'
+                               'switch value in out {case Row:value.items[0]=9;case Other:}',
+                               prefix,writable=writable)
+
+    def test_union_output_projection_runtime_in_checked_and_unchecked_builds(self):
+        prefix='''Row::struct{items:[]int}
+Other::struct{count:int}
+Choice::union{Row,Other}
+publish::proc(out:^Choice,input:Choice){
+ switch value in input {case Row:out^=value;case Other:out^=value}
+}
+'''
+        body='''items:=[1]int{7};input:=Choice(Row{items[:]})
+out:Choice;publish(&out,input)
+switch value in out {
+case Row:value.items[0]=9
+case Other:panic("wrong variant")
+}
+if items[0]!=9 {panic("output slice alias")}
+'''
+        for flags in (['-debug'],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']):
+            with self.subTest(flags=flags):self.invoke(self.program(body,prefix),flags=flags)
+
     def test_scalar_and_inline_copy_matrix(self):
         payloads=[('int','7','value=9',''),
                   ('[2]int','{1,2}','value[0]=9',''),

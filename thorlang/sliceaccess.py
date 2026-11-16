@@ -421,6 +421,10 @@ class SliceAccess:
 
     def narrowed(self,value,typ):
         result=self.copied(value);result.typ=typ
+        if typ.kind=='struct':
+            names=set(self.struct_names(typ))
+            result.fields={name:child for name,child in result.fields.items() if name in names}
+            result.element=None;result.target=None
         if typ.kind not in {'slice','generic','unknown','union'}:result.data.clear()
         if typ.kind in {'scalar','enum','bitset','string'}:
             result.fields={};result.element=None;result.target=None;result.path=None
@@ -540,8 +544,15 @@ class SliceAccess:
             index,path=value.path;actual=bindings[index]
             for step in path:
                 actual=self.member(actual,step[1]) if step[0]=='field' else self.item(actual) if step[0]=='item' else self.deref(actual)
-            result=self.copied(actual);seen[id(value)]=result
+            result=(self.narrowed(actual,value.typ)
+                    if value.typ.kind not in {'unknown','generic'} and self.same_type(value.typ,actual.typ) is False
+                    else self.copied(actual))
+            seen[id(value)]=result
             for origin in value.data:result.data.update(self.resolve(origin,bindings))
+            storage=set()
+            for origin in value.storage:storage.update(self.resolve(origin,bindings))
+            result=self.qualify(result,storage)
+            seen[id(value)]=result
             return result
         result=Value(value.typ);seen[id(value)]=result
         for origin in value.data:result.data.update(self.resolve(origin,bindings))

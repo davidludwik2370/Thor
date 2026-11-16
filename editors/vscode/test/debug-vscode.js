@@ -85,7 +85,11 @@ async function run() {
         }
         let current = await frame();
         assert.equal(current.frame.line,position.line+1);
-        assert.ok(fs.readFileSync(path.join(root,'.vscode/bin/generated/debug_project.odin'),'utf8').startsWith('#+feature using-stmt\n'));
+        const manifestPath=session.configuration.manifest;
+        const manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+        const generatedSource=manifest.generated.find(file=>path.basename(file)==='debug_project.odin');
+        assert.ok(generatedSource,'The debug manifest must include the active Thor source');
+        assert.ok(fs.readFileSync(path.resolve(path.dirname(manifestPath),generatedSource),'utf8').startsWith('#+feature using-stmt\n'));
         await session.customRequest('next',{threadId:current.thread});
         current=await frame();
         assert.equal(current.frame.line,document.positionAt(text.indexOf('last :=')).line+1);

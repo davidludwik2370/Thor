@@ -344,3 +344,44 @@ copy/analysis run passed 43, and the vet/runner run passed 49.
 The integration runner also excludes `.thor-rust-build` when creating a vetted
 source copy. A regression verifies the source copy excludes managed outputs
 from both compiler implementations.
+
+
+## Union projections and permission-analysis bounds
+
+Output-store propagation exposed a previously accepted unsafe vet conversion in
+Skald's atlas-page constructor. Its read-only page slice escaped through renderer
+state to an indirect drawing callback. The older vetted source exceeded the
+6 GiB command budget before reporting that escape. The current diagnostic probe
+reached the original Thor locations in 35.717 seconds with a measured process-tree
+peak of 1,560.3 MiB. Fresh derived vet copies use the corrected ownership policy.
+Original upstream and migrated source trees retain their source contents.
+
+Symbolic argument reconstruction now preserves type-switch variant projections,
+including their read-only storage qualifiers. Narrowing removes fields belonging
+to other union variants. Both compiler implementations cover direct and forwarded
+union output stores. Live TLS verifies caller-side diagnostics, Unicode positions
+and unsaved recovery.
+
+During one graph reconstruction, argument facts are read-only. The Rust analyzer
+reuses origin resolutions and shared path prefixes within that phase, then drops
+those caches before applying output stores. Broad reference origins subsume their
+descendant data origins. Compaction retains storage requirements, concrete
+read-only seeds and unrelated parameters. It preserves the full reference graph.
+Unit tests cover bounded projection work, intervening writes, shared slice
+permissions and the independence of storage requirements.
+
+The Mac focused selection passed 74 tests, with an additional checked/unchecked
+union-output runtime regression and assertion-hygiene rerun. The Python-reference
+copy/analysis selection passed 44 tests and the same additional runtime regression. All 92 Rust unit tests passed. Runtime permission
+fixtures retain checked and unchecked release coverage.
+
+The real Mac and Linux VS Code debugger checks passed launch, breakpoints,
+stepping, watches, restart and clean exit. The harness reads generated source
+locations from the debug manifest. Its previous fixed generated-source path
+was obsolete. The standalone terminal checks also passed on Mac.
+
+The serial clean Linux Kvist rerun passed all 1,004 full-suite cases and its
+22, 17, 2 and 2 entry-point suites, together with the CLI build. Native Linux
+SDK baselines and migrated LLVM 22 builds passed 1,410 core-normal, 359 core-speed,
+254 internal and 43 vendor tests. The native SDK source revision remains pinned
+at 537fac56cfee40cd51967d509ef089aa0a71444b. Final vetted SDK validation is active.
