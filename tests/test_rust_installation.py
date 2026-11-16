@@ -99,7 +99,7 @@ main :: proc() {
         expected = 'native 42: 123456789012345678901234567890\n'
         for flags in (['-debug'], native.UNCHECKED+['--track-allocations=basic']):
             with self.subTest(flags=flags):
-                result = self.invoke('run', '.', *flags, cwd=self.app)
+                result = self.invoke('run', '.', *native.runtime_flags(flags), cwd=self.app)
                 self.assertEqual(result.stdout, expected)
                 self.assertEqual(result.stderr, '')
         self.invoke('build', '.', cwd=self.app)

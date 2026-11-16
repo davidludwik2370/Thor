@@ -34,7 +34,7 @@ class RustReferenceTests(unittest.TestCase):
         entry = root/'input/main.thor'
         before = {p:p.read_bytes() for p in (root/'input').rglob('*') if p.is_file()}
         argv = [str(rust.RUST), command, str(entry.parent if directory else entry),
-                '--output-dir', str(root/'rust'), *flags]
+                '--output-dir', str(root/'rust'), *base.runtime_flags(flags)]
         if args:
             argv += ['--', *args]
         result = subprocess.run(argv, cwd=root if command == 'build' else None,

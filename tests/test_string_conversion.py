@@ -25,7 +25,8 @@ class StringConversionTests(unittest.TestCase):
                 with self.subTest(flags=flags):
                     result=subprocess.run([os.environ.get('THOR_ODIN','odin'),'test',str(base.ROOT/'runtime/format'),
                         '-collection:thor='+str(base.ROOT/'runtime'),'-out:'+str(Path(directory)/'string-tests'),
-                        '-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',*flags],capture_output=True,text=True,timeout=60)
+                        '-thread-count:1','-define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true',*flags],
+                        capture_output=True,text=True,timeout=60)
                     self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_numeric_boolean_and_enum_output_matches_interpolation(self):

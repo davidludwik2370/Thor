@@ -12,6 +12,14 @@ from tests.integration import run_odin_projects as runner
 
 
 class IntegrationRunnerTests(unittest.TestCase):
+    def test_style_recipes_allow_findings_while_builds_keep_warning_policy(self):
+        projects=json.loads(runner.MANIFEST.read_text())
+        examples=next(project for project in projects if project['repo']=='odin-lang/examples')
+        self.assertTrue(any('-warnings-as-errors' in command['args'] for command in examples['commands']))
+        for project in projects:
+            for recipe in project.get('vet',[]):
+                self.assertNotIn('-warnings-as-errors',recipe,project['repo'])
+
     def test_verification_retains_the_recorded_vet_pass(self):
         with tempfile.TemporaryDirectory(prefix='thor-integration-verify-') as directory:
             root=Path(directory);source=root/'odin/sample__project';source.mkdir(parents=True)

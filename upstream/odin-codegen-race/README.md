@@ -10,6 +10,8 @@ intermittent compiler crash. A later regression run repeated the same SIGSEGV
 signature; see `evidence/recurrence-2026-10-29.txt`.
 A Rust-migration regression run repeated the null-source/nonzero-length string
 signature on November 9; see `evidence/recurrence-2026-11-09.txt`.
+A direct native ASan test build repeated the worker-stack signature on
+November 15; see `evidence/recurrence-2026-11-15.txt`.
 
 ## Report material
 

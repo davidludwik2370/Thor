@@ -38,3 +38,43 @@ The complete affected module then passed all 24 tests. Six additional fresh
 comparisons passed, three with checked debug flags and three with unchecked
 release flags. Each comparison independently evaluated both implementations,
 compiled its emitted native source and verified program output "5".
+
+Additional native ASan compilation recurrence
+
+Native Odin compiler recurrence during the local full regression suite.
+
+Compiler source revision 8169255b97b85d6a08691d99764f51fb01f92b5a.
+macOS 15.6 ARM64. Native Odin test compilation of runtime/format,
+with -debug -sanitize:address. No Thor lowering was invoked.
+Process returned -11 without stdout or stderr. The OS report identifies
+EXC_BAD_ACCESS / SIGSEGV at address zero in the Odin compiler.
+
+Faulting worker stack
+  alloc_cstring(gbAllocator, String) + 896
+  lb_type_internal(lbModule*, Type*) + 680
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 4704
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 752
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 864
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 4704
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 752
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 4704
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 752
+  lb_type(lbModule*, Type*) + 568
+  lb_type_internal(lbModule*, Type*) + 864
+
+The main thread was also generating LLVM metadata and procedures.
+The worker alloc_cstring/lb_type stack matches the previously recorded
+type-name-cache publication race signature. This recurrence alone does
+not establish which access raced. The existing TSan evidence provides
+the independent confirmed race.
+
+The native test fixture now selects -thread-count:1, matching the upstream
+integration controls. ASan and unchecked native runtime checks remain active.
+See the local validation report for repeated control results.

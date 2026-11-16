@@ -47,7 +47,11 @@ The large Odin repository and examples matrix use one initial command to
 validate the copied project, followed by individually translated commands for
 the full matrix. This preserves per-command failure evidence.
 
-All stages use the same explicit compiler flags. Native compilation uses one
+Baseline, migrated and vetted builds use the same explicit compiler flags.
+The intervening Thor style pass permits warnings while applying supported edits.
+Its recipes omit `-warnings-as-errors`, allowing unused-parameter findings to be
+reported. The subsequent build retains the original command's warning policy.
+Native compilation uses one
 compiler worker to avoid the separately documented upstream compiler races.
 Odin's test runner uses one worker and a fixed random seed. Timing includes the
 test execution and any upstream subprocesses.

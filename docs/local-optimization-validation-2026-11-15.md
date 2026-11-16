@@ -9,7 +9,9 @@ regressions and documentation. Windows validation remains deferred.
 
 The Mac has 32 GiB of memory. The local Ubuntu 24.04 ARM64 container has three
 CPUs and initially had a 4 GiB memory limit. Editor validation uses a 6 GiB
-container limit within the approximately 7.65 GiB VM. Native compiler jobs run with one worker during
+container limit within the approximately 7.65 GiB VM. Functional regressions
+use up to five CPUs with three concurrent test modules. Timing comparisons
+retain the original three-CPU allocation. Native compiler jobs run with one worker during
 performance comparisons. The Linux environment includes LLVM 18, Rust 1.100,
 Node 22.14.0, CodeLLDB 1.12.3, SDL 3.2.10 and rebuilt native stb libraries.
 
@@ -195,3 +197,57 @@ cache hardening in the previous step.
 The independent upstream JSON-reporting SDK failure has a standalone reproducer
 and native control logs under `upstream/odin-testing-json-report`.
 The complete Mac and Linux functional suites remain in progress at this point.
+
+A native Mac ASan compilation of `runtime/format` also hit the previously
+recorded Odin type-name-cache race signature. The OS crash report names the Odin
+compiler's `alloc_cstring` and `lb_type` worker stack. This command invokes Odin
+directly. An unchanged immediate repetition passed, followed by three passing
+single-worker ASan controls, each running all ten native format tests. The fixture
+now passes `-thread-count:1`, matching the native integration controls. The
+recurrence is recorded in `upstream/odin-codegen-race/evidence/recurrence-2026-11-15.txt`.
+A direct cache-hit regression invocation now also uses the shared functional
+tracking-flag adaptation on Linux.
+
+The Mac full Python regression suite completed successfully across all 214
+modules. The changed fixture modules were rerun after their corrections. The
+snapshot records 3,650 tests before the additional integration-runner policy
+check. Both hosts also passed all 88 Rust unit tests. The native TLS suite passed
+all 1,151 tests again with the matching Linux SDK.
+
+## Upstream matrix follow-up
+
+The Mac verifies its existing migrated and vet-applied projects while the Linux
+functional suite finishes. Each host advances to its upstream comparisons after
+its own regression pass. The 22-repository manifest contains 175 command recipes.
+Builds across all three stages retain their original strict warning flags.
+The intervening Thor style pass now permits warnings while applying supported
+edits. Previously, 17 example vet recipes returned failure because inherited
+`-warnings-as-errors` promoted newly reported unused parameters. The corrected
+recipes keep their target, defines and syntax checks, then the full original
+build command validates the applied result. A regression checks this separation.
+
+Linux preparation retains the pinned native compiler revisions, rebuilds
+Speedrun's C dependencies as native ARM64 ELF objects, and installs TOML
+conformance tooling and ARM64 Chromium/Firefox binaries. The platform-adjusted
+command manifest and complete invocations are retained with the local results.
+
+Both full functional suites completed all 214 modules successfully. The current
+snapshot records 3,651 tests per host, with four platform/configuration skips on
+Mac and 67 on Linux. Linux skips cover the Mac allocation tracker and signing/app
+integration, Windows-specific cases, and host-selected optional configurations.
+The completed suites include the corrected direct invocation helpers and the
+explicit frontend-cancellation wrapper configuration. One older loop fixture
+transferred an anonymous f-string to a deleting callee. It now uses `f!` for that
+transfer and also checks the borrowed `f` form in checked and unchecked loops.
+The assertion-hygiene checks passed with the corrected fixture.
+
+The Mac matrix follow-up matched its native test outcomes and retained successful
+strict builds for the usable example configurations. The style-warning policy
+correction cleared all 17 previously failing example vet passes. Three cold
+builds hit the 6 GiB command limit during slice-permission analysis, including
+OLS tests, Speedrun and the SDK normal suite. The saved pre-optimization compiler
+also exceeds a 5 GiB control limit on the same OLS input. Sampled stacks show
+recursive procedure summaries and abstract result-graph instantiation. An
+isolated diagnostic build is testing arena lifetime changes before any production
+change is applied. The ordinary compiler and regression-suite binaries remain
+unchanged during that experiment.

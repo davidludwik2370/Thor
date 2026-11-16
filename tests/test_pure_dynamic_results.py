@@ -116,7 +116,8 @@ for i in 0..<3{
         report=lambda result:next(json.loads(line)['thor_cache'] for line in result.stdout.splitlines() if line.startswith('{"thor_cache"'))
         self.assertGreater(report(first)['writes'],0)
         result=subprocess.run([str(base.THOR),'run',str(root/'input/main.thor'),'--output-dir',str(root/'output'),
-                               '--cache-report','--track-allocations=basic'],capture_output=True,text=True,timeout=45)
+                               '--cache-report',*base.runtime_flags(['--track-allocations=basic'])],
+                              capture_output=True,text=True,timeout=45)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertEqual(result.stderr,'')
         self.assertGreater(report(result)['hits'],0)

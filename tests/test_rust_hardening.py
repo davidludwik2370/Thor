@@ -99,6 +99,7 @@ main :: proc() {}
         environment = {**os.environ, 'THOR_TEST_HELPER_PHASE':phase,
                        'THOR_TEST_HELPER_MARKER':str(marker),
                        'THOR_TEST_REAL_ODIN':shutil.which('odin')}
+        environment.pop('THOR_FRONTEND_ODIN',None)
         process = subprocess.Popen([str(native.RUST),'build',str(self.source),
                                     '--odin',str(wrapper),'-json-errors',*flags],
                                    env=environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE)

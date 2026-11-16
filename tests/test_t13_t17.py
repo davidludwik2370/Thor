@@ -421,14 +421,18 @@ assert(answer==123&&x==3)
 ''','next::proc(x:^int)->int{x^+=1;return x^}\ncombine::proc(a,b,c:int)->int{return 100*a+10*b+c}\n'))
 
     def test_generated_work_in_loop_conditions_posts_and_do_bodies(self):
-        self.invoke(self.program('''
+        code=self.program('''
 i:=0
 for (switch i {case 0,1,2:true;case:false}) { i+=1 }
-assert(i==3)
+if i!=3{panic("loop condition")}
 for j:=0;j<3;j=switch j{case 0:1;case 1:2;case:3} do i+=1
-assert(i==6)
-for j:=0;j<2;j+=1 do use(f"{j}")
-''','use::proc(s:string){delete(s)}\n'))
+if i!=6{panic("loop post")}
+for j:=0;j<2;j+=1 do borrow(f"{j}")
+for j:=0;j<2;j+=1 do use(f!"{j}")
+''','use::proc(s:string){delete(s)}\nborrow::proc(s:string){if s!="0"&&s!="1"{panic("borrowed text")}}\n')
+        for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):
+                self.invoke(code,flags=flags)
 
     def test_set_and_generic_index_updates_in_loop_posts(self):
         self.invoke(self.program('''
