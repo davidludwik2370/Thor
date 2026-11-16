@@ -152,6 +152,80 @@ main::proc(){value:int;store(&value);if value!=7{panic("scalar output")}}
         self.assertEqual(len(findings),1,findings)
         self.assertIn("'items'",findings[0]['msgs'][0])
 
+    def test_print_readers_preserve_immutable_slice_advice_through_zip_and_aliases(self):
+        self.write('''package main
+import "core:fmt" / println
+import "thor:basic" / print
+main::proc(){
+    zip::soa_zip
+    output::println
+    basic_output::print
+    Gender::enum{male,female}
+    names:=[]string{"Tim","Sally","Tom"}
+    ages:=[]int{22,5,12,7}
+    genders:=[]Gender{.male,.female,.male}
+    people:>zip(name=names,age=ages,gender=genders)
+    for person in people {
+        output(person.name,person.age,person.gender)
+        basic_output(f"{person.name} {person.age} {person.gender}")
+    }
+}
+''')
+        findings=self.findings('--vet=immutable')
+        self.assertEqual([error['msgs'][0] for error in findings],[
+            f"Declare '{name}' immutable with ':>'." for name in ('names','ages','genders')])
+        self.invoke('--vet=immutable','--apply')
+        findings=self.findings('--vet=immutable')
+        self.assertEqual(findings,[])
+        for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):
+                result=self.invoke(*flags,command='run')
+                self.assertEqual(result.stdout,'Tim 22 male\nTim 22 male\nSally 5 female\nSally 5 female\nTom 12 male\nTom 12 male\n')
+
+    def test_transitive_library_readers_keep_formatting_buffers_writable(self):
+        self.write('''package main
+import "core:fmt"
+show::proc(values:[]int){fmt.println(values)}
+main::proc(){
+    values:=[]int{3,4}
+    alias:>values
+    show(alias)
+    buffer:=make([]byte,64)
+    defer delete(buffer)
+    label:=[]int{7}
+    text:>fmt.bprintf(buffer,"%v",label)
+    if text!="[7]"{panic("formatted result")}
+}
+''')
+        findings=self.findings('--vet=immutable')
+        self.assertEqual([error['msgs'][0] for error in findings],[
+            f"Declare '{name}' immutable with ':>'." for name in ('values','label')])
+        pure_findings=self.findings('--vet=pure')
+        self.assertEqual(pure_findings,[])
+        self.invoke('--vet=immutable','--apply')
+        self.assertIn('buffer:=',self.source.read_text())
+        for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            result=self.invoke(*flags,command='run')
+            self.assertEqual(result.stdout,'[3, 4]\n')
+
+    def test_reviewed_calls_preserve_conditional_mutation_and_global_escape_checks(self):
+        for helper,action in [
+                ('print::proc(values:[]int){when CHANGE{values[0]=9}}','print(values)'),
+                ('SHARED:[]int\nchange::proc(){when CHANGE{SHARED[0]=9}}','SHARED=values;change()')]:
+            with self.subTest(helper=helper):
+                self.write('package main\nimport "core:fmt"\nCHANGE::#config(CHANGE,false)\n'+helper+'''
+main::proc(){
+    values:=[]int{1}
+    fmt.println(values)
+    ACTION
+}
+'''.replace('ACTION',action))
+                findings=self.findings('--vet=immutable')
+                self.assertEqual(findings,[])
+                self.invoke('--vet=immutable','--apply')
+                self.assertIn('values:=',self.source.read_text())
+                self.invoke('-define:CHANGE=true',command='run')
+
     def test_purity_includes_transitive_helpers_input_mutation_and_global_state(self):
         self.write('''package main
 import "core:fmt"

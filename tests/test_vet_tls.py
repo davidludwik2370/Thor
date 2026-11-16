@@ -61,6 +61,26 @@ class VetTLSTests(unittest.TestCase):
         self.assertEqual(self.actions(client,path,changed,';'),[])
         self.assertEqual(path.read_text(),text)
 
+    def test_printed_slice_immutable_advice_and_fix_follow_unsaved_mutation(self):
+        text='package main\nimport "core:fmt"\nmain::proc(){values:=[]int{1};fmt.println(values)}\n'
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable')
+        self.assertEqual([error['code'] for error in errors],['thor/prefer-immutable'])
+        self.assertEqual(errors[0]['range']['start'],self.position(text,'values:=',0))
+        actions=self.actions(client,path,text,'values:=')
+        action=next(action for action in actions if action['title']=='Make declaration immutable')
+        edits=action['edit']['changes'][path.as_uri()]
+        self.assertEqual(len(edits),1)
+        self.assertEqual(edits[0]['newText'],'>')
+        changed=text.replace('fmt.println(values)','values[0]=2;fmt.println(values)')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{
+            'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        actions=self.actions(client,path,changed,'values:=')
+        self.assertEqual(actions,[])
+        self.assertEqual(path.read_text(),text)
+
     def test_unused_bindings_have_warning_ranges_and_no_automatic_removal(self):
         text = ('// 😀 header\npackage main\n'
                 'helper::fn(parameter:int)->int{return 1}\n'

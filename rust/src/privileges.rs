@@ -2759,14 +2759,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return first;
         }
         if let Some((path, name)) = &library {
-            if path == "core:fmt" && FMT_READERS.contains(&name.as_str())
-                && self.verified_library(callee, path)
+            let reviewed = reviewed_library_contract(self.r, callee, path, name);
+            if path == "core:fmt" && FMT_READERS.contains(&name.as_str()) && reviewed
             {
                 return self.value(typ);
             }
-            let reviewed_basic = path == "thor:basic" && self.verified_library(callee, path);
+            let reviewed_basic = path == "thor:basic" && reviewed;
             let graph_clone = name == "deepclone" && (reviewed_basic
-                || path == "thor:graph" && self.verified_library(callee, path));
+                || path == "thor:graph" && reviewed);
             if graph_clone || reviewed_basic && ["try_hash", "_string"].contains(&name.as_str()) {
                 let first = self.value(typ);
                 let result = self.r.result_type(r, 1, &mut HashSet::new());
@@ -2783,7 +2783,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 return self.value(typ);
             }
             if path == "core:fmt"
-                && self.verified_library(callee, path)
+                && reviewed
                 && ["bprint", "bprintln", "bprintf", "bprintfln"].contains(&name.as_str())
             {
                 let buffer = args
@@ -2819,7 +2819,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 });
             }
             if path == "core:slice"
-                && self.verified_library(callee, path)
+                && reviewed
                 && matches!(name.as_str(), "clone" | "clone_to_dynamic")
                 && !values.is_empty()
             {
@@ -3503,32 +3503,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         self.r.denotes_type(r)
     }
     fn verified_library(&self, reference: Ref, path: &str) -> bool {
-        let _phase = crate::profile::span("permissions.library_verification");
-        let Some((collection, suffix)) = path.split_once(':') else {
-            return false;
-        };
-        if collection == "thor" {
-            let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .unwrap()
-                .join("runtime")
-                .join(suffix);
-            return self
-                .s(reference)
-                .collection_roots
-                .get(collection)
-                .map(|root| root.join(suffix))
-                .is_some_and(|actual| {
-                    match (
-                        self.r.canonical_path(&actual),
-                        self.r.canonical_path(&expected),
-                    ) {
-                        (Some(actual), Some(expected)) => actual == expected,
-                        _ => false,
-                    }
-                });
-        }
-        self.r.standard_library(reference, path)
+        verified_library(self.r, reference, path)
     }
     fn library(&self, callee: Ref) -> Option<(String, String)> {
         if let Some(cached) = self.library_names.borrow().get(&callee) {
@@ -3796,6 +3771,41 @@ const READERS: &[&str] = &[
     "kmag",
     "conj",
 ];
+// These argument contracts are also used by vet. A checked correction still
+// validates writable buffers, but need not inspect platform-specific internals
+// behind a reviewed contract to establish that contract on other targets.
+pub(crate) fn reviewed_library_contract(
+    resolver: &Resolver<'_>, callee: Ref, path: &str, name: &str,
+) -> bool {
+    let reviewed = match path {
+        "core:fmt" => FMT_READERS.contains(&name)
+            || ["bprint", "bprintln", "bprintf", "bprintfln"].contains(&name),
+        "thor:basic" => ["print", "hash", "try_hash", "_string", "deepclone"].contains(&name),
+        "thor:graph" => name == "deepclone",
+        "core:slice" => ["clone", "clone_to_dynamic"].contains(&name),
+        _ => false,
+    };
+    reviewed && verified_library(resolver, callee, path)
+}
+
+fn verified_library(resolver: &Resolver<'_>, reference: Ref, path: &str) -> bool {
+    let _phase = crate::profile::span("permissions.library_verification");
+    let Some((collection, suffix)) = path.split_once(':') else { return false; };
+    if collection == "thor" {
+        let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent().unwrap().join("runtime").join(suffix);
+        return resolver.sources[reference.file].collection_roots.get(collection)
+            .map(|root| root.join(suffix))
+            .is_some_and(|actual| match (
+                resolver.canonical_path(&actual), resolver.canonical_path(&expected),
+            ) {
+                (Some(actual), Some(expected)) => actual == expected,
+                _ => false,
+            });
+    }
+    resolver.standard_library(reference, path)
+}
+
 const FMT_READERS: &[&str] = &[
     "print",
     "println",

@@ -101,18 +101,52 @@ def reference_output(typ, project, seen=None):
     return False
 
 
-def portable_body(project, root):
-    pending=[root];seen=set()
-    while pending:
-        procedure=pending.pop()
-        if procedure in seen:continue
-        seen.add(procedure);source=procedure.source
-        if source.info.get('target_specific') or any(tag.startswith('#+build') for tag in source.info.get('file_tags',[])):
-            return False
-        for node in project.purity.walk(procedure):
-            if node.kind in {'When','WhenExpr','CompileSwitch','CompileSwitchExpr'}:return False
-            if node.kind=='Call':pending.extend(project.purity.targets(node))
-    return True
+class PortableBodies:
+    def __init__(self, project):
+        self.project=project
+        self.known={}
+        self.contracts={}
+
+    def contracted(self, call):
+        if call not in self.contracts:
+            access=self.project.slice_access
+            library=self.project.purity.library(call)
+            self.contracts[call]=access.verified_reader(call,library) or bool(
+                library and library[0]=='core:slice' and library[1] in {'clone','clone_to_dynamic'}
+                and access.native_library(call,library[0]))
+        return self.contracts[call]
+
+    def check(self, root, argument_contracts=False):
+        key=root,argument_contracts
+        if key in self.known:return self.known[key]
+        pending=[root];seen=set();callers={};rejected=set()
+        while pending:
+            procedure=pending.pop()
+            key=procedure,argument_contracts
+            if key in self.known:
+                if not self.known[key]:rejected.add(procedure)
+                continue
+            if procedure in seen:continue
+            seen.add(procedure);source=procedure.source
+            if source.info.get('target_specific') or any(tag.startswith('#+build') for tag in source.info.get('file_tags',[])):
+                rejected.add(procedure)
+                continue
+            for node in self.project.purity.walk(procedure):
+                if node.kind in {'When','WhenExpr','CompileSwitch','CompileSwitchExpr'}:
+                    rejected.add(procedure)
+                    break
+                if node.kind=='Call' and not (argument_contracts and self.contracted(node)):
+                    for target in self.project.purity.targets(node):
+                        callers.setdefault(target,set()).add(procedure)
+                        pending.append(target)
+        pending=list(rejected)
+        while pending:
+            for caller in callers.get(pending.pop(),()):
+                if caller not in rejected:
+                    rejected.add(caller)
+                    pending.append(caller)
+        for procedure in seen:self.known[procedure,argument_contracts]=procedure not in rejected
+        return self.known[root,argument_contracts]
 
 
 def candidates(project, checks):
@@ -121,6 +155,7 @@ def candidates(project, checks):
     root = project.entry.parent if project.file_entry else project.entry
     result = []
     resolver = project.resolver
+    portable = PortableBodies(project)
     for source in list(project.sources.values()):
         if not source.thor or source.excluded or not source.path.is_relative_to(root):
             continue
@@ -155,7 +190,7 @@ def candidates(project, checks):
                 types=[resolver.type_of(name) for name in names]
                 if any(project.purity.owned_type(typ) or not possible_pure_type(typ,resolver) for typ in types):
                     owner=next(parent for parent in node.ancestors() if parent.kind=='Procedure')
-                    if not portable_body(project,owner):continue
+                    if not portable.check(owner,argument_contracts=True):continue
                 owner=next(parent for parent in node.ancestors() if parent.kind=='Procedure')
                 if any(resolver.frozen_slice_storage(typ) for typ in types):
                     outputs=[resolver.type_node(annotation) for _,annotation in resolver.fields(owner.role('type').role('results'))]
@@ -197,7 +232,7 @@ def candidates(project, checks):
             project.purity.analyze(proc)
             if proc in project.purity.contracts or any(project.purity.owner(site) is proc for site in project.purity.problems):
                 continue
-            if not portable_body(project,proc):continue
+            if not portable.check(proc):continue
             if source.raw[proc.start:proc.start+4] == b'proc':
                 result.append(Fix(source, proc.start, proc.start+4, b'fn', 'pure', label, names[0].start, names[0].end))
     return sorted(result, key=lambda fix: (fix.rule != 'immutable', str(fix.source.path), fix.start))

@@ -642,6 +642,14 @@ reference-capable output parameters. Reference-sensitive locals in these
 procedures require manual review. Scalar output parameters support ordinary
 immutable advice.
 
+Reviewed library argument contracts also bound vet's portability analysis.
+Printing a value, including a slice or a zipped row, permits immutable advice
+without inspecting platform-specific printing internals. Formatting buffer
+destinations still require writable access. These contracts preserve package
+identity through aliases and selected imports. Procedure results are cached per
+analysis mode within each vet invocation. Unreviewed conditional implementations
+retain conservative handling.
+
 Proposed corrections are validated together through normal Thor checking using
 temporary source overlays. Additional analysis runs for `thor vet` and `--vet`.
 Procedures with definitely unsupported public `fn` parameter/result types or

@@ -49,6 +49,21 @@ blocked::proc(x:int)->int{return cycle_a(x)}
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertEqual(len(json.loads(result.stderr)['errors']),80)
 
+    def test_reviewed_argument_contracts_bound_portability_work_for_large_batches(self):
+        declarations='\n'.join(f'values_{index}:=[]int{{{index}}};show(values_{index})' for index in range(80))
+        self.write('package main\nimport "core:fmt"\n'
+                   'show::proc(values:[]int){fmt.println(values)}\nmain::proc(){\n'+declarations+'\n}\n')
+        profile=self.root/'profile.json'
+        result=subprocess.run([str(native.RUST),'vet',str(self.app),'--vet=immutable',
+            '-json-errors','--output-dir',str(self.output)],cwd=self.root,
+            env={**os.environ,'THOR_PROFILE':str(profile)},capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(len(json.loads(result.stderr)['errors']),80)
+        counters=json.loads(profile.read_text())['counters']
+        self.assertEqual(counters.get('vet.portability_body_scans'),2,counters)
+        self.assertEqual(counters.get('vet.contract_calls_skipped'),1,counters)
+        self.assertEqual(counters.get('vet.validation_checks'),1,counters)
+
     def test_fix_payload_matches_reference_byte_offsets_and_hash(self):
         text='// 😀\npackage main\nget::proc(x:int)->int{return x+1}\nmain::proc(){x/*comment*/:=get(1);if x!=2{panic("result")}}\n'
         self.write(text)
@@ -102,6 +117,9 @@ CASES=[
 'mutation_address_escape_group_and_loop_requirements',
 'slice_aliases_calls_and_mutation_contracts_use_full_checker',
 'reference_output_parameters_keep_local_ownership_choices_explicit',
+'print_readers_preserve_immutable_slice_advice_through_zip_and_aliases',
+'transitive_library_readers_keep_formatting_buffers_writable',
+'reviewed_calls_preserve_conditional_mutation_and_global_escape_checks',
 'purity_includes_transitive_helpers_input_mutation_and_global_state',
 'generic_and_attributed_procedures_and_existing_fn_are_conservative',
 'owned_results_keep_aliasing_and_allocation_decisions_explicit',

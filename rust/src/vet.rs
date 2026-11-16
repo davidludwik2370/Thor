@@ -197,17 +197,18 @@ fn reference_output(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<
 // Current-target validation cannot establish every inactive implementation.
 #[derive(Default)]
 struct PortableBodies {
-    known: std::collections::HashMap<Ref, bool>,
+    known: std::collections::HashMap<(Ref, bool), bool>,
+    contracts: std::collections::HashMap<Ref, bool>,
 }
 impl PortableBodies {
-    fn check(&mut self, resolver: &mut Resolver<'_>, root: Ref) -> bool {
-        if let Some(result) = self.known.get(&root) { return *result; }
+    fn check(&mut self, resolver: &mut Resolver<'_>, root: Ref, argument_contracts: bool) -> bool {
+        if let Some(result) = self.known.get(&(root, argument_contracts)) { return *result; }
         let mut pending = vec![root];
         let mut seen = HashSet::new();
         let mut callers = std::collections::HashMap::<Ref, Vec<Ref>>::new();
         let mut rejected = HashSet::new();
         while let Some(procedure) = pending.pop() {
-            if let Some(portable) = self.known.get(&procedure) {
+            if let Some(portable) = self.known.get(&(procedure, argument_contracts)) {
                 if !portable { rejected.insert(procedure); }
                 continue;
             }
@@ -228,7 +229,15 @@ impl PortableBodies {
                 }
                 if source.node(node).kind == "Call" {
                     if let Some(callee) = source.role(node, "callee") {
-                        for target in resolver.candidates(Ref {file:procedure.file,node:callee}) {
+                        let callee = Ref { file: procedure.file, node: callee };
+                        // Immutable corrections use the same reviewed argument
+                        // contracts as ordinary checking. Purity still follows
+                        // every call because a reader can have I/O effects.
+                        if argument_contracts && self.contracted(resolver, callee) {
+                            crate::profile::count("vet.contract_calls_skipped", 1);
+                            continue;
+                        }
+                        for target in resolver.candidates(callee) {
                             callers.entry(target).or_default().push(procedure);
                             pending.push(target);
                         }
@@ -245,9 +254,17 @@ impl PortableBodies {
             }
         }
         for procedure in seen {
-            self.known.insert(procedure, !rejected.contains(&procedure));
+            self.known.insert((procedure, argument_contracts), !rejected.contains(&procedure));
         }
-        self.known[&root]
+        self.known[&(root, argument_contracts)]
+    }
+    fn contracted(&mut self, resolver: &Resolver<'_>, callee: Ref) -> bool {
+        *self.contracts.entry(callee).or_insert_with(|| {
+            ["core:fmt", "thor:basic", "thor:graph", "core:slice"].iter().any(|path| {
+                crate::evaluation::library_member(resolver, callee, path).is_some_and(|name|
+                    crate::privileges::reviewed_library_contract(resolver, callee, path, &name))
+            })
+        })
     }
 }
 
@@ -344,7 +361,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 if types.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
                     || !possible(typ, &mut resolver, &mut HashSet::new())) {
                     let owner = Ref {file,node:owner};
-                    if !portable.check(&mut resolver, owner) { continue; }
+                    if !portable.check(&mut resolver, owner, true) { continue; }
                 }
                 // Returning a readonly alias changes an API used by callers
                 // outside this entry point. Keep that ownership choice explicit.
@@ -441,7 +458,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
             if purity.faults.values().any(|faults| !faults.is_empty()) || !purity.gaps.is_empty() {
                 continue;
             }
-            if !portable.check(&mut resolver, procedure) { continue; }
+            if !portable.check(&mut resolver, procedure, false) { continue; }
             let start = source.node(proc).span.start;
             if source.raw.get(start..start + 4) == Some("proc") {
                 result.push(Fix {
