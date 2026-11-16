@@ -129,13 +129,13 @@ fn owned(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -> b
         | Type::BigRational
         | Type::String { .. }
         | Type::Slice(_)
+        | Type::Soa(_)
         | Type::Dynamic(_)
         | Type::Map { .. }
         | Type::Set(_) => true,
         Type::Nominal(_, base)
         | Type::Array { elem: base, .. }
-        | Type::Fixed { elem: base, .. }
-        | Type::Soa(base) => owned(base, resolver, seen),
+        | Type::Fixed { elem: base, .. } => owned(base, resolver, seen),
         Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver
             .record_fields(typ)
             .iter()

@@ -213,8 +213,9 @@ class SliceAccess:
                     source=self.type(args[0],context)
                     return Type('array',elem=source.elem,length=len(args)-1)
             if builtin=='soa_zip':
-                members={arg.role('field').text:self.type(arg.role('value'),context).elem or Type()
-                         for arg in node.group('args') if arg.kind=='FieldValue'}
+                members={(arg.role('field').text if arg.kind=='FieldValue' else f'_{index}'):
+                         self.type(arg.role('value') if arg.kind=='FieldValue' else arg,context).elem or Type()
+                         for index,arg in enumerate(node.group('args'))}
                 return Type('slice',elem=Type('struct',members=members),soa=True)
             if builtin in {'len','cap','size_of','align_of','offset_of'}:return Type('scalar','int',node)
             if builtin in {'min','max','abs','clamp'}:
@@ -771,8 +772,9 @@ class SliceAccess:
                 return Value(self.type(node,context),element=self.copied(self.item(values[0])))
             if builtin=='soa_zip':
                 result=Value(self.type(node,context))
-                for arg,value in zip(args,values):
-                    if arg.kind=='FieldValue':result.fields[arg.role('field').text]=self.copied(value)
+                for index,(arg,value) in enumerate(zip(args,values)):
+                    name=arg.role('field').text if arg.kind=='FieldValue' else f'_{index}'
+                    result.fields[name]=self.copied(value)
                     result.data.update(value.data)
                 return result
             if builtin=='soa_unzip' and values:

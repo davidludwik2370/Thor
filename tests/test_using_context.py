@@ -8,6 +8,55 @@ class UsingContextTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_zip_row_using_fields_are_available_to_fstrings_and_lowered_expressions(self):
+        prefix='import * "thor:basic"\n'
+        body='''
+zip_alias::(zip)
+Gender::enum{male,female}
+names:>[]string{"Tim","Sally","Tom"}
+ages:>[]int{22,5,12,7}
+genders:>[]Gender{.male,.female,.male}
+people:>zip_alias(name=names,age=ages,gender=genders)
+for person in people{
+    using person
+    print(f"{name} is a {age} year old {gender}")
+    if age**2<0{panic("promoted numeric field")}
+}
+for row in soa_zip(names,ages){
+    using row
+    print(f"{_0} {_1}")
+}
+'''
+        expected='Tim is a 22 year old male\nSally is a 5 year old female\nTom is a 12 year old male\nTim 22\nSally 5\nTom 12'
+        for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            with self.subTest(flags=flags):self.invoke(self.program(body,prefix),flags=flags,expected=expected)
+
+    def test_zip_using_keeps_shadowing_and_nested_slice_permissions(self):
+        prefix='import * "thor:basic"\n'
+        self.invoke(self.program('''
+soa_zip::proc()->[]Row{return nil}
+rows:=soa_zip()
+for row in rows{using row;print(f"{custom}")}
+name:="outer"
+for row in zip(name=[]string{"inner"}){
+    using row
+    print(f"{name}")
+}
+if name!="outer"{panic("projection scope")}
+''',prefix+'Row::struct{custom:int}\n'),expected='inner')
+        writable=self.program('''
+scores:=[2]int{1,2}
+for &row in zip(score=scores[:]){using row;score+=1;print(f"{score}")}
+if (scores!=[2]int{2,3}){panic("promoted writable column")}
+''',prefix)
+        for flags in [[],['-o:speed','-disable-assert','-no-bounds-check','-no-type-assert']]:
+            self.invoke(writable,flags=flags,expected='2\n3')
+        for arguments,member in [('items=values','items'),('values','_0')]:
+            with self.subTest(member=member):
+                self.invoke(self.program('values:>[][]int{{1,2}}\nrows:>zip('+arguments+')\n'
+                    'for row in rows{using row;'+member+'[0]=9}\n',prefix),
+                    command='check',fail='read-only slice')
+
     def test_triangle_classification_switch_with_ternary_enum_arms(self):
         self.invoke(self.program('''
 tri:=Triangle{validity=.possible,a=3,b=3,c=3,aa=60,ab=60,ac=60}

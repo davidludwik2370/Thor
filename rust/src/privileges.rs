@@ -2844,17 +2844,16 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 "soa_zip" => {
                     let mut fields = vec![];
                     let mut columns = BTreeMap::new();
-                    for (arg, value) in args.iter().zip(&values) {
-                        if let Some(field) = self.role(*arg, "field") {
-                            let name = self.text(field);
-                            let typ = self.values[*value]
-                                .typ
-                                .element()
-                                .cloned()
-                                .unwrap_or(Type::Unknown);
-                            fields.push((name.clone(), typ));
-                            columns.insert(name, *value);
-                        }
+                    for (index, (arg, value)) in args.iter().zip(&values).enumerate() {
+                        let name = self.role(*arg, "field")
+                            .map(|field| self.text(field)).unwrap_or_else(|| format!("_{index}"));
+                        let typ = self.values[*value]
+                            .typ
+                            .element()
+                            .cloned()
+                            .unwrap_or(Type::Unknown);
+                        fields.push((name.clone(), typ));
+                        columns.insert(name, *value);
                     }
                     let result = self.value(Type::Soa(Box::new(Type::Anonymous(fields))));
                     self.values[result].fields = columns.into();

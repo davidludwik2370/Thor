@@ -226,6 +226,22 @@ main::proc(){
                 self.assertIn('values:=',self.source.read_text())
                 self.invoke('-define:CHANGE=true',command='run')
 
+    def test_inferred_zip_views_retain_reference_sensitive_vet_checks(self):
+        self.write('''package main
+CHANGE::#config(CHANGE,false)
+change::proc(rows:#soa[]$T){when CHANGE{rows.age[0]=9}}
+main::proc(){
+    ages:=[]int{1}
+    people:=soa_zip(age=ages)
+    change(people)
+}
+''')
+        findings=self.findings('--vet=immutable')
+        self.assertEqual(findings,[])
+        self.invoke('--vet=immutable','--apply')
+        self.assertIn('people:=',self.source.read_text())
+        self.invoke('-define:CHANGE=true',command='run')
+
     def test_purity_includes_transitive_helpers_input_mutation_and_global_state(self):
         self.write('''package main
 import "core:fmt"

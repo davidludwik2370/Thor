@@ -1086,6 +1086,9 @@ Thor enables standalone `using value` statements and `using` procedure
 parameters by default. Write them directly in a `.thor` file; the transpiler
 adds `#+feature using-stmt` to that file's generated Odin when needed.
 This includes `using` parameters in procedure types and anonymous procedures.
+Fields promoted by `using person` inside a loop over `soa_zip` or `basic.zip`
+retain their inferred types in Thor expressions and f-string captures. Constant
+aliases of `soa_zip` preserve this inference.
 
 Embedded fields (`struct { using base: Base }`) and declarations such as
 `using value := Record{}` already work in Odin without the feature, so those

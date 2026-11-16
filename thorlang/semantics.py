@@ -291,6 +291,25 @@ class Resolver:
         return (callee.kind=='Ident' and callee.text==name and self.symbol(callee) is None
                 and callee.text not in callee.source.imports and callee.text not in callee.source.selected)
 
+    def native_builtin_alias(self, callee, name):
+        seen=set()
+        while callee is not None and callee not in seen:
+            seen.add(callee)
+            if callee.kind=='Paren':
+                callee=callee.role('expr')
+                continue
+            symbol=self.symbol(callee)
+            if symbol is None:
+                imported=callee.source.purity.imported(callee) if callee.source.purity else None
+                if imported:
+                    return imported==('base:builtin',name) and callee.source.import_dir(imported[0]) is None
+                return (callee.kind=='Ident' and callee.text==name
+                        and name not in callee.source.imports and name not in callee.source.selected)
+            if symbol.declaration.data.get('mutable') or symbol.immutable:return False
+            callee=symbol.value
+            if callee is not None and callee.kind not in {'Ident','Selector','Paren'}:return False
+        return False
+
     def known_type_operand(self, node, seen=None):
         """Conclusive type expressions only, for value-use diagnostics.
 
@@ -734,6 +753,15 @@ class Resolver:
                 target.witness = n
                 target.untyped = False
                 return target
+            if target.kind=='unknown' and self.native_builtin_alias(callee,'soa_zip'):
+                members={}
+                for index,argument in enumerate(n.group('args')):
+                    value=argument.role('value') if argument.kind=='FieldValue' else argument
+                    column=self.type_of(value,seen.copy())
+                    if column.kind!='slice' or column.soa:return Type(node=n,witness=n)
+                    name=argument.role('field').text if argument.kind=='FieldValue' else f'_{index}'
+                    members[name]=column.elem or Type()
+                if members:return Type('slice',elem=Type('struct',members=members),soa=True,witness=n)
             plan = self.resolve_call(n)
             if plan:
                 results = self.fields(plan.signature.role("results"))

@@ -80,6 +80,8 @@ for name in ('using_field_retains_immutable_storage_origin',
 
 
 for name in ('triangle_classification_switch_with_ternary_enum_arms',
+             'zip_row_using_fields_are_available_to_fstrings_and_lowered_expressions',
+             'zip_using_keeps_shadowing_and_nested_slice_permissions',
              'pointer_parameter_selector_switch_and_runtime_captures',
              'standalone_using_and_using_declaration_share_field_context',
              'nested_promoted_pointer_path_retains_shallow_mutability',

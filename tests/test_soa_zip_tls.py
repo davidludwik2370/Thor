@@ -164,6 +164,25 @@ main::proc(){
         self.assertTrue(any('missing' in error['message'] for error in errors))
         self.assertIn('struct', json.dumps(self.hover(client, path, broken, 'person in')))
 
+    def test_using_zip_row_fields_have_hover_types_inside_fstrings(self):
+        text='''package main
+import * "thor:basic"
+main::proc(){
+    names:>[]string{"Tim"};ages:>[]int{22}
+    people:>zip(name=names,age=ages)
+    for person in people{
+        using person
+        print(f"{name} is {age}")
+    }
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        for needle,typ in [('{name}','string'),('{age}','int')]:
+            hover=self.hover(client,path,text,needle)
+            self.assertIsNotNone(hover,needle)
+            self.assertIn(typ,hover['contents']['value'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1114,6 +1114,29 @@ impl<'a> Resolver<'a> {
             && self.symbol(reference).is_none()
             && !self.import_shadows_builtin(reference.file, name)
     }
+    pub(crate) fn native_builtin_alias(&self, mut reference: Ref, name: &str) -> bool {
+        let mut seen = HashSet::new();
+        while seen.insert(reference) {
+            if self.native_builtin(reference, name) { return true; }
+            let source = &self.sources[reference.file];
+            if source.node(reference.node).kind == "Paren" {
+                let Some(node) = source.role(reference.node, "expr") else { return false; };
+                reference.node = node;
+                continue;
+            }
+            let Some(symbol) = self.symbol(reference).map(|index| &self.symbols[index]) else {
+                return self.standard_library(reference, "base:builtin")
+                    && self.library_alias_member(reference, "base:builtin").as_deref() == Some(name);
+            };
+            if !symbol.constant || symbol.immutable { return false; }
+            let Some(node) = symbol.value else { return false; };
+            reference = Ref { file: symbol.reference.file, node };
+            if !matches!(self.sources[reference.file].node(node).kind.as_str(), "Ident" | "Selector" | "Paren") {
+                return false;
+            }
+        }
+        false
+    }
     fn import_shadows_builtin(&self, file: usize, name: &str) -> bool {
         let source = &self.sources[file];
         source.selections.iter().any(|selection| {

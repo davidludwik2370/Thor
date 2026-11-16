@@ -363,6 +363,28 @@ impl Resolver<'_> {
             }
             result = Some(typ);
         }
-        result.unwrap_or(Type::Unknown)
+        result.unwrap_or_else(|| self.soa_zip_result(call, index, context).unwrap_or(Type::Unknown))
+    }
+
+    fn soa_zip_result(&mut self, call: Ref, index: usize, context: &Substitutions) -> Option<Type> {
+        if index != 0 { return None; }
+        let source = &self.sources[call.file];
+        let callee = Ref { node: source.role(call.node, "callee")?, ..call };
+        if !self.native_builtin_alias(callee, "soa_zip") { return None; }
+        let arguments = source.group(call.node, "args").to_vec();
+        if arguments.is_empty() { return None; }
+        let mut fields = Vec::with_capacity(arguments.len());
+        for (index, node) in arguments.into_iter().enumerate() {
+            let name = source.role(node, "field")
+                .map(|field| source.text(field).to_owned())
+                .unwrap_or_else(|| format!("_{index}"));
+            let value = Ref { node: source.role(node, "value").unwrap_or(node), ..call };
+            let typ = self.specialized_type(value, context);
+            let mut base = &typ;
+            while let Type::Nominal(_, inner) = base { base = inner; }
+            let Type::Slice(element) = base else { return None; };
+            fields.push((name, *element.clone()));
+        }
+        Some(Type::Soa(Box::new(Type::Anonymous(fields))))
     }
 }
