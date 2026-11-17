@@ -755,20 +755,6 @@ main::proc(){
         self.assertIn('main.thor(3:', messages)
         self.assertNotIn('((T)', messages)
 
-    def test_library_callback_constraints_point_to_calls_and_keep_declaration_notes(self):
-        for call in ['basic.fmap(proc(x:int)->bool{return true},[]int{1})',
-                     'basic.filter(proc(x:string)->bool{return true},[]int{1})']:
-            for flags in ([], ['-error-pos-style:unix']):
-                with self.subTest(call=call,flags=flags):
-                    source='// café 😀\r\npackage main\r\nimport "thor:basic"\r\nmain::proc(){_='+call+'}\r\n'
-                    entry,_,errors,_=self.invoke(source,flags=flags)
-                    error=next(e for e in errors if "'where' clause" in e['msgs'][0])
-                    self.assertEqual(error['pos']['file'],str(entry))
-                    self.assertEqual(error['pos']['offset'],source.encode().index(call.encode()))
-                    self.assertEqual(error['pos']['end_offset'],source.encode().index(call.encode())+len(call.encode()))
-                    note=next(note for note in error['related'] if note['message']=='Library type constraint is declared here.')
-                    self.assertTrue(note['pos']['file'].endswith('/runtime/basic/basic.thor'),note)
-
     def test_unix_style_generic_caller_locations_are_mapped(self):
         source = 'package main\ng :: proc(x:$T)->T where T in [int,f64] {return x}\nmain :: proc(){_ = g("bad")}\n'
         errors = self.at(source, 'T in [int,f64]', flags=['-error-pos-style:unix'], message="'where' clause")

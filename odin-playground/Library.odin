@@ -218,8 +218,8 @@ clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location)
     return new_val_address^, .None
 }
 
-fmap :: proc(func: $F, vals: []$T, allocator:=context.allocator) ->
-(res: []T, err: runtime.Allocator_Error) where F == (proc(x: T) -> T) #optional_allocator_error {
+fmap :: proc(vals: []$T, func: proc(x: T) -> T, allocator:=context.allocator) -> 
+(res: []T, err: runtime.Allocator_Error) #optional_allocator_error {
     res = make_slice([]T, len(vals), allocator) or_return
     
     for v, i in vals {

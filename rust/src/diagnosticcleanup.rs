@@ -507,13 +507,7 @@ pub(crate) fn clean(
                 }
             }
         }
-        // Public library constraints are checked in the shared implementation,
-        // but an invalid instantiation also needs a diagnostic at its call.
-        let library_constraint = !support && contract.is_none() && location.as_ref().is_some_and(|(file, _)| {
-            Path::new(file).starts_with(&runtime)
-                && msgs.first().is_some_and(|message| message.starts_with("'where' clause evaluated to false"))
-        });
-        if support || contract.is_some() || kind == "membership-helper" || library_constraint {
+        if support || contract.is_some() || kind == "membership-helper" {
             if let Some((file, offset)) = project
                 .source_locations(&error, false)
                 .into_iter()
@@ -557,11 +551,6 @@ pub(crate) fn clean(
                     {
                         at = source.node(annotation).span;
                     }
-                }
-                if library_constraint {
-                    let mut related = error["related"].as_array().cloned().unwrap_or_default();
-                    related.push(json!({"pos":error["pos"],"message":"Library type constraint is declared here."}));
-                    error["related"] = json!(related);
                 }
                 error["pos"] = position(source, at);
                 location = Some((source.path.to_string_lossy().into(), at));

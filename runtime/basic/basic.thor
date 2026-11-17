@@ -205,10 +205,9 @@ clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location)
     return new_val_address^, .None
 }
 
-// Callback first. Allocate an element-wise mapped slice; delete with allocator.
-// Infer T from vals, then check the callback against that concrete element type.
-fmap :: proc(func: $F, vals: []$T, allocator:=context.allocator) ->
-(res: []T, err: runtime.Allocator_Error) where F == (proc(x: T) -> T) #optional_allocator_error {
+// Allocate an element-wise mapped slice. Delete the result with allocator.
+fmap :: proc(vals: []$T, func: proc(x: T) -> T, allocator:=context.allocator) ->
+(res: []T, err: runtime.Allocator_Error) #optional_allocator_error {
     res = make_slice([]T, len(vals), allocator) or_return
 
     for v, i in vals {
@@ -233,8 +232,7 @@ join :: proc(a: []string, sep:="", allocator := context.allocator) ->
 
 // Preserve input order in a caller-owned slice. Elements are shallow copies;
 // delete the result with allocator, keeping borrowed element storage alive.
-filter :: proc(f: $F, vals: []$T, allocator:=context.allocator) -> []T
-where F == (proc(x: T) -> bool) {
+filter :: proc(vals: []$T, f: proc(x: T)->bool, allocator:=context.allocator) -> []T {
     ret := make([dynamic]T, allocator)
 
     for val in vals {
