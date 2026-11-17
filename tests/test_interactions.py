@@ -67,7 +67,7 @@ Color::enum{Red,Blue}
 CHOSEN:[2]Color:#switch SEED{case 6:[.Red,.Blue];case:[.Blue,.Red]}
 @(test) combined::proc(t:^testing.T){
     data:=range(1,8);defer delete(data)
-    selected:=filter(data,proc(n:int)->bool{return n in 2..=6 && n%2==0})
+    selected:=filter(proc(n:int)->bool{return n in 2..=6 && n%2==0},data)
     defer delete(selected)
     unique:=to_set(selected);defer delete(unique)
     values:=to_slice(unique);defer delete(values)

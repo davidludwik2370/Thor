@@ -1009,24 +1009,25 @@ main::proc(){
 import "thor:basic"
 main::proc(){
     numbers:=basic.range(1,8,2)
-    kept:=basic.filter(numbers,proc(x:int)->bool{return x>2})
+    mapped:=basic.fmap(proc(x:int)->int{return x*2},numbers)
+    kept:=basic.filter(proc(x:int)->bool{return x>2},numbers)
     total:=basic.sum(kept)
     letter:=basic.chr(total)
     code:=basic.ord('界')
     sample:=basic.random(f64,0,1)
     table:=basic.table([]struct{n:int}{{total}})
-    delete(numbers);delete(kept);delete(table)
+    delete(numbers);delete(mapped);delete(kept);delete(table)
     _=letter;_=code;_=sample
 }
 '''
         client,main=self.open(text)
-        for name,typ in [('numbers:=','[]int'),('kept:=','[]int'),('total:=','int'),
+        for name,typ in [('numbers:=','[]int'),('mapped:=','[]int'),('kept:=','[]int'),('total:=','int'),
                          ('letter:=','rune'),('code:=','int'),('sample:=','f64'),('table:=','string')]:
             with self.subTest(name=name):
                 hover=self.hover(client,main,text,name)
                 self.assertIsNotNone(hover)
                 self.assertIn(typ,hover['contents']['value'])
-        for helper in ['range','filter','sum','chr','ord','random','table']:
+        for helper in ['range','fmap','filter','sum','chr','ord','random','table']:
             target=client.request('textDocument/definition',{'textDocument':{'uri':main.as_uri()},
                 'position':self.position(text,'basic.'+helper,len('basic.')+1)})
             targets=target if isinstance(target,list) else [target]
@@ -1035,11 +1036,14 @@ main::proc(){
                 'position':self.position(text,'basic.'+helper,len('basic.')+len(helper)), 'context':{'triggerKind':1}})
             self.assertIn(helper,{i['label'] for i in completion['items']})
         self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
-        changed=text.replace('proc(x:int)','proc(x:string)').replace('return x>2','return true')
+        changed=text.replace('basic.filter(proc(x:int)->bool{return x>2},numbers)',
+                             'basic.filter(proc(x:string)->bool{return true},numbers)')
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
-        errors=client.diagnostic(main.as_uri(),contains='Cannot assign')
-        error=next(e for e in errors if 'Cannot assign' in e['message'])
-        self.assertEqual(error['range']['start'],self.position(changed,'proc(x:string)',0))
+        errors=client.diagnostic(main.as_uri(),contains="'where' clause evaluated to false")
+        error=next(e for e in errors if "'where' clause" in e['message'])
+        self.assertEqual(error['range']['start'],self.position(changed,'basic.filter(',0))
+        self.assertTrue(any(note['location']['uri'].endswith('/runtime/basic/basic.thor')
+                            for note in error['relatedInformation']),error)
         client.notifications.clear()
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)

@@ -101,9 +101,9 @@ main :: proc() {
     assert(ranked[0].name == "elm")
 
     // fmap allocates a result with the same element type as the input.
-    doubled := basic.fmap(numbers, proc(value: int) -> int {
+    doubled := basic.fmap(proc(value: int) -> int {
         return value * 2
-    })
+    }, numbers)
     defer delete(doubled)
     assert(doubled[0] == 16 && numbers[0] == 8)
 
@@ -158,9 +158,9 @@ main :: proc() {
 
     // filter preserves order and creates another shallow, caller-owned slice.
     // Even an empty result is valid to delete.
-    large := basic.filter(numbers, proc(value: int) -> bool {
+    large := basic.filter(proc(value: int) -> bool {
         return value > 3
-    })
+    }, numbers)
     defer delete(large)
     assert(len(large) == 2 && large[0] == 8 && large[1] == 5)
     assert(basic.sum(large) == 13)

@@ -60,12 +60,12 @@ Compile-time array/slice concatenation uses the language's `A ++ B` operator.
 | `clone(value, allocator=...)` | Shallow value copy; references still share storage, as with assignment. Its temporary allocation is freed internally. |
 | `deepclone(source: ^T, allocator=..., scratch_allocator=...)` | Return a heap root and `Deep_Error`; copy supported reachable data while preserving cycles, shared storage, overlapping views and interior pointers. |
 | `deepfree(root: ^T, allocator=..., scratch_allocator=...)` | Free a clone-owned graph once, returning `Deep_Error`. Use the same destination allocator and preserve ownership boundaries/reachability until cleanup. |
-| `fmap(values, callback, allocator=...)` | Allocate an element-wise mapped slice with the same element type. |
+| `fmap(callback, values, allocator=...)` | Allocate an element-wise mapped slice with the same element type. |
 | `split(text, sep="\n", allocator=...)` | Allocate a slice of borrowed string views into `text`. |
 | `join(values, sep="", allocator=...)` | Allocate a joined string. |
 | `to_set(values, allocator=...)`, `to_slice(set, allocator=...)` | Allocate independent containers; element copies are shallow and set order is unspecified. Also exported by `thor:sets`. |
 | `zip(a=first, b=second, ...)` | Alias for `soa_zip`. Return an allocation-free structure-of-arrays view of named slices, with the shortest input's length. Columns share their inputs' storage and slice permissions. |
-| `filter(values, predicate, allocator=...)` | Allocate a slice of matching elements in input order. The predicate runs once per element; copies are shallow. Empty/no-match inputs yield an empty slice. |
+| `filter(predicate, values, allocator=...)` | Allocate a slice of matching elements in input order. The predicate runs once per element; copies are shallow. Empty/no-match inputs yield an empty slice. |
 | `and(a, b, ...)`, `or(a, b, ...)` | Reduce boolean arguments, stopping at the first false/true respectively. Empty calls return true/false. Spread a slice with `and(..flags)` or `or(..flags)`; no allocation. |
 | `sum(values)` | Sum a numeric slice with Odin's arithmetic/overflow rules; empty input returns the element type's zero value. Supports distinct numeric, complex and quaternion types. |
 | `range(end)`, `range(start, end)`, `range(start, end, step)` | Allocate a half-open `[]int`, with a default start of zero and step of one. Descending ranges need a negative step. Zero step, equal bounds and the wrong direction yield an empty slice. Bounds/count arithmetic is widened before allocation. |
@@ -90,6 +90,26 @@ library procedures, with runtime rejection of recursively unsupported schemas;
 they do not change assignment or add automatic ownership management.
 The allocation-error tuples on `clone`, `fmap`, `split` and `join` keep their
 original optional-error behavior.
+
+`fmap` and `filter` take the callback first. Both accept `proc` and `fn`
+callbacks, including procedure variables, and read immutable input slices.
+Their results have separate, caller-owned backing storage:
+
+```odin
+doubled := basic.fmap(proc(x: int) -> int { return x * 2 }, values)
+defer delete(doubled)
+positive := basic.filter(proc(x: int) -> bool { return x > 0 }, values)
+defer delete(positive)
+```
+
+The input slice determines the element type; a compile-time constraint checks
+that the callback has the matching signature. Specialize a polymorphic
+callback with a procedure type before passing it, for example
+`absolute: proc(int) -> int = math.abs`, then `basic.fmap(absolute, values)`.
+Named arguments retain their names: `func`/`vals` for `fmap`, and `f`/`vals`
+for `filter`. The former values-first positional order is no longer accepted.
+Callback constraint failures highlight the call in Thor/TLS and include a link
+to the library constraint declaration.
 
 ## Converting values to strings
 

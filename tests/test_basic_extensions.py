@@ -8,20 +8,156 @@ class BasicExtensionTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_function_first_mapping_and_filtering_callbacks(self):
+        source = '''package main
+import "thor:basic"
+double :: fn(x: int) -> int {return x*2}
+even :: fn(x: int) -> bool {return x%2==0}
+identity :: proc(x: $T) -> T {return x}
+positive :: proc(x: $T) -> bool {return x>0}
+calls: int
+record :: proc(x: int) -> int {calls+=1; return x+calls}
+main :: proc() {
+    data :> []int{3,1,2}
+    mapped := basic.fmap(double, data)
+    defer delete(mapped)
+    kept := basic.filter(even, data)
+    defer delete(kept)
+    if len(mapped)!=3 || mapped[0]!=6 || mapped[2]!=4 {panic("mapped values")}
+    if len(kept)!=1 || kept[0]!=2 {panic("filtered values")}
+    mapped[0]=99
+    kept[0]=88
+    if data[0]!=3 || data[2]!=2 {panic("outputs must have independent storage")}
+
+    // Runtime procedure values and helper aliases keep their normal behavior.
+    callback: proc(int)->int = record
+    map_alias :: basic.fmap
+    filter_alias :: basic.filter
+    recorded := map_alias(callback, data, allocator=context.allocator)
+    defer delete(recorded)
+    if calls!=3 || recorded[0]!=4 || recorded[1]!=3 || recorded[2]!=5 {panic("callback order/count")}
+    predicate: proc(int)->bool = even
+    selected := filter_alias(predicate, data, allocator=context.allocator)
+    defer delete(selected)
+    if len(selected)!=1 || selected[0]!=2 {panic("runtime predicate")}
+
+    // Explicitly specialize polymorphic callbacks before passing them.
+    copier: proc(int)->int = identity
+    test_positive: proc(int)->bool = positive
+    copied := basic.fmap(copier, data)
+    defer delete(copied)
+    positives := basic.filter(test_positive, data)
+    defer delete(positives)
+    if copied[1]!=1 || len(positives)!=3 {panic("specialized callbacks")}
+
+    Item :: struct {name: string, score: int}
+    items :> []Item{{"oak",1},{"elm",2}}
+    changed := basic.fmap(proc(x: Item)->Item {return {x.name,x.score+10}}, items)
+    defer delete(changed)
+    if changed[0].score!=11 || changed[1].name!="elm" || items[0].score!=1 {panic("struct mapping")}
+}
+'''
+        for flags in ([], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(source, flags=flags)
+
+    def test_function_first_collection_imports_and_named_arguments(self):
+        imports = [
+            ('import "thor:basic"', 'basic.fmap', 'basic.filter'),
+            ('import b "thor:basic"', 'b.fmap', 'b.filter'),
+            ('import * "thor:basic"', 'fmap', 'filter'),
+            ('import "thor:basic" / fmap, filter', 'fmap', 'filter'),
+            ('import _ "thor:basic" / fmap, filter', 'fmap', 'filter'),
+        ]
+        body = '''
+data :> []i16{1,2,3}
+mapped, err := MAP(func=proc(x: i16)->i16 {return x+1}, vals=data, allocator=context.allocator)
+defer delete(mapped)
+kept := FILTER(f=proc(x: i16)->bool {return x>1}, vals=data, allocator=context.allocator)
+defer delete(kept)
+if err!=nil || len(mapped)!=3 || mapped[2]!=4 || len(kept)!=2 || kept[0]!=2 {panic("imports/named arguments")}
+'''
+        for declaration, mapper, predicate in imports:
+            with self.subTest(declaration=declaration):
+                self.invoke(self.program(body.replace('MAP',mapper).replace('FILTER',predicate),declaration+'\n'))
+
+    def test_function_first_empty_inputs_and_mapping_allocation_failure(self):
+        source = '''package main
+import "thor:basic"
+import "core:mem"
+calls: int
+record :: proc(x: int) -> int {calls+=1; return x}
+accept :: proc(x: int) -> bool {calls+=1; return true}
+fail :: proc(data: rawptr, mode: mem.Allocator_Mode, size, alignment: int,
+    old: rawptr, old_size: int, loc:=#caller_location) -> ([]byte, mem.Allocator_Error) {
+    return nil, .Out_Of_Memory
+}
+main :: proc() {
+    nil_values: []int
+    literal :> []int{1}
+    for values in ([]([]int){nil_values, literal[:0]}) {
+        mapped, err := basic.fmap(record, values)
+        defer delete(mapped)
+        kept := basic.filter(accept, values)
+        defer delete(kept)
+        if err!=nil || len(mapped)!=0 || len(kept)!=0 || calls!=0 {panic("empty callbacks/results")}
+    }
+    result, err := basic.fmap(record, literal, allocator=mem.Allocator{fail,nil})
+    if err!=.Out_Of_Memory || len(result)!=0 || calls!=0 {panic("allocation failure")}
+}
+'''
+        for flags in ([], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(source,flags=flags)
+
+    def test_function_first_collection_helpers_from_native_odin(self):
+        self.invoke(self.program('native()', ''), directory=True, files={'native.odin':'''package main
+import "thor:basic"
+native :: proc() {
+    values := []int{1,2,3}
+    mapped := basic.fmap(proc(x: int)->int {return x*3}, values)
+    defer delete(mapped)
+    kept := basic.filter(proc(x: int)->bool {return x>1}, values)
+    defer delete(kept)
+    if mapped[2]!=9 || len(kept)!=2 || kept[0]!=2 {panic("native callbacks")}
+}
+'''})
+
+    def test_function_first_collection_helpers_reject_wrong_order_and_types(self):
+        for expression in [
+            'basic.fmap([]int{1},proc(x:int)->int{return x})',
+            'basic.filter([]int{1},proc(x:int)->bool{return true})',
+            'basic.fmap(proc(x:int)->bool{return true},[]int{1})',
+            'basic.filter(proc(x:int)->int{return x},[]int{1})',
+            'basic.fmap(proc(x:string)->string{return x},[]int{1})',
+            'basic.filter(proc(x:string)->bool{return true},[]int{1})',
+        ]:
+            with self.subTest(expression=expression):
+                self.invoke(self.program('_='+expression,'import "thor:basic"\n'),command='check',fail='Error:')
+
+    def test_function_first_callbacks_cannot_write_through_readonly_nested_slices(self):
+        for name,callback in [
+            ('fmap','proc(x:[]int)->[]int{x[0]=9;return x}'),
+            ('filter','proc(x:[]int)->bool{x[0]=9;return true}'),
+        ]:
+            with self.subTest(name=name):
+                self.invoke(self.program('values :> [][]int{{1,2}}\n_=basic.'+name+'('+callback+',values)',
+                                         'import "thor:basic"\n'),command='check',fail='read-only slice')
+
     def test_filter_order_empty_inputs_and_shallow_elements(self):
         self.invoke(self.program('''
 data := []int{5, 2, 4, 1, 6}
 even := proc(x: int)->bool { return x % 2 == 0 }
-result := basic.filter(data, even)
+result := basic.filter(even, data)
 defer delete(result)
 assert(len(result)==3 && result[0]==2 && result[1]==4 && result[2]==6)
 assert(data[0]==5 && data[1]==2)
-none := basic.filter(data, proc(x:int)->bool{return false})
-empty := basic.filter([]int{}, even)
+none := basic.filter(proc(x:int)->bool{return false}, data)
+empty := basic.filter(even, []int{})
 defer delete(none); defer delete(empty)
 assert(len(none)==0 && len(empty)==0)
 words := []string{"oak", "elm"}
-kept := basic.filter(words, proc(x:string)->bool{return true})
+kept := basic.filter(proc(x:string)->bool{return true}, words)
 defer delete(kept)
 assert(raw_data(kept[0])==raw_data(words[0]))
 ''', 'import "thor:basic"\n'))
@@ -43,12 +179,12 @@ no_shrink :: proc(data:rawptr, mode:mem.Allocator_Mode, size, alignment:int,
     allocator := mem.Allocator{no_shrink, &backing}
     data := []int{1,2,3,4,5}
     for mode in 0..<3 {
-        kept := basic.filter(data, proc(x:int)->bool{return x % 2 == 0}, allocator)
+        kept := basic.filter(proc(x:int)->bool{return x % 2 == 0}, data, allocator)
         defer delete(kept,allocator)
         testing.expect(t,len(kept)==2 && kept[0]==2 && kept[1]==4)
-        none := basic.filter(data,proc(x:int)->bool{return false},allocator)
+        none := basic.filter(proc(x:int)->bool{return false},data,allocator)
         defer delete(none,allocator)
-        all := basic.filter(data,proc(x:int)->bool{return true},allocator)
+        all := basic.filter(proc(x:int)->bool{return true},data,allocator)
         defer delete(all,allocator)
     }
     values := basic.range(7,-3,-3,allocator)
@@ -69,7 +205,7 @@ assert(basic.sum([]quaternion256{quaternion(real=1,imag=2,jmag=3,kmag=4),quatern
 ''','import "thor:basic"\n'))
 
     def test_helper_type_constraints_reject_unsupported_arguments(self):
-        for expression in ['basic.sum([]string{"x"})','basic.filter([]int{1},7)',
+        for expression in ['basic.sum([]string{"x"})','basic.filter(7,[]int{1})',
                            'basic.range(1.5)','basic.chr(1.5)','basic.table([]int{1})',
                            'basic.random(string)','basic.ord(1.5)']:
             with self.subTest(expression=expression):
@@ -253,7 +389,7 @@ main::proc(){
         # These useful runtime helpers need capabilities excluded by fn/#run.
         for expression, message in [
             ('basic.random(int)','Pure'),
-            ('basic.filter([]int{1},proc(x:int)->bool{return true})','Pure'),
+            ('basic.filter(proc(x:int)->bool{return true},[]int{1})','Pure'),
             ('basic.table([]struct{v:int}{{1}})','Pure'),
             ('basic.ord("😀")','runtime storage'),
         ]:

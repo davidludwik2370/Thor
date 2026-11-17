@@ -329,7 +329,7 @@ helpers :: proc(t: ^testing.T) {
     data := []int{3, 1, 2}
     result := basic.sorted(data, allocator=context.allocator)
     defer delete(result)
-    mapped := basic.fmap(data, proc(x: int) -> int { return x * 2 })
+    mapped := basic.fmap(proc(x: int) -> int { return x * 2 }, data)
     defer delete(mapped)
     testing.expect(t, mapped[0] == 6 && mapped[2] == 4)
     parts := basic.split("red,blue", ",")

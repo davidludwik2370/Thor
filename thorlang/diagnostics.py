@@ -343,7 +343,9 @@ class Diagnostics:
                 msgs = ["Membership requires comparable elements. " + msgs[0]]
             pure_format=bool(origin and Path(origin.file)==runtime/'format'/'format.odin' and msgs
                              and msgs[0].removeprefix('Compile time panic: ').startswith('Pure formatting supports'))
-            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin',runtime/'optional'/'optional.odin'} or origin.kind=='pure-type-validator' or pure_format)
+            library_constraint=bool(origin and Path(origin.file).is_relative_to(runtime) and msgs
+                                    and msgs[0].startswith("'where' clause evaluated to false"))
+            compiler_support=origin and (Path(origin.file) in {runtime/'sequence'/'sequence.odin',runtime/'sets'/'compiler.odin',runtime/'pure'/'pure.odin',runtime/'eval'/'eval.odin',runtime/'optional'/'optional.odin'} or origin.kind=='pure-type-validator' or pure_format or library_constraint)
             if compiler_support:
                 # Generic dispatch is part of language lowering. Its checker
                 # failures belong to the user's operation, not the support file.
@@ -357,7 +359,15 @@ class Diagnostics:
                                 break
                         if caller: break
                     if caller: break
-                if caller: origin=caller
+                if caller:
+                    if library_constraint:
+                        related.append({'pos':self.locate(origin),'message':'Library type constraint is declared here.'})
+                        source=self.sources.get(caller.file)
+                        calls=[n for n in source.nodes if n.kind=='Call' and n.start<=caller.start<n.end] if source else []
+                        if calls:
+                            call=min(calls,key=lambda n:n.end-n.start)
+                            caller=Origin(caller.file,call.start,call.end)
+                    origin=caller
             source = self.sources.get(origin.file) if origin else None
             if source and any(n.kind == 'OrPanic' and n.start <= origin.start and origin.end <= n.end for n in source.nodes) \
                     and not any(n.kind == 'OrElse' and n.start <= origin.start and origin.end <= n.end for n in source.nodes):
