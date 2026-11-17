@@ -164,7 +164,7 @@ impl Resolver<'_> {
                                 break 'scopes;
                             }
                         }
-                        let typ = self.type_of(entry.owner);
+                        let typ = self.projection_owner_type(entry.owner, &Substitutions::new());
                         if self.member_path(&typ, &name).is_none() {
                             continue;
                         }
@@ -212,12 +212,39 @@ impl Resolver<'_> {
         self.symbol(r)
             .and_then(|id| self.symbols[id].projection.clone())
     }
+    fn projection_owner_type(&mut self, owner: Ref, bindings: &Substitutions) -> Type {
+        if let Some(id) = self.symbol(owner) {
+            let symbol = &self.symbols[id];
+            let source = &self.sources[owner.file];
+            if symbol.reference.file == owner.file
+                && source.node(symbol.reference.node).kind == "TypeSwitch"
+            {
+                // Only the promoted field needs this contextual type. Keep
+                // native type witnesses for ordinary switch-alias expressions.
+                let case = source.ancestors(owner.node).find(|case| {
+                    source.node(*case).kind == "Case"
+                        && source.node(*case).parent.and_then(|body| source.node(body).parent)
+                            == Some(symbol.reference.node)
+                });
+                if let Some(case) = case {
+                    let types = source.group(case, "types");
+                    if types.len() == 1 && source.text(types[0]) != "nil" {
+                        let reference_binding = source.node(symbol.name_node).kind == "Unary"
+                            && source.node(symbol.name_node).op == "&";
+                        let typ = self.specialized_type(Ref { file: owner.file, node: types[0] }, bindings);
+                        return if reference_binding { Type::Pointer(Box::new(typ)) } else { typ };
+                    }
+                }
+            }
+        }
+        if bindings.is_empty() { self.type_of(owner) } else { self.specialized_type(owner, bindings) }
+    }
     pub fn projected_type(&mut self, projection: &Projection, bindings: &Substitutions) -> Type {
-        let typ = self.specialized_type(projection.owner, bindings);
+        let typ = self.projection_owner_type(projection.owner, bindings);
         self.member_type(&typ, &projection.member)
     }
     pub fn projection_indirect(&mut self, projection: &Projection) -> bool {
-        let mut typ = self.type_of(projection.owner);
+        let mut typ = self.projection_owner_type(projection.owner, &Substitutions::new());
         let Some(path) = self.member_path(&typ, &projection.member) else {
             return false;
         };

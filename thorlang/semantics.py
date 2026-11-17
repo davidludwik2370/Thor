@@ -209,7 +209,7 @@ class Resolver:
                                     member=self.package_symbol(self.import_directory(owner.source,imported),name)
                                     if member:return member
                                     continue
-                            owner_type = self.type_of(owner)
+                            owner_type = self._projection_owner_type(owner)
                             field = self.field(owner_type, name)
                             if field:
                                 original = self.symbol(owner)
@@ -219,6 +219,21 @@ class Resolver:
             return None
         finally:
             self.active.remove(key)
+
+    def _projection_owner_type(self, owner, seen=None):
+        symbol = self.symbol(owner)
+        if symbol and symbol.declaration.kind == 'TypeSwitch':
+            # Do not replace ordinary alias expressions' native type witnesses.
+            # The promoted field only needs the type at its `using` site.
+            case = next((case for case in owner.ancestors() if case.kind == 'Case'
+                         and case.parent and case.parent.parent is symbol.declaration), None)
+            types = case.group('types') if case else []
+            if len(types) == 1 and types[0].text != 'nil':
+                narrowed = self.type_node(types[0])
+                if symbol.node.kind == 'Unary' and symbol.node.data.get('op') == '&':
+                    return Type('pointer', node=owner, elem=narrowed, witness=owner)
+                return replace(narrowed, witness=owner)
+        return self.type_of(owner, seen)
 
     def package_symbol(self, directory, name):
         symbols = self.scopes.get((directory, "package"), {}).get(name, [])
@@ -675,7 +690,7 @@ class Resolver:
         if symbol:
             if symbol.projection:
                 owner, member = symbol.projection
-                result = self.field(self.type_of(owner, seen), member)
+                result = self.field(self._projection_owner_type(owner, seen), member)
                 return result[0] if result else Type(node=n)
             if len(symbol.candidates) > 1 and any(any(a.kind in {"When", "CompileSwitch"} for a in s.declaration.ancestors()) for s in symbol.candidates):
                 return Type(node=n, witness=n)
@@ -1142,7 +1157,7 @@ class Resolver:
         if symbol:
             if symbol.projection:
                 owner, member = symbol.projection
-                field = self.field(self.type_of(owner), member)
+                field = self.field(self._projection_owner_type(owner), member)
                 return None if field and field[2] else self.protection(owner)
             if any(s.immutable for s in symbol.candidates or [symbol]):
                 marker = self.markers.get((symbol.declaration, symbol.name))

@@ -3841,6 +3841,10 @@ resolve_symbol_return :: proc(ast_context: ^AstContext, symbol: Symbol, ok := tr
 		return to_symbol(b), ok
 	case SymbolGenericValue:
 		ret, ok := resolve_type_expression(ast_context, v.expr)
+		// Resolving the indexed initializer supplies its type, not the
+		// declaration's storage qualifier or compile-time binding status.
+		ret.flags -= {.Immutable, .ReadOnlyBinding, .CompileTime}
+		ret.flags |= symbol.flags & {.Immutable, .ReadOnlyBinding, .CompileTime}
 		if symbol.type == .Variable {
 			ret.type = symbol.type
 		}

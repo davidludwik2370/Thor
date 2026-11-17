@@ -60,6 +60,19 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
   plain expressions and f-string interpolations, including zipped rows, value
   parameters, nested records and bit fields. Pointer boundaries and independent
   mutable copies retain writable tokens.
+  Promoted fields also retain immutable slice-view qualifiers through nested
+  `using` scopes; readonly parameters do not freeze their slice targets.
+  Imported declarations preserve their own storage qualifiers when indexed or
+  resolved through generic/type aliases. A package namespace does not make its
+  mutable globals readonly. Type-switch cases collect promoted fields after
+  narrowing their binding, including inside f-strings and nested scopes.
+  Both compiler implementations use that case-local owner type when capturing
+  promoted fields in f-strings, while keeping ordinary expressions' native type
+  witnesses unchanged.
+  Compiler permission snapshots carry an editor revision as well as the file
+  hash, so edits to dependencies cannot leave stale readonly tokens or `#mut`
+  hints behind. Revision invalidation is constant-time and late checker results
+  cannot republish facts from an older revision.
 
 - Complete public package members after `/` or `,` in selective imports, including
   partial names, multiline/commented lists, relative and collection imports,

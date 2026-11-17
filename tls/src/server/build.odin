@@ -344,8 +344,14 @@ index_file :: proc(uri: common.Uri, text: string) -> common.Error {
 		}
 		return .None
 	}
+	return index_parsed_file(file)
+}
 
-	corrected_uri := common.create_uri(fullpath, context.temp_allocator)
+// Open buffers already have an adapted AST. Publish their declarations without
+// parsing the file a second time, so other documents see unsaved qualifiers.
+index_parsed_file :: proc(file: ast.File) -> common.Error {
+	defer clear_index_cache()
+	corrected_uri := common.create_uri(file.fullpath, context.temp_allocator)
 	invalidate_document_symbol_caches()
 
 	for k, &v in indexer.index.collection.packages {

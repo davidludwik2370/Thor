@@ -39,6 +39,42 @@ write::proc(using row:Row){values[0]=9}
         self.invoke(self.program('row:=Row{[2,3]};if read(row)!=7{panic("using parameter")}',
             'Row::struct{values:[2]int}\nread::proc(row:Row)->int{using row;return values[-1]+values[0]**2}\n'))
 
+    def test_type_switch_using_fields_in_fstrings_preserve_case_types_and_reference_aliases(self):
+        code=self.program('''
+row:=Row{7}
+value:=format(Choice(row));defer delete(value)
+pointer:=format(Choice(&row));defer delete(pointer)
+reference:=format_reference(Choice(row));defer delete(reference)
+if value!="v:7"||pointer!="p:7"||reference!="r:8"||row.value!=7{
+    panic("narrowed using capture or reference storage")
+}
+''','''Row::struct{value:int}
+Choice::union{Row,^Row}
+format::proc(choice:Choice)->string{
+    switch row in choice{
+    case Row:
+        using row
+        switch {case true:return f"v:{value}"}
+    case ^Row:
+        using row
+        return f"p:{value}"
+    }
+    return ""
+}
+format_reference::proc(choice:Choice)->string{
+    local:=choice
+    #partial switch &row in local{
+    case Row:
+        using row
+        value+=1
+        return f"r:{value}"
+    }
+    return ""
+}
+''')
+        for flags in (['-debug'],compiler.UNCHECKED):
+            with self.subTest(flags=flags):self.invoke(code,flags=flags)
+
     def test_nearest_projection_and_initializer_shadowing(self):
         self.invoke(self.program('''
 value:=99

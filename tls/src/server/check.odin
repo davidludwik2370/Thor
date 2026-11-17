@@ -67,6 +67,7 @@ Check_Request :: struct {
 	config:     ^common.Config,
 	buffers:    []Check_Buffer,
 	generation: int,
+	slice_revision: int,
 }
 
 Check_Buffer :: struct {
@@ -122,7 +123,7 @@ queue_check_request :: proc(mode: Check_Mode, path: string, config: ^common.Conf
 	}
 
 	generation := intrinsics.atomic_add(&checker.generation, 1) + 1
-	ok := chan.send(checker.send, Check_Request{check_mode = mode, path = path, config = config, buffers = buffers[:], generation = generation})
+	ok := chan.send(checker.send, Check_Request{check_mode = mode, path = path, config = config, buffers = buffers[:], generation = generation, slice_revision = thor_current_slice_revision()})
 	if !ok {
 		log.errorf("Failed to queue check request for path %q", path)
 		delete_check_buffers(buffers[:])
@@ -193,15 +194,17 @@ run_check_consumer :: proc(c: Consumer) {
 
 		buffers := request.buffers
 		generation := request.generation
+		slice_revision := request.slice_revision
 		for later in chan.try_recv(c.ch) {
 			append(&paths, later.path)
 			delete_check_buffers(buffers)
 			buffers = later.buffers
 			generation = later.generation
+			slice_revision = later.slice_revision
 		}
 
 		if generation == intrinsics.atomic_load(&checker.generation) {
-			check(request.check_mode, paths[:], buffers, request.config, generation)
+			check(request.check_mode, paths[:], buffers, request.config, generation, slice_revision)
 		}
 
 		if generation == intrinsics.atomic_load(&checker.generation) {
@@ -356,7 +359,7 @@ stop_check_processes :: proc(processes:[]CheckProcess) {
 	}
 }
 
-check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, config: ^common.Config, generation: int) {
+check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, config: ^common.Config, generation: int, slice_revision: int) {
 	write_overlay :: proc(o: ^Check_Overlay, buffers: []Check_Buffer) -> string {
 		if o.dir == "" {
 			temp, err := os.temp_directory(context.temp_allocator)
@@ -576,21 +579,21 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 		log.infof("`%s` has no `-workspace` or `-overlay`, so packages are checked one at a time from disk", command)
 		delete(checker.odin_without_workspace, checker.allocator)
 		checker.odin_without_workspace = strings.clone(command, checker.allocator)
-		check(mode, check_paths, buffers, config, generation)
+		check(mode, check_paths, buffers, config, generation, slice_revision)
 		return
 	}
 	// Ignore results from an older snapshot after another edit arrived.
 	if generation != intrinsics.atomic_load(&checker.generation) { return }
 	clear_diagnostics(.Check)
 	for result in errors {
-		thor_update_slice_info(result.slice_access)
+		thor_update_slice_info(result.slice_access, slice_revision)
 		for info in result.slice_access {
 			for buffer in buffers {
 				if buffer.canonical != info.file { continue }
 				ensure_diagnostic_path(.Check, common.create_uri(buffer.path, context.temp_allocator).uri)
 				if buffer.path != info.file {
 					alias := info; alias.file = buffer.path
-					thor_update_slice_info([]Thor_Slice_Info{alias})
+					thor_update_slice_info([]Thor_Slice_Info{alias}, slice_revision)
 				}
 			}
 		}

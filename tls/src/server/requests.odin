@@ -1832,6 +1832,7 @@ notification_did_change_watched_files :: proc(
 	if unmarshal(params, did_change_watched_files_params, context.temp_allocator) != nil {
 		return .ParseError
 	}
+	if len(did_change_watched_files_params.changes) > 0 { thor_invalidate_slice_info() }
 
 	package_aliases_changed := false
 	for change in did_change_watched_files_params.changes {

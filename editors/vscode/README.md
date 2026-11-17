@@ -302,6 +302,12 @@ writable colors.
 Fields exposed by `using` preserve the same readonly color as explicit member
 accesses, both in ordinary expressions and inside f-string interpolations.
 Mutable copies and fields reached through pointers keep their writable colors.
+Nested `using` scopes retain slice-view permissions. Readonly parameters still
+allow writable slice targets, and copied records can retain readonly backing
+storage in their reference fields. Qualified package globals follow their own
+declarations' mutability, including when their types use generic aliases.
+These rules also apply to narrowed type-switch cases, comprehension bindings,
+raw/owned/nested f-strings and expressions in dynamic field widths.
 
 VS Code sends open/change/save events and unsaved document contents to TLS. TLS
 and the transpiler share the Thor parser, keeping their accepted syntax aligned.

@@ -21,15 +21,30 @@ Thor_Slice_Info :: struct {
 }
 Thor_Cached_Slice_Info :: struct {
     source_hash: u64,
+    revision: int,
     parameters: map[int]bool, // offset -> explicitly written
     readonly_access: map[int]bool,
 }
 thor_slice_info: map[string]Thor_Cached_Slice_Info
 thor_slice_mutex: sync.Mutex
+thor_slice_revision: int
 
-thor_update_slice_info :: proc(infos: []Thor_Slice_Info) {
+thor_invalidate_slice_info :: proc() {
     sync.lock(&thor_slice_mutex)
     defer sync.unlock(&thor_slice_mutex)
+    thor_slice_revision += 1
+}
+
+thor_current_slice_revision :: proc() -> int {
+    sync.lock(&thor_slice_mutex)
+    defer sync.unlock(&thor_slice_mutex)
+    return thor_slice_revision
+}
+
+thor_update_slice_info :: proc(infos: []Thor_Slice_Info, revision: int) {
+    sync.lock(&thor_slice_mutex)
+    defer sync.unlock(&thor_slice_mutex)
+    if revision != thor_slice_revision { return }
     allocator := runtime.heap_allocator()
     if thor_slice_info == nil { thor_slice_info = make(map[string]Thor_Cached_Slice_Info, allocator) }
     for info in infos {
@@ -40,7 +55,7 @@ thor_update_slice_info :: proc(infos: []Thor_Slice_Info) {
         for parameter in info.parameters { parameters[parameter.offset] = parameter.explicit }
         readonly_access := make(map[int]bool, allocator)
         for offset in info.readonly_access { readonly_access[offset] = true }
-        thor_slice_info[key] = {info.source_hash, parameters, readonly_access}
+        thor_slice_info[key] = {info.source_hash, revision, parameters, readonly_access}
     }
 }
 
@@ -48,7 +63,7 @@ thor_slice_parameter_mut :: proc(file: string, offset: int) -> bool {
     sync.lock(&thor_slice_mutex)
     defer sync.unlock(&thor_slice_mutex)
     info, found := thor_slice_info[file]
-    if !found { return false }
+    if !found || info.revision != thor_slice_revision { return false }
     // A hover may run before the next compiler check has finished.
     if document := &document_storage.documents[file]; document != nil {
         if hash.fnv64a(document.text[:document.used_text]) != info.source_hash { return false }
@@ -61,7 +76,7 @@ thor_slice_access_hints :: proc(document: ^Document, range: common.Range) -> []I
     sync.lock(&thor_slice_mutex)
     defer sync.unlock(&thor_slice_mutex)
     info, found := thor_slice_info[document.fullpath]
-    if !found || hash.fnv64a(document.text[:document.used_text]) != info.source_hash { return nil }
+    if !found || info.revision != thor_slice_revision || hash.fnv64a(document.text[:document.used_text]) != info.source_hash { return nil }
     hints := make([dynamic]InlayHint, context.temp_allocator)
     for offset, explicit in info.parameters {
         if explicit { continue }
@@ -76,7 +91,7 @@ thor_slice_readonly_offsets :: proc(file: string, source: []u8) -> map[int]bool 
     sync.lock(&thor_slice_mutex)
     defer sync.unlock(&thor_slice_mutex)
     info, found := thor_slice_info[file]
-    if !found || hash.fnv64a(source) != info.source_hash { return nil }
+    if !found || info.revision != thor_slice_revision || hash.fnv64a(source) != info.source_hash { return nil }
     // A semantic-token response owns one snapshot. The compiler can publish a
     // newer map concurrently, and the source hash is checked once per response.
     offsets := make(map[int]bool, len(info.readonly_access), context.temp_allocator)

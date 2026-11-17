@@ -341,6 +341,11 @@ document_close :: proc(uri_string: string) -> common.Error {
 		log.errorf("Client called close on a document that was never opened: %v ", uri.path)
 		return .InvalidRequest
 	}
+	thor_invalidate_slice_info()
+	// Discarding an unsaved buffer restores the declarations from disk.
+	if data, err := os.read_entire_file(document.fullpath, context.temp_allocator); err == nil {
+		_ = index_file(document.uri, string(data))
+	}
 
 	document_free_allocator(document.allocator)
 	document.allocator = nil
@@ -458,6 +463,9 @@ parser_error_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
 parse_document :: proc(document: ^Document, config: ^common.Config) -> ([]ParserError, bool) {
 
 	spall.trace(#procedure, document.fullpath)
+	// Permission facts also depend on imported/other open files, whose edits
+	// do not change this document's own source hash.
+	if document.client_owned { thor_invalidate_slice_info() }
 
 	p := parser.Parser {
 		err   = parser_error_handler,
@@ -495,6 +503,12 @@ parse_document :: proc(document: ^Document, config: ^common.Config) -> ([]Parser
 	folder := filepath.dir(document.fullpath)
 	if strings.equal_fold(folder, config.builtin_path) {
 		return nil, true
+	}
+	// Only publish registered editor buffers. Transient documents can be used
+	// with an isolated resolver/index and must not replace global declarations.
+	if document.client_owned && document.ast.syntax_error_count == 0 &&
+	   &document_storage.documents[document.uri.path] == document {
+		_ = index_parsed_file(document.ast)
 	}
 
 	return current_errors[:], true

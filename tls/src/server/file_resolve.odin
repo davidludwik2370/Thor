@@ -216,7 +216,11 @@ local_scope :: proc(data: ^FileResolveData, stmt: ^ast.Stmt) {
 	if stmt == nil {
 		return
 	}
+	collect_scope_locals(data, stmt)
+}
 
+@(private = "file")
+collect_scope_locals :: proc(data: ^FileResolveData, stmt: ^ast.Stmt) {
 	data.position_context.position = stmt.end.offset
 	data.position_context.nested_position = data.position_context.position
 
@@ -655,7 +659,7 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 	case ^ast.Defer_Stmt:
 		resolve_node(n.stmt, data)
 	case ^ast.Case_Clause:
-		local_scope(data, n)
+		local_scope(data, nil)
 		if stmt := data.position_context.switch_type_stmt; stmt != nil {
 			if block, ok := stmt.body.derived.(^ast.Block_Stmt); ok {
 				for clause in block.stmts {
@@ -664,6 +668,9 @@ resolve_node :: proc(node: ^ast.Node, data: ^FileResolveData) {
 				}
 			}
 		}
+		// `using` in this case must see the narrowed record before its
+		// promoted fields are collected. Hover's lexical lookup does likewise.
+		collect_scope_locals(data, n)
 		resolve_nodes(n.list, data)
 		resolve_nodes(n.body, data)
 	case ^ast.Type_Switch_Stmt:

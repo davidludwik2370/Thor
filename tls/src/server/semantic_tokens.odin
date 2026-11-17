@@ -711,6 +711,12 @@ semantic_field_is_value_storage :: proc(ast_context: ^AstContext, base: Symbol, 
 
 // Follow value storage until a shallow reference boundary. This only supplies
 // presentation metadata; it must not change type checking or binding lookup.
+semantic_binding_is_readonly :: proc(symbol: Symbol, require_immutable: bool) -> bool {
+	if .Immutable in symbol.flags { return true }
+	if .CompileTime in symbol.flags && .Mutable not_in symbol.flags && .Parameter not_in symbol.flags { return true }
+	return !require_immutable && (.ReadOnlyBinding in symbol.flags || .Mutable not_in symbol.flags)
+}
+
 semantic_field_is_readonly :: proc(
 	ast_context: ^AstContext,
 	expr: ^ast.Expr,
@@ -729,11 +735,17 @@ semantic_field_is_readonly :: proc(
 	case ^ast.Ident:
 		symbol: Symbol
 		if !internal_resolve_type_expression(ast_context, expr, &symbol) { return false }
-		if .Immutable in symbol.flags { return true }
-		return !require_immutable && (.ReadOnlyBinding in symbol.flags || .Mutable not_in symbol.flags)
+		return semantic_binding_is_readonly(symbol, require_immutable)
 	case ^ast.Selector_Expr:
 		base: Symbol
 		if !internal_resolve_type_expression(ast_context, n.expr, &base) { return false }
+		if _, is_package := base.value.(SymbolPackageValue); is_package {
+			// A namespace's own immutability says nothing about the global
+			// selected from it. Inspect that declaration's binding instead.
+			member: Symbol
+			if !internal_resolve_type_expression(ast_context, expr, &member) { return false }
+			return semantic_binding_is_readonly(member, require_immutable)
+		}
 		if n.field == nil || !semantic_field_is_value_storage(ast_context, base, n.field.name) { return false }
 		return semantic_field_is_readonly(ast_context, n.expr, require_immutable, depth+1)
 	case ^ast.Index_Expr:

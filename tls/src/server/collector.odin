@@ -1145,6 +1145,7 @@ collect_symbols :: proc(collection: ^SymbolCollection, file: ast.File, uri: stri
 		if .Mutable in expr.flags {
 			symbol.flags |= {.Mutable}
 		}
+		if .Immutable in expr.flags { symbol.flags |= {.Immutable} }
 
 		pkg := get_or_create_package(collection, symbol.pkg)
 

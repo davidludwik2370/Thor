@@ -397,10 +397,10 @@ get_locals_value_decl :: proc(file: ast.File, value_decl: ast.Value_Decl, ast_co
 	if value_decl.is_using {
 		readonly := !value_decl.is_mutable || thor_is_immutable(value_decl.attributes[:])
 		if value_decl.type != nil {
-			get_locals_using(value_decl.type, ast_context, readonly)
+			get_locals_using(value_decl.type, ast_context, readonly, readonly)
 		} else {
 			for expr in value_decl.values {
-				get_locals_using(expr, ast_context, readonly)
+				get_locals_using(expr, ast_context, readonly, readonly)
 			}
 		}
 	}
@@ -671,11 +671,16 @@ get_locals_block_stmt :: proc(
 	}
 }
 
-get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext, readonly_binding: Maybe(bool) = nil) {
+get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext, readonly_binding: Maybe(bool) = nil, immutable_binding := false) {
 	if symbol, expr, ok := unwrap_procedure_until_struct_bit_field_or_package(ast_context, expr); ok {
 		// A declaration/parameter can supply a type expression rather than its
 		// binding. Use its explicit permissions; otherwise inspect the value once.
-		readonly := readonly_binding.(bool) or_else semantic_field_is_readonly(ast_context, expr)
+		readonly, specified := readonly_binding.(bool)
+		immutable := immutable_binding
+		if !specified {
+			readonly = semantic_field_is_readonly(ast_context, expr)
+			if readonly { immutable = semantic_field_is_readonly(ast_context, expr, require_immutable = true) }
+		}
 		#partial switch v in symbol.value {
 		case SymbolPackageValue:
 			if ident, ok := expr.derived.(^ast.Ident); ok {
@@ -691,7 +696,12 @@ get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext, readonly_bin
 				// mutable copy of that field. Preserve the same shallow access
 				// permissions as an explicit selector, including in f-strings.
 				flags: bit_set[LocalFlag] = {.Mutable}
-				if readonly && semantic_field_is_value_storage(ast_context, symbol, name, i) { flags += {.ReadOnlyBinding} }
+				if readonly && semantic_field_is_value_storage(ast_context, symbol, name, i) {
+					flags += {.ReadOnlyBinding}
+					// Keep the deep view qualifier as well as the binding color.
+					// Readonly parameters only protect the binding, not slice data.
+					if immutable { flags += {.Immutable} }
+				}
 				store_local(
 					ast_context,
 					expr,
@@ -712,7 +722,10 @@ get_locals_using :: proc(expr: ^ast.Expr, ast_context: ^AstContext, readonly_bin
 				selector.field = new_type(ast.Ident, v.types[i].pos, v.types[i].end, ast_context.allocator)
 				selector.field.name = name
 				flags: bit_set[LocalFlag] = {.Mutable}
-				if readonly && symbol.pointers == 0 { flags += {.ReadOnlyBinding} }
+				if readonly && symbol.pointers == 0 {
+					flags += {.ReadOnlyBinding}
+					if immutable { flags += {.Immutable} }
+				}
 				store_local(
 					ast_context,
 					expr,
