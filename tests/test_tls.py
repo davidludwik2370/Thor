@@ -1004,6 +1004,26 @@ main::proc(){
             'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
 
+    def test_data_first_mapping_callbacks_keep_inferred_result_hovers(self):
+        text='''package main
+import "thor:basic"
+twice::proc(x:$T)->T{return x*2}
+positive::proc(x:$T)->bool{return x>0}
+main::proc(){
+    values:=[]int{-2,0,3}
+    mapped:=basic.fmap(values,twice)
+    kept:=basic.filter(values,positive)
+    delete(mapped);delete(kept)
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        for name in ('mapped:=','kept:='):
+            with self.subTest(name=name):
+                hover=self.hover(client,main,text,name)
+                self.assertIsNotNone(hover)
+                self.assertIn('[]int',hover['contents']['value'])
+
     def test_new_basic_helpers_hover_navigation_completion_and_callback_error(self):
         text='''package main
 import "thor:basic"

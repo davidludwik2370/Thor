@@ -8,6 +8,41 @@ class BasicExtensionTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    def test_data_first_callbacks_infer_polymorphic_specializations(self):
+        source = '''package main
+import "thor:basic"
+twice :: proc(x: $T) -> T {return x*2}
+positive :: proc(x: $T) -> bool {return x>0}
+main :: proc() {
+    integers := []int{-2,0,3}
+    mapped := basic.fmap(integers, twice)
+    defer delete(mapped)
+    selected := basic.filter(integers, positive)
+    defer delete(selected)
+    if len(mapped)!=3 || mapped[0]!=-4 || mapped[2]!=6 {panic("generic integer mapper")}
+    if len(selected)!=1 || selected[0]!=3 {panic("generic integer predicate")}
+
+    floats := []f64{-1.25,0,2.5}
+    map_alias :: basic.fmap
+    filter_alias :: basic.filter
+    mapped_floats := map_alias(floats, twice)
+    defer delete(mapped_floats)
+    selected_floats := filter_alias(floats, positive)
+    defer delete(selected_floats)
+    if mapped_floats[0]!=-2.5 || mapped_floats[2]!=5 {panic("generic float mapper")}
+    if len(selected_floats)!=1 || selected_floats[0]!=2.5 {panic("generic float predicate")}
+
+    empty := basic.fmap([]int{}, twice)
+    defer delete(empty)
+    no_matches := basic.filter([]int{}, positive)
+    defer delete(no_matches)
+    if len(empty)!=0 || len(no_matches)!=0 {panic("empty input type inference")}
+}
+'''
+        for flags in ([], ['-o:speed', '-disable-assert', '-no-bounds-check', '-no-type-assert']):
+            with self.subTest(flags=flags):
+                self.invoke(source,flags=flags)
+
     def test_filter_order_empty_inputs_and_shallow_elements(self):
         self.invoke(self.program('''
 data := []int{5, 2, 4, 1, 6}
