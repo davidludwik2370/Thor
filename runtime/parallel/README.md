@@ -14,12 +14,46 @@ defer delete(rows)
 // rows[0].sum == 5; rows[1].product == 20
 ```
 
-Jobs must be a slice of structs. Fields supply positional callback arguments in
-declaration order, as in `calculate(**jobs[i])`. Struct field names need not match
-parameter names. Polymorphic callbacks are inferred from those field types;
-neither a procedure-type annotation nor an explicit specialization is required.
+The callback's declared inputs determine how jobs are passed:
+
+* **One fixed parameter:** pass a slice of that input type. Each element becomes
+  the whole argument: `calculate(jobs[i])`. This includes structs, pointers,
+  arrays, and slices. Thor neither spreads a struct nor takes its address.
+* **Multiple parameters or a variadic parameter:** jobs are structs whose fields
+  supply positional arguments in declaration order: `calculate(**jobs[i])`.
+  Field names need not match parameter names. Trailing defaulted parameters may
+  be omitted from the bundle; defaulted parameters still count toward the
+  callback's declared arity.
+* **Zero parameters:** use a slice of empty structs, one per invocation.
+
+```odin
+twice :: proc(x: int) -> int { return x*2 }
+doubled := basic.pmap([]int{2,3}, twice)
+defer delete(doubled)
+
+Row :: struct { left, right: int }
+total :: proc(row: Row) -> int { return row.left+row.right }
+totals := basic.pmap([]Row{{2,3}}, total)
+defer delete(totals)
+
+constant :: proc() -> int { return 7 }
+empty_jobs: [3]struct{}
+constants := basic.pmap(empty_jobs[:], constant)
+defer delete(constants)
+```
+
+Polymorphic callbacks are inferred without procedure-type annotations or
+explicit specializations. A single-parameter generic callback now infers its
+type from the whole element. For example, mapping `identity(x:$T)->T` over
+`[]Row` returns `[]Row`; a one-field wrapper no longer unpacks its field.
 Procedure aliases, overloads, procedure variables, default arguments, and `fn`
-callbacks are supported. An empty job struct invokes a zero-argument callback.
+callbacks are supported. If both whole-element and argument-bundle overloads
+match, select a specific callback to resolve the ambiguity.
+
+A pointer field in a bundle remains a pointer when the bundle is copied.
+`proc(value:int,destination:^int)` can write `destination^` without receiving
+the address of the job struct. Writing through that pointer updates its target;
+the job's pointer field itself is not replaced.
 
 Results preserve job order, even though callback execution order is unspecified:
 
@@ -65,6 +99,16 @@ allocator. This is deliberately independent of the caller's default allocator:
 a scoped arena or debug tracking allocator may not support concurrent calls.
 Every worker inherits the rest of the caller's context, but new threads retain
 their own temporary allocator. The caller's allocator is restored on return.
+The input mode is selected at compile time, with no per-job dispatch or
+argument-packing allocation.
+
+With Odin's default random generator, each thread has its own state seeded from
+system entropy on first use. Consecutive jobs advance that thread's stream;
+`pmap` does not reseed per job. The calling thread keeps using its existing
+stream. A custom generator's context reference is inherited unchanged, so a
+custom generator backed by shared mutable state needs its usual synchronization
+or separate per-job state. For repeatability independent of worker count,
+provide explicit seeds as job inputs and initialize local generator state.
 
 When callbacks return owned allocations made with their default allocator,
 delete those allocations with **the same worker allocator**. For example:
@@ -139,6 +183,9 @@ One result keeps its exact type; multiple results become a struct using the
 same naming rule as `pmap`. A no-result call has no result type and is an error.
 Queries work through aliases and with polymorphic/overloaded calls. Native
 Odin checks the actual call's argument types, defaults, and constraints.
+Queries can also inspect `pmap` itself, for example
+`result_type_of(basic.pmap([]int{1}, twice))` is `[]int`; neither mapping nor
+allocation runs while answering the query.
 
 Library procedures can use a query as a type parameter's default:
 
@@ -152,6 +199,7 @@ first :: proc(jobs: []$Job, callback: $F,
 
 Thor supplies the default at the caller, where the callback's result names and
 specialization are known. Runtime arguments are evaluated once in written order.
+Explicit compile-time value parameters remain compile-time parameters in these calls.
 The worker implementation is ordinary library code. Pure calls use a reviewed
 scheduler boundary tied to the official `thor:parallel.pmap` declaration, through
 aliases and re-exports; an unrelated procedure named `pmap` receives no special

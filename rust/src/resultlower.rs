@@ -174,7 +174,58 @@ impl Lower<'_, '_> {
         parameters: &HashMap<String, Ref>,
         bindings: &Substitutions,
         literal: &Option<Code>,
+        mapping: Option<(bool, usize)>,
     ) -> Result<Code> {
+        if let Some((spread, arguments)) = mapping {
+            let callback = parameters
+                .get(&self.resolver.fields(signature, "params")[query.callback].0)
+                .copied()
+                .unwrap();
+            let jobs = parameters.get("jobs").copied().unwrap();
+            self.querying += 1;
+            let callback_code = if let Some(code) = literal {
+                Ok(code.clone())
+            } else {
+                self.render(callback.node, None, false)
+            };
+            let jobs_code = self.render(jobs.node, None, false);
+            self.querying -= 1;
+            let mut code = vec![callback_code?, self.g("(", site)];
+            if !spread || arguments > 0 {
+                let type_of = self.native("type_of");
+                let jobs_code = jobs_code?;
+                if spread {
+                    // Odin can select a one-argument overload before expanding
+                    // `**`. Explicit field witnesses keep overload arity visible.
+                    self.meta = true;
+                    let typ = self.resolver.type_of(jobs);
+                    let fields = self
+                        .resolver
+                        .record_fields(typ.element().unwrap_or(&Type::Unknown));
+                    for (i, (name, _)) in fields.iter().enumerate() {
+                        if i > 0 {
+                            code.push(self.g(",", site));
+                        }
+                        code.extend([
+                            self.g(
+                                format!("{}meta.type_field_type({type_of}((", self.prefix),
+                                site,
+                            ),
+                            jobs_code.clone(),
+                            self.g(format!(")[0]),{}){{}}", serde_json::json!(name)), site),
+                        ]);
+                    }
+                } else {
+                    code.extend([
+                        self.g(format!("{type_of}(("), site),
+                        jobs_code,
+                        self.g(")[0]){}", site),
+                    ]);
+                }
+            }
+            code.push(self.g(")", site));
+            return Ok(Code::concat(code));
+        }
         let owner = &self.resolver.sources[query.call.file];
         let span = owner.node(query.call.node).span;
         let args = owner.group(query.call.node, "args");
@@ -289,14 +340,35 @@ impl Lower<'_, '_> {
             else {
                 continue;
             };
-            let Some(results) =
-                resulttypes::resolve(self.resolver, query.call, &bindings, Some(callback))
-            else {
-                return Err(self.result_error(id,"Cannot resolve the mapping callback from the job field types. Job fields must match callback parameters in order."));
+            let (resolved, ambiguous) = resulttypes::resolve_default(
+                self.resolver,
+                self.reference(id),
+                query.call,
+                &bindings,
+                callback,
+            );
+            let Some(results) = resolved else {
+                let message = if ambiguous {
+                    "Ambiguous pmap callback: both whole-element and argument-bundle overloads match. Select a specific callback."
+                } else if !crate::parallelcompile::is_call(self.resolver, self.reference(id)) {
+                    "Cannot resolve the mapping callback from the job field types. Job fields must match callback parameters in order."
+                } else {
+                    "Cannot resolve the mapping callback: a single-parameter callback receives the whole slice element; multiple or variadic parameters require matching struct job fields in order."
+                };
+                return Err(self.result_error(id, message));
             };
             let literal = self.result_literal(callback)?;
-            let witness =
-                self.query_witness(id, signature, query, &parameters, &bindings, &literal)?;
+            let witness = self.query_witness(
+                id,
+                signature,
+                query,
+                &parameters,
+                &bindings,
+                &literal,
+                results
+                    .spread
+                    .map(|spread| (spread, results.arguments.len())),
+            )?;
             let args = self.source.group(id, "args").to_vec();
             let names = self.resolver.fields(signature, "params");
             // The action overload omits the dependent result-type parameter.
@@ -379,6 +451,15 @@ impl Lower<'_, '_> {
             let mut arranged = HashMap::new();
             let mut bound_values = HashMap::new();
             let mut explicit_type = None;
+            let owner = &self.resolver.sources[signature.file];
+            let constant_parameters = owner
+                .role(signature.node, "params")
+                .into_iter()
+                .flat_map(|list| &owner.node(list).children)
+                .flat_map(|field| owner.group(*field, "names"))
+                .filter(|name| owner.node(**name).kind == "PolyType")
+                .map(|name| owner.text(*name).trim_start_matches('$').to_string())
+                .collect::<HashSet<_>>();
             for (index, arg) in args.iter().enumerate() {
                 let named = self.source.node(*arg).kind == "FieldValue";
                 let name = if named {
@@ -397,6 +478,12 @@ impl Lower<'_, '_> {
                 } else {
                     *arg
                 };
+                if name == "__thor_pmap_spread" && results.spread.is_some() {
+                    return Err(self.result_error(
+                        *arg,
+                        "pmap's argument mode is inferred and cannot be supplied explicitly.",
+                    ));
+                }
                 if name == query.name {
                     explicit_type = Some(self.render(value, None, true)?);
                     continue;
@@ -417,6 +504,13 @@ impl Lower<'_, '_> {
                         name.clone(),
                         Code::concat([self.g("cast(", id), signature, self.g(")nil", id)]),
                     );
+                } else if constant_parameters.contains(&name) {
+                    helper_params.push(format!(
+                        "${argument}: ${}Arg_{}",
+                        self.prefix,
+                        helper_params.len()
+                    ));
+                    bound_values.insert(name.clone(), self.render(value, None, true)?);
                 } else {
                     helper_params.push(format!(
                         "{argument}: ${}Arg_{}",
@@ -454,6 +548,9 @@ impl Lower<'_, '_> {
                 .position(|(name, _)| name == &query.name)
                 .unwrap_or(names.len());
             for (index, (name, _)) in names.iter().enumerate() {
+                if name == "__thor_pmap_spread" && results.spread.is_some() {
+                    continue;
+                }
                 if name == &query.name {
                     if !results.fields.is_empty() {
                         native_args.push(self.g(&result_name, id));
@@ -468,6 +565,9 @@ impl Lower<'_, '_> {
                         id,
                     ));
                 }
+            }
+            if let Some(spread) = results.spread {
+                native_args.push(self.g(format!("__thor_pmap_spread={spread}"), id));
             }
             if !results.fields.is_empty() {
                 let typ = if let Some(explicit) = explicit_type {
@@ -537,6 +637,9 @@ impl Lower<'_, '_> {
                 // callee's unbound native polymorphic parameters to Odin.
                 let mut bound_args = vec![];
                 for (index, (name, _)) in names.iter().enumerate() {
+                    if name == "__thor_pmap_spread" && results.spread.is_some() {
+                        continue;
+                    }
                     let code = if name == &query.name {
                         Some(call_args[0].clone())
                     } else if let Some(value) = bound_values.get(name) {
@@ -559,6 +662,12 @@ impl Lower<'_, '_> {
                         }
                         bound_args.push(code);
                     }
+                }
+                if let Some(spread) = results.spread {
+                    if !bound_args.is_empty() {
+                        bound_args.push(self.g(",", id));
+                    }
+                    bound_args.push(self.g(format!("__thor_pmap_spread={spread}"), id));
                 }
                 let bound_call = Code::concat([
                     self.render(callee, None, constant)?,

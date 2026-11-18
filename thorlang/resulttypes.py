@@ -57,6 +57,17 @@ class Default:
     callback: int
 
 
+@dataclass
+class Results:
+    signature: object
+    fields: list
+    arguments: list
+    spread: object = None
+
+    def __getitem__(self,index):return (self.signature,self.fields)[index]
+    def __iter__(self):return iter((self.signature,self.fields))
+
+
 def defaults(resolver, signature):
     parameters=signature.role('params')
     if parameters is None:return []
@@ -105,14 +116,61 @@ def argument_types(resolver,call,bindings):
     return types
 
 
-def resolve(resolver,call,bindings=None,callback=None):
+def signature_spreads(resolver,signature):
+    parameters=resolver.fields(signature.role('params'))
+    return len(parameters)!=1 or bool(parameters[-1][1] and parameters[-1][1].kind=='Ellipsis')
+
+
+def resolve_default(resolver,site,call,bindings,callback):
+    from . import parallelcompile
+    ambiguous=[]
+    result=resolve(resolver,call,bindings,callback,parallelcompile.is_call(resolver,site),ambiguous)
+    return result,bool(ambiguous)
+
+
+def constraint(resolver,node,bindings):
+    if node.kind=='Paren':return constraint(resolver,node.role('expr'),bindings)
+    if node.text in ('true','false'):return node.text=='true'
+    if node.kind=='Unary' and node.data.get('op')=='!':
+        value=constraint(resolver,node.role('expr'),bindings)
+        return not value if value is not None else None
+    if node.kind=='Binary':
+        left,right=node.role('left'),node.role('right');op=node.data.get('op')
+        if op in ('&&','||'):
+            a,b=constraint(resolver,left,bindings),constraint(resolver,right,bindings)
+            if op=='&&':return False if a is False or b is False else True if a is True and b is True else None
+            return True if a is True or b is True else False if a is False and b is False else None
+        if op in ('==','!='):
+            a=bindings.get(left.text) or resolver.type_node(left,bindings)
+            b=bindings.get(right.text) or resolver.type_node(right,bindings)
+            if isinstance(a,Type) and isinstance(b,Type) and a.kind not in ('unknown','generic') and b.kind not in ('unknown','generic'):
+                return (a==b)==(op=='==')
+    return None
+
+
+def resolve(resolver,call,bindings=None,callback=None,mapping=False,ambiguous=None):
     enabled=resolver.native_enabled
     resolver.native_enabled=True
-    try:return _resolve(resolver,call,bindings,callback)
+    try:
+        from . import parallelcompile
+        if callback is None and parallelcompile.is_call(resolver,call):
+            candidates=resolver.procedure_candidates(call.role('callee'))
+            for _,signature in candidates:
+                for default in defaults(resolver,signature):
+                    bound=default_bindings(resolver,signature,call,default)
+                    if not bound:continue
+                    result=resolve_default(resolver,call,default.call,bound[0],bound[1])[0]
+                    if not result:return None
+                    explicit=bound[2].get(default.name)
+                    fields=[('v0',Type('slice',elem=resolver.type_of(explicit) if explicit is not None and explicit is not default.query else packed(result)))] if result.fields else []
+                    selected=signature if fields else next((s for _,s in candidates if not resolver.fields(s.role('results'))),signature)
+                    return Results(selected,fields,argument_types(resolver,call,bindings or {}))
+            return None
+        return _resolve(resolver,call,bindings,callback,mapping,ambiguous)
     finally:resolver.native_enabled=enabled
 
 
-def _resolve(resolver,call,bindings=None,callback=None):
+def _resolve(resolver,call,bindings=None,callback=None,mapping=False,ambiguous=None):
     bindings=bindings or {}
     callee=callback or call.role('callee')
     candidates=resolver.procedure_candidates(callee)
@@ -121,33 +179,52 @@ def _resolve(resolver,call,bindings=None,callback=None):
         if typ.kind=='unknown':typ=resolver.type_of(callee)
         if typ.kind=='procedure' and typ.node:candidates=[(None,typ.node)]
     actuals=argument_types(resolver,call,bindings)
+    job=None
+    if mapping:
+        operand=call.group('args')[0]
+        if operand.kind=='Unary':operand=operand.role('expr')
+        job=resolver.type_node(operand.role('type'),bindings) if operand.kind=='Compound' else resolver.type_node(operand,bindings)
     matches=[]
     for _,signature in candidates:
         parameters=resolver.fields(signature.role('params'))
+        spread=signature_spreads(resolver,signature) if mapping else None
+        if mapping:
+            if not spread:actuals=[job]
+            elif job.kind!='struct':continue
+            elif job.members:actuals=list(job.members.values())
+            elif job.node:actuals=[resolver.type_node(t,job.substitutions) for _,t in resolver.fields(job.node.role('fields'))]
+            else:actuals=[]
         formals=[formal for _,formal in parameters]
         variadic=bool(formals and formals[-1] and formals[-1].kind=='Ellipsis')
         if len(actuals)>len(parameters) and not variadic:continue
         if len(actuals)<len(parameters):
+            from . import parallelcompile
             required=sum(len(field.group('names')) for field in signature.role('params').children
-                         if not field.role('default') and not field.data.get('variadic'))
+                         if not field.role('default') and not field.data.get('variadic') and not (
+                             parallelcompile.has_mode_parameter(signature) and any(name.text.lstrip('$')=='__thor_pmap_spread' for name in field.group('names'))))
             if len(actuals)<required:continue
         substitutions=dict(bindings);score=0
         if variadic:
             fixed=len(parameters)-1
             formals=formals[:fixed]+[formals[-1].role('expr')]*max(0,len(actuals)-fixed)
         for formal,actual in zip(formals,actuals):
-            amount=resolver.unify(formal,actual,substitutions)
+            expected=resolver.type_node(formal,substitutions) if formal else Type()
+            amount=0 if expected.name=='any' else resolver.unify(formal,actual,substitutions)
             if amount<0:
                 if len(candidates)>1:break
                 continue
             score+=amount
         else:
+            if mapping and len(candidates)>1 and signature.parent and any(constraint(resolver,c,substitutions) is False for c in signature.parent.group('where')):continue
             fields=[(name if name and name!='_' else f'v{i}',resolver.type_node(annotation,substitutions))
                     for i,(name,annotation) in enumerate(resolver.fields(signature.role('results')))]
-            matches.append((score,signature,fields))
+            matches.append((score,Results(signature,fields,list(actuals),spread)))
     if not matches:return None
-    best=max(score for score,_,_ in matches)
-    matches=[(signature,fields) for score,signature,fields in matches if score==best]
+    if mapping and {result.spread for _,result in matches}=={False,True}:
+        if ambiguous is not None:ambiguous.append(True)
+        return None
+    best=max(score for score,_ in matches)
+    matches=[result for score,result in matches if score==best]
     return matches[0] if len(matches)==1 else None
 
 
@@ -211,8 +288,12 @@ def render(source,node,constant=False):
         bound=default_bindings(resolver,signature,node,default)
         if not bound:continue
         bindings,callback,parameters=bound
-        result=resolve(resolver,default.call,bindings,callback)
-        if result is None:error(node,'Cannot resolve the mapping callback from the job field types. Job fields must match callback parameters in order.')
+        result,ambiguous=resolve_default(resolver,node,default.call,bindings,callback)
+        if result is None:
+            from . import parallelcompile
+            error(node,'Ambiguous pmap callback: both whole-element and argument-bundle overloads match. Select a specific callback.' if ambiguous else
+                'Cannot resolve the mapping callback: a single-parameter callback receives the whole slice element; multiple or variadic parameters require matching struct job fields in order.' if parallelcompile.is_call(resolver,node) else
+                'Cannot resolve the mapping callback from the job field types. Job fields must match callback parameters in order.')
         names=[name for name,_ in resolver.fields(signature.role('params'))]
         callback_literal=literal(source,callback)
         replacements={}
@@ -234,6 +315,19 @@ def render(source,node,constant=False):
         query_args=default.call.group('args')
         if len(query_args)==1 and query_args[0].kind=='Unary' and query_args[0].data.get('op')=='**' and not argument_types(resolver,default.call,bindings):
             witness=(callback_literal or source.render(callback))+'()'
+        if result.spread is not None:
+            job_type=f'type_of(({source.render(parameters["jobs"])})[0]){{}}'
+            if result.spread:
+                # Keep arity visible: native overload selection can precede ** expansion.
+                import json
+                typ=resolver.type_of(parameters['jobs']).elem
+                fields=list((typ.members or {}).items()) if typ else []
+                if typ and typ.node and not fields:fields=resolver.fields(typ.node.role('fields'))
+                source.needs_intrinsics=True
+                jobs_code=source.render(parameters['jobs'])
+                arguments=','.join(f'{source.prefix}meta.type_field_type(type_of(({jobs_code})[0]),{json.dumps(name)}){{}}' for name,_ in fields)
+            else:arguments=job_type
+            witness=(callback_literal or source.render(callback))+'('+arguments+')'
         fields=result[1]
         from . import parallelcompile
         action=not fields and parallelcompile.is_call(resolver,node)
@@ -251,9 +345,12 @@ def render(source,node,constant=False):
         checked_mapping=bool(source.purity and parallelcompile.is_call(resolver,node) and
             (source.purity.checked(source.purity.owner(node)) or source.purity.eval_mode and node in source.purity.calls.targets))
         specialized=checked_mapping or len(candidates)>1 or any(part.kind=='PolyType' for part in descendants(result[0]))
+        constant_parameters={name.text.lstrip('$') for field in signature.role('params').children
+                             for name in field.group('names') if name.kind=='PolyType'}
         for index,arg in enumerate(node.group('args')):
             name=arg.role('field').text if arg.kind=='FieldValue' else names[index+int(action and index>=names.index(default.name))]
             value=arg.role('value') if arg.kind=='FieldValue' else arg
+            if name=='__thor_pmap_spread' and result.spread is not None:error(arg,"pmap's argument mode is inferred and cannot be supplied explicitly.")
             if name==default.name:explicit=source.render(value,constant=True);continue
             argument=source.prefix+f'arg_{len(params)}'
             if name==callback_name and specialized:
@@ -263,6 +360,9 @@ def render(source,node,constant=False):
                 params.append('$'+callback_type+':typeid');args.append(callback_signature)
                 params.append(argument+':'+callback_type)
                 bound_values[name]='cast('+callback_signature+')nil'
+            elif name in constant_parameters:
+                params.append(f'${argument}:${source.prefix}Arg_{len(params)}')
+                bound_values[name]=source.render(value,constant=True)
             else:params.append(f'{argument}:${source.prefix}Arg_{len(params)}')
             arranged[name]=argument
             from . import parallelcompile
@@ -274,9 +374,11 @@ def render(source,node,constant=False):
         native=[]
         type_position=names.index(default.name)
         for index,name in enumerate(names):
+            if name=='__thor_pmap_spread' and result.spread is not None:continue
             if name==default.name:
                 if fields:native.append(result_name)
             elif name in arranged:native.append(arranged[name] if index<type_position else name+'='+arranged[name])
+        if result.spread is not None:native.append('__thor_pmap_spread='+str(result.spread).lower())
         if fields:
             params.insert(0,f'${result_name}:typeid');args.insert(0,explicit or type_code(source,node,witness,result))
         target=source.expressions.module('parallel','thor:parallel')+'.pmap_checked' if checked_mapping else source.render(node.role('callee'))
@@ -289,6 +391,7 @@ def render(source,node,constant=False):
             source.needs_intrinsics=True
             bound=[]
             for index,name in enumerate(names):
+                if name=='__thor_pmap_spread' and result.spread is not None:continue
                 if name==default.name:code=args[0]
                 elif name in bound_values:code=bound_values[name]
                 elif name in arranged:
@@ -296,6 +399,7 @@ def render(source,node,constant=False):
                     code=args[at]
                 else:continue
                 bound.append((name+'=' if index>type_position else '')+code)
+            if result.spread is not None:bound.append('__thor_pmap_spread='+str(result.spread).lower())
             bound_call=target+'('+','.join(bound)+')'
             for i in range(return_count):
                 output=source.prefix+f'Output_{i}'

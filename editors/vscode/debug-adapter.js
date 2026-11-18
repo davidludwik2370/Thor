@@ -471,6 +471,10 @@ class ThorDebugAdapter {
             const basePoint = base?.source?.path && this.maps?.location(base.source.path, base.line, base.column);
             const mapped = {...frame, ...(point ? {source: this.presentSource(point.source), line: point.line, column: point.column} : {}),
                 name: checked(frame, point) ? point.procedure : generated && base ? (basePoint?.procedure || base.name) : frame.name};
+            if (mapped.source?.path && this.maps?.debugRoots?.some(root =>
+                canonical(mapped.source.path) === canonical(path.join(root,'parallel/pmap.thor')))) {
+                mapped.name = mapped.name.replace(/,\s*__thor_pmap_spread:\$\$(?:true|false)/g,'');
+            }
             this.frames.set(frame.id, {raw: frame, base, point, generated});
             if (generated && base) {
                 // Keep the current frame's id/locals while presenting one user

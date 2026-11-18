@@ -1408,11 +1408,12 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 
 		build_string(n.default_value, builder, remove_pointers)
 	case ^ast.Field_List:
-		for field, i in n.list {
+		first:=true
+		for field in n.list {
+			if thor_pmap_mode_field(field) {continue}
+			if !first {strings.write_string(builder,", ")}
+			first=false
 			build_string(field, builder, remove_pointers)
-			if len(n.list) - 1 != i {
-				strings.write_string(builder, ", ")
-			}
 		}
 	case ^ast.Typeid_Type:
 		strings.write_string(builder, "typeid")

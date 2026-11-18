@@ -3,6 +3,10 @@ from pathlib import Path
 from . import resulttypes
 
 
+def has_mode_parameter(signature):
+    return signature.source.path==Path(__file__).resolve().parents[1]/'runtime/parallel/pmap.thor'
+
+
 def is_call(resolver,call):
     if call is None or call.kind!='Call':return False
     expected=Path(__file__).resolve().parents[1]/'runtime/parallel'
@@ -27,7 +31,7 @@ def callback(resolver,call):
             bindings,argument,_=bound
             symbol=resolver.symbol(argument)
             if symbol and (symbol.immutable or symbol.declaration.data.get('mutable') or symbol.declaration.kind=='Field'):return None
-            result=resulttypes.resolve(resolver,default.call,bindings,argument)
+            result=resulttypes.resolve_default(resolver,call,default.call,bindings,argument)[0]
             if result and result[0].parent and result[0].parent.kind=='Procedure':return argument,result[0].parent
     return None
 
@@ -39,6 +43,8 @@ def explicit_allocator(call,target):
 
 
 def job_field_count(resolver,call):
+    selected=callback(resolver,call)
+    if selected and not resulttypes.signature_spreads(resolver,selected[1].role('type')):return 1
     jobs=None
     for index,arg in enumerate(call.group('args')):
         if arg.kind=='FieldValue':

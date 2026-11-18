@@ -1043,7 +1043,7 @@ Job::struct{x:int}
 calculate::proc(x:$T)->(number:T,valid:bool){return x*2,true}
 Override::struct{value:int,ok:bool}
 main::proc(){
-    jobs:=[]Job{{3}}
+    jobs:=[]int{3}
     mapper::b.pmap
     named:=mapper(jobs,calculate,result_type=Override)
     callback:proc(int)->(answer:int,success:bool)=calculate
@@ -1066,7 +1066,7 @@ import "thor:basic"
 Job::struct{x:int}
 calculate::proc(x:$T)->(value:T,ok:bool){return x,true}
 main::proc(){
-    rows:=basic.pmap([]Job{{3}},calculate)
+    rows:=basic.pmap([]int{3},calculate)
     _=rows[0].value
     delete(rows)
 }
@@ -1095,7 +1095,7 @@ main::proc(){
 import "thor:basic"
 import "core:math"
 main::proc(){
-    rows:=basic.pmap([]struct{x:f64}{{4},{9}},math.sqrt)
+    rows:=basic.pmap([]f64{4,9},math.sqrt)
     _=rows[0]
     delete(rows)
 }
@@ -1110,7 +1110,7 @@ main::proc(){
         text='''package main
 import "thor:basic"
 main::proc(){
-    rows:=basic.pmap([]struct{x:int}{{4}},proc(x:$T)->(value:T,ok:bool){return x,true})
+    rows:=basic.pmap([]int{4},proc(x:$T)->(value:T,ok:bool){return x,true})
     _=rows[0].value
     delete(rows)
 }

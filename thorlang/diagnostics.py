@@ -453,6 +453,9 @@ class Diagnostics:
                 msgs = [pattern.sub(lambda m: self.reference(generated_file, *reference_coordinates(m)), text) for text in msgs]
             for generated_prefix,original_prefix in self.path_aliases.items():
                 msgs=[text.replace(generated_prefix,original_prefix) for text in msgs]
+            if any('/parallel/pmap.thor' in message.replace('\\','/') for message in msgs):
+                msgs=[re.sub(r', \$__thor_pmap_spread(?:: bool|=true|=false)', '', message) for message in msgs]
+                msgs=[re.sub(r'^[ \t]*•[ \t]*__thor_pmap_spread[ \t]*=.*(?:\n|$)', '', message, flags=re.MULTILINE) for message in msgs]
             purity_origin=origin
             if origin:
                 proc=min((proc for proc in self.native_pure_origins if str(proc.source.path)==origin.file

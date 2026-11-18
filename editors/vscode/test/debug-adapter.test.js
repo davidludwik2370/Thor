@@ -7,6 +7,21 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const {Framing,DebugMaps,ThorDebugAdapter} = require('../debug-adapter');
 
+test('parallel-map frames hide compiler input mode without hiding user parameter names',()=>{
+    const adapter=Object.create(ThorDebugAdapter.prototype);
+    adapter.frames=new Map();adapter.sourceAliases=new Map();
+    const name='parallel::_pmap_values:proc(jobs:[]int,__thor_pmap_spread:$$false)->(:[]int)';
+    const root=path.join(os.tmpdir(),'separate Thor installation','runtime');
+    adapter.maps={debugRoots:[root],location:()=>undefined};
+    const native=path.join(root,'parallel/pmap.thor');
+    const frames=adapter.mapFrames([
+        {id:1,name,line:1,source:{path:native}},
+        {id:2,name,line:1,source:{path:path.join(os.tmpdir(),'pmap.thor')}}
+    ]);
+    assert.equal(frames[0].name,'parallel::_pmap_values:proc(jobs:[]int)->(:[]int)');
+    assert.equal(frames[1].name,name);
+});
+
 test('statement stepping leaves source-less native routines and instruction stepping remains visible',async()=>{
     for (const granularity of ['statement','instruction']) {
         const adapter=Object.create(ThorDebugAdapter.prototype);

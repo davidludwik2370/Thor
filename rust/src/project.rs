@@ -1409,6 +1409,7 @@ impl Project {
         }).collect();
         let mut translated=crate::diagnosticcleanup::clean(self,translated);
         for error in &mut translated {
+            if let Some(messages)=error["msgs"].as_array_mut(){crate::parallelcompile::visible_diagnostics(messages);}
             if let Some(messages)=error["msgs"].as_array_mut(){for message in messages {
                 if let Some(text)=message.as_str(){*message=json!(self.hide_generated_names(text));}
             }}

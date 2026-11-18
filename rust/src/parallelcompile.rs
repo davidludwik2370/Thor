@@ -2,6 +2,45 @@
 //! this contract; the selected user callback is still checked transitively.
 use crate::semantics::{Ref, Resolver, Substitutions};
 
+/// Remove only the compiler-owned argument from native pmap diagnostics. The
+/// SDK location scopes this cleanup so an ordinary user parameter keeps its name.
+pub(crate) fn visible_diagnostics(messages: &mut Vec<serde_json::Value>) {
+    if !messages
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .any(|text| text.replace('\\', "/").contains("/parallel/pmap.thor"))
+    {
+        return;
+    }
+    for message in messages.iter_mut() {
+        if let Some(text) = message.as_str() {
+            let mut text = text.to_string();
+            for suffix in [": bool", "=true", "=false"] {
+                text = text.replace(&format!(", $__thor_pmap_spread{suffix}"), "");
+            }
+            text = text
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("• __thor_pmap_spread ="))
+                .collect::<Vec<_>>()
+                .join("\n");
+            *message = serde_json::Value::String(text);
+        }
+    }
+    messages.retain(|message| !message.as_str().is_some_and(|text| text.trim().is_empty()));
+}
+
+pub(crate) fn has_mode_parameter(r: &Resolver<'_>, signature: Ref) -> bool {
+    let source = &r.sources[signature.file];
+    source
+        .path
+        .file_name()
+        .is_some_and(|name| name == "pmap.thor")
+        && source
+            .collection_roots
+            .get("thor")
+            .is_some_and(|root| source.path.parent() == Some(root.join("parallel").as_path()))
+}
+
 pub(crate) fn is_call(r: &Resolver<'_>, call: Ref) -> bool {
     let source = &r.sources[call.file];
     source.node(call.node).kind == "Call"
@@ -53,13 +92,14 @@ pub(crate) fn callback(r: &mut Resolver<'_>, call: Ref, outer: &Substitutions) -
             }) {
                 return None;
             }
-            let result = crate::resulttypes::resolve(r, query.call, &bindings, Some(argument))?;
+            let result =
+                crate::resulttypes::resolve_default(r, call, query.call, &bindings, argument).0?;
             let owner = &r.sources[result.signature.file];
             let procedure = owner
                 .node(result.signature.node)
                 .parent
                 .filter(|node| owner.node(*node).kind == "Procedure")?;
-            let types = crate::resulttypes::argument_types(r, query.call, &bindings);
+            let types = result.arguments;
             let mut position = 0;
             let mut defaults = vec![];
             let owner = &r.sources[result.signature.file];

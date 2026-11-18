@@ -9,6 +9,10 @@ Result :: ti.result_type_of(calculate(**Job{}))
 Named :: struct { added, multiplied: int }
 Action_Job :: struct { value: int, destination: ^int }
 store :: proc(value: $T, destination: ^T) { destination^=value }
+twice :: proc(value: $T) -> T { return value*2 }
+whole :: proc(job: Job) -> int { return job.left+job.right }
+increment :: proc(destination: ^int) { destination^+=1 }
+constant :: proc() -> int { return 7 }
 
 main :: proc() {
     jobs :> []Job{{2,3}, {4,5}, {6,7}}
@@ -30,4 +34,20 @@ main :: proc() {
     actions := []Action_Job{{10,&destinations[0]}, {20,&destinations[1]}, {30,&destinations[2]}}
     basic.pmap(actions, store)
     basic.print(destinations)
+
+    doubled := basic.pmap([]int{2,3,4}, twice)
+    defer delete(doubled)
+    basic.print("single inputs:", doubled)
+
+    totals := basic.pmap(jobs, whole)
+    defer delete(totals)
+    basic.print("whole structs:", totals)
+
+    basic.pmap([]^int{&destinations[0],&destinations[1]}, increment)
+    basic.print("pointer inputs:", destinations)
+
+    empty_jobs: [3]struct{}
+    constants := basic.pmap(empty_jobs[:], constant)
+    defer delete(constants)
+    basic.print("zero inputs:", constants)
 }

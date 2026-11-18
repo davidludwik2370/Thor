@@ -438,7 +438,8 @@ get_bit_field_field_signature :: proc(
 
 write_proc_param_list_and_return :: proc(sb: ^strings.Builder, value: SymbolProcedureValue) {
 	strings.write_string(sb, "(")
-	for arg, i in value.orig_arg_types {
+	args:=thor_pmap_visible_params(value.orig_arg_types)
+	for arg, i in args {
 		if .Any_Int in arg.flags {
 			strings.write_string(sb, "#any_int ")
 		}
@@ -452,7 +453,7 @@ write_proc_param_list_and_return :: proc(sb: ^strings.Builder, value: SymbolProc
 			strings.write_string(sb, "#no_alias ")
 		}
 		build_string_node(arg, sb, false)
-		if i != len(value.orig_arg_types) - 1 {
+		if i != len(args) - 1 {
 			strings.write_string(sb, ", ")
 		}
 	}

@@ -214,7 +214,7 @@ impl Resolver<'_> {
                 let default_used=arguments.iter().flatten().any(|arg|*arg==query.query);
                 if !default_used {continue;}
                 if let Some(callback)=arguments.get(query.callback).and_then(|group|group.first()).copied() {
-                    if let Some(results)=crate::resulttypes::resolve(self,query.call,&bindings,Some(callback)) {
+                    if let Some(results)=crate::resulttypes::resolve_default(self,call,query.call,&bindings,callback).0 {
                         if results.fields.is_empty() {result_default_valid=false;break;}
                         bindings.insert(query.name,crate::resulttypes::packed_type(&results));
                     }
@@ -353,7 +353,8 @@ impl Resolver<'_> {
             if bound[index].is_empty() {
                 if let Some(default) = field.default {
                     bound[index].push(default);
-                } else if !field.variadic {
+                } else if !field.variadic && !(arguments.positions.get("__thor_pmap_spread")==Some(&index)
+                    && crate::parallelcompile::has_mode_parameter(self,signature)) {
                     return None;
                 }
             }

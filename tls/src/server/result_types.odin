@@ -19,7 +19,23 @@ thor_result_query :: proc(symbol: Symbol) -> bool {
     return canonical_proc && len(expected.orig_arg_types)>0 && actual.orig_arg_types[0].pos == expected.orig_arg_types[0].pos
 }
 
-thor_result_record :: proc(ctx: ^AstContext, call: ^ast.Call_Expr, target: Maybe(Symbol)=nil) -> (^ast.Expr, bool) {
+thor_pmap_mode_field :: proc(field:^ast.Field)->bool {
+    if field==nil||len(field.names)!=1 {return false}
+    name:=field.names[0]
+    if poly,ok:=name.derived.(^ast.Poly_Type);ok {name=poly.type}
+    ident,ok:=unwrap_ident(name)
+    if !ok||ident.name!="__thor_pmap_spread" {return false}
+    if indexer.index.collection.config==nil {return false}
+    root,found:=indexer.index.collection.config.collections["thor"]
+    return found&&field.pos.file==path.join({root,"parallel","pmap.thor"},context.temp_allocator)
+}
+
+thor_pmap_visible_params :: proc(params:[]^ast.Field)->[]^ast.Field {
+    if len(params)>0&&thor_pmap_mode_field(params[len(params)-1]) {return params[:len(params)-1]}
+    return params
+}
+
+thor_result_record :: proc(ctx: ^AstContext, call: ^ast.Call_Expr, target: Maybe(Symbol)=nil, mode:Maybe(bool)=nil) -> (^ast.Expr, bool) {
     local := ctx^
     local.call = call
     local.use_locals = true
@@ -43,6 +59,7 @@ thor_result_record :: proc(ctx: ^AstContext, call: ^ast.Call_Expr, target: Maybe
     if !found { return nil, false }
     procedure, found_proc := symbol.value.(SymbolProcedureValue)
     if !found_proc { return nil, false }
+    if spread,ok:=mode.?;ok && spread!=(proc_total_arg_count(procedure)!=1||proc_has_variadic_arg(procedure)) {return nil,false}
     results := get_proc_return_types(&local,symbol,call,true)
     if len(results)==0 { return nil,false }
     if len(results)==1 { return results[0],true }
@@ -66,6 +83,37 @@ thor_result_record :: proc(ctx: ^AstContext, call: ^ast.Call_Expr, target: Maybe
         }
     }
     return record,true
+}
+
+// Match the callback using the same declared-arity policy as native workers.
+// Type expressions are witnesses only; no jobs or callbacks execute here.
+thor_pmap_result_record :: proc(ctx:^AstContext,call:^ast.Call_Expr,poly:^map[string]^ast.Expr,target:Maybe(Symbol))->(^ast.Expr,bool) {
+    if len(call.args)!=1 {return nil,false}
+    literal,ok:=ast.unparen_expr(call.args[0]).derived.(^ast.Comp_Lit)
+    if !ok||literal.type==nil {return nil,false}
+    typ:=literal.type
+    if name,ok:=unwrap_ident(typ);ok {if bound,found:=poly[name.name];found {typ=bound}}
+    direct:=cast(^ast.Call_Expr)clone_node(call,ctx.allocator,nil)
+    direct.args=make([]^ast.Expr,1,ctx.allocator)
+    direct.args[0]=clone_expr(typ,ctx.allocator,nil)
+    one,has_one:=thor_result_record(ctx,direct,target,false)
+    local:=ctx^
+    local.call=nil
+    local.current_package=get_package_from_node(typ)
+    local.recursion_map=make(map[rawptr]struct{},context.temp_allocator)
+    symbol,found:=resolve_type_expression(&local,typ)
+    many:^ast.Expr
+    has_many:=false
+    if record,ok:=symbol.value.(SymbolStructValue);found&&ok {
+        expanded:=cast(^ast.Call_Expr)clone_node(call,ctx.allocator,nil)
+        fields:=make([dynamic]^ast.Expr,ctx.allocator)
+        for field,i in record.types {if i<len(record.from_usings)&&record.from_usings[i]!=-1 {continue};append(&fields,field)}
+        expanded.args=fields[:]
+        many,has_many=thor_result_record(ctx,expanded,target,true)
+    }
+    if has_one&&has_many {return nil,false}
+    if has_one {return one,true}
+    return many,has_many
 }
 
 resolve_thor_result_query :: proc(ctx: ^AstContext, query: ^ast.Call_Expr) -> (Symbol,bool) {
@@ -106,6 +154,8 @@ thor_result_defaults :: proc(ctx: ^AstContext, params: []^ast.Field, args: []Cal
     values:=make(map[string]^ast.Expr,context.temp_allocator)
     symbols:=make(map[string]Symbol,context.temp_allocator)
     position:=0
+    mapping:=false
+    for param in params {if thor_pmap_mode_field(param) {mapping=true}}
     for param in params {
         for name in param.names {
             ident,ok:=parameter_name(name)
@@ -162,6 +212,12 @@ thor_result_defaults :: proc(ctx: ^AstContext, params: []^ast.Field, args: []Cal
         copy.expr=clone_expr(callback,ctx.allocator,nil)
         find_and_replace_poly_type(cast(^ast.Expr)copy,poly)
         copy.pos,copy.end=ctx.call.pos,ctx.call.end
+        if mapping {
+            target:Maybe(Symbol)
+            if symbol,ok:=symbols[callback_name.name];ok {target=symbol}
+            if record,found:=thor_pmap_result_record(ctx,copy,poly,target);found {poly[name.name]=record;status=.Resolved}
+            continue
+        }
         // Indexed generic templates retain their definition's lexical file.
         // Resolve spreads from the bound type explicitly, then pass their
         // actual field types to callback specialization in the caller context.

@@ -75,7 +75,7 @@ single::fn(x:int)->int{return x*3}
 record::proc(x:int)->Item{return {x,"item"}}
 pair::proc(x:int)->(int,int){return x,x+1}
 main::proc(){
-    jobs:=[]Job{{1},{2},{3}}
+    jobs:=[]int{1,2,3}
     scalar:=basic.pmap(jobs,single,workers=2)
     defer delete(scalar)
     items:=basic.pmap(jobs,record,workers=2)
@@ -119,7 +119,7 @@ Job::struct{x:int}
 double::proc(x:int)->(answer:int,valid:bool){return x*2,true}
 main::proc(){
     callback:proc(int)->(number:int,ok:bool)=double
-    output:=MAP([]Job{{3}},callback)
+    output:=MAP([]int{3},callback)
     defer delete(output)
     if output[0].number!=6 || !output[0].ok {panic("procedure variable signature")}
 }
@@ -131,10 +131,10 @@ import "thor:basic"
 import "callbacks"
 import "core:math"
 main::proc(){
-    numbers:=basic.pmap([]struct{x:f64}{{4},{9}},math.sqrt)
+    numbers:=basic.pmap([]f64{4,9},math.sqrt)
     defer delete(numbers)
     if numbers[0]!=2 || numbers[1]!=3 {panic("standard library overload")}
-    rows:=basic.pmap([]struct{x:i32}{{7},{8}},callbacks.calculate)
+    rows:=basic.pmap([]i32{7,8},callbacks.calculate)
     defer delete(rows)
     if rows[0].number!=7 || !rows[1].valid {panic("imported generic callback")}
 }
@@ -146,7 +146,7 @@ main::proc(){
 import "thor:basic"
 read::proc(#any_int value:int)->int{return value+1}
 main::proc(){
-    rows:=basic.pmap([]struct{x:i8}{{3}},read)
+    rows:=basic.pmap([]i8{3},read)
     defer delete(rows)
     if rows[0]!=4 {panic("native parameter directive")}
 }
@@ -156,7 +156,7 @@ main::proc(){
         source='''package main
 import "thor:basic"
 main::proc(){
-    jobs:=[]struct{x:int}{{2},{3}}
+    jobs:=[]int{2,3}
     values:=basic.pmap(jobs,proc(x:int)->int{return x*2})
     defer delete(values)
     rows:=basic.pmap(jobs,proc(x:$T)->(value:T,ok:bool){return x*3,true})
@@ -277,14 +277,14 @@ import "core:sync"
 Job::struct{x:int}
 identify::proc(x:int)->(number,thread_id:int){return x*3,sync.current_thread_id()}
 nested::proc(x:int)->int{
-    output:=basic.pmap([]Job{{x},{x+1}},identify,workers=8)
+    output:=basic.pmap([]int{x,x+1},identify,workers=8)
     defer delete(output)
     if output[0].thread_id!=output[1].thread_id {panic("nested pmap created extra workers")}
     return output[0].number+output[1].number
 }
 main::proc(){
-    jobs:[128]Job
-    for &job,i in jobs {job={i}}
+    jobs:[128]int
+    for &job,i in jobs {job=i}
     frozen :> jobs[:]
     outputs:=basic.pmap(frozen,identify,workers=4)
     defer delete(outputs)
@@ -295,7 +295,7 @@ main::proc(){
     mapped:=basic.pmap(frozen,nested,workers=3)
     defer delete(mapped)
     for value,i in mapped {if value!=6*i+3 {panic("nested result")}}
-    nil_jobs:[]Job
+    nil_jobs:[]int
     empty:=basic.pmap(nil_jobs,identify)
     defer delete(empty)
     if len(empty)!=0 {panic("nil input")}
@@ -322,7 +322,7 @@ main::proc(){
     mem.tracking_allocator_init(&tracker,context.allocator)
     defer mem.tracking_allocator_destroy(&tracker)
     allocator:=mem.tracking_allocator(&tracker)
-    results:=basic.pmap([]Job{{1},{2},{3},{4}},allocate,workers=3,allocator=allocator)
+    results:=basic.pmap([]int{1,2,3,4},allocate,workers=3,allocator=allocator)
     for row,i in results {if row[0]!=i+1 || row[1]!=i+2 {panic("worker allocation lifetime")};delete(row,runtime.heap_allocator())}
     delete(results,allocator)
     if len(tracker.allocation_map)!=0 {panic("scheduling/output allocation leak")}
@@ -339,7 +339,7 @@ calculate::proc(x:int)->(whole:Integer,fraction:Rational){
     return Integer(x)*100000000000000000000000,Rational(x,3)
 }
 main::proc(){
-    rows:=basic.pmap([]Job{{1},{2},{3}},calculate,workers=2)
+    rows:=basic.pmap([]int{1,2,3},calculate,workers=2)
     defer delete(rows)
     for &row,i in rows {
         if row.whole!=Integer(i+1)*100000000000000000000000 || row.fraction!=Rational(i+1,3) {panic("big result shape")}
@@ -374,7 +374,7 @@ main::proc(){
     for limit in 1..=3 {
         state:=State{original,limit}
         allocator:=mem.Allocator{limited,&state}
-        values:=basic.pmap([]Job{{1},{2},{3},{4}},double,workers=4,allocator=allocator)
+        values:=basic.pmap([]int{1,2,3,4},double,workers=4,allocator=allocator)
         for value,i in values {if value!=(i+1)*2 {panic("allocation fallback")}}
         delete(values,allocator)
         if context.allocator.data!=original.data || context.allocator.procedure!=original.procedure {panic("allocator not restored")}
@@ -391,7 +391,7 @@ Job::struct{values:[]int}
 mutate::proc(values:[]int){values[0]=7}
 main::proc(){
     values:=[]int{1,2}
-    jobs :> []Job{{values}}
+    jobs :> [][]int{values}
     basic.pmap(jobs,mutate)
 }
 '''
@@ -410,7 +410,7 @@ import "thor:basic"
 Job::struct{x:int}
 double::proc(x:int)->int{return x*2}
 main::proc(){
-    rows:=basic.pmap([]Job{{1}},double,workers=-1)
+    rows:=basic.pmap([]int{1},double,workers=-1)
     delete(rows)
 }
 '''
@@ -431,7 +431,7 @@ main::proc(){
     constants:=basic.pmap([]Job{{},{},{}},constant,workers=2)
     defer delete(constants)
     if len(constants)!=3 || constants[2]!=42 {panic("empty struct job")}
-    numbers:=basic.pmap([]struct{x:int}{{1},{2}},overload)
+    numbers:=basic.pmap([]int{1,2},overload)
     defer delete(numbers)
     if numbers[1].number!=2 || !numbers[0].ok {panic("callback overload")}
     defaults:=basic.pmap([]struct{x:i16}{{4}},with_default)

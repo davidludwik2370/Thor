@@ -7,7 +7,7 @@ import "base:intrinsics"
 import pure "thor:pure"
 
 map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
-    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location,
+    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,
 )->[]R {
     workers:=worker_count(len(jobs),requested,loc)
     result,err:=make([]R,len(jobs),allocator)
@@ -22,7 +22,8 @@ map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
         context.allocator=pure.scratch_allocator(work.scratch)
         context.temp_allocator=context.allocator
         for i in work.start..<work.end {
-            when intrinsics.type_struct_field_count(J)==0 {work.result[i]=compress_values(work.calculate())}
+            when !spread {work.result[i]=compress_values(work.calculate(work.jobs[i]))}
+            else when intrinsics.type_struct_field_count(J)==0 {work.result[i]=compress_values(work.calculate())}
             else {work.result[i]=compress_values(work.calculate(**work.jobs[i]))}
         }
     }
@@ -53,7 +54,7 @@ map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
 }
 
 map_actions_checked :: proc(jobs:[]$J,calculate:$F,requested:int,
-    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location,
+    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,
 ) {
     workers:=worker_count(len(jobs),requested,loc)
     if workers==0 {return}
@@ -66,7 +67,8 @@ map_actions_checked :: proc(jobs:[]$J,calculate:$F,requested:int,
         context.allocator=pure.scratch_allocator(work.scratch)
         context.temp_allocator=context.allocator
         for i in work.start..<work.end {
-            when intrinsics.type_struct_field_count(J)==0 {work.calculate()}
+            when !spread {work.calculate(work.jobs[i])}
+            else when intrinsics.type_struct_field_count(J)==0 {work.calculate()}
             else {work.calculate(**work.jobs[i])}
         }
     }

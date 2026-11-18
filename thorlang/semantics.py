@@ -1139,7 +1139,7 @@ class Resolver:
                     for default in resulttypes.defaults(self,signature):
                         bound=resulttypes.default_bindings(self,signature,call,default)
                         if bound and bound[2].get(default.name) is default.query:
-                            result=resulttypes.resolve(self,default.call,bound[0],bound[1])
+                            result=resulttypes.resolve_default(self,call,default.call,bound[0],bound[1])[0]
                             if result:
                                 if not result[1]:valid=False;break
                                 substitutions[default.name]=resulttypes.packed(result)

@@ -302,10 +302,13 @@ class Borrowing:
             jobs=self.p.arguments(call,['jobs'])[0]
             if jobs is None:return []
             typ=self.r.type_of(jobs).elem
-            fields=list((typ.members or {}).items()) if typ else []
-            if typ and typ.node and not fields:fields=[(name,self.r.type_node(annotation)) for name,annotation in self.r.fields(typ.node.role('fields'))]
             job=self.p.flow(jobs,env).item()
-            values=iter(job.member(name).header_copy(typ,jobs) for name,typ in fields)
+            from . import resulttypes
+            if resulttypes.signature_spreads(self.r,callee.role('type')):
+                fields=list((typ.members or {}).items()) if typ else []
+                if typ and typ.node and not fields:fields=[(name,self.r.type_node(annotation)) for name,annotation in self.r.fields(typ.node.role('fields'))]
+                values=iter(job.member(name).header_copy(typ,jobs) for name,typ in fields)
+            else:values=iter([job.header_copy(typ,jobs)])
             bound=[]
             for _,field in params:
                 if field.data.get('variadic'):

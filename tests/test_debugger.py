@@ -1158,6 +1158,33 @@ main::proc(){
         self.assertEqual(value['result'],'5',value)
         client.request('continue',{'threadId':thread});client.event('terminated')
 
+    def test_parallel_map_whole_struct_argument_keeps_source_fields(self):
+        text='''package main
+import "thor:basic"
+Row::struct{x,y:int}
+calculate::proc(row:$T)->int{
+    total:=row.x+row.y
+    return total
+}
+main::proc(){
+    rows:=basic.pmap([]Row{{2,3}},calculate,workers=1)
+    defer delete(rows)
+    if rows[0]!=5{panic("whole argument")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,11])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'row.x','context':'watch'})
+        self.assertEqual(value['result'],'2',value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),11),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'rows.data[0]','context':'watch'})
+        self.assertEqual(value['result'],'5',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def build(self, text, files=None, *, vet=False):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
         self.addCleanup(temporary.cleanup)

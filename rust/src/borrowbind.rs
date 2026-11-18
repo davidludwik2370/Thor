@@ -36,11 +36,14 @@ impl Evaluator<'_, '_, '_> {
             let typ=self.resolver.type_of(jobs);
             let value=self.flow(jobs,env);
             let item=self.arena.item(value);
-            let fields=self.resolver.record_fields(typ.element().unwrap_or(&Type::Unknown));
-            let mut values=fields.into_iter().map(|(name,typ)| {
+            let signature=self.role(callee,"type").unwrap_or(callee);
+            let values=if !crate::resulttypes::signature_spreads(self.resolver,signature) {
+                vec![self.arena.header_copy(item,typ.element().cloned().unwrap_or(Type::Unknown),Some(jobs),None,self.resolver)]
+            }else{self.resolver.record_fields(typ.element().unwrap_or(&Type::Unknown)).into_iter().map(|(name,typ)| {
                 let value=self.arena.member(item,&name,self.resolver);
                 self.arena.header_copy(value,typ,Some(jobs),None,self.resolver)
-            }).collect::<Vec<_>>().into_iter();
+            }).collect::<Vec<_>>()};
+            let mut values=values.into_iter();
             let mut bound=vec![];
             for (_,field) in self.parameters(callee) {
                 let value=if self.resolver.sources[field.file].node(field.node).data["variadic"]==true {

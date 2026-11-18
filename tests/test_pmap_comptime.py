@@ -12,7 +12,7 @@ class CompileTimeParallelMapTests(unittest.TestCase):
         prefix='''import "thor:basic"
 square::proc(x:int)->int{return x*x}
 compute::fn(n:int)->int{
-    rows:=basic.pmap([]struct{x:int}{{n},{n+1}},square,workers=2)
+    rows:=basic.pmap([]int{n,n+1},square,workers=2)
     return rows[0]+rows[1]
 }
 '''
@@ -54,7 +54,7 @@ main::proc(){
 import "thor:basic"
 calls:int
 calculate::proc(x:int)->int{BODY}
-main::proc(){rows:=#run basic.pmap([]struct{x:int}{{2}},calculate);delete(rows)}
+main::proc(){rows:=#run basic.pmap([]int{2},calculate);delete(rows)}
 '''.replace('BODY',callback)
                 _,result=self.invoke(source,command='check',fail='Pure')
                 self.assertIn('main.thor(5:',result.stderr)
@@ -101,7 +101,7 @@ allocate::proc(x:int)->[]int{result:=make([]int,2);result[0],result[1]=x,x+1;ret
 Out::struct{destination:^[]int,value:int}
 store::proc(destination:^[]int,value:int){destination^=make([]int,1);destination^[0]=value}
 compute::fn(x:int)->[][]int{
-    rows:=basic.pmap([]Job{{x},{x+1}},allocate,workers=2)
+    rows:=basic.pmap([]int{x,x+1},allocate,workers=2)
     buffer:[]int
     basic.pmap([]Out{{&buffer,x+2}},store,workers=2)
     rows[0][1]+=buffer[0]
@@ -129,11 +129,11 @@ import "thor:basic"
 allocate::proc(x:int)->[]int{result:=make([]int,2);result[0]=x;return result}
 release::proc(values:[]int){delete(values)}
 compute::fn(x:int)->int{
-    rows:=basic.pmap([]struct{x:int}{{x},{x+1}},allocate,workers=2)
+    rows:=basic.pmap([]int{x,x+1},allocate,workers=2)
     result:=rows[0][0]+rows[1][0]
     for row in rows {delete(row)}
-    jobs:[16]struct{values:[]int}
-    for &job in jobs {job.values=make([]int,2)}
+    jobs:[16][]int
+    for &job in jobs {job=make([]int,2)}
     basic.pmap(jobs[:],release,workers=4)
     delete(rows)
     return result
@@ -160,9 +160,9 @@ calculate::proc{first,other}
 Result::struct{value:int,valid:bool}
 main::proc(){
     mapper::b.pmap
-    rows:=#run mapper([]Job{{3},{4}},calculate,result_type=Result,workers=2)
+    rows:=#run mapper([]int{3,4},calculate,result_type=Result,workers=2)
     defer delete(rows)
-    direct:=#run mapper([]Job{{5}},proc(x:$T)->T{return x*3})
+    direct:=#run mapper([]int{5},proc(x:$T)->T{return x*3})
     defer delete(direct)
     if rows[0].value!=6 || !rows[1].valid || direct[0]!=15 {panic("comptime callback inference")}
 }
@@ -199,11 +199,11 @@ import "thor:basic"
 Job::struct{x:int}
 twice::proc(x:$T)->T{return x*2}
 calculate::proc(x:int)->(whole:Integer,fraction:Rational,text:string,values:[]int){
-    nested:=basic.pmap([]Job{{x},{x+1}},twice,workers=4)
+    nested:=basic.pmap([]int{x,x+1},twice,workers=4)
     return Integer(x)*100000000000000000000000,Rational(x,3),f"value {x}",nested
 }
 main::proc(){
-    rows:=#run basic.pmap([]Job{{1},{2}},calculate,workers=2)
+    rows:=#run basic.pmap([]int{1,2},calculate,workers=2)
     for &row,i in rows {
         if row.whole!=Integer(i+1)*100000000000000000000000 || row.fraction!=Rational(i+1,3) || row.values[1]!=2*(i+2) {panic("owned materialization")}
         delete(row.whole);delete(row.fraction);delete(row.text);delete(row.values)
@@ -222,7 +222,7 @@ import "thor:basic"
 import "core:math"
 constant::proc()->int{return 7}
 main::proc(){
-    roots:=#run basic.pmap([]struct{x:f64}{{4},{9}},math.sqrt)
+    roots:=#run basic.pmap([]f64{4,9},math.sqrt)
     defer delete(roots)
     values:=#run basic.pmap([]struct{}{{},{}},constant)
     defer delete(values)
@@ -237,9 +237,9 @@ main::proc(){
 calculate::proc(x:int)->int{return x*2}
 '''
         for body,message in [
-            ('callback:=calculate;rows:=#run basic.pmap([]struct{x:int}{{1}},callback);delete(rows)','compile-time known'),
-            ('rows:=#run basic.pmap([]struct{x:int}{{1}},calculate,allocator=context.allocator);delete(rows)','allocator'),
-            ('rows:=#run basic.pmap([]struct{x:int}{{1}},calculate,worker_allocator=context.allocator);delete(rows)','allocator'),
+            ('callback:=calculate;rows:=#run basic.pmap([]int{1},callback);delete(rows)','compile-time known'),
+            ('rows:=#run basic.pmap([]int{1},calculate,allocator=context.allocator);delete(rows)','allocator'),
+            ('rows:=#run basic.pmap([]int{1},calculate,worker_allocator=context.allocator);delete(rows)','allocator'),
         ]:
             with self.subTest(body=body):self.invoke(self.program(body,prefix),command='check',fail=message)
 
@@ -247,10 +247,10 @@ calculate::proc(x:int)->int{return x*2}
         source='''package main
 import "thor:basic"
 calculate::proc(x:$T)->T{when T==int{return x*2}else{basic.print(x);return x}}
-main::proc(){rows:=#run basic.pmap([]struct{x:int}{{2}},calculate);defer delete(rows);if rows[0]!=4{panic("generic branch")}}
+main::proc(){rows:=#run basic.pmap([]int{2},calculate);defer delete(rows);if rows[0]!=4{panic("generic branch")}}
 '''
         self.invoke(source)
-        self.invoke(source.replace('x:int}{{2}}','x:f64}{{2}}'),command='check',fail='I/O')
+        self.invoke(source.replace('[]int{2}','[]f64{2}'),command='check',fail='I/O')
 
     def test_positional_options_and_unrelated_mapping_name(self):
         source='''package main
@@ -260,19 +260,19 @@ square::proc(x:int)->int{return x*x}
 pmap::proc(x:int)->int{return x+1}
 compute::fn()->int{
     value:int
-    basic.pmap([]struct{destination:^int}{{&value}},set,1)
-    rows:=basic.pmap([]struct{x:int}{{3}},square,int,2)
+    basic.pmap([]^int{&value},set,1)
+    rows:=basic.pmap([]int{3},square,int,2)
     return value+rows[0]+pmap(1)
 }
 main::proc(){value::#run compute();if value!=18{panic("positional options")}}
 '''
         self.invoke(source)
-        self.invoke(source.replace('}},set,1)','}},set,1,context.allocator)'),command='check',fail='allocator')
+        self.invoke(source.replace('},set,1)' ,'},set,1,context.allocator)'),command='check',fail='allocator')
 
     def test_negative_workers_and_timeout_report_the_original_request(self):
-        self.invoke(self.program('rows:=#run basic.pmap([]struct{x:int}{{2}},calculate,workers=-1);delete(rows)',
+        self.invoke(self.program('rows:=#run basic.pmap([]int{2},calculate,workers=-1);delete(rows)',
             'import "thor:basic"\ncalculate::proc(x:int)->int{return x}\n'),command='check',fail='workers must be nonnegative')
-        self.invoke(self.program('rows:=#run basic.pmap([]struct{x:int}{{2}},calculate);delete(rows)',
+        self.invoke(self.program('rows:=#run basic.pmap([]int{2},calculate);delete(rows)',
             'import "thor:basic"\ncalculate::proc(x:int)->int{for {};return x}\n'),command='check',flags=['--run-timeout','1'],fail='timeout')
 
     def test_cached_results_are_reused_and_callback_edits_invalidate_them(self):
@@ -281,7 +281,7 @@ main::proc(){value::#run compute();if value!=18{panic("positional options")}}
 import "thor:basic"
 calculate::proc(x:int)->int{return x*2}
 main::proc(){
-    rows:=#run basic.pmap([]struct{x:int}{{3}},calculate)
+    rows:=#run basic.pmap([]int{3},calculate)
     defer delete(rows)
     if rows[0]!=6 {panic("cached mapping")}
 }
@@ -301,7 +301,7 @@ calculate::proc(x:int)->(whole:Integer,text:string,values:[]int){
     return Integer(x),f"value {x}",make([]int,2)
 }
 main::proc(){
-    rows:=#run basic.pmap([]struct{x:int}{{1},{2}},calculate)
+    rows:=#run basic.pmap([]int{1,2},calculate)
     for row in rows {delete(row.text);delete(row.values)}
     for &row in rows {delete(row.whole)}
     delete(rows)

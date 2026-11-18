@@ -605,7 +605,7 @@ resolve_generic_function_symbol :: proc(
 	i = 0
 	count_required_params := 0
 	for param in params {
-		if param.default_value == nil {
+		if param.default_value == nil && !thor_pmap_mode_field(param) {
 			count_required_params += 1
 		}
 

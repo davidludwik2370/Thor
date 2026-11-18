@@ -252,6 +252,7 @@ add_signature_info :: proc(
 	signature_information: ^[dynamic]SignatureInformation,
 	allocator := context.temp_allocator,
 ) {
+	args:=thor_pmap_visible_params(args)
 	parameters := make([]ParameterInformation, len(args), allocator)
 	call := call
 
