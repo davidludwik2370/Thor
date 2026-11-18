@@ -13,7 +13,7 @@ def literal(source, callback):
     while node.kind=='Paren':node=node.role('expr')
     if node.kind!='Procedure':return None
     name=source.prefix+f'result_callback_{node.start}'
-    checked=bool(source.purity and node in source.purity.calls.callback_entries)
+    checked=bool(source.purity and node in source.purity.calls.callback_entries and not source.purity.pure(node))
     if checked:
         source.purity.calls.emitting.add(node)
         source.purity.calls.emitting_callbacks.add(node)
@@ -299,6 +299,9 @@ def render(source,node,constant=False):
                 'Cannot resolve the mapping callback from the job field types. Job fields must match callback parameters in order.')
         names=[name for name,_ in resolver.fields(signature.role('params'))]
         callback_literal=literal(source,callback)
+        callback_node=callback
+        while callback_node.kind=='Paren':callback_node=callback_node.role('expr')
+        checked_literal=bool(callback_literal and source.purity and callback_node in source.purity.calls.callback_entries and not source.purity.pure(callback_node))
         replacements={}
         for name,annotation in resolver.fields(signature.role('params')):
             actual=parameters.get(name)
@@ -330,6 +333,9 @@ def render(source,node,constant=False):
                 jobs_code=source.render(parameters['jobs'])
                 arguments=','.join(f'{source.prefix}meta.type_field_type(type_of(({jobs_code})[0]),{json.dumps(name)}){{}}' for name,_ in fields)
             else:arguments=job_type
+            if checked_literal:
+                owned='struct{'+','.join(access.key+':[0]u8' for access in sorted(source.purity.borrowing.requirements.get(callback_node,()),key=lambda a:a.key))+'}'
+                arguments=owned+(',' if arguments else '')+arguments
             witness=(callback_literal or source.render(callback))+'('+arguments+')'
         fields=result[1]
         from . import parallelcompile
@@ -376,8 +382,13 @@ def render(source,node,constant=False):
             if target and target in source.purity.calls.names and callback_literal is None:
                 value_code=source.purity.calls.access(source,target)+'_pmap'
             else:value_code=callback_literal if name==callback_name and callback_literal else source.render(value,constant=constant)
-            if static_callback and name==callback_name:known_value=value_code
+            if static_callback and name==callback_name:known_value=(value_code,bool(target and target in source.purity.calls.names) or checked_literal)
             else:args.append(value_code)
+        callback_ownership=None
+        if known_value and known_value[1]:
+            callback_ownership=source.prefix+f'CallbackOwnership_{node.start}'
+            params.append('$'+callback_ownership+':typeid')
+            args.append(source.purity.borrowing.argument(node,source.purity.targets(node),type_only=True))
         native=[]
         type_position=names.index(default.name)
         for index,name in enumerate(names):
@@ -421,15 +432,6 @@ def render(source,node,constant=False):
                 args.append(f'{source.prefix}meta.type_proc_return_type(type_of({source.prefix}meta.procedure_of({bound_call})),{i})')
         returns='->('+','.join(output_types)+')' if return_count else ''
         checks=[]
-        if checked_mapping:
-            purity=source.purity
-            for target in purity.targets(node):
-                bound=purity.borrowing.bindings(node,target,purity.borrowing.environment(purity.owner(node))) if purity.owner(node) else []
-                for access in purity.borrowing.requirements.get(target,()):
-                    condition=purity.borrowing.resolve(bound,access).render(purity,source)
-                    token=source.expressions.error(node,'Pure pmap cannot mutate or delete job storage borrowed from an input.')
-                    import json
-                    checks.append('when '+condition+' {#panic('+json.dumps(token)+')}')
         if known_value is not None:
             job_type=f'type_of(({arranged["jobs"]})[0])'
             if result.spread:
@@ -439,7 +441,8 @@ def render(source,node,constant=False):
                 if typ and typ.node and not job_fields:job_fields=resolver.fields(typ.node.role('fields'))
                 arguments=','.join(f'{source.prefix}meta.type_field_type({job_type},{json.dumps(name)}){{}}' for name,_ in job_fields)
             else:arguments=job_type+'{}'
-            checks.insert(0,arranged[callback_name]+'::'+source.prefix+'meta.procedure_of('+known_value+'('+arguments+'))')
+            if callback_ownership:arguments=callback_ownership+(',' if arguments else '')+arguments
+            checks.insert(0,arranged[callback_name]+'::'+source.prefix+'meta.procedure_of('+known_value[0]+'('+arguments+'))')
         body='\n'.join(checks)+('\n' if checks else '')+('return ' if return_count else '')+native_call
         declaration=f'\n{helper}::proc({",".join(params)}){returns}{{{body}}}\n'
         source.expressions.helpers[source.expressions.helper_scope(node),helper]=source.mapping.wrap(declaration,source.path,node.start,node.end,'result-default')

@@ -21,6 +21,7 @@ fn array(value: &Value) -> Result<&Vec<Value>, String> {
 fn aspect(value: &Value) -> Result<Aspect, String> {
     match string(value)? {
         "borrowed" => Ok(Aspect::Borrowed),
+        "numeric" => Ok(Aspect::NumericBorrowed),
         "location" => Ok(Aspect::Location),
         _ => Err("invalid aspect".into()),
     }
@@ -120,6 +121,7 @@ fn encode(permission: &Permission) -> Value {
                 .collect::<Vec<_>>(),
             match access.aspect {
                 Aspect::Borrowed => "borrowed",
+                Aspect::NumericBorrowed => "numeric",
                 Aspect::Location => "location",
             }
         ]),

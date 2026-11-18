@@ -158,6 +158,10 @@ with `append` and returning its slice is accepted. Callback specialization
 does not weaken that analysis; the accepted allocation case is covered with
 `#run` and debug leak tracking.
 
+That indexed-write rejection and related generic numeric/header-alias cases
+are now corrected by the [purity follow-up](pure-map-permissions-2026-11-18.md).
+The original indexed-assignment fixture has been restored and passes.
+
 The final production gate passed 75 tests: 68 mapping/result-query regressions
 and 7 assertion-hygiene checks. The Python reference exercised the same mapping
 coverage; its cache failure was corrected and the cache, runtime-storage, and

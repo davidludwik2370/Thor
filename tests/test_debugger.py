@@ -1185,6 +1185,27 @@ main::proc(){
         self.assertEqual(value['result'],'5',value)
         client.request('continue',{'threadId':thread});client.event('terminated')
 
+    def test_pure_parallel_map_permission_specialization_keeps_callback_locals(self):
+        text='''package main
+import "thor:basic"
+allocate::proc(x:$T)->[]T{
+    values:=make([]T,2)
+    values[0]=x
+    values[1]=x*2
+    return values
+}
+compute::fn(x:i16)->i16{rows:=basic.pmap([]i16{x},allocate,workers=1);return rows[0][1]}
+main::proc(){n:i16=3;if compute(n)!=6{panic("mapping")}}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[7])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        for expression,expected in [('x','3'),('values.data[0]','3')]:
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':expression,'context':'watch'})
+            self.assertEqual(value['result'],expected,value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_parallel_map_runtime_callback_keeps_source_breakpoint(self):
         text='''package main
 import "thor:basic"

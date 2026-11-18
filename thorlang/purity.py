@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 from .compiler import Hint
 from .semantics import descendants
-from .pureborrow import Borrowing, Permission, OWNED, READONLY, permission
+from .pureborrow import Access, Borrowing, Permission, OWNED, READONLY, permission
 
 
 @dataclass(eq=False)
@@ -17,7 +17,8 @@ class Flow:
     borrowed: object = OWNED
     fields: dict = field(default_factory=dict)
     element: object = None
-    numeric_copy: bool = False
+    # Logical-number assignments clone; reference/aggregate assignments do not.
+    numeric_borrowed: object = None
     target: object = None
     location: object = OWNED
     locations: set = field(default_factory=set)
@@ -35,15 +36,21 @@ class Flow:
         self.location=permission(self.location)
         if self.locations and not self.origins:self.origins=set(self.locations)
 
+    def numeric_permission(self):
+        if self.numeric_borrowed is not None:return self.numeric_borrowed
+        return self.borrowed.substitute(lambda access:Permission('access',(Access(access.proc,access.index,access.path,
+            'numeric' if access.aspect=='borrowed' else access.aspect),)))
+
     def merge(self, other, seen=None):
         if other is self: return False
         seen=set() if seen is None else seen
         if (id(self),id(other)) in seen: return False
         seen.add((id(self),id(other)))
-        numeric_copy=(self.numeric_copy and other.numeric_copy if self.borrowed else other.numeric_copy) if other.borrowed else self.numeric_copy
+        before_numeric=self.numeric_permission()
+        numeric=before_numeric|other.numeric_permission()
         borrowed=self.borrowed|other.borrowed
-        changed=borrowed!=self.borrowed or numeric_copy!=self.numeric_copy
-        self.numeric_copy=numeric_copy
+        changed=borrowed!=self.borrowed or numeric!=before_numeric
+        self.numeric_borrowed=numeric
         self.borrowed=borrowed
         if not other.origins.issubset(self.origins):self.origins.update(other.origins);changed=True
         if not other.stack.issubset(self.stack):self.stack.update(other.stack);changed=True
@@ -75,8 +82,9 @@ class Flow:
         elif self.typ and name in self.typ.members:value.typ=self.typ.members[name]
         value.origins.update(origin.step(('field',name)) for origin in self.origins if len(origin.path)<24)
         if self.borrowed:
+            numeric=value.numeric_permission()|self.borrowed.project(('field',name),'numeric')
             value.borrowed|=self.borrowed.project(('field',name))
-            value.numeric_copy=False
+            value.numeric_borrowed=numeric
         if self.locations:
             value.locations.update(location.step(('field',name)) for location in self.locations if len(location.path)<24)
             value.location=self.location_for(('field',name))
@@ -93,8 +101,9 @@ class Flow:
         if self.typ and self.typ.elem:self.element.typ=self.typ.elem
         self.element.origins.update(origin.step(('item',)) for origin in self.origins if len(origin.path)<24)
         if self.borrowed:
+            numeric=self.element.numeric_permission()|self.borrowed.project(('item',),'numeric')
             self.element.borrowed|=self.borrowed.project(('item',))
-            self.element.numeric_copy=False
+            self.element.numeric_borrowed=numeric
         if self.locations:
             self.element.locations.update(location.step(('item',)) for location in self.locations if len(location.path)<24)
             self.element.location=self.location_for(('item',))
@@ -133,7 +142,7 @@ class Flow:
     def header_copy(self,typ,node=None,seen=None,owner=None):
         seen={} if seen is None else seen
         if id(self) in seen:return seen[id(self)]
-        result=Flow(self.borrowed,numeric_copy=self.numeric_copy,target=self.target,copied_from=node,owner=owner,stack=set(self.stack),kind=typ.kind,typ=typ)
+        result=Flow(self.borrowed,numeric_borrowed=self.numeric_permission(),target=self.target,copied_from=node,owner=owner,stack=set(self.stack),kind=typ.kind,typ=typ)
         if typ.kind in {'pointer','generic','unknown'}:result.copied_base=self
         result.origins=set(self.origins)
         seen[id(self)]=result
@@ -148,7 +157,9 @@ class Flow:
             result.borrowed=OWNED
             result.element=self.item().header_copy(typ.elem,node,seen,owner)
         else:
-            result.fields=dict(self.fields);result.element=self.element
+            result.fields=dict(self.fields)
+            # A header alias must share an as-yet-uninspected backing element.
+            result.element=self.item() if typ.kind in {'slice','dynamic','map','string','generic','unknown'} else self.element
         return result
 
     @staticmethod
@@ -160,6 +171,7 @@ class Flow:
         if key in seen:return seen[key]
         result=Flow(aliases=values);seen[key]=result
         for value in values:
+            result.numeric_borrowed=result.numeric_permission()|value.numeric_permission()
             result.borrowed|=value.borrowed;result.location|=value.location
             result.locations.update(value.locations);result.origins.update(value.origins)
             result.stack.update(value.stack)
@@ -720,17 +732,17 @@ class Purity:
                 if annotation:return self.r.type_node(annotation,plan.substitutions)
         return typ
 
-    def copied(self,value,n):
+    def copied(self,value,n,expected=None):
         typ=self.r.type_of(n)
         # Thor clones direct logical-number assignments. Aggregate copies keep
         # shallow member headers, so their borrowed fields must stay tainted.
-        if n.source.big.enabled and typ.kind in {'big_integer','big_rational'}:return Flow()
-        if n.source.big.enabled and typ.kind in {'generic','unknown'} and (n.source.big.fresh(n) or n.source.big.generic_reference(n)):
+        if n.source.big.enabled and (typ.kind in {'big_integer','big_rational'} or expected and expected.kind in {'big_integer','big_rational'}):return Flow()
+        if n.source.big.enabled and typ.kind in {'generic','unknown'} and (n.source.big.fresh(n) or n.source.big.generic_reference(n) or expected and expected.kind=='generic'):
             # Direct generic numeric copies are independent. Ordinary user
             # fields can still contain borrowed reference storage; retain its
             # provenance and let native type checking distinguish the cases.
             result=value.header_copy(typ,n)
-            result.numeric_copy=True
+            result.numeric_borrowed=OWNED
             return result
         if typ.kind=='array':return Flow(element=value.item())
         if typ.kind=='struct':
@@ -765,12 +777,21 @@ class Purity:
         conditions=[]
         storage=self.storage(lhs,env)
         if storage:conditions.append(storage)
-        if lhs.source.big.enabled and lhs.kind in {'Selector','Index','Deref'} and self.flow(lhs,env).borrowed:
+        value=self.flow(lhs,env) if lhs.source.big.enabled and lhs.kind in {'Selector','Index','Deref'} else None
+        if value and value.numeric_permission():
             kind=self.r.type_of(lhs).kind
-            borrowed=self.flow(lhs,env).borrowed
+            borrowed=value.numeric_permission()
             if kind in {'big_integer','big_rational'}:conditions.append(borrowed)
             elif kind in {'unknown','generic'}:conditions.append(borrowed&Permission('type',('big',lhs)))
         return conditions
+
+    def borrowed_consumption(self,node,env):
+        value=self.flow(node,env);borrowed=value.borrowed;numeric=value.numeric_permission()
+        typ=self.r.type_of(node)
+        if typ.kind in {'big_integer','big_rational'}:return numeric
+        if typ.kind in {'generic','unknown'} and numeric!=borrowed:
+            return (borrowed&Permission('type',('not-big',node)))|(numeric&Permission('type',('big',node)))
+        return borrowed
 
     def storage(self,node,env):
         if node.kind=='Paren':return self.storage(node.role('expr'),env)
@@ -1021,9 +1042,8 @@ class Purity:
                         target=self.arguments(n,['dst'])[0] if builtin=='copy' else next(
                             (a.role('value') for a in n.group('args') if a.kind=='FieldValue' and a.role('field').text in {'array','str','m'}),n.group('args')[0])
                         provenance=self.flow(target,env)
-                        if provenance.borrowed:
-                            condition=provenance.borrowed
-                            if provenance.numeric_copy:condition&=Permission('type',('not-big',target))
+                        condition=self.borrowed_consumption(target,env)
+                        if condition:
                             self.problem(n,'Pure code cannot mutate or delete storage borrowed from an input.',
                                          [condition])
                         if builtin=='delete':
@@ -1492,9 +1512,6 @@ class Purity:
         self.analyze(proc)
         s=block.source;module=self.module(s);prefix=s.prefix+'scratch_'+str(proc.start)
         code=[]
-        if proc in self.calls.emitting_callbacks:
-            fields=','.join(access.key+':[0]u8' for access in sorted(self.borrowing.requirements.get(proc,()),key=lambda a:a.key))
-            code.append(self.calls.ownership_type+'::struct{'+fields+'}')
         declaration=proc.parent
         while declaration and declaration.kind=='Paren':declaration=declaration.parent
         names=declaration.group('names') if declaration and declaration.kind=='Declaration' else []

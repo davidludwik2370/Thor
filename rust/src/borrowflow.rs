@@ -32,7 +32,10 @@ pub struct Flow {
     pub borrowed: Permission,
     pub fields: BTreeMap<String, Id>,
     pub element: Option<Id>,
-    pub numeric_copy: bool,
+    // Permission for Integer/Rational allocation storage. A generic value
+    // assignment clones those values but leaves pointer/aggregate copies
+    // shallow; retain both provenance domains rather than one copy flag.
+    pub numeric_borrowed: Option<Permission>,
     pub target: Option<Id>,
     pub location: Permission,
     pub locations: BTreeSet<Access>,
@@ -51,7 +54,7 @@ impl Default for Flow {
             borrowed: OWNED,
             fields: BTreeMap::new(),
             element: None,
-            numeric_copy: false,
+            numeric_borrowed: None,
             target: None,
             location: OWNED,
             locations: BTreeSet::new(),
@@ -76,7 +79,17 @@ fn base(mut typ: &Type) -> &Type {
     }
     typ
 }
+fn numeric_permission(flow:&Flow)->Permission {
+    flow.numeric_borrowed.clone().unwrap_or_else(||flow.borrowed.substitute(&mut |access| {
+        let mut numeric=access.clone();
+        if numeric.aspect==Aspect::Borrowed {numeric.aspect=Aspect::NumericBorrowed;}
+        Permission::Access(numeric)
+    }))
+}
 impl Arena {
+    pub fn numeric_borrowed(&self,id:Id)->Permission {
+        numeric_permission(&self.values[id])
+    }
     pub fn add(&mut self, mut flow: Flow) -> Id {
         if flow.origins.is_empty() && !flow.locations.is_empty() {
             flow.origins = flow.locations.clone();
@@ -93,19 +106,12 @@ impl Arena {
             return false;
         }
         let incoming = self.values[other].clone();
+        let old_numeric=self.numeric_borrowed(into);
+        let numeric=old_numeric.join(&numeric_permission(&incoming));
         let value = &mut self.values[into];
-        let numeric = if !incoming.borrowed.is_owned() {
-            if !value.borrowed.is_owned() {
-                value.numeric_copy && incoming.numeric_copy
-            } else {
-                incoming.numeric_copy
-            }
-        } else {
-            value.numeric_copy
-        };
         let borrowed = value.borrowed.join(&incoming.borrowed);
-        let mut changed = numeric != value.numeric_copy || borrowed != value.borrowed;
-        value.numeric_copy = numeric;
+        let mut changed = numeric != old_numeric || borrowed != value.borrowed;
+        value.numeric_borrowed = Some(numeric);
         value.borrowed = borrowed;
         for access in incoming.origins {
             changed |= value.origins.insert(access);
@@ -234,8 +240,9 @@ impl Arena {
         self.values[child].origins.extend(origins);
         if !value.borrowed.is_owned() {
             let permission = value.borrowed.project(step.clone(), None);
+            let numeric=self.numeric_borrowed(child).join(&value.borrowed.project(step.clone(),Some(Aspect::NumericBorrowed)));
             self.values[child].borrowed = self.values[child].borrowed.join(&permission);
-            self.values[child].numeric_copy = false;
+            self.values[child].numeric_borrowed = Some(numeric);
         }
         let location = if !value.locations.is_empty() {
             let paths = value
@@ -284,10 +291,11 @@ impl Arena {
                 .map(|access| access.step(Step::Item, None)),
         );
         if !value.borrowed.is_owned() {
+            let numeric=self.numeric_borrowed(child).join(&value.borrowed.project(Step::Item,Some(Aspect::NumericBorrowed)));
             self.values[child].borrowed = self.values[child]
                 .borrowed
                 .join(&value.borrowed.project(Step::Item, None));
-            self.values[child].numeric_copy = false;
+            self.values[child].numeric_borrowed = Some(numeric);
         }
         self.values[child].location = if !value.locations.is_empty() {
             self.values[child].locations.extend(
@@ -367,9 +375,10 @@ impl Arena {
             return *copy;
         }
         let value = self.values[id].clone();
+        let numeric=numeric_permission(&value);
         let copy = self.add(Flow {
             borrowed: value.borrowed,
-            numeric_copy: value.numeric_copy,
+            numeric_borrowed: Some(numeric),
             target: value.target,
             copied_from: node,
             owner,
@@ -399,7 +408,13 @@ impl Arena {
             }
             _ => {
                 self.values[copy].fields = value.fields;
-                self.values[copy].element = value.element;
+                // Header copies share backing storage even when no element
+                // has been inspected yet. Otherwise a helper argument creates
+                // a fresh element node on every fixed-point pass and loses
+                // writes made through that alias.
+                self.values[copy].element = if matches!(base(&typ),Type::Slice(_)|Type::Dynamic(_)|Type::Map{..}|Type::String{..}|Type::Generic|Type::Unknown) {
+                    Some(self.item(id))
+                } else {value.element};
             }
         }
         copy
@@ -435,7 +450,9 @@ impl Arena {
         let mut targets = vec![];
         for id in &distinct {
             let value = self.values[*id].clone();
+            let numeric=self.numeric_borrowed(join).join(&numeric_permission(&value));
             let result = &mut self.values[join];
+            result.numeric_borrowed=Some(numeric);
             result.borrowed = result.borrowed.join(&value.borrowed);
             result.location = result.location.join(&value.location);
             result.locations.extend(value.locations);

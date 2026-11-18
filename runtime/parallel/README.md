@@ -177,6 +177,28 @@ As with other pure calls, a callback may modify referenced storage owned by the
 surrounding computation; it may not modify that computation's borrowed inputs.
 Callers remain responsible for avoiding races between jobs.
 
+Generic callbacks can initialize fresh buffers by indexing, just like ordinary
+checked helpers. For example:
+
+```odin
+make_pair :: proc(value: $T) -> []T {
+    result := make([]T, 2)
+    result[0], result[1] = value, value*2
+    return result
+}
+sum_pair :: fn(value: i16) -> i16 {
+    rows := basic.pmap([]i16{value}, make_pair)
+    return rows[0][0] + rows[0][1]
+}
+answer := #run sum_pair(i16(3)) // 9; worker buffers use the pure caller's scratch lifetime.
+```
+
+Permissions are bound when the callback is specialized, so inactive generic
+branches do not create unconditional mutation requirements. Direct assignments
+of `Integer`/`Rational` values retain their existing clone semantics. Shallow
+aggregate copies and `copy` still preserve borrowed references: owning the outer
+buffer does not grant write access to shared allocations inside its elements.
+
 An explicit `#run` also requires compile-time-known jobs and options. It uses
 the same bounded parallel scheduler inside the compile-time helper. Results
 are materialized and cached through the ordinary `#run` mechanism; the returned

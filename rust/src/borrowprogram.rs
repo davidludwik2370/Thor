@@ -421,7 +421,8 @@ impl Model {
                 } else {
                     eval.flow(rhs, &mut env)
                 };
-                let value = eval.copied(value, rhs);
+                let expected=eval.resolver.type_of(lhs);
+                let value = eval.copied_as(value, rhs,Some(expected));
                 if node_kind == "Declaration" {
                     if let Some(symbol) = eval.resolver.symbol(lhs) {
                         if let Some(existing) = env.symbols.get(&symbol).copied() {

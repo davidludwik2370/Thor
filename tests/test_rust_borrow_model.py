@@ -153,9 +153,9 @@ class RustBorrowModelTests(unittest.TestCase):
         self.compare_model('set::proc(value:^int)->int{value^=9;return value^}',
                            'x:=n;_=type_of(set(&x));return x')
 
-    def test_variadic_alias_graph_retains_reference_nonconvergence_rejection(self):
+    def test_variadic_alias_graph_converges_and_preserves_borrowed_writes(self):
         self.compare_model('write::proc(values:[]int,n:int){values[0]=n}\nforward::proc(n:int,values:..[]int){write(n=n,values=values[0])}',
-                           'forward(2,input);return input[0]','input:[]int',converged=False)
+                           'forward(2,input);return input[0]','input:[]int')
 
     def test_direct_variadic_reference_elements_preserve_permissions(self):
         self.compare_model('change::proc(rows:..[]int){rows[0][0]=9}',

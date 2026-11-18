@@ -201,6 +201,17 @@ impl Lower<'_, '_> {
             let jobs_code = self.render(jobs.node, None, false);
             self.querying -= 1;
             let mut code = vec![callback_code?, self.g("(", site)];
+            let literal_proc=Ref{node:if callback.file==self.file{self.unparen(callback.node)}else{callback.node},..callback};
+            if literal.is_some() && self.borrowing.callbacks.contains(&literal_proc)
+                && self.resolver.sources[literal_proc.file].node(literal_proc.node).data["pure"]!=true {
+                // This witness inspects a signature only. The actual callback
+                // below binds the caller's permissions, not this owned schema.
+                let keys=self.borrowing.profiles.values().flatten()
+                    .filter(|(access,_)|access.procedure==literal_proc)
+                    .map(|(access,_)|format!("{}:[0]u8",access.key(self.resolver)))
+                    .collect::<std::collections::BTreeSet<_>>();
+                code.push(self.g(format!("struct{{{}}}{}",keys.into_iter().collect::<Vec<_>>().join(","),if !spread||arguments>0{","}else{""}),site));
+            }
             if !spread || arguments > 0 {
                 let type_of = self.native("type_of");
                 let jobs_code = jobs_code?;
@@ -368,6 +379,9 @@ impl Lower<'_, '_> {
                 return Err(self.result_error(id, message));
             };
             let literal = self.result_literal(callback)?;
+            let checked_literal=literal.is_some()
+                && self.borrowing.callbacks.contains(&Ref{node:self.unparen(callback.node),..callback})
+                && self.source.node(self.unparen(callback.node)).data["pure"]!=true;
             let witness = self.query_witness(
                 id,
                 signature,
@@ -562,11 +576,19 @@ impl Lower<'_, '_> {
                     self.render(value, None, constant)?
                 };
                 if static_callback && name == *callback_name {
-                    known_value = Some(value_code);
+                    known_value = Some((value_code,checked_callback.is_some() || checked_literal));
                 } else {
                     call_args.push(value_code);
                 }
             }
+            let callback_ownership=if known_value.as_ref().is_some_and(|(_,checked)|*checked) {
+                let name=format!("{}CallbackOwnership_{}",self.prefix,id.0);
+                helper_params.push(format!("${name}:typeid"));
+                let fields=self.borrowing.profiles.get(&self.reference(id)).cloned().unwrap_or_default();
+                let profile=self.ownership_profile_type(id,fields)?;
+                call_args.push(profile);
+                Some(name)
+            }else{None};
             let mut native_args = vec![];
             let type_position = names
                 .iter()
@@ -642,7 +664,7 @@ impl Lower<'_, '_> {
             native.push(self.g(")", id));
             let native_call = Code::concat(native);
             let mut checks = vec![];
-            if let Some(value) = known_value {
+            if let Some((value,_)) = known_value {
                 // Materialize the selected PROCEDURE, not merely a cast to its
                 // type: Odin's typed constants can retain a partial generic
                 // procedure when its result contains a dependent type.
@@ -666,6 +688,9 @@ impl Lower<'_, '_> {
                         .collect::<Vec<_>>()
                         .join(",")
                 };
+                let args=if let Some(profile)=callback_ownership {
+                    format!("{profile}{}{args}",if args.is_empty(){""}else{","})
+                }else{args};
                 checks.push(Code::concat([
                     self.g(
                         format!(
@@ -677,30 +702,6 @@ impl Lower<'_, '_> {
                     value,
                     self.g(format!("({args}))\n"), id),
                 ]));
-            }
-            if self.checked_targets.contains_key(&id)
-                && crate::parallelcompile::is_call(self.resolver, self.reference(id))
-            {
-                for (_, permission) in self
-                    .borrowing
-                    .profiles
-                    .get(&self.reference(id))
-                    .cloned()
-                    .unwrap_or_default()
-                {
-                    let query = self.permission_query(&permission, id)?;
-                    let error = self
-                        .error_token(
-                            id,
-                            "Pure pmap cannot mutate or delete job storage borrowed from an input.",
-                        )
-                        .finish()
-                        .text;
-                    checks.push(self.g(
-                        format!("when {query} {{#panic({})}}\n", serde_json::json!(error)),
-                        id,
-                    ));
-                }
             }
             let return_count = if results.fields.is_empty() {
                 0

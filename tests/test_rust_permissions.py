@@ -75,10 +75,10 @@ class RustPermissionTests(unittest.TestCase):
                 if rng.randrange(3)==0:return {'type':[rng.choice(['pointer','sequence','big','not-big']),rng.randrange(3),rng.randrange(5)]}
                 return {'access':[rng.randrange(3),rng.randrange(5),rng.randrange(4),
                     rng.choice([[],[['item']],[['field','data']],[['deref'],['field','value']]]),
-                    rng.choice(['borrowed','location'])]}
+                    rng.choice(['borrowed','location','numeric'])]}
             operation=rng.choice(['join','meet','project','substitute'])
             if operation in ('join','meet'):return {operation:[tree(depth-1),tree(depth-1)]}
-            if operation=='project':return {operation:[tree(depth-1),rng.choice([['item'],['field','data'],['deref']]),rng.choice([None,'location','borrowed'])]}
+            if operation=='project':return {operation:[tree(depth-1),rng.choice([['item'],['field','data'],['deref']]),rng.choice([None,'location','borrowed','numeric'])]}
             return {operation:[tree(depth-1),[bool(rng.randrange(2)) for _ in range(rng.randrange(5))]]}
         requests=[tree(rng.randrange(5)) for _ in range(750)]
         for length in (23,24,25):

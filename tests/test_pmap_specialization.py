@@ -125,7 +125,7 @@ VALUE::#run compute(i16(3))
 runtime_value:i16=4
 if VALUE!=11||compute(runtime_value)!=14{panic("checked specialization")}
 ''','''import "thor:basic"
-allocate::proc(x:$T)->[]T{values:[dynamic]T;append(&values,x,x*2);return values[:]}
+allocate::proc(x:$T)->[]T{values:=make([]T,2);values[0],values[1]=x,x*2;return values}
 compute::fn(x:i16)->i16{
     rows:=basic.pmap([]i16{x,x+1},allocate,workers=2)
     local:i16

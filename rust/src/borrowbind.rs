@@ -200,6 +200,7 @@ impl Evaluator<'_, '_, '_> {
         match access.aspect {
             Aspect::Location => self.arena.values[value].location.clone(),
             Aspect::Borrowed => self.arena.values[value].borrowed.clone(),
+            Aspect::NumericBorrowed => self.arena.numeric_borrowed(value),
         }
     }
     pub fn instantiate(
@@ -237,9 +238,10 @@ impl Evaluator<'_, '_, '_> {
         let borrowed = flow
             .borrowed
             .substitute(&mut |access| self.resolve_access(bindings, access));
+        let numeric=self.arena.numeric_borrowed(value).substitute(&mut |access| self.resolve_access(bindings,access));
         let incoming = self.arena.add(Flow {
             borrowed,
-            numeric_copy: flow.numeric_copy,
+            numeric_borrowed: Some(numeric),
             stack: flow.stack,
             ..Flow::default()
         });

@@ -236,7 +236,15 @@ class PureCalls:
     def parameters(self,node):
         if node in self.original_types:return None
         proc=self.purity.owner(node)
-        if proc in self.emitting_callbacks or proc in self.callback_entries and proc not in self.emitting:return None
+        if proc is None or node is not proc.role('type'):return None
+        if proc in self.emitting_callbacks:
+            params=node.role('params');source=node.source
+            extra='$'+self.ownership_type+':typeid'+(',' if params.children else '')
+            code=source.splice(params,[(child.start,child.end,source.render(child)) for child in params.children],[(params.start,extra)])
+            replacements=[(child.start,child.end,source.render(child)) for child in node.children if child is not params]
+            replacements.append((params.start,params.end,code))
+            return source.splice(node,replacements,[(params.start,code)] if params.start==params.end else [])
+        if proc in self.callback_entries and proc not in self.emitting:return None
         evaluated=self.purity.eval_mode and proc in self.purity.active and proc not in self.emitting and self.purity.borrowing.internal(proc)
         if not evaluated and proc not in self.emitting or node is not proc.role('type'):return None
         params=node.role('params')

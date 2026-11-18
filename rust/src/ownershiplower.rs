@@ -3,19 +3,23 @@
 use super::*;
 impl Lower<'_, '_> {
     pub(super) fn ownership_signature(&mut self, id: NodeId) -> Result<Option<Code>> {
+        // Bind callback permissions while selecting its native specialization.
+        // Type parameters disappear from the resulting procedure value, so the
+        // worker still calls exactly the user's runtime signature.
         let Some(proc) = self.source.node(id).parent.filter(|proc| {
             self.source.node(*proc).kind == "Procedure"
-                && self.emitting_variants.contains(proc)
+                && (self.emitting_callbacks.contains(proc) || self.emitting_variants.contains(proc)
                 && self.borrowing.procedures.contains(&self.reference(*proc))
-                && !self.borrowing.entries.contains(&self.reference(*proc))
+                && !self.borrowing.entries.contains(&self.reference(*proc)))
         }) else {
             return Ok(None);
         };
-        if self.emitting_callbacks.contains(&proc) {return Ok(None);}
         let params = self.role(id, "params")?;
         let marker = &self.borrow_marker;
         let comma=if self.source.node(params).children.is_empty(){""}else{","};
-        let extra = format!("{comma}{marker}:${marker}_Type=true,{marker}_ownership:${marker}_ownership_Type=struct{{}}{{}}");
+        let callback=self.emitting_callbacks.contains(&proc);
+        let extra = if callback {format!("${marker}_ownership_Type:typeid{comma}")}
+            else {format!("{comma}{marker}:${marker}_Type=true,{marker}_ownership:${marker}_ownership_Type=struct{{}}{{}}")};
         let mut fields = vec![];
         for field in self.source.node(params).children.clone() {
             fields.push((
@@ -26,7 +30,7 @@ impl Lower<'_, '_> {
         let code = self.splice(
             params,
             fields,
-            vec![(self.source.node(params).span.end, self.g(extra, proc))],
+            vec![(if callback {self.source.node(params).span.start}else{self.source.node(params).span.end}, self.g(extra, proc))],
         )?;
         let span = self.source.node(params).span;
         let mut replacements = vec![];
@@ -78,20 +82,21 @@ impl Lower<'_, '_> {
         let Some(fields) = self.borrowing.profiles.get(&self.reference(call)).cloned() else {
             return Ok(None);
         };
+        let profile = self.ownership_profile_type(call, fields)?;
+        Ok(Some(Code::concat([
+            self.g(format!("{}=true,{}_ownership=",self.borrow_marker,self.borrow_marker),call),
+            profile,self.g("{}",call),
+        ])))
+    }
+    pub(super) fn ownership_profile_type(&mut self, call: NodeId,
+        fields: Vec<(crate::permissions::Access, crate::permissions::Permission)>,
+    ) -> Result<Code> {
         let mut profile = vec![];
         for (access, permission) in fields {
             let key = access.key(self.resolver);
             let query = self.permission_query(&permission, call)?;
             profile.push(format!("{key}:([0]bool when {query} else [0]u8)"));
         }
-        Ok(Some(self.g(
-            format!(
-                "{}=true,{}_ownership=struct{{{}}}{{}}",
-                self.borrow_marker,
-                self.borrow_marker,
-                profile.join(",")
-            ),
-            call,
-        )))
+        Ok(self.g(format!("struct{{{}}}",profile.join(",")),call))
     }
 }

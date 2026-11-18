@@ -32,6 +32,7 @@ fn access(value: &Access, resolver: &Resolver<'_>) -> Value {
         value.path.iter().map(step).collect::<Vec<_>>(),
         match value.aspect {
             Aspect::Borrowed => "borrowed",
+            Aspect::NumericBorrowed => "numeric",
             Aspect::Location => "location",
         }
     ])

@@ -521,13 +521,17 @@ impl Evaluator<'_, '_, '_> {
         typ
     }
     pub fn copied(&mut self, value: Id, node: Ref) -> Id {
+        self.copied_as(value,node,None)
+    }
+    pub fn copied_as(&mut self, value:Id,node:Ref,expected:Option<Type>)->Id {
         let typ = self.resolver.type_of(node);
         if self.resolver.logical_enabled(node.file) {
-            if typ.big_name().is_some() {
+            if typ.big_name().is_some() || expected.as_ref().is_some_and(|typ|typ.big_name().is_some()) {
                 return self.empty();
             }
             if typ.is_unknown()
                 && (self.resolver.logical_fresh(node)
+                    || expected.as_ref().is_some_and(|typ|matches!(typ,Type::Generic))
                     || self
                         .resolver
                         .logical_generic_reference(node, &mut HashSet::new()))
@@ -535,7 +539,7 @@ impl Evaluator<'_, '_, '_> {
                 let copy = self
                     .arena
                     .header_copy(value, typ, Some(node), None, self.resolver);
-                self.arena.values[copy].numeric_copy = true;
+                self.arena.values[copy].numeric_borrowed = Some(OWNED);
                 return copy;
             }
         }
@@ -564,7 +568,7 @@ impl Evaluator<'_, '_, '_> {
             && matches!(self.kind(node), "Selector" | "Index" | "Deref")
         {
             let value = self.flow(node, env);
-            let borrowed = self.arena.values[value].borrowed.clone();
+            let borrowed = self.arena.numeric_borrowed(value);
             if !borrowed.is_owned() {
                 let typ = self.resolver.type_of(node);
                 if typ.big_name().is_some() {
@@ -578,14 +582,15 @@ impl Evaluator<'_, '_, '_> {
     }
     pub fn borrowed_consumption(&mut self, node: Ref, env: &mut Environment) -> Permission {
         let value = self.flow(node, env);
-        let provenance = &self.arena.values[value];
-        if provenance.numeric_copy {
-            provenance
-                .borrowed
-                .meet(&Permission::Type(Trait::NotBig, node))
-        } else {
-            provenance.borrowed.clone()
+        let borrowed=self.arena.values[value].borrowed.clone();
+        let numeric=self.arena.numeric_borrowed(value);
+        let typ=self.resolver.type_of(node);
+        if typ.big_name().is_some() {return numeric;}
+        if typ.is_unknown() && numeric!=borrowed {
+            return borrowed.meet(&Permission::Type(Trait::NotBig,node))
+                .join(&numeric.meet(&Permission::Type(Trait::Big,node)));
         }
+        borrowed
     }
     pub fn storage(&mut self, node: Ref, env: &mut Environment) -> Permission {
         if self.kind(node) == "Paren" {

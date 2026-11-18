@@ -103,10 +103,11 @@ demo runs cleanly in normal, debug tracking and unchecked builds. The Python
 reference's unordered collection flags could cause cache misses across process
 hash seeds; that ordering is now stable and callback-edit invalidation is tested.
 
-An existing conservative purity rejection for a generic callback returning a
-fresh slice initialized by indexed assignments was reproduced on the parent
-implementation; see [the implementation notes](../parallel-mapping-2026-11.md#callback-specialization-follow-up).
-The equivalent dynamic-array construction using `append` is tested and accepted.
+The generic indexed-slice purity rejection recorded during this benchmark has
+since been fixed, including related logical-number and helper-alias cases.
+See the [purity follow-up](../pure-map-permissions-2026-11-18.md); indexed writes
+no longer need the earlier `append` workaround. These fixes change compile-time
+permission analysis, not the benchmark's scheduling or runtime ownership rules.
 
 ## Reproduction and raw data
 

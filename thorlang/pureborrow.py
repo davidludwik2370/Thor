@@ -197,7 +197,7 @@ class Borrowing:
             if len(values)==1 and unwrap(values[0]).kind in {'SwitchExpr','CompileSwitchExpr'}:pairs=[(lhs,values[0]) for lhs in names]
             for index,(lhs,rhs) in enumerate(pairs):
                 if lhs.text=='_':continue
-                value=self.p.copied(self.p.result_flow(rhs,index,env) if len(values)==1 else self.p.flow(rhs,env),rhs)
+                value=self.p.copied(self.p.result_flow(rhs,index,env) if len(values)==1 else self.p.flow(rhs,env),rhs,self.r.type_of(lhs))
                 if node.kind=='Declaration':
                     key=node,lhs.data.get('name') or lhs.text
                     if key not in env:
@@ -365,7 +365,7 @@ class Borrowing:
 
     def resolve(self,bindings,access):
         value=self.project(bindings,access)
-        return value.location if access.aspect=='location' else value.borrowed
+        return value.location if access.aspect=='location' else value.numeric_permission() if access.aspect=='numeric' else value.borrowed
 
     def instantiate(self,value,bindings,seen=None,cache=None):
         from .purity import Flow
@@ -376,7 +376,7 @@ class Borrowing:
         if id(value) not in cache:cache[id(value)]=Flow();self.instance_changed=True
         result=cache[id(value)]
         seen[id(value)]=result
-        self.instance_changed|=result.merge(Flow(value.borrowed.substitute(resolve),numeric_copy=value.numeric_copy,stack=set(value.stack)))
+        self.instance_changed|=result.merge(Flow(value.borrowed.substitute(resolve),numeric_borrowed=value.numeric_permission().substitute(resolve),stack=set(value.stack)))
         location=result.location|value.location.substitute(resolve)
         self.instance_changed|=location!=result.location;result.location=location
         result.owner=value.owner;result.kind=value.kind
@@ -418,13 +418,13 @@ class Borrowing:
                                     self.requirements[proc].add(needed);changed=True
             if not changed:return
 
-    def argument(self,call,callees):
+    def argument(self,call,callees,*,type_only=False):
         proc=self.p.owner(call)
-        if proc is None:return 'struct{}{}'
+        if proc is None:return 'struct{}' if type_only else 'struct{}{}'
         fields=[]
         for callee in callees:
             bindings=self.bindings(call,callee,self.environment(proc))
             for access in sorted(self.requirements.get(callee,()),key=lambda a:a.key):
                 condition=self.resolve(bindings,access).render(self.p,call.source)
                 fields.append(access.key+':([0]bool when '+condition+' else [0]u8)')
-        return 'struct{'+','.join(fields)+'}{}'
+        return 'struct{'+','.join(fields)+'}'+('' if type_only else '{}')
