@@ -44,6 +44,22 @@ impl Lower<'_, '_> {
         Error::at(self.source, self.source.node(id).span, message)
     }
     fn result_type_code(&mut self, id: NodeId, call: Code, results: &Results) -> Result<Code> {
+        self.meta = true;
+        let type_of = self.native("type_of");
+        let signature = Code::concat([
+            self.g(format!("{type_of}({}meta.procedure_of(", self.prefix), id),
+            call,
+            self.g("))", id),
+        ]);
+        self.result_signature_code(id, signature, results)
+    }
+
+    fn result_signature_code(
+        &mut self,
+        id: NodeId,
+        signature: Code,
+        results: &Results,
+    ) -> Result<Code> {
         if results.fields.is_empty() {
             return Err(self.result_error(
                 id,
@@ -54,12 +70,6 @@ impl Lower<'_, '_> {
             return Err(self.result_error(id,"result_type_of: result field names collide. Name the results explicitly or supply an explicit result_type."));
         }
         self.meta = true;
-        let type_of = self.native("type_of");
-        let signature = Code::concat([
-            self.g(format!("{type_of}({}meta.procedure_of(", self.prefix), id),
-            call,
-            self.g("))", id),
-        ]);
         let mut fields = vec![];
         for (index, (name, _)) in results.fields.iter().enumerate() {
             let typ = Code::concat([
@@ -424,8 +434,11 @@ impl Lower<'_, '_> {
             }
             let callback_name = &names[query.callback].0;
             let callback_candidates = self.resolver.candidates(callback);
-            let specialize = self.checked_targets.contains_key(&id)
-                && crate::parallelcompile::is_call(self.resolver, self.reference(id))
+            let static_callback = results.spread.is_some()
+                && crate::parallelcompile::known_callback(self.resolver, callback);
+            let specialize = static_callback
+                || self.checked_targets.contains_key(&id)
+                    && crate::parallelcompile::is_call(self.resolver, self.reference(id))
                 || callback_candidates.len() > 1
                 || self.resolver.sources[results.signature.file]
                     .descendants(results.signature.node)
@@ -451,6 +464,7 @@ impl Lower<'_, '_> {
             let mut arranged = HashMap::new();
             let mut bound_values = HashMap::new();
             let mut explicit_type = None;
+            let mut known_value = None;
             let owner = &self.resolver.sources[signature.file];
             let constant_parameters = owner
                 .role(signature.node, "params")
@@ -488,7 +502,11 @@ impl Lower<'_, '_> {
                     explicit_type = Some(self.render(value, None, true)?);
                     continue;
                 }
-                let argument = format!("{}arg_{}", self.prefix, helper_params.len());
+                let argument = if static_callback && name == *callback_name {
+                    format!("{}known_callback_{}", self.prefix, id.0)
+                } else {
+                    format!("{}arg_{}", self.prefix, helper_params.len())
+                };
                 if name == *callback_name && specialize {
                     self.meta = true;
                     let callback_type = format!("{}Callback_{}", self.prefix, helper_params.len());
@@ -497,9 +515,11 @@ impl Lower<'_, '_> {
                         witness.clone(),
                         self.g("))", id),
                     ]);
-                    helper_params.push(format!("${callback_type}: typeid"));
-                    call_args.push(signature.clone());
-                    helper_params.push(format!("{argument}: {callback_type}"));
+                    if !static_callback {
+                        helper_params.push(format!("${callback_type}: typeid"));
+                        call_args.push(signature.clone());
+                        helper_params.push(format!("{argument}: {callback_type}"));
+                    }
                     bound_values.insert(
                         name.clone(),
                         Code::concat([self.g("cast(", id), signature, self.g(")nil", id)]),
@@ -518,7 +538,7 @@ impl Lower<'_, '_> {
                         helper_params.len()
                     ));
                 }
-                arranged.insert(name.clone(), argument);
+                arranged.insert(name.clone(), argument.clone());
                 let checked_callback = if literal.is_none()
                     && name == *callback_name
                     && crate::parallelcompile::is_call(self.resolver, self.reference(id))
@@ -534,13 +554,18 @@ impl Lower<'_, '_> {
                 } else {
                     None
                 };
-                call_args.push(if let Some(target) = checked_callback {
+                let value_code = if let Some(target) = checked_callback {
                     self.checked_callback_access(target, value)?
                 } else if name == *callback_name && literal.is_some() {
                     literal.clone().unwrap()
                 } else {
                     self.render(value, None, constant)?
-                });
+                };
+                if static_callback && name == *callback_name {
+                    known_value = Some(value_code);
+                } else {
+                    call_args.push(value_code);
+                }
             }
             let mut native_args = vec![];
             let type_position = names
@@ -572,18 +597,35 @@ impl Lower<'_, '_> {
             if !results.fields.is_empty() {
                 let typ = if let Some(explicit) = explicit_type {
                     explicit
+                } else if results.spread.is_some() && !static_callback {
+                    // A runtime factory is not a direct procedure for
+                    // procedure_of(factory()(job)). Its procedure TYPE already
+                    // contains all return types; querying it never runs it.
+                    let callback_code = self.render(callback.node, None, false)?;
+                    let type_of = self.native("type_of");
+                    let signature = Code::concat([
+                        self.g(format!("{type_of}("), id),
+                        callback_code,
+                        self.g(")", id),
+                    ]);
+                    self.result_signature_code(id, signature, &results)?
                 } else {
                     self.result_type_code(id, witness, &results)?
                 };
                 helper_params.insert(0, format!("${result_name}: typeid"));
                 call_args.insert(0, typ);
             }
-            let target = if self.checked_targets.contains_key(&id)
+            let target = if (static_callback || self.checked_targets.contains_key(&id))
                 && crate::parallelcompile::is_call(self.resolver, self.reference(id))
             {
                 let module = format!("{}checked_parallel", self.prefix);
                 self.modules.insert(module.clone(), "thor:parallel".into());
-                self.g(format!("{module}.pmap_checked"), id)
+                let entry = match (static_callback, self.checked_targets.contains_key(&id)) {
+                    (true, true) => "_pmap_static_checked",
+                    (true, false) => "_pmap_static",
+                    (false, _) => "pmap_checked",
+                };
+                self.g(format!("{module}.{entry}"), id)
             } else {
                 self.render(callee, None, constant)?
             };
@@ -600,6 +642,42 @@ impl Lower<'_, '_> {
             native.push(self.g(")", id));
             let native_call = Code::concat(native);
             let mut checks = vec![];
+            if let Some(value) = known_value {
+                // Materialize the selected PROCEDURE, not merely a cast to its
+                // type: Odin's typed constants can retain a partial generic
+                // procedure when its result contains a dependent type.
+                let jobs = &arranged["jobs"];
+                let type_of = self.native("type_of");
+                let job_type = format!("{type_of}(({jobs})[0])");
+                let args = if results.spread == Some(false) {
+                    format!("{job_type}{{}}")
+                } else {
+                    let typ = self.resolver.type_of(parameters["jobs"]);
+                    self.resolver
+                        .record_fields(typ.element().unwrap_or(&Type::Unknown))
+                        .iter()
+                        .map(|(name, _)| {
+                            format!(
+                                "{}meta.type_field_type({job_type},{}){{}}",
+                                self.prefix,
+                                json!(name)
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",")
+                };
+                checks.push(Code::concat([
+                    self.g(
+                        format!(
+                            "{} :: {}meta.procedure_of(",
+                            arranged[callback_name], self.prefix
+                        ),
+                        id,
+                    ),
+                    value,
+                    self.g(format!("({args}))\n"), id),
+                ]));
+            }
             if self.checked_targets.contains_key(&id)
                 && crate::parallelcompile::is_call(self.resolver, self.reference(id))
             {

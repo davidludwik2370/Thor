@@ -12,6 +12,21 @@ from thorlang.cache import EvaluationCache
 
 
 class CacheStorageTests(unittest.TestCase):
+    def test_python_default_collection_flags_have_stable_order(self):
+        from thorlang.driver import Project
+        project=Project.__new__(Project)
+        project.entry=Path('/source')
+        project.file_entry=False
+        project.flags=['-o:speed','-collection:user=/original']
+        project.collections={'user':Path('/original'),'thor':Path('/runtime')}
+        project.default_collections={'thor','__thor_runtime'}
+        project.support_collection='__thor_runtime'
+        project.backend_collections={'user':Path('/mapped'),'thor':Path('/runtime'),'__thor_runtime':Path('/runtime')}
+        project.sources={}
+        flags=project.odin_flags()
+        self.assertEqual(flags,['-o:speed','-collection:user=/mapped',
+            '-collection:__thor_runtime=/runtime','-collection:thor=/runtime'])
+
     def setUp(self):
         temporary=tempfile.TemporaryDirectory(prefix='thor-cache-test-')
         self.addCleanup(temporary.cleanup)

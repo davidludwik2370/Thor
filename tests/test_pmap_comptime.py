@@ -276,6 +276,8 @@ main::proc(){value::#run compute();if value!=18{panic("positional options")}}
             'import "thor:basic"\ncalculate::proc(x:int)->int{for {};return x}\n'),command='check',flags=['--run-timeout','1'],fail='timeout')
 
     def test_cached_results_are_reused_and_callback_edits_invalidate_them(self):
+        import os
+        from unittest.mock import patch
         from tests.test_t21_t22 import CacheTests
         source='''package main
 import "thor:basic"
@@ -288,8 +290,10 @@ main::proc(){
 '''
         root,first=self.invoke(source,flags=['--cache-report'],directory=True)
         self.assertGreaterEqual(CacheTests.report(self,first)['writes'],1)
-        warm=CacheTests.again(self,root)
-        self.assertGreaterEqual(CacheTests.report(self,warm)['hits'],1)
+        for seed in ('0','1'):
+            with self.subTest(hash_seed=seed),patch.dict(os.environ,PYTHONHASHSEED=seed):
+                warm=CacheTests.again(self,root)
+                self.assertGreaterEqual(CacheTests.report(self,warm)['hits'],1)
         (root/'input/main.thor').write_text(source.replace('return x*2','return x*3').replace('rows[0]!=6','rows[0]!=9'))
         changed=CacheTests.again(self,root)
         self.assertGreaterEqual(CacheTests.report(self,changed)['writes'],1)

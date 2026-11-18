@@ -2,6 +2,49 @@
 //! this contract; the selected user callback is still checked transitively.
 use crate::semantics::{Ref, Resolver, Substitutions};
 
+/// Type information alone never proves a procedure value's identity. Follow
+/// only compile-time procedure declarations/aliases, stopping at runtime storage.
+pub(crate) fn known_callback(r: &Resolver<'_>, argument: Ref) -> bool {
+    fn visit(r: &Resolver<'_>, node: Ref, seen: &mut std::collections::HashSet<Ref>) -> bool {
+        if !seen.insert(node) {
+            return false;
+        }
+        let source = &r.sources[node.file];
+        match source.node(node.node).kind.as_str() {
+            "Procedure" => true,
+            "Paren" => source
+                .role(node.node, "expr")
+                .is_some_and(|id| visit(r, Ref { node: id, ..node }, seen)),
+            "ProcedureGroup" => {
+                let members = source.group(node.node, "args");
+                !members.is_empty()
+                    && members
+                        .iter()
+                        .all(|id| visit(r, Ref { node: *id, ..node }, &mut seen.clone()))
+            }
+            "Ident" | "Selector" => r.symbol(node).is_some_and(|index| {
+                let symbol = &r.symbols[index];
+                symbol.constant
+                    && !symbol.immutable
+                    && !symbol.parameter
+                    && !symbol.result
+                    && symbol.value.is_some_and(|id| {
+                        visit(
+                            r,
+                            Ref {
+                                file: symbol.reference.file,
+                                node: id,
+                            },
+                            seen,
+                        )
+                    })
+            }),
+            _ => false,
+        }
+    }
+    visit(r, argument, &mut std::collections::HashSet::new())
+}
+
 /// Remove only the compiler-owned argument from native pmap diagnostics. The
 /// SDK location scopes this cleanup so an ordinary user parameter keeps its name.
 pub(crate) fn visible_diagnostics(messages: &mut Vec<serde_json::Value>) {

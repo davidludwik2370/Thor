@@ -30,6 +30,7 @@ import "core:time"
 @IMPORTS@
 Job :: struct { count: int, seed: u64 }
 calculate :: proc(job: Job) -> u64 { @CALCULATE@ }
+runtime_callback: proc(Job)->u64 = calculate
 Work :: struct { jobs: []Job, results: []u64, start, end: int }
 run_work :: proc(work: ^Work) {
     for i in work.start..<work.end { work.results[i] = calculate(work.jobs[i]) }
@@ -188,9 +189,11 @@ def build(folder, kernel, thor, odin, game, flags, native_pmap=False):
         if engine == 'thor': imports += '\nimport "thor:parallel"'
         if native_pmap: imports += '\nimport engine "thor:parallel/native"\nimport "base:runtime"'
         source = HARNESS.replace('@IMPORTS@', imports).replace('@CALCULATE@', CALCULATIONS[kernel])
-        mapping = 'case "pmap": result = parallel.pmap(jobs, calculate, workers=workers)' if engine == 'thor' else ''
+        mapping = ('case "pmap": result = parallel.pmap(jobs, calculate, workers=workers)\n'
+                   'case "runtime": result = parallel.pmap(jobs, runtime_callback, workers=workers)') if engine == 'thor' else ''
         if native_pmap:
             mapping += '\ncase "generic": result = engine.map_values(jobs, calculate, u64, workers, context.allocator, runtime.heap_allocator(), #location(), false)'
+            mapping += '\ncase "specialized": result = engine.map_values_static(jobs, calculate, u64, workers, context.allocator, runtime.heap_allocator(), #location(), false)'
         source = source.replace('@PMAP@', mapping)
         entry = directory/('main.thor' if engine == 'thor' else 'main.odin')
         entry.write_text(source)
@@ -214,13 +217,19 @@ def snapshots(options, folder, flags):
     """Whole-process confirmation against normalized copies of the actual projects."""
     programs = {}
     for name, path, native in [('hilo-odin',options.hilo,True), ('hilo-thor',options.hilo,False),
-                               ('pmap-thor',options.pmap_project,False)]:
+                               ('pmap-thor',options.pmap_project,False),
+                               ('pmap-runtime-thor',options.pmap_project,False)]:
         directory=folder/name
         directory.mkdir(exist_ok=True)
         source=re.sub(r'NUM_TRIALS\s*::\s*[\d_]+', 'NUM_TRIALS :: 1_000_000', path.read_text())
         if native:
             source=re.sub(r'\bfn\(', 'proc(', source).replace(':>', ':=')
             source=re.sub(r'\n[ \t]+(?=: drawn_card)', ' ', source)
+        if name=='pmap-runtime-thor':
+            call='pmap(trial_counts, simulate_batch)'
+            if source.count(call)!=1:raise ValueError('Review pmap snapshot callback control')
+            source=source.replace(call,'pmap(trial_counts, benchmark_runtime_callback)')
+            source+='\nbenchmark_runtime_callback:proc(int)->int=simulate_batch\n'
         entry=directory/('main.odin' if native else 'main.thor')
         entry.write_text(source)
         executable=directory/('benchmark.exe' if os.name=='nt' else 'benchmark')
@@ -290,12 +299,12 @@ def main():
         results = []
         rng = random.Random(7919)
         for name,k,j,w,n,r,s in cases:
-            modes = [('thor','pmap'), ('odin','threads'), ('odin','pool'), ('odin','reuse')]
+            modes = [('thor','pmap'), ('thor','runtime'), ('odin','threads'), ('odin','pool'), ('odin','reuse')]
             if k == 'hilo' and j > 10: modes.append(('odin','dynamic'))
             # Same manual scheduler through Thor proves a language/codegen
             # control, distinct from differences between scheduling APIs.
             modes.append(('thor','threads'))
-            if options.native_pmap:modes.extend([('odin','generic'),('thor','generic')])
+            if options.native_pmap:modes.extend([('odin','generic'),('thor','generic'),('odin','specialized')])
             cells = {(e,m):[] for e,m in modes}
             # Warm every binary/mode before interleaving measured samples.
             for e,m in modes: sample(programs[k,e], m,j,w,n,1,s)

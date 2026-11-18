@@ -3,11 +3,23 @@
 package parallel_native
 
 import "base:runtime"
-import "base:intrinsics"
 import pure "thor:pure"
 
 map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
     allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,
+)->[]R {
+    return _map_values_checked(jobs,calculate,R,requested,allocator,worker_allocator,loc,spread,false,dynamic_callback)
+}
+
+map_values_checked_static :: proc(jobs:[]$J,$calculate:$F,$R:typeid,requested:int,
+    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,
+)->[]R {
+    return _map_values_checked(jobs,calculate,R,requested,allocator,worker_allocator,loc,spread,true,calculate)
+}
+
+@(private)
+_map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
+    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,$is_static:bool,$known:$C,
 )->[]R {
     workers:=worker_count(len(jobs),requested,loc)
     result,err:=make([]R,len(jobs),allocator)
@@ -22,9 +34,7 @@ map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
         context.allocator=pure.scratch_allocator(work.scratch)
         context.temp_allocator=context.allocator
         for i in work.start..<work.end {
-            when !spread {work.result[i]=compress_values(work.calculate(work.jobs[i]))}
-            else when intrinsics.type_struct_field_count(J)==0 {work.result[i]=compress_values(work.calculate())}
-            else {work.result[i]=compress_values(work.calculate(**work.jobs[i]))}
+            work.result[i]=call_value(work.calculate,work.jobs[i],R,spread,is_static,known)
         }
     }
     work,work_error:=make([]Work,workers,allocator)
@@ -56,6 +66,19 @@ map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
 map_actions_checked :: proc(jobs:[]$J,calculate:$F,requested:int,
     allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,
 ) {
+    _map_actions_checked(jobs,calculate,requested,allocator,worker_allocator,loc,spread,false,dynamic_callback)
+}
+
+map_actions_checked_static :: proc(jobs:[]$J,$calculate:$F,requested:int,
+    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,
+) {
+    _map_actions_checked(jobs,calculate,requested,allocator,worker_allocator,loc,spread,true,calculate)
+}
+
+@(private)
+_map_actions_checked :: proc(jobs:[]$J,calculate:$F,requested:int,
+    allocator,worker_allocator:runtime.Allocator,loc:runtime.Source_Code_Location, $spread:bool,$is_static:bool,$known:$C,
+) {
     workers:=worker_count(len(jobs),requested,loc)
     if workers==0 {return}
     local:pure.Scratch
@@ -67,9 +90,7 @@ map_actions_checked :: proc(jobs:[]$J,calculate:$F,requested:int,
         context.allocator=pure.scratch_allocator(work.scratch)
         context.temp_allocator=context.allocator
         for i in work.start..<work.end {
-            when !spread {work.calculate(work.jobs[i])}
-            else when intrinsics.type_struct_field_count(J)==0 {work.calculate()}
-            else {work.calculate(**work.jobs[i])}
+            call_action(work.calculate,work.jobs[i],spread,is_static,known)
         }
     }
     work,err:=make([]Work,workers,allocator)

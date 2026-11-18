@@ -1,0 +1,2356 @@
+{
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "machine": "arm64",
+  "odin": "odin version dev-2026-10:8169255b9",
+  "thor": "Thor 0.41.6",
+  "flags": [
+    "-o:speed",
+    "-disable-assert",
+    "-no-bounds-check",
+    "-no-type-assert"
+  ],
+  "samples": 7,
+  "source_sha256": {
+    "/Users/davidludwik/Code/Thor/hilo/hilo.thor": "eab70c077b373ebf856b35fdc72b35bcab2a699e1516bfa127049865405f8504",
+    "/Users/davidludwik/Code/Thor/hilo_test/hilo_test.thor": "530a33ea5670c631a2f5b782b498d5d437e2228afe1f1c2cfc01a069b919f211"
+  },
+  "kernel_sha256": "8a9f8ecb6e471f9deec5feeb3c733e501f4b5c8ffa09a09237f9203b18c1cd88",
+  "results": [
+    {
+      "case": "hilo-balanced",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 10,
+      "work_per_job": 100000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 127784833.0,
+      "min_ns": 123237291.0,
+      "max_ns": 135109917.0,
+      "samples": [
+        {
+          "ns_per_call": 135109917.0,
+          "checksum": 69346,
+          "process_seconds": 1.1444906249816995
+        },
+        {
+          "ns_per_call": 123237291.0,
+          "checksum": 69346,
+          "process_seconds": 1.135579374997178
+        },
+        {
+          "ns_per_call": 128823833.0,
+          "checksum": 69346,
+          "process_seconds": 1.1413340840081219
+        },
+        {
+          "ns_per_call": 127784833.0,
+          "checksum": 69346,
+          "process_seconds": 1.138260875013657
+        },
+        {
+          "ns_per_call": 127660625.0,
+          "checksum": 69346,
+          "process_seconds": 1.1392484169919044
+        },
+        {
+          "ns_per_call": 128445834.0,
+          "checksum": 69346,
+          "process_seconds": 1.13975054200273
+        },
+        {
+          "ns_per_call": 126236750.0,
+          "checksum": 69346,
+          "process_seconds": 1.1336896250140853
+        }
+      ]
+    },
+    {
+      "case": "hilo-balanced",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 10,
+      "work_per_job": 100000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 130077750.0,
+      "min_ns": 125596417.0,
+      "max_ns": 132577166.0,
+      "samples": [
+        {
+          "ns_per_call": 132577166.0,
+          "checksum": 69346,
+          "process_seconds": 1.1425272499909624
+        },
+        {
+          "ns_per_call": 125596417.0,
+          "checksum": 69346,
+          "process_seconds": 1.1355344999756198
+        },
+        {
+          "ns_per_call": 131103666.0,
+          "checksum": 69346,
+          "process_seconds": 1.1476678749895655
+        },
+        {
+          "ns_per_call": 127562000.0,
+          "checksum": 69346,
+          "process_seconds": 1.1430810829915572
+        },
+        {
+          "ns_per_call": 130077750.0,
+          "checksum": 69346,
+          "process_seconds": 1.1393853749905247
+        },
+        {
+          "ns_per_call": 128879583.0,
+          "checksum": 69346,
+          "process_seconds": 1.1385362499859184
+        },
+        {
+          "ns_per_call": 130497708.0,
+          "checksum": 69346,
+          "process_seconds": 1.140089207998244
+        }
+      ]
+    },
+    {
+      "case": "hilo-balanced",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 10,
+      "work_per_job": 100000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 125382000.0,
+      "min_ns": 124100500.0,
+      "max_ns": 136848000.0,
+      "samples": [
+        {
+          "ns_per_call": 134163667.0,
+          "checksum": 69346,
+          "process_seconds": 1.1322117499948945
+        },
+        {
+          "ns_per_call": 125382000.0,
+          "checksum": 69346,
+          "process_seconds": 1.1256461669981945
+        },
+        {
+          "ns_per_call": 124890500.0,
+          "checksum": 69346,
+          "process_seconds": 1.1251806250074878
+        },
+        {
+          "ns_per_call": 127979917.0,
+          "checksum": 69346,
+          "process_seconds": 1.1266656249936204
+        },
+        {
+          "ns_per_call": 124983958.0,
+          "checksum": 69346,
+          "process_seconds": 1.1272265000152402
+        },
+        {
+          "ns_per_call": 136848000.0,
+          "checksum": 69346,
+          "process_seconds": 1.1380565829749685
+        },
+        {
+          "ns_per_call": 124100500.0,
+          "checksum": 69346,
+          "process_seconds": 1.126497624994954
+        }
+      ]
+    },
+    {
+      "case": "hilo-balanced",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 10,
+      "work_per_job": 100000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 129623458.0,
+      "min_ns": 125066292.0,
+      "max_ns": 159442792.0,
+      "samples": [
+        {
+          "ns_per_call": 159442792.0,
+          "checksum": 69346,
+          "process_seconds": 1.161534999992
+        },
+        {
+          "ns_per_call": 129623458.0,
+          "checksum": 69346,
+          "process_seconds": 1.130360166018363
+        },
+        {
+          "ns_per_call": 125738333.0,
+          "checksum": 69346,
+          "process_seconds": 1.124711666983785
+        },
+        {
+          "ns_per_call": 146855750.0,
+          "checksum": 69346,
+          "process_seconds": 1.14754449998145
+        },
+        {
+          "ns_per_call": 131671834.0,
+          "checksum": 69346,
+          "process_seconds": 1.1314510839874856
+        },
+        {
+          "ns_per_call": 125066292.0,
+          "checksum": 69346,
+          "process_seconds": 1.1278034160204697
+        },
+        {
+          "ns_per_call": 127679875.0,
+          "checksum": 69346,
+          "process_seconds": 1.1311820410192013
+        }
+      ]
+    },
+    {
+      "case": "hilo-balanced",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 10,
+      "work_per_job": 100000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 126120583.0,
+      "min_ns": 122852958.0,
+      "max_ns": 138952542.0,
+      "samples": [
+        {
+          "ns_per_call": 126482917.0,
+          "checksum": 69346,
+          "process_seconds": 1.1278450000099838
+        },
+        {
+          "ns_per_call": 124878416.0,
+          "checksum": 69346,
+          "process_seconds": 1.1239292090176605
+        },
+        {
+          "ns_per_call": 126120583.0,
+          "checksum": 69346,
+          "process_seconds": 1.1273313340207096
+        },
+        {
+          "ns_per_call": 132344834.0,
+          "checksum": 69346,
+          "process_seconds": 1.1356597080011852
+        },
+        {
+          "ns_per_call": 122852958.0,
+          "checksum": 69346,
+          "process_seconds": 1.123424374993192
+        },
+        {
+          "ns_per_call": 125318708.0,
+          "checksum": 69346,
+          "process_seconds": 1.127856040984625
+        },
+        {
+          "ns_per_call": 138952542.0,
+          "checksum": 69346,
+          "process_seconds": 1.1427259999909438
+        }
+      ]
+    },
+    {
+      "case": "hilo-balanced",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 10,
+      "work_per_job": 100000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 125541875.0,
+      "min_ns": 124310708.0,
+      "max_ns": 133304375.0,
+      "samples": [
+        {
+          "ns_per_call": 124310708.0,
+          "checksum": 69346,
+          "process_seconds": 1.1344194170087576
+        },
+        {
+          "ns_per_call": 126104667.0,
+          "checksum": 69346,
+          "process_seconds": 1.1368578340043314
+        },
+        {
+          "ns_per_call": 125541875.0,
+          "checksum": 69346,
+          "process_seconds": 1.1368696249846835
+        },
+        {
+          "ns_per_call": 133304375.0,
+          "checksum": 69346,
+          "process_seconds": 1.1460260830062907
+        },
+        {
+          "ns_per_call": 124838375.0,
+          "checksum": 69346,
+          "process_seconds": 1.1336997499747667
+        },
+        {
+          "ns_per_call": 126313333.0,
+          "checksum": 69346,
+          "process_seconds": 1.1380614579829853
+        },
+        {
+          "ns_per_call": 125416750.0,
+          "checksum": 69346,
+          "process_seconds": 1.1516867080063093
+        }
+      ]
+    },
+    {
+      "case": "hilo-one-worker",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 1,
+      "work_per_job": 100000,
+      "workers": 1,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 100308667.0,
+      "min_ns": 100192083.0,
+      "max_ns": 100475541.0,
+      "samples": [
+        {
+          "ns_per_call": 100308667.0,
+          "checksum": 6935,
+          "process_seconds": 0.20417745801387355
+        },
+        {
+          "ns_per_call": 100298209.0,
+          "checksum": 6935,
+          "process_seconds": 0.2034187910030596
+        },
+        {
+          "ns_per_call": 100414583.0,
+          "checksum": 6935,
+          "process_seconds": 0.20376308300183155
+        },
+        {
+          "ns_per_call": 100192083.0,
+          "checksum": 6935,
+          "process_seconds": 0.2033931250043679
+        },
+        {
+          "ns_per_call": 100475541.0,
+          "checksum": 6935,
+          "process_seconds": 0.20417741598794237
+        },
+        {
+          "ns_per_call": 100463208.0,
+          "checksum": 6935,
+          "process_seconds": 0.20397245898493566
+        },
+        {
+          "ns_per_call": 100287541.0,
+          "checksum": 6935,
+          "process_seconds": 0.20372641700669192
+        }
+      ]
+    },
+    {
+      "case": "hilo-one-worker",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 1,
+      "work_per_job": 100000,
+      "workers": 1,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 100363292.0,
+      "min_ns": 100259500.0,
+      "max_ns": 100730042.0,
+      "samples": [
+        {
+          "ns_per_call": 100500459.0,
+          "checksum": 6935,
+          "process_seconds": 0.20557270798599347
+        },
+        {
+          "ns_per_call": 100301250.0,
+          "checksum": 6935,
+          "process_seconds": 0.2038322089938447
+        },
+        {
+          "ns_per_call": 100727833.0,
+          "checksum": 6935,
+          "process_seconds": 0.20437354099703953
+        },
+        {
+          "ns_per_call": 100259500.0,
+          "checksum": 6935,
+          "process_seconds": 0.20397633401444182
+        },
+        {
+          "ns_per_call": 100730042.0,
+          "checksum": 6935,
+          "process_seconds": 0.20506479099276476
+        },
+        {
+          "ns_per_call": 100363292.0,
+          "checksum": 6935,
+          "process_seconds": 0.204882166988682
+        },
+        {
+          "ns_per_call": 100263375.0,
+          "checksum": 6935,
+          "process_seconds": 0.20382137500564568
+        }
+      ]
+    },
+    {
+      "case": "hilo-one-worker",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 1,
+      "work_per_job": 100000,
+      "workers": 1,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 99350000.0,
+      "min_ns": 99238125.0,
+      "max_ns": 100017500.0,
+      "samples": [
+        {
+          "ns_per_call": 99273459.0,
+          "checksum": 6935,
+          "process_seconds": 0.20228695901460014
+        },
+        {
+          "ns_per_call": 99238125.0,
+          "checksum": 6935,
+          "process_seconds": 0.202093583997339
+        },
+        {
+          "ns_per_call": 99353459.0,
+          "checksum": 6935,
+          "process_seconds": 0.20239237500936724
+        },
+        {
+          "ns_per_call": 99350000.0,
+          "checksum": 6935,
+          "process_seconds": 0.20285479200538248
+        },
+        {
+          "ns_per_call": 99497334.0,
+          "checksum": 6935,
+          "process_seconds": 0.20302112502395175
+        },
+        {
+          "ns_per_call": 100017500.0,
+          "checksum": 6935,
+          "process_seconds": 0.20452395800384693
+        },
+        {
+          "ns_per_call": 99279959.0,
+          "checksum": 6935,
+          "process_seconds": 0.20228424997185357
+        }
+      ]
+    },
+    {
+      "case": "hilo-one-worker",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 1,
+      "work_per_job": 100000,
+      "workers": 1,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 99379458.0,
+      "min_ns": 99256083.0,
+      "max_ns": 101013708.0,
+      "samples": [
+        {
+          "ns_per_call": 99622333.0,
+          "checksum": 6935,
+          "process_seconds": 0.20569350000005215
+        },
+        {
+          "ns_per_call": 99378458.0,
+          "checksum": 6935,
+          "process_seconds": 0.20191387500381097
+        },
+        {
+          "ns_per_call": 99379458.0,
+          "checksum": 6935,
+          "process_seconds": 0.20359620798262767
+        },
+        {
+          "ns_per_call": 101013708.0,
+          "checksum": 6935,
+          "process_seconds": 0.20473766699433327
+        },
+        {
+          "ns_per_call": 99295125.0,
+          "checksum": 6935,
+          "process_seconds": 0.20239370802300982
+        },
+        {
+          "ns_per_call": 99460209.0,
+          "checksum": 6935,
+          "process_seconds": 0.20230499998433515
+        },
+        {
+          "ns_per_call": 99256083.0,
+          "checksum": 6935,
+          "process_seconds": 0.20221658298396505
+        }
+      ]
+    },
+    {
+      "case": "hilo-one-worker",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 1,
+      "work_per_job": 100000,
+      "workers": 1,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 99329459.0,
+      "min_ns": 99190333.0,
+      "max_ns": 100573417.0,
+      "samples": [
+        {
+          "ns_per_call": 100573417.0,
+          "checksum": 6935,
+          "process_seconds": 0.20624320799834095
+        },
+        {
+          "ns_per_call": 99329459.0,
+          "checksum": 6935,
+          "process_seconds": 0.20257029199274257
+        },
+        {
+          "ns_per_call": 99444583.0,
+          "checksum": 6935,
+          "process_seconds": 0.20347837498411536
+        },
+        {
+          "ns_per_call": 99190333.0,
+          "checksum": 6935,
+          "process_seconds": 0.20151654200162739
+        },
+        {
+          "ns_per_call": 99971791.0,
+          "checksum": 6935,
+          "process_seconds": 0.2033831670123618
+        },
+        {
+          "ns_per_call": 99326750.0,
+          "checksum": 6935,
+          "process_seconds": 0.20219958398956805
+        },
+        {
+          "ns_per_call": 99258583.0,
+          "checksum": 6935,
+          "process_seconds": 0.20170274999691173
+        }
+      ]
+    },
+    {
+      "case": "hilo-one-worker",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 1,
+      "work_per_job": 100000,
+      "workers": 1,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 100352625.0,
+      "min_ns": 100193167.0,
+      "max_ns": 100616625.0,
+      "samples": [
+        {
+          "ns_per_call": 100561459.0,
+          "checksum": 6935,
+          "process_seconds": 0.20388395900954492
+        },
+        {
+          "ns_per_call": 100193167.0,
+          "checksum": 6935,
+          "process_seconds": 0.20378145901486278
+        },
+        {
+          "ns_per_call": 100223750.0,
+          "checksum": 6935,
+          "process_seconds": 0.20371516700834036
+        },
+        {
+          "ns_per_call": 100267667.0,
+          "checksum": 6935,
+          "process_seconds": 0.20406837499467656
+        },
+        {
+          "ns_per_call": 100616625.0,
+          "checksum": 6935,
+          "process_seconds": 0.2058605839847587
+        },
+        {
+          "ns_per_call": 100352625.0,
+          "checksum": 6935,
+          "process_seconds": 0.20470350002869964
+        },
+        {
+          "ns_per_call": 100411458.0,
+          "checksum": 6935,
+          "process_seconds": 0.20488537498749793
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 128496208.0,
+      "min_ns": 124377792.0,
+      "max_ns": 131771416.0,
+      "samples": [
+        {
+          "ns_per_call": 128496208.0,
+          "checksum": 69136,
+          "process_seconds": 1.1407525000104215
+        },
+        {
+          "ns_per_call": 125476375.0,
+          "checksum": 69136,
+          "process_seconds": 1.1329031250206754
+        },
+        {
+          "ns_per_call": 128945084.0,
+          "checksum": 69136,
+          "process_seconds": 1.1383628330077045
+        },
+        {
+          "ns_per_call": 126636542.0,
+          "checksum": 69136,
+          "process_seconds": 1.1383214159868658
+        },
+        {
+          "ns_per_call": 131771416.0,
+          "checksum": 69136,
+          "process_seconds": 1.140514416998485
+        },
+        {
+          "ns_per_call": 129804375.0,
+          "checksum": 69136,
+          "process_seconds": 1.14074216701556
+        },
+        {
+          "ns_per_call": 124377792.0,
+          "checksum": 69136,
+          "process_seconds": 1.1325023340177722
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 129491333.0,
+      "min_ns": 123567458.0,
+      "max_ns": 147279334.0,
+      "samples": [
+        {
+          "ns_per_call": 128798625.0,
+          "checksum": 69136,
+          "process_seconds": 1.1387792089954019
+        },
+        {
+          "ns_per_call": 147279334.0,
+          "checksum": 69136,
+          "process_seconds": 1.157944790989859
+        },
+        {
+          "ns_per_call": 126190125.0,
+          "checksum": 69136,
+          "process_seconds": 1.148267249984201
+        },
+        {
+          "ns_per_call": 132780750.0,
+          "checksum": 69136,
+          "process_seconds": 1.1411072080081794
+        },
+        {
+          "ns_per_call": 132292000.0,
+          "checksum": 69136,
+          "process_seconds": 1.144742165983189
+        },
+        {
+          "ns_per_call": 123567458.0,
+          "checksum": 69136,
+          "process_seconds": 1.13357254199218
+        },
+        {
+          "ns_per_call": 129491333.0,
+          "checksum": 69136,
+          "process_seconds": 1.1416889999818522
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 131167417.0,
+      "min_ns": 122664458.0,
+      "max_ns": 139627625.0,
+      "samples": [
+        {
+          "ns_per_call": 134549292.0,
+          "checksum": 69136,
+          "process_seconds": 1.1405022090184502
+        },
+        {
+          "ns_per_call": 136684875.0,
+          "checksum": 69136,
+          "process_seconds": 1.1367590829904657
+        },
+        {
+          "ns_per_call": 124495834.0,
+          "checksum": 69136,
+          "process_seconds": 1.1230815420276485
+        },
+        {
+          "ns_per_call": 139627625.0,
+          "checksum": 69136,
+          "process_seconds": 1.140014208998764
+        },
+        {
+          "ns_per_call": 130804791.0,
+          "checksum": 69136,
+          "process_seconds": 1.1282112500048243
+        },
+        {
+          "ns_per_call": 122664458.0,
+          "checksum": 69136,
+          "process_seconds": 1.124325625016354
+        },
+        {
+          "ns_per_call": 131167417.0,
+          "checksum": 69136,
+          "process_seconds": 1.1311962500039954
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 125496125.0,
+      "min_ns": 123584417.0,
+      "max_ns": 134608458.0,
+      "samples": [
+        {
+          "ns_per_call": 134608458.0,
+          "checksum": 69136,
+          "process_seconds": 1.1365423329989426
+        },
+        {
+          "ns_per_call": 128244125.0,
+          "checksum": 69136,
+          "process_seconds": 1.1277255410095677
+        },
+        {
+          "ns_per_call": 124855583.0,
+          "checksum": 69136,
+          "process_seconds": 1.1215721670014318
+        },
+        {
+          "ns_per_call": 129084292.0,
+          "checksum": 69136,
+          "process_seconds": 1.1291181670094375
+        },
+        {
+          "ns_per_call": 123584417.0,
+          "checksum": 69136,
+          "process_seconds": 1.1230681669840124
+        },
+        {
+          "ns_per_call": 125496125.0,
+          "checksum": 69136,
+          "process_seconds": 1.1252638750011101
+        },
+        {
+          "ns_per_call": 124134542.0,
+          "checksum": 69136,
+          "process_seconds": 1.126584500016179
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 126033042.0,
+      "min_ns": 124038500.0,
+      "max_ns": 131466542.0,
+      "samples": [
+        {
+          "ns_per_call": 126033042.0,
+          "checksum": 69136,
+          "process_seconds": 1.1258275409927592
+        },
+        {
+          "ns_per_call": 126811791.0,
+          "checksum": 69136,
+          "process_seconds": 1.1293803750013467
+        },
+        {
+          "ns_per_call": 125136542.0,
+          "checksum": 69136,
+          "process_seconds": 1.130105124990223
+        },
+        {
+          "ns_per_call": 131466542.0,
+          "checksum": 69136,
+          "process_seconds": 1.1349033750011586
+        },
+        {
+          "ns_per_call": 124038500.0,
+          "checksum": 69136,
+          "process_seconds": 1.1254840000183322
+        },
+        {
+          "ns_per_call": 129887958.0,
+          "checksum": 69136,
+          "process_seconds": 1.1340523330145516
+        },
+        {
+          "ns_per_call": 124753166.0,
+          "checksum": 69136,
+          "process_seconds": 1.1241991659917403
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "dynamic",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 124093959.0,
+      "min_ns": 123288959.0,
+      "max_ns": 126529750.0,
+      "samples": [
+        {
+          "ns_per_call": 124093959.0,
+          "checksum": 69136,
+          "process_seconds": 1.1258549579943065
+        },
+        {
+          "ns_per_call": 123288959.0,
+          "checksum": 69136,
+          "process_seconds": 1.124642374983523
+        },
+        {
+          "ns_per_call": 124365958.0,
+          "checksum": 69136,
+          "process_seconds": 1.123704458004795
+        },
+        {
+          "ns_per_call": 123576667.0,
+          "checksum": 69136,
+          "process_seconds": 1.1214682499994524
+        },
+        {
+          "ns_per_call": 123731500.0,
+          "checksum": 69136,
+          "process_seconds": 1.122377708001295
+        },
+        {
+          "ns_per_call": 126529750.0,
+          "checksum": 69136,
+          "process_seconds": 1.1278578750207089
+        },
+        {
+          "ns_per_call": 125757167.0,
+          "checksum": 69136,
+          "process_seconds": 1.1245474579918664
+        }
+      ]
+    },
+    {
+      "case": "hilo-many-jobs",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": false,
+      "median_ns": 128820209.0,
+      "min_ns": 123108875.0,
+      "max_ns": 138504167.0,
+      "samples": [
+        {
+          "ns_per_call": 128820209.0,
+          "checksum": 69136,
+          "process_seconds": 1.1401451250130776
+        },
+        {
+          "ns_per_call": 123108875.0,
+          "checksum": 69136,
+          "process_seconds": 1.1325164159934502
+        },
+        {
+          "ns_per_call": 138504167.0,
+          "checksum": 69136,
+          "process_seconds": 1.1495410419884138
+        },
+        {
+          "ns_per_call": 129555958.0,
+          "checksum": 69136,
+          "process_seconds": 1.1398535410116892
+        },
+        {
+          "ns_per_call": 133311333.0,
+          "checksum": 69136,
+          "process_seconds": 1.2195303330081515
+        },
+        {
+          "ns_per_call": 127476208.0,
+          "checksum": 69136,
+          "process_seconds": 1.1406030000071041
+        },
+        {
+          "ns_per_call": 124974708.0,
+          "checksum": 69136,
+          "process_seconds": 1.132855792006012
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 1006703583.0,
+      "min_ns": 1003731125.0,
+      "max_ns": 1009684958.0,
+      "samples": [
+        {
+          "ns_per_call": 1003731125.0,
+          "checksum": 69346,
+          "process_seconds": 2.0211257910123095
+        },
+        {
+          "ns_per_call": 1004178625.0,
+          "checksum": 69346,
+          "process_seconds": 2.012447459012037
+        },
+        {
+          "ns_per_call": 1009684958.0,
+          "checksum": 69346,
+          "process_seconds": 2.0194234579976182
+        },
+        {
+          "ns_per_call": 1004369375.0,
+          "checksum": 69346,
+          "process_seconds": 2.0184742079873104
+        },
+        {
+          "ns_per_call": 1006703583.0,
+          "checksum": 69346,
+          "process_seconds": 2.015802000008989
+        },
+        {
+          "ns_per_call": 1007818709.0,
+          "checksum": 69346,
+          "process_seconds": 2.021406208019471
+        },
+        {
+          "ns_per_call": 1009420125.0,
+          "checksum": 69346,
+          "process_seconds": 2.0188691249932162
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 1006533959.0,
+      "min_ns": 1004341292.0,
+      "max_ns": 1010007416.0,
+      "samples": [
+        {
+          "ns_per_call": 1005586917.0,
+          "checksum": 69346,
+          "process_seconds": 2.014899041998433
+        },
+        {
+          "ns_per_call": 1006533959.0,
+          "checksum": 69346,
+          "process_seconds": 2.0199102089973167
+        },
+        {
+          "ns_per_call": 1008681459.0,
+          "checksum": 69346,
+          "process_seconds": 2.0191097919887397
+        },
+        {
+          "ns_per_call": 1007453125.0,
+          "checksum": 69346,
+          "process_seconds": 2.018512875016313
+        },
+        {
+          "ns_per_call": 1005468291.0,
+          "checksum": 69346,
+          "process_seconds": 2.0159591250121593
+        },
+        {
+          "ns_per_call": 1004341292.0,
+          "checksum": 69346,
+          "process_seconds": 2.017296957987128
+        },
+        {
+          "ns_per_call": 1010007416.0,
+          "checksum": 69346,
+          "process_seconds": 2.0241060410044156
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 995344666.0,
+      "min_ns": 994175375.0,
+      "max_ns": 997354375.0,
+      "samples": [
+        {
+          "ns_per_call": 996646791.0,
+          "checksum": 69346,
+          "process_seconds": 1.9970725000021048
+        },
+        {
+          "ns_per_call": 994175375.0,
+          "checksum": 69346,
+          "process_seconds": 1.999041542003397
+        },
+        {
+          "ns_per_call": 994336167.0,
+          "checksum": 69346,
+          "process_seconds": 1.9930837919819169
+        },
+        {
+          "ns_per_call": 995344666.0,
+          "checksum": 69346,
+          "process_seconds": 1.999038334004581
+        },
+        {
+          "ns_per_call": 997354375.0,
+          "checksum": 69346,
+          "process_seconds": 1.998324042011518
+        },
+        {
+          "ns_per_call": 994932083.0,
+          "checksum": 69346,
+          "process_seconds": 1.9940749579982366
+        },
+        {
+          "ns_per_call": 995789542.0,
+          "checksum": 69346,
+          "process_seconds": 1.9961626250005793
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 997000083.0,
+      "min_ns": 994172708.0,
+      "max_ns": 1002553416.0,
+      "samples": [
+        {
+          "ns_per_call": 1002553416.0,
+          "checksum": 69346,
+          "process_seconds": 2.0029187080217525
+        },
+        {
+          "ns_per_call": 994744334.0,
+          "checksum": 69346,
+          "process_seconds": 1.9979022500046995
+        },
+        {
+          "ns_per_call": 999177041.0,
+          "checksum": 69346,
+          "process_seconds": 1.997557875001803
+        },
+        {
+          "ns_per_call": 998425250.0,
+          "checksum": 69346,
+          "process_seconds": 2.0043502079788595
+        },
+        {
+          "ns_per_call": 996971792.0,
+          "checksum": 69346,
+          "process_seconds": 1.9950158330029808
+        },
+        {
+          "ns_per_call": 997000083.0,
+          "checksum": 69346,
+          "process_seconds": 2.0000620000064373
+        },
+        {
+          "ns_per_call": 994172708.0,
+          "checksum": 69346,
+          "process_seconds": 1.994505125010619
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 998208708.0,
+      "min_ns": 994212417.0,
+      "max_ns": 1008777375.0,
+      "samples": [
+        {
+          "ns_per_call": 1008777375.0,
+          "checksum": 69346,
+          "process_seconds": 2.008039749984164
+        },
+        {
+          "ns_per_call": 998208708.0,
+          "checksum": 69346,
+          "process_seconds": 2.00143304199446
+        },
+        {
+          "ns_per_call": 994212417.0,
+          "checksum": 69346,
+          "process_seconds": 1.9950695410079788
+        },
+        {
+          "ns_per_call": 994691750.0,
+          "checksum": 69346,
+          "process_seconds": 2.007057167007588
+        },
+        {
+          "ns_per_call": 994561042.0,
+          "checksum": 69346,
+          "process_seconds": 1.9960977080045268
+        },
+        {
+          "ns_per_call": 1005252167.0,
+          "checksum": 69346,
+          "process_seconds": 2.0070809590106364
+        },
+        {
+          "ns_per_call": 1002271167.0,
+          "checksum": 69346,
+          "process_seconds": 2.003834792005364
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "odin",
+      "mode": "dynamic",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 134855750.0,
+      "min_ns": 123463083.0,
+      "max_ns": 144595209.0,
+      "samples": [
+        {
+          "ns_per_call": 134855750.0,
+          "checksum": 69346,
+          "process_seconds": 1.1341433330089785
+        },
+        {
+          "ns_per_call": 123463083.0,
+          "checksum": 69346,
+          "process_seconds": 1.123855541984085
+        },
+        {
+          "ns_per_call": 141739166.0,
+          "checksum": 69346,
+          "process_seconds": 1.141711292002583
+        },
+        {
+          "ns_per_call": 127317875.0,
+          "checksum": 69346,
+          "process_seconds": 1.128224667016184
+        },
+        {
+          "ns_per_call": 144595209.0,
+          "checksum": 69346,
+          "process_seconds": 1.1453673749929294
+        },
+        {
+          "ns_per_call": 139708375.0,
+          "checksum": 69346,
+          "process_seconds": 1.1403065829945263
+        },
+        {
+          "ns_per_call": 133068833.0,
+          "checksum": 69346,
+          "process_seconds": 1.1326892499928363
+        }
+      ]
+    },
+    {
+      "case": "hilo-skewed",
+      "kernel": "hilo",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 100,
+      "work_per_job": 10000,
+      "workers": 10,
+      "rounds": 1,
+      "skew": true,
+      "median_ns": 1006010750.0,
+      "min_ns": 1004393833.0,
+      "max_ns": 1009459250.0,
+      "samples": [
+        {
+          "ns_per_call": 1004393833.0,
+          "checksum": 69346,
+          "process_seconds": 2.0159134580171667
+        },
+        {
+          "ns_per_call": 1009459250.0,
+          "checksum": 69346,
+          "process_seconds": 2.0193596669996623
+        },
+        {
+          "ns_per_call": 1006010750.0,
+          "checksum": 69346,
+          "process_seconds": 2.017194916988956
+        },
+        {
+          "ns_per_call": 1004915041.0,
+          "checksum": 69346,
+          "process_seconds": 2.0173978340171743
+        },
+        {
+          "ns_per_call": 1007577959.0,
+          "checksum": 69346,
+          "process_seconds": 2.017843500012532
+        },
+        {
+          "ns_per_call": 1008083000.0,
+          "checksum": 69346,
+          "process_seconds": 2.020093083003303
+        },
+        {
+          "ns_per_call": 1004662375.0,
+          "checksum": 69346,
+          "process_seconds": 2.0112836250045802
+        }
+      ]
+    },
+    {
+      "case": "cheap-startup",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 10,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 100,
+      "skew": false,
+      "median_ns": 117751.23,
+      "min_ns": 114986.68,
+      "max_ns": 124704.97,
+      "samples": [
+        {
+          "ns_per_call": 115425.39,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014640000008512288
+        },
+        {
+          "ns_per_call": 123323.4,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014762042002985254
+        },
+        {
+          "ns_per_call": 115884.98,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014312792016426101
+        },
+        {
+          "ns_per_call": 117796.21,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014538374991388991
+        },
+        {
+          "ns_per_call": 117751.23,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014500166988000274
+        },
+        {
+          "ns_per_call": 114986.68,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014139458013232797
+        },
+        {
+          "ns_per_call": 124704.97,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014795041002798826
+        }
+      ]
+    },
+    {
+      "case": "cheap-startup",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 10,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 100,
+      "skew": false,
+      "median_ns": 122463.79,
+      "min_ns": 85771.7,
+      "max_ns": 137654.99,
+      "samples": [
+        {
+          "ns_per_call": 137654.99,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.016460665996419266
+        },
+        {
+          "ns_per_call": 119771.26,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014840041985735297
+        },
+        {
+          "ns_per_call": 122510.48,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014637415995821357
+        },
+        {
+          "ns_per_call": 85771.7,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.011037124990252778
+        },
+        {
+          "ns_per_call": 122463.79,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014930124976672232
+        },
+        {
+          "ns_per_call": 122540.49,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014912291982909665
+        },
+        {
+          "ns_per_call": 115082.06,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014173667004797608
+        }
+      ]
+    },
+    {
+      "case": "cheap-startup",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 10,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 100,
+      "skew": false,
+      "median_ns": 120851.12,
+      "min_ns": 115473.77,
+      "max_ns": 132422.12,
+      "samples": [
+        {
+          "ns_per_call": 132422.12,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.016280999989248812
+        },
+        {
+          "ns_per_call": 123220.07,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014858375012408942
+        },
+        {
+          "ns_per_call": 120851.12,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014700250001624227
+        },
+        {
+          "ns_per_call": 115866.25,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014342874987050891
+        },
+        {
+          "ns_per_call": 122322.04,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.01472404200467281
+        },
+        {
+          "ns_per_call": 115473.77,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014155542012304068
+        },
+        {
+          "ns_per_call": 115642.9,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014175667020026594
+        }
+      ]
+    },
+    {
+      "case": "cheap-startup",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 10,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 100,
+      "skew": false,
+      "median_ns": 168577.05,
+      "min_ns": 161432.1,
+      "max_ns": 176292.08,
+      "samples": [
+        {
+          "ns_per_call": 165871.68,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.019433415989624336
+        },
+        {
+          "ns_per_call": 168780.86,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.019520542002283037
+        },
+        {
+          "ns_per_call": 176292.08,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.02005366698722355
+        },
+        {
+          "ns_per_call": 174894.64,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.02027383298263885
+        },
+        {
+          "ns_per_call": 161432.1,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.018839500000467524
+        },
+        {
+          "ns_per_call": 163438.81,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.018770041991956532
+        },
+        {
+          "ns_per_call": 168577.05,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.019542999973054975
+        }
+      ]
+    },
+    {
+      "case": "cheap-startup",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 10,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 100,
+      "skew": false,
+      "median_ns": 13730.83,
+      "min_ns": 11435.01,
+      "max_ns": 37144.53,
+      "samples": [
+        {
+          "ns_per_call": 12725.48,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.004061125015141442
+        },
+        {
+          "ns_per_call": 11609.56,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.004118290991755202
+        },
+        {
+          "ns_per_call": 14754.97,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.004521041992120445
+        },
+        {
+          "ns_per_call": 37144.53,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.006771624990506098
+        },
+        {
+          "ns_per_call": 11435.01,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.004236834007315338
+        },
+        {
+          "ns_per_call": 15163.29,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.004526375007117167
+        },
+        {
+          "ns_per_call": 13730.83,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.0042500830022618175
+        }
+      ]
+    },
+    {
+      "case": "cheap-startup",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 10,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 100,
+      "skew": false,
+      "median_ns": 119356.18,
+      "min_ns": 101615.35,
+      "max_ns": 165251.31,
+      "samples": [
+        {
+          "ns_per_call": 165251.31,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.019340124999871477
+        },
+        {
+          "ns_per_call": 125300.77,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.015169375023106113
+        },
+        {
+          "ns_per_call": 101615.35,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.013257541024358943
+        },
+        {
+          "ns_per_call": 115589.56,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014690249983686954
+        },
+        {
+          "ns_per_call": 123886.69,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.0151187919836957
+        },
+        {
+          "ns_per_call": 119356.18,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014610000012908131
+        },
+        {
+          "ns_per_call": 119175.02,
+          "checksum": 3367154607368362252,
+          "process_seconds": 0.014601875009248033
+        }
+      ]
+    },
+    {
+      "case": "cheap-many",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 908358.2,
+      "min_ns": 751112.4,
+      "max_ns": 1004804.1,
+      "samples": [
+        {
+          "ns_per_call": 926983.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02199595799902454
+        },
+        {
+          "ns_per_call": 751112.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01959241699660197
+        },
+        {
+          "ns_per_call": 908358.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021622540982207283
+        },
+        {
+          "ns_per_call": 944258.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.0226252080174163
+        },
+        {
+          "ns_per_call": 1004804.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022978292021434754
+        },
+        {
+          "ns_per_call": 866054.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021573749982053414
+        },
+        {
+          "ns_per_call": 842366.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.0210453339968808
+        }
+      ]
+    },
+    {
+      "case": "cheap-many",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 993850.1,
+      "min_ns": 946704.3,
+      "max_ns": 1016354.0,
+      "samples": [
+        {
+          "ns_per_call": 993412.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02264045798801817
+        },
+        {
+          "ns_per_call": 993850.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022644499986199662
+        },
+        {
+          "ns_per_call": 946704.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022150375007186085
+        },
+        {
+          "ns_per_call": 1015058.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02325783300329931
+        },
+        {
+          "ns_per_call": 1005683.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.023213792010210454
+        },
+        {
+          "ns_per_call": 972025.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02237279200926423
+        },
+        {
+          "ns_per_call": 1016354.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.023052375006955117
+        }
+      ]
+    },
+    {
+      "case": "cheap-many",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 855775.1,
+      "min_ns": 746666.6,
+      "max_ns": 920750.1,
+      "samples": [
+        {
+          "ns_per_call": 920750.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021537332999287173
+        },
+        {
+          "ns_per_call": 910158.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02218033399549313
+        },
+        {
+          "ns_per_call": 907850.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021710958011681214
+        },
+        {
+          "ns_per_call": 855775.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02124899998307228
+        },
+        {
+          "ns_per_call": 774958.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019874791003530845
+        },
+        {
+          "ns_per_call": 829529.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02107991700177081
+        },
+        {
+          "ns_per_call": 746666.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019785459007835016
+        }
+      ]
+    },
+    {
+      "case": "cheap-many",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 984945.8,
+      "min_ns": 933275.1,
+      "max_ns": 1129904.5,
+      "samples": [
+        {
+          "ns_per_call": 972337.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02208583301398903
+        },
+        {
+          "ns_per_call": 1036358.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.023053832992445678
+        },
+        {
+          "ns_per_call": 933275.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02215150001575239
+        },
+        {
+          "ns_per_call": 984945.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02271387499058619
+        },
+        {
+          "ns_per_call": 971029.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02228725000168197
+        },
+        {
+          "ns_per_call": 1129904.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024268832989037037
+        },
+        {
+          "ns_per_call": 985887.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02230845799203962
+        }
+      ]
+    },
+    {
+      "case": "cheap-many",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 826083.5,
+      "min_ns": 576470.6,
+      "max_ns": 886237.5,
+      "samples": [
+        {
+          "ns_per_call": 886237.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021877916995435953
+        },
+        {
+          "ns_per_call": 700112.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01935233297990635
+        },
+        {
+          "ns_per_call": 826083.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021190291998209432
+        },
+        {
+          "ns_per_call": 798371.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02100804101792164
+        },
+        {
+          "ns_per_call": 867196.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021819999994477257
+        },
+        {
+          "ns_per_call": 576470.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.017766833014320582
+        },
+        {
+          "ns_per_call": 858396.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021565583010669798
+        }
+      ]
+    },
+    {
+      "case": "cheap-many",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 10,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 952558.3,
+      "min_ns": 918058.2,
+      "max_ns": 1049362.6,
+      "samples": [
+        {
+          "ns_per_call": 1049362.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02330099997925572
+        },
+        {
+          "ns_per_call": 918058.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021792333020130172
+        },
+        {
+          "ns_per_call": 1033704.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.023488249978981912
+        },
+        {
+          "ns_per_call": 996045.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02349579200381413
+        },
+        {
+          "ns_per_call": 952558.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02157654199982062
+        },
+        {
+          "ns_per_call": 939620.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021942166989902034
+        },
+        {
+          "ns_per_call": 932195.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022257499978877604
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 817624.9,
+      "min_ns": 798949.9,
+      "max_ns": 876858.3,
+      "samples": [
+        {
+          "ns_per_call": 876858.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02072974998736754
+        },
+        {
+          "ns_per_call": 860858.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020046833000378683
+        },
+        {
+          "ns_per_call": 821345.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019441791984718293
+        },
+        {
+          "ns_per_call": 798949.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01934729199274443
+        },
+        {
+          "ns_per_call": 817624.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019575500016799197
+        },
+        {
+          "ns_per_call": 804820.7,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019485583005007356
+        },
+        {
+          "ns_per_call": 799695.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01957070900243707
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 1324345.9,
+      "min_ns": 1308637.5,
+      "max_ns": 1337045.7,
+      "samples": [
+        {
+          "ns_per_call": 1324345.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024416749976808205
+        },
+        {
+          "ns_per_call": 1308637.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024307874991791323
+        },
+        {
+          "ns_per_call": 1317737.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.0249030829872936
+        },
+        {
+          "ns_per_call": 1337045.7,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02490104199387133
+        },
+        {
+          "ns_per_call": 1330975.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02528616599738598
+        },
+        {
+          "ns_per_call": 1329704.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024665082979481667
+        },
+        {
+          "ns_per_call": 1311720.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024282957980176434
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 810079.1,
+      "min_ns": 800245.9,
+      "max_ns": 835896.1,
+      "samples": [
+        {
+          "ns_per_call": 835871.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020002374978503212
+        },
+        {
+          "ns_per_call": 803845.7,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01932662501349114
+        },
+        {
+          "ns_per_call": 835896.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019713749992661178
+        },
+        {
+          "ns_per_call": 809437.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019686499988893047
+        },
+        {
+          "ns_per_call": 814200.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01952466700458899
+        },
+        {
+          "ns_per_call": 800245.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019309209019411355
+        },
+        {
+          "ns_per_call": 810079.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01936191599816084
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 847512.4,
+      "min_ns": 840225.0,
+      "max_ns": 918741.6,
+      "samples": [
+        {
+          "ns_per_call": 918741.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02102254200144671
+        },
+        {
+          "ns_per_call": 850762.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020277208997868
+        },
+        {
+          "ns_per_call": 864008.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020164875022601336
+        },
+        {
+          "ns_per_call": 840225.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01976804100559093
+        },
+        {
+          "ns_per_call": 846129.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019924833002733067
+        },
+        {
+          "ns_per_call": 842616.7,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02006100001744926
+        },
+        {
+          "ns_per_call": 847512.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019744333025300875
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 854400.0,
+      "min_ns": 838412.4,
+      "max_ns": 897671.0,
+      "samples": [
+        {
+          "ns_per_call": 897671.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020536750002065673
+        },
+        {
+          "ns_per_call": 881975.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020558749994961545
+        },
+        {
+          "ns_per_call": 855141.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.0202665840042755
+        },
+        {
+          "ns_per_call": 854400.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019973208982264623
+        },
+        {
+          "ns_per_call": 852962.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019988083018688485
+        },
+        {
+          "ns_per_call": 838412.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.01957870798651129
+        },
+        {
+          "ns_per_call": 840625.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.019797957997070625
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 1289404.2,
+      "min_ns": 1276112.4,
+      "max_ns": 1306358.5,
+      "samples": [
+        {
+          "ns_per_call": 1276908.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024063667020527646
+        },
+        {
+          "ns_per_call": 1291525.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024649291997775435
+        },
+        {
+          "ns_per_call": 1289404.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024643415992613882
+        },
+        {
+          "ns_per_call": 1283833.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02430295798694715
+        },
+        {
+          "ns_per_call": 1293045.7,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024466041999403387
+        },
+        {
+          "ns_per_call": 1306358.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024479584011714906
+        },
+        {
+          "ns_per_call": 1276112.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.024129916011588648
+        }
+      ]
+    }
+  ],
+  "snapshots": {
+    "hilo-odin": [
+      {
+        "seconds": 0.13052825001068413,
+        "wins": 68920
+      },
+      {
+        "seconds": 0.13019420800264925,
+        "wins": 69060
+      },
+      {
+        "seconds": 0.13722679199418053,
+        "wins": 69158
+      },
+      {
+        "seconds": 0.1348017500131391,
+        "wins": 69051
+      },
+      {
+        "seconds": 0.1289301670040004,
+        "wins": 69783
+      },
+      {
+        "seconds": 0.1357433749944903,
+        "wins": 69350
+      },
+      {
+        "seconds": 0.14269758301088586,
+        "wins": 69423
+      }
+    ],
+    "hilo-thor": [
+      {
+        "seconds": 0.13159775000531226,
+        "wins": 69589
+      },
+      {
+        "seconds": 0.1323782090039458,
+        "wins": 69227
+      },
+      {
+        "seconds": 0.13120241698925383,
+        "wins": 69544
+      },
+      {
+        "seconds": 0.13048204098595306,
+        "wins": 69513
+      },
+      {
+        "seconds": 0.14059737499337643,
+        "wins": 69554
+      },
+      {
+        "seconds": 0.13332954197539948,
+        "wins": 69422
+      },
+      {
+        "seconds": 0.15095241699600592,
+        "wins": 69485
+      }
+    ],
+    "pmap-thor": [
+      {
+        "seconds": 0.12912670901278034,
+        "wins": 69243
+      },
+      {
+        "seconds": 0.13293045799946412,
+        "wins": 69314
+      },
+      {
+        "seconds": 0.12945537499035709,
+        "wins": 69415
+      },
+      {
+        "seconds": 0.1289227909874171,
+        "wins": 69306
+      },
+      {
+        "seconds": 0.13199029199313372,
+        "wins": 69633
+      },
+      {
+        "seconds": 0.1295164999901317,
+        "wins": 69264
+      },
+      {
+        "seconds": 0.13752950000343844,
+        "wins": 69586
+      }
+    ]
+  }
+}

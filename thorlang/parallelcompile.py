@@ -3,6 +3,25 @@ from pathlib import Path
 from . import resulttypes
 
 
+def known_callback(resolver,argument):
+    def visit(node,seen):
+        if node is None or node in seen:return False
+        seen.add(node)
+        if node.kind=='Procedure':return True
+        if node.kind=='Paren':return visit(node.role('expr'),seen)
+        if node.kind=='ProcedureGroup':
+            members=node.group('args')
+            return bool(members) and all(visit(member,seen.copy()) for member in members)
+        if node.kind not in {'Ident','Selector'}:return False
+        symbol=resolver.symbol(node)
+        return bool(symbol and not symbol.immutable and not symbol.declaration.data.get('mutable')
+                    and symbol.declaration.kind!='Field' and visit(symbol.value,seen))
+    enabled=resolver.native_enabled
+    resolver.native_enabled=True
+    try:return visit(argument,set())
+    finally:resolver.native_enabled=enabled
+
+
 def has_mode_parameter(signature):
     return signature.source.path==Path(__file__).resolve().parents[1]/'runtime/parallel/pmap.thor'
 

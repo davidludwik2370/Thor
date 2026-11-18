@@ -39,6 +39,13 @@ main :: proc() {
     defer delete(doubled)
     basic.print("single inputs:", doubled)
 
+    // A known procedure such as `twice` above is specialized automatically.
+    // A procedure held in runtime storage keeps dynamic callback dispatch.
+    callback: proc(int)->int = twice
+    selected := basic.pmap([]int{2,3,4}, callback)
+    defer delete(selected)
+    basic.print("runtime callback:", selected)
+
     totals := basic.pmap(jobs, whole)
     defer delete(totals)
     basic.print("whole structs:", totals)

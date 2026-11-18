@@ -126,3 +126,45 @@ and optimized unchecked builds. The updated demo ran cleanly with debug
 allocation tracking and with assertions/bounds/type assertions disabled.
 Two warm release transpiles of that demo took 0.321 and 0.302 seconds; these
 measure lowering with cached compile-time results, excluding Odin compilation.
+
+## Callback specialization follow-up
+
+Known procedures now reach the native worker as compile-time value parameters,
+including imported aliases, overload groups and inferred polymorphic callbacks.
+The compiler materializes the selected monomorphic procedure with a constant
+`procedure_of` declaration. It never passes that intrinsic as a runtime value;
+this distinction also avoids partially specialized generic return types.
+Runtime procedure storage, parameters, fields and factories keep indirect
+dispatch. Result-type queries for these values inspect their procedure type
+without evaluating the callback expression. Argument effects still occur once,
+in their original order.
+
+The checked and ordinary paths share inline call dispatchers and their existing
+worker implementations. There is no runtime test for specialization, added
+per-job allocation, scheduler change, or relaxation of purity checks. The
+library reference and parallel demo describe both call paths. Additional
+regressions inspect optimized LLVM IR for removal/preservation of indirect
+calls and exercise live TLS types, unsaved edits, and source breakpoints.
+The Python reference also emits its default collection flags in a stable order;
+previous set iteration could give identical helpers different cache keys across
+process hash seeds. The cache regression checks reuse across two explicit seeds
+and invalidation after a callback edit.
+
+One existing conservative purity rejection was reproduced on the parent
+implementation during this work: a polymorphic callback returning a newly
+allocated slice can be rejected as borrowed mutation when it initializes the
+slice through indexed assignments. Building an equivalent local dynamic array
+with `append` and returning its slice is accepted. Callback specialization
+does not weaken that analysis; the accepted allocation case is covered with
+`#run` and debug leak tracking.
+
+The final production gate passed 75 tests: 68 mapping/result-query regressions
+and 7 assertion-hygiene checks. The Python reference exercised the same mapping
+coverage; its cache failure was corrected and the cache, runtime-storage, and
+type-witness cases were rechecked. Additional validation passed 96 Rust unit
+tests, 128 related purity/slice/fallback tests, 12 live TLS tests, 6 live TLS
+tests against an unchecked server, all 1,166 native TLS tests in both checked
+and unchecked configurations, 3 CodeLLDB callback breakpoint tests and 143
+editor tests. The demo passed normal, debug tracking and unchecked builds.
+The [benchmark report](benchmarks/pmap-specialized-2026-11-18.md) records the
+runtime measurements and unchanged scheduling limitations.

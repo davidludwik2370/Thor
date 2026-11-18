@@ -1185,6 +1185,31 @@ main::proc(){
         self.assertEqual(value['result'],'5',value)
         client.request('continue',{'threadId':thread});client.event('terminated')
 
+    def test_parallel_map_runtime_callback_keeps_source_breakpoint(self):
+        text='''package main
+import "thor:basic"
+Row::struct{x,y:int}
+calculate::proc(row:Row)->int{
+    total:=row.x+row.y
+    return total
+}
+main::proc(){
+    callback:proc(Row)->int=calculate;rows:=basic.pmap([]Row{{2,3}},callback,workers=1)
+    defer delete(rows)
+    if rows[0]!=5{panic("runtime callback")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,11])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'row.x','context':'watch'})
+        self.assertEqual(value['result'],'2',value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),11),frame)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def build(self, text, files=None, *, vet=False):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
         self.addCleanup(temporary.cleanup)

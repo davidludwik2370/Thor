@@ -1,0 +1,629 @@
+{
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "machine": "arm64",
+  "odin": "odin version dev-2026-10:8169255b9",
+  "thor": "Thor 0.41.6",
+  "flags": [
+    "-o:speed"
+  ],
+  "samples": 11,
+  "source_sha256": {
+    "/Users/davidludwik/Code/Thor/hilo/hilo.thor": "eab70c077b373ebf856b35fdc72b35bcab2a699e1516bfa127049865405f8504",
+    "/Users/davidludwik/Code/Thor/hilo_test/hilo_test.thor": "530a33ea5670c631a2f5b782b498d5d437e2228afe1f1c2cfc01a069b919f211"
+  },
+  "kernel_sha256": "8a9f8ecb6e471f9deec5feeb3c733e501f4b5c8ffa09a09237f9203b18c1cd88",
+  "results": [
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "pmap",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 1044796.1,
+      "min_ns": 1005354.2,
+      "max_ns": 1220600.0,
+      "samples": [
+        {
+          "ns_per_call": 1220600.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.026004625018686056
+        },
+        {
+          "ns_per_call": 1016654.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021947916015051305
+        },
+        {
+          "ns_per_call": 1037283.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022277291980572045
+        },
+        {
+          "ns_per_call": 1044796.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022372958017513156
+        },
+        {
+          "ns_per_call": 1005354.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021927041991148144
+        },
+        {
+          "ns_per_call": 1181345.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02490670798579231
+        },
+        {
+          "ns_per_call": 1108304.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.023660834005568177
+        },
+        {
+          "ns_per_call": 1079791.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022660417016595602
+        },
+        {
+          "ns_per_call": 1088408.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022618332994170487
+        },
+        {
+          "ns_per_call": 1005533.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021788999991258606
+        },
+        {
+          "ns_per_call": 1035316.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022333208995405585
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "runtime",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 1560771.1,
+      "min_ns": 1535733.4,
+      "max_ns": 1612250.0,
+      "samples": [
+        {
+          "ns_per_call": 1551591.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02747504200669937
+        },
+        {
+          "ns_per_call": 1542258.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.027325499977450818
+        },
+        {
+          "ns_per_call": 1560771.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.027276000007987022
+        },
+        {
+          "ns_per_call": 1535733.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02723966698977165
+        },
+        {
+          "ns_per_call": 1547487.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.027361708984244615
+        },
+        {
+          "ns_per_call": 1598874.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.027845375007018447
+        },
+        {
+          "ns_per_call": 1588079.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.027879875007783994
+        },
+        {
+          "ns_per_call": 1612250.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02828250001766719
+        },
+        {
+          "ns_per_call": 1599895.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02802670799428597
+        },
+        {
+          "ns_per_call": 1605183.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.028087582992156968
+        },
+        {
+          "ns_per_call": 1546991.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.027477666008053347
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "threads",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 1040545.6,
+      "min_ns": 999516.5,
+      "max_ns": 1124691.5,
+      "samples": [
+        {
+          "ns_per_call": 1063341.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022008667001500726
+        },
+        {
+          "ns_per_call": 1013933.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021249541983706877
+        },
+        {
+          "ns_per_call": 999516.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021121458994457498
+        },
+        {
+          "ns_per_call": 1007429.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021304374997271225
+        },
+        {
+          "ns_per_call": 1000745.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02105583398952149
+        },
+        {
+          "ns_per_call": 1124691.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02259912498993799
+        },
+        {
+          "ns_per_call": 1068229.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022123666014522314
+        },
+        {
+          "ns_per_call": 1050795.7,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021570834011072293
+        },
+        {
+          "ns_per_call": 1119304.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.022979291999945417
+        },
+        {
+          "ns_per_call": 1040545.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.021691208006814122
+        },
+        {
+          "ns_per_call": 1027837.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02141091600060463
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "pool",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 915375.0,
+      "min_ns": 903895.8,
+      "max_ns": 1008737.6,
+      "samples": [
+        {
+          "ns_per_call": 903895.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020251749985618517
+        },
+        {
+          "ns_per_call": 915033.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020346416014945135
+        },
+        {
+          "ns_per_call": 915375.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02010345901362598
+        },
+        {
+          "ns_per_call": 911658.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.0202929170045536
+        },
+        {
+          "ns_per_call": 907533.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020159209001576528
+        },
+        {
+          "ns_per_call": 906846.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020299374999012798
+        },
+        {
+          "ns_per_call": 934604.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020506166998529807
+        },
+        {
+          "ns_per_call": 1008737.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02176754199899733
+        },
+        {
+          "ns_per_call": 963354.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02080758399097249
+        },
+        {
+          "ns_per_call": 959562.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020854041998973116
+        },
+        {
+          "ns_per_call": 931370.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020552624977426603
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "odin",
+      "mode": "reuse",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 936641.4,
+      "min_ns": 901916.5,
+      "max_ns": 991545.9,
+      "samples": [
+        {
+          "ns_per_call": 908654.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02019891599775292
+        },
+        {
+          "ns_per_call": 936641.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020413625024957582
+        },
+        {
+          "ns_per_call": 991545.9,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02143970801262185
+        },
+        {
+          "ns_per_call": 902454.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020334000000730157
+        },
+        {
+          "ns_per_call": 901916.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.0201161669974681
+        },
+        {
+          "ns_per_call": 911483.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020218499994371086
+        },
+        {
+          "ns_per_call": 963975.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02156891699996777
+        },
+        {
+          "ns_per_call": 943883.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020731750002596527
+        },
+        {
+          "ns_per_call": 962170.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020869750005658716
+        },
+        {
+          "ns_per_call": 945487.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.02087900001788512
+        },
+        {
+          "ns_per_call": 912858.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.020388583972817287
+        }
+      ]
+    },
+    {
+      "case": "cheap-one-worker",
+      "kernel": "cheap",
+      "engine": "thor",
+      "mode": "threads",
+      "jobs": 1000000,
+      "work_per_job": 0,
+      "workers": 1,
+      "rounds": 10,
+      "skew": false,
+      "median_ns": 1931621.0,
+      "min_ns": 1900129.2,
+      "max_ns": 2008933.4,
+      "samples": [
+        {
+          "ns_per_call": 1924554.3,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.031145624991040677
+        },
+        {
+          "ns_per_call": 1908771.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.030999292008345947
+        },
+        {
+          "ns_per_call": 1931621.0,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.031384000001708046
+        },
+        {
+          "ns_per_call": 1927608.5,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.03109604201745242
+        },
+        {
+          "ns_per_call": 1900129.2,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.03084783401573077
+        },
+        {
+          "ns_per_call": 1969971.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.03144008299568668
+        },
+        {
+          "ns_per_call": 1953037.6,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.031204958009766415
+        },
+        {
+          "ns_per_call": 2008933.4,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.03189758301596157
+        },
+        {
+          "ns_per_call": 1982699.8,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.03167591700912453
+        },
+        {
+          "ns_per_call": 1968004.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.031617166998330504
+        },
+        {
+          "ns_per_call": 1924879.1,
+          "checksum": 10210756871121200368,
+          "process_seconds": 0.031434458011062816
+        }
+      ]
+    }
+  ],
+  "snapshots": {
+    "hilo-odin": [
+      {
+        "seconds": 0.13256920900312252,
+        "wins": 69542
+      },
+      {
+        "seconds": 0.1312986249977257,
+        "wins": 69002
+      },
+      {
+        "seconds": 0.12901020899880677,
+        "wins": 69188
+      },
+      {
+        "seconds": 0.13452220801264048,
+        "wins": 69484
+      },
+      {
+        "seconds": 0.1379767920006998,
+        "wins": 69316
+      },
+      {
+        "seconds": 0.13121975000831299,
+        "wins": 69292
+      },
+      {
+        "seconds": 0.13303275001817383,
+        "wins": 69000
+      },
+      {
+        "seconds": 0.13032091700006276,
+        "wins": 69327
+      },
+      {
+        "seconds": 0.13711704200250097,
+        "wins": 69329
+      },
+      {
+        "seconds": 0.1338903330033645,
+        "wins": 68986
+      },
+      {
+        "seconds": 0.1287879160081502,
+        "wins": 69096
+      }
+    ],
+    "hilo-thor": [
+      {
+        "seconds": 0.13054529199143872,
+        "wins": 68906
+      },
+      {
+        "seconds": 0.12958416700712405,
+        "wins": 69436
+      },
+      {
+        "seconds": 0.13965641701361164,
+        "wins": 69217
+      },
+      {
+        "seconds": 0.1325067079742439,
+        "wins": 69701
+      },
+      {
+        "seconds": 0.13070104201324284,
+        "wins": 69748
+      },
+      {
+        "seconds": 0.1334830410196446,
+        "wins": 69608
+      },
+      {
+        "seconds": 0.14249683302477933,
+        "wins": 69781
+      },
+      {
+        "seconds": 0.1316934999777004,
+        "wins": 69252
+      },
+      {
+        "seconds": 0.13812783398316242,
+        "wins": 69089
+      },
+      {
+        "seconds": 0.1293423330062069,
+        "wins": 69116
+      },
+      {
+        "seconds": 0.12865508400136605,
+        "wins": 69075
+      }
+    ],
+    "pmap-thor": [
+      {
+        "seconds": 0.13737237500026822,
+        "wins": 69369
+      },
+      {
+        "seconds": 0.14162266699713655,
+        "wins": 69689
+      },
+      {
+        "seconds": 0.1373264160065446,
+        "wins": 69379
+      },
+      {
+        "seconds": 0.14069820797885768,
+        "wins": 69283
+      },
+      {
+        "seconds": 0.14293937498587184,
+        "wins": 69131
+      },
+      {
+        "seconds": 0.1372197910095565,
+        "wins": 69217
+      },
+      {
+        "seconds": 0.136427833000198,
+        "wins": 69455
+      },
+      {
+        "seconds": 0.13748741598101333,
+        "wins": 69360
+      },
+      {
+        "seconds": 0.14258804198470898,
+        "wins": 69667
+      },
+      {
+        "seconds": 0.13745241600554436,
+        "wins": 69759
+      },
+      {
+        "seconds": 0.1422665000136476,
+        "wins": 69084
+      }
+    ],
+    "pmap-runtime-thor": [
+      {
+        "seconds": 0.13925999999628402,
+        "wins": 69343
+      },
+      {
+        "seconds": 0.1378097500128206,
+        "wins": 69495
+      },
+      {
+        "seconds": 0.1380511659954209,
+        "wins": 69180
+      },
+      {
+        "seconds": 0.13609987500240095,
+        "wins": 69332
+      },
+      {
+        "seconds": 0.16004054099903442,
+        "wins": 69335
+      },
+      {
+        "seconds": 0.1363915829861071,
+        "wins": 69267
+      },
+      {
+        "seconds": 0.13701270800083876,
+        "wins": 69539
+      },
+      {
+        "seconds": 0.14333175000501797,
+        "wins": 69350
+      },
+      {
+        "seconds": 0.1361294590169564,
+        "wins": 69574
+      },
+      {
+        "seconds": 0.1365008749999106,
+        "wins": 69767
+      },
+      {
+        "seconds": 0.13837791699916124,
+        "wins": 69198
+      }
+    ]
+  }
+}

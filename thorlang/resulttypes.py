@@ -246,12 +246,15 @@ def default_bindings(resolver,signature,site,default):
 
 
 def type_code(source,query,call,result):
+    return signature_code(source,query,f'type_of({source.prefix}meta.procedure_of({call}))',result)
+
+
+def signature_code(source,query,signature,result):
     fields=result[1]
     if not fields:error(query,'result_type_of: the call has no return values and therefore no result type.')
     if len({name for name,_ in fields})!=len(fields):error(query,'result_type_of: result field names collide. Name the results explicitly or supply an explicit result_type.')
     source.needs_intrinsics=True
     meta=source.prefix+'meta'
-    signature=f'type_of({meta}.procedure_of({call}))'
     types=[f'{meta}.type_proc_return_type({signature},{i})' for i in range(len(fields))]
     if len(fields)==1:return types[0]
     return 'struct{'+','.join(name+':'+typ for (name,_),typ in zip(fields,types))+'}'
@@ -336,7 +339,7 @@ def render(source,node,constant=False):
         if not fields and supplied:error(node,'The callback has no return values; result_type cannot be supplied.')
         helper=source.prefix+f'result_call_{node.start}'
         result_name=source.prefix+'Result'
-        params=[];args=[];arranged={};explicit=None;bound_values={}
+        params=[];args=[];arranged={};explicit=None;bound_values={};known_value=None
         callback_name=names[default.callback]
         enabled=resolver.native_enabled;resolver.native_enabled=True
         try:candidates=resolver.procedure_candidates(callback)
@@ -344,7 +347,8 @@ def render(source,node,constant=False):
         from . import parallelcompile
         checked_mapping=bool(source.purity and parallelcompile.is_call(resolver,node) and
             (source.purity.checked(source.purity.owner(node)) or source.purity.eval_mode and node in source.purity.calls.targets))
-        specialized=checked_mapping or len(candidates)>1 or any(part.kind=='PolyType' for part in descendants(result[0]))
+        static_callback=result.spread is not None and parallelcompile.known_callback(resolver,callback)
+        specialized=static_callback or checked_mapping or len(candidates)>1 or any(part.kind=='PolyType' for part in descendants(result[0]))
         constant_parameters={name.text.lstrip('$') for field in signature.role('params').children
                              for name in field.group('names') if name.kind=='PolyType'}
         for index,arg in enumerate(node.group('args')):
@@ -352,13 +356,14 @@ def render(source,node,constant=False):
             value=arg.role('value') if arg.kind=='FieldValue' else arg
             if name=='__thor_pmap_spread' and result.spread is not None:error(arg,"pmap's argument mode is inferred and cannot be supplied explicitly.")
             if name==default.name:explicit=source.render(value,constant=True);continue
-            argument=source.prefix+f'arg_{len(params)}'
+            argument=(source.prefix+f'known_callback_{node.start}' if static_callback and name==callback_name else source.prefix+f'arg_{len(params)}')
             if name==callback_name and specialized:
                 source.needs_intrinsics=True
                 callback_type=source.prefix+f'Callback_{len(params)}'
                 callback_signature=f'type_of({source.prefix}meta.procedure_of({witness}))'
-                params.append('$'+callback_type+':typeid');args.append(callback_signature)
-                params.append(argument+':'+callback_type)
+                if not static_callback:
+                    params.append('$'+callback_type+':typeid');args.append(callback_signature)
+                    params.append(argument+':'+callback_type)
                 bound_values[name]='cast('+callback_signature+')nil'
             elif name in constant_parameters:
                 params.append(f'${argument}:${source.prefix}Arg_{len(params)}')
@@ -369,8 +374,10 @@ def render(source,node,constant=False):
             checked=source.purity.calls.targets.get(node,[]) if name==callback_name and source.purity and parallelcompile.is_call(resolver,node) else []
             target=checked[0] if checked else None
             if target and target in source.purity.calls.names and callback_literal is None:
-                args.append(source.purity.calls.access(source,target)+'_pmap')
-            else:args.append(callback_literal if name==callback_name and callback_literal else source.render(value,constant=constant))
+                value_code=source.purity.calls.access(source,target)+'_pmap'
+            else:value_code=callback_literal if name==callback_name and callback_literal else source.render(value,constant=constant)
+            if static_callback and name==callback_name:known_value=value_code
+            else:args.append(value_code)
         native=[]
         type_position=names.index(default.name)
         for index,name in enumerate(names):
@@ -380,8 +387,12 @@ def render(source,node,constant=False):
             elif name in arranged:native.append(arranged[name] if index<type_position else name+'='+arranged[name])
         if result.spread is not None:native.append('__thor_pmap_spread='+str(result.spread).lower())
         if fields:
-            params.insert(0,f'${result_name}:typeid');args.insert(0,explicit or type_code(source,node,witness,result))
-        target=source.expressions.module('parallel','thor:parallel')+'.pmap_checked' if checked_mapping else source.render(node.role('callee'))
+            inferred=(signature_code(source,node,f'type_of({source.render(callback)})',result)
+                      if result.spread is not None and not static_callback else type_code(source,node,witness,result))
+            params.insert(0,f'${result_name}:typeid');args.insert(0,explicit or inferred)
+        entry='_pmap_static_checked' if checked_mapping else '_pmap_static'
+        target=(source.expressions.module('parallel','thor:parallel')+'.'+entry if static_callback else
+                source.expressions.module('parallel','thor:parallel')+'.pmap_checked' if checked_mapping else source.render(node.role('callee')))
         from . import sourceidentity
         location=''.join(code for _,code in sourceidentity.caller_arguments(source,node,signature))
         native_call=target+'('+','.join(native)+location+')'
@@ -400,7 +411,10 @@ def render(source,node,constant=False):
                 else:continue
                 bound.append((name+'=' if index>type_position else '')+code)
             if result.spread is not None:bound.append('__thor_pmap_spread='+str(result.spread).lower())
-            bound_call=target+'('+','.join(bound)+')'
+            # This unevaluated witness uses a typed nil callback. Keep the
+            # ordinary signature rather than requiring a constant procedure.
+            bound_target=source.render(node.role('callee')) if static_callback else target
+            bound_call=bound_target+'('+','.join(bound)+')'
             for i in range(return_count):
                 output=source.prefix+f'Output_{i}'
                 params.append('$'+output+':typeid');output_types.append(output)
@@ -416,6 +430,16 @@ def render(source,node,constant=False):
                     token=source.expressions.error(node,'Pure pmap cannot mutate or delete job storage borrowed from an input.')
                     import json
                     checks.append('when '+condition+' {#panic('+json.dumps(token)+')}')
+        if known_value is not None:
+            job_type=f'type_of(({arranged["jobs"]})[0])'
+            if result.spread:
+                import json
+                typ=resolver.type_of(parameters['jobs']).elem
+                job_fields=list((typ.members or {}).items()) if typ else []
+                if typ and typ.node and not job_fields:job_fields=resolver.fields(typ.node.role('fields'))
+                arguments=','.join(f'{source.prefix}meta.type_field_type({job_type},{json.dumps(name)}){{}}' for name,_ in job_fields)
+            else:arguments=job_type+'{}'
+            checks.insert(0,arranged[callback_name]+'::'+source.prefix+'meta.procedure_of('+known_value+'('+arguments+'))')
         body='\n'.join(checks)+('\n' if checks else '')+('return ' if return_count else '')+native_call
         declaration=f'\n{helper}::proc({",".join(params)}){returns}{{{body}}}\n'
         source.expressions.helpers[source.expressions.helper_scope(node),helper]=source.mapping.wrap(declaration,source.path,node.start,node.end,'result-default')

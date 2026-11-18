@@ -1,5 +1,9 @@
 # pmap runtime comparison, 2026-11-18
 
+This records the baseline before callback specialization. See the
+[specialization follow-up](pmap-specialized-2026-11-18.md) for the implemented
+optimization and new measurements.
+
 For the supplied Hi-Lo projects, `pmap` and the existing thread-pool code have
 similar runtime. The important differences are callback inlining, thread reuse,
 and load balancing. No compiler or runtime implementation was changed for this

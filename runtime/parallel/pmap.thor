@@ -52,3 +52,41 @@ _pmap_actions :: proc(jobs: []$Job, calculate: $F,
 ) where intrinsics.type_proc_return_count(F)==0 {
     engine.map_actions(jobs, calculate, workers, allocator, worker_allocator, loc, __thor_pmap_spread)
 }
+
+// Compiler-only targets retaining a resolved callback as a constant value.
+_pmap_static :: proc { _pmap_values_static, _pmap_actions_static }
+_pmap_static_checked :: proc { _pmap_values_static_checked, _pmap_actions_static_checked }
+
+@(private="file")
+_pmap_values_static_checked :: proc(jobs:[]$Job,$calculate:$F,
+    $result_type:typeid=ti.result_type_of(calculate(Job{})),
+    workers:=0,allocator:=context.allocator,
+    worker_allocator:runtime.Allocator={runtime.heap_allocator_proc,nil},loc:=#caller_location,$__thor_pmap_spread:bool,
+)->[]result_type {
+    return engine.map_values_checked_static(jobs,calculate,result_type,workers,allocator,worker_allocator,loc,__thor_pmap_spread)
+}
+
+@(private="file")
+_pmap_actions_static_checked :: proc(jobs:[]$Job,$calculate:$F,
+    workers:=0,allocator:=context.allocator,
+    worker_allocator:runtime.Allocator={runtime.heap_allocator_proc,nil},loc:=#caller_location,$__thor_pmap_spread:bool,
+) where intrinsics.type_proc_return_count(F)==0 {
+    engine.map_actions_checked_static(jobs,calculate,workers,allocator,worker_allocator,loc,__thor_pmap_spread)
+}
+
+@(private="file")
+_pmap_values_static :: proc(jobs: []$Job, $calculate: $F,
+    $result_type: typeid = ti.result_type_of(calculate(Job{})),
+    workers := 0, allocator := context.allocator,
+    worker_allocator: runtime.Allocator = {runtime.heap_allocator_proc, nil}, loc := #caller_location, $__thor_pmap_spread: bool,
+) -> []result_type {
+    return engine.map_values_static(jobs, calculate, result_type, workers, allocator, worker_allocator, loc, __thor_pmap_spread)
+}
+
+@(private="file")
+_pmap_actions_static :: proc(jobs: []$Job, $calculate: $F,
+    workers := 0, allocator := context.allocator,
+    worker_allocator: runtime.Allocator = {runtime.heap_allocator_proc, nil}, loc := #caller_location, $__thor_pmap_spread: bool,
+) where intrinsics.type_proc_return_count(F)==0 {
+    engine.map_actions_static(jobs, calculate, workers, allocator, worker_allocator, loc, __thor_pmap_spread)
+}

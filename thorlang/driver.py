@@ -338,7 +338,9 @@ class Project:
                 result.append(f"-collection:{name}={mapped}")
             else:
                 result.append(flag)
-        for name in self.default_collections:
+        # Helper cache keys include flags. These compiler-owned collections
+        # have unique names, so emit their set in a stable order across runs.
+        for name in sorted(self.default_collections):
             result.append(f"-collection:{name}={self.backend_collections[name]}")
         if 'thor' not in self.collections:result.append(f"-collection:thor={self.backend_collections['thor']}")
         if self.support_collection not in self.default_collections:result.append(f"-collection:{self.support_collection}={self.backend_collections[self.support_collection]}")

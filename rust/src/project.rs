@@ -734,7 +734,10 @@ impl Project {
         self.collections
             .insert(project_collection.clone(), self.destination.clone());
         let mut jobs=Vec::new();
-        let lowering_imports=if purity.parallel_callbacks.is_empty(){vec![]}else{vec!["thor:parallel".to_string()]};
+        // Ordinary static callbacks also introduce a direct scheduler import,
+        // including when the public call came through basic or another re-export.
+        let parallel_source=self.options.root.join("runtime/parallel/pmap.thor");
+        let lowering_imports=if purity.parallel_callbacks.is_empty() && !self.sources.iter().any(|s|s.path==parallel_source){vec![]}else{vec!["thor:parallel".to_string()]};
         let mut planning_error=None;
         for (file,source) in self.sources.iter().enumerate() {
             if source.shared_native && !sdk.adapts(&source.path) { continue; }

@@ -50,6 +50,32 @@ Procedure aliases, overloads, procedure variables, default arguments, and `fn`
 callbacks are supported. If both whole-element and argument-bundle overloads
 match, select a specific callback to resolve the ambiguity.
 
+### Callback specialization
+
+Thor automatically specializes `pmap` when its callback is a procedure
+declaration, a procedure literal, or a compile-time procedure alias. This also
+works through imports, re-exports, overload groups, and polymorphic callbacks;
+no extra annotations or different call syntax are needed. The selected concrete
+procedure reaches the worker loop as a constant, so Odin can inline it and
+optimize the loop around it. Actual inlining remains the optimizer's decision.
+
+Runtime procedure variables, parameters, fields, indexed procedure values, and
+callback factories retain the runtime dispatch path. Their current value is
+evaluated once in the original argument order, including after reassignment:
+
+```odin
+callback: proc(int)->int = twice
+rows := basic.pmap([]int{2,3}, callback) // Runtime callback.
+defer delete(rows)
+```
+
+The two paths share the scheduler and allocation/ownership behavior. Selecting
+a callback at compile time adds no per-job branch, reflection, or allocation.
+It can produce more native code when a program maps many distinct callbacks.
+The same specialization applies inside `fn` and `#run`; it does not relax purity
+or slice-permission checks. TLS continues to show the public callback and result
+types, and debug builds retain callback source breakpoints.
+
 A pointer field in a bundle remains a pointer when the bundle is copied.
 `proc(value:int,destination:^int)` can write `destination^` without receiving
 the address of the job struct. Writing through that pointer updates its target;
