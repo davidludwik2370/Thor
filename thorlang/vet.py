@@ -152,7 +152,7 @@ class PortableBodies:
         return self.known[root,argument_contracts]
 
 
-def candidates(project, checks, pure_exemptions=()):
+def candidates(project, checks):
     if not {'immutable', 'pure'}.intersection(checks):
         return []
     root = project.entry.parent if project.file_entry else project.entry
@@ -208,8 +208,7 @@ def candidates(project, checks, pure_exemptions=()):
                     result.append(Fix(source, *separator, b'>', 'immutable', label, names[0].start, names[-1].end))
             values = node.group('values')
             if ('pure' not in checks or len(values) != 1 or values[0].kind != 'Procedure'
-                    or len(names) != 1 or names[0].text == 'main'
-                    or (str(source.path), names[0].start) in pure_exemptions):
+                    or len(names) != 1 or names[0].text == 'main'):
                 continue
             proc = values[0]
             signature = proc.role('type')
@@ -372,8 +371,7 @@ def apply(fixes):
 def run(project, options, flags, native_errors=None):
     checks = CHECKS if options.vet is None else tuple(options.vet.split(','))
     from .vet_unused import analyze
-    unused_findings, immutable_exemptions, import_fixes, pure_exemptions = analyze(project, include_unused='unused' in checks) if {'unused', 'immutable'}.intersection(checks) else ([], [], [], [])
-    pure_exemptions = {(str(node.source.path), node.start) for node in pure_exemptions}
+    unused_findings, immutable_exemptions, import_fixes = analyze(project, include_unused='unused' in checks) if {'unused', 'immutable'}.intersection(checks) else ([], [], [])
     exempt_offsets = {}
     for node in immutable_exemptions:
         exempt_offsets.setdefault(str(node.source.path), []).append(node.start)
@@ -387,7 +385,7 @@ def run(project, options, flags, native_errors=None):
         index = bisect_left(offsets, fix.highlight_start)
         return index < len(offsets) and offsets[index] < fix.highlight_end
 
-    proposed = [*import_fixes, *(fix for fix in candidates(project, checks, pure_exemptions) if not exempt_declaration(fix))]
+    proposed = [*import_fixes, *(fix for fix in candidates(project, checks) if not exempt_declaration(fix))]
     findings = unused_findings if 'unused' in checks else []
     if native_errors is not None:
         reported = {(finding['pos']['file'], finding['pos']['offset'], tuple(finding['msgs']))

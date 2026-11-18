@@ -168,7 +168,6 @@ pub(super) struct Analysis {
     pub(super) findings: Vec<Value>,
     pub(super) immutable_exemptions: Vec<Ref>,
     pub(super) import_fixes: Vec<Fix>,
-    pub(super) pure_exemptions: Vec<Ref>,
 }
 
 fn procedure_value(resolver: &Resolver<'_>, mut at: Ref) -> bool {
@@ -532,9 +531,6 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         // no immutable advice. Any ordinary use makes them eligible again.
         if !observed.contains(index) && !types.contains(index) {
             analysis.immutable_exemptions.push(at);
-        }
-        if procedures.contains(index) && !observed.contains(index) {
-            analysis.pure_exemptions.push(at);
         }
         if used.contains(index) {
             continue;

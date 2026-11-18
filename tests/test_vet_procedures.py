@@ -135,27 +135,30 @@ main::proc(){}
             packet, _ = json.JSONDecoder().raw_decode(result.stderr.lstrip())
             self.assertEqual(packet['errors'], [])
 
-    def test_unused_procedure_takes_priority_over_pure_advice_and_is_not_applied(self):
+    def test_unused_procedure_also_gets_pure_advice_and_is_converted_without_removal(self):
         text = 'package main\nanswer::proc()->int{return 1}\nmain::proc(){}\n'
         for engine in ('python','rust'):
+            self.write(text)
+            _, errors = self.invoke(engine)
+            self.assertEqual([error['code'] for error in errors],['thor/unused-procedure','thor/prefer-fn'])
             for option in ('--apply','--ask'):
                 self.write(text)
                 result, errors = self.invoke(engine,option,input='y\n')
-                self.assertNotIn('[y/N]',result.stdout)
+                self.assertEqual('[y/N]' in result.stdout, option=='--ask')
                 self.assertEqual([error['code'] for error in errors],['thor/unused-procedure'])
-                self.assertEqual(self.source.read_text(),text)
+                self.assertEqual(self.source.read_text(),text.replace('answer::proc','answer::fn'))
             self.write(text.replace('main::proc(){}','main::proc(){_=answer()}'))
             _, errors = self.invoke(engine,'--apply')
             self.assertEqual(errors, [])
             self.assertIn('answer::fn()',self.source.read_text())
 
-    def test_explicit_discards_silence_unused_procedures_and_combined_pure_advice(self):
+    def test_explicit_discards_silence_unused_procedures_but_keep_pure_advice(self):
         text = 'package main\nanswer::proc()->int{return 1}\nmain::proc(){_=answer}\n'
         for engine in ('python','rust'):
             self.write(text)
             _, errors = self.invoke(engine,'--apply')
             self.assertEqual(errors, [])
-            self.assertEqual(self.source.read_text(),text)
+            self.assertEqual(self.source.read_text(),text.replace('answer::proc','answer::fn'))
 
     def test_procedure_warning_positions_follow_removed_import_lines(self):
         text = '// 😀\npackage main\nimport "core:thread"\nunused::proc(){}\nmain::proc(){}\n'
@@ -175,7 +178,7 @@ main::proc(){}
         self.assertTrue(errors[0]['pos']['file'].endswith('/library/main.thor'))
         self.assertEqual(updated,text.encode())
 
-    def test_unused_procedures_skip_purity_analysis_and_correction_validation(self):
+    def test_unused_procedure_pure_suggestions_share_one_validation_batch(self):
         self.write('package main\n'+''.join(f'unused_{i}::proc(x:int)->int{{return x+1}}\n' for i in range(64))+'main::proc(){}\n')
         profile = self.root/'profile.json'
         result = subprocess.run([str(native.RUST),'vet',str(self.app),'-json-errors',
@@ -183,11 +186,12 @@ main::proc(){}
                                 env={**os.environ,'THOR_PROFILE':str(profile)},timeout=90)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         errors = json.loads(result.stderr)['errors']
-        self.assertEqual(len(errors),64,errors)
-        self.assertTrue(all(error['code']=='thor/unused-procedure' for error in errors))
+        self.assertEqual(len(errors),128,errors)
+        self.assertEqual(sum(error['code']=='thor/unused-procedure' for error in errors),64)
+        self.assertEqual(sum(error['code']=='thor/prefer-fn' for error in errors),64)
         counters = json.loads(profile.read_text())['counters']
-        self.assertEqual(counters.get('vet.validation_checks',0),0,counters)
-        self.assertEqual(counters.get('vet.portability_body_scans',0),0,counters)
+        self.assertEqual(counters.get('vet.validation_checks'),1,counters)
+        self.assertEqual(counters.get('vet.portability_body_scans'),64,counters)
 
     def test_foreign_prototypes_are_not_unused_procedure_definitions(self):
         text = 'package main\nforeign import libc "system:c"\nforeign libc {puts::proc "c"(text:cstring)->i32 ---}\nmain::proc(){}\n'

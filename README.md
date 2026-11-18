@@ -628,10 +628,11 @@ it does not trace unused values through other bindings or report overwritten
 initializers when the binding is subsequently used.
 Unused values, types and procedures have no removal edit: initializer effects,
 allocations and public declarations require review. `--apply` and `--ask`
-preserve them. With the `unused` check enabled, unused procedures take priority
-over pure-function advice; bindings used only in `_ = procedure_name` discards
-also receive no pure conversion. Selecting only `--vet=pure` checks that
-convention independently.
+preserve their declarations. Pure-function advice is independent of usage:
+an eligible unused procedure receives both `thor/unused-procedure` and
+`thor/prefer-fn` warnings. `--apply` converts its `proc` keyword to `fn`, and
+the unused warning remains. An explicit `_ = procedure_name` use suppresses
+the unused warning while retaining applicable pure-function advice.
 Unused imports have compiler-validated removal edits. Whole selective or wildcard
 imports can be removed when unused; if any selected member or the namespace is
 used, the declaration remains. A standalone unused import's entire line,
@@ -646,8 +647,8 @@ unused name receives no immutable suggestion or conversion, including when a
 group contains both used and unused names. After those names are used or removed,
 the remaining declaration can qualify for an immutable suggestion. This also
 applies when selecting only the `immutable` check.
-Bindings used only in explicit `_ = name` discards receive no immutable
-suggestions, automatic conversions, or TLS quick fixes. Any other use of the
+Bindings used only in explicit `_ = name` discards receive no immutable-binding
+suggestions, conversions, or related TLS quick fixes. Any other use of the
 binding makes it eligible for immutable advice again, regardless of the
 discard's position. Expressions such as `_ = name + 1` count as ordinary uses.
 The `semicolon` check reports unnecessary statement terminators with the

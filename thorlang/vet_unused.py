@@ -348,7 +348,7 @@ def analyze(project, *, include_unused=True):
                             observed.add((symbol.declaration, symbol.name))
                 pending.extend((child, certain) for child in node.children)
     adapter = project.diagnostic_adapter()
-    findings, immutable_exemptions, pure_exemptions = [], [], []
+    findings, immutable_exemptions = [], []
     for key, symbol in candidates.items():
         if symbol.node not in certain_names:
             continue
@@ -356,8 +356,6 @@ def analyze(project, *, include_unused=True):
         # no immutable advice. Any ordinary use makes them eligible again.
         if key not in observed and key not in types:
             immutable_exemptions.append(symbol.node)
-        if key in procedures and key not in observed:
-            pure_exemptions.append(symbol.node)
         if key in used:
             continue
         node = symbol.node
@@ -371,4 +369,4 @@ def analyze(project, *, include_unused=True):
                          'pos': adapter.locate(Origin(str(node.source.path), start, node.end)),
                          'msgs': [message]})
     findings.extend({key: value for key, value in fix.diagnostic(adapter).items() if key != 'fix'} for fix in import_fixes)
-    return sorted(findings, key=lambda finding: (finding['pos']['file'], finding['pos']['offset'])), immutable_exemptions, import_fixes, pure_exemptions
+    return sorted(findings, key=lambda finding: (finding['pos']['file'], finding['pos']['offset'])), immutable_exemptions, import_fixes

@@ -51,18 +51,25 @@ class VetDeclarationTLSTests(unittest.TestCase):
         text = '// 😀\npackage main\nunused_proc::proc()->int{return 1}\nunused_fn::fn()->int{return 1}\nmain::proc(){}\n'
         client, path = self.open(text, vet=True)
         errors = client.diagnostic(path.as_uri(), code='thor/unused-procedure')
-        self.assertEqual([error['code'] for error in errors], ['thor/unused-procedure']*2)
+        unused = [error for error in errors if error['code']=='thor/unused-procedure']
+        self.assertEqual(len(unused),2)
+        self.assertEqual(sum(error['code']=='thor/prefer-fn' for error in errors),1)
         for word in ('unused_proc::','unused_fn::'):
-            error = next(error for error in errors if error['range']['start'] == self.position(text,word,0))
+            error = next(error for error in unused if error['range']['start'] == self.position(text,word,0))
             self.assertEqual(error['severity'],2)
             self.assertEqual(error['tags'],[1])
-            self.assertEqual(self.actions(client,path,text,word), [])
+            actions = self.actions(client,path,text,word)
+            self.assertEqual([action['title'] for action in actions], ['Declare as fn'] if word=='unused_proc::' else [])
+            self.assertFalse(any('remove' in action['title'].lower() for action in actions))
         changed = text.replace('main::proc(){}','main::proc(){_=unused_proc();_=unused_fn()}')
         client.notifications.clear()
         client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
             'contentChanges':[{'text':changed}]})
         # Only the independent pure-style advice remains for the used proc.
-        errors = client.diagnostic(path.as_uri(),code='thor/prefer-fn')
+        snapshot = 14695981039346656037
+        for byte in changed.encode():
+            snapshot = ((snapshot ^ byte)*1099511628211) & ((1 << 64)-1)
+        errors = client.diagnostic(path.as_uri(),code='thor/prefer-fn',snapshot=f'{snapshot:016x}')
         self.assertEqual([error['code'] for error in errors], ['thor/prefer-fn'])
         self.assertEqual(path.read_text(),text)
 
