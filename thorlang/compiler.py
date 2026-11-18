@@ -422,6 +422,8 @@ class Source:
 
     def denotes_type(self, expression, seen=None):
         """Recognize statically named types; Odin verifies the actual identity."""
+        from . import resulttypes
+        if self.resolver and resulttypes.is_query(self.resolver,expression):return True
         seen = set() if seen is None else seen
         if expression is None or expression in seen:
             return False
@@ -526,6 +528,11 @@ class Source:
         if self.resolver:
             shape = self.resolver.type_of(n)
             if shape.kind == "struct":
+                if shape.members is not None and shape.node is None:
+                    self.needs_intrinsics=True
+                    typ=self.expressions.type_code(hint)
+                    return {name:Hint(self,n,f'{self.prefix}meta.type_field_type({typ},{json.dumps(name)})',semantic=member)
+                            for name,member in shape.members.items()}
                 fields = shape.node.role("fields")
                 return {name.text: Hint(f.source, f.role("type")) for f in fields.children if f.kind == "Field"
                         for name in f.group("names")}
@@ -663,6 +670,9 @@ class Source:
         return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
+        from . import resulttypes
+        result_query=resulttypes.render(self,n,constant) if n not in self.run_values else None
+        if result_query is not None:return result_query
         parent = n.parent
         if n.kind == 'Ident' and parent and (parent.kind == 'Attribute' or parent.kind == 'FieldValue'
                 and parent.role('field') is n and any(owner.kind == 'Attribute' for owner in parent.ancestors())):

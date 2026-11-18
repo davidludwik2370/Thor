@@ -126,8 +126,8 @@ def resource(source, node, code):
     return f'({p} when ({absolute}) else {relative})'
 
 
-def caller_arguments(source, call):
-    signature = source.signature(call)
+def caller_arguments(source, call, signature=None):
+    signature = signature or source.signature(call)
     if signature is None: return []
     fields = [(f,n.text.lstrip('$')) for f in signature.role('params').children for n in f.group('names')]
     if not any(f.role('default') and f.role('default').text.startswith('#caller_') for f,_ in fields): return []

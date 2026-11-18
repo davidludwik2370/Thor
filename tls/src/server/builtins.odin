@@ -91,6 +91,9 @@ check_builtin_proc_return_type :: proc(
 	^ast.Expr,
 	bool,
 ) {
+	if thor_result_query(symbol) && len(call.args)==1 {
+		if inner,ok:=ast.unparen_expr(call.args[0]).derived.(^ast.Call_Expr);ok { return thor_result_record(ast_context,inner) }
+	}
 	if element, _, found := thor_extrema_return(ast_context, symbol, call); found { return element, true }
 	name := builtin_proc_name(symbol)
 	if name != "" {

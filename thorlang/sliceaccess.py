@@ -734,6 +734,8 @@ class SliceAccess:
         return roots,tuple(nodes),frozenset(context.effects),frozenset(context.issues)
 
     def call(self,node,context):
+        from . import resulttypes
+        if resulttypes.is_query(self.r,node):return Value(self.r.type_node(node))
         callee=node.role('callee');args=node.group('args')
         library=self.project.purity.library(node)
         if library==('thor:sets','insert') and node.source.import_dir(library[0])==(Path(__file__).resolve().parents[1]/'runtime/sets'):

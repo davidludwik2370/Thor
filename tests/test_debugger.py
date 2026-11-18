@@ -1094,6 +1094,37 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_parallel_map_generic_callback_keeps_source_breakpoints_and_result_fields(self):
+        text='''package main
+import "thor:basic"
+Job::struct{left,right:int}
+calculate::proc(a,b:$T)->(sum,product:T){
+    sum=a+b
+    product=a*b
+    return
+}
+main::proc(){
+    jobs:=[]Job{{2,3}}
+    rows:=basic.pmap(jobs,calculate,workers=1)
+    defer delete(rows)
+    if rows[0].sum!=5 || rows[0].product!=6 {panic("mapped result")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[5,13])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),5),frame)
+        self.assertIn('calculate',frame['name'])
+        for expression,expected in [('a','2'),('b','3')]:
+            value=client.request('evaluate',{'frameId':frame['id'],'expression':expression,'context':'watch'})
+            self.assertEqual(value['result'],expected,value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),13),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'rows.data[0].sum','context':'watch'})
+        self.assertEqual(value['result'],'5',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def build(self, text, files=None, *, vet=False):
         temporary = tempfile.TemporaryDirectory(prefix='thor-dap-')
         self.addCleanup(temporary.cleanup)

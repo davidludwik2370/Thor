@@ -194,7 +194,7 @@ class Purity:
               'make','copy','delete','assert','assert_contextless','panic'}
     sequence_mutators={'append','clear','pop','pop_safe','pop_front','pop_front_safe'}
     builtins |= sequence_mutators
-    type_queries={'type_of','size_of','align_of','offset_of'}
+    type_queries={'type_of','size_of','align_of','offset_of','result_type_of'}
     libraries={('thor:format','format'),('thor:format','format_plain'),('thor:format','format_options'),('thor:format','format_spec'),
                ('thor:format','group_integer'),('core:strings','clone'),('core:slice','clone')}
     libraries |= {('thor:big',name) for name in ['from_integer','rational_from_integer','fraction','parse_integer','parse_rational','parse_fraction','clone','numerator','denominator','to_string','equal','is_zero','sum','ascending','descending']}
@@ -436,6 +436,8 @@ class Purity:
         return None
 
     def builtin(self,call):
+        from . import resulttypes
+        if resulttypes.is_query(self.r,call):return 'result_type_of'
         extrema=call.source.expressions.extrema.builtin(call.role('callee'))
         if extrema:return extrema
         callee=call.role('callee')

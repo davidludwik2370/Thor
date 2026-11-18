@@ -919,6 +919,15 @@ expand_call_args :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -> ([]C
 	for arg in call.args {
 		reset_ast_context(ast_context)
 		ast_context.current_package = ast_context.document_package
+		if unary,spread:=ast.unparen_expr(arg).derived.(^ast.Unary_Expr);spread && unary.op.kind==.Mul_Mul {
+			expanded,ok:=expand_values(ast_context,unary.expr,context.temp_allocator)
+			if !ok { all_valid=false;continue }
+			procedure:=expanded.expr.derived.(^ast.Proc_Type)
+			for field in procedure.results.list {
+				if !append_arg(ast_context,field.type,&results,&used_named) { all_valid=false }
+			}
+			continue
+		}
 		if !append_arg(ast_context, arg, &results, &used_named) {
 			all_valid = false
 			append(&results, CallArg{})
@@ -1201,7 +1210,17 @@ resolve_function_overload :: proc(ast_context: ^AstContext, group: ^ast.Proc_Gro
 	candidates := make([dynamic]Candidate, context.temp_allocator)
 	call_args, ok := expand_call_args(ast_context, call_expr)
 	if !ok {
-		return {}, false
+		// A dependent result query can resolve a callback overload from the
+		// input fields even when the bare callback has no selected type yet.
+		dependent:=false
+		for expression in group.args {
+			local:=ast_context^
+			local.call=nil
+			if symbol,found:=resolve_type_expression(&local,expression);found {
+				if procedure,ok:=symbol.value.(SymbolProcedureValue);ok && thor_has_result_default(&local,procedure) {dependent=true;break}
+			}
+		}
+		if !dependent {return {},false}
 	}
 
 	if !resolve_all_possibilities {
@@ -1232,6 +1251,8 @@ resolve_function_overload :: proc(ast_context: ^AstContext, group: ^ast.Proc_Gro
 			continue
 		}
 		if procedure, ok := f.value.(SymbolProcedureValue); ok {
+			if procedure.thor_result_default==.Invalid {continue}
+			if procedure.thor_result_default==.Resolved {candidate.score-=1000}
 			i := 0
 			total_arg_count := proc_total_arg_count(procedure)
 			is_variadic := proc_has_variadic_arg(procedure)
@@ -1287,6 +1308,10 @@ resolve_function_overload :: proc(ast_context: ^AstContext, group: ^ast.Proc_Gro
 
 					if proc_arg_is_value_poly(procedure, arg_index) && !call_arg.is_constant {
 						continue args
+					}
+					if original,poly:=orig_arg.derived.(^ast.Poly_Type);poly && original.specialization==nil {
+						candidate.score+=1
+						continue
 					}
 
 					expected_expr, expected_is_variadic := proc_field_type_for_call(proc_arg)
@@ -1717,6 +1742,7 @@ resolve_value_type_expression :: proc(ast_context: ^AstContext, expr: ^ast.Expr)
 			return {}, false
 		}
 		if builtin_proc_name(callee) == "type_of" { return resolve_type_of_call(ast_context, v) }
+		if thor_result_query(callee) { return resolve_thor_result_query(ast_context,v) }
 		#partial switch _ in callee.value{
 		case SymbolStructValue,SymbolUnionValue,SymbolBasicValue:
 			ok:=internal_resolve_type_expression(ast_context,v,&callee)
@@ -2254,6 +2280,7 @@ resolve_call_expr :: proc(ast_context: ^AstContext, v: ^ast.Call_Expr) -> (Symbo
 
 	ok := internal_resolve_type_expression(ast_context, v.expr, &symbol)
 	if ok && builtin_proc_name(symbol) == "type_of" { return resolve_type_of_call(ast_context, v) }
+	if ok && thor_result_query(symbol) { return resolve_thor_result_query(ast_context,v) }
 	if ok {
 		symbol = contextualize_objc_call_symbol(ast_context, symbol, v)
 	}
@@ -3024,7 +3051,7 @@ is_type_alias_call :: proc(ast_context: ^AstContext, expr: ^ast.Expr) -> bool {
 	alias_context.call = nil
 	callee, found := resolve_type_expression(&alias_context, call.expr)
 	if !found { return false }
-	if builtin_proc_name(callee) == "type_of" { return true }
+	if builtin_proc_name(callee) == "type_of" || thor_result_query(callee) { return true }
 	#partial switch value in callee.value {
 	case SymbolStructValue: return value.poly != nil
 	case SymbolUnionValue: return value.poly != nil
@@ -3795,6 +3822,7 @@ resolve_symbol_return :: proc(ast_context: ^AstContext, symbol: Symbol, ok := tr
 	case SymbolProcedureValue:
 		// Keep builtin identity when an imported/local alias changes name/pkg.
 		if symbol.pkg == "$builtin" && v.builtin_name == "" { v.builtin_name = symbol.name }
+		if thor_result_query(symbol) { return symbol,true }
 		if v.generic {
 			if resolved_symbol, ok := resolve_generic_function(
 				ast_context,

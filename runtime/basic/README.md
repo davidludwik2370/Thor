@@ -61,6 +61,7 @@ Compile-time array/slice concatenation uses the language's `A ++ B` operator.
 | `deepclone(source: ^T, allocator=..., scratch_allocator=...)` | Return a heap root and `Deep_Error`; copy supported reachable data while preserving cycles, shared storage, overlapping views and interior pointers. |
 | `deepfree(root: ^T, allocator=..., scratch_allocator=...)` | Free a clone-owned graph once, returning `Deep_Error`. Use the same destination allocator and preserve ownership boundaries/reachability until cleanup. |
 | `fmap(values, callback, allocator=...)` | Allocate an element-wise mapped slice with the same element type. |
+| `pmap(jobs, callback, result_type=..., workers=0, allocator=..., worker_allocator=...)` | Map struct jobs with bounded parallel workers, preserving order. [Results and ownership](../parallel/README.md). |
 | `split(text, sep="\n", allocator=...)` | Allocate a slice of borrowed string views into `text`. |
 | `join(values, sep="", allocator=...)` | Allocate a joined string. |
 | `to_set(values, allocator=...)`, `to_slice(set, allocator=...)` | Allocate independent containers; element copies are shallow and set order is unspecified. Also exported by `thor:sets`. |

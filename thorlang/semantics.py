@@ -438,6 +438,11 @@ class Resolver:
         if n is None:
             return Type()
         substitutions = substitutions or {}
+        from . import resulttypes
+        if resulttypes.is_query(self,n):
+            call=resulttypes.expression(n)
+            result=resulttypes.resolve(self,call,substitutions) if call else None
+            return resulttypes.packed(result) if result else Type()
         seen = set() if seen is None else seen
         key = (n, "type")
         if key in seen:
@@ -657,6 +662,11 @@ class Resolver:
     def _type_of(self, n, seen=None):
         if n is None:
             return Type()
+        from . import resulttypes
+        if resulttypes.is_query(self,n):
+            call=resulttypes.expression(n)
+            result=resulttypes.resolve(self,call) if call else None
+            return resulttypes.packed(result) if result else Type()
         seen = set() if seen is None else seen
         if n in seen:
             return Type(node=n)
@@ -1124,6 +1134,16 @@ class Resolver:
                         if actual.kind=='AutoCast' and amount<0:amount=0
                         score += amount
                         valid &= amount >= 0
+                if valid:
+                    from . import resulttypes
+                    for default in resulttypes.defaults(self,signature):
+                        bound=resulttypes.default_bindings(self,signature,call,default)
+                        if bound and bound[2].get(default.name) is default.query:
+                            result=resulttypes.resolve(self,default.call,bound[0],bound[1])
+                            if result:
+                                if not result[1]:valid=False;break
+                                substitutions[default.name]=resulttypes.packed(result)
+                                score+=1
                 if valid:
                     candidates.append(Candidate(symbol, signature, substitutions, score))
             if not candidates:

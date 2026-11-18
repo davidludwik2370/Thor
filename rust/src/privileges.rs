@@ -2701,6 +2701,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
     }
     fn call(&mut self, r: Ref, c: C) -> V {
+        if crate::resulttypes::is_query(self.r,r) {
+            let typ=self.typ(r,c);
+            return self.value(typ);
+        }
         let _phase = crate::profile::span("permissions.calls");
         let Some(callee) = self.role(r, "callee") else {
             return self.value(Type::Unknown);

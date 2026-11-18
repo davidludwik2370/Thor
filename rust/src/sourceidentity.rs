@@ -189,6 +189,9 @@ impl Lower<'_, '_> {
         let Some(signature) = self.resolver.call_signature(self.reference(call)) else {
             return Ok(vec![]);
         };
+        self.caller_arguments_for_signature(call,signature)
+    }
+    pub(super) fn caller_arguments_for_signature(&mut self,call:NodeId,signature:Ref)->Result<Vec<(usize,Code)>> {
         let source = &self.resolver.sources[signature.file];
         let Some(params) = source.role(signature.node, "params") else {
             return Ok(vec![]);

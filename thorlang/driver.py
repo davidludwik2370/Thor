@@ -258,7 +258,6 @@ class Project:
         self.backend_collections[self.support_collection]=runtime_base
         directories={path.parent:output.parent for path,output in self.outputs.items()}
         def import_path(source,path):
-            if path.startswith('thor:') and ('thor' in self.default_collections or source.path.is_relative_to(ROOT/'runtime')):return path
             original=source.import_dir(path)
             target=directories.get(original)
             return os.path.relpath(target,self.outputs[source.path].parent).replace(os.sep,'/') if target else path

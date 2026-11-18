@@ -293,6 +293,11 @@ impl Resolver<'_> {
             })
     }
     fn specialize(&mut self, r: Ref, bindings: &Substitutions, seen: &mut HashSet<Ref>) -> Type {
+        if crate::resulttypes::is_query(self,r) {
+            return crate::resulttypes::expression(self,r)
+                .and_then(|call|crate::resulttypes::resolve(self,call,bindings,None))
+                .map(|results|crate::resulttypes::packed_type(&results)).unwrap_or(Type::Unknown);
+        }
         if let Some(typ)=self.logical_constant_type(r){return typ;}
         if !seen.insert(r) {
             return Type::Unknown;

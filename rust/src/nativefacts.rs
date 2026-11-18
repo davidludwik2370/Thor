@@ -2,6 +2,39 @@
 use super::*;
 
 impl Project {
+    pub(super) fn discover_result_facts(&mut self)->Result<()> {
+        let mut resolver=self.resolver();
+        let mut packages=BTreeSet::new();
+        let mut seen=HashSet::new();
+        for file in 0..self.sources.len() {
+            let source=&self.sources[file];
+            if !source.thor || source.shared_native {continue;}
+            for (index,_) in source.nodes.iter().enumerate().filter(|(_,node)|node.kind=="Call") {
+                let site=crate::semantics::Ref{file,node:crate::ast::NodeId(index)};
+                if crate::resulttypes::is_query(&resolver,site) {
+                    if let Some(call)=crate::resulttypes::expression(&resolver,site) {
+                        if let Some(callee)=source.role(call.node,"callee") {
+                            Self::referenced_packages(&resolver,crate::semantics::Ref{file,node:callee},&mut seen,&mut packages)?;
+                        }
+                    }
+                } else if let Some(callee)=source.role(site.node,"callee") {
+                    for candidate in resolver.candidates(crate::semantics::Ref{file,node:callee}) {
+                        let owner=&resolver.sources[candidate.file];
+                        let signature=if owner.node(candidate.node).kind=="Procedure" {crate::semantics::Ref{node:owner.role(candidate.node,"type").unwrap_or(candidate.node),..candidate}}else{candidate};
+                        for query in crate::resulttypes::default_queries(&resolver,signature) {
+                            if let Some((_,callback,_))=crate::resulttypes::bind_default(&mut resolver,site,signature,&query) {
+                                Self::referenced_packages(&resolver,callback,&mut seen,&mut packages)?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        packages.retain(|directory|!self.sources.iter().any(|source|source.path.parent()==Some(directory)));
+        self.retain_resolver(resolver);
+        if !packages.is_empty(){self.discover_type_facts_from(packages)?;}
+        Ok(())
+    }
     pub(super) fn discover_expression_facts(&mut self) -> Result<()> {
         let _phase = crate::profile::span("analysis.discover_expressions");
         use crate::{ast::NodeId, semantics::Ref};

@@ -717,6 +717,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         format!("{subject} cannot call '{}' because it performs I/O. Use proc for I/O and keep it outside fn/#run call chains.",self.text(callee))
     }
     fn call(&mut self, root: Ref, proc: Ref, call: Ref, bindings: &Substitutions, via: &[Ref]) {
+        if crate::resulttypes::is_query(self.r,call) {return;}
         let Some(callee) = self.role(call, "callee") else {
             self.gap(root, call);
             return;

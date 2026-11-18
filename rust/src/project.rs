@@ -537,6 +537,7 @@ impl Project {
     pub fn inspect_sources(&mut self) -> Result<()> {
         let _phase = crate::profile::span("analysis.inspect_sources");
         self.discover_type_facts()?;
+        self.discover_result_facts()?;
         self.discover_expression_facts()?;
         self.discover_call_facts()?;
         self.source_facts = Some(SourceFacts {

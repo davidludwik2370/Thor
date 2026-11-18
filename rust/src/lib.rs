@@ -36,6 +36,7 @@ pub mod project_template;
 pub mod purity;
 mod purediagnostics;
 pub mod semantics;
+mod resulttypes;
 pub mod specialization;
 pub mod values;
 pub mod vet;

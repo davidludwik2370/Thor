@@ -67,6 +67,8 @@ mod temporaries;
 mod sourceidentity;
 #[path = "branchlocations.rs"]
 mod branchlocations;
+#[path = "resultlower.rs"]
+mod resultlower;
 
 #[derive(Clone, Debug)]
 pub struct Hint {
@@ -983,6 +985,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         if let Some(code) = self.switch_replacements.get(&id) {
             return Ok(code.clone());
         }
+        if self.source.node(id).kind=="Call" {
+            if let Some(code)=self.result_query(id)? {return Ok(code);}
+        }
         if !self.evaluated_busy.contains(&id) {
             if self.specialized.contains_key(&id) {
                 self.evaluated_busy.insert(id);
@@ -1149,6 +1154,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if kind == "Field" {
+            if let Some(code)=self.result_query_field(id)? {return Ok(code);}
             if let Some(code) = self.pure_result_field(id)? {
                 return Ok(code);
             }
@@ -1194,6 +1200,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             return self.comprehension(id, expected, constant);
         }
         if kind == "Call" {
+            if let Some(code)=self.result_default_call(id,constant)? {return Ok(code);}
             if let Some(code) = self.extrema(id, constant)? {
                 return Ok(code);
             }

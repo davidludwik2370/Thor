@@ -1233,6 +1233,14 @@ impl<'a> Resolver<'a> {
         }
     }
     pub fn type_of(&mut self, reference: Ref) -> Type {
+        if crate::resulttypes::is_query(self,reference) {
+            if let Some(call)=crate::resulttypes::expression(self,reference) {
+                if let Some(results)=crate::resulttypes::resolve(self,call,&Substitutions::new(),None) {
+                    return crate::resulttypes::packed_type(&results);
+                }
+            }
+            return Type::Unknown;
+        }
         if (!self.bound_types.is_empty() || !self.bound_constants.is_empty())
             && matches!(
                 self.sources[reference.file]
@@ -1863,6 +1871,7 @@ impl<'a> Resolver<'a> {
         self.known_type_seen(r,&mut HashSet::new())
     }
     fn known_type_seen(&self,r:Ref,seen:&mut HashSet<Ref>)->bool {
+        if crate::resulttypes::is_query(self,r) {return true;}
         if !seen.insert(r){return false;}
         let source=&self.sources[r.file];let node=source.node(r.node);
         if node.kind=="Paren" {return source.role(r.node,"expr").is_some_and(|node|self.known_type_seen(Ref{file:r.file,node},seen));}
@@ -1880,6 +1889,7 @@ impl<'a> Resolver<'a> {
         self.type_operand(r, &mut HashSet::new())
     }
     fn type_operand(&self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
+        if crate::resulttypes::is_query(self,r) {return true;}
         if !seen.insert(r) {
             return false;
         }

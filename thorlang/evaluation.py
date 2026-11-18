@@ -34,6 +34,7 @@ class Evaluator:
         self.explicit_arguments=0
         self.specializations=Specializations(self)
         self.result_bindings={}
+        self.query_imports={}
         self.r.evaluated_integer=self.constant_integer
         self.r.evaluation_active=True
         from .native import NativeSources
@@ -307,13 +308,28 @@ class Evaluator:
         args=n.group('args')
         if len(args)!=(2 if self.purity.builtin(n)=='offset_of' else 1):return None
         arg=args[0]
-        typ=self.r.type_node(arg) if arg.source.denotes_type(arg) else self.r.type_of(arg)
+        result_query=self.purity.builtin(n)=='result_type_of'
+        typ=self.r.type_node(n) if result_query else self.r.type_node(arg) if arg.source.denotes_type(arg) else self.r.type_of(arg)
         if typ.kind in {'generic','unknown'}:return None
         n.source.evaluation_context=n
+        previous_import=getattr(n.source,'evaluation_import',None)
+        query_imports={}
+        if result_query:
+            def imported(target):
+                directory=target.path.parent
+                alias=n.source.prefix+'evaluation_result_type_'+hashlib.sha256(str(directory).encode()).hexdigest()[:12]
+                query_imports[alias]=os.path.relpath(directory,n.source.path.parent)
+                return alias+'.'
+            n.source.evaluation_import=imported
         try:code=type_code(typ,n.source,self.r)
         except Unresolved:return None
+        finally:
+            if result_query:
+                if previous_import is None:del n.source.evaluation_import
+                else:n.source.evaluation_import=previous_import
+        self.query_imports[n]=query_imports
         builtin=self.purity.builtin(n)
-        if builtin!='type_of':code=builtin+'('+code+''.join(','+a.text for a in args[1:])+')'
+        if builtin not in {'type_of','result_type_of'}:code=builtin+'('+code+''.join(','+a.text for a in args[1:])+')'
         return code,typ
 
     def known(self,n,seen=None):
@@ -693,10 +709,14 @@ class Evaluator:
                 code,typ=query;queries[node]=code
                 for namespace in node.source.imports:
                     if node.source.namespace_code(namespace)+'.' in code:imports.setdefault(node.source,set()).add(namespace)
-                if typ.node and typ.node is not node:
-                    parent=typ.node.parent
-                    if parent and parent.kind=='Declaration':declaration(parent)
-                    elif typ.node.kind.endswith('Type'):visit(typ.node)
+                def retain_type(typ):
+                    if typ.node and typ.node is not node:
+                        parent=typ.node.parent
+                        if parent and parent.kind=='Declaration':declaration(parent)
+                        elif typ.node.kind.endswith('Type'):visit(typ.node)
+                    if typ.elem:retain_type(typ.elem)
+                    for field in (typ.members or {}).values():retain_type(field)
+                retain_type(typ)
                 return
             if node.kind=='Run':
                 self.evaluate(node);visit(node.role('expr'));return
@@ -883,6 +903,7 @@ class Evaluator:
         for query,code in queries.items():
             node=node_copy(query)
             node.source.run_values[node]=code
+            node.source.expressions.modules.update(self.query_imports.get(query,{}))
         mode=next((flag.split(':',1)[1] for flag in self.p.flags if flag.startswith('-build-mode:')), 'exe')
         modes={'exe':'Executable','test':'Executable','dll':'Dynamic','shared':'Dynamic','dynamic':'Dynamic',
                'static':'Static','lib':'Static','obj':'Object','object':'Object',

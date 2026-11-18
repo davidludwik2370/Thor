@@ -386,12 +386,14 @@ get_poly_map :: proc(node: ^ast.Node, poly_map: ^map[string]^ast.Expr) -> (^ast.
 	}
 
 	if ident, ok := node.derived.(^ast.Ident); ok {
-		if v, ok := poly_map[ident.name]; ok && !is_generic_type_recursive(v, ident.name) {
+		if v, ok := poly_map[ident.name]; ok && (v.pos.file != node.pos.file || !is_generic_type_recursive(v, ident.name)) {
 			return v, ok
 		}
 	}
 	if poly, ok := node.derived.(^ast.Poly_Type); ok && poly.type != nil {
-		if v, ok := poly_map[poly.type.name]; ok && !is_generic_type_recursive(v, poly.type.name) {
+		// A caller's concrete Job and an imported $Job have the same spelling
+		// but different lexical origins; that binding is not self-recursive.
+		if v, ok := poly_map[poly.type.name]; ok && (v.pos.file != node.pos.file || !is_generic_type_recursive(v, poly.type.name)) {
 			return v, ok
 		}
 	}
@@ -646,6 +648,7 @@ resolve_generic_function_symbol :: proc(
 		}
 	}
 
+	result_default:=thor_result_defaults(ast_context,params,call_args,&poly_map)
 	for k, v in poly_map {
 		find_and_replace_poly_type(v, &poly_map)
 	}
@@ -654,15 +657,8 @@ resolve_generic_function_symbol :: proc(
 		return {}, false
 	}
 
-	function_name := ""
-
-	if ident, ok := call_expr.expr.derived.(^ast.Ident); ok {
-		function_name = ident.name
-	} else if selector, ok := call_expr.expr.derived.(^ast.Selector_Expr); ok {
-		function_name = selector.field.name
-	} else {
-		return {}, false
-	}
+	// The name is not part of type substitution. Inline polymorphic
+	// callbacks have the same parameter/result inference as named procs.
 
 	return_types := make([dynamic]^ast.Field, ast_context.allocator)
 	argument_types := make([dynamic]^ast.Field, ast_context.allocator)
@@ -723,6 +719,7 @@ resolve_generic_function_symbol :: proc(
 	procedure := proc_symbol.value.(SymbolProcedureValue)
 	procedure.return_types, procedure.arg_types = return_types[:], argument_types[:]
 	procedure.orig_arg_types, procedure.orig_return_types = params[:], results[:]
+	procedure.thor_result_default=result_default
 	procedure.inlining, procedure.generic = inlining, false
 	symbol.value = procedure
 

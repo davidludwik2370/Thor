@@ -209,6 +209,18 @@ impl Resolver<'_> {
                 .collect::<Vec<_>>();
             let mut bindings = context.clone();
             bindings.extend(self.parameter_bindings(signature, &types));
+            let mut result_default_valid=true;
+            for query in crate::resulttypes::default_queries(self,signature) {
+                let default_used=arguments.iter().flatten().any(|arg|*arg==query.query);
+                if !default_used {continue;}
+                if let Some(callback)=arguments.get(query.callback).and_then(|group|group.first()).copied() {
+                    if let Some(results)=crate::resulttypes::resolve(self,query.call,&bindings,Some(callback)) {
+                        if results.fields.is_empty() {result_default_valid=false;break;}
+                        bindings.insert(query.name,crate::resulttypes::packed_type(&results));
+                    }
+                }
+            }
+            if !result_default_valid {continue;}
             let sites = arguments
                 .iter()
                 .map(|group| group.first().copied().unwrap_or(call))

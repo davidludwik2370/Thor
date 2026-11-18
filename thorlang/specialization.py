@@ -26,6 +26,8 @@ class Binding:
 
 def type_code(typ,source,resolver):
     if isinstance(typ,int):return str(typ)
+    if typ.kind=='struct' and typ.node is None and typ.members:
+        return 'struct{'+','.join(name+':'+type_code(member,source,resolver) for name,member in typ.members.items())+'}'
     if typ.nominal is None and typ.kind in {'scalar','string'} and typ.name:return typ.name
     # A pointer/sequence inferred from a local value is a structural type. Its
     # expression's enclosing declaration does not declare a named local type.

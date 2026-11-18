@@ -42,6 +42,7 @@ class Client:
                             'completion': {'completionItem': {'snippetSupport': True}},
                             'semanticTokens': {'requests': {'full': True}}}},
             'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
+                'collections': [{'name':'thor','path':str(ROOT/'runtime')}],
                 'odin_command': odin, 'thor_command': str(compiler_command or THOR) if compiler else '',
                 'enable_parser_errors': True, 'enable_semantic_tokens': True,
                 'enable_unused_imports_reporting': unused_imports,
@@ -1003,6 +1004,122 @@ main::proc(){
         client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},
             'contentChanges':[{'text':text}]})
         client.diagnostic(main.as_uri(),empty=True)
+
+    def test_parallel_map_and_result_type_query_hovers_and_completion(self):
+        text='''package main
+import "thor:basic"
+import ti "thor:intrinsics"
+Job::struct{left,right:int}
+calculate::proc(a,b:$T)->(sum,product:T){return a+b,a*b}
+Result::ti.result_type_of(calculate(**Job{}))
+main::proc(){
+    jobs:=[]Job{{2,3},{4,5}}
+    rows:=basic.pmap(jobs,calculate)
+    defer delete(rows)
+    item:Result={5,6}
+    _=item.sum
+    _=rows[0].product
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        for name in ('Result::','rows:='):
+            hover=self.hover(client,main,text,name)
+            self.assertIsNotNone(hover,name)
+            if name=='Result::':
+                self.assertIn('sum',hover['contents']['value'])
+                self.assertIn('product',hover['contents']['value'])
+                self.assertIn('int',hover['contents']['value'])
+            else:self.assertIn('[]struct',hover['contents']['value'])
+        for phrase in ('item.sum','rows[0].product'):
+            completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,phrase,phrase.index('.')+1),'context':{'triggerKind':1}})
+            self.assertTrue({'sum','product'}<={item['label'] for item in completion['items']},completion)
+
+    def test_parallel_map_aliases_overrides_and_callback_variable_names(self):
+        text='''package main
+import b "thor:basic"
+Job::struct{x:int}
+calculate::proc(x:$T)->(number:T,valid:bool){return x*2,true}
+Override::struct{value:int,ok:bool}
+main::proc(){
+    jobs:=[]Job{{3}}
+    mapper::b.pmap
+    named:=mapper(jobs,calculate,result_type=Override)
+    callback:proc(int)->(answer:int,success:bool)=calculate
+    indirect:=mapper(jobs,callback)
+    _=named[0].value
+    _=indirect[0].answer
+    delete(named);delete(indirect)
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        for phrase,fields in [('named[0].value',{'value','ok'}),('indirect[0].answer',{'answer','success'})]:
+            items=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+                'position':self.position(text,phrase,phrase.index('.')+1),'context':{'triggerKind':1}})
+            self.assertTrue(fields<={item['label'] for item in items['items']},items)
+
+    def test_parallel_map_result_errors_and_unsaved_callback_recovery(self):
+        text='''package main
+import "thor:basic"
+Job::struct{x:int}
+calculate::proc(x:$T)->(value:T,ok:bool){return x,true}
+main::proc(){
+    rows:=basic.pmap([]Job{{3}},calculate)
+    _=rows[0].value
+    delete(rows)
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        invalid=text.replace('calculate)', 'calculate,result_type=struct{bad:string})')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':invalid}]})
+        errors=client.diagnostic(main.as_uri(),contains='result_type must match')
+        error=next(error for error in errors if 'result_type must match' in error['message'])
+        self.assertEqual(error['range']['start'],self.position(invalid,'basic.pmap',0))
+        self.assertNotIn('Thor expression',error['message'])
+        changed=text.replace('value:T','number:T').replace('rows[0].value','rows[0].number')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':changed}]})
+        client.diagnostic(main.as_uri(),empty=True)
+        items=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(changed,'rows[0].number',len('rows[0].')),'context':{'triggerKind':1}})
+        names={item['label'] for item in items['items']}
+        self.assertTrue({'number','ok'}<=names,names)
+        self.assertNotIn('value',names)
+
+    def test_parallel_map_standard_library_overloaded_callback_completion(self):
+        text='''package main
+import "thor:basic"
+import "core:math"
+main::proc(){
+    rows:=basic.pmap([]struct{x:f64}{{4},{9}},math.sqrt)
+    _=rows[0]
+    delete(rows)
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        hover=self.hover(client,main,text,'rows:=')
+        self.assertIsNotNone(hover)
+        self.assertIn('[]f64',hover['contents']['value'])
+
+    def test_parallel_map_inline_polymorphic_callback_fields(self):
+        text='''package main
+import "thor:basic"
+main::proc(){
+    rows:=basic.pmap([]struct{x:int}{{4}},proc(x:$T)->(value:T,ok:bool){return x,true})
+    _=rows[0].value
+    delete(rows)
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'rows[0].value',len('rows[0].')),'context':{'triggerKind':1}})
+        self.assertTrue({'value','ok'}<={item['label'] for item in completion['items']},completion)
 
     def test_data_first_mapping_callbacks_keep_inferred_result_hovers(self):
         text='''package main

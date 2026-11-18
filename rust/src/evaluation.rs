@@ -616,7 +616,8 @@ impl<'a, 'r> Extraction<'a, 'r> {
         if self.kind(node) != "Call" {
             return None;
         }
-        let builtin = self.builtin(node)?;
+        let result_query=crate::resulttypes::is_query(self.r,node);
+        let builtin = if result_query {"type_of".to_string()} else {self.builtin(node)?};
         if !["type_of", "size_of", "align_of", "offset_of"].contains(&builtin.as_str()) {
             return None;
         }
@@ -624,11 +625,12 @@ impl<'a, 'r> Extraction<'a, 'r> {
         if args.len() != if builtin == "offset_of" { 2 } else { 1 } {
             return None;
         }
-        let typ = self.r.specialized_type(args[0], &Default::default());
+        let typ = self.r.specialized_type(if result_query{node}else{args[0]}, &Default::default());
         if typ.is_unknown() {
             return None;
         }
         let mut context = TypeCode::new(node.file, Some(node));
+        context.allow_imports = result_query;
         let mut code = context.render(&typ, self.r).ok()?;
         for (alias, directory) in context.imports {
             self.graph
@@ -658,6 +660,14 @@ impl<'a, 'r> Extraction<'a, 'r> {
             | Type::Pointer(elem)
             | Type::Dynamic(elem) => Self::type_definition(elem),
             _ => None,
+        }
+    }
+    fn query_definitions(typ:&Type,definitions:&mut Vec<Ref>) {
+        if let Some(owner)=Self::type_definition(typ) {definitions.push(owner);}
+        match typ {
+            Type::Anonymous(fields)=>for (_,typ) in fields {Self::query_definitions(typ,definitions)},
+            Type::Array{elem,..}|Type::Slice(elem)|Type::Dynamic(elem)|Type::Pointer(elem)|Type::Fixed{elem,..}=>Self::query_definitions(elem,definitions),
+            _=>{},
         }
     }
     fn declaration(&mut self, node: Ref) -> Result<()> {
@@ -789,7 +799,10 @@ impl<'a, 'r> Extraction<'a, 'r> {
     fn visit(&mut self, node: Ref) -> Result<()> {
         if let Some((code, typ)) = self.query(node) {
             self.graph.queries.insert(node, code);
-            if let Some(owner) = Self::type_definition(&typ) {
+            let mut definitions=vec![];
+            Self::query_definitions(&typ,&mut definitions);
+            definitions.sort();definitions.dedup();
+            for owner in definitions {
                 if let Some(declaration) = self.r.sources[owner.file]
                     .node(owner.node)
                     .parent

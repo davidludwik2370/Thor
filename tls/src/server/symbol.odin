@@ -82,6 +82,7 @@ SymbolBitFieldValue :: struct {
 SymbolPackageValue :: struct {}
 
 SymbolProcedureValue :: struct {
+    thor_result_default: Thor_Result_Default,
     thor_pure: bool,
 	builtin_name: string, // Original builtin identity survives imported/renamed aliases.
 	return_types:       []^ast.Field,
@@ -806,6 +807,7 @@ get_proc_arg_type_from_index :: proc(value: SymbolProcedureValue, parameter_inde
 get_proc_arg_type_from_name :: proc(v: SymbolProcedureValue, name: string) -> (^ast.Field, bool) {
 	for arg in v.arg_types {
 		for arg_name in arg.names {
+			if poly,ok:=arg_name.derived.(^ast.Poly_Type);ok && poly.type.name==name {return arg,true}
 			if ident, ok := arg_name.derived.(^ast.Ident); ok {
 				if name == ident.name {
 					return arg, true
@@ -819,6 +821,7 @@ get_proc_arg_type_from_name :: proc(v: SymbolProcedureValue, name: string) -> (^
 get_proc_arg_name_from_name :: proc(v: SymbolProcedureValue, name: string) -> (^ast.Ident, bool) {
 	for arg in v.arg_types {
 		for arg_name in arg.names {
+			if poly,ok:=arg_name.derived.(^ast.Poly_Type);ok && poly.type.name==name {return poly.type,true}
 			if ident, ok := arg_name.derived.(^ast.Ident); ok {
 				if name == ident.name {
 					return ident, true

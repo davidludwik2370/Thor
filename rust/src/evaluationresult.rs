@@ -296,6 +296,7 @@ impl Lower<'_, '_> {
                     self.querying -= 1;
                     let (open, close) = if crate::purity::builtin_call(self.resolver, query)
                         .as_deref() == Some("type_of")
+                        || crate::resulttypes::is_query(self.resolver,query)
                     {
                         // A type query supplies a type operand, so keep it
                         // in a native type context while validating the use.

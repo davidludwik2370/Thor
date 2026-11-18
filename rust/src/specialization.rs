@@ -181,6 +181,10 @@ impl TypeCode {
             }
             _ => {}
         }
+        if let Type::Anonymous(fields)=typ {
+            let fields=fields.iter().map(|(name,typ)|self.render(typ,r).map(|typ|format!("{name}:{typ}"))).collect::<Result<Vec<_>>>()?;
+            return Ok(format!("struct{{{}}}",fields.join(",")));
+        }
         let owner = match typ {
             Type::Nominal(owner, _)
             | Type::Struct(owner)

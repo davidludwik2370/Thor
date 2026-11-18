@@ -19,6 +19,10 @@ import "thor:big"
 import "thor:format"
 import "thor:graph"
 import hashing "thor:hash"
+import parallel "thor:parallel"
+
+// A bounded, synchronous parallel map. See thor:parallel's ownership contract.
+pmap :: parallel.pmap
 
 // Runtime value hashes. Strings/bytes hash contents, records/sequences ignore
 // padding and allocator metadata, pointers hash addresses. No heap allocation.

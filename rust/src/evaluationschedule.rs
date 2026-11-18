@@ -198,6 +198,7 @@ impl<'p> Scheduler<'p> {
         crate::purity::builtin_call(&mut self.resolver, node)
     }
     fn type_query(&mut self, node: Ref) -> bool {
+        if crate::resulttypes::is_query(&self.resolver,node) {return true;}
         if self.kind(node) != "Call"
             || !self.builtin(node).is_some_and(|name| {
                 ["type_of", "size_of", "align_of", "offset_of"].contains(&name.as_str())
@@ -227,6 +228,7 @@ impl<'p> Scheduler<'p> {
     }
     fn queried(&mut self, node: Ref) -> bool {
         self.source(node).ancestors(node.node).any(|id| {
+            if crate::resulttypes::is_query(&self.resolver,Ref{file:node.file,node:id}) {return true;}
             self.kind(Ref {
                 file: node.file,
                 node: id,
