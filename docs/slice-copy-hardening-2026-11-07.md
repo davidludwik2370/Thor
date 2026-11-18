@@ -34,12 +34,20 @@ the outer pointed-to value. None of those operations independently clones nested
 slice backing storage. The diagnostic now names `core:slice.clone` when suggesting
 a writable copy, rather than suggesting an ambiguous `clone`.
 
-Normal directory builds also exclude `_test.thor`/`_test.odin` files. Native SDK
-inspection excludes its test files. Previously the access analysis could report
-test-only invalid examples or traverse large irrelevant test graphs in ordinary
-builds. `thor test` still checks the target package's tests, and explicit file
-input remains supported. A regression verifies that a read-only violation in a
-test file is ignored by ordinary directory checking and rejected by `thor test`.
+Normal directory builds and native SDK inspection exclude files tagged `#+test`.
+The earlier filename-based `_test.thor`/`_test.odin` exclusion was incorrect and
+has been removed for user/SDK sources: Odin includes those filenames normally.
+Test-only invalid examples must use `#+test`; ordinary builds skip them before
+analysis, while `thor test` checks them. The regression for a test-only read-only
+violation uses that explicit tag. Installation-owned compiler support views
+continue to omit Thor's own unit-test files.
+
+The source-discovery follow-up was checked directly against installed Odin
+`dev-2026-10:8169255b9`: a sole `hilo_test.odin` containing `main` builds and runs
+normally. `tests.test_source_discovery` covers the same Thor/native filenames,
+checked and unchecked builds, imported compile-time helpers, unsaved overlays,
+ordinary body checking, and explicit test tags. The user's `hilo_test.thor`
+also built successfully as a directory project in an isolated copy.
 
 ## Validation
 

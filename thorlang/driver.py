@@ -129,8 +129,8 @@ class Project:
         paths = [entry] if entry.is_file() or entry in self.overlays else sorted(
             {p for p in entry.iterdir() if p.is_file() and p.suffix in {".thor", ".odin"}} |
             {p for p in self.overlays if p.parent == entry and p.suffix in {".thor", ".odin"}})
-        if not self.test and entry.is_dir():
-            paths=[path for path in paths if not path.name.endswith(('_test.thor','_test.odin'))]
+        # Odin uses #+test to select test-only sources. A _test filename alone
+        # is ordinary source; Source applies the actual tag before parsing.
         # Compiler support has its own native test command. Importing its test
         # files into a program can add core-library dependencies to bootstrap
         # support used by checked versions of those same libraries.

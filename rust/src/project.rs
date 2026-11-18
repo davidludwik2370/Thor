@@ -230,7 +230,7 @@ fn reference_coordinates(suffix: &str) -> Option<(usize, usize, usize)> {
     (line > 0 && column > 0).then_some((line, column, length))
 }
 
-fn package_files(entry: &Path, test: bool, overlays: &BTreeMap<PathBuf, String>) -> Result<Vec<PathBuf>> {
+fn package_files(entry: &Path, skip_support_tests: bool, overlays: &BTreeMap<PathBuf, String>) -> Result<Vec<PathBuf>> {
     if entry.is_file() || overlays.contains_key(entry) {
         return Ok(vec![entry.to_path_buf()]);
     }
@@ -246,7 +246,7 @@ fn package_files(entry: &Path, test: bool, overlays: &BTreeMap<PathBuf, String>)
             continue;
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        if !test && (name.ends_with("_test.thor") || name.ends_with("_test.odin")) {
+        if skip_support_tests && (name.ends_with("_test.thor") || name.ends_with("_test.odin")) {
             continue;
         }
         files.push(crate::project::canonicalize(path)?);
@@ -257,7 +257,7 @@ fn package_files(entry: &Path, test: bool, overlays: &BTreeMap<PathBuf, String>)
             continue;
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        if !test && (name.ends_with("_test.thor") || name.ends_with("_test.odin")) {
+        if skip_support_tests && (name.ends_with("_test.thor") || name.ends_with("_test.odin")) {
             continue;
         }
         files.push(path.clone());
@@ -457,7 +457,10 @@ impl Project {
         }
         let support_library =
             entry.starts_with(self.options.root.join("runtime")) && entry != self.options.entry;
-        let files = package_files(&entry, self.frontend.test && !support_library, &self.options.overlays)?;
+        // User filenames do not determine test eligibility. The frontend
+        // applies Odin's #+test tag. Only installation-owned runtime packages
+        // omit their own unit-test sources from the compiler support view.
+        let files = package_files(&entry, support_library, &self.options.overlays)?;
         let files = files.into_iter().filter(|path| !self.sources.iter().any(|s| s.path == *path))
             .collect::<Vec<_>>();
         self.parse_imports(files.iter().map(|path| (path.clone(), entry.is_dir())).collect());
@@ -503,7 +506,7 @@ impl Project {
                 && import != self.options.entry;
             // Discovery reports directory errors in its original order. A
             // failed speculative parse is likewise retained until consumed.
-            if let Ok(files) = package_files(&import, self.frontend.test && !support_library, &self.options.overlays) {
+            if let Ok(files) = package_files(&import, support_library, &self.options.overlays) {
                 frontier.extend(files.into_iter().map(|path| (path, import.is_dir())));
             }
         }
@@ -983,8 +986,8 @@ impl Project {
                 ["core.odin", "core_builtin.odin"].into_iter()
                     .map(|name| package.join(name)).filter(|path| path.is_file()).collect()
             } else {
-                // The imported SDK is a library even when the project's entry
-                // package is being tested. Its own *_test files are not inputs.
+                // Match native tag filtering, including ordinary APIs whose
+                // filenames happen to end in _test.odin.
                 package_files(&package, false, &self.options.overlays)?
             };
             pending.extend(files.into_iter().filter(|path| seen.insert(path.clone())));

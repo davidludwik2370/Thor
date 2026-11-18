@@ -519,9 +519,9 @@ Record::struct{value:int}
 read::proc(using r:Record)->int{return value}
 '''), expected='4')
 
-    def test_directory_build_excludes_test_sources(self):
+    def test_directory_build_excludes_tagged_test_sources(self):
         self.compare(self.program('fmt.println(7)', 'import "core:fmt"\n'), directory=True,
-                     files={'broken_test.thor':'package main\nthis is invalid\n'}, expected='7')
+                     files={'broken_test.thor':'#+test\npackage main\nthis is invalid\n'}, expected='7')
 
     def test_mixed_relative_import_packages(self):
         self.compare(self.program('fmt.println(helper.value())',

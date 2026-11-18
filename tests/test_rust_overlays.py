@@ -75,7 +75,7 @@ class RustOverlayTests(unittest.TestCase):
         unrelated.mkdir()
         other = unrelated / 'other.thor'
         overlay = self.overlay({
-            test_file: 'package main\ncheck::proc(){missing_overlay_test()}\n',
+            test_file: '#+test\npackage main\ncheck::proc(){missing_overlay_test()}\n',
             self.app / 'ignored.txt': 'not Thor source',
             other: 'package other\ninvalid::missing_other_package\n',
         })

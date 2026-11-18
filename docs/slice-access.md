@@ -244,9 +244,10 @@ flags.
 The [copy-boundary hardening report](slice-copy-hardening-2026-11-07.md) describes
 the additional compiler and live TLS matrices in
 `tests/test_slice_copy_hardening.py` and `tests/test_slice_copy_hardening_tls.py`.
-Normal directory builds exclude `_test.thor`/`_test.odin` sources, matching Odin;
-`thor test` includes the target package's tests. This keeps test-only examples
-from producing access errors in an ordinary application build.
+Normal directory builds exclude files tagged `#+test`, matching Odin;
+`thor test` includes those sources. The `_test.thor`/`_test.odin` filename suffix
+alone does not exclude a file. Mark test-only examples with `#+test` to keep
+them out of an ordinary application build.
 
 Ordinary compilation checks every body and infers borrowing contracts on demand
 for reference-bearing calls. Editor metadata requests infer contracts for unused

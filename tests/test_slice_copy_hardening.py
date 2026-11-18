@@ -196,7 +196,7 @@ from_array::proc(values:[$N]int)->int{copy:=values;copy[0]=9;return copy[0]}
         self.check('view :> []int{7};choose(view)',prefix.replace('return values[0]','values[0]=9;return values[0]'),writable=False)
 
     def test_normal_builds_do_not_analyze_test_only_slice_examples(self):
-        files={'invalid_test.thor':'package main\nimport "core:testing"\n@(test)\ninvalid::proc(t:^testing.T){values :> []int{1};values[0]=9;_=t}\n'}
+        files={'invalid_test.thor':'#+test\npackage main\nimport "core:testing"\n@(test)\ninvalid::proc(t:^testing.T){values :> []int{1};values[0]=9;_=t}\n'}
         self.invoke(self.program(''),files=files,directory=True,command='check')
         self.invoke(self.program(''),files=files,directory=True,command='test',fail='read-only slice')
 
