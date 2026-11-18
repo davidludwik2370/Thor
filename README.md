@@ -599,12 +599,19 @@ suggests `fn` for eligible procedures, including their transitive calls and
 signature requirements. Findings have stable `thor/prefer-immutable` and
 `thor/prefer-fn` diagnostic codes. The `unused` check reports unused local
 variables, immutable bindings, local constants, loop/type-switch/comprehension
-bindings, and procedure parameters with the `thor/unused` code. All four checks
+bindings, and procedure parameters with the `thor/unused` code. It also reports
+unused imports (`thor/unused-import`) and named data types and type aliases
+(`thor/unused-type`), including package-level types. All four checks
 are enabled by default for `thor vet` and `--vet`. `_` and explicit `_ = value`
 uses indicate intentional discards. Member names, named argument labels, and
 shadowed bindings are distinguished from actual uses. Named return values and
 parameter names in procedure-type declarations are part of their signatures.
-Package-level declarations and struct fields are outside this local-binding check.
+Package-level values and struct fields are outside this local-binding check.
+Type references in annotations, aliases, other project files, f-strings and
+compile-time code count as uses; a recursive type's self-reference alone does not.
+Generic type specializations and aliases into Odin libraries are checked too.
+The latter load declaration facts on demand during vetting; ordinary builds
+without `--vet` keep their existing SDK loading behavior.
 Assignments alone do not count as uses, including `x += 1` and simple arithmetic
 self-updates such as `x = x + 1`. Passing a value to any function counts as use,
 even when that function ignores its parameter; unused parameters are checked in
@@ -614,9 +621,14 @@ reference type-switch bindings. Conditions, returns, address-taking and explicit
 `_ = value` discards also count. This is a conservative local check:
 it does not trace unused values through other bindings or report overwritten
 initializers when the binding is subsequently used.
-Unused findings have no automatic edit: initializer effects and allocations must
-be reviewed before removing a declaration. `--apply` and `--ask` preserve these
-findings while applying the other verified corrections.
+Unused values and types have no automatic edit: initializer effects, allocations
+and public type declarations require review. `--apply` and `--ask` preserve them.
+Unused imports have compiler-validated removal edits. Whole selective or wildcard
+imports can be removed when unused; if any selected member or the namespace is
+used, the declaration remains. Comments and neighboring statements are preserved.
+Explicit blank imports (`import _ "package"`) remain intentional, including
+imports needed for initialization. Imports used only in inactive debug/platform
+branches are retained so applying corrections does not break other configurations.
 Unused bindings take priority over immutable suggestions. A declaration with an
 unused name receives no immutable suggestion or conversion, including when a
 group contains both used and unused names. After those names are used or removed,

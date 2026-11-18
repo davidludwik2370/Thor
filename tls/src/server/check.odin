@@ -687,7 +687,7 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 				uri.uri,
 				Diagnostic {
 					code = error.code != "" ? error.code : "thor",
-					tags = (error.code == "thor/unused" || error.code == "thor/unnecessary-semicolon") ? []DiagnosticTag{.Unnecessary} : nil,
+					tags = (error.code == "thor/unused" || error.code == "thor/unused-type" || error.code == "thor/unused-import" || error.code == "thor/unnecessary-semicolon") ? []DiagnosticTag{.Unnecessary} : nil,
 					data = vet_fix,
 					severity = diagnostic_severity,
 					range = compiler_error_range(error.pos),

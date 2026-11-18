@@ -103,7 +103,7 @@
           "type": "boolean",
           "default": false,
           "scope": "resource",
-          "description": "Enable Thor immutable-binding, pure-function, unused-binding and unnecessary-semicolon warnings, with quick fixes for immutable, pure and semicolon suggestions."
+          "description": "Enable Thor immutable-binding, pure-function, unused-declaration and unnecessary-semicolon warnings, with quick fixes for immutable, pure, unused-import and semicolon suggestions."
         },
         "tls.server.path": {
           "type": "string",

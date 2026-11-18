@@ -35,6 +35,9 @@ class Fix:
         elif self.rule == 'immutable':
             message = f"Declare '{self.names}' immutable with ':>'."
             code = 'thor/prefer-immutable'
+        elif self.rule == 'import':
+            message = f"Unused import '{self.names}'."
+            code = 'thor/unused-import'
         else:
             message = f"Procedure '{self.names}' can be declared with 'fn'."
             code = 'thor/prefer-fn'
@@ -368,7 +371,7 @@ def apply(fixes):
 def run(project, options, flags, native_errors=None):
     checks = CHECKS if options.vet is None else tuple(options.vet.split(','))
     from .vet_unused import analyze
-    unused_findings, immutable_exemptions = analyze(project) if {'unused', 'immutable'}.intersection(checks) else ([], [])
+    unused_findings, immutable_exemptions, import_fixes = analyze(project, include_unused='unused' in checks) if {'unused', 'immutable'}.intersection(checks) else ([], [], [])
     exempt_offsets = {}
     for node in immutable_exemptions:
         exempt_offsets.setdefault(str(node.source.path), []).append(node.start)
@@ -382,7 +385,7 @@ def run(project, options, flags, native_errors=None):
         index = bisect_left(offsets, fix.highlight_start)
         return index < len(offsets) and offsets[index] < fix.highlight_end
 
-    proposed = [fix for fix in candidates(project, checks) if not exempt_declaration(fix)]
+    proposed = [*import_fixes, *(fix for fix in candidates(project, checks) if not exempt_declaration(fix))]
     findings = unused_findings if 'unused' in checks else []
     if native_errors is not None:
         reported = {(finding['pos']['file'], finding['pos']['offset'], tuple(finding['msgs']))
@@ -392,9 +395,18 @@ def run(project, options, flags, native_errors=None):
                                 (finding.get('pos') or {}).get('offset'), tuple(finding['msgs'])) not in reported]
     from .source_tools import semicolon_edits
     accepted = semicolon_edits(project, thor_only=True) if 'semicolon' in checks else []
+    covered_semicolons = [fix for fix in accepted if any(
+        item.source is fix.source and item.start <= fix.start and fix.end <= item.end for item in import_fixes)]
+    accepted = [fix for fix in accepted if fix not in covered_semicolons]
     if proposed:
         with tempfile.TemporaryDirectory(prefix='thor-vet-') as directory:
             Validator(project, options, flags, directory).select(proposed, accepted)
+    accepted.extend(fix for fix in covered_semicolons if not any(
+        item.rule == 'import' and item.source is fix.source and item.start <= fix.start and fix.end <= item.end
+        for item in accepted))
+    corrected_imports = {(str(fix.source.path), fix.highlight_start) for fix in accepted if fix.rule == 'import'}
+    findings = [finding for finding in findings if finding['code'] != 'thor/unused-import'
+                or (finding['pos']['file'], finding['pos']['offset']) not in corrected_imports]
     if options.command == 'vet' and (options.apply or options.ask) and accepted:
         adapter = project.diagnostic_adapter()
         for fix in accepted:

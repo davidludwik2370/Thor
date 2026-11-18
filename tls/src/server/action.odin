@@ -149,6 +149,7 @@ add_vet_corrections :: proc(document: ^Document, range: common.Range, actions: ^
         title := "Declare as fn"
         if diagnostic.code == "thor/prefer-immutable" { title = "Make declaration immutable" }
         else if diagnostic.code == "thor/unnecessary-semicolon" { title = "Remove unnecessary semicolon" }
+        else if diagnostic.code == "thor/unused-import" { title = "Remove unused import" }
 		changes := make(map[string][]TextEdit, context.temp_allocator)
 		edits := make([]TextEdit, 1, context.temp_allocator)
 		edits[0] = {range = fix.range, newText = strings.clone(fix.text, context.temp_allocator)}

@@ -158,7 +158,7 @@
         "vet",
         "publish"
       ],
-      "text": "Thor conventions: check, build, run, test, vet, publish\n  --vet[=CHECKS]               Check immutable,pure,unused,semicolon (default all)\n                                 immutable    Suggest immutable declarations\n                                 pure         Suggest eligible procs become fn\n                                 unused       Report unused local bindings/parameters\n                                 semicolon    Report unnecessary semicolons\n                               Select multiple checks with commas\n                               thor vet enables all four checks by default\n                               Findings are errors for build; warnings otherwise\n"
+      "text": "Thor conventions: check, build, run, test, vet, publish\n  --vet[=CHECKS]               Check immutable,pure,unused,semicolon (default all)\n                                 immutable    Suggest immutable declarations\n                                 pure         Suggest eligible procs become fn\n                                 unused       Report unused bindings, imports and data types\n                                 semicolon    Report unnecessary semicolons\n                               Select multiple checks with commas\n                               thor vet enables all four checks by default\n                               Findings are errors for build; warnings otherwise\n"
     },
     {
       "commands": [
@@ -1001,7 +1001,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated imports and aliases do not preserve native import usage checks."
+      "thor_rejection": "Generated imports and aliases do not preserve native import usage checks. Use --vet=unused for original Thor imports."
     },
     {
       "name": "vet-shadowing",

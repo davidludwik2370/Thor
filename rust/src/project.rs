@@ -1269,6 +1269,9 @@ impl Project {
                 .vet
                 .clone()
                 .unwrap_or_else(|| crate::vet::CHECKS.iter().map(|check| (*check).into()).collect());
+            if checks.iter().any(|check| check == "unused") {
+                self.discover_vet_type_facts()?;
+            }
             let mut findings = crate::vet::run(
                 self,
                 &checks,

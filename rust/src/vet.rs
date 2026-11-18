@@ -37,6 +37,8 @@ impl Fix {
             format!("Declare '{}' immutable with ':>'.", self.names)
         } else if self.rule == "semicolon" {
             "Unnecessary semicolon.".into()
+        } else if self.rule == "import" {
+            format!("Unused import '{}'.", self.names)
         } else {
             format!("Procedure '{}' can be declared with 'fn'.", self.names)
         }
@@ -50,7 +52,7 @@ impl Fix {
             .fold(14695981039346656037u64, |h, b| {
                 (h ^ u64::from(*b)).wrapping_mul(1099511628211)
             });
-        json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", _=>"thor/prefer-fn"},
+        json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", "import"=>"thor/unused-import", _=>"thor/prefer-fn"},
             "pos":position(source,self.highlight),"msgs":[self.message()],
             "fix":{"pos":position(source,self.span),"text":self.replacement,"snapshot":format!("{hash:016x}")}})
     }
@@ -834,7 +836,7 @@ pub fn run(
         .iter()
         .any(|check| matches!(check.as_str(), "unused" | "immutable"))
     {
-        unused::analyze(project)
+        unused::analyze(project, checks.iter().any(|check| check == "unused"))
     } else {
         unused::Analysis::default()
     };
@@ -846,8 +848,7 @@ pub fn run(
             .or_default()
             .insert(source.node(at.node).span.start);
     }
-    let proposed = candidates(project, checks)
-        .into_iter()
+    let proposed = usage.import_fixes.into_iter().chain(candidates(project, checks))
         .filter(|fix| {
             fix.rule != "immutable"
                 || exempt_offsets
@@ -893,6 +894,9 @@ pub fn run(
     } else {
         vec![]
     };
+    let (covered_semicolons, independent): (Vec<_>, Vec<_>) = accepted.into_iter().partition(|fix|
+        proposed.iter().any(|item| item.rule == "import" && item.file == fix.file && item.span.contains(fix.span)));
+    accepted = independent;
     if !proposed.is_empty() {
         let scratch = Scratch::new()?;
         Validator {
@@ -902,6 +906,17 @@ pub fn run(
         }
         .select(&proposed, &mut accepted)?;
     }
+    for fix in covered_semicolons {
+        if !accepted.iter().any(|item| item.rule == "import" && item.file == fix.file && item.span.contains(fix.span)) {
+            accepted.push(fix);
+        }
+    }
+    let corrected_imports = accepted.iter().filter(|fix| fix.rule == "import")
+        .map(|fix| (project.sources[fix.file].path.to_string_lossy().into_owned(), fix.highlight.start))
+        .collect::<BTreeSet<_>>();
+    findings.retain(|finding| finding["code"] != "thor/unused-import"
+        || !corrected_imports.contains(&(finding["pos"]["file"].as_str().unwrap().into(),
+            finding["pos"]["offset"].as_u64().unwrap() as usize)));
     if project.options.command == "vet" && (apply_requested || ask) && !accepted.is_empty() {
         for fix in &accepted {
             let source = &project.sources[fix.file];

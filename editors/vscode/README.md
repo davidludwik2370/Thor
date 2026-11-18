@@ -93,9 +93,11 @@ Server** channel in VS Code's Output panel.
 ## Thor convention checks
 
 Enable `"tls.vet": true` in workspace settings for opt-in immutable-binding,
-pure-function, unused-binding and unnecessary-semicolon warnings. Unused local bindings and parameters
+pure-function, unused-declaration and unnecessary-semicolon warnings. Unused local bindings, parameters and types
 are dimmed and highlighted at their original Thor declarations, including in
-unsaved files. Their removal requires reviewing initializer side effects.
+unsaved files. Their removal requires manual review. Unused imports also receive
+warnings and a **Remove unused import** quick fix. Intentional blank imports and
+imports referenced in other debug/platform branches are retained.
 Bindings used only in explicit `_ = name` discards receive neither unused nor
 immutable-binding warnings or immutable quick fixes. Other uses make the binding
 eligible for immutable advice regardless of the discard's position.

@@ -2,6 +2,46 @@
 use super::*;
 
 impl Project {
+    /// Vet needs declaration identity for aliases such as `Value :: time.Duration`.
+    /// Inspect only packages named by unresolved constant values, following alias
+    /// chains on demand. This runs after native checking, never for plain builds.
+    pub(super) fn discover_vet_type_facts(&mut self) -> Result<()> {
+        let root = if self.file_entry { self.options.entry.parent().unwrap() } else { &self.options.entry };
+        let aliases = self.sources.iter().enumerate().filter(|(_, source)|
+            source.thor && !source.excluded && !source.shared_native && source.path.starts_with(root))
+            .flat_map(|(file, source)| source.nodes.iter().enumerate()
+                .filter(|(_, node)| node.kind == "Declaration" && !node.mutable && !node.immutable)
+                .flat_map(move |(index, _)| source.group(crate::ast::NodeId(index), "values").iter()
+                    .filter(|id| matches!(source.node(**id).kind.as_str(), "Ident" | "Selector" | "Paren" | "WhenExpr" | "Call"))
+                    .map(move |node| crate::semantics::Ref { file, node: *node })))
+            .collect::<Vec<_>>();
+        if aliases.is_empty() { return Ok(()); }
+        let mut inspected = BTreeSet::new();
+        loop {
+            let resolver = self.resolver();
+            let mut packages = BTreeSet::new();
+            let mut seen = HashSet::new();
+            for alias in &aliases {
+                if !resolver.denotes_type(*alias) {
+                    let source = &resolver.sources[alias.file];
+                    let reference = if source.node(alias.node).kind == "Call" {
+                        crate::semantics::Ref { node: source.role(alias.node, "callee").unwrap_or(alias.node), ..*alias }
+                    } else { *alias };
+                    Self::referenced_packages(&resolver, reference, &mut seen, &mut packages)?;
+                }
+            }
+            packages.retain(|directory| !inspected.contains(directory)
+                && !self.sources.iter().any(|source| source.path.parent() == Some(directory)));
+            if packages.is_empty() {
+                self.retain_resolver(resolver);
+                return Ok(());
+            }
+            inspected.extend(packages.iter().cloned());
+            drop(resolver);
+            self.discover_type_facts_from(packages)?;
+        }
+    }
+
     pub(super) fn discover_result_facts(&mut self)->Result<()> {
         let mut resolver=self.resolver();
         let mut packages=BTreeSet::new();

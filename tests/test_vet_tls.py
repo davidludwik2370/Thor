@@ -148,13 +148,14 @@ class VetTLSTests(unittest.TestCase):
         self.assertEqual(path.read_text(), text)
 
     def test_discard_only_suppression_and_other_use_immutable_quick_fixes(self):
-        text = ('package main\nimport "core:fmt"\n'
+        text = ('package main\n'
                 'main::proc(){/* 😀 */value:=(1+2)*5;_=value}\n')
         client, path = self.open(text, vet=True)
         client.diagnostic(path.as_uri(), empty=True)
         self.assertEqual(self.actions(client, path, text, 'value:='), [])
-        used = text.replace('_=value', '_=value;fmt.println(value)')
-        moved = text.replace('_=value', 'fmt.println(value);_=((value))')
+        imported = text.replace('package main\n', 'package main\nimport "core:fmt"\n')
+        used = imported.replace('_=value', '_=value;fmt.println(value)')
+        moved = imported.replace('_=value', 'fmt.println(value);_=((value))')
         for version, changed in ((2, used), (3, moved), (4, text)):
             client.notifications.clear()
             client.send('textDocument/didChange', {

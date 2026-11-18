@@ -307,7 +307,7 @@ main::proc(){
 import "lib"
 GLOBAL_UNUSED:int
 Record::struct{field:int, callback:proc(prototype_name:int)}
-main::proc(){_=lib.read(1)}
+main::proc(){_=Record{};_=lib.read(1)}
 ''', ['unused_parameter'])
 
     def test_warning_policy_default_checks_selection_and_duplicate_native_warning(self):
