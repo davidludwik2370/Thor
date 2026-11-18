@@ -194,6 +194,37 @@ thor_call :: proc(name: string, start, end: tokenizer.Pos, args: []^ast.Expr) ->
     return call
 }
 
+// Only an or_else operand can introduce a fallback list. Ordinary grouping
+// and commas belonging to an outer assignment/call keep native precedence.
+thor_parse_fallback_paren :: proc(p:^Parser)->^ast.Expr {
+    open:=expect_token(p,.Open_Paren)
+    previous:=p.expr_level
+    p.expr_level=max(previous,0)+1
+    p.fallback_paren=-1
+    if p.curr_tok.kind==.Open_Paren {p.fallback_paren=p.curr_tok.pos.offset}
+    first:=parse_expr(p,false)
+    p.fallback_paren=-1
+    values:=make([dynamic]^ast.Expr)
+    append(&values,first)
+    multiple:=false
+    for allow_token(p,.Comma) {
+        multiple=true
+        skip_possible_newline(p)
+        if p.curr_tok.kind==.Close_Paren {break}
+        append(&values,parse_expr(p,false))
+    }
+    p.expr_level=previous
+    close:=expect_token(p,.Close_Paren)
+    if multiple {
+        result:=thor_call("__thor_fallback_list",open.pos,end_pos(close),values[:])
+        append(&p.features,Feature{kind="FallbackList",start=result.pos.offset,end=result.end.offset})
+        return result
+    }
+    grouped:=ast.new(ast.Paren_Expr,open.pos,end_pos(close))
+    grouped.open,grouped.close,grouped.expr=open.pos,close.pos,first
+    return grouped
+}
+
 parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
     lexer: tokenizer.Tokenizer
     tokenizer.init(&lexer,p.file.src,p.file.fullpath,p.err)

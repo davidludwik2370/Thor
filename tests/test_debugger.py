@@ -1063,6 +1063,39 @@ main::proc(){
         client.request('continue',{'threadId':thread})
         client.event('terminated')
 
+    def test_or_else_fallback_list_keeps_breakpoints_and_user_step_into(self):
+        text='''package main
+get::proc()->(int,int,bool){return 0,0,false}
+fallback::proc(x:int)->int{
+    value:=x+1
+    return value
+}
+main::proc(){
+    _,value:>get() or_else (_,fallback(7))
+    after:=value+1
+    if after!=9{panic("fallback result")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[8,9])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),8),frame)
+        observed=[]
+        for _ in range(10):
+            client.request('stepIn',{'threadId':thread})
+            thread,frame=self.frame(client)
+            observed.append((frame['source'].get('path'),frame['line']))
+            if frame['source'].get('path')==str(source) and frame['line']==4:break
+        self.assertEqual((frame['source'].get('path'),frame['line']),(str(source),4),observed)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'x','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('continue',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source'].get('path'),frame['line']),(str(source),9),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'value','context':'watch'})
+        self.assertEqual(value['result'],'8',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_confined_mutation_helper_breakpoints_and_caller_locals(self):
         text='''package main
 change::proc(out:^int){

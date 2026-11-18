@@ -644,7 +644,7 @@ impl Resolver<'_> {
             "OrElse" => child("x")
                 .map(|r| self.specialized_value_result(r, index, bindings, seen))
                 .unwrap_or(Type::Unknown),
-            "SwitchResults" => s
+            "SwitchResults" | "FallbackList" => s
                 .group(r.node, "args")
                 .get(index)
                 .copied()

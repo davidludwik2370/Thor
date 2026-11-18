@@ -15,7 +15,7 @@ class Frame:
 class FStringLifetimes:
     expressions={'Call','FieldValue','Paren','Interpolation','Binary','Unary',
                  'Ternary','WhenExpr','Index','Slice','Selector','Deref','Compound',
-                 'SwitchExpr','CompileSwitchExpr','SwitchResults','Cast','AutoCast','OrElse','OrPanic'}
+                 'SwitchExpr','CompileSwitchExpr','SwitchResults','FallbackList','Cast','AutoCast','OrElse','OrPanic'}
     queries={'type_of','typeid_of','size_of','align_of','offset_of','type_info_of',
              '#assert','#config','#defined'}
 

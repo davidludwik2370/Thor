@@ -231,6 +231,7 @@ impl Lower<'_, '_> {
         Ok(match self.source.node(id).kind.as_str() {
             "SwitchBreak" => 0,
             "SwitchResults" => self.source.group(id, "args").len(),
+            "OrElse"|"FallbackList"=>crate::fallbacks::count(self.resolver,self.reference(id)).unwrap_or(1),
             "SwitchExpr" | "CompileSwitchExpr" => self.switch_count(id)?,
             "Call" => {
                 if self.diverging(id) {
@@ -693,6 +694,13 @@ impl Lower<'_, '_> {
                 .get(index)
                 .cloned()
                 .map(|code| Code::concat([self.g("(", arm), code, self.g("){}", arm)])));
+        }
+        if self.source.node(arm).kind=="OrElse" {
+            let count=self.arm_count(arm)?;
+            let types=self.multi_value_types(arm,count)?;
+            return Ok(types.get(index).cloned().map(|code|Code::concat([
+                self.g("(",arm),code,self.g("){}",arm),
+            ])));
         }
         if self.source.node(arm).kind == "Call" {
             let callee = self.role(arm, "callee")?;

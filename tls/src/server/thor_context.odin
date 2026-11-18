@@ -39,7 +39,7 @@ thor_context_adapter :: proc(call: ^ast.Call_Expr) -> bool {
     ident, ok := call.expr.derived.(^ast.Ident)
     if !ok || ident.pos.offset != ident.end.offset { return false }
     _, sw := thor_context_switch_count(call)
-    return strings.has_prefix(ident.name,"__thor_comprehension") || sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break"
+    return strings.has_prefix(ident.name,"__thor_comprehension") || sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break" || ident.name == "__thor_fallback_list"
 }
 
 // A nonreturning call supplies no switch result type. Use its procedure type,
@@ -296,6 +296,18 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
                 }
             }
         }
+    case ^ast.Or_Else_Expr:
+        if list,ok:=thor_fallback_list(node.y);ok {
+            for arg,index in list.args {
+                if !position_in_node(arg,pc.position) {continue}
+                child:Symbol
+                if typ:=thor_fallback_result_type(ctx,node.x,index);typ!=nil {child,_=thor_context_type(ctx,typ)}
+                return thor_context_expression(ctx,pc,arg,child,wanted,depth+1)
+            }
+        }
+        for branch in ([2]^ast.Expr{node.x,node.y}) {
+            if position_in_node(branch,pc.position) {return thor_context_expression(ctx,pc,branch,expected,wanted,depth+1)}
+        }
     case ^ast.Ternary_If_Expr:
         if position_in_node(node.cond, pc.position) {
             return thor_context_expression(ctx, pc, node.cond, {}, wanted, depth+1)
@@ -376,6 +388,9 @@ thor_resolve_expected_type :: proc(ctx: ^AstContext, pc: ^DocumentPositionContex
             expected := thor_context_type(ctx, assignment.lhs[i]) or_return
             return thor_context_expression(ctx, pc, rhs, expected, wanted)
         }
+    }
+    if assignment:=pc.assign;assignment!=nil&&len(assignment.rhs)==1 {
+        if symbol,ok:=thor_context_expression(ctx,pc,assignment.rhs[0],{},wanted);ok {return symbol,true}
     }
     if returns := pc.returns; returns != nil && pc.function != nil && pc.function.type != nil && pc.function.type.results != nil {
         if len(returns.results)==1 && thor_switch_root(returns.results[0]) && thor_switch_arity(returns.results[0],ctx)>1{

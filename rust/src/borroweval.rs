@@ -370,7 +370,7 @@ impl Evaluator<'_, '_, '_> {
                 }
                 result
             }
-            "SwitchResults" => {
+            "SwitchResults" | "FallbackList" => {
                 let result = self.empty();
                 for value in self.group(node, "args") {
                     let value = self.flow(value, env);
@@ -632,7 +632,14 @@ impl Evaluator<'_, '_, '_> {
                 .role(node, "expr")
                 .map(|child| self.result_flow(child, index, env))
                 .unwrap_or_else(|| self.empty()),
-            "SwitchResults" => self
+            "OrElse" => {
+                let result=self.empty();
+                for role in ["x","y"] {if let Some(child)=self.role(node,role) {
+                    let value=self.result_flow(child,index,env);self.arena.merge(result,value);
+                }}
+                result
+            }
+            "SwitchResults" | "FallbackList" => self
                 .group(node, "args")
                 .get(index)
                 .map(|child| self.flow(*child, env))

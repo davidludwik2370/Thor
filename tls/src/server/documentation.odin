@@ -1137,7 +1137,7 @@ keywords_docs: map[string]string = {
 	"not_in"        = "",
 	"or_break"      = "",
 	"or_continue"   = "",
-	"or_else"       = "",
+	"or_else"       = "Uses the fallback expression only when the operation fails. Thor supports multi-value fallback lists: `a, b := read() or_else (0, 1)`. A discarded target requires `_` at the same fallback position: `_, b := read() or_else (_, 1)`. Each fallback is checked against its corresponding successful result type; the error/ok result is excluded.",
 	"or_return"     = "",
 	"opaque"        = "",
 	"package"       = "",

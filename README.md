@@ -231,6 +231,22 @@ TLS supports result types, immutable highlighting, keyword help/completion,
 references/rename, and diagnostics. Original-source debug mapping applies as
 usual. `or_panic` is reserved in Thor; native `.odin` files remain unchanged.
 
+## Multiple-value `or_else` defaults
+
+Optional operations with several successful results can use a parenthesized
+fallback list. Discarded positions must match the assignment targets:
+
+```odin
+_, cores :> info.cpu_core_count() or_else (_, 1)
+number, text := read_pair() or_else (7, "fallback")
+```
+
+The operation executes once; defaults execute in order only on failure. Each
+slot retains its corresponding result type, ownership, and slice permissions.
+The fallback list itself does not allocate. See the
+[complete rules](docs/or-else-fallback-lists.md) and
+[runnable example](examples/or-else-lists/or_else_lists.thor).
+
 ## Spread minimum and maximum
 
 Thor extends Odin's builtins with fixed-array expansion and slice spreading:

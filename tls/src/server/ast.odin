@@ -1330,6 +1330,12 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 		strings.write_string(builder, ")")
 	case ^ast.Call_Expr:
 		thor_set:=false
+		if name,ok:=n.expr.derived.(^ast.Ident);ok&&name.name=="__thor_fallback_list"&&name.pos.offset==name.end.offset {
+			strings.write_string(builder,"(")
+			for arg,i in n.args {if i>0 {strings.write_string(builder,", ")};build_string(arg,builder,remove_pointers)}
+			strings.write_string(builder,")")
+			return
+		}
 		if name,ok:=n.expr.derived.(^ast.Ident);ok&&name.name=="__thor_run"&&name.pos.offset==name.end.offset&&len(n.args)==1 {
 			strings.write_string(builder,"#run ")
 			build_string(n.args[0],builder,remove_pointers)

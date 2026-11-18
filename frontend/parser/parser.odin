@@ -64,6 +64,7 @@ Parser :: struct {
 	comprehension_depth: int,
 	comprehension_filter: bool,
 	comprehension_level: int,
+	fallback_paren: int, // Source offset of the next or_else RHS grouping.
 }
 
 Edit :: struct {start, end: int, text: string}
@@ -2484,6 +2485,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		}
 
 	case .Open_Paren:
+		if p.thor && p.fallback_paren==p.curr_tok.pos.offset {return thor_parse_fallback_paren(p)}
 		open := expect_token(p, .Open_Paren)
 		prev_expr_level := p.expr_level
 		p.expr_level = max(p.expr_level, 0) + 1
@@ -3826,7 +3828,11 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int, stop_membership:=
 				expr = te
 			case .Or_Else:
 				x := expr
+				previous_fallback:=p.fallback_paren
+				p.fallback_paren=-1
+				if p.thor && p.curr_tok.kind==.Open_Paren {p.fallback_paren=p.curr_tok.pos.offset}
 				y := parse_expr(p, lhs)
+				p.fallback_paren=previous_fallback
 				oe := ast.new(ast.Or_Else_Expr, expr.pos, end_pos(p.prev_tok))
 				oe.x     = x
 				oe.token = op

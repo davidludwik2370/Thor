@@ -29,6 +29,8 @@ pub(crate) mod concatenation;
 mod contextlower;
 #[path = "defaults.rs"]
 mod defaults;
+#[path = "fallbacklower.rs"]
+mod fallbacklower;
 #[path = "evaluationlower.rs"]
 mod evaluationlower;
 #[path = "evaluationresult.rs"]
@@ -1026,6 +1028,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         let node = self.source.node(id);
         let kind = node.kind.clone();
+        if kind=="FallbackList" {return self.fallback_list(id,constant);}
         if kind=="Binary"&&matches!(node.op.as_str(),"in"|"not_in"){
             let mut interval=self.role(id,"right")?;
             while self.source.node(interval).kind=="Paren"{interval=self.role(interval,"expr")?;}
@@ -1252,27 +1255,43 @@ impl<'a, 'r> Lower<'a, 'r> {
             if let Some(fallback) = self.source.role(id, "y") {
                 let operand = self.unparen(fallback);
                 if self.source.node(operand).kind == "Call" && !self.diverging(operand) {
-                    if let Some(callee) = self.source.role(operand, "callee") {
-                        if let Some(signature) = self.resolver.signature(self.reference(callee)) {
-                            let source = &self.resolver.sources[signature.file];
-                            let data = &source.node(signature.node).data;
-                            if self.resolver.fields(signature, "results").len() == 2
-                                && (data["optional_ok"] == true
-                                    || data["optional_allocator_error"] == true)
-                            {
-                                let left =
-                                    self.render(self.role(id, "x")?, expected.clone(), constant)?;
-                                let right = self.render(fallback, expected, constant)?;
-                                self.default = true;
-                                return Ok(Code::concat([
-                                    self.g("(", id),
-                                    left,
-                                    self.g(format!(" or_else {}default_value(", self.prefix), id),
-                                    right,
-                                    self.g("))", id),
-                                ]));
-                            }
+                    let mut optional = false;
+                    if let Some(signature) = self.resolver.call_signature(self.reference(operand)) {
+                        let source = &self.resolver.sources[signature.file];
+                        let data = &source.node(signature.node).data;
+                        optional = data["optional_ok"] == true || data["optional_allocator_error"] == true;
+                        if self.resolver.fields(signature, "results").len() == 2
+                            && optional
+                            && !crate::fallbacks::count(self.resolver, self.reference(self.role(id, "x")?))
+                                .is_some_and(|n| n > 2)
+                        {
+                            let left = self.render(self.role(id, "x")?, expected.clone(), constant)?;
+                            let right = self.render(fallback, expected, constant)?;
+                            self.default = true;
+                            return Ok(Code::concat([
+                                self.g("(", id),
+                                left,
+                                self.g(format!(" or_else {}default_value(", self.prefix), id),
+                                right,
+                                self.g("))", id),
+                            ]));
                         }
+                    }
+                    // Odin can drop mixed-type results when a fallback is a
+                    // direct multi-result call. Packing and expanding it keeps
+                    // the same values and lazy evaluation without allocation.
+                    if !optional && crate::fallbacks::count(self.resolver, self.reference(operand))
+                        .is_some_and(|n| n > 1)
+                    {
+                        let left = self.render(self.role(id, "x")?, expected.clone(), constant)?;
+                        let right = self.render(fallback, expected, constant)?;
+                        let expand = self.native("expand_values");
+                        let compress = self.native("compress_values");
+                        return Ok(Code::concat([
+                            self.g("(", id), left,
+                            self.g(format!(" or_else {expand}({compress}("), id),
+                            right, self.g(")))", id),
+                        ]));
                     }
                 }
             }
@@ -2676,6 +2695,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             "SwitchExpr",
             "CompileSwitchExpr",
             "SwitchResults",
+            "FallbackList",
             "Cast",
             "AutoCast",
             "OrElse",

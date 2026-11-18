@@ -659,7 +659,7 @@ class Purity:
             return stable
         if n.kind in {'Ternary','WhenExpr','OrElse'}:
             result=Flow();result.merge(self.flow(n.role('x'),env));result.merge(self.flow(n.role('y'),env));return result
-        if n.kind == 'SwitchResults':
+        if n.kind in {'SwitchResults','FallbackList'}:
             result=Flow()
             for value in n.group('args'):result.merge(self.flow(value,env))
             return result
@@ -1100,7 +1100,11 @@ class Purity:
 
     def result_flow(self,n,index,env):
         if n.kind=='Paren':return self.result_flow(n.role('expr'),index,env)
-        if n.kind=='SwitchResults':
+        if n.kind=='OrElse':
+            result=Flow()
+            for role in ('x','y'):result.merge(self.result_flow(n.role(role),index,env))
+            return result
+        if n.kind in {'SwitchResults','FallbackList'}:
             args=n.group('args')
             return self.flow(args[index],env) if index<len(args) else Flow()
         if n.kind in {'SwitchExpr','CompileSwitchExpr'}:

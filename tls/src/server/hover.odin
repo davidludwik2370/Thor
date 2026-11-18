@@ -138,6 +138,12 @@ get_hover_information :: proc(
 		hover.range = common.get_token_range(ast.Ident{pos=token.pos, end=position_context.or_panic.end, name=token.text}, ast_context.file.src)
 		return hover, true, true
 	}
+	if node:=position_context.or_else_fallback;node!=nil {
+		hover.contents={kind="markdown",value=keywords_docs["or_else"]}
+		token:=node.token
+		hover.range=common.get_token_range(ast.Ident{pos=token.pos,end=token.pos,name=token.text},ast_context.file.src)
+		return hover,true,true
+	}
 
 	if position_context.type_cast != nil &&
 	   !position_in_node(position_context.type_cast.type, position_context.position) &&

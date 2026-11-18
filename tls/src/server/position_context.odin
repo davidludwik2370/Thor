@@ -66,6 +66,7 @@ DocumentPositionContext :: struct {
 	call_commas:            []int,
 	directive:              ^ast.Basic_Directive,
 	or_panic:               ^ast.Or_Return_Expr,
+	or_else_fallback:       ^ast.Or_Else_Expr,
 }
 
 
@@ -951,6 +952,9 @@ get_document_position_node :: proc(node: ^ast.Node, position_context: ^DocumentP
 		position_context.implicit_selector_expr = n
 		get_document_position(n.field, position_context)
 	case ^ast.Or_Else_Expr:
+		if int(position_context.position)>=n.token.pos.offset && int(position_context.position)<n.token.pos.offset+len(n.token.text) {
+			position_context.or_else_fallback=n
+		}
 		get_document_position(n.x, position_context)
 		get_document_position(n.y, position_context)
 	case ^ast.Or_Return_Expr:

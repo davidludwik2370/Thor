@@ -19,6 +19,7 @@ pub mod evaluation;
 pub mod evaluationcache;
 pub mod evaluationinputs;
 mod extremaplan;
+mod fallbacks;
 pub mod formatting;
 pub mod frontend;
 pub mod kind;

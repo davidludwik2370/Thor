@@ -145,6 +145,8 @@ class BigNumbers:
             return self.s.splice(node, [(value.start,value.end,self.owned(value,hint,constant))])
         typ, expected = self.shape(node), self.expected(hint)
         wanted = expected if expected and expected.kind in {*KINDS,'generic'} else typ
+        if node.kind=='Compound' and node.role('type') is None and not node.group('elems') and wanted.kind in KINDS:
+            return self.mapped(node,self.module()+'.'+KINDS[wanted.kind]+'{}')
         # Generic Rational properties already return independent owners. A
         # second reference-copy wrapper would lose that first allocation.
         if typ.kind=='unknown' and node.kind in {'Ident','Selector','Index','Deref','Paren'} and not self.fresh(node):
@@ -463,6 +465,8 @@ class BigNumbers:
         kind=self.shape(node)
         if kind.kind not in {*KINDS,'generic'}:return None
         primary=node.role('x') if node.kind=='OrElse' else node.role('expr')
+        from .fallbacks import count
+        if (count(self.s.resolver,primary) or 0)>2:return None
         primary=unwrap(primary)
         if primary.kind=='Call':types=self.result_types(primary,2)
         else:types=(self.e.ownership.native_type(primary),'bool')
@@ -558,6 +562,9 @@ class BigNumbers:
         return self.statement(node,body)
 
     def result_types(self,value,count):
+        if unwrap(value).kind!='Call':
+            from .fallbacks import result_types
+            return result_types(self.s,value,count)
         self.s.needs_intrinsics=True
         self.e.ownership.querying+=1
         try: code=self.s.render(value)

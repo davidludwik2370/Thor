@@ -2178,7 +2178,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 self.merge(result, y);
                 result
             }
-            "SwitchResults" => {
+            "SwitchResults" | "FallbackList" => {
                 let values = self
                     .group(r, "args")
                     .into_iter()

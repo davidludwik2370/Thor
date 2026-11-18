@@ -1182,7 +1182,7 @@ class SliceAccess:
                     else:results[index].merge(value)
             if results and typ.kind not in {'unknown','generic'}:results[0].typ=typ
             return self.record_results(node,context,results)
-        if node.kind=='SwitchResults':
+        if node.kind in {'SwitchResults','FallbackList'}:
             return self.record_results(node,context,[self.eval(arg,context) for arg in node.group('args')])
         if node.kind=='Comprehension':
             loop=node.role('loop');self.bind_loop(loop,context)

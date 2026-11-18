@@ -157,6 +157,9 @@ class Switches:
 
     def call_count(self, node):
         node = unwrap(node)
+        if node.kind in {'OrElse','FallbackList'}:
+            from .fallbacks import count
+            return count(self.s.resolver,node) or 1
         if node.kind in {'SwitchExpr','CompileSwitchExpr'}: return self.count(node)
         if node.kind != 'Call': return 1
         if self.deferred_call(node):return 1
@@ -191,6 +194,10 @@ class Switches:
         node = unwrap(node)
         if node.kind in {'SwitchExpr', 'CompileSwitchExpr'}:
             types=self.types(node, (None,) * self.count(node))
+            return '('+types[index]+'){}' if index<len(types) else e.error(node,'This switch arm supplies too few results.')
+        if node.kind=='OrElse':
+            from .fallbacks import result_types
+            types=result_types(s,node,self.call_count(node))
             return '('+types[index]+'){}' if index<len(types) else e.error(node,'This switch arm supplies too few results.')
         if node.kind != 'Call':
             return s.render(node) if index == 0 else e.error(node,'This switch arm supplies too few results.')

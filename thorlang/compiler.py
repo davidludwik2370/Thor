@@ -670,6 +670,13 @@ class Source:
         return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
+        if n.kind=='FallbackList':
+            from . import fallbacks
+            return fallbacks.render(self,n,constant)
+        if n.kind=='OrElse' and n not in self.run_values:
+            from . import fallbacks
+            fallback=fallbacks.render_call(self,n,expected,constant)
+            if fallback is not None:return fallback
         if self.purity and n.kind=='Block':
             witness=self.purity.calls.witness_body(n)
             if witness is not None:return witness

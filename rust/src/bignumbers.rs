@@ -478,6 +478,11 @@ impl Lower<'_, '_> {
             .filter(|typ| typ.big_name().is_some() || matches!(typ, Type::Generic))
             .cloned()
             .unwrap_or_else(|| typ.clone());
+        if self.source.node(id).kind=="Compound"&&self.source.role(id,"type").is_none()
+            && self.source.group(id,"elems").is_empty()&&wanted.big_name().is_some() {
+            let module=self.big_module();
+            return Ok(self.g(format!("{module}.{}{{}}",wanted.big_name().unwrap()),id));
+        }
         if matches!(typ, Type::Unknown)
             && matches!(
                 self.source.node(id).kind.as_str(),

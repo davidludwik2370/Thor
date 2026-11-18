@@ -10,6 +10,9 @@ impl Lower<'_, '_> {
         })
     }
     pub(super) fn big_result_types(&mut self, id: NodeId, count: usize) -> Result<Vec<Code>> {
+        if self.source.node(self.unparen(id)).kind!="Call" {
+            return self.multi_value_types(id,count);
+        }
         self.meta = true;
         let code = self.query_value(id)?;
         Ok((0..count)
@@ -255,6 +258,7 @@ impl Lower<'_, '_> {
         }
         let else_ = self.source.node(id).kind == "OrElse";
         let primary = self.unparen(self.role(id, if else_ { "x" } else { "expr" })?);
+        if crate::fallbacks::count(self.resolver,self.reference(primary)).is_some_and(|n|n>2) {return Ok(None)}
         let types = if self.source.node(primary).kind == "Call" {
             self.big_result_types(primary, 2)?
         } else {

@@ -625,7 +625,7 @@ class Resolver:
         if n.kind=='OrElse':return self.result_type(n.role('x'),index,seen)
         if index==1 and (n.kind=='TypeAssertion' or n.kind=='Index' and self.type_of(n.role('expr')).kind in {'map','generic','unknown'}):
             return Type('scalar','bool',n)
-        if n.kind == 'SwitchResults':
+        if n.kind in {'SwitchResults','FallbackList'}:
             args = n.group('args')
             return self.type_of(args[index], seen) if index < len(args) else Type(node=n)
         if n.kind == 'SwitchExpr':
