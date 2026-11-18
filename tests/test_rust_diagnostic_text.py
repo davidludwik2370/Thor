@@ -1,4 +1,5 @@
 """Terminal rendering keeps the reference's excerpts, Unicode and position styles."""
+import re
 import unittest
 from tests import test_rust_compiler as native
 
@@ -19,6 +20,36 @@ class RustDiagnosticTextTests(unittest.TestCase):
                 self.assertEqual(actual.returncode, 1, actual.stderr)
                 self.assertEqual(actual.stdout, reference.stdout)
                 self.assertEqual(actual.stderr, reference.stderr)
+                location = (rf'{re.escape(str(self.source))}:4:\d+:' if '-error-pos-style:unix' in flags
+                            else rf'{re.escape(str(self.source))}\(4:\d+\):')
+                self.assertRegex(actual.stderr, location + r'\nError: ')
+
+    def test_build_and_vet_put_severity_below_the_source_location(self):
+        cases = [
+            ('build', 'package main\nmain::proc(){value:int="wrong";_=value}\n', [], 1, 'Error'),
+            ('build', 'package main\n@(deprecated="old helper")\nhelper::proc(){}\nmain::proc(){helper()}\n',
+             [], 0, 'Warning'),
+            ('build', 'package main\nmain::proc(){unused:=1;_=0}\n', ['--vet=unused'], 1, 'Error'),
+            ('vet', 'package main\nStrategy::enum{one,two}\nprint_board::proc(){}\nmain::proc(){}\n',
+             ['--vet=unused'], 0, 'Warning'),
+        ]
+        for command, source, flags, status, label in cases:
+            self.source.write_text(source)
+            for engine in ('python', 'rust'):
+                for mode in (([],) if command == 'vet' else ([], native.UNCHECKED)):
+                    with self.subTest(command=command, engine=engine, flags=flags, mode=mode):
+                        result = self.invoke(engine, command=command, flags=[*flags, *mode])
+                        self.assertEqual(result.returncode, status, result.stderr)
+                        headers = re.findall(r'^(.+\(\d+:\d+\):)\n' + label + r': (.+)$',
+                                             result.stderr, re.MULTILINE)
+                        self.assertTrue(headers, result.stderr)
+                        self.assertEqual(len(headers), result.stderr.count(label + ': '), result.stderr)
+                        self.assertTrue(all(path.startswith(str(self.source)) for path, _ in headers), result.stderr)
+                        self.assertIn('\n    ', result.stderr)
+                        self.assertIn('^', result.stderr)
+                        if command == 'vet':
+                            self.assertIn("Type 'Strategy' declared but not used", result.stderr)
+                            self.assertIn("Procedure 'print_board' declared but not used", result.stderr)
 
     def test_compile_time_optional_failure_marks_the_complete_original_expression(self):
         import json
@@ -47,3 +78,4 @@ class RustDiagnosticTextTests(unittest.TestCase):
                 self.assertEqual((reference.returncode,actual.returncode),(1,1),actual.stderr)
                 self.assertEqual(actual.stderr,reference.stderr)
                 self.assertIn('value:=or_panic',actual.stderr)
+                self.assertRegex(actual.stderr, r':\nError: ')

@@ -75,6 +75,7 @@ class DiagnosticColorTests(unittest.TestCase):
                     self.assertEqual((plain_status, colored_status), (status, status), colored)
                     self.assertNotIn('\x1b[', plain)
                     self.assertIn(f'\x1b[{code}m{label}:\x1b[0m', colored)
+                    self.assertRegex(colored, r'\):\n' + re.escape(f'\x1b[{code}m{label}:\x1b[0m'))
                     self.assertRegex(colored, '\x1b\\['+code+r'm\^+\x1b\[0m')
                     self.assertEqual(re.sub(r'\x1b\[[0-9;]*m', '', colored), plain)
 
@@ -91,6 +92,7 @@ class DiagnosticColorTests(unittest.TestCase):
             self.assertEqual(status, 1, output)
             self.assertIn(':2:', output)
             self.assertIn('\x1b[31mError:\x1b[0m', output)
+            self.assertRegex(output, r':2:\d+:\n' + re.escape('\x1b[31mError:\x1b[0m'))
             self.assertNotIn('^', output)
 
     def test_json_remains_machine_readable_in_a_terminal(self):

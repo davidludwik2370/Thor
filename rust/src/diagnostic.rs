@@ -150,7 +150,8 @@ fn render(error: &Value, raw: Option<&str>, terse: bool, unix: bool, color: bool
         .collect::<Vec<_>>()
         .join("\n");
     let label = style(&format!("{severity}:"), severity, color);
-    let mut output = format!("{location} {label} {messages}");
+    let separator = if file.is_some() && severity != "Note" { "\n" } else { " " };
+    let mut output = format!("{location}{separator}{label} {messages}");
     let read = if raw.is_none() {
         file.and_then(|file| std::fs::read_to_string(file).ok())
     } else {
@@ -244,9 +245,13 @@ mod migration_tests {
         for (severity, label, code) in [("error", "Error", "31"), ("warning", "Warning", "33")] {
             let diagnostic = json!({"type":severity,"pos":pos,"msgs":["message"],
                 "related":[{"pos":pos,"message":"related note"}]});
-            for (terse, unix) in [(false, false), (true, false), (false, true)] {
+            for (terse, unix) in [(false, false), (true, false), (false, true), (true, true)] {
                 let plain = render(&diagnostic, Some("\tbad"), terse, unix, false);
                 let colored = render(&diagnostic, Some("\tbad"), terse, unix, true);
+                let location = if unix { "/source.thor:1:2:" } else { "/source.thor(1:2):" };
+                if !plain.starts_with(&format!("{location}\n{label}: message\n")) {
+                    panic!("source diagnostic severity must start on the next line");
+                }
                 let prefix = format!("\x1b[{code}m");
                 let stripped = colored.replace(&prefix, "").replace("\x1b[0m", "");
                 if stripped != plain || !colored.contains(&format!("{prefix}{label}:\x1b[0m")) {
@@ -258,6 +263,17 @@ mod migration_tests {
                 if !colored.contains(" Note: related note") {
                     panic!("related notes inherited an error or warning style");
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn source_less_diagnostics_keep_the_tool_prefix() {
+        for (severity, label) in [("error", "Error"), ("warning", "Warning"), ("note", "Note")] {
+            let diagnostic = json!({"type":severity,"msgs":["message"]});
+            let output = render(&diagnostic, None, false, false, false);
+            if output != format!("thor {label}: message") {
+                panic!("source-less diagnostics must retain the tool prefix");
             }
         }
     }

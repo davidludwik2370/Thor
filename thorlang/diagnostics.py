@@ -680,7 +680,8 @@ class Diagnostics:
         def style(text):
             return f'\x1b[{code}m{text}\x1b[0m' if code else text
         label = style(severity+':')
-        output = [f'{location} {label} ' + "\n".join(diagnostic["msgs"])]
+        separator = '\n' if pos and severity != 'Note' else ' '
+        output = [f'{location}{separator}{label} ' + "\n".join(diagnostic["msgs"])]
         if pos and not terse:
             raw = self.read(pos["file"])
             lines = raw.decode("utf-8", errors="replace").splitlines()

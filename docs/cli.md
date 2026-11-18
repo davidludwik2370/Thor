@@ -129,6 +129,19 @@ paths. `-target:?`, `-microarch:?`, and `-target-features:?` show supported valu
 without loading a project. Compile-time helpers do not inherit final-artifact
 report, documentation, or vet/style flags.
 
+Text errors and warnings put the source location on its own line, followed by
+the severity, message, source excerpt, and underline:
+
+```text
+/path/project/main.thor(13:1):
+Warning: Type 'Strategy' declared but not used
+    Strategy :: enum {
+    ^^^^^^^^
+```
+
+This layout also applies with `-terse-errors` and Unix-style positions. JSON
+diagnostics and language-server diagnostics retain their structured format.
+
 ## Source tools
 
 `doc` accepts one entry package per invocation; use `-all-packages` for its
