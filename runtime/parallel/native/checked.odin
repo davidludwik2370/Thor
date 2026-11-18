@@ -28,14 +28,14 @@ map_values_checked :: proc(jobs:[]$J,calculate:$F,$R:typeid,requested:int,
     }
     work,work_error:=make([]Work,workers,allocator)
     if work_error!=nil {
-        one:=[1]Work{{jobs,result,calculate,0,len(jobs),pure.scratch_child(parent)}}
+        one:=[1]Work{{jobs,result,calculate,0,len(jobs),pure.scratch_child(rawptr(parent))}}
         run_chunks(one[:],run,allocator,worker_allocator)
     } else {
         start:=0
         base,extra:=len(jobs)/workers,len(jobs)%workers
         for &item,i in work {
             end:=start+base+int(i<extra)
-            item={jobs,result,calculate,start,end,pure.scratch_child(parent)}
+            item={jobs,result,calculate,start,end,pure.scratch_child(rawptr(parent))}
             start=end
         }
         run_chunks(work,run,allocator,worker_allocator)
@@ -72,14 +72,14 @@ map_actions_checked :: proc(jobs:[]$J,calculate:$F,requested:int,
     }
     work,err:=make([]Work,workers,allocator)
     if err!=nil {
-        one:=[1]Work{{jobs,calculate,0,len(jobs),pure.scratch_child(parent)}}
+        one:=[1]Work{{jobs,calculate,0,len(jobs),pure.scratch_child(rawptr(parent))}}
         run_chunks(one[:],run,allocator,worker_allocator)
     } else {
         start:=0
         base,extra:=len(jobs)/workers,len(jobs)%workers
         for &item,i in work {
             end:=start+base+int(i<extra)
-            item={jobs,calculate,start,end,pure.scratch_child(parent)}
+            item={jobs,calculate,start,end,pure.scratch_child(rawptr(parent))}
             start=end
         }
         run_chunks(work,run,allocator,worker_allocator)

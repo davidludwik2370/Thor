@@ -95,6 +95,10 @@ defer delete(rows)
 ```
 
 `pmap` remains a `proc`: an ordinary runtime call may run an impure callback.
+Calling an enclosing `fn` with compile-time-known arguments automatically
+evaluates that function, including its `pmap` calls, in normal builds. In
+`-debug`, optional automatic evaluation is disabled to preserve debugging;
+constant declarations still require it, and `#run` explicitly forces it.
 When called by `fn` or `#run`, the selected callback must instead meet the normal
 pure-code rules, recursively. Runtime procedure variables, ambient context,
 global mutable state, I/O, and explicit `allocator`/`worker_allocator` arguments

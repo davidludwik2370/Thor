@@ -7,6 +7,27 @@ class CompileTimeParallelMapTests(unittest.TestCase):
     invoke=mapping.ParallelMapTests.invoke
     program=mapping.ParallelMapTests.program
 
+    def test_enclosing_fn_evaluates_automatically_except_optional_debug_calls(self):
+        from tests.test_t21_t22 import CacheTests
+        prefix='''import "thor:basic"
+square::proc(x:int)->int{return x*x}
+compute::fn(n:int)->int{
+    rows:=basic.pmap([]struct{x:int}{{n},{n+1}},square,workers=2)
+    return rows[0]+rows[1]
+}
+'''
+        for declaration,flags,evaluated in [
+            ('value:=compute(3)',[],True),
+            ('value:=compute(3)',['-debug'],False),
+            ('value:=#run compute(3)',['-debug'],True),
+            ('value::compute(3)',['-debug'],True),
+        ]:
+            with self.subTest(declaration=declaration,flags=flags):
+                _,result=self.invoke(self.program(declaration+';if value!=25{panic("automatic mapping")}',prefix),flags=[*flags,'--cache-report'])
+                self.assertEqual(CacheTests.report(self,result)['writes']>0,evaluated)
+                self.assertNotIn('may keep a reference to the stack memory',result.stderr)
+                self.assertNotIn('still allocated',result.stderr)
+
     def test_scalar_and_polymorphic_multi_result_callbacks(self):
         source='''package main
 import "thor:basic"
