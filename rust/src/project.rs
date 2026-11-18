@@ -731,10 +731,11 @@ impl Project {
         self.collections
             .insert(project_collection.clone(), self.destination.clone());
         let mut jobs=Vec::new();
+        let lowering_imports=if purity.parallel_callbacks.is_empty(){vec![]}else{vec!["thor:parallel".to_string()]};
         let mut planning_error=None;
         for (file,source) in self.sources.iter().enumerate() {
             if source.shared_native && !sdk.adapts(&source.path) { continue; }
-            match filelowering::Job::prepare(self,file,&sdk,&project_collection,&mut paths) {
+            match filelowering::Job::prepare(self,file,&sdk,&project_collection,&mut paths,&lowering_imports) {
                 Ok(job)=>jobs.push(job),
                 Err(error)=>{planning_error=Some(error);break;}
             }

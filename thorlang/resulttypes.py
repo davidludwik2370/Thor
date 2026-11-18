@@ -13,7 +13,15 @@ def literal(source, callback):
     while node.kind=='Paren':node=node.role('expr')
     if node.kind!='Procedure':return None
     name=source.prefix+f'result_callback_{node.start}'
-    code='\n'+name+'::'+source.render(node)+'\n'
+    checked=bool(source.purity and node in source.purity.calls.callback_entries)
+    if checked:
+        source.purity.calls.emitting.add(node)
+        source.purity.calls.emitting_callbacks.add(node)
+    try:code='\n'+name+'::'+source.render(node)+'\n'
+    finally:
+        if checked:
+            source.purity.calls.emitting.discard(node)
+            source.purity.calls.emitting_callbacks.discard(node)
     source.expressions.helpers[source.expressions.helper_scope(callback),name]=source.mapping.wrap(code,source.path,node.start,node.end,'result-callback')
     return name
 
@@ -227,7 +235,10 @@ def render(source,node,constant=False):
         if len(query_args)==1 and query_args[0].kind=='Unary' and query_args[0].data.get('op')=='**' and not argument_types(resolver,default.call,bindings):
             witness=(callback_literal or source.render(callback))+'()'
         fields=result[1]
+        from . import parallelcompile
+        action=not fields and parallelcompile.is_call(resolver,node)
         supplied=parameters.get(default.name) is not default.query
+        if action:supplied=any(arg.kind=='FieldValue' and arg.role('field').text==default.name for arg in node.group('args'))
         if not fields and supplied:error(node,'The callback has no return values; result_type cannot be supplied.')
         helper=source.prefix+f'result_call_{node.start}'
         result_name=source.prefix+'Result'
@@ -236,9 +247,12 @@ def render(source,node,constant=False):
         enabled=resolver.native_enabled;resolver.native_enabled=True
         try:candidates=resolver.procedure_candidates(callback)
         finally:resolver.native_enabled=enabled
-        specialized=len(candidates)>1 or any(part.kind=='PolyType' for part in descendants(result[0]))
+        from . import parallelcompile
+        checked_mapping=bool(source.purity and parallelcompile.is_call(resolver,node) and
+            (source.purity.checked(source.purity.owner(node)) or source.purity.eval_mode and node in source.purity.calls.targets))
+        specialized=checked_mapping or len(candidates)>1 or any(part.kind=='PolyType' for part in descendants(result[0]))
         for index,arg in enumerate(node.group('args')):
-            name=arg.role('field').text if arg.kind=='FieldValue' else names[index]
+            name=arg.role('field').text if arg.kind=='FieldValue' else names[index+int(action and index>=names.index(default.name))]
             value=arg.role('value') if arg.kind=='FieldValue' else arg
             if name==default.name:explicit=source.render(value,constant=True);continue
             argument=source.prefix+f'arg_{len(params)}'
@@ -251,7 +265,12 @@ def render(source,node,constant=False):
                 bound_values[name]='cast('+callback_signature+')nil'
             else:params.append(f'{argument}:${source.prefix}Arg_{len(params)}')
             arranged[name]=argument
-            args.append(callback_literal if name==callback_name and callback_literal else source.render(value,constant=constant))
+            from . import parallelcompile
+            checked=source.purity.calls.targets.get(node,[]) if name==callback_name and source.purity and parallelcompile.is_call(resolver,node) else []
+            target=checked[0] if checked else None
+            if target and target in source.purity.calls.names and callback_literal is None:
+                args.append(source.purity.calls.access(source,target)+'_pmap')
+            else:args.append(callback_literal if name==callback_name and callback_literal else source.render(value,constant=constant))
         native=[]
         type_position=names.index(default.name)
         for index,name in enumerate(names):
@@ -260,7 +279,7 @@ def render(source,node,constant=False):
             elif name in arranged:native.append(arranged[name] if index<type_position else name+'='+arranged[name])
         if fields:
             params.insert(0,f'${result_name}:typeid');args.insert(0,explicit or type_code(source,node,witness,result))
-        target=source.render(node.role('callee'))
+        target=source.expressions.module('parallel','thor:parallel')+'.pmap_checked' if checked_mapping else source.render(node.role('callee'))
         from . import sourceidentity
         location=''.join(code for _,code in sourceidentity.caller_arguments(source,node,signature))
         native_call=target+'('+','.join(native)+location+')'
@@ -283,7 +302,17 @@ def render(source,node,constant=False):
                 params.append('$'+output+':typeid');output_types.append(output)
                 args.append(f'{source.prefix}meta.type_proc_return_type(type_of({source.prefix}meta.procedure_of({bound_call})),{i})')
         returns='->('+','.join(output_types)+')' if return_count else ''
-        body=('return ' if return_count else '')+native_call
+        checks=[]
+        if checked_mapping:
+            purity=source.purity
+            for target in purity.targets(node):
+                bound=purity.borrowing.bindings(node,target,purity.borrowing.environment(purity.owner(node))) if purity.owner(node) else []
+                for access in purity.borrowing.requirements.get(target,()):
+                    condition=purity.borrowing.resolve(bound,access).render(purity,source)
+                    token=source.expressions.error(node,'Pure pmap cannot mutate or delete job storage borrowed from an input.')
+                    import json
+                    checks.append('when '+condition+' {#panic('+json.dumps(token)+')}')
+        body='\n'.join(checks)+('\n' if checks else '')+('return ' if return_count else '')+native_call
         declaration=f'\n{helper}::proc({",".join(params)}){returns}{{{body}}}\n'
         source.expressions.helpers[source.expressions.helper_scope(node),helper]=source.mapping.wrap(declaration,source.path,node.start,node.end,'result-default')
         return source.mapping.wrap(helper+'('+','.join(args)+')',source.path,node.start,node.end,'result-default')

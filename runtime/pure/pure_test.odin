@@ -6,6 +6,58 @@ import "core:testing"
 import "base:runtime"
 
 @(test)
+worker_scratch_children_keep_allocations_until_parent_cleanup :: proc(t:^testing.T) {
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,context.allocator,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracker)
+    backing:=mem.tracking_allocator(&tracker)
+    parent:Scratch
+    scratch_init(&parent)
+    child:=scratch_child(&parent)
+    child.backing=backing
+    child.allocations.allocator=backing
+    first:=make([]int,3,scratch_allocator(child))
+    first[0]=7
+    nested:=scratch_child(child)
+    nested.backing=backing
+    nested.allocations.allocator=backing
+    second:=make([]int,5,scratch_allocator(nested))
+    second[0]=9
+    testing.expect(t,first[0]+second[0]==16&&len(tracker.allocation_map)>0)
+    scratch_destroy(&parent)
+    testing.expect(t,parent.children==nil&&len(tracker.allocation_map)==0&&len(tracker.bad_free_array)==0)
+}
+
+@(test)
+worker_scratch_cross_owner_resize_query_and_free :: proc(t:^testing.T) {
+    tracker:mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracker,context.allocator,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracker)
+    backing:=mem.tracking_allocator(&tracker)
+    parent:Scratch
+    scratch_init(&parent)
+    parent.backing=backing
+    parent.allocations.allocator=backing
+    child:=scratch_child(&parent)
+    child.backing=backing
+    child.allocations.allocator=backing
+    root_alloc,worker_alloc:=scratch_allocator(&parent),scratch_allocator(child)
+    bytes,err:=mem.alloc_bytes(17,32,worker_alloc)
+    bytes[0]=42
+    bigger,resize_err:=runtime.mem_resize(raw_data(bytes),len(bytes),129,32,root_alloc)
+    testing.expect(t,err==.None&&resize_err==.None&&bigger[0]==42&&len(child.allocations)==1)
+    query:=runtime.Allocator_Query_Info{pointer=raw_data(bigger)}
+    _,query_err:=root_alloc.procedure(root_alloc.data,.Query_Info,0,0,&query,0)
+    testing.expect(t,query_err==.None&&query.pointer==nil&&query.size==129&&query.alignment==32)
+    delete(bigger,root_alloc)
+    original:=make([]int,3,root_alloc)
+    delete(original,worker_alloc)
+    testing.expect(t,len(parent.allocations)==0&&len(child.allocations)==0)
+    scratch_destroy(&parent)
+    testing.expect(t,len(tracker.allocation_map)==0&&len(tracker.bad_free_array)==0)
+}
+
+@(test)
 dynamic_results_preserve_capacity_and_own_allocator_and_nested_values :: proc(t:^testing.T) {
     tracker:mem.Tracking_Allocator
     mem.tracking_allocator_init(&tracker,context.allocator,context.allocator)

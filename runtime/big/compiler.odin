@@ -43,6 +43,15 @@ compiler_destroy_value :: proc(value: $T) {
         destroy(&temporary)
     }
 }
+// Explicit delete must preserve Odin's behavior for a nonnumeric generic value.
+// compiler_destroy_value is intentionally only numeric temporary cleanup.
+compiler_delete_value :: proc(value:$T)->runtime.Allocator_Error {
+    when T==Integer || T==Rational {
+        temporary:=value
+        destroy(&temporary)
+        return .None
+    } else {return sets.compiler_delete(value)}
+}
 // Preserve native delete behavior for other generic specializations.
 compiler_delete :: proc(target: ^$T)->runtime.Allocator_Error {
     when T == Integer || T == Rational { destroy(target);return .None }

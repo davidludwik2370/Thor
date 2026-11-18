@@ -35,6 +35,11 @@ def call_contexts(graphs,origin,hints):
 
 def contextualize(adapter,context,origin,messages,related):
     root,path=context
+    if root.kind=='Call':
+        primary=Origin(str(root.source.path),root.start,root.end,'pure-call-context')
+        notes=list(related)
+        if origin:notes.append({'pos':adapter.locate(origin),'message':'Underlying purity violation in this compile-time pmap callback.'})
+        return primary,['Compile-time pmap callback is not pure: '+messages[0],*messages[1:]],notes
     call=path[0];name=procedure_name(root)
     primary=Origin(str(call.source.path),call.start,call.end,'pure-call-context')
     messages=[f"Pure function '{name}' cannot call '{call.role('callee').text}': {messages[0]}",*messages[1:]]

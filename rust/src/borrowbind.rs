@@ -31,6 +31,30 @@ impl Evaluator<'_, '_, '_> {
             .collect()
     }
     pub fn bindings(&mut self, call: Ref, callee: Ref, env: &mut Environment) -> Vec<Id> {
+        if crate::parallelcompile::is_call(self.resolver,call) {
+            let Some(jobs)=self.argument(call,"jobs",0) else {return vec![];};
+            let typ=self.resolver.type_of(jobs);
+            let value=self.flow(jobs,env);
+            let item=self.arena.item(value);
+            let fields=self.resolver.record_fields(typ.element().unwrap_or(&Type::Unknown));
+            let mut values=fields.into_iter().map(|(name,typ)| {
+                let value=self.arena.member(item,&name,self.resolver);
+                self.arena.header_copy(value,typ,Some(jobs),None,self.resolver)
+            }).collect::<Vec<_>>().into_iter();
+            let mut bound=vec![];
+            for (_,field) in self.parameters(callee) {
+                let value=if self.resolver.sources[field.file].node(field.node).data["variadic"]==true {
+                    let remaining=values.by_ref().collect::<Vec<_>>();
+                    let element=(!remaining.is_empty()).then(||self.arena.joined(&remaining,self.resolver));
+                    self.arena.add(Flow{element,..Flow::default()})
+                } else {values.next().unwrap_or_else(|| {
+                    self.role(field,"default").map(|node|self.flow(node,env)).unwrap_or_else(||self.arena.add(Flow{borrowed:READONLY,..Flow::default()}))
+                })};
+                self.arena.values[value].location=READONLY;
+                bound.push(value);
+            }
+            return bound;
+        }
         let mut positional = vec![];
         let mut named = HashMap::new();
         if let Some(receiver) = self.role(call, "callee") {

@@ -17,6 +17,7 @@ impl Job {
         sdk: &sdkmirror::SdkMirror,
         project_collection: &str,
         paths: &mut BTreeSet<PathBuf>,
+        extra_imports: &[String],
     ) -> Result<Self> {
         let source = &project.sources[file];
         let mut relative = if source.shared_native {
@@ -58,6 +59,7 @@ impl Job {
             .filter(|node| node.kind == "Import")
             .map(|node| unquote(&node.op))
             .collect::<Result<Vec<_>>>()?;
+        imports.extend(extra_imports.iter().cloned());
         if let Some(view) = project
             .evaluation
             .as_ref()

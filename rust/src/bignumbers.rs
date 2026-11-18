@@ -1373,7 +1373,7 @@ impl Lower<'_, '_> {
                                 if addressable == "true" {
                                     "compiler_delete(&("
                                 } else {
-                                    "compiler_destroy_value("
+                                    "compiler_delete_value("
                                 }
                             ),
                             id,

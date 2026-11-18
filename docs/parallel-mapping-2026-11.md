@@ -26,8 +26,9 @@ callbacks, overrides, result type queries and no-result actions. `fmap` and
 ## Implementation boundaries
 
 The compiler handles the general type query and a query used as a dependent
-type-parameter default. It does not recognize `pmap` by name. An ordinary user
-library can use the same mechanism. Forwarding helpers supply native type
+type-parameter default. An ordinary user library can use the same mechanism.
+Pure mapping additionally recognizes the official scheduler declaration, as
+described below. Forwarding helpers supply native type
 arguments positionally and preserve runtime argument evaluation exactly once,
 in written order. Known polymorphic and overloaded callbacks receive a concrete
 expected procedure type automatically; callers need no extra type annotations.
@@ -80,3 +81,48 @@ of parent `7b7274b` also exceeded 45 seconds; the stack is in the pre-existing
 Python slice-analysis path. The production Rust demo passes. A separate Python
 anonymous-struct field lookup failure exposed by ZIP coverage was corrected
 and its targeted ZIP regression passes.
+
+## Compile-time mapping follow-up
+
+`#run basic.pmap(jobs, callback)` and `pmap` inside `fn` now check the selected
+callback transitively. The scheduler boundary is identified by its installed
+declaration, including aliases and re-exports, rather than a bare identifier.
+The scheduler still runs bounded parallel work in the isolated helper. Normal
+runtime mapping remains a `proc` with the existing shallow ownership contract.
+No language syntax or Odin compiler changes are involved.
+
+Callbacks retain their native signatures. Ordinary procedures receive separate
+checked direct-call and callback variants; per-call ownership proofs project
+the job fields onto callback parameters. This permits local output mutation
+without granting write access to a pure caller's borrowed data. Used defaults
+and selected polymorphic branches are checked normally. Runtime callbacks and
+explicit allocator overrides are rejected in pure mapping.
+
+Each checked worker has an independent heap-backed scratch allocator, linked
+to the caller before workers start. Its allocations survive joins and remain
+available through result promotion and local use. The caller then releases
+all worker scratch storage, including nested maps. Direct `#run` requests
+materialize independent results before releasing their worker scratch storage.
+Trees used by parallel calls synchronize allocation bookkeeping so explicit
+delete, resize and allocation queries also work across worker/caller storage.
+Ordinary scratch storage does not acquire that lock.
+Ordinary runtime worker loops are unchanged.
+
+The new `tests.test_pmap_comptime` suite covers callback inference, aliases,
+inline callbacks, overloads, defaults, mixed direct/mapping calls, local versus
+borrowed mutation, nested allocations, numeric results, cache reuse and
+invalidation, failures and timeouts. Checked, debug allocation tracking, and
+unchecked optimized builds exercise ownership paths. Live TLS coverage checks
+result fields and original-location purity diagnostics through unsaved edits.
+A related explicit-delete fallback now preserves native deletion of nonnumeric
+record fields in programs that also use big numbers; its regression checks
+that string and slice fields are freed with assertions disabled as well.
+
+The follow-up release gate passed 103 mapping, purity, big-number and assertion
+hygiene tests. All 17 new compile-time mapping tests also passed on the Python
+reference. Additional validation passed 96 Rust unit tests, 9 live TLS tests,
+all 1,166 native TLS tests, and all 11 native pure-runtime tests in both checked
+and optimized unchecked builds. The updated demo ran cleanly with debug
+allocation tracking and with assertions/bounds/type assertions disabled.
+Two warm release transpiles of that demo took 0.321 and 0.302 seconds; these
+measure lowering with cached compile-time results, excluding Odin compilation.

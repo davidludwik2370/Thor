@@ -19,11 +19,20 @@ impl Lower<'_, '_> {
             self.resolver.sources[target.file].prefix, target.node.0
         )
     }
-    fn checked_access(&mut self, target: Ref, site: NodeId) -> Result<Code> {
+    pub(super) fn checked_access(&mut self, target: Ref, site: NodeId) -> Result<Code> {
         let name = self.checked_name(target);
-        self.compiler_access(target,&name,site)
+        self.compiler_access(target, &name, site)
     }
-    pub(super) fn compiler_access(&mut self,target:Ref,name:&str,site:NodeId)->Result<Code> {
+    pub(super) fn checked_callback_access(&mut self, target: Ref, site: NodeId) -> Result<Code> {
+        let name = format!("{}_pmap", self.checked_name(target));
+        self.compiler_access(target, &name, site)
+    }
+    pub(super) fn compiler_access(
+        &mut self,
+        target: Ref,
+        name: &str,
+        site: NodeId,
+    ) -> Result<Code> {
         let owner = &self.resolver.sources[target.file];
         if owner.path.parent() == self.source.path.parent() {
             return Ok(self.g(name, site));
@@ -128,9 +137,7 @@ impl Lower<'_, '_> {
             .collect::<Vec<_>>();
         // A checked outer body copies its local declarations together with
         // their checked variants. Prepare those local variants first.
-        targets.sort_by_key(|target| {
-            std::cmp::Reverse(self.source.ancestors(target.node).count())
-        });
+        targets.sort_by_key(|target| std::cmp::Reverse(self.source.ancestors(target.node).count()));
         for target in targets {
             let mut parent = self.source.node(target.node).parent;
             while parent.is_some_and(|node| self.source.node(node).kind == "Paren") {
@@ -139,92 +146,115 @@ impl Lower<'_, '_> {
             let Some(declaration) =
                 parent.filter(|node| self.source.node(*node).kind == "Declaration")
             else {
+                if facts.parallel_callbacks.contains(&target) {
+                    continue;
+                }
                 return Err(self.unsupported(target.node, "named checked procedure bodies"));
             };
             let body = self.role(target.node, "body")?;
-            let prefix = format!("{}checked_{}_", self.source.prefix, target.node.0);
-            let saved_prefix = std::mem::replace(&mut self.prefix, prefix);
-            let old_prologue = self.body_prologues.remove(&body);
-            let old_owned = self.pure_owned.contains(&target.node);
-            let edit_count = self.edits.len();
-            let evaluation = self.evaluation.take();
-            self.emitting_variants.insert(target.node);
-            let result: Result<Code> = (|| {
-                self.prepare_pure(target, !facts.entry_roots.contains(&target))?;
-                let name = self.checked_name(target);
-                let procedure = self.render(target.node, None, false)?;
-                let mut attrs = vec![];
-                for attribute in self.source.group(declaration, "attributes") {
-                    for item in self.source.group(*attribute, "elems") {
-                        let key = self.source.role(*item, "field").unwrap_or(*item);
-                        if ["require_results", "deprecated"].contains(&self.source.text(key)) {
-                            attrs.push(self.render(*item, None, true)?);
+            for callback in [false, true] {
+                if callback && !facts.parallel_callbacks.contains(&target) {
+                    continue;
+                }
+                if callback {
+                    self.emitting_callbacks.insert(target.node);
+                }
+                let prefix = format!(
+                    "{}checked_{}_{}",
+                    self.source.prefix,
+                    target.node.0,
+                    if callback { "pmap_" } else { "" }
+                );
+                let saved_prefix = std::mem::replace(&mut self.prefix, prefix);
+                let old_prologue = self.body_prologues.remove(&body);
+                let old_owned = self.pure_owned.contains(&target.node);
+                let edit_count = self.edits.len();
+                let evaluation = self.evaluation.take();
+                self.emitting_variants.insert(target.node);
+                let result: Result<Code> = (|| {
+                    self.prepare_pure(target, !facts.entry_roots.contains(&target))?;
+                    let name = format!(
+                        "{}{}",
+                        self.checked_name(target),
+                        if callback { "_pmap" } else { "" }
+                    );
+                    let procedure = self.render(target.node, None, false)?;
+                    let mut attrs = vec![];
+                    for attribute in self.source.group(declaration, "attributes") {
+                        for item in self.source.group(*attribute, "elems") {
+                            let key = self.source.role(*item, "field").unwrap_or(*item);
+                            if ["require_results", "deprecated"].contains(&self.source.text(key)) {
+                                attrs.push(self.render(*item, None, true)?);
+                            }
                         }
                     }
-                }
-                let mut annotation = vec![];
-                if !attrs.is_empty() {
-                    annotation.push(self.g("\n@(", target.node));
-                    for (index, attr) in attrs.into_iter().enumerate() {
-                        if index > 0 {
-                            annotation.push(self.g(",", target.node));
+                    let mut annotation = vec![];
+                    if !attrs.is_empty() {
+                        annotation.push(self.g("\n@(", target.node));
+                        for (index, attr) in attrs.into_iter().enumerate() {
+                            if index > 0 {
+                                annotation.push(self.g(",", target.node));
+                            }
+                            annotation.push(attr);
                         }
-                        annotation.push(attr);
+                        annotation.push(self.g(")\n", target.node));
                     }
-                    annotation.push(self.g(")\n", target.node));
+                    Ok(Code::concat([
+                        Code::concat(annotation),
+                        self.g(format!("\n{name} :: "), target.node),
+                        procedure,
+                        self.g("\n", target.node),
+                    ])
+                    .region(
+                        &self.source.path,
+                        self.source.node(target.node).span,
+                        &format!(
+                            "pure-procedure|{}|{name}",
+                            self.source
+                                .group(declaration, "names")
+                                .first()
+                                .map(|id| self.source.text(*id))
+                                .unwrap_or("anonymous procedure")
+                        ),
+                    ))
+                })();
+                if self.meta {
+                    self.modules
+                        .insert(format!("{}meta", self.prefix), "base:intrinsics".into());
                 }
-                Ok(Code::concat([
-                    Code::concat(annotation),
-                    self.g(format!("\n{name} :: "), target.node),
-                    procedure,
-                    self.g("\n", target.node),
-                ])
-                .region(
-                    &self.source.path,
-                    self.source.node(target.node).span,
-                    &format!(
-                        "pure-procedure|{}|{name}",
-                        self.source
-                            .group(declaration, "names")
-                            .first()
-                            .map(|id| self.source.text(*id))
-                            .unwrap_or("anonymous procedure")
-                    ),
-                ))
-            })();
-            if self.meta {
-                self.modules
-                    .insert(format!("{}meta", self.prefix), "base:intrinsics".into());
+                if self.builtin {
+                    self.modules
+                        .insert(format!("{}builtin", self.prefix), "base:builtin".into());
+                }
+                if self.default {
+                    let name = format!("{}default_value", self.prefix);
+                    let code=self.g(format!("\n@(private=\"file\")\n{name}::proc \"contextless\"(value:$T)->T{{return value}}\n"),target.node);
+                    self.helpers
+                        .entry((NodeId(0), self.prefix.clone(), name))
+                        .or_insert(code);
+                }
+                self.emitting_variants.remove(&target.node);
+                if callback {
+                    self.emitting_callbacks.remove(&target.node);
+                }
+                self.evaluation = evaluation;
+                // A checked body can convert a `do` block into braces. Its source
+                // edits belong to the rendered variant, never the original proc.
+                self.edits.truncate(edit_count);
+                self.body_prologues.remove(&body);
+                if let Some(prologue) = old_prologue {
+                    self.body_prologues.insert(body, prologue);
+                }
+                if !old_owned {
+                    self.pure_owned.remove(&target.node);
+                }
+                self.prefix = saved_prefix;
+                let code = result?;
+                self.declaration_helpers
+                    .entry(declaration)
+                    .or_default()
+                    .push(code);
             }
-            if self.builtin {
-                self.modules
-                    .insert(format!("{}builtin", self.prefix), "base:builtin".into());
-            }
-            if self.default {
-                let name = format!("{}default_value", self.prefix);
-                let code=self.g(format!("\n@(private=\"file\")\n{name}::proc \"contextless\"(value:$T)->T{{return value}}\n"),target.node);
-                self.helpers
-                    .entry((NodeId(0), self.prefix.clone(), name))
-                    .or_insert(code);
-            }
-            self.emitting_variants.remove(&target.node);
-            self.evaluation = evaluation;
-            // A checked body can convert a `do` block into braces. Its source
-            // edits belong to the rendered variant, never the original proc.
-            self.edits.truncate(edit_count);
-            self.body_prologues.remove(&body);
-            if let Some(prologue) = old_prologue {
-                self.body_prologues.insert(body, prologue);
-            }
-            if !old_owned {
-                self.pure_owned.remove(&target.node);
-            }
-            self.prefix = saved_prefix;
-            let code = result?;
-            self.declaration_helpers
-                .entry(declaration)
-                .or_default()
-                .push(code);
         }
         Ok(())
     }
@@ -232,6 +262,9 @@ impl Lower<'_, '_> {
         let Some(targets) = self.checked_targets.get(&id).cloned() else {
             return Ok(None);
         };
+        if crate::parallelcompile::is_call(self.resolver, self.reference(id)) {
+            return Ok(None);
+        }
         if !targets
             .iter()
             .any(|target| self.resolver.sources[target.file].node(target.node).data["pure"] != true)

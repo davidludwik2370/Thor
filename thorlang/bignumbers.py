@@ -742,7 +742,7 @@ class BigNumbers:
                     return name+'('+', '.join(inputs)+')'
                 if self.e.addressable(arg) is True:
                     return f'{self.module()}.compiler_delete(&({self.e.address(arg)}))'
-                return f'{self.module()}.compiler_destroy_value({self.s.render(arg)})'
+                return f'{self.module()}.compiler_delete_value({self.s.render(arg)})'
             consumed=self.consume_regular_call(node)
             if consumed is not None: return consumed
         if node.kind=='Compound' and self.shape(node).kind in KINDS:

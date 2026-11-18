@@ -1121,6 +1121,35 @@ main::proc(){
             'position':self.position(text,'rows[0].value',len('rows[0].')),'context':{'triggerKind':1}})
         self.assertTrue({'value','ok'}<={item['label'] for item in completion['items']},completion)
 
+    def test_compile_time_parallel_map_fields_and_purity_diagnostic_recovery(self):
+        text='''package main
+import "thor:basic"
+GLOBAL:int
+calculate::proc(a,b:$T)->(sum:T,ok:bool){return a+b,true}
+main::proc(){
+    _="😀";rows:=#run basic.pmap([]struct{a,b:int}{{2,3}},calculate)
+    _=rows[0].sum
+    delete(rows)
+}
+'''
+        client,main=self.open(text)
+        client.diagnostic(main.as_uri(),empty=True)
+        hover=self.hover(client,main,text,'rows:=')
+        self.assertIsNotNone(hover)
+        completion=client.request('textDocument/completion',{'textDocument':{'uri':main.as_uri()},
+            'position':self.position(text,'rows[0].sum',len('rows[0].')),'context':{'triggerKind':1}})
+        self.assertTrue({'sum','ok'}<={item['label'] for item in completion['items']},completion)
+        broken=text.replace('return a+b,true','return a+b+GLOBAL,true')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':2},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(main.as_uri(),contains='runtime storage')
+        error=next(error for error in errors if 'runtime storage' in error['message'])
+        self.assertEqual(error['range']['start'],self.position(broken,'basic.pmap',0))
+        self.assertNotIn('Thor expression',error['message'])
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':main.as_uri(),'version':3},'contentChanges':[{'text':text}]})
+        client.diagnostic(main.as_uri(),empty=True)
+
     def test_data_first_mapping_callbacks_keep_inferred_result_hovers(self):
         text='''package main
 import "thor:basic"

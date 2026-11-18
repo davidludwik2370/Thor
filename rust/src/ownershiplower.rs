@@ -11,10 +11,11 @@ impl Lower<'_, '_> {
         }) else {
             return Ok(None);
         };
+        if self.emitting_callbacks.contains(&proc) {return Ok(None);}
         let params = self.role(id, "params")?;
         let marker = &self.borrow_marker;
-        let extra = format!("{}{marker}:${marker}_Type=true,{marker}_ownership:${marker}_ownership_Type=struct{{}}{{}}",
-            if self.source.node(params).children.is_empty() { "" } else { "," });
+        let comma=if self.source.node(params).children.is_empty(){""}else{","};
+        let extra = format!("{comma}{marker}:${marker}_Type=true,{marker}_ownership:${marker}_ownership_Type=struct{{}}{{}}");
         let mut fields = vec![];
         for field in self.source.node(params).children.clone() {
             fields.push((
@@ -54,6 +55,7 @@ impl Lower<'_, '_> {
         }) else {
             return Ok(None);
         };
+        if self.emitting_callbacks.contains(&proc) {return Ok(None);}
         if !self.ownership_wrapping.insert(id) {
             return Ok(None);
         }

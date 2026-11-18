@@ -262,7 +262,7 @@ class Purity:
             cc=foreign.data.get('calling_convention','c') if foreign else 'c'
         return cc in {'','odin'}
 
-    def checked(self,proc):return bool(proc and (self.pure(proc) or self.eval_mode and proc in self.active or proc in self.calls.emitting))
+    def checked(self,proc):return bool(proc and (self.pure(proc) or self.eval_mode and proc in self.active and proc not in self.calls.callback_entries or proc in self.calls.emitting))
 
     def invalid_default(self,node):return any(parent in self.invalid_defaults for parent in (node,*node.ancestors()))
 
@@ -389,6 +389,8 @@ class Purity:
                 'Use proc for I/O and keep it outside fn/#run call chains.')
 
     def approved(self,call):
+        from . import parallelcompile
+        if parallelcompile.is_call(self.r,call):return True
         if self.primitive(call.role('callee')):return True
         library=self.library(call)
         if library not in self.libraries:return False
@@ -455,6 +457,10 @@ class Purity:
         return False if False in allowed else None if None in allowed else True
 
     def targets(self,call):
+        from . import parallelcompile
+        if parallelcompile.is_call(self.r,call):
+            selected=parallelcompile.callback(self.r,call)
+            return [selected[1]] if selected else []
         if self.eval_mode and call in self.calls.targets:return self.calls.targets[call]
         direct=self.r.symbol(call.role('callee'))
         if direct and direct.declaration.data.get('mutable',False):return []
@@ -893,6 +899,7 @@ class Purity:
                 if any(name.startswith('deferred_') for name in names):
                     self.contracts[proc]=(attribute,'Pure calls cannot use implicit deferred procedure callbacks; make eligible calls explicit in the body.')
         for n in nodes:
+            if proc in self.calls.callback_entries and not self.calls.default_evaluated(n):continue
             if n in self.borrowing.escapes:self.problem(n,self.borrowing.escapes[n])
             typ=self.r.type_node(n.role('type')) if n.kind=='Declaration' and n.role('type') else self.r.type_of(n) if n.kind in {'Compound','Comprehension'} else None
             if typ and typ.kind=='struct' and typ.node and typ.node.data.get('op')=='raw_union':
@@ -988,6 +995,19 @@ class Purity:
             if n.kind=='Call':
                 builtin=self.builtin(n);library=self.library(n)
                 if self.calls.queried(n):continue
+                from . import parallelcompile
+                if parallelcompile.is_call(self.r,n):
+                    target=parallelcompile.callback(self.r,n)
+                    if target:
+                        argument,callback=target
+                        if parallelcompile.explicit_allocator(n,callback):self.problem(n,'Compile-time/pure pmap cannot select an allocator or worker_allocator.')
+                        if parallelcompile.primitive_callback(self,argument,callback):continue
+                        self.calls.callback_entries.add(callback)
+                        self.calls.targets[n]=[callback]
+                        if not self.pure(callback):self.calls.name(callback)
+                        self.analyze(callback)
+                    else:self.problem(n,'Compile-time/pure pmap requires a resolved constant callback; runtime procedure values are not eligible.')
+                    continue
                 if self.io_call(n):
                     self.problem(n.role('callee'),self.io_message(n))
                 elif builtin=='make':
@@ -1468,6 +1488,9 @@ class Purity:
         self.analyze(proc)
         s=block.source;module=self.module(s);prefix=s.prefix+'scratch_'+str(proc.start)
         code=[]
+        if proc in self.calls.emitting_callbacks:
+            fields=','.join(access.key+':[0]u8' for access in sorted(self.borrowing.requirements.get(proc,()),key=lambda a:a.key))
+            code.append(self.calls.ownership_type+'::struct{'+fields+'}')
         declaration=proc.parent
         while declaration and declaration.kind=='Paren':declaration=declaration.parent
         names=declaration.group('names') if declaration and declaration.kind=='Declaration' else []

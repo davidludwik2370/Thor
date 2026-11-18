@@ -32,6 +32,7 @@ pub struct Facts {
     /// Native `when` selection decides whether these body checks are reached.
     pub conditional: BTreeMap<Ref, Fault>,
     pub entry_roots: BTreeSet<Ref>,
+    pub parallel_callbacks: BTreeSet<Ref>,
 }
 pub struct Purity<'a, 'r> {
     r: &'r mut Resolver<'a>,
@@ -190,7 +191,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                     file: call.file,
                     node,
                 }) {
-                    this.facts.entry_roots.extend(targets.iter().copied());
+                    this.facts.entry_roots.extend(targets.iter().copied().filter(|target|!this.facts.parallel_callbacks.contains(target)));
                 }
             }
         }
@@ -287,6 +288,8 @@ impl<'a, 'r> Purity<'a, 'r> {
                         .is_some_and(|runtime| caller.path.starts_with(runtime))
             })
                 .map_or(&[][..], |index| &via[index..])
+        } else if let Some(index)=via.iter().position(|call|crate::parallelcompile::is_call(self.r,*call)) {
+            &via[index..]
         } else {
             &[]
         };
@@ -738,6 +741,28 @@ impl<'a, 'r> Purity<'a, 'r> {
                 node: *node,
             })
             .collect::<Vec<_>>();
+        if crate::parallelcompile::is_call(self.r,call) {
+            if let Some(callback)=crate::parallelcompile::callback(self.r,call,bindings) {
+                if crate::parallelcompile::explicit_allocator(self.r,call,callback.returns_values) {
+                    self.fault(root,call,via,"Compile-time/pure pmap cannot select an allocator or worker_allocator.");
+                }
+                let target=callback.procedure;
+                let mut chain=via.to_vec();chain.push(call);
+                if !self.llvm_primitive(target) {
+                    self.facts.targets.entry(call).or_default().insert(target);
+                    self.facts.parallel_callbacks.insert(target);
+                    for default in &callback.defaults {
+                        if let Some(node)=self.r.sources[default.file].node(default.node).parent {self.facts.defaults.insert(Ref{file:default.file,node});}
+                    }
+                    let defaults=(!callback.defaults.is_empty()).then(||(callback.defaults,callback.bindings.clone()));
+                    self.pending.push_back(PendingCall{procedure:target,bindings:callback.bindings,via:chain,branch:None,defaults});
+                }
+                for arg in args {if arg!=callback.argument {self.walk(root,proc,arg,bindings,via);}}
+            } else {
+                self.fault(root,call,via,"Compile-time/pure pmap requires a resolved constant callback; runtime procedure values are not eligible.");
+            }
+            return;
+        }
         let builtin = builtin_call(self.r, call);
         if self.kind(callee) == "Directive"
             && ["assert", "config"].contains(

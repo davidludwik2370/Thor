@@ -174,6 +174,7 @@ pub(crate) fn approved_format(r: &Resolver<'_>, callee: Ref) -> bool {
 
 pub(crate) fn approved_library(r: &Resolver<'_>, callee: Ref) -> Option<(String, String)> {
     for (path, names) in [
+        ("thor:parallel", &["pmap"][..]),
         ("core:slice", &["clone"][..]),
         ("core:strings", &["clone"][..]),
         ("thor:format", PURE_FORMAT_PROCEDURES),

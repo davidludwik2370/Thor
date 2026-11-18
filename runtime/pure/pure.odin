@@ -11,6 +11,10 @@ import "thor:typeinfo"
 Scratch :: struct {
     backing: runtime.Allocator,
     allocations: map[rawptr]Scratch_Entry,
+    children, next, parent: ^Scratch,
+    // Only a tree used by parallel pure calls needs synchronized bookkeeping.
+    gate: ^Scratch,
+    locked: u32,
 }
 Scratch_Entry :: struct {size,alignment:int}
 scratch_init :: #force_inline proc(s:^Scratch) {
@@ -18,9 +22,75 @@ scratch_init :: #force_inline proc(s:^Scratch) {
     s.allocations.allocator=s.backing
 }
 scratch_allocator :: #force_inline proc(s:^Scratch)->runtime.Allocator {return {procedure=scratch_allocate,data=s}}
+// Worker scratch arenas allocate independently on the heap. A shared gate also
+// permits explicit delete/resize across the caller/worker ownership boundary.
+@(private="file")
+scratch_lock :: proc(s:^Scratch) {
+    for intrinsics.atomic_exchange_explicit(&s.locked,1,.Acquire)!=0 {intrinsics.cpu_relax()}
+}
+@(private="file")
+scratch_unlock :: proc(s:^Scratch) {intrinsics.atomic_store_explicit(&s.locked,0,.Release)}
+@(private="file")
+scratch_find :: proc(root:^Scratch,pointer:rawptr)->^Scratch {
+    node:=root
+    for {
+        if pointer in node.allocations {return node}
+        if node.children!=nil {node=node.children;continue}
+        for node!=root && node.next==nil {node=node.parent}
+        if node==root {return nil}
+        node=node.next
+    }
+}
+scratch_parent :: #force_inline proc(allocator:runtime.Allocator)->^Scratch {
+    if allocator.procedure==scratch_allocate {return cast(^Scratch)allocator.data}
+    return nil
+}
+// The caller retains this parent until scratch_destroy; the child cannot escape
+// that lifetime. rawptr makes this deliberate internal lifetime link explicit.
+scratch_child :: proc(parent_data:rawptr)->^Scratch {
+    parent:=cast(^Scratch)parent_data
+    heap:=runtime.heap_allocator()
+    data,err:=runtime.mem_alloc_bytes(size_of(Scratch),align_of(Scratch),heap)
+    if err!=.None||raw_data(data)==nil {panic("Pure worker scratch allocation failed")}
+    child:=cast(^Scratch)raw_data(data)
+    if parent.gate==nil {parent.gate=parent}
+    gate:=parent.gate
+    scratch_lock(gate)
+    defer scratch_unlock(gate)
+    child^={backing=heap,next=parent.children,parent=parent,gate=gate}
+    child.allocations.allocator=heap
+    parent.children=child
+    return child
+}
+@(private="file")
+scratch_release_children :: proc(s:^Scratch) {
+    pending:=s.children
+    s.children=nil
+    for pending!=nil {
+        child:=pending
+        pending=child.next
+        if child.children!=nil {
+            tail:=child.children
+            for tail.next!=nil {tail=tail.next}
+            tail.next=pending
+            pending=child.children
+        }
+        for pointer in child.allocations {runtime.mem_free(pointer,child.backing)}
+        if cap(child.allocations)>0 {delete(child.allocations)}
+        runtime.mem_free(child,runtime.heap_allocator())
+    }
+}
 scratch_allocate :: proc(data:rawptr,mode:runtime.Allocator_Mode,size,alignment:int,
                          old_memory:rawptr,old_size:int,loc:=#caller_location)->([]byte,runtime.Allocator_Error) {
     s:=cast(^Scratch)data
+    gate:=s.gate
+    if gate!=nil {scratch_lock(gate)}
+    defer {if gate!=nil {scratch_unlock(gate)}}
+    // Slice and string descriptors carry no allocator. The caller's default
+    // allocator must still be able to release storage produced by a worker.
+    if old_memory!=nil && (mode==.Free||mode==.Resize||mode==.Resize_Non_Zeroed) && old_memory not_in s.allocations && gate!=nil {
+        if owner:=scratch_find(gate,old_memory);owner!=nil {s=owner}
+    }
     #partial switch mode {
     case .Query_Features:
         if old_memory!=nil {(cast(^runtime.Allocator_Mode_Set)old_memory)^={.Alloc,.Alloc_Non_Zeroed,.Free,.Free_All,.Resize,.Resize_Non_Zeroed,.Query_Features,.Query_Info}}
@@ -28,11 +98,13 @@ scratch_allocate :: proc(data:rawptr,mode:runtime.Allocator_Mode,size,alignment:
     case .Query_Info:
         query:=cast(^runtime.Allocator_Query_Info)old_memory
         if query!=nil {
+            if gate!=nil {if owner:=scratch_find(gate,query.pointer);owner!=nil {s=owner}}
             if entry,ok:=s.allocations[query.pointer];ok {query.size=entry.size;query.alignment=entry.alignment}
             query.pointer=nil
         }
         return nil,.None
     case .Free_All:
+        scratch_release_children(s)
         for pointer in s.allocations {runtime.mem_free(pointer,s.backing)}
         clear(&s.allocations)
         return nil,.None
@@ -53,6 +125,7 @@ scratch_allocate :: proc(data:rawptr,mode:runtime.Allocator_Mode,size,alignment:
     return result,err
 }
 scratch_destroy :: #force_inline proc(s:^Scratch) {
+    if s.children!=nil {scratch_release_children(s)}
     // No map storage exists until the first tracked allocation. Avoid the
     // generic map destructor on allocation-free pure calls. A zero length with
     // retained capacity still needs the normal cleanup below.

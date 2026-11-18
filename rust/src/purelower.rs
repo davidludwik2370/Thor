@@ -180,6 +180,15 @@ impl Lower<'_, '_> {
         };
         let module = self.module("pure");
         let mut checks = vec![];
+        if self.emitting_callbacks.contains(&root.node) {
+            // Every pmap caller proves these requirements. Keep that static
+            // proof out of the runtime callback signature.
+            let keys=self.borrowing.profiles.values().flatten()
+                .filter(|(access,_)|access.procedure==root)
+                .map(|(access,_)|format!("{}:[0]u8",access.key(self.resolver)))
+                .collect::<std::collections::BTreeSet<_>>();
+            checks.push(self.g(format!("\n{}_ownership_Type :: struct{{{}}}\n",self.borrow_marker,keys.into_iter().collect::<Vec<_>>().join(",")),root.node));
+        }
         if let Some(fields) = self.source.role(signature, "params") {
             for field in self.source.node(fields).children.clone() {
                 if self.source.node(field).kind != "Field" {

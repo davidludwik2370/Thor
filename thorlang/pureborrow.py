@@ -159,7 +159,8 @@ class Borrowing:
                             kind=typ.kind,typ=typ)
                 for node in self.nodes[proc]:
                     if node.kind!='Call' or self.p.calls.queried(node):continue
-                    if self.p.builtin(node) or self.p.approved(node) or node.source.denotes_type(node.role('callee')) or self.p.io_call(node):continue
+                    from . import parallelcompile
+                    if self.p.builtin(node) or self.p.approved(node) and not parallelcompile.is_call(self.r,node) or node.source.denotes_type(node.role('callee')) or self.p.io_call(node):continue
                     queue.extend(target for target in self.p.targets(node) if not self.p.io_procedure(target))
             if not added:return
             # All joins are conservative and monotone. Bound path expansion in
@@ -176,6 +177,7 @@ class Borrowing:
 
     def pass_(self,proc):
         from .purity import Flow
+        from . import parallelcompile
         changed=False;env=self.envs[proc]
         for node in self.nodes[proc]:
             if node.kind=='IncDec' or node.kind=='Assignment' and node.data['op']!='in':
@@ -254,7 +256,7 @@ class Borrowing:
                         target=self.p.flow(dst,env).item();value=self.p.flow(src,env).item()
                         changed|=target.write(value)
                         changed|=self.store(proc,target,value,node)
-                elif not(self.p.builtin(node) or self.p.approved(node) or node.source.denotes_type(node.role('callee')) or self.p.io_call(node)):
+                elif not(self.p.builtin(node) or self.p.approved(node) and not parallelcompile.is_call(self.r,node) or node.source.denotes_type(node.role('callee')) or self.p.io_call(node)):
                     for callee in self.p.targets(node):
                         if callee not in self.stores:continue
                         if callee in self.mutates and proc not in self.mutates:self.mutates.add(proc);changed=True
@@ -295,6 +297,25 @@ class Borrowing:
     def bindings(self,call,callee,env):
         from .purity import Flow
         params=self.parameters(callee)
+        from . import parallelcompile
+        if parallelcompile.is_call(self.r,call):
+            jobs=self.p.arguments(call,['jobs'])[0]
+            if jobs is None:return []
+            typ=self.r.type_of(jobs).elem
+            fields=list((typ.members or {}).items()) if typ else []
+            if typ and typ.node and not fields:fields=[(name,self.r.type_node(annotation)) for name,annotation in self.r.fields(typ.node.role('fields'))]
+            job=self.p.flow(jobs,env).item()
+            values=iter(job.member(name).header_copy(typ,jobs) for name,typ in fields)
+            bound=[]
+            for _,field in params:
+                if field.data.get('variadic'):
+                    element=Flow()
+                    for value in values:element.merge(value)
+                    value=Flow(element=element)
+                else:value=next(values,None) or self.p.flow(field.role('default'),env)
+                value.location=READONLY
+                bound.append(value)
+            return bound
         positional=[];named={}
         receiver=call.role('callee')
         if receiver.kind=='Selector' and receiver.data.get('op')=='->':positional.append(receiver.role('expr'))

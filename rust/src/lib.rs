@@ -37,6 +37,7 @@ pub mod purity;
 mod purediagnostics;
 pub mod semantics;
 mod resulttypes;
+mod parallelcompile;
 pub mod specialization;
 pub mod values;
 pub mod vet;

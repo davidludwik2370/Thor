@@ -731,8 +731,19 @@ class Evaluator:
                 self.p.native_sources.verify_access(callee,self.r)
                 builtin=self.purity.builtin(node)
                 library=self.purity.library(node)
+                from . import parallelcompile
+                if parallelcompile.is_call(self.r,node):
+                    external[callee]=('thor:parallel','pmap')
+                    directory=self.root/'runtime/parallel'
+                    keep.update(source.root for source in self.p.sources.values() if source.path.parent==directory)
+                    for arg in node.group('args'):visit(arg)
+                    return
                 if builtin:
                     calls[callee]=builtin
+                    for arg in node.group('args'):visit(arg)
+                    return
+                if library and library[0]=='base:intrinsics' and self.purity.primitive(callee):
+                    external[callee]=library
                     for arg in node.group('args'):visit(arg)
                     return
                 if library in self.purity.libraries and self.purity.approved(node):
@@ -871,6 +882,7 @@ class Evaluator:
         helper=Project(self.p.entry,self.p.frontend,flags,test=self.p.test,overlays=overlays,cache_frontend=self.p.cache_frontend,cache_directory=self.p.cache_directory,use_shared=False)
         helper.discover(self.root/'runtime'/'eval')
         self.p.native_sources.attach(helper,keep|procedures)
+        helper.native_sources=helper.resolver.native
         originals={**self.p.sources,**{node.source.path:node.source for node in keep|procedures}}
         by_original={old:helper.sources[path] for path,old in originals.items()}
         def node_copy(old):
@@ -892,6 +904,17 @@ class Evaluator:
         # and their source signatures must not acquire helper-only parameters.
         helper.purity.entry_roots={node_copy(p) for call in descendants(n) if call.kind=='Call'
                                    for p in self.purity.targets(call) if p.source in by_original}
+        from . import parallelcompile
+        for root in (*roots,*keep):
+            for call in descendants(root):
+                if parallelcompile.is_call(self.r,call):
+                    selected=parallelcompile.callback(self.r,call)
+                    if selected:
+                        _,target=selected
+                        helper.purity.entry_roots.discard(node_copy(target))
+                        helper.purity.calls.callback_entries.add(node_copy(target))
+                        helper.purity.calls.targets[node_copy(call)]=[node_copy(target)]
+                        if not helper.purity.pure(node_copy(target)) and not parallelcompile.primitive_callback(self.purity,selected[0],target):helper.purity.calls.name(node_copy(target))
         for call in descendants(n):
             if call.kind!='Call':continue
             for symbol,_ in self.r.procedure_candidates(call.role('callee')):
@@ -952,6 +975,8 @@ class Evaluator:
             if target and target in procedures:
                 helper.purity.calls.targets[node_copy(callee.parent)]=[node_copy(target)]
             name=target_symbol.name
+            if target and node_copy(target) in helper.purity.calls.callback_entries and not helper.purity.pure(node_copy(target)):
+                name=helper.purity.calls.names[node_copy(target)]
             if caller.path.parent!=target_source.path.parent:
                 bridge=target_source.prefix+'run_target_'+str(target_symbol.node.start)
                 key=target_source.root,bridge

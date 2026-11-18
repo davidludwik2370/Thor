@@ -25,6 +25,8 @@ class PureCalls:
         self.wrapping=set()
         self.origins={}
         self.original_types=set()
+        self.callback_entries=set()
+        self.emitting_callbacks=set()
 
     @property
     def ownership(self):return self.marker+'_ownership'
@@ -48,6 +50,11 @@ class PureCalls:
         names=[name.text.lstrip('$') for parameter in params.children for name in parameter.group('names')]
         wanted={name.text.lstrip('$') for name in field.group('names')}
         for call in incoming:
+            from . import parallelcompile
+            if parallelcompile.is_call(self.purity.r,call):
+                count=parallelcompile.job_field_count(self.purity.r,call)
+                if count is None or not wanted<=set(names[:count]):return True
+                continue
             callee=call.role('callee')
             receiver=callee.kind=='Selector' and callee.data.get('op')=='->'
             supplied=set(names[:1] if receiver else [])
@@ -78,6 +85,9 @@ class PureCalls:
                 caller=self.purity.owner(call)
                 if caller is None:continue
                 path=(call,*tail)
+                from . import parallelcompile
+                if self.purity.eval_mode and parallelcompile.is_call(self.purity.r,call) and not self.purity.pure(caller):
+                    result.append((call,path));continue
                 if self.purity.pure(caller):result.append((caller,path))
                 else:queue.append((caller,path))
         return result
@@ -117,6 +127,17 @@ class PureCalls:
                 if proc in self.purity.contracts:continue
                 for node in self.purity.walk(proc):
                     if node.kind!='Call' or self.queried(node) or any(a.kind=='Run' for a in node.ancestors()):continue
+                    from . import parallelcompile
+                    if parallelcompile.is_call(r,node):
+                        callback=parallelcompile.callback(r,node)
+                        if callback:
+                            argument,target=callback
+                            if parallelcompile.primitive_callback(self.purity,argument,target):continue
+                            self.targets[node]=[target]
+                            self.callback_entries.add(target)
+                            if not self.purity.pure(target):self.name(target)
+                            queue.append(target)
+                        continue
                     if self.purity.io_call(node):
                         self.purity.problem(node.role('callee'),self.purity.io_message(node))
                         continue
@@ -185,7 +206,7 @@ class PureCalls:
             name=next((node.text for node in proc.parent.group('names')),'')
         owner=proc.source
         if owner.path.parent==caller.path.parent:return name
-        if getattr(owner,'native_inspected',False):
+        if getattr(owner,'native_inspected',False) and not self.purity.eval_mode:
             native=self.purity.project.native_sources
             relative=owner.path.parent.relative_to(Path(native.root).resolve())
             path=relative.parts[0]+':'+ '/'.join(relative.parts[1:])
@@ -194,11 +215,13 @@ class PureCalls:
         return caller.expressions.module('pure_dependency_'+key,path)+'.'+name
 
     def callee(self,node):
-        if self.purity.eval_mode:return None
         call=node.parent
         if not(call and call.kind=='Call' and call.role('callee') is node):return None
+        from . import parallelcompile
+        if parallelcompile.is_call(self.purity.r,call):return None
+        if self.purity.eval_mode and not any(target in self.callback_entries for target in self.purity.targets(call)):return None
         if node in self.purity.problems or call in self.purity.problems:return None
-        targets=self.targets.get(call,[])
+        targets=self.purity.targets(call) if self.purity.eval_mode else self.targets.get(call,[])
         if not any(target in self.names for target in targets):return None
         if any(not self.purity.pure(target) and target not in self.names for target in targets):return None
         names=list(dict.fromkeys(self.access(node.source,target) for target in targets))
@@ -213,7 +236,8 @@ class PureCalls:
     def parameters(self,node):
         if node in self.original_types:return None
         proc=self.purity.owner(node)
-        evaluated=self.purity.eval_mode and proc in self.purity.active and self.purity.borrowing.internal(proc)
+        if proc in self.emitting_callbacks or proc in self.callback_entries and proc not in self.emitting:return None
+        evaluated=self.purity.eval_mode and proc in self.purity.active and proc not in self.emitting and self.purity.borrowing.internal(proc)
         if not evaluated and proc not in self.emitting or node is not proc.role('type'):return None
         params=node.role('params')
         source=node.source
@@ -246,11 +270,19 @@ class PureCalls:
 
     def body(self,node,expected,constant):
         proc=self.purity.owner(node)
+        if proc in self.emitting_callbacks:return None
         if proc not in self.emitting or node is not proc.role('body') or node in self.wrapping:return None
         self.wrapping.add(node)
         try:code=node.source._render(node,expected,constant)
         finally:self.wrapping.remove(node)
         return '{when '+self.marker+'_Type==bool '+code+'}'
+
+    def witness_body(self,node):
+        proc=node.parent
+        if (self.purity.eval_mode and proc in self.callback_entries and not self.purity.pure(proc)
+            and proc not in self.emitting and node is proc.role('body')):
+            return '{panic_contextless("Unreachable compile-time callback type witness")}'
+        return None
 
     def procedure_name(self,node):
         proc=self.purity.owner(node)
@@ -271,7 +303,7 @@ class PureCalls:
         args=call.group('args');position=args[-1].end if args else call.end-1
         profile=self.purity.borrowing.argument(call,targets)
         extra=self.ownership+'='+profile
-        if not self.purity.eval_mode:extra=self.marker+'=true,'+extra
+        if not self.purity.eval_mode or any(target in self.callback_entries for target in targets):extra=self.marker+'=true,'+extra
         inserts=[(position,(', ' if args else '')+extra)]
         callee=call.role('callee')
         if callee.kind=='Selector' and callee.data.get('op')=='->':
@@ -279,18 +311,26 @@ class PureCalls:
         return inserts
 
     def helpers(self,declaration):
-        if self.purity.eval_mode:return ''
         result=[]
         for proc in self.declarations.get(declaration,[]):
-            self.emitting.add(proc)
-            try:body=proc.source.render(proc)
-            finally:self.emitting.remove(proc)
-            attributes=[]
-            for attribute in declaration.group('attributes'):
-                for item in attribute.group('elems'):
-                    name=item.role('field').text if item.kind=='FieldValue' else item.text
-                    if name in {'require_results','deprecated'}:attributes.append(proc.source.render(item))
-            annotation='@('+','.join(attributes)+')\n' if attributes else ''
-            result.append(proc.source.mapping.wrap('\n'+annotation+self.names[proc]+'::'+body+'\n',
-                proc.source.path,proc.start,proc.end,'pure-procedure|'+declaration.group('names')[0].text+'|'+self.names[proc]))
+            if self.purity.eval_mode and proc not in self.callback_entries:continue
+            for callback in ([False,True] if proc in self.callback_entries else [False]):
+                result.append(self.helper(declaration,proc,callback))
         return ''.join(result)
+
+    def helper(self,declaration,proc,callback):
+        if callback:self.emitting_callbacks.add(proc)
+        self.emitting.add(proc)
+        try:body=proc.source.render(proc)
+        finally:
+            self.emitting.remove(proc)
+            if callback:self.emitting_callbacks.remove(proc)
+        attributes=[]
+        for attribute in declaration.group('attributes'):
+            for item in attribute.group('elems'):
+                name=item.role('field').text if item.kind=='FieldValue' else item.text
+                if name in {'require_results','deprecated'}:attributes.append(proc.source.render(item))
+        annotation='@('+','.join(attributes)+')\n' if attributes else ''
+        name=self.names[proc]+('_pmap' if callback else '')
+        return proc.source.mapping.wrap('\n'+annotation+name+'::'+body+'\n',
+            proc.source.path,proc.start,proc.end,'pure-procedure|'+declaration.group('names')[0].text+'|'+name)

@@ -83,6 +83,43 @@ a callback. Shared state, referenced resources, and callback synchronization are
 the programmer's responsibility. Small callbacks may cost less than starting
 threads; use a serial loop/`fmap` or `workers=1` for small workloads.
 
+## Compile-time execution and pure callers
+
+The same API works with `#run`, including inferred polymorphic callbacks and
+named multiple results:
+
+```odin
+rows := #run basic.pmap([]Job{{2,3}, {4,5}}, calculate, workers=2)
+defer delete(rows)
+// rows[0].sum == 5; rows[1].product == 20
+```
+
+`pmap` remains a `proc`: an ordinary runtime call may run an impure callback.
+When called by `fn` or `#run`, the selected callback must instead meet the normal
+pure-code rules, recursively. Runtime procedure variables, ambient context,
+global mutable state, I/O, and explicit `allocator`/`worker_allocator` arguments
+are not eligible. Callback defaults are checked only when the jobs omit them.
+As with other pure calls, a callback may modify referenced storage owned by the
+surrounding computation; it may not modify that computation's borrowed inputs.
+Callers remain responsible for avoiding races between jobs.
+
+An explicit `#run` also requires compile-time-known jobs and options. It uses
+the same bounded parallel scheduler inside the compile-time helper. Results
+are materialized and cached through the ordinary `#run` mechanism; the returned
+runtime slice is allocated and must be deleted normally. Empty input, nested
+mapping, result-type overrides, and allocated/numeric results follow the same
+rules as other eligible compile-time calls. Execution timeout and callback
+errors refer to the original Thor request.
+
+Pure callers use independent worker scratch allocators. Worker allocations stay
+alive until the caller has promoted its result and finished using its local
+data, then are released with the caller's scratch storage. This also supports
+callbacks returning allocated values or writing allocated values through local
+output parameters. Synchronized scratch bookkeeping also supports explicitly
+freeing or resizing buffers across the caller/worker boundary. Ordinary runtime
+calls retain the worker-allocator ownership
+contract described above.
+
 ## Result type queries
 
 `result_type_of` is a compiler intrinsic in the ordinary `thor:intrinsics`
@@ -111,5 +148,7 @@ first :: proc(jobs: []$Job, callback: $F,
 
 Thor supplies the default at the caller, where the callback's result names and
 specialization are known. Runtime arguments are evaluated once in written order.
-The worker implementation is ordinary library code; the compiler does not
-recognize `pmap` by name or change Odin itself.
+The worker implementation is ordinary library code. Pure calls use a reviewed
+scheduler boundary tied to the official `thor:parallel.pmap` declaration, through
+aliases and re-exports; an unrelated procedure named `pmap` receives no special
+treatment. No Odin compiler changes are needed.

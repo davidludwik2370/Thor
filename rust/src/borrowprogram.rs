@@ -30,6 +30,7 @@ pub struct Model {
 }
 #[derive(Clone, Default)]
 pub struct Emission {
+    pub callbacks: BTreeSet<Ref>,
     pub procedures: BTreeSet<Ref>,
     pub entries: BTreeSet<Ref>,
     pub checks: BTreeMap<Ref, Permission>,
@@ -133,6 +134,7 @@ impl Model {
         }
         let mut result = Emission {
             entries: purity.entry_roots.clone(),
+            callbacks: purity.parallel_callbacks.clone(),
             ..Emission::default()
         };
         for (proc, nodes) in &self.nodes {
@@ -151,7 +153,7 @@ impl Model {
                     return true;
                 }
                 eval.builtin(*node).is_some()
-                    || eval.approved(*node)
+                    || eval.approved(*node) && !crate::parallelcompile::is_call(eval.resolver,*node)
                     || eval
                         .role(*node, "callee")
                         .is_some_and(|callee| eval.resolver.denotes_type(callee))
@@ -289,7 +291,7 @@ impl Model {
                 if eval.kind(*node) != "Call"
                     || eval.queried(*node)
                     || eval.builtin(*node).is_some()
-                    || eval.approved(*node)
+                    || eval.approved(*node) && !crate::parallelcompile::is_call(eval.resolver,*node)
                     || eval.io_call(*node)
                     || eval
                         .role(*node, "callee")
@@ -300,9 +302,10 @@ impl Model {
                 let Some(callee) = eval.role(*node, "callee") else {
                     continue;
                 };
-                let plans = eval.resolver.call_plans(*node, &Default::default());
+                let parallel=crate::parallelcompile::is_call(eval.resolver,*node);
+                let plans = if parallel {vec![]}else{eval.resolver.call_plans(*node, &Default::default())};
                 let targets = if plans.is_empty() {
-                    eval.resolver.candidates(callee)
+                    if parallel {vec![]}else{eval.resolver.candidates(callee)}
                 } else {
                     plans.into_iter().map(|plan| plan.procedure).collect()
                 };

@@ -670,6 +670,9 @@ class Source:
         return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
+        if self.purity and n.kind=='Block':
+            witness=self.purity.calls.witness_body(n)
+            if witness is not None:return witness
         from . import resulttypes
         result_query=resulttypes.render(self,n,constant) if n not in self.run_values else None
         if result_query is not None:return result_query

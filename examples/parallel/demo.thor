@@ -16,6 +16,10 @@ main :: proc() {
     defer delete(rows)
     for row in rows { basic.print(row.sum, row.product) }
 
+    precomputed := #run basic.pmap([]Job{{2,3}, {4,5}}, calculate, workers=2)
+    defer delete(precomputed)
+    basic.print("compile-time:", precomputed[0].sum, precomputed[1].product)
+
     renamed := basic.pmap(jobs, calculate, result_type=Named)
     defer delete(renamed)
     basic.print(renamed[0].added, renamed[0].multiplied)

@@ -13,8 +13,18 @@ impl Lower<'_, '_> {
         if self.source.node(node).kind != "Procedure" {
             return Ok(None);
         }
+        let checked_callback = self.borrowing.callbacks.contains(&self.reference(node))
+            && self.source.node(node).data["pure"] != true;
+        if checked_callback {
+            self.emitting_callbacks.insert(node);
+            self.prepare_pure(self.reference(node), true)?;
+        }
         let name = format!("{}result_callback_{}", self.prefix, node.0);
-        let body = self.render(node, None, false)?;
+        let body = self.render(node, None, false);
+        if checked_callback {
+            self.emitting_callbacks.remove(&node);
+        }
+        let body = body?;
         let declaration = Code::concat([
             self.g(format!("\n{name} :: "), node),
             body,
@@ -289,15 +299,25 @@ impl Lower<'_, '_> {
                 self.query_witness(id, signature, query, &parameters, &bindings, &literal)?;
             let args = self.source.group(id, "args").to_vec();
             let names = self.resolver.fields(signature, "params");
+            // The action overload omits the dependent result-type parameter.
+            // Its third positional argument is workers, not result_type.
+            let action = results.fields.is_empty()
+                && crate::parallelcompile::is_call(self.resolver, self.reference(id));
+            let query_position = names
+                .iter()
+                .position(|(name, _)| name == &query.name)
+                .unwrap_or(names.len());
             let supplied = args.iter().enumerate().any(|(index, arg)| {
                 if self.source.node(*arg).kind == "FieldValue" {
                     self.source
                         .role(*arg, "field")
                         .is_some_and(|field| self.source.text(field) == query.name)
-                } else {
+                } else if !action {
                     names
                         .get(index)
                         .is_some_and(|(name, _)| name == &query.name)
+                } else {
+                    false
                 }
             });
             if results.fields.is_empty() && supplied {
@@ -332,7 +352,9 @@ impl Lower<'_, '_> {
             }
             let callback_name = &names[query.callback].0;
             let callback_candidates = self.resolver.candidates(callback);
-            let specialize = callback_candidates.len() > 1
+            let specialize = self.checked_targets.contains_key(&id)
+                && crate::parallelcompile::is_call(self.resolver, self.reference(id))
+                || callback_candidates.len() > 1
                 || self.resolver.sources[results.signature.file]
                     .descendants(results.signature.node)
                     .any(|node| {
@@ -366,7 +388,7 @@ impl Lower<'_, '_> {
                         .unwrap_or_default()
                 } else {
                     names
-                        .get(index)
+                        .get(index + usize::from(action && index >= query_position))
                         .map(|(name, _)| name.clone())
                         .unwrap_or_default()
                 };
@@ -403,7 +425,24 @@ impl Lower<'_, '_> {
                     ));
                 }
                 arranged.insert(name.clone(), argument);
-                call_args.push(if name == *callback_name && literal.is_some() {
+                let checked_callback = if literal.is_none()
+                    && name == *callback_name
+                    && crate::parallelcompile::is_call(self.resolver, self.reference(id))
+                {
+                    self.checked_targets
+                        .get(&id)
+                        .and_then(|targets| targets.first())
+                        .copied()
+                        .filter(|target| {
+                            self.resolver.sources[target.file].node(target.node).data["pure"]
+                                != true
+                        })
+                } else {
+                    None
+                };
+                call_args.push(if let Some(target) = checked_callback {
+                    self.checked_callback_access(target, value)?
+                } else if name == *callback_name && literal.is_some() {
                     literal.clone().unwrap()
                 } else {
                     self.render(value, None, constant)?
@@ -439,7 +478,15 @@ impl Lower<'_, '_> {
                 helper_params.insert(0, format!("${result_name}: typeid"));
                 call_args.insert(0, typ);
             }
-            let target = self.render(callee, None, constant)?;
+            let target = if self.checked_targets.contains_key(&id)
+                && crate::parallelcompile::is_call(self.resolver, self.reference(id))
+            {
+                let module = format!("{}checked_parallel", self.prefix);
+                self.modules.insert(module.clone(), "thor:parallel".into());
+                self.g(format!("{module}.pmap_checked"), id)
+            } else {
+                self.render(callee, None, constant)?
+            };
             let mut native = vec![target, self.g("(", id)];
             for (index, arg) in native_args.into_iter().enumerate() {
                 if index > 0 {
@@ -452,6 +499,31 @@ impl Lower<'_, '_> {
             }
             native.push(self.g(")", id));
             let native_call = Code::concat(native);
+            let mut checks = vec![];
+            if self.checked_targets.contains_key(&id)
+                && crate::parallelcompile::is_call(self.resolver, self.reference(id))
+            {
+                for (_, permission) in self
+                    .borrowing
+                    .profiles
+                    .get(&self.reference(id))
+                    .cloned()
+                    .unwrap_or_default()
+                {
+                    let query = self.permission_query(&permission, id)?;
+                    let error = self
+                        .error_token(
+                            id,
+                            "Pure pmap cannot mutate or delete job storage borrowed from an input.",
+                        )
+                        .finish()
+                        .text;
+                    checks.push(self.g(
+                        format!("when {query} {{#panic({})}}\n", serde_json::json!(error)),
+                        id,
+                    ));
+                }
+            }
             let return_count = if results.fields.is_empty() {
                 0
             } else {
@@ -523,6 +595,7 @@ impl Lower<'_, '_> {
                 ),
                 Code::concat(returns),
                 self.g(" {", id),
+                Code::concat(checks),
                 self.g(if return_count == 0 { "" } else { "return " }, id),
                 native_call,
                 self.g("}\n", id),
