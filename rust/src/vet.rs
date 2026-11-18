@@ -271,6 +271,9 @@ impl PortableBodies {
 }
 
 pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
+    candidates_with_exemptions(project, checks, &BTreeSet::new())
+}
+fn candidates_with_exemptions(project: &Project, checks: &[String], pure_exemptions: &BTreeSet<(PathBuf,usize)>) -> Vec<Fix> {
     if !checks.iter().any(|check| matches!(check.as_str(), "immutable" | "pure")) {
         return vec![];
     }
@@ -407,6 +410,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 || values.len() != 1
                 || names.len() != 1
                 || source.text(names[0]) == "main"
+                || pure_exemptions.contains(&(source.path.clone(), source.node(names[0]).span.start))
             {
                 continue;
             }
@@ -848,7 +852,9 @@ pub fn run(
             .or_default()
             .insert(source.node(at.node).span.start);
     }
-    let proposed = usage.import_fixes.into_iter().chain(candidates(project, checks))
+    let pure_exemptions = usage.pure_exemptions.into_iter().map(|at|
+        (project.sources[at.file].path.clone(), project.sources[at.file].node(at.node).span.start)).collect::<BTreeSet<_>>();
+    let proposed = usage.import_fixes.into_iter().chain(candidates_with_exemptions(project, checks, &pure_exemptions))
         .filter(|fix| {
             fix.rule != "immutable"
                 || exempt_offsets

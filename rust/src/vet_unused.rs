@@ -168,6 +168,59 @@ pub(super) struct Analysis {
     pub(super) findings: Vec<Value>,
     pub(super) immutable_exemptions: Vec<Ref>,
     pub(super) import_fixes: Vec<Fix>,
+    pub(super) pure_exemptions: Vec<Ref>,
+}
+
+fn procedure_value(resolver: &Resolver<'_>, mut at: Ref) -> bool {
+    let mut seen = HashSet::new();
+    while seen.insert(at) {
+        let source = &resolver.sources[at.file];
+        match source.node(at.node).kind.as_str() {
+            "Paren" => {
+                let Some(node) = source.role(at.node, "expr") else {
+                    return false;
+                };
+                at.node = node;
+            }
+            "Procedure" => return source.role(at.node, "body").is_some(),
+            "ProcedureGroup" => return true,
+            "Ident" | "Selector" => {
+                let Some(symbol) = resolver.symbol(at).map(|index| &resolver.symbols[index]) else {
+                    return false;
+                };
+                if !symbol.constant {
+                    return false;
+                }
+                let Some(node) = symbol.value else {
+                    return false;
+                };
+                at = Ref {
+                    file: symbol.reference.file,
+                    node,
+                };
+            }
+            _ => return false,
+        }
+    }
+    false
+}
+
+fn automatic_procedure(resolver: &Resolver<'_>, index: usize) -> bool {
+    let symbol = &resolver.symbols[index];
+    let source = &resolver.sources[symbol.reference.file];
+    symbol.name == "main" && source.node(symbol.scope).kind == "File"
+        || resolver
+            .attributes(symbol.reference)
+            .iter()
+            .any(|(name, _)| {
+                matches!(
+                    name.as_str(),
+                    "init" | "fini" | "test" | "export" | "require"
+                )
+            })
+        || source
+            .ancestors(symbol.reference.node)
+            .any(|id| source.node(id).kind == "ForeignBlock")
 }
 
 // Import removal must preserve uses in every target branch, not merely the
@@ -286,12 +339,28 @@ fn unused_imports(resolver: &mut Resolver<'_>, file: usize, names: &HashSet<Node
         if source.raw.as_bytes().get(after) == Some(&b';') {
             end = after + 1;
         }
+        let mut start = node.span.start;
+        let line_start = source.raw[..start]
+            .rfind('\n')
+            .map_or(0, |offset| offset + 1);
+        let line_end = source.raw[end..]
+            .find('\n')
+            .map_or(source.raw.len(), |offset| end + offset + 1);
+        let whitespace = |text: &str| {
+            text.bytes()
+                .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+        };
+        if whitespace(&source.raw[line_start..start]) && whitespace(&source.raw[end..line_end]) {
+            start = line_start;
+            end = line_end;
+            replacement = comments.join(newline);
+            if !comments.is_empty() && source.raw[..end].ends_with('\n') {
+                replacement.push_str(newline);
+            }
+        }
         fixes.push(Fix {
             file,
-            span: Span {
-                start: node.span.start,
-                end,
-            },
+            span: Span { start, end },
             replacement,
             rule: "import",
             names: path,
@@ -313,6 +382,8 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
     let queries = resolver.begin_symbol_queries();
     let mut candidates = HashMap::new();
     let mut types = HashSet::new();
+    let mut procedures = HashSet::new();
+    let mut used = HashSet::new();
     for (index, symbol) in resolver.symbols.iter().enumerate() {
         let source = &project.sources[symbol.reference.file];
         if !source.thor
@@ -349,14 +420,32 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
                     node,
                 })
             });
-        if local || datatype {
+        let procedure = include_unused
+            && !datatype
+            && symbol.constant
+            && source.node(symbol.reference.node).kind == "Declaration"
+            && symbol.value.is_some_and(|node| {
+                procedure_value(
+                    &resolver,
+                    Ref {
+                        file: symbol.reference.file,
+                        node,
+                    },
+                )
+            });
+        if local || datatype || procedure {
             candidates.insert((symbol.reference, symbol.name.clone()), index);
             if datatype {
                 types.insert(index);
             }
+            if procedure {
+                procedures.insert(index);
+                if automatic_procedure(&resolver, index) {
+                    used.insert(index);
+                }
+            }
         }
     }
-    let mut used = HashSet::new();
     let mut observed = HashSet::new();
     let mut certain_names = HashSet::new();
     let mut import_fixes = vec![];
@@ -408,11 +497,11 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
                 if let Some(symbol) = resolver.symbol(Ref { file, node: id }) {
                     let owner = &resolver.symbols[binding(&resolver, symbol)];
                     if let Some(index) = candidates.get(&(owner.reference, owner.name.clone())) {
-                        if types.contains(index)
+                        if (types.contains(index) || procedures.contains(index))
                             && owner.reference.file == file
                             && source.node(owner.reference.node).span.contains(node.span)
                         {
-                            continue; // A recursive type alone is not a use.
+                            continue; // Self references alone are not a use.
                         }
                         used.insert(*index);
                         if resolver.symbols[symbol].projection.is_some()
@@ -444,6 +533,9 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         if !observed.contains(index) && !types.contains(index) {
             analysis.immutable_exemptions.push(at);
         }
+        if procedures.contains(index) && !observed.contains(index) {
+            analysis.pure_exemptions.push(at);
+        }
         if used.contains(index) {
             continue;
         }
@@ -452,12 +544,15 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         // Reference loop bindings include '&' in their binding node.
         span.start += source.slice(span).len() - symbol.name.len();
         let datatype = types.contains(index);
+        let procedure = procedures.contains(index);
         let message = if datatype {
             format!("Type '{}' declared but not used", symbol.name)
+        } else if procedure {
+            format!("Procedure '{}' declared but not used", symbol.name)
         } else {
             format!("'{}' declared but not used", symbol.name)
         };
-        analysis.findings.push(json!({"type":"warning", "stage":"vet", "code":if datatype {"thor/unused-type"} else {"thor/unused"},
+        analysis.findings.push(json!({"type":"warning", "stage":"vet", "code":if datatype {"thor/unused-type"} else if procedure {"thor/unused-procedure"} else {"thor/unused"},
             "pos":position(source, span), "msgs":[message]}));
     }
     for fix in &analysis.import_fixes {

@@ -181,7 +181,17 @@ def unused_imports(source, resolver, names):
             after += 1
         if source.raw[after:after+1] == b';':
             end = after+1
-        result.append(Fix(source, node.start, end, replacement, 'import', path, node.start, highlight_end))
+        start = node.start
+        line_start = source.raw.rfind(b'\n', 0, start)+1
+        line_end = source.raw.find(b'\n', end)
+        line_end = len(source.raw) if line_end < 0 else line_end+1
+        if (not source.raw[line_start:start].strip(b' \t\r')
+                and not source.raw[end:line_end].strip(b' \t\r\n')):
+            start, end = line_start, line_end
+            replacement = newline.join(comments)
+            if comments and source.raw[:end].endswith(b'\n'):
+                replacement += newline
+        result.append(Fix(source, start, end, replacement, 'import', path, node.start, highlight_end))
     return result
 
 
@@ -219,6 +229,37 @@ def datatype(node, resolver, seen=None):
                 and datatype(symbol.value, resolver, seen))
 
 
+def procedure_value(node, resolver):
+    """Constant aliases of procedures/overload groups are procedure bindings."""
+    seen = set()
+    while node is not None and node not in seen:
+        seen.add(node)
+        if node.kind == 'Paren':
+            node = node.role('expr')
+        elif node.kind == 'Procedure':
+            return node.role('body') is not None
+        elif node.kind == 'ProcedureGroup':
+            return True
+        elif node.kind in {'Ident','Selector'}:
+            symbol = resolver.symbol(node)
+            if symbol is None or symbol.declaration.data.get('mutable', True) or symbol.immutable:
+                return False
+            node = symbol.value
+        else:
+            return False
+    return False
+
+
+def automatic_procedure(symbol):
+    declaration = symbol.declaration
+    if symbol.name == 'main' and symbol.scope.kind == 'File':
+        return True
+    attributes = {(item.role('field') if item.kind == 'FieldValue' else item).text
+                  for attribute in declaration.group('attributes') for item in attribute.group('elems')}
+    return bool(attributes.intersection({'init','fini','test','export','require'})
+                or any(owner.kind == 'ForeignBlock' for owner in declaration.ancestors()))
+
+
 def analyze(project, *, include_unused=True):
     root = project.entry.parent if project.file_entry else project.entry
     resolver = project.resolver
@@ -229,6 +270,7 @@ def analyze(project, *, include_unused=True):
                      if not source.excluded and source.path.is_relative_to(root)]
     candidates = {}
     types = set()
+    procedures, automatic = set(), set()
     for symbol in list(resolver.by_decl.values()):
         declaration = symbol.declaration
         if symbol.node.source not in source_set:
@@ -242,19 +284,25 @@ def analyze(project, *, include_unused=True):
             local = (symbol.scope.role('body') is not None
                      and declaration.parent is signature.role('params'))
         is_datatype = False
+        is_procedure = False
         if (include_unused and declaration.kind == 'Declaration'
                 and not declaration.data.get('mutable', True) and symbol.value is not None):
             enabled = resolver.native_enabled
             resolver.native_enabled = True
             try:
                 is_datatype = datatype(symbol.value, resolver)
+                is_procedure = not is_datatype and not symbol.immutable and procedure_value(symbol.value, resolver)
             finally:
                 resolver.native_enabled = enabled
-        if local or is_datatype:
+        if local or is_datatype or is_procedure:
             candidates[declaration, symbol.name] = symbol
             if is_datatype:
                 types.add((declaration, symbol.name))
-    used, observed, certain_names = set(), set(), set()
+            if is_procedure:
+                procedures.add((declaration, symbol.name))
+                if automatic_procedure(symbol):
+                    automatic.add((declaration, symbol.name))
+    used, observed, certain_names = set(automatic), set(), set()
     import_fixes = []
     with resolver.cached_queries():
         for source in usage_sources:
@@ -292,15 +340,15 @@ def analyze(project, *, include_unused=True):
                         symbol = resolver.symbol(symbol.projection[0])
                     if symbol:
                         key = symbol.declaration, symbol.name
-                        if key in types and node.source is symbol.node.source and (
+                        if (key in types or key in procedures) and node.source is symbol.node.source and (
                                 symbol.declaration.start <= node.start < symbol.declaration.end):
-                            continue # A recursive type alone is not a use.
+                            continue # Self references alone are not a use.
                         used.add(key)
                         if projection or not explicit_discard(node):
                             observed.add((symbol.declaration, symbol.name))
                 pending.extend((child, certain) for child in node.children)
     adapter = project.diagnostic_adapter()
-    findings, immutable_exemptions = [], []
+    findings, immutable_exemptions, pure_exemptions = [], [], []
     for key, symbol in candidates.items():
         if symbol.node not in certain_names:
             continue
@@ -308,13 +356,19 @@ def analyze(project, *, include_unused=True):
         # no immutable advice. Any ordinary use makes them eligible again.
         if key not in observed and key not in types:
             immutable_exemptions.append(symbol.node)
+        if key in procedures and key not in observed:
+            pure_exemptions.append(symbol.node)
         if key in used:
             continue
         node = symbol.node
         start = node.end - len(symbol.name.encode())
         is_datatype = key in types
-        findings.append({'type': 'warning', 'stage': 'vet', 'code': 'thor/unused-type' if is_datatype else 'thor/unused',
+        is_procedure = key in procedures
+        code = 'thor/unused-type' if is_datatype else 'thor/unused-procedure' if is_procedure else 'thor/unused'
+        message = (f"Type '{symbol.name}' declared but not used" if is_datatype else
+                   f"Procedure '{symbol.name}' declared but not used" if is_procedure else f"'{symbol.name}' declared but not used")
+        findings.append({'type': 'warning', 'stage': 'vet', 'code': code,
                          'pos': adapter.locate(Origin(str(node.source.path), start, node.end)),
-                         'msgs': [f"Type '{symbol.name}' declared but not used" if is_datatype else f"'{symbol.name}' declared but not used"]})
+                         'msgs': [message]})
     findings.extend({key: value for key, value in fix.diagnostic(adapter).items() if key != 'fix'} for fix in import_fixes)
-    return sorted(findings, key=lambda finding: (finding['pos']['file'], finding['pos']['offset'])), immutable_exemptions, import_fixes
+    return sorted(findings, key=lambda finding: (finding['pos']['file'], finding['pos']['offset'])), immutable_exemptions, import_fixes, pure_exemptions

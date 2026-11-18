@@ -23,7 +23,8 @@ class VetDeclarationTLSTests(unittest.TestCase):
         action = next(action for action in actions if action['title']=='Remove unused import')
         edit = action['edit']['changes'][path.as_uri()][0]
         self.assertEqual(edit['newText'], '')
-        self.assertEqual(edit['range'], warnings['thor/unused-import']['range'])
+        self.assertEqual(edit['range']['start'], warnings['thor/unused-import']['range']['start'])
+        self.assertEqual(edit['range']['end'], self.position(text,'Unused::',0))
         changed = text.replace('main::proc(){}','main::proc(){fmt.println(Unused{1})}')
         client.notifications.clear()
         client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
@@ -45,6 +46,25 @@ class VetDeclarationTLSTests(unittest.TestCase):
         self.assertEqual([error['code'] for error in errors], ['thor/unused-type'])
         self.assertEqual(errors[0]['range']['start'], self.position(text,'Unused::',0))
         self.assertEqual(self.actions(client,path,text,'Unused::'), [])
+
+    def test_unused_proc_and_fn_warnings_have_no_removal_fixes_and_recover_on_calls(self):
+        text = '// 😀\npackage main\nunused_proc::proc()->int{return 1}\nunused_fn::fn()->int{return 1}\nmain::proc(){}\n'
+        client, path = self.open(text, vet=True)
+        errors = client.diagnostic(path.as_uri(), code='thor/unused-procedure')
+        self.assertEqual([error['code'] for error in errors], ['thor/unused-procedure']*2)
+        for word in ('unused_proc::','unused_fn::'):
+            error = next(error for error in errors if error['range']['start'] == self.position(text,word,0))
+            self.assertEqual(error['severity'],2)
+            self.assertEqual(error['tags'],[1])
+            self.assertEqual(self.actions(client,path,text,word), [])
+        changed = text.replace('main::proc(){}','main::proc(){_=unused_proc();_=unused_fn()}')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+            'contentChanges':[{'text':changed}]})
+        # Only the independent pure-style advice remains for the used proc.
+        errors = client.diagnostic(path.as_uri(),code='thor/prefer-fn')
+        self.assertEqual([error['code'] for error in errors], ['thor/prefer-fn'])
+        self.assertEqual(path.read_text(),text)
 
 
 if __name__ == '__main__':

@@ -601,12 +601,17 @@ signature requirements. Findings have stable `thor/prefer-immutable` and
 variables, immutable bindings, local constants, loop/type-switch/comprehension
 bindings, and procedure parameters with the `thor/unused` code. It also reports
 unused imports (`thor/unused-import`) and named data types and type aliases
-(`thor/unused-type`), including package-level types. All four checks
+(`thor/unused-type`), including package-level types. Unused named `proc`/`fn`
+declarations, constant procedure aliases and overload groups use
+`thor/unused-procedure`. Entry points, lifecycle hooks, exported/required
+procedures and native test procedures are treated as used. Calls, callbacks,
+aliases and compile-time references count as uses; self-recursion alone does not.
+All four checks
 are enabled by default for `thor vet` and `--vet`. `_` and explicit `_ = value`
 uses indicate intentional discards. Member names, named argument labels, and
 shadowed bindings are distinguished from actual uses. Named return values and
 parameter names in procedure-type declarations are part of their signatures.
-Package-level values and struct fields are outside this local-binding check.
+Other package-level values and struct fields are outside this local-binding check.
 Type references in annotations, aliases, other project files, f-strings and
 compile-time code count as uses; a recursive type's self-reference alone does not.
 Generic type specializations and aliases into Odin libraries are checked too.
@@ -621,11 +626,18 @@ reference type-switch bindings. Conditions, returns, address-taking and explicit
 `_ = value` discards also count. This is a conservative local check:
 it does not trace unused values through other bindings or report overwritten
 initializers when the binding is subsequently used.
-Unused values and types have no automatic edit: initializer effects, allocations
-and public type declarations require review. `--apply` and `--ask` preserve them.
+Unused values, types and procedures have no removal edit: initializer effects,
+allocations and public declarations require review. `--apply` and `--ask`
+preserve them. With the `unused` check enabled, unused procedures take priority
+over pure-function advice; bindings used only in `_ = procedure_name` discards
+also receive no pure conversion. Selecting only `--vet=pure` checks that
+convention independently.
 Unused imports have compiler-validated removal edits. Whole selective or wildcard
 imports can be removed when unused; if any selected member or the namespace is
-used, the declaration remains. Comments and neighboring statements are preserved.
+used, the declaration remains. A standalone unused import's entire line,
+including indentation and its newline, is removed without creating a blank line.
+Comments and neighboring same-line statements are preserved, as are existing
+intentional blank lines and the file's newline style.
 Explicit blank imports (`import _ "package"`) remain intentional, including
 imports needed for initialization. Imports used only in inactive debug/platform
 branches are retained so applying corrections does not break other configurations.

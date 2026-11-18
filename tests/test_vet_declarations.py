@@ -147,7 +147,7 @@ main::proc(){value:Alias;_=value}
         for imports, alias, value in [('import "core:time" / Duration, Second','Duration','Second'),
                                       ('import "core:time"','time.Duration','time.Second')]:
             text = ('package main\n'+imports+'\nimport "core:fmt"\n'
-                    'Unused::'+alias+'\nDelay::'+value+'\nPrint::fmt.println\nmain::proc(){}\n')
+                    'Unused::'+alias+'\nDelay::'+value+'\nPrint::fmt.println\nmain::proc(){_=Print}\n')
             errors, updated = self.reports(text,'--apply')
             self.assertEqual([error['code'] for error in errors], ['thor/unused-type'])
             self.assertIn("'Unused'", errors[0]['msgs'][0])

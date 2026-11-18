@@ -248,7 +248,7 @@ prints::proc(){fmt.println(1)}
 reader::proc(value:[]int)->int{return value[0]}
 main::proc(){}
 '''
-        client,path=self.open(text,vet=True)
+        client,path=self.open(text,checker_args='--vet=pure')
         errors=client.diagnostic(path.as_uri(),code='thor/prefer-fn')
         self.assertEqual(len(errors),1,errors)
         self.assertEqual(errors[0]['range']['start'],self.position(text,'reader::',0))

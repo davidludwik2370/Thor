@@ -100,9 +100,9 @@ active project or dependency source is `.thor`, even with a package selector.
 Native unused checks can flag generated helpers; native style checks inspect
 generated formatting; native flow analysis can miss reads hidden in captures;
 Thor's automatic using feature tag overrides the native using policies.
-Use `--vet=unused` for original Thor bindings, imports and data types, and
+Use `--vet=unused` for original Thor bindings, imports, data types and procedures, and
 `--vet=semicolon` for original Thor terminators. Unused imports can be removed
-with `thor vet --apply`; unused values and types remain warning-only findings
+with `thor vet --apply`; unused values, types and procedures remain warning-only findings
 without removal edits. These are not replacements for native procedure, cast,
 shadowing, pointer-flow, or atomic-access checks. Generic
 formatting helpers can hide redundant casts, and generated comprehension
