@@ -15,6 +15,9 @@ Info :: struct {
     kind: string,
     start, end, parent: int,
     op, name: string,
+    struct_flags: string `json:"struct_flags,omitempty"`,
+    field_tag: string `json:"field_tag,omitempty"`,
+    subtype_field: bool `json:"subtype_field,omitempty"`,
     calling_convention: string,
     mutable: bool,
     using_field: bool,
@@ -206,6 +209,8 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Field_List: info.kind = "Fields"
     case ^ast.Field:
         info.kind = "Field"; info.roles["type"] = span(n.type); info.lists["names"] = spans(n.names)
+        info.field_tag = n.tag.text
+        info.subtype_field = .Subtype in n.flags
         info.roles["default"] = span(n.default_value)
         info.using_field = .Using in n.flags
         if n.type!=nil {_,info.variadic=n.type.derived.(^ast.Ellipsis)}
@@ -222,6 +227,8 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
     case ^ast.Struct_Type:
         info.kind = "StructType"; info.roles["fields"] = span(n.fields); info.roles["params"] = span(n.poly_params)
         if n.is_raw_union {info.op="raw_union"}
+        if n.is_packed {info.struct_flags = " #packed"}
+        if n.is_all_or_none {info.struct_flags = n.is_packed ? " #packed #all_or_none" : " #all_or_none"}
         info.lists["where"] = spans(n.where_clauses)
     case ^ast.Union_Type:
         info.kind = "UnionType"; info.roles["params"] = span(n.poly_params); info.lists["where"] = spans(n.where_clauses)

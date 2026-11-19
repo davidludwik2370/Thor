@@ -113,6 +113,7 @@ impl Lower<'_, '_> {
             if predicate.is_empty(){check}else{format!("when {predicate}{{{check}}}\n")}
         }).collect::<String>();
         let count = pureschema::field_count(&names, &meta);
+        let (padding_code, padding_count, _) = self.record_padding_count(&meta, &builtin, &name);
         let overlap = pureschema::overlap_count(&names, &meta, &builtin);
         let fields = names
             .iter()
@@ -126,7 +127,7 @@ impl Lower<'_, '_> {
         let numeric = |t: &str| {
             format!("{meta}.type_is_integer({t})||{meta}.type_is_float({t})||{meta}.type_is_complex({t})||{meta}.type_is_quaternion({t})||{meta}.type_is_enum({t})||{meta}.type_is_matrix({t})||{meta}.type_is_simd_vector({t})||{meta}.type_is_bit_set({t})")
         };
-        let code=format!("\n{name}::#force_inline proc \"contextless\"(a:$T,b:$U,$Site:string)->T{{\nwhen T!=U {{#panic(Site)}} else when {meta}.type_is_struct(T){{\n{raw_checks}when {meta}.type_struct_field_count(T)!=({count}) || ({overlap})>1 {{#panic(Site)}} else {{result:T\n{fields}return result}}\n}} else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T){{\nwhen {} {{return a {op} b}} else {{result:T;for i in 0..<{builtin}.len(result){{result[i]={name}(a[i],b[i],Site)}};return result}}\n}} else when {} {{return a {op} b}} else {{#panic(Site)}}\n}}\n",numeric(&format!("{meta}.type_elem_type(T)")),numeric("T"));
+        let code=format!("\n{name}::#force_inline proc \"contextless\"(a:$T,b:$U,$Site:string)->T{{\nwhen T!=U {{#panic(Site)}} else when {meta}.type_is_struct(T){{\n{raw_checks}when ({overlap})>1 {{#panic(Site)}} else {{when {meta}.type_struct_field_count(T)!=({count}) {{{padding_code}when {meta}.type_struct_field_count(T)!=({count})+{padding_count} {{#panic(Site)}}}}\nresult:T\n{fields}return result}}\n}} else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T){{\nwhen {} {{return a {op} b}} else {{result:T;for i in 0..<{builtin}.len(result){{result[i]={name}(a[i],b[i],Site)}};return result}}\n}} else when {} {{return a {op} b}} else {{#panic(Site)}}\n}}\n",numeric(&format!("{meta}.type_elem_type(T)")),numeric("T"));
         self.helpers.insert(
             key,
             self.g(code, NodeId(0)).region(
@@ -147,7 +148,7 @@ impl Lower<'_, '_> {
     ) -> Result<Code> {
         let op = self.source.node(id).op.trim_end_matches('=').to_string();
         let helper = self.generic_struct_helper(&op);
-        let token=self.struct_error(id,&format!("Cannot apply '{op}' to struct: every field must be named and be a self-contained fixed-size value supporting '{op}'; unnamed padding, pointers, slices, strings, dynamic containers, Integer and Rational are excluded."));
+        let token=self.struct_error(id,&format!("Cannot apply '{op}' to struct: operands must have the same type and every named field must be a self-contained fixed-size value supporting '{op}'; pointers, slices, strings, dynamic containers, Integer and Rational are excluded."));
         if compound {
             return self.big_statement(id, |this| {
                 let typ = this.native_type(a)?.finish().text;
@@ -262,9 +263,7 @@ impl Lower<'_, '_> {
         let mut shapes = Vec::with_capacity(fields.len());
         for (name, typ) in fields {
             if name == "_" {
-                return Err(
-                    "unnamed ('_') padding fields have no readable arithmetic value".into(),
-                );
+                continue;
             }
             let path = if path.is_empty() {
                 name.clone()

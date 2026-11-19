@@ -289,7 +289,10 @@ clone_at :: proc(dst,src:rawptr,info:^runtime.Type_Info,allocator:runtime.Alloca
         for i in 0..<item.count {clone_at(offset(dst,i*item.elem_size),offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
     case typeinfo.Type_Info_Struct:
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
-        for i in 0..<int(item.field_count) {clone_at(offset(dst,int(item.offsets[i])),offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)}
+        for i in 0..<int(item.field_count) {
+            if item.names[i]=="_" {continue}
+            clone_at(offset(dst,int(item.offsets[i])),offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)
+        }
     case typeinfo.Type_Info_Union:
         runtime.mem_copy_non_overlapping(dst,src,info.size)
         variant:=union_variant(src,item)
@@ -329,7 +332,10 @@ destroy_at :: proc(src:rawptr,info:^runtime.Type_Info,allocator:runtime.Allocato
         for i in 0..<item.count {destroy_at(offset(src,i*item.elem_size),item.elem,allocator,depth+1)}
     case typeinfo.Type_Info_Struct:
         if .raw_union in item.flags {panic("Raw unions cannot be pure results")}
-        for i in 0..<int(item.field_count) {destroy_at(offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)}
+        for i in 0..<int(item.field_count) {
+            if item.names[i]=="_" {continue}
+            destroy_at(offset(src,int(item.offsets[i])),item.types[i],allocator,depth+1)
+        }
     case typeinfo.Type_Info_Union:
         variant:=union_variant(src,item)
         if variant!=nil {destroy_at(src,variant,allocator,depth+1)}

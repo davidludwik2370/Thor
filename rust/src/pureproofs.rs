@@ -678,6 +678,33 @@ impl Lower<'_, '_> {
             return Ok(None);
         }
         let node = self.source.node(id);
+        let expanded = if node.kind == "Unary" && node.op == "**" {
+            self.source.role(id, "expr")
+        } else if node.kind == "Call" && self.source.role(id,"callee")
+            .is_some_and(|callee|self.resolver.native_builtin_alias(self.reference(callee),"expand_values")) {
+            self.source.group(id,"args").first().copied()
+        } else {None};
+        if let Some(operand) = expanded {
+            let name = format!("{}pure_expand_type", self.prefix);
+            let key = (NodeId(0), self.prefix.clone(), name.clone());
+            if !self.helpers.contains_key(&key) {
+                let validator = format!("{}_mode", self.pure_validator(id));
+                self.meta=true;self.builtin=true;
+                let meta=format!("{}meta",self.prefix);let builtin=format!("{}builtin",self.prefix);
+                let (code,count,fields)=self.record_padding_count(&meta,&builtin,&name);
+                let checks=fields.iter().enumerate().map(|(index,typ)|
+                    format!("when {meta}.type_struct_field_count(T)>{index}{{{validator}({typ},true,true,false,0,Site,3)}}\n")).collect::<String>();
+                let helper=format!("\n{name}::proc \"contextless\"($T:typeid,$Site:string)->T{{when {meta}.type_is_struct(T){{{code}when {count}>0{{{checks}}}}};return {{}}}}\n");
+                self.helpers.insert(key,self.g(helper,id));
+            }
+            let owner=self.source.ancestors(id).find(|node|self.source.node(*node).kind=="Procedure").unwrap_or(id);
+            let token=self.pure_type_site(id,owner,"expanded padding fields");
+            let query=self.native("type_of");
+            let value=self.render(operand,None,constant)?;
+            let guarded=Code::concat([self.g(format!("({query}({name}({query}("),id),value.clone(),
+                self.g(format!("),{token})))("),id),value,self.g(")",id)]);
+            return self.splice(id,vec![(self.source.node(operand).span,guarded)],vec![]).map(Some);
+        }
         if node.kind == "Call" {
             let callee = self.role(id, "callee")?;
             if crate::evaluation::approved_format(self.resolver, self.reference(callee)) {

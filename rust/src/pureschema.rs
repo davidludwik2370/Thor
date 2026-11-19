@@ -81,6 +81,7 @@ impl Lower<'_, '_> {
                 | Type::Fixed {elem:inner,..} => pending.push((*inner, depth + 1)),
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                     for (name, typ) in self.resolver.record_fields(&typ) {
+                        if name == "_" { continue; }
                         names.insert(name);
                         pending.push((typ, depth + 1));
                     }
@@ -120,6 +121,7 @@ impl Lower<'_, '_> {
                     .flat_map(|field| s.group(*field, "names"))
                     .map(|field| s.text(*field).to_string())
             })
+            .filter(|name| name != "_")
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>());
@@ -128,8 +130,14 @@ impl Lower<'_, '_> {
         let module = self.module("pure");
         self.builtin = true;
         let builtin = format!("{}builtin", self.source.prefix);
+        let (padding_code, padding_count, padding_fields) = self.record_padding_count(&meta, &builtin, &name);
+        // Arithmetic and ownership ignore padding. Representation-inspecting
+        // conversions/comparisons must still reject pointers hidden there.
+        let padding_representation = padding_fields.iter().enumerate().map(|(index, typ)|
+            format!("when Mode!=0 && {meta}.type_struct_field_count(T)>{index}{{{name}({typ},Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}\n")).collect::<String>();
         let mut parts=vec![
-            format!("when Mode!=0 && ({meta}.type_is_pointer(T)||{meta}.type_is_multi_pointer(T)||{meta}.type_is_proc(T)||{meta}.type_is_map(T)||{meta}.type_is_cstring(T)||{meta}.type_is_cstring16(T)||{meta}.type_is_string16(T)||T==rawptr||T==any||T==typeid){{#panic((\"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.\" when Mode==1 else \"Pure code cannot observe pointer identities or convert pointers to numeric values.\")+Site)}}"),
+            format!("when Mode==3 && ({meta}.type_is_slice(T)||{meta}.type_is_dynamic_array(T)||{meta}.type_is_fixed_capacity_dynamic_array(T)||{meta}.type_is_string(T)||{meta}.type_is_pointer(T)||{meta}.type_is_multi_pointer(T)||{meta}.type_is_proc(T)||{meta}.type_is_map(T)||{meta}.type_is_cstring(T)||{meta}.type_is_cstring16(T)||{meta}.type_is_string16(T)||T==rawptr||T==any||T==typeid){{#panic(\"Pure code cannot expose reference-containing padded records through value expansion; access named fields directly.\"+Site)}}"),
+            format!("else when Mode!=0 && ({meta}.type_is_pointer(T)||{meta}.type_is_multi_pointer(T)||{meta}.type_is_proc(T)||{meta}.type_is_map(T)||{meta}.type_is_cstring(T)||{meta}.type_is_cstring16(T)||{meta}.type_is_string16(T)||T==rawptr||T==any||T==typeid){{#panic((\"Pure code cannot convert values to pointers, procedure values, any or runtime type identities.\" when Mode==1 else \"Pure code cannot observe pointer identities or convert pointers to numeric values.\")+Site)}}"),
             format!("else when Depth>24{{#panic(\"Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels\"+Site)}}"),
             format!("else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr{{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}"),
             format!("else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T){{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}"),
@@ -137,13 +145,13 @@ impl Lower<'_, '_> {
         ];
         if self.big_enabled(){
             let big=self.module("big");
-            parts.insert(2,format!("else when T=={big}.Integer || T=={big}.Rational{{when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc\"+Site)}}}}"));
+            parts.insert(3,format!("else when T=={big}.Integer || T=={big}.Rational{{when Mode==3{{#panic(\"Pure code cannot expose reference-containing padded records through value expansion; access named fields directly.\"+Site)}}else when Result && !Allow_Owned{{#panic(\"Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc\"+Site)}}}}"));
         }
         // Odin specializes the complete generic body before discarding inactive
         // branches. Keep the field scanner out of scalar specializations, whose
         // distinct diagnostic sites would otherwise duplicate every SDK field.
         let mut record_parts = vec![
-            format!("when {meta}.type_struct_field_count(T)!=({}){{#panic(\"Pure record fields could not be fully resolved\"+Site)}}",field_count(&names,&meta)),
+            format!("when {meta}.type_struct_field_count(T)!=({count}){{{padding_code}when {meta}.type_struct_field_count(T)!=({count})+{padding_count}{{#panic(\"Pure record fields could not be fully resolved\"+Site)}}{padding_representation}}}",count=field_count(&names,&meta)),
             format!("when {}>1{{#panic(\"Raw-union storage cannot be proved pure: overlapping fields in a raw-union\"+Site)}}else{{",overlap_count(&names,&meta,&builtin)),
         ];
         for (file, owner) in self.resolver.sources.iter().enumerate() {

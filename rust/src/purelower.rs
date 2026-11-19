@@ -22,7 +22,7 @@ impl Lower<'_, '_> {
                 Type::Struct(owner) | Type::Record(owner, _) => {
                     if !seen.insert(*owner) { return false; }
                     let fields = r.record_fields(typ);
-                    let result = !fields.is_empty() && fields.iter().all(|(_, typ)| inline(r, typ, seen));
+                    let result = !fields.is_empty() && fields.iter().all(|(name, typ)| name == "_" || inline(r, typ, seen));
                     seen.remove(owner);
                     result
                 }
@@ -525,7 +525,7 @@ impl Lower<'_, '_> {
                 .resolver
                 .record_fields(typ)
                 .iter()
-                .any(|(_, typ)| self.pure_owns(typ, seen)),
+                .any(|(name, typ)| name != "_" && self.pure_owns(typ, seen)),
             Type::Union(..) => self
                 .resolver
                 .union_variants(typ)

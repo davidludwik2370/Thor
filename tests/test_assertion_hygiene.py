@@ -167,7 +167,14 @@ class AssertionHygieneTests(unittest.TestCase):
             paths = [ROOT/name for name in ['demo/main.thor', 'examples/demo/demo.thor', 'runtime/basic/basic.thor',
                                            'tests/fixtures/array_type_mismatch/main.thor']]
             tagged=Path(directory)/'tagged.thor'
-            tagged.write_text('package main\nPoint::struct{x,y:f32}\nMode::enum u8{Read=1,Alias=Read,Write}\nmain::proc(){values:#soa[]Point;lanes:#simd[4]f32;_=values;_=lanes}\n')
+            tagged.write_text('''package main
+Point::struct{x,y:f32}
+Mode::enum u8{Read=1,Alias=Read,Write}
+Packed::struct #packed{_:int,using point:Point `coordinates`,_:bool}
+Aligned::struct #all_or_none #align(16){_:bool,value:int `amount`}
+Subtype::struct{#subtype point:Point,_:int}
+main::proc(){values:#soa[]Point;lanes:#simd[4]f32;_=values;_=lanes}
+''')
             paths.append(tagged)
             for path in [*paths, invalid]:
                 for mode in [[], ['--source-tools']]:

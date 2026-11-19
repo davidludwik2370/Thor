@@ -27,6 +27,8 @@ mod comprehensions;
 pub(crate) mod concatenation;
 #[path = "structmath.rs"]
 mod structmath;
+#[path = "recordpadding.rs"]
+mod recordpadding;
 #[path = "contextlower.rs"]
 mod contextlower;
 #[path = "defaults.rs"]
@@ -110,6 +112,7 @@ pub struct Lower<'a, 'r> {
     branch_procedures: HashSet<NodeId>,
     querying: usize,
     struct_math_busy: HashSet<NodeId>,
+    padding_layouts: Option<recordpadding::Layouts>,
     logical: bignumbers::State,
     temporary_serial: usize,
     temporary_discarding: HashSet<NodeId>,
@@ -184,6 +187,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             captures: vec![],
             fstring_plans: HashMap::new(),
             struct_math_busy: HashSet::new(),
+            padding_layouts: None,
             fstring_frames: vec![],
             fstring_busy: HashSet::new(),
             resource_busy: HashSet::new(),

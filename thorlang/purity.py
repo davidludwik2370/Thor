@@ -202,7 +202,7 @@ class Flow:
 class Purity:
     storage_message='Pure code cannot inspect Integer/Rational implementation storage; use numeric operators and public properties.'
     builtins={'len','cap','size_of','align_of','offset_of','type_of','min','max','abs','clamp',
-              'complex','quaternion','real','imag','jmag','kmag','conj','swizzle',
+              'complex','quaternion','real','imag','jmag','kmag','conj','swizzle','expand_values','compress_values',
               'make','copy','delete','assert','assert_contextless','panic'}
     sequence_mutators={'append','clear','pop','pop_safe','pop_front','pop_front_safe'}
     builtins |= sequence_mutators
@@ -498,11 +498,14 @@ class Purity:
             if typ.elem:pending.append((typ.elem,depth+1))
             if typ.kind=='struct':
                 if typ.members:
-                    names.update(typ.members);pending.extend((value,depth+1) for value in typ.members.values())
+                    names.update(name for name in typ.members if name!='_')
+                    pending.extend((value,depth+1) for name,value in typ.members.items() if name!='_')
                 elif typ.node:
                     for field in (typ.node.role('fields') or typ.node).children:
                         if field.kind!='Field':continue
-                        names.update(name.text for name in field.group('names'))
+                        fields=[name.text for name in field.group('names') if name.text!='_']
+                        if not fields:continue
+                        names.update(fields)
                         pending.append((self.r.type_node(field.role('type'),typ.substitutions),depth+1))
                 else:return self.validator(s)
             if typ.kind=='union':
@@ -524,16 +527,18 @@ class Purity:
         if key in s.expressions.helpers:return name+'_mode' if mode else name
         public=name;name+='_mode'
         names=fields if fields is not None else sorted({n.text for unit in self.r.sources for record in unit.nodes if record.kind=='StructType'
-                      for f in (record.role('fields') or record).children if f.kind=='Field' for n in f.group('names')})
+                      for f in (record.role('fields') or record).children if f.kind=='Field' for n in f.group('names') if n.text!='_'})
         s.needs_intrinsics=True;meta=s.prefix+'meta';native=self.module(s)
         builtin=s.expressions.module('builtin','base:builtin')
         forbidden=' || '.join([f'{meta}.type_is_{kind}(T)' for kind in ['pointer','multi_pointer','proc','map','cstring','cstring16','string16']]+['T==rawptr','T==any','T==typeid'])
         target_message=json.dumps('Pure code cannot convert values to pointers, procedure values, any or runtime type identities.')
         source_message=json.dumps('Pure code cannot observe pointer identities or convert pointers to numeric values.')
-        parts=[f'when Mode!=0 && ({forbidden}) {{#panic(({target_message} when Mode==1 else {source_message})+Site)}}',
+        expansion_message=json.dumps('Pure code cannot expose reference-containing padded records through value expansion; access named fields directly.')
+        parts=[f'when Mode==3 && ({forbidden}||{meta}.type_is_slice(T)||{meta}.type_is_dynamic_array(T)||{meta}.type_is_fixed_capacity_dynamic_array(T)||{meta}.type_is_string(T)) {{#panic({expansion_message}+Site)}}',
+               f'else when Mode!=0 && ({forbidden}) {{#panic(({target_message} when Mode==1 else {source_message})+Site)}}',
                f'else when Depth>24 {{#panic("Pure functions do not support recursive reference-containing types or value nesting deeper than 24 levels"+Site)}}']
         if not getattr(s,'native_inspected',False) and any(unit.path==Path(__file__).resolve().parents[1]/'runtime'/'big'/'big.odin' for unit in self.r.sources):
-            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
+            parts.append(f'else when T=={s.big.module()}.Integer || T=={s.big.module()}.Rational {{when Mode==3 {{#panic({expansion_message}+Site)}} else when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return allocated numbers; use fn or a contextful proc"+Site)}}}}')
         parts.append(f'else when Allow_Refs && {meta}.type_is_pointer(T) && T!=rawptr {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
         parts.append(f'else when Allow_Refs && {meta}.type_is_fixed_capacity_dynamic_array(T) {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}')
         parts.append(f'else when {meta}.type_is_dynamic_array(T) {{when Result && !Allow_Owned {{#panic("Contextless compile-time procedures cannot return dynamic arrays; use fn or a contextful proc"+Site)}} else when Result || Allow_Refs {{{name}({meta}.type_elem_type(T),Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}} else {{{native}.validate(T,false,Depth,Site)}}}}')
@@ -562,7 +567,10 @@ class Purity:
         # inspected many record schemas. A left-associated sum can exhaust the
         # native compiler's stack before it can report any useful diagnostic.
         count=count_fields(names)
-        record_parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{#panic("Pure record fields could not be fully resolved"+Site)}}')
+        from . import recordpadding
+        padding_code,padding_count,padding_fields=recordpadding.count(self.r.sources,meta,builtin,name,cache=s)
+        representation=''.join(f'when Mode!=0 && {meta}.type_struct_field_count(T)>{index} {{{name}({typ},Result,Allow_Owned,Allow_Refs,Depth+1,Site,Mode)}}\n' for index,typ in enumerate(padding_fields))
+        record_parts.append(f'when {meta}.type_struct_field_count(T)!=({count}) {{{padding_code}when {meta}.type_struct_field_count(T)!=({count})+{padding_count} {{#panic("Pure record fields could not be fully resolved"+Site)}}{representation}}}')
         from .imports import file_private
         for unit in self.r.sources:
             for record in unit.nodes:
@@ -836,7 +844,7 @@ class Purity:
         if typ.kind=='struct' and typ.node:
             if typ.node.data.get('op')=='raw_union':return True
             for field in (typ.node.role('fields') or typ.node).children:
-                if field.kind=='Field' and self.unsafe_storage(self.r.type_node(field.role('type'),typ.substitutions),seen):return True
+                if field.kind=='Field' and any(name.text!='_' for name in field.group('names')) and self.unsafe_storage(self.r.type_node(field.role('type'),typ.substitutions),seen):return True
         if typ.kind=='union' and typ.node:
             return any(self.unsafe_storage(self.r.type_node(v,typ.substitutions),seen) for v in typ.node.group('variants'))
 
@@ -849,7 +857,7 @@ class Purity:
         if typ.elem and self.unresolved_storage(typ.elem,seen):return True
         if typ.kind=='struct' and typ.node:
             return any(self.unresolved_storage(self.r.type_node(field.role('type'),typ.substitutions),seen)
-                       for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field')
+                       for field in (typ.node.role('fields') or typ.node).children if field.kind=='Field' and any(name.text!='_' for name in field.group('names')))
         if typ.kind=='union' and typ.node:
             return any(self.unresolved_storage(self.r.type_node(value,typ.substitutions),seen) for value in typ.node.group('variants'))
         return False
@@ -1247,6 +1255,26 @@ class Purity:
         self.analyze(proc)
         if self.invalid_default(n):return None
         if n in self.rendering:return None
+        expanded=(n.role('expr') if n.kind=='Unary' and n.data.get('op')=='**'
+                  else next(iter(n.group('args')),None) if n.kind=='Call' and self.r.native_builtin_alias(n.role('callee'),'expand_values') else None)
+        if expanded is not None and self.calls.default_evaluated(n):
+            self.rendering.add(n)
+            try:
+                source=n.source;name=source.prefix+'pure_expand_type';key=source.root,name
+                if key not in source.expressions.helpers:
+                    from . import recordpadding
+                    validator=self.validator(source)+'_mode'
+                    meta=source.prefix+'meta';source.needs_intrinsics=True
+                    builtin=source.expressions.module('builtin','base:builtin')
+                    code,count,fields=recordpadding.count(self.r.sources,meta,builtin,name,cache=source)
+                    checks=''.join(f'when {meta}.type_struct_field_count(T)>{index} {{{validator}({typ},true,true,false,0,Site,3)}}\n' for index,typ in enumerate(fields))
+                    helper=f'\n{name}::proc "contextless"($T:typeid,$Site:string)->T{{when {meta}.type_is_struct(T){{{code}when {count}>0{{{checks}}}}};return {{}}}}\n'
+                    source.expressions.helpers[key]=source.mapping.wrap(helper,source.path,n.start,n.end,'pure-expansion')
+                token,_,_=self.type_site(source,n,'expanded padding fields')
+                value=source.render(expanded,constant=constant)
+                guarded=f'(type_of({name}(type_of({value}),{json.dumps(token)})))({value})'
+                return source.splice(n,[(expanded.start,expanded.end,guarded)])
+            finally:self.rendering.remove(n)
         checked_body=self.calls.body(n,expected,constant)
         if checked_body is not None:return checked_body
         if n is proc.role('body') and proc in self.contracts:
@@ -1445,7 +1473,7 @@ class Purity:
         if typ.elem:return self.owned_type(typ.elem,seen)
         if typ.kind=='struct' and typ.node:
             return any(self.owned_type(self.r.type_node(f.role('type'),typ.substitutions),seen.copy())
-                       for f in (typ.node.role('fields') or typ.node).children if f.kind=='Field')
+                       for f in (typ.node.role('fields') or typ.node).children if f.kind=='Field' and any(name.text!='_' for name in f.group('names')))
         if typ.kind=='union' and typ.node:
             return any(self.owned_type(self.r.type_node(v,typ.substitutions),seen.copy()) for v in typ.node.group('variants'))
         return False

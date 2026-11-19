@@ -51,11 +51,18 @@ def generic_helper(source, op):
         check=f'when {meta}.type_base_type(T)==struct #raw_union #align(align_of(T)){{{schema}}}{{#panic(Site)}}\n'
         raw_checks.append(f'when {predicate}{{{check}}}\n' if predicate else check)
     raw_checks=''.join(raw_checks)
+    from . import recordpadding
+    builtin=expressions.module('builtin','base:builtin')
+    padding_code,padding_count,_=recordpadding.count(source.resolver.sources,meta,builtin,name,cache=source)
     fields=''.join(f'when {direct(field)} {{result.{field}={name}(a.{field},b.{field},Site)}}\n' for field in names)
     code=f'''\n{name}::#force_inline proc "contextless"(a:$T,b:$U,$Site:string)->T {{
 when T!=U {{#panic(Site)}} else when {meta}.type_is_struct(T) {{
     {raw_checks}
-    when {meta}.type_struct_field_count(T)!=({count(names)}) {{#panic(Site)}} else {{
+    when {meta}.type_struct_field_count(T)!=({count(names)}) {{
+        {padding_code}
+        when {meta}.type_struct_field_count(T)!=({count(names)})+{padding_count} {{#panic(Site)}}
+    }}
+    {{
     result:T
     {fields}
     return result
@@ -74,7 +81,7 @@ def generic_render(source,node,a,b,compound,expected):
     e=source.expressions
     op=node.data['op'].rstrip('=')
     helper=generic_helper(source,op)
-    token=struct_error(source,node,f"Cannot apply '{op}' to struct: every field must be named and be a self-contained fixed-size value supporting '{op}'; unnamed padding, pointers, slices, strings, dynamic containers, Integer and Rational are excluded.")
+    token=struct_error(source,node,f"Cannot apply '{op}' to struct: operands must have the same type and every named field must be a self-contained fixed-size value supporting '{op}'; pointers, slices, strings, dynamic containers, Integer and Rational are excluded.")
     typ=e.ownership.native_type(a)
     condition=dispatch_condition(source,typ)
     if compound:
@@ -128,7 +135,7 @@ def shape(resolver, typ, source, site, op, path='', depth=0):
             field_type = resolver.type_node(field.role('type'), typ.substitutions)
             for name in field.group('names'):
                 name = name.text
-                if name=='_':raise ValueError("unnamed ('_') padding fields have no readable arithmetic value")
+                if name=='_':continue
                 member = shape(resolver, field_type, source, site, op, path+'.'+name if path else name, depth+1)
                 result.append((name, member))
         return ('record', result)

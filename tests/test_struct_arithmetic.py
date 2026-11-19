@@ -225,11 +225,7 @@ for row in ([1]Row{frozen}) {next:=row+{[2]int{1,1}};next.values[0]=5}
             self.assertEqual((pos['offset'],pos['end_offset']),(start,start+3),errors)
             self.assertNotIn('__thor_',json.dumps(errors))
 
-    def test_generic_restrictions_point_to_the_operator_and_reject_unnamed_padding(self):
-        for body in ('_=x+x','_=add(x,x)'):
-            self.compare(self.program('x:=Padded{value=1};'+body,
-                'Padded::struct{_:int,value:int}\nadd::proc(a,b:$T)->T{return a+b}\n'),
-                command='check',fail='padding')
+    def test_generic_restrictions_point_to_the_operator(self):
         source=self.program('x:=Bad{};_=add(x,x)',
             '// 😀 header\nBad::struct{data:[]int}\nadd::proc(a,b:$T)->T{return a+b}\n')
         self.source.write_text(source)

@@ -4,6 +4,7 @@ import "core:fmt"
 
 Pair :: struct {a, b: int}
 Batch :: struct {pairs: [2]Pair}
+Padded :: struct {_: [3]byte, value: int, _: bool}
 
 BASE :: Pair{1, 2} + {3, 4}
 grow :: fn(value: Pair) -> Pair { return value + {1, 2} }
@@ -20,6 +21,11 @@ main :: proc() {
     doubled :> rows + rows
     if (doubled.pairs != [2]Pair{{2, 4}, {6, 8}}) { panic("nested arithmetic") }
     if (AUTO != Pair{5, 8} || EXPLICIT != AUTO) { panic("compile-time arithmetic") }
+
+    // Padding does not participate, even when its type has no '/' operator.
+    padded := Padded{value=6}
+    padded /= {value=2}
+    if padded.value != 3 { panic("ignored padding") }
 
     // These are intentionally invalid:
     // Other :: struct {a, b: int}

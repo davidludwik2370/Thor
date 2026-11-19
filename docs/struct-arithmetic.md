@@ -29,9 +29,24 @@ Pointers, strings, slices, dynamic arrays, fixed-capacity dynamic arrays, maps,
 including when nested inside an array or another struct. A slice header's fixed
 size does not make its backing storage a value owned by the struct. Raw-union
 storage and bit fields do not gain arithmetic operators. Existing native
-operators and Thor logical-number/set operators retain their meanings. Fields
-must be named: explicit `_` padding fields have no readable arithmetic value
-and are rejected. Ordinary implicit alignment padding is fine.
+operators and Thor logical-number/set operators retain their meanings.
+
+Explicit `_` fields are padding: arithmetic and eligibility checks ignore them,
+regardless of their declared types. Only named fields participate, including in
+generics and compile-time execution. Result padding is normally initialized;
+its source bytes are not copied or combined. Implicit alignment padding is also
+ignored. Unsupported named fields remain errors even alongside padding.
+In a `fn`, explicit `expand_values`/`**` expansion of a padded record requires
+self-contained fields. Reference-containing records should use named field
+access instead. Ignoring padding for arithmetic does not permit exposing a
+hidden pointer or mutable backing storage in pure code. Ordinary `proc`
+expansion keeps its native Odin behavior.
+
+```odin
+Padded :: struct {_: [3]byte, value: int, _: bool}
+a := Padded{value=6}
+b := a / {value=2} // value is 3; padding does not participate in division.
+```
 
 Runtime operands are evaluated once. Compound assignment evaluates the target
 once and consumes the complete right-hand value before writing the result,
@@ -58,11 +73,12 @@ Run the [standalone example](../examples/struct_arithmetic/demo.thor) with
 a `struct_arithmetic` section.
 
 The differential and live TLS regressions are in
-`tests/test_struct_arithmetic.py` and `tests/test_struct_arithmetic_tls.py`.
+`tests/test_struct_arithmetic.py`, `tests/test_struct_padding.py` and
+`tests/test_struct_arithmetic_tls.py`.
 After building the release compiler, run them with:
 
 ```sh
-THOR_TEST_PREBUILT=1 python3 -m unittest tests.test_struct_arithmetic tests.test_struct_arithmetic_tls
+THOR_TEST_PREBUILT=1 python3 -m unittest tests.test_struct_arithmetic tests.test_struct_padding tests.test_struct_arithmetic_tls
 ```
 
 Runtime cases run both checked and with `-o:speed -disable-assert

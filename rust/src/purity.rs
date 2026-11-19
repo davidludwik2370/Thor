@@ -1180,7 +1180,7 @@ impl<'a, 'r> Purity<'a, 'r> {
                 .r
                 .record_fields(t)
                 .iter()
-                .any(|(_, t)| self.unsafe_storage(t, seen)),
+                .any(|(name, t)| name != "_" && self.unsafe_storage(t, seen)),
             Type::Union(..) => self
                 .r
                 .union_variants(t)
@@ -1253,6 +1253,8 @@ pub(crate) const BUILTINS: &[&str] = &[
     "kmag",
     "conj",
     "swizzle",
+    "expand_values",
+    "compress_values",
     "make",
     "copy",
     "delete",

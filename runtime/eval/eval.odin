@@ -165,12 +165,15 @@ write_dynamic :: proc(builder:^strings.Builder,value:any,depth:int) {
     case typeinfo.Type_Info_Struct:
         assert(.raw_union not_in variant.flags,"Raw unions cannot be serialized")
         strings.write_string(builder,`{"kind":"record","fields":[`)
+        written:=0
         for i in 0..<int(variant.field_count) {
-            if i>0 {strings.write_byte(builder,',')}
+            if variant.names[i]=="_" {continue}
+            if written>0 {strings.write_byte(builder,',')}
             strings.write_string(builder,`["`);strings.write_string(builder,variant.names[i])
             strings.write_string(builder,`",`)
             item:=any{rawptr(uintptr(value.data)+variant.offsets[i]),variant.types[i].id}
             write_dynamic(builder,item,depth+1);strings.write_byte(builder,']')
+            written+=1
         }
         strings.write_string(builder,` ]}`)
     case typeinfo.Type_Info_Enumerated_Array:

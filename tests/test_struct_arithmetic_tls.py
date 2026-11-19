@@ -79,5 +79,65 @@ main::proc(){x:=Foo{};_=add(x,x)}
         self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+3}})
         self.assertNotIn('__thor_',json.dumps(errors))
 
+    def test_padding_keeps_generic_pure_hover_and_literal_completion(self):
+        text='''package main
+Padded::struct{_:[]int,value:int,_:^int}
+add::fn(a,b:$T)->T{return a+b}
+RUN::#run add(Padded{value=2},Padded{value=3})
+main::proc(){
+    x:=Padded{value=4}
+    total:>add(x,x)
+    _=total.value;_=RUN.value
+    _=x+{}
+    x+={}
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        for fragment in ('total.value','RUN.value'):
+            self.assertIn('Padded',json.dumps(self.hover(client,path,text,fragment)))
+        for fragment,offset in (('x+{}',3),('x+={}',4)):
+            completed=client.request('textDocument/completion',{'textDocument':{'uri':path.as_uri()},
+                'position':self.position(text,fragment,offset),'context':{'triggerKind':1}})
+            items=completed.get('items',[]) if isinstance(completed,dict) else completed
+            self.assertIn('value',[item['label'] for item in items])
+            self.assertNotIn('_',[item['label'] for item in items])
+        self.assert_original_identifier_tokens(path,text,self.semantic_spans(client,path,text))
+
+    def test_padding_edits_do_not_hide_named_field_diagnostics(self):
+        text='''package main
+Padded::struct{_:int,value:int,_:bool}
+add::proc(a,b:$T)->T{return a+b}
+main::proc(){x:=Padded{};_=add(x,x)}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+
+        changed=text.replace('_:int','_:map[int]int')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        broken=changed.replace('value:int','value:[]int')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':3},'contentChanges':[{'text':broken}]})
+        errors=client.diagnostic(path.as_uri(),contains='self-contained fixed-size')
+        start=self.position(broken,'a+b',0)
+        self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+3}})
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':4},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+
+    def test_padding_expansion_purity_error_underlines_the_call(self):
+        text='''package main
+Padded::struct{_:[]int,number:int}
+inspect::fn(value:Padded)->int{buffer,_:=expand_values(value);_=buffer;return 0}
+main::proc(){}
+'''
+        client,path=self.open(text)
+        errors=client.diagnostic(path.as_uri(),contains='reference-containing padded records')
+        self.assertEqual(len(errors),1,errors)
+        start=self.position(text,'expand_values(value)',0)
+        self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+len('expand_values(value)')}})
+
 
 if __name__=='__main__':unittest.main()
