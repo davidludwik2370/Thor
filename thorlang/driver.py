@@ -170,6 +170,8 @@ class Project:
                 self.discover(dependency)
 
     def emit(self, destination, *, persist_maps=None, materialize=True):
+        from .unused_attributes import validate
+        validate(self)
         self.slice_access.prepare()
         if self.purity.eval_mode:
             for proc in self.purity.active:self.purity.analyze(proc)
@@ -543,6 +545,8 @@ def _main(argv=None):
             if options.command == 'ast':
                 print(json.dumps({'version':1,'sources':[{'path':str(source.path),'frontend':source.info} for source in project.sources.values()]}))
                 return 0
+            from .unused_attributes import validate
+            validate(project)
             lowering = time.monotonic()
             project.slice_access.enabled|=options.editor_info
             project.slice_access.full_contracts=options.editor_info
@@ -552,6 +556,8 @@ def _main(argv=None):
                 odin_root=Path(subprocess.check_output([odin,'root'],text=True).strip())
                 project.debug_roots=[str(ROOT/'runtime'),*[str(odin_root/name) for name in ['base','core','vendor']]]
             Evaluator(project,odin,options.run_timeout,cache).evaluate_all()
+            from .unused_attributes import validate
+            validate(project,final=True)
             memory = None
             if '-debug' in flags or options.track_allocations not in {'auto', 'off'}:
                 from .memory_debug import MemoryDebug

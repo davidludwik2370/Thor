@@ -48,3 +48,5 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod publishing;
 
 mod source_tools;
+mod source_uses;
+mod unused_attributes;

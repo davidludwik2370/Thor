@@ -2,7 +2,8 @@
 use super::{position, Fix, Project};
 use crate::{
     ast::{NodeId, Source, Span},
-    semantics::{Ref, Resolver, Type},
+    semantics::{Ref, Resolver},
+    source_uses::{names, field_label},
 };
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -20,21 +21,6 @@ fn binding(resolver: &Resolver<'_>, mut symbol: usize) -> usize {
     symbol
 }
 
-fn names(source: &Source) -> HashSet<NodeId> {
-    let mut names = HashSet::new();
-    let mut pending = vec![];
-    for (i, _) in source.nodes.iter().enumerate() {
-        let id = NodeId(i);
-        pending.extend(source.group(id, "names").iter().copied());
-        pending.extend(source.role(id, "label"));
-    }
-    while let Some(id) = pending.pop() {
-        if names.insert(id) {
-            pending.extend(source.node(id).children.iter().copied());
-        }
-    }
-    names
-}
 
 fn direct_name(source: &Source, mut id: NodeId) -> Option<NodeId> {
     while source.node(id).kind == "Paren" {
@@ -129,39 +115,6 @@ fn write_only(resolver: &Resolver<'_>, file: usize) -> HashSet<NodeId> {
     writes
 }
 
-fn field_label(resolver: &mut Resolver<'_>, at: Ref) -> bool {
-    let source = &resolver.sources[at.file];
-    let Some(parent) = source.node(at.node).parent else {
-        return false;
-    };
-    if source.node(at.node).span.start < source.node(parent).span.start
-        || source.node(parent).kind == "Other"
-            && matches!(
-                source.text(parent).split_whitespace().next(),
-                Some("break" | "continue")
-            )
-    {
-        return true;
-    }
-    match source.node(parent).kind.as_str() {
-        "Selector" => source.role(parent, "field") == Some(at.node),
-        "ImplicitSelector" | "EnumType" | "PolyType" => true,
-        "FieldValue" if source.role(parent, "field") == Some(at.node) => {
-            let Some(owner) = source.node(parent).parent else {
-                return true;
-            };
-            if source.node(owner).kind != "Compound" {
-                return true;
-            }
-            let mut typ = resolver.type_of(Ref { node: owner, ..at });
-            while let Type::Nominal(_, inner) = typ {
-                typ = *inner;
-            }
-            matches!(typ, Type::Struct(_) | Type::Record(..) | Type::Anonymous(_))
-        }
-        _ => false,
-    }
-}
 
 #[derive(Default)]
 pub(super) struct Analysis {
@@ -437,6 +390,7 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
             || !source.path.starts_with(root)
             || symbol.result
             || symbol.projection.is_some()
+            || crate::unused_attributes::marked(source, symbol.reference.node)
         {
             continue;
         }

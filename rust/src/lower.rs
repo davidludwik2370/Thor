@@ -973,6 +973,21 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
 
     fn render_inner(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
+        if self.source.thor && self.source.node(id).kind == "Attribute"
+            && self.source.node(id).parent.is_some_and(|parent| self.source.node(parent).kind == "Declaration")
+        {
+            let removed = crate::unused_attributes::elements(self.source, id);
+            if !removed.is_empty() {
+                let mut parts = vec![];
+                for element in self.source.group(id, "elems") {
+                    if removed.contains(element) { continue; }
+                    parts.push(self.g(if parts.is_empty() { "@(" } else { ", " }, id));
+                    parts.push(self.render(*element, None, true)?);
+                }
+                if !parts.is_empty() { parts.push(self.g(")", id)); }
+                return Ok(Code::concat(parts));
+            }
+        }
         if self.source.node(id).kind == "Ident" && self.source.node(id).parent.is_some_and(|parent| self.source.node(parent).kind == "Attribute"
             || self.source.node(parent).kind == "FieldValue" && self.source.role(parent, "field") == Some(id)
                 && self.source.ancestors(parent).any(|owner| self.source.node(owner).kind == "Attribute")) {
@@ -1729,6 +1744,13 @@ impl<'a, 'r> Lower<'a, 'r> {
         }
         if kind == "Block" {
             let mut helpers = self.body_prologues.get(&id).cloned().unwrap_or_default();
+            if node.children.len() == 1 && self.source.node(node.children[0]).kind == "Declaration"
+                && crate::unused_attributes::marked(self.source, node.children[0])
+            {
+                // Avoid Odin's sole-unused-declaration warning without reading
+                // the value or retaining any unused runtime declarations.
+                helpers.push(self.g("\n_ = 0\n", node.children[0]));
+            }
             helpers.extend(
                 self.storage_block_guards
                     .get(&id)

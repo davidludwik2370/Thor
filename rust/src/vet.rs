@@ -322,7 +322,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
             let id = NodeId(i);
             let at = Ref { file, node: id };
             if node.kind != "Declaration"
-                || !source.group(id, "attributes").is_empty()
+            || !crate::unused_attributes::only_unused_attributes(source, id)
                 || source.ancestors(id).any(|id| {
                     matches!(
                         source.node(id).kind.as_str(),

@@ -596,6 +596,16 @@ impl Project {
         } else {
             crate::profile::count("analysis.inherited_source_facts", 1);
         }
+        if crate::unused_attributes::present(&self.sources) {
+            let mut resolver = self.resolver();
+            resolver.prepare_contexts();
+            resolver.set_evaluations(self.evaluated.clone());
+            if let Some(plan) = &self.evaluation {
+                crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
+            }
+            crate::unused_attributes::validate(&mut resolver, false)?;
+            self.retain_resolver(resolver);
+        }
         self.schedule_evaluations()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index, &self.resolver_state);
@@ -603,6 +613,11 @@ impl Project {
         resolver.prepare_contexts();
         if let Some(plan) = &self.evaluation {
             crate::specialization::Specializations::apply_bindings(&plan.bindings, &mut resolver);
+        }
+        // A helper retains only part of these original files. Its caller checks
+        // the full source contract after installing the condition results.
+        if self.evaluation.is_none() && crate::unused_attributes::present(&self.sources) {
+            crate::unused_attributes::validate(&mut resolver, true)?;
         }
         crate::lower::prime_logical_constants(&mut resolver);
         resolver.begin_symbol_queries();

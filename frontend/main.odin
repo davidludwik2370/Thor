@@ -238,7 +238,15 @@ visit :: proc(v: ^ast.Visitor, node: ^ast.Node) -> ^ast.Visitor {
         info.roles["body"] = span(n.body); info.roles["else"] = span(n.else_stmt)
     case ^ast.Return_Stmt: info.kind = "Return"; info.lists["values"] = spans(n.results)
     case ^ast.Defer_Stmt: info.kind = "Defer"; info.roles["stmt"] = span(n.stmt)
-    case ^ast.Block_Stmt: info.kind = "Block"
+    case ^ast.Block_Stmt:
+        info.kind = "Block"
+        // A `do` block starts at its statement's token in Odin's AST. Value
+        // declaration attributes precede that token and belong to the block.
+        if len(n.stmts)>0 {
+            if declaration,ok:=n.stmts[0].derived.(^ast.Value_Decl);ok && len(declaration.attributes)>0 {
+                info.start=min(info.start,declaration.attributes[0].pos.offset)
+            }
+        }
     case ^ast.Import_Decl:
         info.kind = "Import"; info.name = n.name.text; info.op = n.relpath.text
         if len(n.attributes)>0 {info.start=n.attributes[0].pos.offset}

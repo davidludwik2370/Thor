@@ -1,6 +1,8 @@
 """Unused source bindings, independent of generated helpers and cleanup."""
 from .sourcemap import Origin
 from bisect import bisect_left
+from .source_uses import field_label, names as binding_names
+from .unused_attributes import marked
 
 
 def condition(project, node, seen=None):
@@ -37,24 +39,6 @@ def condition(project, node, seen=None):
     from .sliceaccess import Summary
     return project.slice_access.condition(node, Summary(None, {}))
 
-
-def field_label(resolver, node):
-    parent = node.parent
-    if parent is None:
-        return False
-    if node.start < parent.start:  # Statement labels precede the statement span.
-        return True
-    if parent.kind == 'Other' and parent.text.split()[:1] in (['break'], ['continue']):
-        return True
-    if parent.kind in {'ImplicitSelector', 'EnumType', 'PolyType'}:
-        return True
-    if parent.kind == 'Selector':
-        return parent.role('field') is node
-    if parent.kind == 'FieldValue' and parent.role('field') is node:
-        owner = parent.parent
-        return (owner is None or owner.kind != 'Compound'
-                or resolver.type_of(owner).kind in {'struct', 'record', 'anonymous'})
-    return False
 
 
 def direct_name(node):
@@ -302,7 +286,7 @@ def analyze(project, *, include_unused=True):
     procedures, automatic = set(), set()
     for symbol in list(resolver.by_decl.values()):
         declaration = symbol.declaration
-        if symbol.node.source not in source_set:
+        if symbol.node.source not in source_set or marked(declaration):
             continue
         owner = next((parent for parent in declaration.ancestors()
                       if parent.kind in {'Procedure', 'StructType', 'File'}), None)
@@ -337,13 +321,7 @@ def analyze(project, *, include_unused=True):
     with resolver.cached_queries():
         for source in usage_sources:
             writes = write_only(resolver, source)
-            names = set()
-            pending = [name for node in source.nodes for name in node.group('names')]
-            while pending:
-                node = pending.pop()
-                if node not in names:
-                    names.add(node)
-                    pending.extend(node.children)
+            names = binding_names(source)
             if include_unused and source.thor:
                 import_fixes.extend(unused_imports(source, resolver, names))
             pending = [(source.root, True)]

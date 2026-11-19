@@ -670,6 +670,10 @@ class Source:
         return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
+        if self.thor and n.kind == 'Attribute' and n.parent and n.parent.kind == 'Declaration':
+            from .unused_attributes import render_attribute
+            attribute = render_attribute(self,n)
+            if attribute is not None:return attribute
         if n.kind=='FallbackList':
             from . import fallbacks
             return fallbacks.render(self,n,constant)
@@ -1022,6 +1026,10 @@ class Source:
                 result=self.splice(n,replacements,[(n.data['roles']['colon'][1],declarations)])
         if kind == "Block":
             declarations = self.expressions.declarations(n)
+            if self.thor and len(n.children) == 1 and n.children[0].kind == 'Declaration':
+                from .unused_attributes import marked
+                if marked(n.children[0]):
+                    declarations += self.mapping.wrap('\n_ = 0\n',self.path,n.children[0].start,n.children[0].end,'unused-attribute')
             if declarations:
                 if real_block:
                     result = self.splice(n, replacements, [*inserts, (n.start+1,declarations)])

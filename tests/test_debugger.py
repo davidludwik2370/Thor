@@ -242,6 +242,29 @@ main::proc(){
         self.assertEqual((frame['source']['path'],frame['line']),(str(source),10),frame)
         client.request('continue',{'threadId':thread});client.event('terminated')
 
+    def test_unused_attribute_keeps_original_breakpoints_and_locals(self):
+        text='''package main
+INPUT:int=3
+main::proc(){
+    @(unused) held:=INPUT+4
+    if true do @(unused) scoped:=INPUT+1
+    reached:=INPUT+5
+    if reached!=8 {panic("result")}
+}
+'''
+        directory,source=self.build(text)
+        client=self.launch(directory,source,[6])
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),6),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'held','context':'watch'})
+        self.assertEqual(value['result'],'7',value)
+        client.request('next',{'threadId':thread})
+        thread,frame=self.frame(client)
+        self.assertEqual((frame['source']['path'],frame['line']),(str(source),7),frame)
+        value=client.request('evaluate',{'frameId':frame['id'],'expression':'reached','context':'watch'})
+        self.assertEqual(value['result'],'8',value)
+        client.request('continue',{'threadId':thread});client.event('terminated')
+
     def test_unused_do_declaration_warns_and_keeps_original_stepping(self):
         text='''package main
 calls:int

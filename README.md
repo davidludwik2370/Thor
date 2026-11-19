@@ -653,6 +653,38 @@ an eligible unused procedure receives both `thor/unused-procedure` and
 `thor/prefer-fn` warnings. `--apply` converts its `proc` keyword to `fn`, and
 the unused warning remains. An explicit `_ = procedure_name` use suppresses
 the unused warning while retaining applicable pure-function advice.
+`@(unused)` explicitly marks a variable, constant, type, `proc`, or `fn` as
+intentionally unavailable. It suppresses that declaration's unused warning;
+referencing it is a compile error until the attribute is removed:
+
+```odin
+@(unused)
+debug_dump :: proc(value: int) { _ = value }
+
+main :: proc() {
+    @(unused) future_limit :: 100
+    // debug_dump(1)      // Error: debug_dump is marked @(unused).
+    // _ = future_limit  // Error: even an explicit discard is a reference.
+}
+```
+
+The attribute takes no value and applies to every name in a grouped declaration.
+Reads, writes, addresses, type queries, aliases, and compile-time references all
+count as uses. Checks follow declarations through package imports and distinguish
+shadowed bindings and field/argument labels. Statically excluded files and known
+inactive `when` arms are ignored, including conditions resolved by compile-time
+execution. References in potentially active procedure definitions are checked even
+if the procedure itself is unused. Entry points and declarations automatically
+used through `@(init)`, `@(fini)`, `@(test)`, `@(export)`, or `@(require)` cannot be
+marked `@(unused)`.
+
+The attribute does not suppress warnings about parameters or locals inside a
+procedure, or other vet advice. `--apply` preserves it, including when converting
+an eligible `proc` to `fn`. It does not change initializer or ownership behavior.
+For unused parameters, use `_` or `_ = parameter`; this declaration attribute is
+not a parameter annotation. TLS reports forbidden uses at the reference with a
+link to the tagged declaration.
+
 Unused imports have compiler-validated removal edits. Whole selective or wildcard
 imports can be removed when unused; if any selected member or the namespace is
 used, the declaration remains. A standalone unused import's entire line,

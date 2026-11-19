@@ -470,6 +470,7 @@ class Diagnostics:
                     origin=Origin(str(site.source.path),site.start,site.end,'pure-native-call')
             diagnostic = {"type": error.get("type", "error"), "stage": error.get("stage", "checker" if backend else "thor"),
                           "pos": self.locate(origin) if origin else None, "msgs": msgs}
+            if not backend and error.get('code'):diagnostic['code'] = error['code']
             if related: diagnostic['related'] = related
             # Call-context diagnostics move the primary underline. Cascades
             # still depend on the original failing expression, not on every

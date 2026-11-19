@@ -1,5 +1,6 @@
 """Opt-in Thor conventions, checked fixes and explicit source updates."""
 from __future__ import annotations
+from .unused_attributes import only_unused_attributes
 
 import contextlib
 from bisect import bisect_left
@@ -181,7 +182,7 @@ def candidates(project, checks):
                     written.add(symbol.declaration)
                     if node.kind in {'Assignment','IncDec'}:mutated.add(symbol.declaration)
         for node in source.nodes:
-            if (node.kind != 'Declaration' or node.group('attributes')
+            if (node.kind != 'Declaration' or not only_unused_attributes(node)
                     or any(parent.kind in {'When', 'CompileSwitch', 'CompileSwitchExpr'} for parent in node.ancestors())):
                 continue
             names = [name for name in node.group('names') if name.text != '_']

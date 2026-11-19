@@ -111,6 +111,12 @@ checked conversions still run; comment layouts requiring a placeholder retain
 parameters, types, procedures, union-switch bindings and comprehension bindings
 remain warning-only findings without automatic edits. A required but intentionally
 unused callback parameter can be named `_` or explicitly discarded with `_ = name`.
+`@(unused)` on a variable, constant, type, `proc`, or `fn` suppresses its unused
+warning and makes references to that declaration a compile error, including
+aliases, assignments, explicit discards, and compile-time uses. Remove the tag
+before using it. The tag remains under `--apply`; other vet checks and warnings
+inside a tagged procedure remain enabled. It cannot mark automatically used
+entry points, exports, lifecycle hooks, required declarations, or native tests.
 TLS offers the same checked loop corrections on current unsaved buffers. These are not replacements for native procedure, cast,
 shadowing, pointer-flow, or atomic-access checks. Generic
 formatting helpers can hide redundant casts, and generated comprehension

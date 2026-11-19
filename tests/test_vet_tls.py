@@ -317,6 +317,40 @@ main::proc(){}
         client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
         client.diagnostic(path.as_uri(),empty=True)
 
+    def test_unused_attribute_forbids_unsaved_uses_and_recovers_when_removed(self):
+        text='// 😀\npackage main\nmain::proc(){@(unused) value:=10;_=0}\n'
+        client,path=self.open(text,checker_args='--vet=unused')
+        client.diagnostic(path.as_uri(),empty=True)
+        changed=text.replace('_=0','_=value')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        errors=client.diagnostic(path.as_uri(),code='thor/unused-reference')
+        self.assertEqual(len(errors),1,errors)
+        error=errors[0]
+        self.assertEqual(error['severity'],1)
+        self.assertEqual(error['range']['start'],self.position(changed,'_=value',2))
+        self.assertEqual(error['range']['end'],self.position(changed,'_=value',7))
+        self.assertIn('marked @(unused)',error['message'])
+        self.assertEqual(error['relatedInformation'][0]['location']['range']['start'],self.position(changed,'value:=',0))
+        self.assertEqual(self.actions(client,path,changed,'_=value'),[])
+        changed=changed.replace('@(unused) ','')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':3},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
+    def test_unused_attribute_related_declaration_can_be_in_another_file(self):
+        text='package main\nmain::proc(){reserved()}\n'
+        other='package main\n@(unused) reserved::proc(){}\n'
+        client,path=self.open(text,files={'other.thor':other},checker_args='--vet=unused')
+        errors=client.diagnostic(path.as_uri(),code='thor/unused-reference')
+        self.assertEqual(len(errors),1,errors)
+        error=errors[0]
+        self.assertEqual(error['range']['start'],self.position(text,'reserved()',0))
+        related=error['relatedInformation'][0]
+        self.assertEqual(related['location']['uri'],(path.parent/'other.thor').as_uri())
+        self.assertIn('marked @(unused)',related['message'])
+
 
 if __name__ == '__main__':
     unittest.main()
