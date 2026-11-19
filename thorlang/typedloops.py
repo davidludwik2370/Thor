@@ -25,7 +25,8 @@ class TypedLoops:
         name=loop.group('names')[1]
         target=self.s.render(annotation)
         module=self.s.expressions.module('sequence')
-        return self.mapped(f'\n{self.s.copy(name.start,name.end)} := {module}.checked_loop_index({self.native_index(loop)}, {target})\n',annotation)
+        separator=' = ' if name.text=='_' else ' := '
+        return self.mapped(f'\n{self.s.copy(name.start,name.end)}{separator}{module}.checked_loop_index({self.native_index(loop)}, {target})\n',annotation)
 
     def render(self, node):
         if node.kind!='Range':return None

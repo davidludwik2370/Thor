@@ -102,8 +102,16 @@ generated formatting; native flow analysis can miss reads hidden in captures;
 Thor's automatic using feature tag overrides the native using policies.
 Use `--vet=unused` for original Thor bindings, imports, data types and procedures, and
 `--vet=semicolon` for original Thor terminators. Unused imports can be removed
-with `thor vet --apply`; unused values, types and procedures remain warning-only findings
-without removal edits. These are not replacements for native procedure, cast,
+with `thor vet --apply`. Unused `for` bindings also have automatic corrections:
+the first or sole binding becomes `_`, and an unused second binding is removed.
+If both are unused, the loop becomes `for _ in container`. Reference bindings
+become `_` without `&`. Typed indices retain their annotation as `(_:Type)` so
+checked conversions still run; comment layouts requiring a placeholder retain
+`_` too. The iterable and loop body are preserved. Regular unused variables,
+parameters, types, procedures, union-switch bindings and comprehension bindings
+remain warning-only findings without automatic edits. A required but intentionally
+unused callback parameter can be named `_` or explicitly discarded with `_ = name`.
+TLS offers the same checked loop corrections on current unsaved buffers. These are not replacements for native procedure, cast,
 shadowing, pointer-flow, or atomic-access checks. Generic
 formatting helpers can hide redundant casts, and generated comprehension
 bindings do not retain the original lexical shadowing relationship.

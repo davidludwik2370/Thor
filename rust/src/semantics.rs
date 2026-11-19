@@ -484,6 +484,11 @@ impl<'a> Resolver<'a> {
                         "_".to_string()
                     } else if source.node(name_node).kind == "PolyType" {
                         source.names.get(source.node(name_node).name).to_string()
+                    } else if let Some(operand) = source.role(name_node, "expr")
+                        .filter(|operand| source.node(name_node).kind == "Unary"
+                            && source.node(*operand).kind == "Ident")
+                    {
+                        source.text(operand).to_string()
                     } else {
                         source
                             .text(name_node)

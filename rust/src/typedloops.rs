@@ -182,11 +182,12 @@ impl Lower<'_, '_> {
                 .get(1)
                 .ok_or_else(|| Error::new("typed index name omitted"))?;
             let module = self.module("sequence");
+            let separator = if s.text(name) == "_" { " = " } else { " := " };
             let prologue = Code::concat([
                 self.g("\n", name),
                 self.copy(s.node(name).span),
                 self.g(
-                    format!(" := {module}.checked_loop_index({native_index}, "),
+                    format!("{separator}{module}.checked_loop_index({native_index}, "),
                     annotation,
                 ),
                 target,

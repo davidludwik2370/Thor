@@ -632,9 +632,23 @@ reference type-switch bindings. Conditions, returns, address-taking and explicit
 `_ = value` discards also count. This is a conservative local check:
 it does not trace unused values through other bindings or report overwritten
 initializers when the binding is subsequently used.
-Unused values, types and procedures have no removal edit: initializer effects,
-allocations and public declarations require review. `--apply` and `--ask`
-preserve their declarations. Pure-function advice is independent of usage:
+Unused regular variables, parameters, types and procedures have no removal edit:
+initializer effects, allocations and public declarations require review.
+`--apply` and `--ask` preserve their declarations. Unused `for` iterator bindings
+have compiler-validated fixes: a first or sole binding becomes `_`, and an unused
+second binding is removed. Both unused bindings become a single `_`.
+
+```odin
+for hand, i in hands { use(i) }    // --apply: for _, i in hands
+for hand, i in hands { use(hand) } // --apply: for hand in hands
+for i in 0..<trials { run() }     // --apply: for _ in 0..<trials
+```
+
+Reference markers on discarded bindings are removed. Typed indices keep their
+checked conversion as `(_:Type)`; comment layouts requiring a second binding
+also keep `_`. The iteration expression and body are preserved. TLS offers the
+same fixes. Union-switch and comprehension bindings remain manual.
+Pure-function advice is independent of usage:
 an eligible unused procedure receives both `thor/unused-procedure` and
 `thor/prefer-fn` warnings. `--apply` converts its `proc` keyword to `fn`, and
 the unused warning remains. An explicit `_ = procedure_name` use suppresses

@@ -30,7 +30,7 @@ class UnusedVetTests(unittest.TestCase):
                 self.assertTrue(all(error['code'] == 'thor/unused' for error in errors), errors)
                 names = [error['msgs'][0].split("'")[1] for error in errors]
                 self.assertEqual(names, expected, errors)
-                self.assertTrue(all(error['type'] == 'warning' and 'fix' not in error for error in errors))
+                self.assertTrue(all(error['type'] == 'warning' for error in errors))
                 reports.append(errors)
         self.assertEqual(len(reports), 2)
         self.assertEqual(reports[0], reports[1])

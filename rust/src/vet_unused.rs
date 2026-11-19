@@ -167,7 +167,54 @@ fn field_label(resolver: &mut Resolver<'_>, at: Ref) -> bool {
 pub(super) struct Analysis {
     pub(super) findings: Vec<Value>,
     pub(super) immutable_exemptions: Vec<Ref>,
-    pub(super) import_fixes: Vec<Fix>,
+    pub(super) fixes: Vec<Fix>,
+}
+
+// Edits use original binding spans, preserving iteration expressions and body
+// scopes. In particular, typed indices retain their checked conversion.
+fn loop_fix(
+    source: &Source,
+    file: usize,
+    declaration: NodeId,
+    name: NodeId,
+    spelling: &str,
+    highlight: Span,
+) -> Option<Fix> {
+    let names = source.group(declaration, "names");
+    let index = names.iter().position(|id| *id == name)?;
+    if names.len() > 2 {
+        return None;
+    }
+    let binding = source.node(name).span;
+    let mut span = binding;
+    let mut replacement = source
+        .slice(Span { start: binding.start, end: highlight.start })
+        .strip_prefix('&')
+        .unwrap_or("")
+        .to_string();
+    replacement.push('_');
+    if index == 1 && source.role(declaration, "index_type").is_none() {
+        let bindings = source.group(declaration, "bindings");
+        let first = *bindings.first().unwrap_or(&names[0]);
+        let second = *bindings.get(1).unwrap_or(&names[1]);
+        let gap = Span { start: source.node(first).span.end, end: source.node(second).span.start };
+        // Lexer comment spans are ordered and nonoverlapping. Limit searches
+        // to this header instead of rescanning a file for every unused name.
+        let lower = source.comments.partition_point(|comment| comment.end <= gap.start);
+        let upper = source.comments.partition_point(|comment| comment.start < gap.end);
+        let comments = &source.comments[lower..upper];
+        let comma = source.slice(gap).match_indices(',')
+            .map(|(offset, _)| gap.start + offset)
+            .find(|offset| !comments.iter().any(|comment| comment.start <= *offset && *offset < comment.end))?;
+        let retained = source.slice(Span { start: comma + 1, end: gap.end });
+        // Keep a placeholder when a comment's newline requires the comma for
+        // parsing. Otherwise preserve the comments while dropping the binding.
+        if comments.is_empty() || !retained.contains(['\n','\r']) {
+            span = Span { start: comma, end: source.node(second).span.end };
+            replacement = if comments.is_empty() { String::new() } else { retained.to_string() };
+        }
+    }
+    Some(Fix { file, span, replacement, rule: "iterator", names: spelling.to_string(), highlight })
 }
 
 fn procedure_value(resolver: &Resolver<'_>, mut at: Ref) -> bool {
@@ -448,6 +495,7 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
     let mut observed = HashSet::new();
     let mut certain_names = HashSet::new();
     let mut import_fixes = vec![];
+    let mut comprehension_loops = HashSet::new();
     for (file, source) in project.sources.iter().enumerate() {
         if source.excluded || !source.path.starts_with(root) {
             continue;
@@ -460,6 +508,11 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         let mut pending = vec![(NodeId(0), true)];
         while let Some((id, certain)) = pending.pop() {
             let node = source.node(id);
+            if node.kind == "Comprehension" {
+                if let Some(node) = source.role(id, "loop") {
+                    comprehension_loops.insert(Ref { file, node });
+                }
+            }
             if certain && names.contains(&id) {
                 certain_names.insert(Ref { file, node: id });
             }
@@ -515,7 +568,7 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         }
     }
     let mut analysis = Analysis {
-        import_fixes,
+        fixes: import_fixes,
         ..Analysis::default()
     };
     for index in candidates.values() {
@@ -539,6 +592,13 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         let mut span = source.node(at.node).span;
         // Reference loop bindings include '&' in their binding node.
         span.start += source.slice(span).len() - symbol.name.len();
+        if include_unused && source.node(symbol.reference.node).kind == "Range"
+            && !comprehension_loops.contains(&symbol.reference)
+        {
+            if let Some(fix) = loop_fix(source, at.file, symbol.reference.node, symbol.name_node, &symbol.name, span) {
+                analysis.fixes.push(fix);
+            }
+        }
         let datatype = types.contains(index);
         let procedure = procedures.contains(index);
         let message = if datatype {
@@ -551,7 +611,7 @@ pub(super) fn analyze(project: &Project, include_unused: bool) -> Analysis {
         analysis.findings.push(json!({"type":"warning", "stage":"vet", "code":if datatype {"thor/unused-type"} else if procedure {"thor/unused-procedure"} else {"thor/unused"},
             "pos":position(source, span), "msgs":[message]}));
     }
-    for fix in &analysis.import_fixes {
+    for fix in analysis.fixes.iter().filter(|fix| fix.rule == "import") {
         analysis.findings.push(
             json!({"type":"warning", "stage":"vet", "code":"thor/unused-import",
             "pos":position(&project.sources[fix.file], fix.highlight), "msgs":[fix.message()]}),

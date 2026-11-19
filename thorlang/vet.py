@@ -35,6 +35,9 @@ class Fix:
         elif self.rule == 'immutable':
             message = f"Declare '{self.names}' immutable with ':>'."
             code = 'thor/prefer-immutable'
+        elif self.rule == 'iterator':
+            message = f"'{self.names}' declared but not used"
+            code = 'thor/unused'
         elif self.rule == 'import':
             message = f"Unused import '{self.names}'."
             code = 'thor/unused-import'
@@ -371,7 +374,7 @@ def apply(fixes):
 def run(project, options, flags, native_errors=None):
     checks = CHECKS if options.vet is None else tuple(options.vet.split(','))
     from .vet_unused import analyze
-    unused_findings, immutable_exemptions, import_fixes = analyze(project, include_unused='unused' in checks) if {'unused', 'immutable'}.intersection(checks) else ([], [], [])
+    unused_findings, immutable_exemptions, usage_fixes = analyze(project, include_unused='unused' in checks) if {'unused', 'immutable'}.intersection(checks) else ([], [], [])
     exempt_offsets = {}
     for node in immutable_exemptions:
         exempt_offsets.setdefault(str(node.source.path), []).append(node.start)
@@ -385,7 +388,7 @@ def run(project, options, flags, native_errors=None):
         index = bisect_left(offsets, fix.highlight_start)
         return index < len(offsets) and offsets[index] < fix.highlight_end
 
-    proposed = [*import_fixes, *(fix for fix in candidates(project, checks) if not exempt_declaration(fix))]
+    proposed = [*usage_fixes, *(fix for fix in candidates(project, checks) if not exempt_declaration(fix))]
     findings = unused_findings if 'unused' in checks else []
     if native_errors is not None:
         reported = {(finding['pos']['file'], finding['pos']['offset'], tuple(finding['msgs']))
@@ -396,7 +399,7 @@ def run(project, options, flags, native_errors=None):
     from .source_tools import semicolon_edits
     accepted = semicolon_edits(project, thor_only=True) if 'semicolon' in checks else []
     covered_semicolons = [fix for fix in accepted if any(
-        item.source is fix.source and item.start <= fix.start and fix.end <= item.end for item in import_fixes)]
+        item.source is fix.source and item.start <= fix.start and fix.end <= item.end for item in usage_fixes if item.rule=='import')]
     accepted = [fix for fix in accepted if fix not in covered_semicolons]
     if proposed:
         with tempfile.TemporaryDirectory(prefix='thor-vet-') as directory:
@@ -404,7 +407,7 @@ def run(project, options, flags, native_errors=None):
     accepted.extend(fix for fix in covered_semicolons if not any(
         item.rule == 'import' and item.source is fix.source and item.start <= fix.start and fix.end <= item.end
         for item in accepted))
-    corrected_imports = {(str(fix.source.path), fix.highlight_start) for fix in accepted if fix.rule == 'import'}
+    corrected_imports = {(str(fix.source.path), fix.highlight_start) for fix in accepted if fix.rule=='import'}
     findings = [finding for finding in findings if finding['code'] != 'thor/unused-import'
                 or (finding['pos']['file'], finding['pos']['offset']) not in corrected_imports]
     if options.command == 'vet' and (options.apply or options.ask) and accepted:
@@ -420,6 +423,9 @@ def run(project, options, flags, native_errors=None):
                 answer = ''
             confirmed = answer.strip().lower() in {'y', 'yes'}
         if confirmed:
+            corrected={(str(fix.source.path),fix.highlight_start) for fix in accepted if fix.rule=='iterator'}
+            findings=[finding for finding in findings if finding['code']!='thor/unused'
+                      or (finding['pos']['file'],finding['pos']['offset']) not in corrected]
             apply(accepted)
             updated = revisions(accepted)
             project.vet_updated_sources = {str(path): raw for path, raw in updated.items()}
@@ -436,4 +442,8 @@ def run(project, options, flags, native_errors=None):
             print(f'Applied {len(accepted)} corrections.')
             return findings
     adapter = project.diagnostic_adapter()
-    return [*findings, *(fix.diagnostic(adapter) for fix in accepted)]
+    iterator_fixes={(str(fix.source.path),fix.highlight_start):fix for fix in accepted if fix.rule=='iterator'}
+    findings=[iterator_fixes[(finding['pos']['file'],finding['pos']['offset'])].diagnostic(adapter)
+              if finding['code']=='thor/unused' and (finding['pos']['file'],finding['pos']['offset']) in iterator_fixes
+              else finding for finding in findings]
+    return [*findings, *(fix.diagnostic(adapter) for fix in accepted if fix.rule!='iterator')]

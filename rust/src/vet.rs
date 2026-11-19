@@ -37,6 +37,8 @@ impl Fix {
             format!("Declare '{}' immutable with ':>'.", self.names)
         } else if self.rule == "semicolon" {
             "Unnecessary semicolon.".into()
+        } else if self.rule == "iterator" {
+            format!("'{}' declared but not used", self.names)
         } else if self.rule == "import" {
             format!("Unused import '{}'.", self.names)
         } else {
@@ -52,7 +54,7 @@ impl Fix {
             .fold(14695981039346656037u64, |h, b| {
                 (h ^ u64::from(*b)).wrapping_mul(1099511628211)
             });
-        json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", "import"=>"thor/unused-import", _=>"thor/prefer-fn"},
+        json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", "import"=>"thor/unused-import", "iterator"=>"thor/unused", _=>"thor/prefer-fn"},
             "pos":position(source,self.highlight),"msgs":[self.message()],
             "fix":{"pos":position(source,self.span),"text":self.replacement,"snapshot":format!("{hash:016x}")}})
     }
@@ -848,7 +850,7 @@ pub fn run(
             .or_default()
             .insert(source.node(at.node).span.start);
     }
-    let proposed = usage.import_fixes.into_iter().chain(candidates(project, checks))
+    let proposed = usage.fixes.into_iter().chain(candidates(project, checks))
         .filter(|fix| {
             fix.rule != "immutable"
                 || exempt_offsets
@@ -936,6 +938,11 @@ pub fn run(
             confirmed = matches!(answer.trim().to_lowercase().as_str(), "y" | "yes");
         }
         if confirmed {
+            let corrected = accepted.iter().filter(|fix| fix.rule == "iterator")
+                .map(|fix| (project.sources[fix.file].path.to_string_lossy().into_owned(), fix.highlight.start))
+                .collect::<BTreeSet<_>>();
+            findings.retain(|finding| finding["code"] != "thor/unused" || !corrected.contains(&(
+                finding["pos"]["file"].as_str().unwrap().into(), finding["pos"]["offset"].as_u64().unwrap() as usize)));
             apply(&accepted, &project.sources)?;
             let updated = revisions(&accepted, &project.sources);
             for finding in &mut findings {
@@ -974,7 +981,18 @@ pub fn run(
             return Ok(findings);
         }
     }
-    findings.extend(accepted.iter().map(|fix| fix.diagnostic(&project.sources)));
+    // Enrich loop warnings in place so binding diagnostics retain source order.
+    let iterator_fixes = accepted.iter().filter(|fix| fix.rule == "iterator")
+        .map(|fix| ((project.sources[fix.file].path.to_string_lossy().into_owned(), fix.highlight.start), fix))
+        .collect::<BTreeMap<(String, usize), _>>();
+    for finding in &mut findings {
+        if finding["code"] == "thor/unused" {
+            if let Some(fix) = iterator_fixes.get(&(finding["pos"]["file"].as_str().unwrap().into(), finding["pos"]["offset"].as_u64().unwrap() as usize)) {
+                *finding = fix.diagnostic(&project.sources);
+            }
+        }
+    }
+    findings.extend(accepted.iter().filter(|fix| fix.rule != "iterator").map(|fix| fix.diagnostic(&project.sources)));
     Ok(findings)
 }
 

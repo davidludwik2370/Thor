@@ -260,6 +260,63 @@ main::proc(){}
         symbols=client.request('textDocument/documentSymbol',{'textDocument':{'uri':path.as_uri()}})
         self.assertTrue(any(item['name']=='reader' for item in symbols),symbols)
 
+    def test_unused_iterator_fixes_have_original_warning_and_edit_ranges(self):
+        text=('// 😀\npackage main\nmain::proc(){\n values:=[1,2]\n'
+              ' for &unused_value, i in values {_=i}\n'
+              ' for value, unused_index in values {_=value}\n}\n')
+        client,path=self.open(text,checker_args='--vet=unused')
+        warnings=client.diagnostic(path.as_uri(),code='thor/unused')
+        self.assertEqual(len(warnings),2,warnings)
+        for word,replacement,start,end in [
+            ('unused_value','_','&unused_value','unused_value,'),
+            ('unused_index','',', unused_index','unused_index in'),
+        ]:
+            warning=next(item for item in warnings if item['range']['start']==self.position(text,word,0))
+            self.assertEqual((warning['severity'],warning['tags']),(2,[1]))
+            actions=self.actions(client,path,text,word)
+            action=next(item for item in actions if item['title']=='Discard unused loop binding')
+            edit=action['edit']['changes'][path.as_uri()][0]
+            self.assertEqual(edit['newText'],replacement)
+            self.assertEqual(edit['range']['start'],self.position(text,start,0))
+            self.assertEqual(edit['range']['end'],self.position(text,end,len(word)))
+        changed=text.replace('&unused_value','_').replace(', unused_index','')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
+    def test_iterator_quick_fixes_track_unsaved_uses_and_reject_stale_edits(self):
+        text='package main\nmain::proc(){values:>[1,2];for value, i in values {_=value}}\n'
+        client,path=self.open(text,checker_args='--vet=unused')
+        client.diagnostic(path.as_uri(),code='thor/unused')
+        self.assertTrue(self.actions(client,path,text,'i in'))
+        changed=text.replace('_=value','_=value;_=i')
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        self.assertEqual(self.actions(client,path,changed,'i in'),[])
+        client.diagnostic(path.as_uri(),empty=True)
+        changed=changed.replace('_=value;_=i','_=i')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':3},'contentChanges':[{'text':changed}]})
+        warnings=client.diagnostic(path.as_uri(),code='thor/unused')
+        self.assertEqual(warnings[0]['range']['start'],self.position(changed,'value,',0))
+        action=next(item for item in self.actions(client,path,changed,'value,') if item['title']=='Discard unused loop binding')
+        self.assertEqual(action['edit']['changes'][path.as_uri()][0]['newText'],'_')
+
+    def test_unused_typed_index_fix_retains_the_annotation(self):
+        text='package main\nmain::proc(){values:>[1,2];for value,(unused:i8) in values {_=value}}\n'
+        client,path=self.open(text,checker_args='--vet=unused')
+        warnings=client.diagnostic(path.as_uri(),code='thor/unused')
+        self.assertEqual(len(warnings),1,warnings)
+        action=next(item for item in self.actions(client,path,text,'unused:') if item['title']=='Discard unused loop binding')
+        edit=action['edit']['changes'][path.as_uri()][0]
+        self.assertEqual(edit['newText'],'_')
+        self.assertEqual(edit['range']['start'],self.position(text,'unused:',0))
+        self.assertEqual(edit['range']['end'],self.position(text,'unused:',len('unused')))
+        changed=text.replace('unused:i8','_:i8')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+
 
 if __name__ == '__main__':
     unittest.main()

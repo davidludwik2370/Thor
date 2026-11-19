@@ -1,5 +1,6 @@
 """Unused source bindings, independent of generated helpers and cleanup."""
 from .sourcemap import Origin
+from bisect import bisect_left
 
 
 def condition(project, node, seen=None):
@@ -260,6 +261,34 @@ def automatic_procedure(symbol):
                 or any(owner.kind == 'ForeignBlock' for owner in declaration.ancestors()))
 
 
+def loop_fix(symbol):
+    from .vet import Fix
+    source=symbol.node.source
+    loop=symbol.declaration
+    names=loop.group('names')
+    if len(names)>2 or symbol.node not in names:return None
+    index=names.index(symbol.node)
+    start,end=symbol.node.start,symbol.node.end
+    highlight=end-len(symbol.name.encode())
+    prefix=source.raw[start:highlight]
+    replacement=prefix[1:]+b'_' if prefix.startswith(b'&') else b'_'
+    if index==1 and loop.role('index_type') is None:
+        bindings=loop.group('bindings') or names
+        gap_start,gap_end=bindings[0].end,bindings[1].start
+        comments=source.info.get('comments') or []
+        lower=bisect_left(comments,gap_start,key=lambda span:span[0])
+        upper=bisect_left(comments,gap_end,key=lambda span:span[0])
+        comments=comments[lower:upper]
+        comma=next((i for i in range(gap_start,gap_end) if source.raw[i]==ord(',')
+                    and not any(a<=i<b for a,b in comments)),None)
+        if comma is None:return None
+        retained=source.raw[comma+1:gap_end]
+        if not comments or not any(c in retained for c in (b'\n',b'\r')):
+            start,end=comma,bindings[1].end
+            replacement=retained if comments else b''
+    return Fix(source,start,end,replacement,'iterator',symbol.name,highlight,symbol.node.end)
+
+
 def analyze(project, *, include_unused=True):
     root = project.entry.parent if project.file_entry else project.entry
     resolver = project.resolver
@@ -304,6 +333,7 @@ def analyze(project, *, include_unused=True):
                     automatic.add((declaration, symbol.name))
     used, observed, certain_names = set(automatic), set(), set()
     import_fixes = []
+    comprehension_loops=set()
     with resolver.cached_queries():
         for source in usage_sources:
             writes = write_only(resolver, source)
@@ -319,6 +349,7 @@ def analyze(project, *, include_unused=True):
             pending = [(source.root, True)]
             while pending:
                 node, certain = pending.pop()
+                if node.kind=='Comprehension':comprehension_loops.add(node.role('loop'))
                 if certain and node in names:
                     certain_names.add(node)
                 if node.kind in {'When', 'WhenExpr'} and node.role('cond'):
@@ -349,6 +380,7 @@ def analyze(project, *, include_unused=True):
                 pending.extend((child, certain) for child in node.children)
     adapter = project.diagnostic_adapter()
     findings, immutable_exemptions = [], []
+    fixes=list(import_fixes)
     for key, symbol in candidates.items():
         if symbol.node not in certain_names:
             continue
@@ -360,6 +392,9 @@ def analyze(project, *, include_unused=True):
             continue
         node = symbol.node
         start = node.end - len(symbol.name.encode())
+        if include_unused and symbol.declaration.kind=='Range' and symbol.declaration not in comprehension_loops:
+            fix=loop_fix(symbol)
+            if fix:fixes.append(fix)
         is_datatype = key in types
         is_procedure = key in procedures
         code = 'thor/unused-type' if is_datatype else 'thor/unused-procedure' if is_procedure else 'thor/unused'
@@ -369,4 +404,4 @@ def analyze(project, *, include_unused=True):
                          'pos': adapter.locate(Origin(str(node.source.path), start, node.end)),
                          'msgs': [message]})
     findings.extend({key: value for key, value in fix.diagnostic(adapter).items() if key != 'fix'} for fix in import_fixes)
-    return sorted(findings, key=lambda finding: (finding['pos']['file'], finding['pos']['offset'])), immutable_exemptions, import_fixes
+    return sorted(findings, key=lambda finding: (finding['pos']['file'], finding['pos']['offset'])), immutable_exemptions, fixes

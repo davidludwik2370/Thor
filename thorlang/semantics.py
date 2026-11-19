@@ -71,6 +71,8 @@ def descendants(n):
 
 def binding_name(n):
     if n.kind=='Ident' and n.data.get('name')=='_':return '_'
+    if n.kind == 'Unary' and (operand := n.role('expr')) and operand.kind == 'Ident':
+        return operand.data.get('name') or operand.text
     if n.kind in {"Unary", "PolyType"}:
         return n.data.get("name") or n.text.lstrip("&$")
     return n.text
