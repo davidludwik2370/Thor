@@ -51,8 +51,12 @@ impl Lower<'_, '_> {
             let mut inner = Code::concat([
                 self.g(format!("\n{value} := "), id),
                 if matches!(request.mode, crate::evaluation::Mode::Condition) {
+                    let native_constant=self.source.ancestors(id).any(|owner| {
+                        matches!(self.source.node(owner).kind.as_str(),"When"|"WhenExpr")
+                            && self.source.role(owner,"cond").is_some_and(|cond|self.source.node(cond).span.contains(self.source.node(id).span))
+                    });
                     Code::concat([
-                        self.g("true when (", id),
+                        self.g(if native_constant {"true when ("} else {"true if ("}, id),
                         expression,
                         self.g(") else false", id),
                     ])

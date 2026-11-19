@@ -743,6 +743,9 @@ class Source:
         if kind=='Range':
             typed_loop=self.typed_loops.render(n)
             if typed_loop is not None:return typed_loop
+        from . import structmath
+        struct_code = structmath.render(self,n,expected,constant)
+        if struct_code is not None: return struct_code
         big_code = self.big.render(n, expected, constant)
         if big_code is not None: return big_code
         if kind=='Ternary' and constant:

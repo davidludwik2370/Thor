@@ -2055,11 +2055,22 @@ collection_comprehensions :: proc() {
     if COMPREHENSION_SQUARES!=[0,4,16] || len(flat)!=4 || len(unique)!=3 || indexed[2]!=2 {panic("comprehensions")}
 }
 
+// Native fixed-size fields have value arithmetic; slices, pointers, strings,
+// dynamic containers and logical big numbers are deliberately excluded.
+struct_arithmetic :: proc() {
+    BASE :: Point{1, 2} + {3, 4}
+    point := Point{1, 2}
+    point += {3, 4}
+    point *= {2, 3}
+    if (BASE != Point{4, 6} || point != Point{8, 18}) { panic("struct arithmetic") }
+}
+
 main :: proc() {
     println("Thor: a commented, executable language tour")
 
     imports_and_odin()
     arrays_and_context()
+    struct_arithmetic()
     constant_concatenation()
     collection_comprehensions()
     optional_results()

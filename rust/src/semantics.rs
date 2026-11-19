@@ -98,6 +98,13 @@ impl Type {
             _ => None,
         }
     }
+    pub(crate) fn record_like(&self) -> bool {
+        match self {
+            Self::Struct(_) | Self::Record(..) | Self::Anonymous(_) => true,
+            Self::Nominal(_, inner) => inner.record_like(),
+            _ => false,
+        }
+    }
     pub fn is_string(&self) -> bool {
         match self {
             Self::String { .. } => true,
@@ -1600,7 +1607,7 @@ impl<'a> Resolver<'a> {
                 if n.op == "*" && b.is_string() {
                     return b;
                 }
-                if a.untyped() && !b.untyped() {
+                if s.thor && a.is_unknown() && b.record_like() || a.untyped() && !b.untyped() {
                     b
                 } else {
                     a

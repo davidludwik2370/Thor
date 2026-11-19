@@ -351,6 +351,10 @@ thor_context_expression :: proc(ctx: ^AstContext, pc: ^DocumentPositionContext,
             if node.op.kind == .Increment && !thor_context_concrete(ctx, expected) {
                 expected, _ = thor_context_switch_value(ctx, other)
             }
+            if (node.op.kind==.Add || node.op.kind==.Sub || node.op.kind==.Mul || node.op.kind==.Quo) && !thor_context_concrete(ctx,expected) {
+                candidate,ok:=thor_context_value(ctx,other)
+                if _,is_struct:=candidate.value.(SymbolStructValue);ok && is_struct && candidate.pointers==0 {expected=candidate}
+            }
             return thor_context_expression(ctx, pc, branch, expected, wanted, depth+1)
         }
     }

@@ -1027,7 +1027,10 @@ class Evaluator:
             try:expr=source.render(site,constant=condition)
             finally:source.evaluation_keep=old
         alias=source.prefix+'evaluation'
-        emitted='true when ('+expr+') else false' if condition or condition_case is not None else expr
+        native_constant=any(owner.kind in {'When','WhenExpr'} and (cond:=owner.role('cond'))
+                            and cond.start<=n.start and n.end<=cond.end for owner in n.ancestors())
+        emitted=('true '+('when' if native_constant else 'if')+' ('+expr+') else false'
+                 if condition or condition_case is not None else expr)
         result_name=source.prefix+'evaluation_result'
         guards=[]
         if n.kind=='Call' and self.purity.approved(n):

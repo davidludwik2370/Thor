@@ -48,6 +48,11 @@ with filtered compile-time fixed arrays and one-level `..` unpacking. See the
 [comprehension reference](docs/comprehensions.md) and the executable
 [commented examples](examples/comprehensions/demo.thor).
 
+Same-type structs containing self-contained fixed-size arithmetic values support
+field-by-field `+`, `-`, `*`, `/` and compound assignments, including contextual
+literals and compile-time values. See [struct arithmetic](docs/struct-arithmetic.md)
+and its [executable example](examples/struct_arithmetic/demo.thor).
+
 ## Run the demo
 
 Requirements are `odin` on `PATH` and a release compiler built with Rust 1.85+

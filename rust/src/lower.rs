@@ -25,6 +25,8 @@ mod access;
 mod comprehensions;
 #[path = "concatenation.rs"]
 pub(crate) mod concatenation;
+#[path = "structmath.rs"]
+mod structmath;
 #[path = "contextlower.rs"]
 mod contextlower;
 #[path = "defaults.rs"]
@@ -107,6 +109,7 @@ pub struct Lower<'a, 'r> {
     branch_captures: Vec<(NodeId, String)>,
     branch_procedures: HashSet<NodeId>,
     querying: usize,
+    struct_math_busy: HashSet<NodeId>,
     logical: bignumbers::State,
     temporary_serial: usize,
     temporary_discarding: HashSet<NodeId>,
@@ -118,6 +121,7 @@ pub struct Lower<'a, 'r> {
     pub errors: HashMap<String, String>,
     pub type_sites: HashMap<String, (Ref, String)>,
     pub pure_error_sites: HashMap<String, Ref>,
+    pub expression_error_sites: HashMap<String, Ref>,
     blocked: HashMap<NodeId, String>,
     storage_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
     storage_block_guards: BTreeMap<NodeId, Vec<storage::Guard>>,
@@ -179,6 +183,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             mutating_params: HashSet::new(),
             captures: vec![],
             fstring_plans: HashMap::new(),
+            struct_math_busy: HashSet::new(),
             fstring_frames: vec![],
             fstring_busy: HashSet::new(),
             resource_busy: HashSet::new(),
@@ -196,6 +201,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             errors: HashMap::new(),
             type_sites: HashMap::new(),
             pure_error_sites: HashMap::new(),
+            expression_error_sites: HashMap::new(),
             blocked: HashMap::new(),
             storage_guards: BTreeMap::new(),
             storage_block_guards: BTreeMap::new(),
@@ -1178,6 +1184,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     .any(|operand| self.index_uses_type_operand(operand))
             });
         if !native_type_operand {
+            if let Some(code) = self.struct_math(id, expected.clone(), constant)? { return Ok(code); }
             if let Some(code) = self.big_expression(id, expected.clone(), constant)? {
                 return Ok(code);
             }

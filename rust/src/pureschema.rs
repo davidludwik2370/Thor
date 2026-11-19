@@ -2,13 +2,13 @@
 use super::*;
 use std::collections::BTreeSet;
 
-fn direct_field(name: &str, meta: &str) -> String {
+pub(super) fn direct_field(name: &str, meta: &str) -> String {
     // type_has_field also sees promoted `using` members. Shared-field checks
     // compare physical struct fields, so aliases cannot inflate schema coverage.
     let quoted = json!(name);
     format!("({meta}.type_has_shared_fields(T,struct{{{name}:{meta}.type_field_type(T,{quoted})}}) when {meta}.type_has_field(T,{quoted}) else false)")
 }
-fn field_count(names: &[String], meta: &str) -> String {
+pub(super) fn field_count(names: &[String], meta: &str) -> String {
     match names.len() {
         0 => "0".into(),
         1 => format!("(1 when {} else 0)", direct_field(&names[0], meta)),
@@ -23,7 +23,7 @@ fn field_count(names: &[String], meta: &str) -> String {
     }
 }
 
-fn overlap_count(names: &[String], meta: &str, builtin: &str) -> String {
+pub(super) fn overlap_count(names: &[String], meta: &str, builtin: &str) -> String {
     // Ordinary struct fields with positive size cannot share byte offset zero.
     // A raw union can. Field-name equality alone would also reject unrelated
     // ordinary records; zero-sized fields carry no overlapping bytes.

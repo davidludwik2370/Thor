@@ -256,6 +256,9 @@ impl<'a> Inputs<'a> {
             job.entry,
         );
         let (emitted, errors) = lower.finish()?;
+        for (token, site) in std::mem::take(&mut lower.expression_error_sites) {
+            related.insert(token, LoweringNotes {operation: Some(site), related: vec![]});
+        }
         let output = Output {
             emitted,
             errors,

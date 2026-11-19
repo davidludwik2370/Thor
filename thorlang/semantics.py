@@ -835,6 +835,8 @@ class Resolver:
                 from .repetition import result_type
                 repeated = result_type(n, seen)
                 if repeated is not None: return repeated
+            if n.source.thor and operands[0].kind in {'unknown','generic'} and operands[1].kind=='struct':
+                return replace(operands[1],witness=n)
             return self.type_of(n.role("left"), seen)
         if kind == "Unary":
             inner = self.type_of(n.role("expr"), seen)

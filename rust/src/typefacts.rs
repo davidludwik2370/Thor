@@ -406,6 +406,10 @@ impl Resolver<'_> {
                     self.specialize(Ref { node, ..r }, bindings, &mut seen.clone())
                 })
             }
+            "Binary" if s.thor && matches!(n.op.as_str(),"+"|"-"|"*"|"/") => {
+                let a=subtype("left");let b=subtype("right");
+                if a.record_like() {a} else if b.record_like() {b} else {self.type_of(r)}
+            }
             "WhenExpr" => {
                 if let Some(cond) = child("cond").and_then(|r| self.context_condition(r, bindings))
                 {

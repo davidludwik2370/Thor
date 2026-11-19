@@ -47,6 +47,9 @@ class Diagnostics:
         self.raw = {str(p): s.raw for p, s in (sources or {}).items()}
         self.prefixes = [s.prefix for s in (sources or {}).values()]
         self.error_messages = {name: message for s in (sources or {}).values() for name, message in s.error_messages.items()}
+        self.expression_error_sites={token:Origin(str(path),node.start,node.end,'expression',True)
+                                     for path,source in (sources or {}).items()
+                                     for token,node in getattr(source,'expression_error_sites',{}).items()}
         # Linked/overlaid native files can be metadata-only source objects.
         self.slice_sites={token:Origin(str(path),node.start,node.end,'slice-access',True)
                           for path,source in (sources or {}).items()
@@ -146,7 +149,7 @@ class Diagnostics:
             for token, message in self.error_messages.items():
                 if any(token in m for m in msgs):
                     msgs = [message]
-                    slice_site=self.slice_sites.get(token)
+                    slice_site=self.slice_sites.get(token) or self.expression_error_sites.get(token)
                     for source in self.sources.values():
                         for note in getattr(source,'slice_related',{}).get(token,[]):
                             if note:
