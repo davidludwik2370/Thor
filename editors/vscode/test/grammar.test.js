@@ -124,6 +124,8 @@ for (const [name, source, word, scope, line] of [
     ['native else when', '} else when true {', 'when', 'keyword.control'],
     ['membership', 'x in [1, 2]', 'in', 'keyword.control'],
     ['range membership', 'x in 0..<10', '..<', 'keyword.operator.range'],
+    ['power assignment', 'x **= {3, 4}', '**=', 'keyword.operator.assignment.compound'],
+    ['interpolated power assignment', 's := f"{proc(){x **= {3, 4}}()}"', '**=', 'keyword.operator.assignment.compound'],
     ['power operator', 'x := 2**3**2', '**', 'keyword.operator.power-or-expansion'],
     ['array concatenation', 'ALL :: [1] ++ [2]', '++', 'keyword.operator.concatenation'],
     ['optional panic', 'value := get() or_panic', 'or_panic', 'keyword.control'],

@@ -429,7 +429,16 @@ impl<'p> Scheduler<'p> {
     fn numeric_power(&mut self,node:Ref)->bool{
         let source=self.source(node);
         if !source.thor||self.kind(node)!="Binary"||source.node(node.node).op!="**"{return false;}
-        if self.resolver.logical_enabled(node.file){
+        // A pair of contextual literals has no standalone type. Let its
+        // enclosing typed call/return/assignment supply context; an enclosing
+        // fn/#run still evaluates the operation in compile-time scratch storage.
+        if source.value_annotation(node.node).is_none()
+            && ["left","right"].iter().all(|role|source.role(node.node,role).is_some_and(|id|self.resolver.type_of(Ref{file:node.file,node:id}).is_unknown()))
+            && source.descendants(node.node).any(|id|source.node(id).kind=="Compound" && source.role(id,"type").is_none())
+        { return false; }
+        let record=["left","right"].iter().any(|role|source.role(node.node,role).is_some_and(|id|self.resolver.type_of(Ref{file:node.file,node:id}).record_like()))
+            || source.value_annotation(node.node).is_some_and(|id|self.resolver.type_of(Ref{file:node.file,node:id}).record_like());
+        if !record && self.resolver.logical_enabled(node.file){
             if self.resolver.logical_operator(node,None){return false;}
             for ancestor in source.ancestors(node.node){
                 let at=Ref{file:node.file,node:ancestor};let n=source.node(ancestor);

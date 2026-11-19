@@ -829,6 +829,7 @@ class Resolver:
                 if operand.kind in {'big_integer','big_rational'}:return replace(operand,witness=n)
             if n.data['op']=='**':
                 left,right=operands
+                if left.kind in {'unknown','generic'} and right.kind=='struct':return replace(right,witness=n)
                 if left.untyped and (not right.untyped or right.name.startswith('f')):return replace(right,witness=n)
                 return replace(left,witness=n,untyped=left.untyped and right.untyped)
             if n.source.thor and n.data['op']=='*':

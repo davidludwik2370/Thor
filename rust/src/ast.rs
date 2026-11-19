@@ -620,6 +620,36 @@ impl Source {
     pub fn ancestors(&self, id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
         std::iter::successors(self.node(id).parent, move |id| self.node(*id).parent)
     }
+    /// A directly enclosing annotation supplies the type even when an
+    /// expression is extracted from its declaration for compile-time execution.
+    pub fn value_annotation(&self, mut id: NodeId) -> Option<NodeId> {
+        loop {
+            let parent = self.node(id).parent?;
+            match self.node(parent).kind.as_str() {
+                "Paren" => id = parent,
+                "Declaration" | "Field" => return self.role(parent, "type"),
+                "Return" => {
+                    let procedure = self
+                        .ancestors(parent)
+                        .find(|node| self.node(*node).kind == "Procedure")?;
+                    let signature = self.role(procedure, "type")?;
+                    let results = self.role(signature, "results")?;
+                    let fields = self
+                        .node(results)
+                        .children
+                        .iter()
+                        .filter(|node| self.node(**node).kind == "Field")
+                        .copied()
+                        .collect::<Vec<_>>();
+                    if fields.len() == 1 && self.group(fields[0], "names").len() <= 1 {
+                        return self.role(fields[0], "type");
+                    }
+                    return None;
+                }
+                _ => return None,
+            }
+        }
+    }
     pub fn comprehension_annotation(&self, id: NodeId) -> Option<NodeId> {
         self.ancestors(id)
             .find(|ancestor| matches!(self.node(*ancestor).kind.as_str(), "Declaration" | "Procedure"))

@@ -1043,7 +1043,7 @@
         },
         {
           "name": "keyword.operator.assignment.compound.thor",
-          "match": "[+\\-*/%]=|%%="
+          "match": "\\*\\*=|[+\\-*/%]=|%%="
         },
         {
           "name": "keyword.operator.assignment.compound.bitwise.thor",

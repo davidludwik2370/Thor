@@ -49,7 +49,8 @@ with filtered compile-time fixed arrays and one-level `..` unpacking. See the
 [commented examples](examples/comprehensions/demo.thor).
 
 Same-type structs containing self-contained fixed-size arithmetic values support
-field-by-field `+`, `-`, `*`, `/` and compound assignments, including contextual
+field-by-field arithmetic, bitwise operators, shifts, power `**`, unary complement
+`~`, and compound assignments, including contextual
 literals and compile-time values. See [struct arithmetic](docs/struct-arithmetic.md)
 and its [executable example](examples/struct_arithmetic/demo.thor).
 

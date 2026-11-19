@@ -748,6 +748,8 @@ class Source:
         if struct_code is not None: return struct_code
         big_code = self.big.render(n, expected, constant)
         if big_code is not None: return big_code
+        if self.thor and kind=='Assignment' and n.data['op']=='**=':
+            return structmath.power_assignment(self,n)
         if kind=='Ternary' and constant:
             return '('+self.render(n.role('x'),expected,True)+' when ('+self.render(n.role('cond'),constant=True)+') else '+self.render(n.role('y'),expected,True)+')'
         extra = self.expressions.render(n, expected, constant)

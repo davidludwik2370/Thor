@@ -15,6 +15,25 @@ fn base(mut typ: &Type) -> &Type {
     }
     typ
 }
+fn unary(op: &str) -> bool {
+    op == "~unary"
+}
+fn display_op(op: &str) -> &str {
+    if unary(op) {
+        "~"
+    } else {
+        op
+    }
+}
+fn scalar(a: &str, b: &str, op: &str, power: &str) -> String {
+    if unary(op) {
+        format!("(~({a}))")
+    } else if op == "**" {
+        format!("{power}.power({a},{b})")
+    } else {
+        format!("(({a}) {op} ({b}))")
+    }
+}
 fn record(typ: &Type) -> bool {
     typ.record_like()
 }
@@ -47,7 +66,16 @@ impl Lower<'_, '_> {
             "+" => "add",
             "-" => "sub",
             "*" => "mul",
-            _ => "div",
+            "/" => "div",
+            "&" => "and",
+            "|" => "or",
+            "~" => "xor",
+            "&~" => "and_not",
+            "<<" => "shl",
+            ">>" => "shr",
+            "**" => "power",
+            "~unary" => "complement",
+            _ => unreachable!(),
         };
         let name = format!("{}struct_generic_{suffix}", self.prefix);
         let key = (NodeId(0), self.prefix.clone(), name.clone());
@@ -115,19 +143,79 @@ impl Lower<'_, '_> {
         let count = pureschema::field_count(&names, &meta);
         let (padding_code, padding_count, _) = self.record_padding_count(&meta, &builtin, &name);
         let overlap = pureschema::overlap_count(&names, &meta, &builtin);
-        let fields = names
-            .iter()
-            .map(|field| {
-                format!(
-                    "when {} {{result.{field}={name}(a.{field},b.{field},Site)}}\n",
-                    pureschema::direct_field(field, &meta)
-                )
-            })
-            .collect::<String>();
-        let numeric = |t: &str| {
-            format!("{meta}.type_is_integer({t})||{meta}.type_is_float({t})||{meta}.type_is_complex({t})||{meta}.type_is_quaternion({t})||{meta}.type_is_enum({t})||{meta}.type_is_matrix({t})||{meta}.type_is_simd_vector({t})||{meta}.type_is_bit_set({t})")
+        let is_unary = unary(op);
+        let power = if op == "**" {
+            self.module("numeric")
+        } else {
+            String::new()
         };
-        let code=format!("\n{name}::#force_inline proc \"contextless\"(a:$T,b:$U,$Site:string)->T{{\nwhen T!=U {{#panic(Site)}} else when {meta}.type_is_struct(T){{\n{raw_checks}when ({overlap})>1 {{#panic(Site)}} else {{when {meta}.type_struct_field_count(T)!=({count}) {{{padding_code}when {meta}.type_struct_field_count(T)!=({count})+{padding_count} {{#panic(Site)}}}}\nresult:T\n{fields}return result}}\n}} else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T){{\nwhen {} {{return a {op} b}} else {{result:T;for i in 0..<{builtin}.len(result){{result[i]={name}(a[i],b[i],Site)}};return result}}\n}} else when {} {{return a {op} b}} else {{#panic(Site)}}\n}}\n",numeric(&format!("{meta}.type_elem_type(T)")),numeric("T"));
+        let args = if is_unary {
+            "a:$T,$Site:string"
+        } else {
+            "a:$T,b:$U,$Site:string"
+        };
+        let check = if is_unary {
+            String::new()
+        } else {
+            "when T!=U {#panic(Site)} else ".to_string()
+        };
+        let operands = |a: &str, b: &str| {
+            if is_unary {
+                format!("{a},Site")
+            } else {
+                format!("{a},{b},Site")
+            }
+        };
+        let fields = names.iter().map(|field| {
+            let call=format!("result.{field}={name}({})",operands(&format!("a.{field}"),&format!("b.{field}")));
+            // Passing a bool alone through a procedure normalizes its byte.
+            // Field operators must retain its native bit pattern, including
+            // when a previous complement produced a noncanonical bool byte.
+            let operation=if matches!(op,"~unary"|"&"|"|"|"~") {
+                let direct=scalar(&format!("a.{field}"),&format!("b.{field}"),op,&power);
+                format!("when {meta}.type_is_boolean({builtin}.type_of(a.{field})) {{result.{field}={direct}}} else {{{call}}}")
+            } else {call};
+            format!("when {} {{{operation}}}\n",pureschema::direct_field(field,&meta))
+        }).collect::<String>();
+        let kinds: &[&str] = match op {
+            "**" => &["integer", "float"],
+            "<<" | ">>" => &["integer"],
+            "&~" => &["integer", "enum", "bit_set", "simd_vector"],
+            "~unary" => &["integer", "boolean", "bit_set", "simd_vector"],
+            "&" | "|" | "~" => &["integer", "boolean", "enum", "bit_set", "simd_vector"],
+            _ => &[
+                "integer",
+                "float",
+                "complex",
+                "quaternion",
+                "enum",
+                "matrix",
+                "simd_vector",
+                "bit_set",
+            ],
+        };
+        let numeric = |t: &str| {
+            kinds
+                .iter()
+                .map(|kind| format!("{meta}.type_is_{kind}({t})"))
+                .collect::<Vec<_>>()
+                .join("||")
+        };
+        let array_native = if matches!(op, "**" | "<<" | ">>") {
+            String::new()
+        } else {
+            format!(
+                "when {} {{return {}}} else ",
+                numeric(&format!("{meta}.type_elem_type(T)")),
+                scalar("a", "b", op, &power)
+            )
+        };
+        let numeric = numeric("T");
+        // Native shifts take a scalar count and power is scalar-only, so
+        // corresponding fixed-array fields recurse element by element.
+        let element_call = operands("a[i]", "b[i]");
+        let leaf = scalar("a", "b", op, &power);
+        let code=format!("\n{name}::#force_inline proc \"contextless\"({args})->T{{\n{check}when {meta}.type_is_struct(T){{\n{raw_checks}when ({overlap})>1 {{#panic(Site)}} else {{when {meta}.type_struct_field_count(T)!=({count}) {{{padding_code}when {meta}.type_struct_field_count(T)!=({count})+{padding_count} {{#panic(Site)}}}}\nresult:T\n{fields}return result}}\n}} else when {meta}.type_is_array(T)||{meta}.type_is_enumerated_array(T){{\n{array_native}{{result:T;when {builtin}.len(T{{}})==0 {{return result}};for _,i in result {{result[i]={name}({element_call})}};return result}}\n}} else when {numeric} {{return {leaf}}} else {{#panic(Site)}}\n}}\n");
         self.helpers.insert(
             key,
             self.g(code, NodeId(0)).region(
@@ -146,9 +234,14 @@ impl Lower<'_, '_> {
         compound: bool,
         expected: Option<Hint>,
     ) -> Result<Code> {
-        let op = self.source.node(id).op.trim_end_matches('=').to_string();
+        let op = if self.source.node(id).kind == "Unary" {
+            "~unary".to_string()
+        } else {
+            self.source.node(id).op.trim_end_matches('=').to_string()
+        };
         let helper = self.generic_struct_helper(&op);
-        let token=self.struct_error(id,&format!("Cannot apply '{op}' to struct: operands must have the same type and every named field must be a self-contained fixed-size value supporting '{op}'; pointers, slices, strings, dynamic containers, Integer and Rational are excluded."));
+        let shown = display_op(&op);
+        let token=self.struct_error(id,&format!("Cannot apply '{shown}' to struct: operands must have the same type and every named field must be a self-contained fixed-size value supporting '{shown}'; pointers, slices, strings, dynamic containers, Integer and Rational are excluded."));
         if compound {
             return self.big_statement(id, |this| {
                 let typ = this.native_type(a)?.finish().text;
@@ -203,11 +296,14 @@ impl Lower<'_, '_> {
             plain_array: false,
         };
         let left = self.render(a, None, false)?;
-        let right = self.struct_operand(b, &hint, false)?;
+        let right = if unary(&op) {
+            Code::concat([])
+        } else {
+            Code::concat([self.g(",", id), self.struct_operand(b, &hint, false)?])
+        };
         Ok(Code::concat([
             self.g(format!("({helper}("), id),
             left,
-            self.g(",", id),
             right,
             self.g(format!(",{}) when {condition} else ", json!(token)), id),
             native,
@@ -230,14 +326,18 @@ impl Lower<'_, '_> {
         match base(typ) {
             Type::Array {elem, length: Some(length)} => {
                 let shape = self.struct_shape(elem, &format!("{path}[]"), depth + 1,site,op)?;
-                if matches!(shape, Shape::Leaf) { Ok(Shape::Leaf) }
+                if matches!(shape, Shape::Leaf) && !matches!(op, "**" | "<<" | ">>") { Ok(Shape::Leaf) }
                 else { Ok(Shape::Array(usize::try_from(*length).map_err(|_| format!("invalid array length at '{path}'"))?, Box::new(shape))) }
             }
+            Type::Scalar {name, ..} if name == "bool" && matches!(op,"&"|"|"|"~"|"~unary") => Ok(Shape::Leaf),
+            Type::Scalar {name, ..} if (matches!(op,"&"|"|"|"~"|"&~"|"<<"|">>"|"~unary") && name.starts_with('f')) || (op=="**" && !(typ.numeric())) => Err(format!("field '{path}' does not support '{}'",display_op(op))),
             Type::Scalar {name, ..} if typ.numeric() || name=="bit_set" || name.starts_with("complex") || name.starts_with("quaternion") => Ok(Shape::Leaf),
+            Type::Enum(_) if matches!(op,"**"|"~unary") => Err(format!("field '{path}' does not support '{}'",display_op(op))),
             Type::Enum(_) => Ok(Shape::Leaf),
             Type::Generic | Type::Unknown | Type::Array {length:None,..} => {
                 let helper=self.generic_struct_helper(op);
-                let token=self.struct_error(site,&format!("Cannot apply '{op}' to struct: field '{path}' must be a self-contained fixed-size value supporting '{op}'; reference-containing values, Integer and Rational are excluded."));
+                let shown=display_op(op);
+                let token=self.struct_error(site,&format!("Cannot apply '{shown}' to struct: field '{path}' must be a self-contained fixed-size value supporting '{shown}'; reference-containing values, Integer and Rational are excluded."));
                 Ok(Shape::Deferred(helper,json!(token).to_string()))
             }
             Type::Struct(owner) | Type::Record(owner, _) => {
@@ -281,13 +381,20 @@ impl Lower<'_, '_> {
         b: &str,
         op: &str,
         type_of: &str,
+        power: &str,
         constant: bool,
         statements: &mut String,
         serial: &mut usize,
     ) -> String {
         match shape {
-            Shape::Leaf => format!("(({a}) {op} ({b}))"),
-            Shape::Deferred(helper, site) => format!("{helper}({a},{b},{site})"),
+            Shape::Leaf => scalar(a, b, op, power),
+            Shape::Deferred(helper, site) => {
+                if unary(op) {
+                    format!("{helper}({a},{site})")
+                } else {
+                    format!("{helper}({a},{b},{site})")
+                }
+            }
             Shape::Record(fields) => format!(
                 "{type_of}({a}){{{}}}",
                 fields
@@ -301,6 +408,7 @@ impl Lower<'_, '_> {
                                 &format!("({b}).{name}"),
                                 op,
                                 type_of,
+                                power,
                                 constant,
                                 statements,
                                 serial
@@ -319,6 +427,7 @@ impl Lower<'_, '_> {
                         &format!("({b})[{i}]"),
                         op,
                         type_of,
+                        power,
                         true,
                         statements,
                         serial
@@ -338,6 +447,7 @@ impl Lower<'_, '_> {
                     &format!("({b})[{i}]"),
                     op,
                     type_of,
+                    power,
                     false,
                     &mut body,
                     serial,
@@ -357,11 +467,24 @@ impl Lower<'_, '_> {
         let key = (self.helper_scope(id), self.prefix.clone(), name.clone());
         if !self.helpers.contains_key(&key) {
             let type_of = self.native("type_of");
+            let power = if op == "**" {
+                self.module("numeric")
+            } else {
+                String::new()
+            };
             let mut body = String::new();
-            let value = Self::struct_value(shape, "a", "b", op, &type_of, false, &mut body, &mut 0);
+            let value = Self::struct_value(
+                shape, "a", "b", op, &type_of, &power, false, &mut body, &mut 0,
+            );
             let mismatch =
                 self.struct_error(id, "Struct arithmetic requires operands of the same type.");
-            let code = format!("\n{name} :: #force_inline proc \"contextless\"(a:$T,b:$U)->T {{\nwhen T!=U {{#panic({})}} else {{\n{body}return {value}\n}}\n}}\n",json!(mismatch));
+            let args = if unary(op) { "a:$T" } else { "a:$T,b:$U" };
+            let guard = if unary(op) {
+                String::new()
+            } else {
+                format!("when T!=U {{#panic({})}} else ", json!(mismatch))
+            };
+            let code = format!("\n{name} :: #force_inline proc \"contextless\"({args})->T {{\n{guard}{{\n{body}return {value}\n}}\n}}\n");
             self.helpers.insert(
                 key,
                 self.g(code, id).region(
@@ -399,14 +522,26 @@ impl Lower<'_, '_> {
             return Ok(None);
         }
         let node = self.source.node(id);
-        let compound =
-            node.kind == "Assignment" && matches!(node.op.as_str(), "+=" | "-=" | "*=" | "/=");
-        if !(node.kind == "Binary" && matches!(node.op.as_str(), "+" | "-" | "*" | "/"))
+        let compound = node.kind == "Assignment"
+            && matches!(
+                node.op.as_str(),
+                "+=" | "-=" | "*=" | "/=" | "&=" | "|=" | "~=" | "&~=" | "<<=" | ">>=" | "**="
+            );
+        let is_unary = node.kind == "Unary" && node.op == "~";
+        if !(node.kind == "Binary"
+            && matches!(
+                node.op.as_str(),
+                "+" | "-" | "*" | "/" | "&" | "|" | "~" | "&~" | "<<" | ">>" | "**"
+            ))
+            && !is_unary
             && !compound
         {
             return Ok(None);
         }
-        let (a, b) = if compound {
+        let (a, b) = if is_unary {
+            let a = self.role(id, "expr")?;
+            (a, a)
+        } else if compound {
             let (lhs, rhs) = (self.source.group(id, "lhs"), self.source.group(id, "rhs"));
             if lhs.len() != 1 || rhs.len() != 1 {
                 return Ok(None);
@@ -414,6 +549,73 @@ impl Lower<'_, '_> {
             (lhs[0], rhs[0])
         } else {
             (self.role(id, "left")?, self.role(id, "right")?)
+        };
+        // Evaluation helpers render the expression independently of its
+        // declaration/default. Retain that explicit contextual type.
+        let expected = if expected.is_none() && node.op == "**" {
+            if let Some(annotation) = self
+                .source
+                .value_annotation(id)
+                .filter(|annotation| record(&self.typ(*annotation)))
+            {
+                Some(Hint {
+                    code: self.render(annotation, None, true)?,
+                    semantic: Some(self.typ(annotation)),
+                    constant_literal: constant,
+                    element_only: false,
+                    plain_array: false,
+                })
+            } else {
+                expected
+            }
+        } else {
+            expected
+        };
+        let expected = if node.op == "**" && self.typ(a).is_unknown() && self.typ(b).is_unknown() {
+            let parent = node.parent.map(|p| {
+                if self.source.node(p).kind == "FieldValue" {
+                    self.source.node(p).parent.unwrap_or(p)
+                } else {
+                    p
+                }
+            });
+            let call = parent.filter(|p| self.source.node(*p).kind == "Call");
+            let typ = call.and_then(|call| {
+                let plans = self
+                    .resolver
+                    .call_plans(self.reference(call), &Default::default());
+                if plans.len() != 1 {
+                    return None;
+                }
+                let plan = &plans[0];
+                self.resolver
+                    .fields(plan.signature, "params")
+                    .into_iter()
+                    .zip(&plan.arguments)
+                    .find(|(_, args)| {
+                        args.iter().any(|arg| {
+                            *arg == self.reference(id)
+                                || self.resolver.sources[arg.file].role(arg.node, "value")
+                                    == Some(id)
+                                    && arg.file == self.file
+                        })
+                    })
+                    .and_then(|((_, annotation), _)| annotation)
+                    .map(|annotation| self.resolver.specialized_type(annotation, &plan.bindings))
+            });
+            if let Some(typ) = typ.filter(record) {
+                self.context_type(&typ).map(|code| Hint {
+                    code: self.g(code, id),
+                    semantic: Some(typ),
+                    constant_literal: constant,
+                    element_only: false,
+                    plain_array: false,
+                })
+            } else {
+                expected
+            }
+        } else {
+            expected
         };
         let at = self.typ(a);
         let bt = self.typ(b);
@@ -442,13 +644,18 @@ impl Lower<'_, '_> {
             }
             return Ok(None);
         };
-        let op = self.source.node(id).op.trim_end_matches('=').to_string();
+        let op = if self.source.node(id).kind == "Unary" {
+            "~unary".to_string()
+        } else {
+            self.source.node(id).op.trim_end_matches('=').to_string()
+        };
+        let shown = display_op(&op);
         let shape = match self.struct_shape(&typ, "", 0, id, &op) {
             Ok(shape) => shape,
             Err(reason) => {
                 return Ok(Some(self.error_token(
                     id,
-                    &format!("Cannot apply '{op}' to struct: {reason}."),
+                    &format!("Cannot apply '{shown}' to struct: {reason}."),
                 )))
             }
         };
@@ -489,7 +696,11 @@ impl Lower<'_, '_> {
                 .map(Some);
         }
         let left = self.struct_operand(a, &hint, constant)?;
-        let right = self.struct_operand(b, &hint, constant)?;
+        let right = if is_unary {
+            Code::concat([])
+        } else {
+            self.struct_operand(b, &hint, constant)?
+        };
         if constant {
             let name = format!(
                 "{}struct_constant_{}_{}",
@@ -507,12 +718,18 @@ impl Lower<'_, '_> {
                 ),
             );
             let type_of = self.native("type_of");
+            let power = if op == "**" {
+                self.module("numeric")
+            } else {
+                String::new()
+            };
             let value = Self::struct_value(
                 &shape,
                 &format!("{name}_a"),
                 &format!("{name}_b"),
                 &op,
                 &type_of,
+                &power,
                 true,
                 &mut String::new(),
                 &mut 0,
@@ -521,13 +738,19 @@ impl Lower<'_, '_> {
                 .error_token(b, "Struct arithmetic requires operands of the same type.")
                 .finish()
                 .text;
-            let value =
-                format!("({value} when {type_of}({name}_a)=={type_of}({name}_b) else {mismatch})");
+            let value = if is_unary {
+                value
+            } else {
+                format!("({value} when {type_of}({name}_a)=={type_of}({name}_b) else {mismatch})")
+            };
             let code = Code::concat([
                 self.g(format!("\n{name}_a :: "), a),
                 left,
-                self.g(format!("\n{name}_b :: "), b),
-                right,
+                if is_unary {
+                    Code::concat([])
+                } else {
+                    Code::concat([self.g(format!("\n{name}_b :: "), b), right])
+                },
                 self.g(format!("\n{name} :: {value}\n"), id),
             ]);
             self.helpers.insert(key, code);
@@ -537,8 +760,11 @@ impl Lower<'_, '_> {
         Ok(Some(Code::concat([
             self.g(format!("{helper}("), id),
             left,
-            self.g(",", id),
-            right,
+            if is_unary {
+                Code::concat([])
+            } else {
+                Code::concat([self.g(",", id), right])
+            },
             self.g(")", id),
         ])))
     }

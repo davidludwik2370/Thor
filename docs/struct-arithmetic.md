@@ -1,7 +1,15 @@
 # Struct arithmetic
 
-Thor supports binary `+`, `-`, `*`, `/` and compound `+=`, `-=`, `*=`, `/=`
-for two values of the same struct type. Each operation applies independently to
+Thor supports these field-wise operators for two values of the same struct type:
+
+| Operation | Operators | Compound assignments |
+| --- | --- | --- |
+| Arithmetic | `+`, `-`, `*`, `/` | `+=`, `-=`, `*=`, `/=` |
+| Bitwise | `&`, `|`, `~` (XOR), `&~` (AND NOT) | `&=`, `|=`, `~=`, `&~=` |
+| Shifts | `<<`, `>>` | `<<=`, `>>=` |
+| Power | `**` | `**=` |
+
+Unary `~value` complements each named field. Each operation applies independently to
 the corresponding fields and preserves the struct's type.
 
 ```odin
@@ -20,9 +28,29 @@ same type are allowed. There is no scalar broadcast to all struct fields.
 All fields must be self-contained fixed-size values supporting the requested
 operation. Native arithmetic values, fixed arrays, and nested eligible structs
 are supported. Fixed arrays of eligible structs recurse element by element;
-native numeric arrays, matrices, complex numbers, quaternions and bit sets retain their
+native numeric arrays, SIMD vectors, matrices, complex numbers, quaternions and bit sets retain their
 existing arithmetic semantics. Each field result must fit the original field
-type. Overflow, division, and representability rules remain Odin's.
+type. Overflow, division, bitwise, and representability rules remain Odin's.
+Shifts require unsigned count fields, just like native Odin; with the same-type
+operand rule, use unsigned integer fields for struct shifts. Fixed-array fields
+pair their elements for shifts and power, including nested and enum-indexed arrays. Generic enum-indexed operations can
+also be evaluated explicitly through `fn`/`#run`.
+
+Power follows Thor's scalar `**` rules: integer and floating-point fields are
+supported, matching field types are required, integer exponents must be
+nonnegative, and floating-point exponents may be fractional or negative.
+Integer runtime overflow follows the scalar power implementation. Booleans and
+bit sets support their native bitwise operations; they do not gain power or
+arithmetic operators that their scalar types lack.
+
+```odin
+Bits :: struct {a, b: uint}
+masked := Bits{12, 10} & {10, 6} // Bits{8, 2}
+shifted := masked << {1, 2}      // Bits{16, 8}
+inverted := ~masked
+powered := Bits{2, 3} ** {5, 4}  // Bits{32, 81}
+powered **= {2, 1}              // Bits{1024, 81}
+```
 
 Pointers, strings, slices, dynamic arrays, fixed-capacity dynamic arrays, maps,
 `set[T]` values, unions, procedure values, `any`, `Integer`, and `Rational` are excluded,
@@ -62,7 +90,9 @@ AUTO :: grow(BASE)
 EXPLICIT :: #run grow(BASE)
 ```
 
-Constant arithmetic emits native constant struct expressions. Pure functions,
+Constant bitwise and arithmetic operations emit native constant struct expressions.
+Compile-time power uses the existing compile-time evaluation path and
+materializes a native constant of the original struct type. Pure functions,
 explicit `#run`, generic procedures and generic records support the same value
 restrictions. TLS retains the original expressions for hover, completion,
 semantic tokens, rename and source diagnostics. Field completion in untyped
@@ -73,14 +103,15 @@ Run the [standalone example](../examples/struct_arithmetic/demo.thor) with
 a `struct_arithmetic` section.
 
 The differential and live TLS regressions are in
-`tests/test_struct_arithmetic.py`, `tests/test_struct_padding.py` and
-`tests/test_struct_arithmetic_tls.py`.
+`tests/test_struct_arithmetic.py`, `tests/test_struct_padding.py`,
+`tests/test_struct_bitwise_power.py`, and `tests/test_struct_arithmetic_tls.py`.
 After building the release compiler, run them with:
 
 ```sh
-THOR_TEST_PREBUILT=1 python3 -m unittest tests.test_struct_arithmetic tests.test_struct_padding tests.test_struct_arithmetic_tls
+THOR_TEST_PREBUILT=1 python3 -m unittest tests.test_struct_arithmetic tests.test_struct_padding tests.test_struct_bitwise_power tests.test_struct_arithmetic_tls
 ```
 
 Runtime cases run both checked and with `-o:speed -disable-assert
 -no-bounds-check -no-type-assert`. An LLVM comparison also verifies that optimized
-numeric field arithmetic matches the handwritten equivalent without helper calls.
+field operators match the handwritten equivalent, including generic bitwise
+operations, shifts and power.

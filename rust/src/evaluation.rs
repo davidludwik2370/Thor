@@ -413,6 +413,9 @@ pub(crate) fn request_roots(source: &crate::ast::Source, expression: Ref, mode: 
         roots
     } else {
         let mut roots = vec![expression];
+        if source.node(expression.node).kind=="Binary" && source.node(expression.node).op=="**" {
+            if let Some(node)=source.value_annotation(expression.node) {roots.push(Ref{node,..expression});}
+        }
         if source.node(expression.node).kind == "Comprehension" {
             if let Some(node) = source.comprehension_annotation(expression.node) {
                 roots.push(Ref { node, ..expression });

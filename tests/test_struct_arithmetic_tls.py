@@ -139,5 +139,58 @@ main::proc(){}
         start=self.position(text,'expand_values(value)',0)
         self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+len('expand_values(value)')}})
 
+    def test_extended_operators_keep_context_hover_completion_and_readonly(self):
+        text='''package main
+Bits::struct{alpha,beta:uint}
+power::fn(a,b:$T)->T{return a**b}
+COMPILED::#run power(Bits{2,3},Bits{3,2})
+COERCED:Bits: {2,3}**{3,2}
+main::proc(){
+    x:=Bits{2,3}
+    masked:>x|{alpha=1,beta=2}
+    shifted:>{alpha=2,beta=4}<<x
+    inverted:>~x
+    powered:>x**{alpha=3,beta=2}
+    x**={alpha=2,beta=3}
+    _=masked.alpha;_=shifted.beta;_=inverted.alpha;_=powered.beta;_=COMPILED.alpha;_=COERCED.beta
+    _=x&{}
+    _={}<<x
+    _=x**{}
+    x**={}
+}
+'''
+        client,path=self.open(text)
+        client.diagnostic(path.as_uri(),empty=True)
+        for fragment in ('masked.alpha','shifted.beta','inverted.alpha','powered.beta','COMPILED.alpha','COERCED.beta'):
+            self.assertIn('Bits',json.dumps(self.hover(client,path,text,fragment)))
+        for fragment,offset in (('x&{}',3),('{}<<x',1),('x**{}',4),('x**={}',5)):
+            completed=client.request('textDocument/completion',{'textDocument':{'uri':path.as_uri()},
+                'position':self.position(text,fragment,offset),'context':{'triggerKind':1}})
+            self.assertIn('alpha',json.dumps(completed))
+            self.assertIn('beta',json.dumps(completed))
+        self.assert_original_identifier_tokens(path,text,self.semantic_spans(client,path,text))
+
+    def test_extended_operator_diagnostics_and_editing_recovery(self):
+        for expression,body in [('~x','_=~x'),('x**x','_=x**x'),('x|x','_=x|x'),('x<<x','_=x<<x'),('x**={}','x**={}')]:
+            text='// 😀 original spans\npackage main\nBad::struct{_:int,data:[]int}\nmain::proc(){x:=Bad{};'+body+'}\n'
+            client,path=self.open(text)
+            errors=client.diagnostic(path.as_uri(),contains='self-contained fixed-size')
+            start=self.position(text,expression,0)
+            self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+len(expression)}})
+            self.assertNotIn('__thor_',json.dumps(errors))
+            changed=text.replace('data:[]int','data:uint')
+            client.notifications.clear()
+            client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+            client.diagnostic(path.as_uri(),empty=True)
+
+    def test_generic_complement_and_power_errors_use_original_operator(self):
+        for expression in ('~a','a**b'):
+            text='package main\nBad::struct{_:int,data:[]int}\ncalc::proc(a,b:$T)->T{return '+expression+'}\nmain::proc(){x:=Bad{};_=calc(x,x)}\n'
+            client,path=self.open(text)
+            errors=client.diagnostic(path.as_uri(),contains='Cannot apply')
+            start=self.position(text,expression,0)
+            self.assertEqual(errors[0]['range'],{'start':start,'end':{**start,'character':start['character']+len(expression)}})
+            self.assertNotIn('__thor_',json.dumps(errors))
+
 
 if __name__=='__main__':unittest.main()

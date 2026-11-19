@@ -2063,6 +2063,13 @@ struct_arithmetic :: proc() {
     point += {3, 4}
     point *= {2, 3}
     if (BASE != Point{4, 6} || point != Point{8, 18}) { panic("struct arithmetic") }
+    Bits :: struct {a, b: uint}
+    POWERS :: Bits{2, 3} ** {3, 2}
+    bits := Bits{12, 10} & {10, 6}
+    bits <<= {1, 2}
+    bits **= {2, 3}
+    inverse :> ~bits
+    if (POWERS != Bits{8, 9} || bits != Bits{256, 512} || inverse.a != ~uint(256)) { panic("struct bitwise/power") }
 }
 
 main :: proc() {

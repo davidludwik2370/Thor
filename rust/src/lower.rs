@@ -1194,6 +1194,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         if self.source.thor && !native_type_operand {
+            if kind == "Assignment" && node.op == "**=" {
+                return self.power_assignment(id);
+            }
             if let Some(code) = self.temporary_expression(id, constant)? { return Ok(code); }
         }
         if !native_type_operand && matches!(kind.as_str(), "Declaration" | "Assignment" | "Return") {
@@ -2075,6 +2078,42 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.g(if op == "not_in" { ")))" } else { "))" }, id),
         ])
         .expansion(&self.source.path, self.source.node(id).span))
+    }
+    fn power_assignment(&mut self, id: NodeId) -> Result<Code> {
+        let lhs = self.source.group(id, "lhs").to_vec();
+        let rhs = self.source.group(id, "rhs").to_vec();
+        if lhs.len() != 1 || rhs.len() != 1 {
+            return Ok(self.error_token(
+                id,
+                "Power assignment requires one destination and one exponent.",
+            ));
+        }
+        self.big_statement(id, |this| {
+            let mut code = vec![];
+            let targets = this.big_capture_targets(id, &lhs, &mut code)?;
+            let target = &targets[0];
+            let right = format!(
+                "{}power_rhs_{}",
+                this.prefix,
+                this.source.node(id).span.start
+            );
+            let type_of = this.native("type_of");
+            let hint = Hint {
+                code: this.g(format!("{type_of}({target})"), id),
+                semantic: Some(this.typ(lhs[0])),
+                constant_literal: false,
+                element_only: false,
+                plain_array: false,
+            };
+            let value = this.render(rhs[0], Some(hint), false)?;
+            let module = this.module("numeric");
+            code.extend([
+                this.g(format!("{right}:{type_of}({target})="), rhs[0]),
+                value,
+                this.g(format!("\n{target}={module}.power({target},{right})\n"), id),
+            ]);
+            Ok(Code::concat(code))
+        })
     }
     fn power(&mut self, id: NodeId, constant: bool) -> Result<Code> {
         let left = self.role(id, "left")?;

@@ -791,6 +791,12 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			} else if t.ch == '*' {
 				advance_rune(t)
 				kind = .Mul_Mul
+				// Reuse the native assignment AST kind; preserve the full text so
+				// Thor lowers **= without changing Odin's token or AST ABI.
+				if t.thor && t.ch == '=' {
+					advance_rune(t)
+					kind = .Mul_Eq
+				}
 			}
 		case '=':
 			kind = .Eq

@@ -92,8 +92,13 @@ class Evaluator:
     @staticmethod
     def power(n):
         if not (n.source.thor and n.kind=='Binary' and n.data['op']=='**'):return False
+        from .structmath import value_annotation
+        if value_annotation(n) is None and all(n.source.resolver.type_of(n.role(side)).kind in {'unknown','generic'} for side in ('left','right')) and any(child.kind=='Compound' and not child.role('type') for child in descendants(n)):
+            return False
         big=n.source.big
-        if big.enabled:
+        annotation=value_annotation(n)
+        record=any(n.source.resolver.type_of(n.role(side)).kind=='struct' for side in ('left','right')) or bool(annotation and n.source.resolver.type_node(annotation).kind=='struct')
+        if big.enabled and not record:
             if big.ops.handles(n):return False
             for ancestor in n.ancestors():
                 if ancestor.kind=='Call' and big.constructor(ancestor):return False
@@ -256,7 +261,14 @@ class Evaluator:
             if self.scalar_witnesses[call]=='expression':return f'type_of({code})'
             meta=source.prefix+'meta'
             return f'{meta}.type_proc_return_type(type_of({meta}.procedure_of({code})),0)'
-        if self.power(call):return call.source.expressions.power_type(call)
+        from .structmath import value_annotation
+        context=value_annotation(call) if self.power(call) else None
+        if self.power(call) and self.r.type_of(call).kind!='struct' and not (context and self.r.type_node(context).kind=='struct'):return call.source.expressions.power_type(call)
+        if self.power(call):
+            saved=call.source.run_values.pop(call,None)
+            try:return f'type_of({call.source._render(call)})'
+            finally:
+                if saved is not None:call.source.run_values[call]=saved
         if call.source.expressions.extrema.plan(call):return call.source.expressions.extrema.result_type(call)
         constructor=call.source.big.constructor(call)
         if constructor:return call.source.big.type_hint(constructor.kind).expression
@@ -844,6 +856,10 @@ class Evaluator:
         error_site=n.parent if n.parent and n.parent.kind=='Run' else n
         label='#run' if error_site.kind=='Run' else 'Compile-time'
         roots=[n] if condition_case is None else list(extra)
+        if self.power(n):
+            from .structmath import value_annotation
+            annotation=value_annotation(n)
+            if annotation:roots.append(annotation)
         if n.kind=='Comprehension':
             declaration=next((a for a in n.ancestors() if a.kind in {'Declaration','Procedure'}),None)
             if declaration and declaration.kind=='Declaration' and declaration.role('type'):roots.append(declaration.role('type'))

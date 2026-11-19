@@ -4429,7 +4429,11 @@ resolve_binary_expression :: proc(ast_context: ^AstContext, binary: ^ast.Binary_
 		}
 		return symbol_a, true
 	case .Shl, .Shr:
-		return resolve_type_expression(ast_context, binary.left)
+		// Scalar shifts keep the left type. Thor contextual struct literals
+		// can instead receive their type from the right operand.
+		if symbol, ok := resolve_type_expression(ast_context, binary.left); ok {
+			return symbol, true
+		}
 	}
 
 	if expr, ok := binary.left.derived.(^ast.Binary_Expr); ok {

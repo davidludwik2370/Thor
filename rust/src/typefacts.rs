@@ -406,7 +406,7 @@ impl Resolver<'_> {
                     self.specialize(Ref { node, ..r }, bindings, &mut seen.clone())
                 })
             }
-            "Binary" if s.thor && matches!(n.op.as_str(),"+"|"-"|"*"|"/") => {
+            "Binary" if s.thor && matches!(n.op.as_str(),"+"|"-"|"*"|"/"|"&"|"|"|"~"|"&~"|"<<"|">>"|"**") => {
                 let a=subtype("left");let b=subtype("right");
                 if a.record_like() {a} else if b.record_like() {b} else {self.type_of(r)}
             }

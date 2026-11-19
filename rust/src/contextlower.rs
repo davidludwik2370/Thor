@@ -104,7 +104,7 @@ impl Lower<'_, '_> {
         self.modules.insert(alias.clone(), path);
         Some(format!("{alias}."))
     }
-    fn context_type(&mut self, typ: &Type) -> Option<String> {
+    pub(super) fn context_type(&mut self, typ: &Type) -> Option<String> {
         Some(match typ {
             Type::BigInteger | Type::BigRational => format!("{}.{}",self.module("big"),typ.big_name()?),
             Type::Scalar { name, .. } | Type::String { name, .. } => self.native(name),

@@ -3,9 +3,11 @@ package main
 import "core:fmt"
 
 Pair :: struct {a, b: int}
+Bits :: struct {a, b: uint}
 Batch :: struct {pairs: [2]Pair}
 Padded :: struct {_: [3]byte, value: int, _: bool}
 
+POWERS :: Bits{2, 3} ** {5, 4}
 BASE :: Pair{1, 2} + {3, 4}
 grow :: fn(value: Pair) -> Pair { return value + {1, 2} }
 AUTO :: grow(BASE)
@@ -26,6 +28,14 @@ main :: proc() {
     padded := Padded{value=6}
     padded /= {value=2}
     if padded.value != 3 { panic("ignored padding") }
+
+    bits := Bits{12, 10}
+    bits &= {10, 6}             // {8, 2}
+    bits <<= {1, 2}             // {16, 8}; counts follow Odin's unsigned rule.
+    bits **= {2, 3}             // {256, 512}
+    complement :> ~bits
+    if (bits != Bits{256, 512} || complement.a != ~uint(256)) { panic("struct bits") }
+    if (POWERS != Bits{32, 81}) { panic("constant struct power") }
 
     // These are intentionally invalid:
     // Other :: struct {a, b: int}
