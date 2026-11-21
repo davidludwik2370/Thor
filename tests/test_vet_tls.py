@@ -81,6 +81,41 @@ class VetTLSTests(unittest.TestCase):
         self.assertEqual(actions,[])
         self.assertEqual(path.read_text(),text)
 
+    def test_inline_fixed_array_copy_gets_a_quick_fix_with_map_output_parameters(self):
+        text='''package main
+Hand::[dynamic;2]int
+Results::map[int]int
+make_hand::proc()->(hand:Hand){append(&hand,7);return}
+record::proc(out:^Results,deal:[]Hand){
+    for i in 0..<len(deal){
+        hand := deal[i]
+        out[i]=hand[0]
+    }
+}
+main::proc(){
+    deal:>[1]Hand{make_hand()}
+    results:=make(Results);defer delete(results)
+    record(&results,deal[:])
+}
+'''
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable')
+        self.assertEqual(len(errors),1,errors)
+        self.assertEqual(errors[0]['range']['start'],self.position(text,'hand :=',0))
+        actions=self.actions(client,path,text,'hand :=')
+        action=next(action for action in actions if action['title']=='Make declaration immutable')
+        edits=action['edit']['changes'][path.as_uri()]
+        self.assertEqual(len(edits),1)
+        self.assertEqual(edits[0]['newText'],'>')
+        changed=text.replace('hand := deal[i]','hand := deal[i]\n        hand[0]+=1')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{
+            'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        actions=self.actions(client,path,changed,'hand :=')
+        self.assertEqual(actions,[])
+        self.assertEqual(path.read_text(),text)
+
     def test_unused_bindings_have_warning_ranges_and_no_automatic_removal(self):
         text = ('// 😀 header\npackage main\n'
                 'helper::fn(parameter:int)->int{return 1}\n'

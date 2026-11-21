@@ -7,7 +7,7 @@ use crate::{
 };
 use serde_json::{json, Value};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -151,6 +151,29 @@ fn owned(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -> b
         _ => false,
     }
 }
+// These values contain their storage inline. Freezing an independent copy does
+// not change another value's write privileges or an output-parameter contract.
+// Slice/using/type-switch projections still require the alias guards; taking
+// the address excludes the declaration from immutable advice entirely.
+// Keep this separate from `possible`: fixed-capacity arrays are not pure fn
+// inputs, but their ordinary value copies can be immutable.
+fn inline_value(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>) -> bool {
+    if let Some(value) = known.get(typ) { return *value; }
+    known.insert(typ.clone(), false);
+    crate::profile::count("vet.inline_types_scanned", 1);
+    let value = match typ {
+        Type::Nominal(_, base) | Type::Array { elem: base, .. } | Type::Fixed { elem: base, .. } =>
+            inline_value(base, resolver, known),
+        Type::Struct(owner) | Type::Record(owner, _) if resolver.sources[owner.file].node(owner.node).op == "raw_union" => false,
+        Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)
+            .iter().all(|(_, typ)| inline_value(typ, resolver, known)),
+        Type::Union(..) => resolver.union_variants(typ)
+            .iter().all(|typ| inline_value(typ, resolver, known)),
+        _ => !owned(typ, resolver, &mut HashSet::new()) && possible(typ, resolver, &mut HashSet::new()),
+    };
+    known.insert(typ.clone(), value);
+    value
+}
 fn field_types(resolver: &mut Resolver<'_>, signature: Ref, role: &str) -> Vec<Type> {
     let source = &resolver.sources[signature.file];
     let fields = source
@@ -287,14 +310,30 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
     crate::lower::prime_logical_constants(&mut resolver);
     let mut result = vec![];
     let mut portable = PortableBodies::default();
+    let mut inline_types = HashMap::new();
     for (file, source) in project.sources.iter().enumerate() {
         if !source.thor || source.excluded || !source.path.starts_with(root) {
             continue;
         }
         let mut written = BTreeSet::new();
         let mut mutated = BTreeSet::new();
+        let mut viewed = BTreeSet::new();
         for (i, node) in source.nodes.iter().enumerate() {
             let id = NodeId(i);
+            if matches!(node.kind.as_str(), "Slice" | "TypeSwitch") {
+                if let Some(declaration) = source.role(id, "expr")
+                    .and_then(|node| binding(&resolver, Ref {file, node})) {
+                    viewed.insert(declaration);
+                }
+            } else if node.kind == "Using" {
+                for node in source.group(id, "values") {
+                    if let Some(declaration) = binding(&resolver, Ref {file, node:*node}) {
+                        viewed.insert(declaration);
+                    }
+                }
+            } else if node.kind == "Declaration" && node.data["using_field"] == true {
+                viewed.insert(Ref {file, node:id});
+            }
             let targets = if node.kind == "Assignment" && node.op != "in" {
                 source.group(id, "lhs").to_vec()
             } else if node.kind == "IncDec"
@@ -362,14 +401,15 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
             {
                 let owner = source.ancestors(id).find(|owner| source.node(*owner).kind == "Procedure").unwrap();
                 let types = names.iter().map(|name| resolver.type_of(Ref {file,node:*name})).collect::<Vec<_>>();
-                if types.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
-                    || !possible(typ, &mut resolver, &mut HashSet::new())) {
+                let inline = types.iter().all(|typ| inline_value(typ, &mut resolver, &mut inline_types));
+                let aliases_storage = !inline || viewed.contains(&at);
+                if aliases_storage {
                     let owner = Ref {file,node:owner};
                     if !portable.check(&mut resolver, owner, true) { continue; }
                 }
                 // Returning a readonly alias changes an API used by callers
                 // outside this entry point. Keep that ownership choice explicit.
-                if types.iter().any(|typ| resolver.frozen_slice_storage(typ)) {
+                if aliases_storage && types.iter().any(|typ| resolver.frozen_slice_storage(typ)) {
                     let signature = source.role(owner, "type").unwrap_or(owner);
                     let outputs = field_types(&mut resolver, Ref {file,node:signature}, "results");
                     if outputs.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
@@ -385,11 +425,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                     .any(|owner| !crate::specialization::parameters(Ref {file,node:owner}, &resolver).is_empty());
                 // A check of this entry point cannot establish write access for
                 // every future specialization of a shared generic body.
-                let independent = !generic_local || names.iter().all(|name| {
-                    let typ = resolver.type_of(Ref {file,node:*name});
-                    !owned(&typ, &mut resolver, &mut HashSet::new())
-                        && possible(&typ, &mut resolver, &mut HashSet::new())
-                });
+                let independent = !generic_local || inline;
                 if let Some(span) = node
                     .spans
                     .get("separator")

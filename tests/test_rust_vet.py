@@ -64,6 +64,131 @@ blocked::proc(x:int)->int{return cycle_a(x)}
         self.assertEqual(counters.get('vet.contract_calls_skipped'),1,counters)
         self.assertEqual(counters.get('vet.validation_checks'),1,counters)
 
+    def test_inline_index_copies_are_immutable_despite_unrelated_output_parameters(self):
+        for typ, initial, read in [
+            ('Hand', 'first', 'hand[0].num'),
+            ('Hand_Alias', 'first', 'hand[0].num'),
+            ('[2]Card', '[2]Card{first[0],first[1]}', 'hand[0].num'),
+            ('[2]Hand', '[2]Hand{first,first}', 'hand[1][0].num'),
+            ('Box(Hand)', 'Box(Hand){first}', 'hand.payload[0].num'),
+        ]:
+            with self.subTest(typ=typ):
+                text='''package main
+CHANGE::#config(CHANGE,false)
+Suit::enum{club,heart}
+Card::struct{num:int,suit:Suit}
+Hand::[dynamic;2]Card
+Hand_Alias::Hand
+Box::struct($T:typeid){payload:T}
+Results::map[int]int
+make_hand::proc()->(hand:Hand){append(&hand,Card{7,.club});append(&hand,Card{8,.heart});return}
+record::proc(out:^Results,deal:[]TYPE,extra:$T){
+    _=extra
+    when CHANGE {out[99]=99}
+    for i in 0..<len(deal) {
+        hand := deal[i]
+        out[i]=READ
+    }
+}
+main::proc(){
+    first:>make_hand()
+    deal:=[1]TYPE{INITIAL}
+    results:=make(Results);defer delete(results)
+    record(&results,deal[:],1)
+    record(&results,deal[:],"another specialization")
+    if results[0]!=7{panic("copied hand")}
+}
+'''.replace('TYPE',typ).replace('INITIAL',initial).replace('READ',read)
+                self.write(text)
+                errors=self.findings('--vet=immutable')
+                self.assertEqual([error['msgs'][0] for error in errors],
+                    ["Declare 'hand' immutable with ':>'."])
+                self.assertEqual(self.source.read_text(),text)
+                self.invoke('--vet=immutable','--apply')
+                self.assertIn('hand :> deal[i]',self.source.read_text())
+                remaining=self.findings('--vet=immutable')
+                self.assertEqual(remaining,[])
+                for flags in [[],[*native.UNCHECKED,'-define:CHANGE=true']]:
+                    self.invoke(*flags,command='run')
+
+    def test_inline_views_and_reference_elements_keep_escape_guards(self):
+        for typ, initializer, projection in [
+            ('[2]int','[2]int{7,8}','values[:]'),
+            ('Hand','make_hand()','values[:]'),
+            ('Box(Hand)','Box(Hand){make_hand()}','values.payload[:]'),
+            ('Box([]int)','Box([]int){[]int{7,8}}','values.payload'),
+        ]:
+            with self.subTest(typ=typ):
+                self.write('''package main
+Hand::[dynamic;2]int
+Box::struct($T:typeid){payload:T}
+Row::struct{items:[]int}
+make_hand::proc()->(hand:Hand){append(&hand,7);append(&hand,8);return}
+store::proc(out:^Row){defer out.items=nil;values:=INITIAL;out.items=PROJECTION}
+main::proc(){}
+'''.replace('INITIAL',initializer).replace('PROJECTION',projection))
+                findings=self.findings('--vet=immutable')
+                self.assertEqual(findings,[])
+                self.invoke('--vet=immutable','--apply')
+                self.assertIn('values:=',self.source.read_text())
+
+        for body in [
+            'values:=Box(Hand){make_hand()};using values;out.items=payload[:]',
+            'using values:=Box(Hand){make_hand()};out.items=payload[:]',
+            'values:=Choice(make_hand());switch &item in values{case Hand:out.items=item[:];case int:out.items=nil}',
+        ]:
+            with self.subTest(projection=body):
+                self.write('''package main
+Hand::[dynamic;2]int
+Box::struct($T:typeid){payload:T}
+Choice::union{Hand,int}
+Row::struct{items:[]int}
+make_hand::proc()->(hand:Hand){append(&hand,7);return}
+store::proc(out:^Row){defer out.items=nil;BODY}
+main::proc(){}
+'''.replace('BODY',body))
+                findings=self.findings('--vet=immutable')
+                self.assertEqual(findings,[])
+                self.invoke('--vet=immutable','--apply')
+                self.assertIn('values:=',self.source.read_text())
+
+        self.write('''package main
+CHANGE::#config(CHANGE,false)
+Hand::[dynamic;2]int
+Results::map[int]int
+make_hand::proc()->(hand:Hand){append(&hand,7);return}
+write::proc(values:[]int){when CHANGE{values[0]=9}}
+record::proc(out:^Results){hand:=make_hand();write(hand[:]);out[0]=hand[0]}
+main::proc(){
+    results:=make(Results);defer delete(results)
+    record(&results)
+    expected:>9 when CHANGE else 7
+    if results[0]!=expected{panic("conditional view write")}
+}
+''')
+        findings=self.findings('--vet=immutable')
+        self.assertEqual(findings,[])
+        self.invoke('--vet=immutable','--apply')
+        self.assertIn('hand:=make_hand()',self.source.read_text())
+        self.invoke(command='run')
+        self.invoke(*native.UNCHECKED,'-define:CHANGE=true',command='run')
+
+    def test_inline_value_classification_is_shared_across_large_batches(self):
+        declarations='\n'.join(f'hand_{i}:=deal[0];out[{i}]=hand_{i}[0]' for i in range(80))
+        self.write('package main\nHand::[dynamic;2]int\nResults::map[int]int\n'
+            'record::proc(out:^Results,deal:[]Hand){\n'+declarations+'\n}\nmain::proc(){}\n')
+        profile=self.root/'profile.json'
+        result=subprocess.run([str(native.RUST),'vet',str(self.app),'--vet=immutable',
+            '-json-errors','--output-dir',str(self.output)],cwd=self.root,
+            env={**os.environ,'THOR_PROFILE':str(profile)},capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(len(json.loads(result.stderr)['errors']),80)
+        counters=json.loads(profile.read_text())['counters']
+        self.assertLessEqual(counters.get('vet.inline_types_scanned',0),3,counters)
+        self.assertGreater(counters.get('vet.inline_types_scanned',0),0,counters)
+        self.assertEqual(counters.get('vet.portability_body_scans',0),0,counters)
+        self.assertEqual(counters.get('vet.validation_checks'),1,counters)
+
     def test_fix_payload_matches_reference_byte_offsets_and_hash(self):
         text='// 😀\npackage main\nget::proc(x:int)->int{return x+1}\nmain::proc(){x/*comment*/:=get(1);if x!=2{panic("result")}}\n'
         self.write(text)

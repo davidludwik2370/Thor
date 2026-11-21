@@ -81,3 +81,25 @@ that additional performance issue.
 
 The full-test slowdown is subsequently resolved in Thor/TLS 0.41.6; see the
 [test-command performance report](test-performance-2026-11-08.md).
+
+## Inline-copy precision follow-up, 2026-11-21
+
+Immutable advice distinguishes self-contained value copies from shared storage.
+For example, `hand := deal[i]` copies a fixed-capacity hand and can become `:>`
+even in a procedure with an unrelated map output parameter. Fixed arrays,
+fixed-capacity arrays and records containing them share this rule, including
+aliases and concrete locals in generic procedures. This does not change `fn`
+eligibility or the language's mutability rules.
+
+Slice, `using` and type-switch projections retain the conservative alias/escape
+guards; taking a local's address still excludes it. Type classification is
+cached per analysis, and large independent batches still use one compiler
+validation. Native vet and live TLS tests cover warnings, application, unsaved
+mutation, preserved escape restrictions, and checked/unchecked execution.
+
+Validation passed 45 native vet/TLS tests, 98 Rust unit tests and seven assertion
+hygiene tests. The real `poker_pmap` project builds and passes all 213 tests in
+both checked and unchecked configurations with only the indexed-hand declaration
+made readonly through a temporary overlay. Original project sources are
+unchanged. Its immutable-vet pass validates the corrections in one compiler
+check; the 80-copy regression also verifies bounded, shared type classification.
