@@ -101,13 +101,15 @@ main::proc(){
 '''.replace('TYPE',typ).replace('INITIAL',initial).replace('READ',read)
                 self.write(text)
                 errors=self.findings('--vet=immutable')
-                self.assertEqual([error['msgs'][0] for error in errors],
-                    ["Declare 'hand' immutable with ':>'."])
+                hand=[error for error in errors if error['msgs'][0]=="Declare 'hand' immutable with ':>'."]
+                self.assertEqual(len(hand),1,errors)
+                self.assertIn('fix',hand[0])
+                self.assertTrue(all(error.get('manual_review') for error in errors if error not in hand),errors)
                 self.assertEqual(self.source.read_text(),text)
                 self.invoke('--vet=immutable','--apply')
                 self.assertIn('hand :> deal[i]',self.source.read_text())
                 remaining=self.findings('--vet=immutable')
-                self.assertEqual(remaining,[])
+                self.assertTrue(all(error.get('manual_review') for error in remaining),remaining)
                 for flags in [[],[*native.UNCHECKED,'-define:CHANGE=true']]:
                     self.invoke(*flags,command='run')
 
@@ -128,7 +130,7 @@ store::proc(out:^Row){defer out.items=nil;values:=INITIAL;out.items=PROJECTION}
 main::proc(){}
 '''.replace('INITIAL',initializer).replace('PROJECTION',projection))
                 findings=self.findings('--vet=immutable')
-                self.assertEqual(findings,[])
+                self.assertTrue(all(error.get('manual_review') and 'fix' not in error for error in findings),findings)
                 self.invoke('--vet=immutable','--apply')
                 self.assertIn('values:=',self.source.read_text())
 
@@ -148,7 +150,7 @@ store::proc(out:^Row){defer out.items=nil;BODY}
 main::proc(){}
 '''.replace('BODY',body))
                 findings=self.findings('--vet=immutable')
-                self.assertEqual(findings,[])
+                self.assertTrue(all(error.get('manual_review') and 'fix' not in error for error in findings),findings)
                 self.invoke('--vet=immutable','--apply')
                 self.assertIn('values:=',self.source.read_text())
 
@@ -167,7 +169,9 @@ main::proc(){
 }
 ''')
         findings=self.findings('--vet=immutable')
-        self.assertEqual(findings,[])
+        self.assertEqual(len(findings),1,findings)
+        self.assertTrue(findings[0].get('manual_review'))
+        self.assertNotIn('fix',findings[0])
         self.invoke('--vet=immutable','--apply')
         self.assertIn('hand:=make_hand()',self.source.read_text())
         self.invoke(command='run')
@@ -188,6 +192,7 @@ main::proc(){
         self.assertGreater(counters.get('vet.inline_types_scanned',0),0,counters)
         self.assertEqual(counters.get('vet.portability_body_scans',0),0,counters)
         self.assertEqual(counters.get('vet.validation_checks'),1,counters)
+        self.assertEqual(counters.get('vet.source_snapshots'),1,counters)
 
     def test_fix_payload_matches_reference_byte_offsets_and_hash(self):
         text='// 😀\npackage main\nget::proc(x:int)->int{return x+1}\nmain::proc(){x/*comment*/:=get(1);if x!=2{panic("result")}}\n'

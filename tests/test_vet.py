@@ -140,7 +140,10 @@ main::proc(){
                 text+=f'store::proc(out:{signature}){{items:=[x+7 for x in 0..<1];{store}}}\n'
                 text+='main::proc(){'+body+';if row.items[0]!=7{panic("output")}}\n'
                 self.write(text)
-                self.assertEqual(self.findings('--vet=immutable'),[])
+                findings=self.findings('--vet=immutable')
+                self.assertEqual(len(findings),1,findings)
+                self.assertTrue(findings[0].get('manual_review'))
+                self.assertNotIn('fix',findings[0])
                 self.invoke('--vet=immutable','--apply')
                 self.assertIn('items:=',self.source.read_text())
                 self.invoke(command='run')
@@ -221,7 +224,8 @@ main::proc(){
 }
 '''.replace('ACTION',action))
                 findings=self.findings('--vet=immutable')
-                self.assertEqual(findings,[])
+                self.assertEqual(bool(findings),not helper.startswith('SHARED'),findings)
+                self.assertTrue(all(error.get('manual_review') and 'fix' not in error for error in findings),findings)
                 self.invoke('--vet=immutable','--apply')
                 self.assertIn('values:=',self.source.read_text())
                 self.invoke('-define:CHANGE=true',command='run')
@@ -237,7 +241,8 @@ main::proc(){
 }
 ''')
         findings=self.findings('--vet=immutable')
-        self.assertEqual(findings,[])
+        self.assertTrue(findings,findings)
+        self.assertTrue(all(error.get('manual_review') and 'fix' not in error for error in findings),findings)
         self.invoke('--vet=immutable','--apply')
         self.assertIn('people:=',self.source.read_text())
         self.invoke('-define:CHANGE=true',command='run')

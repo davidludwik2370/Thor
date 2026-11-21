@@ -370,7 +370,7 @@ impl<'a, 'r> Lower<'a, 'r> {
     pub fn apply_privileges<'f>(
         &mut self,
         facts: &'f crate::privileges::Facts,
-    ) -> Vec<(String, &'f crate::privileges::Issue)> {
+    ) -> Vec<(String, Vec<&'f crate::privileges::Issue>)> {
         self.mutating_params.extend(
             facts
                 .mutating
@@ -379,12 +379,18 @@ impl<'a, 'r> Lower<'a, 'r> {
                 .map(|r| r.node),
         );
         let mut sites = Vec::new();
-        for (reference, issue) in &facts.issues {
+        for (reference, issues) in &facts.issues {
+            let Some(issue) = issues.first() else { continue; };
             if reference.file == self.file
                 && !self.conditional_immutable_issue(reference.node, issue.seed, &issue.message)
             {
                 if let Some(token) = self.permission_error(reference.node, &issue.message) {
-                    sites.push((token, issue));
+                    // Conditional seeds keep their existing native guards. An
+                    // unconditional failure may also name all other unconditional
+                    // roots, without treating a guarded seed as a proven error.
+                    let roots = issues.iter().filter(|issue|
+                        self.resolver.immutable_marker(issue.seed).is_none()).collect();
+                    sites.push((token, roots));
                 }
             }
         }

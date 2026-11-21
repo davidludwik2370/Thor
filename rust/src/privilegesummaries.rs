@@ -13,10 +13,13 @@ impl FactEvent {
     fn apply(&self, facts: &mut Facts) {
         match self {
             Self::Issue(issue) => {
-                facts
-                    .issues
-                    .entry(issue.operation)
-                    .or_insert_with(|| (**issue).clone());
+                // A variadic/opaque call can reject several independent roots
+                // at the same site. Preserve their declarations for diagnostics
+                // and batched vet rejection, retaining the first issue's verdict.
+                let issues = facts.issues.entry(issue.operation).or_default();
+                if !issues.iter().any(|existing| existing.seed == issue.seed) {
+                    issues.push((**issue).clone());
+                }
             }
             Self::Readonly(site) => {
                 facts.readonly.insert(*site);

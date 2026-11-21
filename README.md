@@ -616,8 +616,12 @@ thor vet . --vet=unused            # Select checks (comma-separated)
 thor vet . -warnings-as-errors     # Require corrections for a successful check
 ```
 
-The `immutable` check suggests `:>` for initialized local bindings whose uses
-permit immutability. Grouped declarations qualify together. The `pure` check
+The `immutable` check suggests `:>` for initialized bindings whose conversion
+passes the compiler in the current configuration. Grouped declarations qualify
+together. Global bindings and changes with uncertain API or configuration effects
+produce manual-review warnings that `--apply` leaves unchanged. See
+[immutable declaration advice](docs/immutable-vet.md), including alias batches
+and editor actions. The `pure` check
 suggests `fn` for eligible procedures, including their transitive calls and
 signature requirements. Findings have stable `thor/prefer-immutable` and
 `thor/prefer-fn` diagnostic codes. The `unused` check reports unused local
@@ -744,17 +748,18 @@ using the active target and build flags. Unused warnings use original source
 bindings so generated helper arguments and ownership cleanup cannot hide unused
 values. Known inactive `when` arms and excluded files are skipped. For unresolved
 generic/native compile-time conditions, potential uses are retained and warnings
-inside uncertain arms are omitted. The correction checks conservatively skip
-conditional declarations, uninitialized locals, generic procedure conversions,
-attributed procedures and the entry point. Procedures returning owned or
+inside uncertain arms are omitted. Immutable advice includes active conditional
+declarations and native declaration attributes; uninitialized bindings are skipped.
+Procedure conversions conservatively skip conditional declarations, generic
+procedures, attributed procedures and the entry point. Procedures returning owned or
 reference-bearing data also require manual review, since `fn` can change result
 ownership and allocation behavior. Converting a procedure to `fn` enables its
 normal automatic compile-time evaluation with known arguments.
 
 Immutable corrections preserve ownership choices across API results and
-reference-capable output parameters. Reference-sensitive locals in these
-procedures require manual review. Scalar output parameters support ordinary
-immutable advice.
+reference-capable output parameters. Compiler-accepted reference-sensitive locals
+in these procedures receive manual-review warnings. Unrelated outputs that cannot
+carry readonly views support ordinary immutable corrections.
 
 Reviewed library argument contracts also bound vet's portability analysis.
 Printing a value, including a slice or a zipped row, permits immutable advice

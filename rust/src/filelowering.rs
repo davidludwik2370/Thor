@@ -231,14 +231,16 @@ impl<'a> Inputs<'a> {
                 .map(|(node, unchecked)| (node.node, *unchecked))
                 .collect(),
         );
-        for (token, issue) in lower.apply_privileges(self.privileges) {
-            let notes = std::iter::once((issue.seed, "Read-only view declared here."))
+        for (token, issues) in lower.apply_privileges(self.privileges) {
+            let issue = issues[0];
+            let notes = issues.iter().flat_map(|issue|
+                std::iter::once((issue.seed, "Read-only view declared here."))
                 .chain(
                     issue
                         .related
                         .iter()
                         .map(|site| (*site, "Slice effect occurs here.")),
-                )
+                ))
                 .map(|(site, message)| crate::purediagnostics::note(self.sources, site, message))
                 .collect();
             related.insert(

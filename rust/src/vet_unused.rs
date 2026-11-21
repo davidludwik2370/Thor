@@ -167,7 +167,7 @@ fn loop_fix(
             replacement = if comments.is_empty() { String::new() } else { retained.to_string() };
         }
     }
-    Some(Fix { file, span, replacement, rule: "iterator", names: spelling.to_string(), highlight })
+    Some(Fix { file, span, replacement, rule: "iterator", names: spelling.to_string(), highlight, manual: None, borrows: Vec::new() })
 }
 
 fn procedure_value(resolver: &Resolver<'_>, mut at: Ref) -> bool {
@@ -364,6 +364,8 @@ fn unused_imports(resolver: &mut Resolver<'_>, file: usize, names: &HashSet<Node
             rule: "import",
             names: path,
             highlight,
+            manual: None,
+            borrows: Vec::new(),
         });
     }
     fixes

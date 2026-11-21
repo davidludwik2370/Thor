@@ -25,6 +25,8 @@ pub struct Fix {
     rule: &'static str,
     names: String,
     highlight: Span,
+    manual: Option<&'static str>,
+    borrows: Vec<Ref>,
 }
 fn position(source: &Source, span: Span) -> Value {
     let (line, column) = source.position(span.start);
@@ -45,19 +47,73 @@ impl Fix {
             format!("Procedure '{}' can be declared with 'fn'.", self.names)
         }
     }
-    fn diagnostic(&self, sources: &[Source]) -> Value {
+    fn diagnostic(&self, sources: &[Source], snapshots: &mut HashMap<usize,u64>, batch_only: bool) -> Value {
         let source = &sources[self.file];
-        let hash = source
-            .raw
-            .as_bytes()
-            .iter()
-            .fold(14695981039346656037u64, |h, b| {
-                (h ^ u64::from(*b)).wrapping_mul(1099511628211)
+        let mut diagnostic = json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", "import"=>"thor/unused-import", "iterator"=>"thor/unused", _=>"thor/prefer-fn"},
+            "pos":position(source,self.highlight),"msgs":[self.message()]});
+        if let Some(reason) = self.manual {
+            diagnostic.as_object_mut().unwrap().remove("fix");
+            diagnostic["manual_review"] = json!(reason);
+            diagnostic["msgs"].as_array_mut().unwrap().push(json!(format!(
+                "Manual review: {reason}. --apply leaves this declaration unchanged.")));
+        } else if batch_only {
+            diagnostic["batch_only"] = json!(true);
+            diagnostic["msgs"].as_array_mut().unwrap().push(json!(
+                "This may require related slice aliases to be made immutable together. Use thor vet --apply for the verified batch."));
+        } else {
+            let hash = snapshots.entry(self.file).or_insert_with(|| {
+                crate::profile::count("vet.source_snapshots",1);
+                source.raw.as_bytes().iter().fold(14695981039346656037u64, |h,b|
+                    (h ^ u64::from(*b)).wrapping_mul(1099511628211))
             });
-        json!({"type":"warning","stage":"vet","code":match self.rule {"immutable"=>"thor/prefer-immutable", "semicolon"=>"thor/unnecessary-semicolon", "import"=>"thor/unused-import", "iterator"=>"thor/unused", _=>"thor/prefer-fn"},
-            "pos":position(source,self.highlight),"msgs":[self.message()],
-            "fix":{"pos":position(source,self.span),"text":self.replacement,"snapshot":format!("{hash:016x}")}})
+            diagnostic["fix"] = json!({"pos":position(source,self.span),"text":self.replacement,"snapshot":format!("{hash:016x}")});
+        }
+        diagnostic
     }
+}
+// Writes and addresses through a pointer/dynamic-array target do not change
+// the binding itself. Follow inline projections, including `using`, without
+// confusing copied reference headers with their pointees.
+fn binding_storage(resolver: &mut Resolver<'_>, mut at: Ref) -> Option<Ref> {
+    let mut seen = HashSet::new();
+    while seen.insert(at) {
+        let source = &resolver.sources[at.file];
+        let kind = source.node(at.node).kind.as_str();
+        if kind == "Deref" { return None; }
+        if kind == "Ident" {
+            if let Some(projection) = resolver.projection(at) {
+                if resolver.projection_indirect(&projection) { return None; }
+                at = projection.owner;
+                continue;
+            }
+            return binding(resolver, at);
+        }
+        if !matches!(kind, "Paren" | "Selector" | "Index" | "Slice" | "MatrixIndex") { return None; }
+        let operand = source.role(at.node, "expr")?;
+        if kind != "Paren" {
+            let typ = resolver.type_of(Ref {node:operand, ..at});
+            let mut base = &typ;
+            while let Type::Nominal(_, inner) = base { base = inner; }
+            if matches!(base, Type::Pointer(_))
+                || matches!(kind, "Index" | "Slice") && matches!(base, Type::Dynamic(_) | Type::Fixed {..}) {
+                return None;
+            }
+            if kind == "Selector" {
+                if let Some(field) = resolver.sources[at.file].role(at.node,"field") {
+                    if let Some(path) = resolver.member_path(&typ,resolver.sources[at.file].text(field)) {
+                        let mut current = typ;
+                        for field in path {
+                            while let Type::Nominal(_,inner) = current { current = *inner; }
+                            if matches!(current,Type::Pointer(_)) { return None; }
+                            current = resolver.member_type(&current,&field);
+                        }
+                    }
+                }
+            }
+        }
+        at.node = operand;
+    }
+    None
 }
 fn binding(resolver: &Resolver<'_>, mut at: Ref) -> Option<Ref> {
     let source = &resolver.sources[at.file];
@@ -203,19 +259,47 @@ fn field_types(resolver: &mut Resolver<'_>, signature: Ref, role: &str) -> Vec<T
         })
         .collect()
 }
-fn reference_output(typ: &Type, resolver: &mut Resolver<'_>, seen: &mut HashSet<Type>) -> bool {
-    if !seen.insert(typ.clone()) { return false; }
-    match typ {
-        Type::Nominal(_, base) => reference_output(base, resolver, seen),
-        Type::Pointer(base) | Type::Slice(base) | Type::Dynamic(base) | Type::Soa(base)
-        | Type::Set(base) | Type::Map { value: base, .. } =>
-            owned(base, resolver, &mut HashSet::new())
-                || !possible(base, resolver, &mut HashSet::new()),
-        Type::Array { elem, .. } | Type::Fixed { elem, .. } => reference_output(elem, resolver, seen),
+// Only reference-bearing destinations can export a newly readonly slice.
+// In particular ^map[int]Value does not expose one when Value is self-contained.
+fn carries_view(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>) -> bool {
+    carries_view_inner(typ,resolver,known,0)
+}
+fn carries_view_inner(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>, depth: usize) -> bool {
+    if let Some(value) = known.get(typ) { return *value; }
+    if depth > 32 { return true; }
+    known.insert(typ.clone(), true);
+    crate::profile::count("vet.escape_types_scanned", 1);
+    let value = match typ {
+        Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic
+        | Type::BigInteger | Type::BigRational => true,
+        Type::Nominal(_, base) | Type::Pointer(base) | Type::Dynamic(base) | Type::Set(base)
+        | Type::Array {elem:base,..} | Type::Fixed {elem:base,..} => carries_view_inner(base, resolver, known,depth+1),
+        Type::Map {key,value} => carries_view_inner(key, resolver, known,depth+1) || carries_view_inner(value, resolver, known,depth+1),
         Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)
-            .iter().any(|(_, field)| reference_output(field, resolver, seen)),
+            .iter().any(|(_,typ)| carries_view_inner(typ, resolver, known,depth+1)),
         Type::Union(..) => resolver.union_variants(typ)
-            .iter().any(|variant| reference_output(variant, resolver, seen)),
+            .iter().any(|typ| carries_view_inner(typ, resolver, known,depth+1)),
+        Type::Scalar {name,..} => matches!(name.as_str(), "rawptr" | "any"),
+        _ => false,
+    };
+    known.insert(typ.clone(), value);
+    value
+}
+fn reference_output(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>) -> bool {
+    reference_output_inner(typ,resolver,known,0)
+}
+fn reference_output_inner(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>, depth: usize) -> bool {
+    if depth > 32 { return true; }
+    match typ {
+        Type::Nominal(_, base) => reference_output_inner(base, resolver, known,depth+1),
+        Type::Pointer(base) | Type::Slice(base) | Type::Dynamic(base) | Type::Soa(base)
+        | Type::Set(base) => carries_view(base, resolver, known),
+        Type::Map {key,value} => carries_view(key,resolver,known) || carries_view(value,resolver,known),
+        Type::Array {elem,..} | Type::Fixed {elem,..} => reference_output_inner(elem,resolver,known,depth+1),
+        Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)
+            .iter().any(|(_,field)| reference_output_inner(field,resolver,known,depth+1)),
+        Type::Union(..) => resolver.union_variants(typ)
+            .iter().any(|variant| reference_output_inner(variant,resolver,known,depth+1)),
         Type::Unknown | Type::Generic => true,
         _ => false,
     }
@@ -311,11 +395,13 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
     let mut result = vec![];
     let mut portable = PortableBodies::default();
     let mut inline_types = HashMap::new();
+    let mut escape_types = HashMap::new();
     for (file, source) in project.sources.iter().enumerate() {
         if !source.thor || source.excluded || !source.path.starts_with(root) {
             continue;
         }
         let mut written = BTreeSet::new();
+        let mut conditional_writes = BTreeSet::new();
         let mut mutated = BTreeSet::new();
         let mut viewed = BTreeSet::new();
         for (i, node) in source.nodes.iter().enumerate() {
@@ -349,23 +435,29 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 vec![]
             };
             for node in targets {
-                if let Some(declaration) = binding(&resolver, Ref { file, node }) {
-                    written.insert(declaration);
-                    if matches!(source.node(id).kind.as_str(), "Assignment" | "IncDec") {
+                if matches!(source.node(id).kind.as_str(), "Assignment" | "IncDec") {
+                    if let Some(declaration) = binding(&resolver, Ref { file, node }) {
                         mutated.insert(declaration);
                     }
+                }
+                if let Some(declaration) = binding_storage(&mut resolver, Ref { file, node }) {
+                    let at = Ref {file,node:id};
+                    let uncertain = source.ancestors(id).filter(|owner| source.node(*owner).kind == "When")
+                        .any(|owner| source.role(owner,"cond").is_none_or(|node|
+                            resolver.condition(Ref {file,node}).is_none()));
+                    if !uncertain && resolver.active_definition(at) { written.insert(declaration); }
+                    else { conditional_writes.insert(declaration); }
                 }
             }
         }
         for (i, node) in source.nodes.iter().enumerate() {
             let id = NodeId(i);
             let at = Ref { file, node: id };
-            if node.kind != "Declaration"
-            || !crate::unused_attributes::only_unused_attributes(source, id)
+            if node.kind != "Declaration" || !resolver.active_definition(at)
                 || source.ancestors(id).any(|id| {
                     matches!(
                         source.node(id).kind.as_str(),
-                        "When" | "CompileSwitch" | "CompileSwitchExpr"
+                        "CompileSwitch" | "CompileSwitchExpr"
                     )
                 })
             {
@@ -395,42 +487,81 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 && !node.immutable
                 && !values.is_empty()
                 && !written.contains(&at)
-                && source
-                    .ancestors(id)
-                    .any(|id| source.node(id).kind == "Procedure")
             {
-                let owner = source.ancestors(id).find(|owner| source.node(*owner).kind == "Procedure").unwrap();
+                let owner = source.ancestors(id).find(|owner| source.node(*owner).kind == "Procedure");
                 let types = names.iter().map(|name| resolver.type_of(Ref {file,node:*name})).collect::<Vec<_>>();
                 let inline = types.iter().all(|typ| inline_value(typ, &mut resolver, &mut inline_types));
                 let aliases_storage = !inline || viewed.contains(&at);
-                if aliases_storage {
-                    let owner = Ref {file,node:owner};
-                    if !portable.check(&mut resolver, owner, true) { continue; }
+                let changes_views = types.iter().any(|typ| resolver.frozen_slice_storage(typ));
+                let mut manual = conditional_writes.contains(&at)
+                    .then_some("this binding is written or addressed in another compile-time branch");
+                if owner.is_none() {
+                    manual = Some("a global binding can be used by callers outside this compilation");
                 }
+                if let Some(owner) = owner.filter(|_| aliases_storage && changes_views) {
+                    if !portable.check(&mut resolver, Ref {file,node:owner}, true) {
+                        manual = Some("read-only views cross compile-time or target-dependent code");
+                    }
                 // Returning a readonly alias changes an API used by callers
                 // outside this entry point. Keep that ownership choice explicit.
-                if aliases_storage && types.iter().any(|typ| resolver.frozen_slice_storage(typ)) {
                     let signature = source.role(owner, "type").unwrap_or(owner);
                     let outputs = field_types(&mut resolver, Ref {file,node:signature}, "results");
-                    if outputs.iter().any(|typ| owned(typ, &mut resolver, &mut HashSet::new())
-                        || !possible(typ, &mut resolver, &mut HashSet::new())) { continue; }
+                    if outputs.iter().any(|typ| carries_view(typ, &mut resolver, &mut escape_types)) {
+                        manual = Some("read-only storage could escape through a result and change its callers' contract");
+                    }
                     // Output parameters can expose the same ownership contract
                     // as a returned alias to callers outside this entry point.
                     let inputs = field_types(&mut resolver, Ref {file,node:signature}, "params");
-                    if inputs.iter().any(|typ| reference_output(typ, &mut resolver, &mut HashSet::new())) {
-                        continue;
+                    if inputs.iter().any(|typ| reference_output(typ, &mut resolver, &mut escape_types)) {
+                        manual = Some("read-only storage could escape through an output parameter");
                     }
                 }
                 let generic_local = source.ancestors(id).filter(|owner| source.node(*owner).kind == "Procedure")
                     .any(|owner| !crate::specialization::parameters(Ref {file,node:owner}, &resolver).is_empty());
                 // A check of this entry point cannot establish write access for
                 // every future specialization of a shared generic body.
-                let independent = !generic_local || inline;
+                if generic_local && !inline {
+                    manual = Some("other generic specializations can have different storage requirements");
+                }
                 if let Some(span) = node
                     .spans
                     .get("separator")
-                    .filter(|span| independent && source.slice(**span) == "=")
+                    .filter(|span| source.slice(**span) == "=")
                 {
+                    let mut borrows = HashSet::new();
+                    let header = types.iter().any(|typ| {
+                        let mut typ=typ;
+                        while let Type::Nominal(_,base)=typ {typ=base;}
+                        matches!(typ,Type::Slice(_)|Type::Soa(_)|Type::Unknown|Type::Generic)
+                    });
+                    if header {
+                        let mut pending=values.to_vec();
+                        while let Some(value)=pending.pop() {
+                            let syntax=source.node(value);
+                            // Fresh literals/comprehensions do not borrow their
+                            // source's outer header. Named calls may return it.
+                            if matches!(syntax.kind.as_str(),"Procedure"|"Compound"|"Comprehension") {continue;}
+                            if syntax.kind=="Ident" {
+                                let reference=Ref{file,node:value};
+                                if resolver.symbol(reference).is_none_or(|index| {
+                                    let symbol=&resolver.symbols[index];
+                                    symbol.constant || symbol.parameter || symbol.result
+                                }) {continue;}
+                                let typ=resolver.type_of(reference);
+                                if resolver.frozen_slice_storage(&typ) {
+                                    let mut origin=reference;
+                                    let mut seen=HashSet::new();
+                                    while seen.insert(origin) {
+                                        let Some(projection)=resolver.projection(origin) else {break;};
+                                        if resolver.projection_indirect(&projection) {break;}
+                                        origin=projection.owner;
+                                    }
+                                    if let Some(binding)=binding(&resolver,origin) {borrows.insert(binding);}
+                                }
+                            }
+                            pending.extend(syntax.children.iter().copied());
+                        }
+                    }
                     result.push(Fix {
                         file,
                         span: *span,
@@ -438,10 +569,14 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                         rule: "immutable",
                         names: label.clone(),
                         highlight,
+                        manual,
+                        borrows: borrows.into_iter().collect(),
                     });
                 }
             }
             if !checks.iter().any(|check| check == "pure")
+                || !crate::unused_attributes::only_unused_attributes(source, id)
+                || source.ancestors(id).any(|id| source.node(id).kind == "When")
                 || values.len() != 1
                 || names.len() != 1
                 || source.text(names[0]) == "main"
@@ -508,6 +643,8 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                     rule: "pure",
                     names: label,
                     highlight,
+                    manual: None,
+                    borrows: Vec::new(),
                 });
             }
         }
@@ -802,6 +939,8 @@ pub(crate) fn apply_source_edits(edits: &[(usize, Span, String)], sources: &[Sou
     let fixes = edits.iter().map(|(file, span, replacement)| Fix {
         file: *file, span: *span, replacement: replacement.clone(),
         rule: "source-cleanup", names: String::new(), highlight: *span,
+        manual: None,
+        borrows: Vec::new(),
     }).collect::<Vec<_>>();
     apply(&fixes, sources)
 }
@@ -936,6 +1075,8 @@ pub fn run(
             .into_iter()
             .map(|(file, span, replacement)| Fix {
                 file, span, replacement, rule: "semicolon", names: String::new(), highlight: span,
+                manual: None,
+                borrows: Vec::new(),
             })
             .collect()
     } else {
@@ -945,15 +1086,36 @@ pub fn run(
     let (covered_semicolons, independent): (Vec<_>, Vec<_>) = accepted.into_iter().partition(|fix|
         proposed.iter().any(|item| item.rule == "import" && item.file == fix.file && item.span.contains(fix.span)));
     accepted = independent;
+    let mut manual_findings = Vec::new();
+    let mut snapshots = HashMap::new();
     if !proposed.is_empty() {
         let scratch = Scratch::new()?;
-        Validator {
+        let validator = Validator {
             project,
             directory: &scratch.0,
             compiler: std::env::current_exe()?,
+        };
+        let cleanups = accepted.clone();
+        validator.select(&proposed, &mut accepted)?;
+        if accepted.iter().any(|fix| fix.manual.is_some()) {
+            let verified = std::mem::replace(&mut accepted, cleanups);
+            let cleanup_keys = accepted.iter().map(|fix| (fix.file, fix.span)).collect::<HashSet<_>>();
+            let automatic = verified.iter().filter(|fix| fix.manual.is_none()
+                && !cleanup_keys.contains(&(fix.file, fix.span))).cloned().collect::<Vec<_>>();
+            // A warning can rely on other manual edits in the validated batch.
+            // Validate exactly the subset --apply and editor fixes may publish.
+            validator.select(&automatic, &mut accepted)?;
+            let automatic_keys = accepted.iter().map(|fix| (fix.file, fix.span)).collect::<HashSet<_>>();
+            for mut fix in verified {
+                if !automatic_keys.contains(&(fix.file, fix.span)) {
+                    fix.manual.get_or_insert("this correction depends on edits that require manual review");
+                    manual_findings.push(fix.diagnostic(&project.sources,&mut snapshots,false));
+                }
+            }
+            crate::profile::count("vet.manual_findings", manual_findings.len() as u64);
         }
-        .select(&proposed, &mut accepted)?;
     }
+    findings.extend(manual_findings);
     for fix in covered_semicolons {
         if !accepted.iter().any(|item| item.rule == "import" && item.file == fix.file && item.span.contains(fix.span)) {
             accepted.push(fix);
@@ -1027,6 +1189,12 @@ pub fn run(
             return Ok(findings);
         }
     }
+    // An individual source edit must not leave a mutable slice alias of a newly
+    // readonly source. Such fixes remain automatic in the verified CLI batch.
+    let borrowed = accepted.iter().flat_map(|fix| fix.borrows.iter().copied()).collect::<HashSet<_>>();
+    let batch_only = suppressions.symbols.iter().filter(|symbol| borrowed.contains(&symbol.reference))
+        .map(|symbol|(symbol.reference.file,project.sources[symbol.reference.file].node(symbol.name_node).span.start))
+        .collect::<HashSet<_>>();
     // Enrich loop warnings in place so binding diagnostics retain source order.
     let iterator_fixes = accepted.iter().filter(|fix| fix.rule == "iterator")
         .map(|fix| ((project.sources[fix.file].path.to_string_lossy().into_owned(), fix.highlight.start), fix))
@@ -1034,11 +1202,12 @@ pub fn run(
     for finding in &mut findings {
         if finding["code"] == "thor/unused" {
             if let Some(fix) = iterator_fixes.get(&(finding["pos"]["file"].as_str().unwrap().into(), finding["pos"]["offset"].as_u64().unwrap() as usize)) {
-                *finding = fix.diagnostic(&project.sources);
+                *finding = fix.diagnostic(&project.sources,&mut snapshots,false);
             }
         }
     }
-    findings.extend(accepted.iter().filter(|fix| fix.rule != "iterator").map(|fix| fix.diagnostic(&project.sources)));
+    findings.extend(accepted.iter().filter(|fix| fix.rule != "iterator").map(|fix| fix.diagnostic(&project.sources,&mut snapshots,
+        batch_only.contains(&(fix.file,fix.highlight.start)))));
     Ok(findings)
 }
 
@@ -1067,6 +1236,8 @@ mod tests {
                     rule: "immutable",
                     names: "value".into(),
                     highlight: Span::new(start - 5, start),
+                    manual: None,
+                    borrows: Vec::new(),
                 }
             })
             .collect()

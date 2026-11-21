@@ -103,3 +103,19 @@ both checked and unchecked configurations with only the indexed-hand declaration
 made readonly through a temporary overlay. Original project sources are
 unchanged. Its immutable-vet pass validates the corrections in one compiler
 check; the 80-copy regression also verifies bounded, shared type classification.
+
+
+## Complete warning validation follow-up
+
+The broader immutable audit and its policy are documented in
+[immutable declaration advice](immutable-vet.md). Compiler-accepted declarations
+are reported even when automatic changes need manual review. This includes
+readonly views used alongside unrelated output parameters, grouped factory
+results, pointee writes, active compile-time branches, native attributes and
+global bindings. Uncertain APIs/configurations have no automatic edit; alias
+sources that need a batch retain CLI application while withholding an unsafe
+individual editor action. Per-source diagnostic hashes are shared.
+
+[The November 21 measurements](benchmarks/immutable-vet-2026-11-21.md) compare
+the expanded advice with the previous implementation and account for its extra
+compiler validations.

@@ -111,7 +111,7 @@ pub struct Issue {
 }
 #[derive(Clone, Default)]
 pub struct Facts {
-    pub issues: HashMap<Ref, Issue>,
+    pub issues: HashMap<Ref, Vec<Issue>>,
     pub mutating: BTreeSet<Ref>,
     pub verified_parameters: BTreeSet<Ref>,
     pub readonly: BTreeSet<Ref>,

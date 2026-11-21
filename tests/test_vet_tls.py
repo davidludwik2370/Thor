@@ -107,13 +107,71 @@ main::proc(){
         edits=action['edit']['changes'][path.as_uri()]
         self.assertEqual(len(edits),1)
         self.assertEqual(edits[0]['newText'],'>')
-        changed=text.replace('hand := deal[i]','hand := deal[i]\n        hand[0]+=1')
+        changed=text.replace('hand := deal[i]','hand := deal[i]\n        append(&hand,9)')
         client.notifications.clear()
         client.send('textDocument/didChange',{
             'textDocument':{'uri':path.as_uri(),'version':2},'contentChanges':[{'text':changed}]})
         client.diagnostic(path.as_uri(),empty=True)
         actions=self.actions(client,path,changed,'hand :=')
         self.assertEqual(actions,[])
+        self.assertEqual(path.read_text(),text)
+
+    def test_grouped_fixed_results_with_a_readonly_view_have_a_group_quick_fix(self):
+        text='''package main
+Hand::[dynamic;2]int
+Results::map[int]int
+pair::proc()->(a:Hand,b:[2]Hand){append(&a,7);b[0]=a;return}
+read::proc(values:[]Hand)->int{return values[0][0]}
+record::proc(out:^Results){common, deal := pair();out[0]=common[0]+read(deal[:])}
+main::proc(){results:=make(Results);defer delete(results);record(&results)}
+'''
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable')
+        warning=next(error for error in errors if error['range']['start']==self.position(text,'common, deal :=',0))
+        self.assertNotIn('Manual review',warning['message'])
+        actions=self.actions(client,path,text,'common, deal :=')
+        action=next(action for action in actions if action['title']=='Make declaration immutable')
+        self.assertEqual(action['edit']['changes'][path.as_uri()][0]['newText'],'>')
+
+    def test_manual_immutable_warning_has_no_unsafe_quick_fix(self):
+        text='''package main
+create::proc()->[]int{subject := make([]int,1);return subject}
+main::proc(){view:>create();defer delete(view);if len(view)!=1{panic("length")}}
+'''
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable')
+        self.assertEqual(len(errors),1,errors)
+        self.assertIn('Manual review',errors[0]['message'])
+        self.assertIn('--apply leaves',errors[0]['message'])
+        actions=self.actions(client,path,text,'subject :=')
+        self.assertFalse(any(action['title']=='Make declaration immutable' for action in actions),actions)
+        changed=text.replace('subject :=','subject :>')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+            'contentChanges':[{'text':changed}]})
+        client.diagnostic(path.as_uri(),empty=True)
+        self.assertEqual(path.read_text(),text)
+
+    def test_alias_sources_offer_a_single_edit_only_after_the_alias_is_readonly(self):
+        text='package main\nmain::proc(){values := []int{7};alias := values;if alias[0]!=7{panic("alias")}}\n'
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable')
+        source=next(error for error in errors if error['range']['start']==self.position(text,'values :=',0))
+        self.assertIn('verified batch',source['message'])
+        actions=self.actions(client,path,text,'values :=')
+        self.assertFalse(any(action['title']=='Make declaration immutable' for action in actions),actions)
+        actions=self.actions(client,path,text,'alias :=')
+        self.assertTrue(any(action['title']=='Make declaration immutable' for action in actions),actions)
+        changed=text.replace('alias :=','alias :>')
+        client.notifications.clear()
+        client.send('textDocument/didChange',{'textDocument':{'uri':path.as_uri(),'version':2},
+            'contentChanges':[{'text':changed}]})
+        snapshot=14695981039346656037
+        for byte in changed.encode():snapshot=((snapshot^byte)*1099511628211)&((1<<64)-1)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable',snapshot=f'{snapshot:016x}')
+        self.assertEqual(len(errors),1,errors)
+        actions=self.actions(client,path,changed,'values :=')
+        self.assertTrue(any(action['title']=='Make declaration immutable' for action in actions),actions)
         self.assertEqual(path.read_text(),text)
 
     def test_unused_bindings_have_warning_ranges_and_no_automatic_removal(self):
