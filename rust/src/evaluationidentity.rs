@@ -15,7 +15,8 @@ fn owner(typ: &Type) -> Option<Ref> {
         | Type::Record(at, _)
         | Type::Enum(at)
         | Type::Union(at, _) => Some(*at),
-        Type::Array { elem, .. }
+        Type::Array { elem, .. } | Type::Matrix{elem,..}
+            | Type::Vector { elem, .. }
         | Type::Pointer(elem)
         | Type::Slice(elem)
         | Type::Dynamic(elem) => owner(elem),

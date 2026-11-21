@@ -1,7 +1,7 @@
 //! One-clause collection construction with native loops and checked allocation.
 use super::*;
 impl Lower<'_, '_> {
-    fn comp_interval(&self, mut id: NodeId) -> Option<NodeId> {
+    pub(super) fn comp_interval(&self, mut id: NodeId) -> Option<NodeId> {
         while self.source.node(id).kind == "Paren" {
             id = self.source.role(id, "expr")?;
         }

@@ -5,7 +5,7 @@ use serde_json::json;
 impl Scheduler<'_> {
     fn binding_condition(&mut self, typ: &Type) -> Result<String> {
         match typ {
-            Type::Array { elem: element, .. }
+            Type::Array { elem: element, .. } | Type::Matrix{elem:element,..}
             | Type::Fixed { elem: element, .. }
             | Type::Slice(element)
             | Type::Dynamic(element)

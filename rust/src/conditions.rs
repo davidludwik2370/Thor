@@ -5,7 +5,11 @@ use super::*;
 fn type_identity(typ: Type) -> Type {
     match typ {
         Type::Scalar { name, .. } => Type::Scalar {
-            name,
+            name: match name.as_str() {
+                "byte" => "u8".into(),
+                "rune" => "i32".into(),
+                _ => name,
+            },
             untyped: false,
         },
         Type::String { name, .. } => Type::String {
@@ -13,6 +17,21 @@ fn type_identity(typ: Type) -> Type {
             untyped: false,
         },
         Type::Array { elem, length } => Type::Array {
+            elem: Box::new(type_identity(*elem)),
+            length,
+        },
+        Type::Matrix {
+            elem,
+            rows,
+            columns,
+            row_major,
+        } => Type::Matrix {
+            elem: Box::new(type_identity(*elem)),
+            rows,
+            columns,
+            row_major,
+        },
+        Type::Vector { elem, length } => Type::Vector {
             elem: Box::new(type_identity(*elem)),
             length,
         },
@@ -34,19 +53,49 @@ fn type_identity(typ: Type) -> Type {
     }
 }
 
+fn exact_identity(typ: &Type) -> bool {
+    match typ {
+        Type::Scalar { name, .. } => name != "bit_set",
+        Type::Nominal(_, inner)
+        | Type::Pointer(inner)
+        | Type::Slice(inner)
+        | Type::Dynamic(inner)
+        | Type::Soa(inner)
+        | Type::Set(inner) => exact_identity(inner),
+        Type::Array { elem, .. }
+        | Type::Vector { elem, .. }
+        | Type::Matrix { elem, .. }
+        | Type::Fixed { elem, .. } => exact_identity(elem),
+        Type::Map { key, value } => exact_identity(key) && exact_identity(value),
+        Type::Anonymous(fields) | Type::Record(_, fields) | Type::Union(_, fields) => {
+            fields.iter().all(|(_, typ)| exact_identity(typ))
+        }
+        _ => typ.resolved(),
+    }
+}
+
 impl Resolver<'_> {
     pub(crate) fn native_boolean(&self, reference: Ref) -> Option<bool> {
         let source = &self.sources[reference.file];
         let name = source.text(reference.node);
         if !matches!(name, "ODIN_DEBUG" | "ODIN_VALGRIND_SUPPORT")
-            || self.symbol(reference).is_some() { return None; }
+            || self.symbol(reference).is_some()
+        {
+            return None;
+        }
         match name {
             "ODIN_DEBUG" => Some(self.flags.iter().any(|flag| flag == "-debug")),
             "ODIN_VALGRIND_SUPPORT" => {
-                let target = self.flags.iter().find_map(|flag| flag.strip_prefix("-target:"))
+                let target = self
+                    .flags
+                    .iter()
+                    .find_map(|flag| flag.strip_prefix("-target:"))
                     .and_then(|target| target.split_once('_'));
-                let host_arch = if cfg!(target_arch = "x86_64") { "amd64" }
-                    else { std::env::consts::ARCH };
+                let host_arch = if cfg!(target_arch = "x86_64") {
+                    "amd64"
+                } else {
+                    std::env::consts::ARCH
+                };
                 let (os, arch) = target.unwrap_or((std::env::consts::OS, host_arch));
                 // Odin exposes Valgrind intrinsics on non-Windows amd64 targets.
                 Some(os != "windows" && arch == "amd64")
@@ -64,7 +113,8 @@ impl Resolver<'_> {
         seen: &mut HashSet<Ref>,
     ) -> Option<bool> {
         if !seen.insert(r) {
-            self.incomplete_plans.set(self.incomplete_plans.get().wrapping_add(1));
+            self.incomplete_plans
+                .set(self.incomplete_plans.get().wrapping_add(1));
             return None;
         }
         if let Some(Constant::Boolean(value)) = self.constant_value(r, bindings, None) {
@@ -117,7 +167,7 @@ impl Resolver<'_> {
                 {
                     let a = self.specialized_type(left, bindings);
                     let b = self.specialized_type(right, bindings);
-                    if a.resolved() && b.resolved() {
+                    if a.resolved() && b.resolved() && exact_identity(&a) && exact_identity(&b) {
                         return Some((type_identity(a) == type_identity(b)) == (op == "=="));
                     }
                 }
@@ -140,6 +190,22 @@ impl Resolver<'_> {
                             return Some(match name.as_str() {
                                 "type_is_slice" => matches!(base, Type::Slice(_)),
                                 "type_is_array" => matches!(base, Type::Array { .. }),
+                                "type_is_matrix" => matches!(base, Type::Matrix { .. }),
+                                "type_is_matrix_row_major" => matches!(
+                                    base,
+                                    Type::Matrix {
+                                        row_major: true,
+                                        ..
+                                    }
+                                ),
+                                "type_is_matrix_column_major" => matches!(
+                                    base,
+                                    Type::Matrix {
+                                        row_major: false,
+                                        ..
+                                    }
+                                ),
+                                "type_is_simd_vector" => matches!(base, Type::Vector { .. }),
                                 "type_is_dynamic_array" => matches!(base, Type::Dynamic(_)),
                                 "type_is_pointer" => matches!(base, Type::Pointer(_)),
                                 "type_is_struct" => {
@@ -188,7 +254,11 @@ impl Resolver<'_> {
                 return None;
             }
             let field = s.role(r.node, "field")?;
-            if self.namespace_imports(r.file, s.text(base)).iter().any(|import| import == path) {
+            if self
+                .namespace_imports(r.file, s.text(base))
+                .iter()
+                .any(|import| import == path)
+            {
                 return Some(s.text(field).into());
             }
         }
@@ -260,23 +330,40 @@ mod native_boolean_tests {
     #[test]
     fn valgrind_support_uses_the_selected_native_target() {
         let text = "ODIN_VALGRIND_SUPPORT";
-        let source = Source::from_frontend("/native-target.thor".into(), text.into(),
+        let source = Source::from_frontend(
+            "/native-target.thor".into(),
+            text.into(),
             serde_json::json!({"nodes":[
                 {"kind":"File","start":0,"end":text.len(),"parent":-1},
                 {"kind":"Ident","start":0,"end":text.len(),"parent":0}
-            ],"features":[],"edits":[],"selections":[]}), true).unwrap();
+            ],"features":[],"edits":[],"selections":[]}),
+            true,
+        )
+        .unwrap();
         let sources = [source];
-        let reference = Ref { file:0, node:NodeId(1) };
-        for (target, expected) in [("linux_amd64",true),("darwin_amd64",true),
-            ("windows_amd64",false),("linux_arm64",false),("darwin_arm64",false),
-            ("freestanding_amd64",true),("js_wasm32",false),("wasi_wasm32",false)] {
+        let reference = Ref {
+            file: 0,
+            node: NodeId(1),
+        };
+        for (target, expected) in [
+            ("linux_amd64", true),
+            ("darwin_amd64", true),
+            ("windows_amd64", false),
+            ("linux_arm64", false),
+            ("darwin_arm64", false),
+            ("freestanding_amd64", true),
+            ("js_wasm32", false),
+            ("wasi_wasm32", false),
+        ] {
             let mut resolver = Resolver::new(&sources);
             resolver.flags = vec![format!("-target:{target}")];
             let condition = resolver.condition(reference);
-            let contextual = resolver.context_condition(reference,&Substitutions::new());
-            let constant = resolver.constant_value(reference,&Substitutions::new(),None);
-            if condition != Some(expected) || contextual != Some(expected)
-                || !matches!(constant,Some(Constant::Boolean(value)) if value==expected) {
+            let contextual = resolver.context_condition(reference, &Substitutions::new());
+            let constant = resolver.constant_value(reference, &Substitutions::new(), None);
+            if condition != Some(expected)
+                || contextual != Some(expected)
+                || !matches!(constant,Some(Constant::Boolean(value)) if value==expected)
+            {
                 panic!("native Boolean disagrees with selected target {target}");
             }
         }

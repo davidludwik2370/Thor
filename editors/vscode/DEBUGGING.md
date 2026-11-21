@@ -149,7 +149,7 @@ locations. Use the `thor-lldb` configuration for Thor source mapping.
 ## Validation
 
 ```sh
-python3 -m unittest tests.test_mkthor tests.test_debugger -v
+python3 -m unittest tests.test_mkthor tests.test_debugger tests.test_parameter_contracts_debugger tests.test_debugger_transport -v
 python3 tools/test_vscode_debug.py
 cd editors/vscode
 npm test
@@ -163,3 +163,17 @@ project and the installed CodeLLDB extension; `--codelldb` selects that director
 It exercises the shortcut's command, pre-launch task, launch configuration,
 breakpoint, stepping, watch/locals and clean termination. macOS is the end-to-end
 validated platform for this local setup.
+
+Adapter startup failures report CodeLLDB's exit status or spawn error rather than
+leaving initialization pending. Cancelling before the backend connects also
+settles initialization and permits a clean disconnect. The live test transport
+keeps fixed request/event deadlines; a timeout includes the pending operation,
+recent backend events/output, and adapter stderr. Failed-launch cleanup uses a
+short disconnect deadline so it does not add another full timeout or obscure the
+primary failure.
+
+For metadata parameters, inspect locals after reaching the first body statement:
+a native step-in may initially stop on the signature before parameters are
+stored. Odin strings and slices have native descriptors; `text.len`, `text.data`,
+and `values.data[0]` are supported inspection expressions without requiring
+custom string/slice formatters.

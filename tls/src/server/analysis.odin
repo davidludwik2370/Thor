@@ -1550,6 +1550,10 @@ resolve_basic_directive :: proc(
 	bool,
 ) {
 	switch directive.name {
+	case "caller_expression":
+		ident:=new_type(ast.Ident,directive.pos,directive.end,ast_context.allocator)
+		ident.name="string"
+		return resolve_type_identifier(ast_context,ident^)
 	case "caller_location", "branch_location":
 		return lookup("Source_Code_Location", indexer.runtime_package, directive.pos.file)
 	}
@@ -2182,7 +2186,7 @@ internal_resolve_type_expression :: proc(ast_context: ^AstContext, node: ^ast.Ex
 		old_call := ast_context.call
 		if name,is_ident:=v.expr.derived.(^ast.Ident);is_ident&&name.pos.offset==name.end.offset{
 			if strings.has_prefix(name.name,"__thor_comprehension") {out^,ok=thor_comprehension_type(ast_context,v);return ok}
-			if name.name=="__thor_run"&&len(v.args)==1 {
+			if (name.name=="__thor_run"||name.name=="__thor_runtime")&&len(v.args)==1 {
 				defer ast_context.call=old_call
 				if call,is_call:=v.args[0].derived.(^ast.Call_Expr);is_call {
 					ast_context.call=call
@@ -2294,6 +2298,8 @@ resolve_call_directive :: proc(ast_context: ^AstContext, call: ^ast.Call_Expr) -
 	}
 
 	switch directive.name {
+	case "caller_expression":
+		return resolve_basic_directive(ast_context,directive^)
 	case "config":
 		if len(call.args) > 1 {
 			return resolve_type_expression(ast_context, call.args[1])

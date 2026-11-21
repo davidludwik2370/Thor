@@ -163,7 +163,7 @@ impl Plan {
                         .iter()
                         .all(|(_, typ)| self.emits_type(typ, sources))
             }
-            Type::Array { elem, .. }
+            Type::Array { elem, .. } | Type::Matrix{elem,..}
             | Type::Fixed { elem, .. }
             | Type::Pointer(elem)
             | Type::Slice(elem)
@@ -658,7 +658,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
             | Type::Record(owner, _)
             | Type::Enum(owner)
             | Type::Union(owner, _) => Some(*owner),
-            Type::Array { elem, .. }
+            Type::Array { elem, .. } | Type::Matrix{elem,..}
             | Type::Slice(elem)
             | Type::Pointer(elem)
             | Type::Dynamic(elem) => Self::type_definition(elem),
@@ -669,7 +669,7 @@ impl<'a, 'r> Extraction<'a, 'r> {
         if let Some(owner)=Self::type_definition(typ) {definitions.push(owner);}
         match typ {
             Type::Anonymous(fields)=>for (_,typ) in fields {Self::query_definitions(typ,definitions)},
-            Type::Array{elem,..}|Type::Slice(elem)|Type::Dynamic(elem)|Type::Pointer(elem)|Type::Fixed{elem,..}=>Self::query_definitions(elem,definitions),
+            Type::Array{elem,..} | Type::Matrix{elem,..}|Type::Slice(elem)|Type::Dynamic(elem)|Type::Pointer(elem)|Type::Fixed{elem,..}=>Self::query_definitions(elem,definitions),
             _=>{},
         }
     }

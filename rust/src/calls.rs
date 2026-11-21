@@ -127,6 +127,16 @@ impl Resolver<'_> {
     }
 
     fn plan_calls(&mut self, call: Ref, context: &Substitutions) -> Vec<CallPlan> {
+        self.plan_target_calls(call, context, None)
+    }
+
+    /// Effect analysis can resolve a runtime procedure value to a known body.
+    /// Use the ordinary argument arrangement and specialization rules for it.
+    pub(crate) fn call_plans_for_targets(&mut self, call: Ref, context: &Substitutions, targets: &[Ref]) -> Vec<CallPlan> {
+        self.plan_target_calls(call, context, Some(targets))
+    }
+
+    fn plan_target_calls(&mut self, call: Ref, context: &Substitutions, targets: Option<&[Ref]>) -> Vec<CallPlan> {
         let source = &self.sources[call.file];
         let Some(callee) = source.role(call.node, "callee") else {
             return vec![];
@@ -146,11 +156,18 @@ impl Resolver<'_> {
                 node: source.role(arg.node, "value").unwrap_or(arg.node),
             })
             .collect::<HashSet<_>>();
+        let argument_signature=if targets.is_some() {
+            let mut typ=self.specialized_type(Ref{file:call.file,node:callee},context);
+            while let Type::Nominal(_,inner)=typ {typ=*inner;}
+            let Type::Procedure(signature)=typ else{return vec![];};
+            Some(signature)
+        }else{None};
         let mut plans = vec![];
-        for procedure in self.candidates(Ref {
+        let candidates = targets.map(|targets| targets.to_vec()).unwrap_or_else(|| self.candidates(Ref {
             file: call.file,
             node: callee,
-        }) {
+        }));
+        for procedure in candidates {
             let owner = &self.sources[procedure.file];
             let signature = if owner.node(procedure.node).kind == "Procedure" {
                 owner
@@ -163,7 +180,9 @@ impl Resolver<'_> {
             } else {
                 procedure
             };
-            let Some(arguments) = self.arrange_arguments(signature, &args) else {
+            // Defaults and named arguments belong to the callable's declared
+            // type; parameter effects belong to the selected implementation.
+            let Some(arguments) = self.arrange_arguments(argument_signature.unwrap_or(signature), &args) else {
                 continue;
             };
             let layout = self.signature_layout(signature);
@@ -363,6 +382,7 @@ impl Resolver<'_> {
     }
 
     pub fn specialized_result(&mut self, call: Ref, index: usize, context: &Substitutions) -> Type {
+        if let Some(typ)=self.builtin_result_type(call,index,context){return typ;}
         let mut result = None;
         for plan in self.call_plans(call, context) {
             let layout = self.signature_layout(plan.signature);

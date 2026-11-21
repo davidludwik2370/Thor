@@ -167,6 +167,13 @@ get_hover_information :: proc(
 
 	if position_context.identifier != nil {
 		if ident, ok := position_context.identifier.derived.(^ast.Ident); ok {
+            if is_in_attribute(&position_context) {
+                if doc,found:=attribute_docs[ident.name];found {
+                    hover.contents={kind="markdown",value=doc}
+                    hover.range=common.get_token_range(position_context.identifier^,ast_context.file.src)
+                    return hover,true,true
+                }
+            }
 			if str, ok := keywords_docs[ident.name]; ok {
 				hover.contents.kind = "markdown"
 				hover.contents.value = str

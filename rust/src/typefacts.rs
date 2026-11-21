@@ -3,7 +3,85 @@
 use super::*;
 use std::collections::BTreeMap;
 pub type Substitutions = BTreeMap<String, Type>;
+// Native aggregate arithmetic is distinct from elementwise array arithmetic.
+// Result dimensions and the matrix layout participate in later generic proofs.
+pub(super) fn arithmetic_shape(op:&str,left:&Type,right:&Type)->Option<Type>{
+    fn base(mut typ:&Type)->&Type{while let Type::Nominal(_,inner)=typ{typ=inner;}typ}
+    let a=base(left);let b=base(right);
+    if op=="*"{
+        match (a,b){
+            (Type::Matrix{elem,rows,columns:_,row_major},Type::Matrix{columns,..})=>{
+                return Some(if a==b{if matches!(right,Type::Nominal(..))&&!matches!(left,Type::Nominal(..)){right.clone()}else{left.clone()}}
+                    else{Type::Matrix{elem:elem.clone(),rows:*rows,columns:*columns,row_major:*row_major}});
+            },
+            (Type::Matrix{elem,rows,row_major,..},Type::Array{length,..})=>{
+                return Some(match (rows,length){(Some(rows),Some(length)) if rows==length=>right.clone(),(Some(_),Some(_))=>Type::Matrix{elem:elem.clone(),rows:*rows,columns:Some(1),row_major:*row_major},_=>Type::Unknown});
+            },
+            (Type::Array{length,..},Type::Matrix{elem,columns,row_major,..})=>{
+                return Some(match (columns,length){(Some(columns),Some(length)) if columns==length=>left.clone(),(Some(_),Some(_))=>Type::Matrix{elem:elem.clone(),rows:Some(1),columns:*columns,row_major:*row_major},_=>Type::Unknown});
+            },
+            _=>{},
+        }
+    }
+    if matches!(a,Type::Array{..}|Type::Vector{..}|Type::Matrix{..}) && b.numeric(){return Some(left.clone());}
+    if a.numeric() && matches!(b,Type::Array{..}|Type::Vector{..}|Type::Matrix{..}){return Some(right.clone());}
+    None
+}
+
 impl Resolver<'_> {
+    /// Preserve the native distinction erased by the compact Pointer shape.
+    /// A pointer to an array auto-dereferences; a multipointer to arrays does not.
+    fn multipointer(&mut self, at:Ref, depth:usize)->Option<bool> {
+        if depth>32{return None;}
+        let s=&self.sources[at.file];let n=s.node(at.node);
+        let role=|name|s.role(at.node,name).map(|node|Ref{node,..at});
+        if n.kind=="Call" && role("callee").is_some_and(|callee|self.native_builtin_alias(callee,"raw_data")){return Some(true);}
+        let next=match n.kind.as_str(){
+            "PointerType"=>return Some(false),"MultiPointerType"=>return Some(true),
+            "Unary" if n.op=="&"=>return Some(false),
+            "Paren"|"HelperType"=>role("expr"),"Cast"=>role("type"),
+            "Slice" if s.role(at.node,"high").is_none()=>role("expr"),
+            "Binary" if n.op=="/"=>role("right"),
+            "Ident"|"Selector"=>self.symbol(at).and_then(|i|{let sym=&self.symbols[i];sym.annotation.or(sym.value).map(|node|Ref{file:sym.reference.file,node})}),
+            "Call"=>role("callee").and_then(|callee|{
+                if self.denotes_type(callee){Some(callee)}else{
+                    self.signature(callee).and_then(|signature|self.fields(signature,"results").first().and_then(|(_,t)|*t))
+                }
+            }),
+            _=>None,
+        }?;
+        self.multipointer(next,depth+1)
+    }
+    pub(super) fn slice_type(&mut self, operand:Ref, typ:Type)->Type {
+        let mut base=&typ;while let Type::Nominal(_,inner)=base{base=inner;}
+        if typ.is_string(){return typ;}
+        if let Type::Pointer(inner)=base {
+            return match self.multipointer(operand,0){
+                Some(true)=>{
+                    let source=&self.sources[operand.file];
+                    if source.node(operand.node).parent.is_some_and(|parent|source.node(parent).kind=="Slice"&&source.role(parent,"high").is_none()){
+                        typ
+                    }else{Type::Slice(inner.clone())}
+                },
+                Some(false)=>if inner.is_string(){*inner.clone()}else{Type::Slice(Box::new(inner.element().cloned().unwrap_or(Type::Unknown)))},
+                None=>Type::Unknown,
+            };
+        }
+        if matches!(base,Type::Soa(_)){return typ;}
+        Type::Slice(Box::new(typ.element().cloned().unwrap_or(Type::Unknown)))
+    }
+    pub(super) fn index_type(&mut self, operand:Ref, typ:Type)->Type {
+        let mut base=&typ;while let Type::Nominal(_,inner)=base{base=inner;}
+        if typ.is_string(){return Type::scalar("u8");}
+        if let Type::Pointer(inner)=base {
+            return match self.multipointer(operand,0){
+                Some(true)=>*inner.clone(),
+                Some(false)=>if inner.is_string(){Type::scalar("u8")}else{inner.indexed_element().cloned().unwrap_or(Type::Unknown)},
+                None=>Type::Unknown,
+            };
+        }
+        typ.indexed_element().cloned().unwrap_or(Type::Unknown)
+    }
     /// Storage affected by freezing a value, including an inline array that
     /// can later be sliced. Pointer/map/dynamic-array targets retain Odin access.
     pub fn frozen_slice_storage(&mut self, typ: &Type) -> bool {
@@ -102,9 +180,10 @@ impl Resolver<'_> {
     }
     fn member_type_uncached(&mut self, typ: &Type, name: &str) -> Type {
         match typ {
+            Type::Scalar{name:scalar,..} if scalar=="any" => match name {"id"=>Type::scalar("typeid"),"data"=>Type::scalar("rawptr"),_=>Type::Unknown},
             Type::BigRational if matches!(name,"numerator"|"denominator") => Type::BigInteger,
             Type::Nominal(_, base) | Type::Pointer(base) => self.member_type(base, name),
-            Type::Array { elem, length }
+            Type::Array { elem, length } | Type::Vector{elem,length}
                 if !name.is_empty() && name.chars().all(|c| "xyzwrgba".contains(c)) =>
             {
                 let positions = name
@@ -119,10 +198,10 @@ impl Resolver<'_> {
                 if name.len() == 1 {
                     *elem.clone()
                 } else {
-                    Type::Array {
+                    if matches!(typ,Type::Vector{..}){Type::Vector{elem:elem.clone(),length:Some(name.len() as i128)}}else{Type::Array {
                         elem: elem.clone(),
                         length: Some(name.len() as i128),
-                    }
+                    }}
                 }
             }
             Type::Soa(elem) => Type::Pointer(Box::new(self.member_type(elem, name))),
@@ -308,6 +387,13 @@ impl Resolver<'_> {
         let child = |role: &str| s.role(r.node, role).map(|node| Ref { file: r.file, node });
         if matches!(n.kind.as_str(), "Ident" | "PolyType") {
             if let Some(typ) = self.bound_type(r, bindings).cloned() {
+                if typ.is_unknown(){
+                    if let Some(annotation)=self.symbol(r).and_then(|i|{
+                        let symbol=&self.symbols[i];let source=&self.sources[symbol.reference.file];
+                        symbol.annotation.filter(|node|source.node(symbol.name_node).kind=="PolyType"&&source.node(*node).kind!="TypeidType")
+                            .map(|node|Ref{file:symbol.reference.file,node})
+                    }){return self.specialize(annotation,bindings,seen);}
+                }
                 if let Type::Constant(value) = typ {
                     if let Some(annotation) = self.symbol(r).and_then(|index| {
                         let symbol = &self.symbols[index];
@@ -335,10 +421,27 @@ impl Resolver<'_> {
                     .map(|target| self.specialize(target, bindings, seen))
                     .unwrap_or(Type::Generic);
             }
-            if let Some(symbol) = self.symbol(r) {
+            if let Some(symbol) = self.context_symbol(r,bindings) {
                 let symbol = self.symbols[symbol].clone();
                 if let Some(projection) = symbol.projection {
                     return self.projected_type(&projection, bindings);
+                }
+                if self.sources[symbol.reference.file].node(symbol.reference.node).kind == "TypeSwitch" {
+                    let source = &self.sources[r.file];
+                    if let Some(case) = source.ancestors(r.node).find(|node| source.node(*node).kind == "Case"
+                        && source.node(*node).parent.and_then(|p|source.node(p).parent) == Some(symbol.reference.node)) {
+                        let types = source.group(case,"types");
+                        if let [node] = types {
+                            if source.text(*node) != "nil" {
+                                // `switch &value` makes the alias addressable;
+                                // its expression type remains the case type.
+                                return self.specialize(Ref{node:*node,..r},bindings,seen);
+                            }
+                        }
+                    }
+                    if let Some(node)=self.sources[symbol.reference.file].role(symbol.reference.node,"expr") {
+                        return self.specialize(Ref{node,file:symbol.reference.file},bindings,seen);
+                    }
                 }
                 if self.sources[symbol.reference.file]
                     .node(symbol.reference.node)
@@ -390,6 +493,21 @@ impl Resolver<'_> {
                     );
                     return if symbol.annotation.is_some() || symbol.constant { typ } else { typ.defaulted() };
                 }
+                // Range bindings inherit the specialized iterable element,
+                // rather than the generic type from an ordinary type query.
+                let source = &self.sources[symbol.reference.file];
+                if source.node(symbol.reference.node).kind == "Range" {
+                    if let Some(node) = source.role(symbol.reference.node, "expr") {
+                        let mut typ = self.specialize(Ref { file: symbol.reference.file, node }, bindings, seen);
+                        while let Type::Pointer(elem) = typ { typ = *elem; }
+                        if let Type::Map { key, value } = typ {
+                            return if symbol.index == 0 { *key } else { *value };
+                        }
+                        if symbol.index == 1 { return Type::scalar("int"); }
+                        if matches!(typ, Type::String { .. }) { return Type::scalar("rune"); }
+                        return typ.element().cloned().unwrap_or_else(|| typ.defaulted());
+                    }
+                }
             }
         }
         let specialization_division = n.kind == "Binary" && n.op == "/"
@@ -400,15 +518,30 @@ impl Resolver<'_> {
                 .unwrap_or(Type::Unknown)
         };
         match n.kind.as_str() {
-            "Paren" | "HelperType" | "Run" => subtype("expr"),
+            "HelperType"=>{let mut typ=subtype("expr");if let Type::Matrix{row_major,..}=&mut typ{if ["row_major","column_major"].contains(&n.op.as_str()){*row_major=n.op=="row_major";}}typ},
+            "Paren" | "Run" | "Runtime" => subtype("expr"),
+            "Unary" => {
+                let typ=subtype("expr");
+                if n.op == "&" {Type::Pointer(Box::new(typ))} else if n.op == "!" {Type::scalar("bool")} else {typ}
+            }
+            "Cast" | "TypeAssertion" => subtype("type"),
+            "AutoCast" => subtype("expr"),
+            "Slice" => {
+                let typ=subtype("expr");
+                child("expr").map(|operand|self.slice_type(operand,typ)).unwrap_or(Type::Unknown)
+            }
+            "Ternary" => {
+                let a=subtype("x");let b=subtype("y");
+                if a.is_unknown() || a.untyped() && !b.untyped() {b}else{a}
+            }
             "Binary" if n.op == "++" => {
                 crate::lower::concatenation::result_type(s, r.node, |node| {
                     self.specialize(Ref { node, ..r }, bindings, &mut seen.clone())
                 })
             }
-            "Binary" if s.thor && matches!(n.op.as_str(),"+"|"-"|"*"|"/"|"&"|"|"|"~"|"&~"|"<<"|">>"|"**") => {
+            "Binary" if s.thor && !specialization_division && matches!(n.op.as_str(),"+"|"-"|"*"|"/"|"&"|"|"|"~"|"&~"|"<<"|">>"|"**") => {
                 let a=subtype("left");let b=subtype("right");
-                if a.record_like() {a} else if b.record_like() {b} else {self.type_of(r)}
+                if a.record_like() {a} else if b.record_like() {b} else {arithmetic_shape(&n.op,&a,&b).unwrap_or_else(||self.type_of(r))}
             }
             "WhenExpr" => {
                 if let Some(cond) = child("cond").and_then(|r| self.context_condition(r, bindings))
@@ -456,14 +589,19 @@ impl Resolver<'_> {
                 self.member_type(&typ, name)
             }
             "Deref" => subtype("expr").element().cloned().unwrap_or(Type::Unknown),
-            "Index" => subtype("expr").indexed_element().cloned().unwrap_or(Type::Unknown),
+            "Index" => {
+                let typ=subtype("expr");
+                child("expr").map(|operand|self.index_type(operand,typ)).unwrap_or(Type::Unknown)
+            }
+            "MatrixType"=>Type::Matrix{row_major:false,elem:Box::new(subtype("elem")),rows:child("rows").and_then(|r|self.context_integer(r,bindings)),columns:child("columns").and_then(|r|self.context_integer(r,bindings))},
+            "MatrixIndex"=>{let typ=subtype("expr");child("expr").map(|v|self.index_type(v,typ)).unwrap_or(Type::Unknown)},
             "ArrayType" => {
                 let elem = Box::new(subtype("elem"));
                 if let Some(len) = child("len") {
-                    Type::Array {
+                    if n.op=="simd"{Type::Vector{elem,length:self.context_integer(len,bindings)}}else{Type::Array {
                         elem,
                         length: self.context_integer(len, bindings),
-                    }
+                    }}
                 } else if n.op == "soa" {
                     Type::Soa(elem)
                 } else {
@@ -614,13 +752,14 @@ impl Resolver<'_> {
                     }
                 }
             }
-            "Binary" if specialization_division => subtype("right"),
+            "Binary" if specialization_division=>{let actual=subtype("left");if actual.is_unknown(){subtype("right")}else{actual}},
             "Binary" => {
                 if matches!(n.op.as_str(), "in" | "not_in" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||") {
                     return Type::scalar("bool");
                 }
                 let left = subtype("left");
                 let right = subtype("right");
+                if let Some(typ)=arithmetic_shape(&n.op,&left,&right){return typ;}
                 if n.op == "*" && right.is_string() || left.untyped() && !right.untyped() {right} else {left}
             }
             _ => self.type_of(r),
@@ -846,17 +985,28 @@ impl Resolver<'_> {
         };
         if matches!(
             n.kind.as_str(),
-            "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis"
+            "MatrixType" | "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis"
         ) {
             let expected_kind = n.kind.as_str();
             let elem = match (expected_kind, actual) {
-                ("ArrayType", Type::Array { elem, length }) if child("len").is_some() => {
+                ("MatrixType",Type::Matrix{elem,rows,columns,..})=>{
+                    for (role,actual) in [("rows",rows),("columns",columns)]{
+                        let expected=child(role).and_then(|r|self.context_integer(r,bindings));
+                        if expected.is_some()&&actual.is_some()&&expected!=*actual{return None;}
+                    }elem.as_ref()
+                },
+                ("ArrayType", Type::Array { elem, length }) if child("len").is_some() && n.op!="simd" => {
                     let count = child("len").and_then(|r| self.context_integer(r, bindings));
                     if count.is_some() && length.is_some() && count != *length {
                         return None;
                     }
                     elem.as_ref()
                 }
+                ("ArrayType",Type::Vector{elem,length}) if n.op=="simd"=>{
+                    let count=child("len").and_then(|r|self.context_integer(r,bindings));
+                    if count.is_some()&&length.is_some()&&count!=*length{return None;}
+                    elem.as_ref()
+                },
                 ("ArrayType", Type::Slice(elem)) if child("len").is_none() && n.op != "soa" => {
                     elem.as_ref()
                 }
@@ -904,13 +1054,10 @@ impl Resolver<'_> {
         if expected.is_unknown() || actual.is_unknown() {
             return Some(0);
         }
-        let canonical = |name: &str| match name {
-            "byte" => "u8".to_string(),
-            "rune" => "i32".to_string(),
-            other => other.to_string(),
-        };
+        fn canonical(name:&str)->&str{match name{"byte"=>"u8","rune"=>"i32",other=>other}}
         match (expected, actual) {
             (Type::Scalar { name, .. }, _) if name == "any" => Some(0),
+            (Type::Scalar { name, .. }, Type::Pointer(_)) if name == "rawptr" => Some(1),
             (
                 Type::Scalar { name, .. },
                 Type::Scalar {
@@ -939,7 +1086,11 @@ impl Resolver<'_> {
                     None
                 }
             }
+            (Type::Matrix{elem:a,rows:r,columns:c,row_major:x},Type::Matrix{elem:b,rows:s,columns:d,row_major:y})=>{
+                if x!=y||r.is_some()&&s.is_some()&&r!=s||c.is_some()&&d.is_some()&&c!=d{None}else{Self::type_score(a,b)}
+            },
             (Type::Array { elem: a, length: n }, Type::Array { elem: b, length: m })
+            | (Type::Vector { elem: a, length: n }, Type::Vector { elem: b, length: m })
             | (Type::Fixed { elem: a, length: n }, Type::Fixed { elem: b, length: m }) => {
                 if n.is_some() && m.is_some() && n != m {
                     return None;
@@ -991,6 +1142,7 @@ impl Resolver<'_> {
             })
         };
         match n.kind.as_str() {
+            "HelperType"|"Paren"=>{if let Some(expr)=child("expr"){self.bind_shape(expr,actual,bindings,seen);}},
             "PolyType" => {
                 let binding = bindings
                     .entry(s.names.get(n.name).into())
@@ -1009,11 +1161,19 @@ impl Resolver<'_> {
                     }
                 }
             }
-            "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis" => {
+            "MatrixType" | "ArrayType" | "DynamicArrayType" | "PointerType" | "MultiPointerType" | "Ellipsis" => {
+                if let Type::Matrix{rows,columns,..}=actual{
+                    for (role,count) in [("rows",rows),("columns",columns)]{
+                        if let (Some(count),Some(value))=(count,child(role)){
+                            if s.node(value.node).kind=="PolyType"{bindings.insert(s.names.get(s.node(value.node).name).into(),Type::Constant(Constant::Integer(*count)));}
+                        }
+                    }
+                }
                 if let Type::Array {
                     length: Some(length),
                     ..
                 }
+                | Type::Vector{length:Some(length),..}
                 | Type::Fixed {
                     length: Some(length),
                     ..
@@ -1100,6 +1260,33 @@ impl Resolver<'_> {
     }
     pub fn candidates(&mut self, callee: Ref) -> Vec<Ref> {
         self.candidate_inner(callee, &mut HashSet::new())
+    }
+    // Native `when` declarations share their enclosing scope. A generic
+    // specialization must use the selected arm's annotation, not whichever
+    // same-name declaration the syntax-only lookup encountered first.
+    pub(crate) fn context_symbol(&mut self,site:Ref,bindings:&Substitutions)->Option<usize>{
+        let index=self.symbol(site)?;
+        if bindings.is_empty(){return Some(index);}
+        let symbol=&self.symbols[index];let Some(owner)=self.enclosing_when(symbol.reference)else{return Some(index);};
+        let scope=Ref{file:symbol.reference.file,node:symbol.scope};
+        let alternatives=self.scopes.get(&scope).and_then(|names|names.get(&symbol.name)).cloned().unwrap_or_default();
+        let mut active=vec![];
+        for alternative in alternatives{
+            let reference=self.symbols[alternative].reference;
+            if self.enclosing_when(reference)!=Some(owner){continue;}
+            let source=&self.sources[reference.file];let span=source.node(reference.node).span;
+            let conditions=source.ancestors(reference.node).filter(|n|source.node(*n).kind=="When")
+                .filter_map(|n|Some((source.role(n,"cond")?,source.role(n,"body"),source.role(n,"else")))).collect::<Vec<_>>();
+            let mut selected=true;
+            for (cond,body,other) in conditions{
+                if let Some(value)=self.context_condition(Ref{node:cond,..reference},bindings){
+                    let branch=if value{body}else{other};
+                    if !branch.is_some_and(|node|self.sources[reference.file].node(node).span.contains(span)){selected=false;break;}
+                }
+            }
+            if selected{active.push(alternative);}
+        }
+        (active.len()==1).then(||active[0])
     }
     fn enclosing_when(&self, declaration: Ref) -> Option<NodeId> {
         let source = &self.sources[declaration.file];

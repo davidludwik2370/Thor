@@ -230,6 +230,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
     let mut options = Options {
         odin_compatible: false,
         native_policy_probe: false,
+        native_policy_only: false,
         command,
         entry,
         output: None,
@@ -361,6 +362,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             "--ask" => options.vet_ask = true,
             "--source-maps" => options.maps = true,
             "--editor-info" => options.editor_info = true,
+            "--native-policy-only" => options.native_policy_only = true,
             "--track-allocations" => {
                 options.tracking = args
                     .next()
@@ -453,6 +455,9 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         return Err(Error::usage(
             "application packaging options are only supported by thor publish",
         ));
+    }
+    if options.native_policy_only && !matches!(options.command.as_str(),"check"|"build") {
+        return Err(Error::usage("The internal native policy request requires check or build."));
     }
     thor_compiler::cli::normalize(&mut options)?;
     if let Some(status) = thor_compiler::cli::query(&options)? { return Ok(status); }

@@ -93,3 +93,89 @@ test('debug maps require a matching debug build and reject stale original text',
         assert.throws(()=>new DebugMaps(manifest),/Rebuild/);
     } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });
+
+test('a native adapter exit before connecting settles initialize immediately', {timeout:2000}, async t=>{
+    const cp=require('node:child_process');
+    const {EventEmitter}=require('node:events');
+    const {PassThrough}=require('node:stream');
+    t.mock.method(cp,'spawn',()=>{
+        const child=new EventEmitter();
+        child.stdout=new PassThrough();child.stderr=new PassThrough();
+        child.kill=()=>{};
+        setImmediate(()=>child.emit('exit',19,null));
+        return child;
+    });
+    const adapter=new ThorDebugAdapter({backend:'/test/codelldb',cwd:os.tmpdir()});
+    t.after(()=>adapter.dispose());
+    const messages=[];
+    adapter.onDidSendMessage(message=>messages.push(message));
+    await adapter.handleMessage({seq:1,type:'request',command:'initialize',arguments:{}});
+    const response=messages.find(message=>message.type==='response'&&message.request_seq===1);
+    assert.equal(response?.success,false,messages);
+    assert.match(response.message,/CodeLLDB exited \(code 19\)/);
+    assert.equal(adapter.pending.size,0);
+});
+
+test('cancelling before the native connection rejects the startup promise', {timeout:2000}, async t=>{
+    const cp=require('node:child_process');
+    const {EventEmitter}=require('node:events');
+    const {PassThrough}=require('node:stream');
+    let spawned;
+    const ready=new Promise(resolve=>spawned=resolve);
+    t.mock.method(cp,'spawn',()=>{
+        const child=new EventEmitter();
+        child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
+        spawned();
+        return child;
+    });
+    const adapter=new ThorDebugAdapter({backend:'/test/codelldb',cwd:os.tmpdir()});
+    t.after(()=>adapter.dispose());
+    const starting=adapter.start();
+    const rejected=assert.rejects(starting,/Thor debug session closed/);
+    await ready;
+    await adapter.dispose();
+    await rejected;
+    assert.equal(adapter.rejectStarting,undefined);
+});
+
+test('a native spawn error fails initialize with its original message', {timeout:2000}, async t=>{
+    const cp=require('node:child_process');
+    const {EventEmitter}=require('node:events');
+    const {PassThrough}=require('node:stream');
+    t.mock.method(cp,'spawn',()=>{
+        const child=new EventEmitter();
+        child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
+        setImmediate(()=>child.emit('error',new Error('test adapter unavailable')));
+        return child;
+    });
+    const adapter=new ThorDebugAdapter({backend:'/test/codelldb',cwd:os.tmpdir()});
+    t.after(()=>adapter.dispose());
+    const starting=adapter.start();
+    await assert.rejects(starting,/test adapter unavailable/);
+});
+
+test('disconnect during native startup succeeds and settles initialize', {timeout:2000}, async t=>{
+    const cp=require('node:child_process');
+    const {EventEmitter}=require('node:events');
+    const {PassThrough}=require('node:stream');
+    let spawned;
+    const ready=new Promise(resolve=>spawned=resolve);
+    t.mock.method(cp,'spawn',()=>{
+        const child=new EventEmitter();
+        child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
+        spawned();
+        return child;
+    });
+    const adapter=new ThorDebugAdapter({backend:'/test/codelldb',cwd:os.tmpdir()});
+    t.after(()=>adapter.dispose());
+    const messages=[];
+    adapter.onDidSendMessage(message=>messages.push(message));
+    const initialize=adapter.handleMessage({seq:1,type:'request',command:'initialize',arguments:{}});
+    await ready;
+    await adapter.handleMessage({seq:2,type:'request',command:'disconnect',arguments:{}});
+    await initialize;
+    assert.equal(messages.find(message=>message.type==='response'&&message.request_seq===2)?.success,true,messages);
+    const response=messages.find(message=>message.type==='response'&&message.request_seq===1);
+    assert.equal(response?.success,false,messages);
+    assert.match(response.message,/Thor debug session closed/);
+});

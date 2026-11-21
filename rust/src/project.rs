@@ -32,6 +32,8 @@ mod nativefacts;
 mod dependencylookahead;
 #[path = "discoverywork.rs"]
 mod discoverywork;
+#[path = "noallocdiscovery.rs"]
+mod noallocdiscovery;
 #[path = "runtimeview.rs"]
 mod runtimeview;
 #[path = "sdkmirror.rs"]
@@ -39,13 +41,15 @@ mod sdkmirror;
 #[path = "filelowering.rs"]
 mod filelowering;
 #[path = "nativechecks.rs"]
-mod nativechecks;
+pub(crate) mod nativechecks;
 
 #[derive(Clone)]
 pub struct Options {
     pub odin_compatible: bool,
     /// Internal source-policy validation uses a syntax-preserving native view.
     pub native_policy_probe: bool,
+    /// Internal reference-engine entry point; validate policies without running a program.
+    pub native_policy_only: bool,
     pub command: String,
     pub entry: PathBuf,
     pub output: Option<PathBuf>,
@@ -439,7 +443,6 @@ impl Project {
             }
             source.support_collection=support.clone();
         }
-        crate::cli::validate_native_checks(&project)?;
         Ok(project)
     }
     fn discover(&mut self, entry: &Path, visited: &mut HashSet<PathBuf>) -> Result<()> {
@@ -606,7 +609,15 @@ impl Project {
             crate::unused_attributes::validate(&mut resolver, false)?;
             self.retain_resolver(resolver);
         }
+        if self.sources.iter().any(|s| s.thor && !s.excluded && (s.raw.contains("vet_ignore") || s.info["auto_parameters"].as_array().is_some_and(|p| !p.is_empty()))) {
+            let mut resolver=self.resolver();
+            resolver.prepare_contexts();
+            crate::vet_attributes::validate(&resolver)?;
+            crate::caller_metadata::validate(&mut resolver)?;
+            self.retain_resolver(resolver);
+        }
         self.schedule_evaluations()?;
+        self.check_no_alloc()?;
         self.backend_runtime = runtimeview::prepare(&self.options.root)?;
         let mut resolver = Self::resolver_for(&self.sources, &self.options.flags, &self.resolver_index, &self.resolver_state);
         resolver.set_evaluations(self.evaluated.clone());
@@ -627,6 +638,7 @@ impl Project {
             self.options.editor_info,
             self.evaluation.as_ref(),
         );
+        crate::caller_metadata::validate_with_permissions(&mut resolver,Some(&privileges))?;
         self.editor_info = privileges.editor_info.clone();
         let purity = if let Some(plan) = &self.evaluation {
             if plan.requests.is_empty() {
@@ -930,6 +942,42 @@ impl Project {
     fn discover_type_facts(&mut self) -> Result<()> {
         self.discover_type_facts_from(BTreeSet::new())
     }
+    fn check_no_alloc(&mut self) -> Result<()> {
+        if self.evaluation.is_some() || !crate::noalloc::present(&self.sources) {return Ok(());}
+        let _phase=crate::profile::span("analysis.no_alloc");
+        // Ordinary native-only syntax may not have requested SDK type facts.
+        // Install directory identities without parsing any SDK package yet.
+        for source in &mut self.sources {
+            if ["base","core","vendor"].iter().all(|name|source.collection_roots.contains_key(*name)) {continue;}
+            if let Some(root)=source.info["odin_root"].as_str().map(PathBuf::from) {
+                for name in ["base","core","vendor"] {
+                    source.collection_roots.entry(name.into()).or_insert_with(||root.join(name));
+                }
+            }
+        }
+        let mut inspected=BTreeSet::new();
+        let mut discovery=noallocdiscovery::Discovery::default();
+        let sdk_verified=std::rc::Rc::new(std::cell::Cell::new(false));
+        loop {
+            let mut resolver=self.resolver();
+            resolver.prepare_contexts();
+            resolver.set_evaluations(self.evaluated.clone());
+            resolver.begin_symbol_queries();
+            resolver.track_import_demands(true);
+            let result=crate::noalloc::Check::analyze(&mut resolver,&inspected,sdk_verified.clone(),&self.options.overlays);
+            let packages=resolver.demanded_packages().into_iter().filter(|p|
+                !inspected.contains(p) && !self.sources.iter().any(|s|s.path.parent()==Some(p)))
+                .collect::<BTreeSet<_>>();
+            let demands=resolver.demanded_symbols();
+            if packages.is_empty() && demands.is_empty() {self.retain_resolver(resolver);return result;}
+            inspected.extend(packages.iter().cloned());
+            self.retain_resolver(resolver);
+            let before=self.sources.len();
+            if !packages.is_empty() {self.discover_type_facts_from(packages)?;}
+            discovery.load(self,&demands)?;
+            if before==self.sources.len() {return result;}
+        }
+    }
     fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
         let _phase = crate::profile::span("analysis.discover_types");
         let general = self.sources.iter().any(|s| {
@@ -938,6 +986,7 @@ impl Project {
                     || n.data["pure"] == true
                     || matches!(n.kind.as_str(), "Run" | "Interpolation" | "OrPanic")
             }) || s.selections.iter().any(|selection| selection.wildcard)
+                || s.info["ro_parameters"].as_array().is_some_and(|x| !x.is_empty())
                 || s.info["mut_parameters"]
                     .as_array()
                     .is_some_and(|rows| !rows.is_empty())
@@ -1088,9 +1137,6 @@ impl Project {
                 result.push(format!("-define:THOR_APP_SOURCE_ROOT={}", root.display()));
             }
         }
-        if crate::cli::checks_requested(&result) {
-            crate::cli::check_scopes(self, &mut result);
-        }
         if nativechecks::active(self) {
             result.retain(|flag| !nativechecks::checking_flag(flag));
         }
@@ -1107,7 +1153,7 @@ impl Project {
     pub fn compile(&mut self, target: &Path) -> Result<i32> {
         let _phase = crate::profile::span("backend.final");
         let (policy_status, policy_diagnostics) = nativechecks::validate(self)?;
-        if policy_status != 0 {
+        if policy_status != 0 || self.options.native_policy_only {
             self.report_details(&policy_diagnostics, "");
             return Ok(policy_status);
         }

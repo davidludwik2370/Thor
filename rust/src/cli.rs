@@ -6,7 +6,6 @@ use crate::{
 };
 use serde::Deserialize;
 use std::{
-    collections::BTreeSet,
     env,
     path::{Path, PathBuf},
     process::Command,
@@ -32,7 +31,7 @@ pub struct NativeFlag {
     pub commands: Vec<String>,
     pub internal: bool,
     #[serde(default)]
-    pub thor_rejection: Option<String>,
+    pub source_check: bool,
 }
 #[derive(Deserialize)]
 pub struct Catalog {
@@ -54,56 +53,10 @@ pub fn source_command(name: &str) -> bool {
         .any(|command| command.name == name && command.source)
 }
 
-/// Native checks see generated Odin, so only audited checks can be applied to
-/// Thor-containing projects. Keep native-only projects compatible with Odin.
-pub fn native_check_rejection(name: &str) -> Option<&'static str> {
-    if let Some(flag) = catalog().native_flags.iter().find(|flag| flag.name == name) {
-        return flag.thor_rejection.as_deref();
-    }
-    name.starts_with("vet-").then_some(
-        "This native check has not been audited against generated Thor code.",
-    )
-}
-
-pub fn validate_native_checks(project: &crate::project::Project) -> Result<()> {
-    if project.options.odin_compatible {
-        return Ok(());
-    }
-    if !project.sources.iter().any(|source| source.thor && !source.excluded) {
-        return Ok(());
-    }
-    for flag in &project.options.flags {
-        let name = flag.trim_start_matches('-').split(':').next().unwrap_or_default();
-        if let Some(reason) = native_check_rejection(name) {
-            return Err(Error::new(format!(
-                "-{name} is supported only for Odin-only projects. {reason} Remove -{name} for projects containing Thor source."
-            )));
-        }
-    }
-    if project.options.command != "ast" {
-        for source in project.sources.iter().filter(|source| source.thor && !source.excluded) {
-            for tag in source.info["file_tags"].as_array().into_iter().flatten().filter_map(|tag| tag.as_str()) {
-                let mut words = tag.trim_start_matches("#+").split_whitespace();
-                if words.next() != Some("vet") { continue; }
-                let mut names = words.flat_map(|word| word.split(',')).filter(|name| !name.is_empty()).collect::<Vec<_>>();
-                // A bare #+vet enables Odin's full bundle.
-                if names.is_empty() { names.push(""); }
-                for name in names.into_iter().filter(|name| !name.starts_with('!')) {
-                    let check = if name.is_empty() { "vet".into() } else { format!("vet-{name}") };
-                    if let Some(reason) = native_check_rejection(&check) {
-                        let start = source.raw.match_indices(tag)
-                            .map(|(start, _)| start)
-                            .find(|start| !source.comments.iter().any(|comment| comment.start <= *start && *start < comment.end))
-                            .unwrap_or_default();
-                        let label = if name.is_empty() { "#+vet".into() } else { format!("#+vet {name}") };
-                        return Err(Error::at(source, crate::ast::Span::new(start, start + tag.len()),
-                            format!("{label} is supported only in Odin source files. {reason}")));
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
+/// Policies that require original lexical scopes rather than generated helpers.
+pub fn native_source_check(name: &str) -> bool {
+    catalog().native_flags.iter().find(|flag| flag.name == name)
+        .map_or_else(|| name.starts_with("vet-"), |flag| flag.source_check)
 }
 
 /// File identity also covers case-insensitive paths, symlinks and Unix hardlinks.
@@ -456,44 +409,6 @@ pub fn normalize(options: &mut Options) -> Result<()> {
         }
     }
     Ok(())
-}
-
-pub fn checks_requested(flags: &[String]) -> bool {
-    flags
-        .iter()
-        .any(|flag| flag.starts_with("-vet") || flag.starts_with("-strict-style"))
-}
-pub fn check_scopes(project: &crate::project::Project, flags: &mut Vec<String>) {
-    let mut packages = BTreeSet::new();
-    let root = if project.options.entry.is_file() {
-        project.options.entry.parent().unwrap()
-    } else {
-        &project.options.entry
-    };
-    for source in &project.sources {
-        if source.path.starts_with(root) && !source.excluded {
-            packages.insert(
-                source
-                    .names
-                    .get(source.node(crate::ast::NodeId(0)).name)
-                    .to_string(),
-            );
-        }
-    }
-    let packages = packages.into_iter().collect::<Vec<_>>().join(",");
-    if flags.iter().any(|flag| flag.starts_with("-vet"))
-        && !flags.iter().any(|flag| flag.starts_with("-vet-packages:"))
-    {
-        flags.push(format!("-vet-packages:{packages}"));
-    }
-    if flags.iter().any(|flag| flag == "-strict-style")
-        && !project.options.native_policy_probe
-        && !flags
-            .iter()
-            .any(|flag| flag.starts_with("-strict-style-packages:"))
-    {
-        flags.push(format!("-strict-style-packages:{packages}"));
-    }
 }
 
 /// Reports and artifact policies belong to the final compilation, not isolated

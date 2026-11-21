@@ -269,6 +269,7 @@ class ThorDebugAdapter {
         if (this.starting) return this.starting;
         this.starting = new Promise((resolve, reject) => {
             const server = net.createServer(socket => {
+                this.rejectStarting = undefined;
                 this.socket = socket;
                 server.close();
                 clearTimeout(timer);
@@ -281,8 +282,17 @@ class ThorDebugAdapter {
                 resolve();
             });
             this.server = server;
-            const timer = setTimeout(() => { server.close(); reject(new Error('CodeLLDB startup timed out')); this.dispose(); }, 15000);
-            server.on('error', error => { clearTimeout(timer); reject(error); });
+            const timer = setTimeout(() => { this.fail(new Error('CodeLLDB startup timed out')); this.dispose(); }, 15000);
+            // A native adapter can exit (or be cancelled) before connecting.
+            // Settle initialize as well as ordinary backend requests; otherwise
+            // clearing the startup timer leaves its promise pending forever.
+            this.rejectStarting = error => {
+                this.rejectStarting = undefined;
+                clearTimeout(timer);
+                server.close();
+                reject(error);
+            };
+            server.on('error', error => this.fail(error));
             this.authToken=crypto.randomBytes(32).toString('base64');
             server.listen(0, '127.0.0.1', () => {
                 const root = this.options.backend;
@@ -292,8 +302,8 @@ class ThorDebugAdapter {
                 delete env.PYTHONHOME; delete env.PYTHONPATH; delete env.CODELLDB_STARTUP;
                 this.child = cp.spawn(executable, ['--liblldb', this.options.library || path.join(root, 'lldb', lib), '--connect', String(server.address().port), '--auth-token', this.authToken],
                     {cwd: this.options.cwd, env, stdio: ['ignore', 'pipe', 'pipe']});
-                this.child.on('error', error => { clearTimeout(timer); server.close(); reject(error); });
-                this.child.on('exit', () => { clearTimeout(timer); server.close(); this.fail(new Error('CodeLLDB exited')); });
+                this.child.on('error', error => this.fail(error));
+                this.child.on('exit', (code, signal) => this.fail(new Error(`CodeLLDB exited (${signal ? 'signal '+signal : 'code '+code})`)));
                 for (const stream of [this.child.stdout, this.child.stderr]) stream.on('data', data => {
                     this.emit({type: 'event', event: 'output', body: {category: 'console', output: data.toString()}});
                 });
@@ -302,6 +312,7 @@ class ThorDebugAdapter {
         return this.starting;
     }
     fail(error) {
+        this.rejectStarting?.(error);
         for (const {reject} of this.pending.values()) reject(error);
         this.pending.clear();
         if (!this.exited) { this.exited = true; this.emit({type: 'event', event: 'terminated'}); }
@@ -405,6 +416,7 @@ class ThorDebugAdapter {
         if (command === 'continue' || command === 'pause') this.step = undefined;
         if (command === 'disconnect') {
             this.disconnecting=true;
+            if (!this.socket || this.socket.destroyed || this.exited) { await this.dispose(); return {}; }
             try { return await this.request(command, args); } finally { this.dispose(); }
         }
         return this.request(command, args);

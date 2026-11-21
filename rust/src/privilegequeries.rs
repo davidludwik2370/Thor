@@ -45,6 +45,7 @@ impl Privileges<'_, '_> {
         let nodes = self.s(current).descendants(current.node).collect::<Vec<_>>();
         for node in nodes {
             let reference = Ref { file: current.file, node };
+            if self.explicit_ro.contains(&reference) { local=true; break; }
             if !self.r.active_definition(reference) { continue; }
             let source = self.s(current);
             if source.ancestors(node).find(|id| source.node(*id).kind == "Procedure")
@@ -85,6 +86,7 @@ impl Privileges<'_, '_> {
         body
     }
     pub(super) fn has_readonly_views(&mut self) -> bool {
+        if !self.explicit_ro.is_empty() { return true; }
         let declarations = self.r.sources.iter().enumerate().flat_map(|(file, source)| {
             source.nodes.iter().enumerate().filter(|(_, node)| node.immutable)
                 .flat_map(move |(index, _)| source.group(NodeId(index), "names").iter()
@@ -121,7 +123,7 @@ impl Privileges<'_, '_> {
     pub(super) fn needs_root(&mut self, proc: Ref) -> bool {
         let _phase = crate::profile::span("permissions.root_selection");
         let source = self.s(proc);
-        if source.node(proc.node).data["pure"] == true {
+        if source.node(proc.node).data["pure"] == true || self.reader_targets.contains(&proc) {
             return true;
         }
         // Explicit contracts also feed checked-helper code generation, even
@@ -136,7 +138,7 @@ impl Privileges<'_, '_> {
         if self
             .params(signature)
             .iter()
-            .any(|(name, _)| self.explicit.contains(name))
+            .any(|(name, _)| self.explicit.contains(name) || self.explicit_ro.contains(name))
         {
             crate::profile::count("permissions.explicit_roots", 1);
             return true;

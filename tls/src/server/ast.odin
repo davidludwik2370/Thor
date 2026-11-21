@@ -115,9 +115,11 @@ parse_file :: proc (p: ^parser.Parser, file: ^ast.File, allocator := context.all
 	clear(&p.edits)
 	clear(&p.immutables)
 	clear(&p.mut_parameters)
+	clear(&p.ro_parameters)
+	clear(&p.auto_parameters)
 	clear(&p.features)
 	ok := parser.parse_file(p, file)
-	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file); thor_adapt_switches(p,file); thor_adapt_expressions(p,file) }
+	if p.thor { thor_add_import_aliases(p, file); thor_mark_immutables(p, file); thor_mark_parameters(p,file); thor_adapt_switches(p,file); thor_adapt_expressions(p,file) }
 	return ok
 }
 
@@ -1336,8 +1338,8 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 			strings.write_string(builder,")")
 			return
 		}
-		if name,ok:=n.expr.derived.(^ast.Ident);ok&&name.name=="__thor_run"&&name.pos.offset==name.end.offset&&len(n.args)==1 {
-			strings.write_string(builder,"#run ")
+		if name,ok:=n.expr.derived.(^ast.Ident);ok&&(name.name=="__thor_run"||name.name=="__thor_runtime")&&name.pos.offset==name.end.offset&&len(n.args)==1 {
+			strings.write_string(builder,"#runtime " if name.name=="__thor_runtime" else "#run ")
 			build_string(n.args[0],builder,remove_pointers)
 			return
 		}
@@ -1385,7 +1387,7 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 		build_string(n.elems, builder, remove_pointers)
 	case ^ast.Field:
 		for name, i in n.names {
-			if thor_slice_parameter_mut(name.pos.file, name.pos.offset) { strings.write_string(builder, "#mut ") }
+			if thor_parameter_code(n,i)=='r' {strings.write_string(builder,"#ro ")} else if thor_slice_parameter_mut(name.pos.file, name.pos.offset) { strings.write_string(builder, "#mut ") }
 			build_string(name, builder, remove_pointers)
 			if len(n.names) - 1 != i {
 				strings.write_string(builder, ", ")
@@ -1401,7 +1403,7 @@ build_string_node :: proc(node: ^ast.Node, builder: ^strings.Builder, remove_poi
 			}
 
 		} else if len(n.names) > 0 && n.default_value != nil {
-			strings.write_string(builder, " := ")
+			strings.write_string(builder, " :> " if thor_parameter_auto(n) else " := ")
 		} else {
 			build_string(n.type, builder, remove_pointers)
 		}

@@ -60,7 +60,9 @@ def frontend_binary(odin):
 
 class Project:
     def __init__(self, entry, frontend, flags, *, test=False, overlays=None, cache_frontend=True,
-                 cache_directory=None,use_shared=True,debug_maps=None):
+                 cache_directory=None,use_shared=True,debug_maps=None,native_policy_probe=False):
+        self.native_policy_probe=native_policy_probe
+        self.native_policy_checked=False
         self.entry = Path(entry).resolve()
         self.overlays = overlays or {}
         self.cache_frontend = cache_frontend
@@ -139,7 +141,7 @@ class Project:
         for path in paths:
             if path in self.sources:
                 continue
-            source = Source(path, self.frontend, thor=path.suffix == ".thor", package=entry.is_dir(),
+            source = Source(path, self.frontend, thor=path.suffix == ".thor" and not self.native_policy_probe, package=entry.is_dir(),
                             test=self.test, project_name=(self.entry.parent if self.file_entry else self.entry).name, mapping=self.mapping,
                             raw=self.overlays.get(path), target=self.target,cache=self.cache_frontend,cache_dir=self.cache_directory)
             for namespace,imported in list(source.imports.items()):
@@ -172,7 +174,13 @@ class Project:
     def emit(self, destination, *, persist_maps=None, materialize=True):
         from .unused_attributes import validate
         validate(self)
+        from . import vet_attributes, caller_metadata
+        vet_attributes.validate(self)
+        caller_metadata.validate(self)
+        from . import noalloc
+        noalloc.validate(self)
         self.slice_access.prepare()
+        caller_metadata.validate(self,permissions=True)
         if self.purity.eval_mode:
             for proc in self.purity.active:self.purity.analyze(proc)
             self.purity.borrowing.finish(self.purity.active)
@@ -359,8 +367,8 @@ class Project:
             else:
                 root = self.entry.parent if self.file_entry else self.entry
                 result.append('-define:THOR_APP_SOURCE_ROOT=' + str(root))
-        from .cli import check_scopes
-        check_scopes(self, result)
+        if self.native_policy_checked:
+            result=[f for f in result if not f.startswith(("-vet", "-strict-style"))]
         return result
 
     def diagnostic_adapter(self):
@@ -540,13 +548,22 @@ def _main(argv=None):
             preparing = time.monotonic()
             project = Project(entry,frontend,flags,test=test_mode,overlays=overlays,
                               cache_frontend=not options.no_cache,cache_directory=cache_root)
-            cli.validate_native_checks(project, options.command, flags)
+            native_diagnostics=[]
+            if options.command not in {'ast','transpile'}:
+                from . import nativechecks
+                status, native_diagnostics=nativechecks.validate(project, options.command, odin)
+                if status:
+                    report(native_diagnostics)
+                    return status
             preparation = time.monotonic()-preparing
             if options.command == 'ast':
                 print(json.dumps({'version':1,'sources':[{'path':str(source.path),'frontend':source.info} for source in project.sources.values()]}))
                 return 0
             from .unused_attributes import validate
             validate(project)
+            from . import vet_attributes, caller_metadata
+            vet_attributes.validate(project)
+            caller_metadata.validate(project)
             lowering = time.monotonic()
             project.slice_access.enabled|=options.editor_info
             project.slice_access.full_contracts=options.editor_info
@@ -570,7 +587,7 @@ def _main(argv=None):
                 memory.finish(project)
                 project.write()
             diagnostics = project.diagnostic_adapter()
-            frontend_diagnostics = diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)
+            frontend_diagnostics = [*native_diagnostics, *diagnostics.translate([d for s in project.sources.values() for d in s.diagnostics], backend=False)]
         finally:
             if options.cache_report:print(json.dumps({'thor_cache':cache.stats,'thor_prepared_hits':cache.prepared_hits}),flush=True)
         lowering = time.monotonic()-lowering

@@ -180,6 +180,7 @@ fn expression_name(s: &Source, node: NodeId) -> bool {
     }
     if let Some(parent) = n.parent {
         let p = s.node(parent);
+        if s.role(parent,"label")==Some(node){return false;}
         if matches!(
             p.kind.as_str(),
             "Declaration" | "Field" | "Range" | "TypeSwitch"

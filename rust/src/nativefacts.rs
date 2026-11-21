@@ -202,6 +202,7 @@ impl Project {
                 node.immutable || node.data["pure"] == true
                     || matches!(node.kind.as_str(), "Run" | "Interpolation" | "OrPanic")
             }) || !source.selections.is_empty()
+                || source.info["ro_parameters"].as_array().is_some_and(|x| !x.is_empty())
                 || source.info["mut_parameters"].as_array().is_some_and(|rows| !rows.is_empty()))
         }) { return Ok(()); }
         let mut inspected = HashSet::new();

@@ -15,8 +15,9 @@ class UnusedLocalTests(unittest.TestCase):
     invoke = base.ThorTests.invoke
     program = base.ThorTests.program
 
+    # Serialize expected diagnostics for the pinned SDK's reporting race.
     def warnings(self, source, *, flags=(), command='run', expected=None):
-        root, result = self.invoke(source, command=command, flags=[*flags, '-json-errors'], expected=expected)
+        root, result = self.invoke(source, command=command, flags=[*flags, '-thread-count:1', '-json-errors'], expected=expected)
         packet = json.loads(result.stderr)
         self.assertEqual(packet['error_count'], 0, packet)
         self.assertTrue(all(error['type'] == 'warning' for error in packet['errors']), packet)
@@ -65,11 +66,11 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
         _, result = self.invoke(source, command='check', flags=['-json-errors', '-warnings-as-errors'], fail='declared but not used')
         self.assertEqual(json.loads(result.stderr)['errors'][0]['type'], 'error')
         self.invoke(self.program('unused:=1;value:=2;_=value'), command='check',
-                    flags=['-vet-unused-variables'], fail='Odin-only projects')
+                    flags=['-vet-unused-variables', '-thread-count:1'], fail='not used')
         self.invoke(self.program('if true {unused:=1}', 'import "core:fmt"\n'),
-                    command='check', flags=['-vet-unused-imports'], fail='Odin-only projects')
-        self.invoke(self.program('outer:=1;if true {outer:=2};_=outer'),
-                    command='check', flags=['-vet-shadowing'], fail='Odin-only projects')
+                    command='check', flags=['-vet-unused-imports', '-thread-count:1'], fail='not used')
+        self.invoke(self.program('outer:=1;if true {outer:=2;_=outer};_=outer'),
+                    command='check', flags=['-vet-shadowing', '-thread-count:1'], fail='shadows')
 
     def test_native_selection_and_existing_unused_rules(self):
         for body in ['when false {if true {unused:=missing}}',
@@ -131,9 +132,9 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
 
     def test_requested_procedure_vetting_stays_strict(self):
         self.invoke(self.program('local::proc($T:typeid){};_=1'), command='check',
-                    flags=['-vet-unused-procedures', '-vet-packages:main'], fail='Odin-only projects')
+                    flags=['-vet-unused-procedures', '-vet-packages:main', '-thread-count:1'], fail='not used')
         self.invoke('#+vet unused-procedures\n'+self.program('local::proc($T:typeid){};_=1'),
-                    command='check', fail='supported only in Odin source files')
+                    command='check', flags=['-thread-count:1'], fail='not used')
 
     def test_clean_backend_success_keeps_one_compiler_invocation(self):
         result = subprocess.CompletedProcess(['odin', 'check', '.'], 0, stderr=b'')

@@ -65,6 +65,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let mut project = Project::new(Options {
             native_policy_probe: false,
+            native_policy_only: false,
             odin_compatible: false,
         command: "check".into(),
         entry: std::env::args().nth(1).ok_or("source")?.into(),

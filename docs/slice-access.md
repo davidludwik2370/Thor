@@ -139,8 +139,8 @@ receive a source-level diagnostic. The directive is erased before Odin sees the
 signature, preserving calling conventions, evaluation order and debugger maps.
 
 Other native parameter directives retain Odin's grouped-field rules. Put them
-before the shared name list, or use separate typed parameter clauses. Only
-`#mut` has the per-name extension described here.
+before the shared name list, or use separate typed parameter clauses. `#mut` and `#ro`
+have the per-name extension described here.
 
 Returned aliases preserve the caller's permission. A mutable declaration cannot
 turn such a result into writable access. A fresh clone has independent writable
@@ -255,3 +255,29 @@ procedures as well. Recursive summaries propagate changes only to their actual
 callers, using completed permission graphs to determine convergence. See the
 [test-command performance report](test-performance-2026-11-08.md) for validation
 of these optimizations and their cache boundaries.
+
+
+## Explicit read-only inputs with `#ro`
+
+`#ro` enforces a read-only slice view in a procedure body even when its caller
+owns writable storage. It applies only to the immediately following parameter
+name, and cannot share that name with `#mut`.
+
+```odin
+copy_values :: proc(#ro source, #mut destination: []int) {
+    copy(destination, source)
+}
+```
+
+Both mutable and immutable slices can be read through `source`. Mutation,
+writable alias/address creation, and calls that require writable backing through
+that reference are errors. Copies of inline numeric/record elements remain
+ordinary independent values; references within those copies retain their access
+permissions. Slice returns derived from `source` remain read-only. Existing
+writable aliases outside the procedure can still change the shared backing.
+
+The annotation is supported on slice inputs, variadics, generic slice
+specializations, and explicit callback signatures. A procedure assigned/passed
+to a `#ro` callback must be a verified reader or carry the compatible contract;
+mutating procedures are rejected. The directive adds no runtime tag or allocation.
+`#runtime` preserves these permissions when it prevents automatic evaluation.

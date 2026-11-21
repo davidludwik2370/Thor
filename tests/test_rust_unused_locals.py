@@ -11,8 +11,9 @@ class RustUnusedLocalTests(unittest.TestCase):
     invoke=native.RustCompilerTests.invoke
     compare=native.RustCompilerTests.compare
 
+    # Serialize expected diagnostics for the pinned SDK's reporting race.
     def warnings(self, source, *, flags=(), expected='', files=None, count=None):
-        result=self.compare(source,files=files,flags=[*flags,'-json-errors'],expected=expected)
+        result=self.compare(source,files=files,flags=[*flags,'-thread-count:1','-json-errors'],expected=expected)
         packet=json.loads(result.stderr)
         self.assertEqual(packet['error_count'],0,packet)
         self.assertTrue(all(error['type']=='warning' for error in packet['errors']),packet)
@@ -53,11 +54,11 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
         self.warnings(source,flags=['-ignore-warnings'],count=0)
         self.compare(source,command='check',flags=['-json-errors','-warnings-as-errors'],fail='declared but not used')
         self.compare(self.program('unused:=1;value:=2;_=value'),command='check',
-                     flags=['-vet-unused-variables'],fail='Odin-only projects')
+                     flags=['-vet-unused-variables', '-thread-count:1'],fail='not used')
         self.compare(self.program('if true {unused:=1}','import "core:fmt"\n'),command='check',
-                     flags=['-vet-unused-imports'],fail='Odin-only projects')
-        self.compare(self.program('outer:=1;if true {outer:=2};_=outer'),command='check',
-                     flags=['-vet-shadowing'],fail='Odin-only projects')
+                     flags=['-vet-unused-imports', '-thread-count:1'],fail='not used')
+        self.compare(self.program('outer:=1;if true {outer:=2;_=outer};_=outer'),command='check',
+                     flags=['-vet-shadowing', '-thread-count:1'],fail='shadows')
 
     def test_native_selection_and_existing_block_rules_remain_unchanged(self):
         for body in ['when false {if true {unused:=missing}}','unused:=1','{unused:=1}',
@@ -68,7 +69,7 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
         source=self.program('/* 😀 */if true do unused:=1;value:int="wrong";_=value')
         for flags in [[],['-max-error-count:1']]:
             with self.subTest(flags=flags):
-                result=self.compare(source,command='check',flags=[*flags,'-json-errors'],fail='Cannot convert')
+                result=self.compare(source,command='check',flags=[*flags,'-thread-count:1','-json-errors'],fail='Cannot convert')
                 errors=json.loads(result.stderr)['errors']
                 warning=next(error for error in errors if error['type']=='warning')
                 self.assertEqual(warning['pos']['offset'],source.encode().index(b'unused'))
@@ -99,6 +100,6 @@ pair::proc()->(int,int){calls+=1;return calls,calls}
 
     def test_requested_procedure_vetting_stays_strict(self):
         self.compare(self.program('local::proc($T:typeid){};_=1'),command='check',
-                     flags=['-vet-unused-procedures','-vet-packages:main'],fail='Odin-only projects')
+                     flags=['-vet-unused-procedures','-vet-packages:main','-thread-count:1'],fail='not used')
         self.compare('#+vet unused-procedures\n'+self.program('local::proc($T:typeid){};_=1'),
-                     command='check',fail='supported only in Odin source files')
+                     command='check',flags=['-thread-count:1'],fail='not used')

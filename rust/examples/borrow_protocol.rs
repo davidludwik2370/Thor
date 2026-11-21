@@ -96,6 +96,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let sources = if std::env::args().any(|arg| arg == "--project") {
         let mut project = Project::new(Options {
             native_policy_probe: false,
+            native_policy_only: false,
             odin_compatible: false,
             command: "check".into(),
             entry: entry.clone().into(),

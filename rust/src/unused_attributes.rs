@@ -32,7 +32,7 @@ pub(crate) fn only_unused_attributes(source: &Source, declaration: NodeId) -> bo
             .group(declaration, "attributes")
             .iter()
             .all(|attribute| {
-                source.group(*attribute, "elems").len() == elements(source, *attribute).len()
+                source.group(*attribute, "elems").len() == elements(source, *attribute).len() + crate::vet_attributes::elements(source,*attribute).len() + crate::noalloc::elements(source,*attribute).len()
             })
 }
 

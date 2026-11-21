@@ -17,7 +17,8 @@ impl Lower<'_, '_> {
                 Type::Scalar { name, .. } => name == "bool" || typ.numeric()
                     || name.starts_with("complex") || name.starts_with("quaternion"),
                 Type::Enum(_) => true,
-                Type::Nominal(_, base) | Type::Array { elem: base, .. }
+                Type::Nominal(_, base) | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
+            | Type::Vector { elem: base, .. }
                 | Type::Fixed { elem: base, .. } => inline(r, base, seen),
                 Type::Struct(owner) | Type::Record(owner, _) => {
                     if !seen.insert(*owner) { return false; }
@@ -519,7 +520,8 @@ impl Lower<'_, '_> {
         }
         match typ {
             Type::Nominal(_, base)
-            | Type::Array { elem: base, .. }
+            | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
+            | Type::Vector { elem: base, .. }
             | Type::Fixed { elem: base, .. } => self.pure_owns(base, seen),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .resolver

@@ -115,7 +115,7 @@ class SliceAccess:
         self.readonly_access={}
         for source in project.sources.values():
             source.slice_access=self
-            self.enabled|=bool(source.info.get('mut_parameters') or source.info.get('immutables'))
+            self.enabled|=bool(source.info.get('mut_parameters') or source.info.get('ro_parameters') or source.info.get('immutables'))
         self.validate_annotations()
 
     @staticmethod
@@ -137,12 +137,12 @@ class SliceAccess:
         for source in self.project.sources.values():
             names={name.start:(name,field) for proc in source.nodes if proc.kind=='ProcedureType'
                    for name,field in self.parameters(proc)}
-            for offset,start,end in source.info.get('mut_parameters') or []:
-                if offset not in names:source.error('#mut is only allowed immediately before a procedure parameter name.',start,end)
-                name,field=names[offset];name.data['slice_mut']=True
+            for readonly,(offset,start,end) in [(ro,row) for ro,key in [(False,'mut_parameters'),(True,'ro_parameters')] for row in source.info.get(key) or []]:
+                if offset not in names:source.error(('#ro requires a slice parameter; it' if readonly else '#mut')+' is only allowed immediately before a procedure input parameter name.',start,end)
+                name,field=names[offset];name.data['slice_ro' if readonly else 'slice_mut']=True
                 typ=self.r.type_node(field.role('type'))
                 if typ.kind not in {'slice','generic','unknown'} and not field.data.get('variadic'):
-                    source.error('#mut requires a slice parameter; pointer and scalar parameters are not supported.',start,end)
+                    source.error(('#ro' if readonly else '#mut')+' requires a slice parameter; pointer and scalar parameters are not supported.',start,end)
 
     def prepare(self):
         if not self.enabled:return
@@ -182,10 +182,13 @@ class SliceAccess:
             # both repeats work and can inspect declarations pruned from that
             # helper. Calls recursively instantiate the retained callees.
             procedures=[proc for proc in self.project.purity.active if proc.kind=='Procedure']
+        from .caller_metadata import reader_targets
+        targets=reader_targets(self.project)
+        procedures=list(dict.fromkeys([*procedures,*targets]))
         # Check every body, but infer hypothetical parameter borrowing only
         # when an actual reference-bearing call needs that contract. Editors
         # also request contracts for unused declarations to display #mut hints.
-        for proc in procedures:self.summary(proc,{},contract=self.full_contracts)
+        for proc in procedures:self.summary(proc,{},contract=self.full_contracts or proc in targets)
         self.stabilize()
         for context in list(self.summaries.values()):self.publish(context)
         for source in self.project.sources.values():
@@ -653,6 +656,8 @@ class SliceAccess:
         for index,(name,field) in enumerate(params):
             typ=self.substitute_type(self.parameter_type(field,substitutions),substitutions)
             context.env[field,name.text.lstrip('$')]=self.fresh(typ,(index,()) if contract else None)
+            if name.data.get('slice_ro'):
+                context.env[field,name.text.lstrip('$')]=self.freeze(context.env[field,name.text.lstrip('$')],name)
             if name.data.get('slice_mut'):
                 self.require({Origin(index)},name,context,'satisfy explicit #mut')
         result_fields=proc.role('type').role('results')
@@ -834,8 +839,13 @@ class SliceAccess:
                 self.require(self.references(value),node,context,'erase read-only slice permissions in a conversion')
             return result
         if self.indirect_callee(callee):
-            for arg in args:self.require(self.references(self.eval(arg,context)),arg,context,
-                                          'verify an indirect call with a read-only slice')
+            signature=node.source.signature(node)
+            contract=self.parameters(signature) if signature else []
+            for index,arg in enumerate(args):
+                position=next((i for i,(name,_) in enumerate(contract) if arg.kind=='FieldValue' and name.text.lstrip('$')==arg.role('field').text),index)
+                parameter=contract[position] if position<len(contract) else contract[-1] if contract and contract[-1][1].data.get('variadic') else None
+                if parameter and parameter[0].data.get('slice_ro'):continue
+                self.require(self.references(self.eval(arg,context)),arg,context,'verify an indirect call with a read-only slice')
             return self.opaque_call(node,context)
         plan=self.r.resolve_call(node)
         if plan is None:
@@ -898,6 +908,7 @@ class SliceAccess:
         return False
 
     def has_readonly_views(self):
+        if any(source.info.get('ro_parameters') for source in self.project.sources.values()):return True
         if self.opaque_readonly is None:
             def escapes(declaration):
                 procedure=next((node for node in declaration.ancestors() if node.kind=='Procedure'),None)
@@ -969,6 +980,8 @@ class SliceAccess:
             if opaque.name in {'any','rawptr'} and index<len(bindings):
                 self.require(self.references(bindings[index]),sites[index],context,
                     'preserve read-only slice permissions through an opaque parameter', [name])
+            if name.data.get('slice_ro') and index<len(bindings) and bindings[index].typ.kind not in {'slice','soa','unknown','generic'}:
+                node.source.error('#ro requires a slice parameter in this specialization.',node.start,node.end)
             if name.data.get('slice_mut') and index<len(bindings):
                 if bindings[index].typ.kind not in {'slice','generic','unknown'}:
                     token=node.source.prefix+'slice_parameter_type_'+str(node.start)
@@ -1084,7 +1097,7 @@ class SliceAccess:
                     self.publish(owner)
                 return self.globals.get(key,Value(typ))
             return Value(typ)
-        if node.kind in {'Paren','OrReturn','OrBranch','OrPanic','AutoCast'}:
+        if node.kind in {'Paren','Runtime','OrReturn','OrBranch','OrPanic','AutoCast'}:
             inner=node.role('expr');value=self.eval(inner,context)
             values=context.expressions.get((inner,'results'))
             if values is not None:

@@ -113,6 +113,7 @@ pub struct Issue {
 pub struct Facts {
     pub issues: HashMap<Ref, Issue>,
     pub mutating: BTreeSet<Ref>,
+    pub verified_parameters: BTreeSet<Ref>,
     pub readonly: BTreeSet<Ref>,
     pub invalid: HashMap<Ref, String>,
     pub pure_faults: BTreeMap<Ref, Vec<Issue>>,
@@ -207,6 +208,8 @@ pub struct Privileges<'a, 'r> {
     globals: HashMap<usize, V>,
     global_active: HashSet<usize>,
     explicit: HashSet<Ref>,
+    explicit_ro: HashSet<Ref>,
+    reader_targets: HashSet<Ref>,
     facts: Facts,
     changed: bool,
     depth: usize,
@@ -236,6 +239,7 @@ struct SummaryKey {
 }
 impl<'a, 'r> Privileges<'a, 'r> {
     fn new(r: &'r mut Resolver<'a>, flags: &[String], discovering: bool) -> Self {
+        let reader_targets=crate::caller_metadata::reader_targets(r);
         let global_view_names = r.symbols.iter().filter(|symbol| {
             symbol.immutable && r.sources[symbol.reference.file].node(symbol.scope).kind == "File"
         }).map(|symbol| symbol.name.clone()).collect();
@@ -248,6 +252,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             globals: HashMap::new(),
             global_active: HashSet::new(),
             explicit: HashSet::new(),
+            explicit_ro: HashSet::new(),
+            reader_targets,
             facts: Facts::default(),
             changed: false,
             depth: 0,
@@ -301,6 +307,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 s.nodes
                     .iter()
                     .any(|n| n.immutable || n.data["pure"] == true)
+                    || s.info["ro_parameters"].as_array().is_some_and(|x| !x.is_empty())
                     || s.info["mut_parameters"]
                         .as_array()
                         .is_some_and(|x| !x.is_empty())
@@ -355,7 +362,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 .parent()
                 .unwrap()
                 .join("runtime");
-            if this.s(proc).path.starts_with(&toolkit)
+            if this.s(proc).path.starts_with(&toolkit) && !this.reader_targets.contains(&proc)
                 && !this
                     .s(proc)
                     .descendants(proc.node)
@@ -368,14 +375,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     .descendants(sig.node)
                     .any(|id| this.s(sig).node(id).kind == "PolyType")
             });
-            if editor || !generic || this.s(proc).node(proc.node).data["pure"] == true {
+            if editor || !generic || this.reader_targets.contains(&proc) || this.s(proc).node(proc.node).data["pure"] == true {
                 crate::profile::count("permissions.root_candidates", 1);
                 if !editor && !this.needs_root(proc) {
                     crate::profile::count("permissions.roots_skipped", 1);
                     continue;
                 }
                 this.pure_depth = usize::from(this.s(proc).node(proc.node).data["pure"] == true);
-                this.summary(proc, Substitutions::new(), None, editor);
+                this.summary(proc, Substitutions::new(), None, editor || this.reader_targets.contains(&proc));
                 this.pure_depth = 0;
                 if discovering && this.r.has_demanded_packages() {
                     crate::profile::event("permissions.incomplete", || serde_json::json!({
@@ -429,6 +436,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 continue;
             };
             let sig = this.role(proc, "type").unwrap_or(proc);
+            if this.contexts[c].complete {
+                this.facts.verified_parameters.extend(this.params(sig).into_iter().map(|(name,_)|name));
+            }
             for origin in this.contexts[c].effects.keys() {
                 if let Some((name, _)) = this.params(sig).get(origin.path.index) {
                     this.facts.mutating.insert(*name);
@@ -1489,7 +1499,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
     fn annotations(&mut self) {
         let sources = self.r.sources;
         for (file, s) in sources.iter().enumerate() {
-            for row in s.info["mut_parameters"].as_array().into_iter().flatten() {
+            for (readonly, row) in [false, true].into_iter().flat_map(|ro| s.info[if ro {"ro_parameters"} else {"mut_parameters"}].as_array().into_iter().flatten().map(move |row| (ro, row))) {
                 let offset = row[0].as_u64().unwrap_or(u64::MAX) as usize;
                 let field = s
                     .nodes
@@ -1507,7 +1517,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         .find(|name| s.node(**name).span.start == offset)
                     {
                         let reference = Ref { file, node: *name };
-                        self.explicit.insert(reference);
+                        if readonly { self.explicit_ro.insert(reference); } else { self.explicit.insert(reference); }
                         let valid = s.ancestors(field).any(|ancestor| {
                             s.node(ancestor).kind == "ProcedureType"
                                 && s.node(field).parent == s.role(ancestor, "params")
@@ -1526,7 +1536,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                         {
                             self.facts
                                 .invalid
-                                .insert(reference, "#mut requires a slice parameter.".into());
+                                .insert(reference, if readonly {"#ro requires a slice parameter."} else {"#mut requires a slice parameter."}.into());
                         }
                     }
                 }
@@ -1621,6 +1631,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     steps: Shared::new(),
                 }),
             );
+            let v = if self.explicit_ro.contains(&name) { self.freeze(v, name) } else { v };
             if let Some(symbol) = self.r.symbol(name) {
                 self.contexts[c].env.insert(symbol, v);
             }
@@ -1698,6 +1709,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
         } else {
             self.contexts[c].cacheable = false;
             for (index, (name, _)) in self.params(sig).into_iter().enumerate() {
+                if self.explicit_ro.contains(&name) { continue; }
                 self.require(
                     [Origin {
                         path: Path {
@@ -1785,7 +1797,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                     return self.member_type(&typ, &self.text(field));
                 }
             }
-            "Index" | "Deref" => {
+            "Index" | "MatrixIndex" | "Deref" => {
                 if let Some(base) = self.role(r, "expr") {
                     return self
                         .typ(base, c)
@@ -1932,7 +1944,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             return self.value(typ);
         }
         match kind.as_str() {
-            "Paren" | "OrReturn" | "OrBranch" | "OrPanic" | "AutoCast" => {
+            "Paren" | "Runtime" | "OrReturn" | "OrBranch" | "OrPanic" | "AutoCast" => {
                 let Some(inner) = self.role(r, "expr") else {
                     return self.value(typ);
                 };
@@ -1962,8 +1974,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 v
             }
-            "Index" => {
+            "Index" | "MatrixIndex" => {
                 self.eval_role(r, "index", c);
+                self.eval_role(r,"row",c);self.eval_role(r,"column",c);
                 let v = self.eval_role(r, "expr", c);
                 let result = self.item(v);
                 if matches!(base_type(&self.values[v].typ), Type::Map { .. }) {
@@ -3071,7 +3084,12 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 }
                 return id;
             }
-            for (arg, v) in self.expanded_arguments(r, c, &args, &values) {
+            let contract = self.r.signature(callee).map(|signature| self.params(signature)).unwrap_or_default();
+            for (index,(arg, v)) in self.expanded_arguments(r, c, &args, &values).into_iter().enumerate() {
+                let parameter = if self.kind(arg)=="FieldValue" {
+                    self.role(arg,"field").and_then(|label| contract.iter().find(|(name,_)|self.text(*name)==self.text(label)))
+                }else {contract.get(index).or_else(||contract.last().filter(|(_,field)|self.s(*field).node(field.node).data["variadic"]==true))};
+                if parameter.is_some_and(|(name,_)|self.explicit_ro.contains(name)) {continue;}
                 let refs = self.refs(v);
                 self.require(
                     refs,
@@ -3176,6 +3194,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
             for (index, (name, field)) in params.iter().enumerate() {
                 let v = bound[index];
+                if self.explicit_ro.contains(name) && !matches!(base_type(&self.values[v].typ), Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic) {
+                    self.fact_event(cached::FactEvent::Invalid(r, std::sync::Arc::new("#ro requires a slice parameter in this specialization.".into())));
+                }
                 if self.explicit.contains(name) {
                     if !matches!(
                         base_type(&self.values[v].typ),

@@ -1,5 +1,6 @@
 """Real CodeLLDB/DAP checks against executables built with ordinary Odin."""
 import ast
+from collections import deque
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,8 @@ class DAP:
         self.events = []
         self.responses = {}
         self.seq = 0
+        self.commands = {}
+        self.recent = deque(maxlen=24)
         self.reader = threading.Thread(target=self.read, daemon=True)
         self.reader.start()
 
@@ -57,33 +60,50 @@ class DAP:
     def send(self, command, arguments=None):
         self.seq += 1
         data = json.dumps({'seq': self.seq, 'type': 'request', 'command': command, 'arguments': arguments or {}}).encode()
+        self.commands[self.seq] = command
         self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode()+data)
         self.process.stdin.flush()
         return self.seq
 
-    def next(self, timeout):
-        value = self.messages.get(timeout=timeout)
+    def diagnostics(self, waiting):
+        self.log.flush()
+        self.log.seek(0)
+        stderr=self.log.read().decode(errors='replace')[-8000:]
+        recent='\n'.join(self.recent)
+        return f"Timed out waiting for {waiting}. Adapter exit: {self.process.poll()}.\nRecent DAP messages:\n{recent}\nAdapter stderr:\n{stderr}"
+
+    def next(self, timeout, *, waiting='a debugger message'):
+        try:value = self.messages.get(timeout=timeout)
+        except queue.Empty:raise TimeoutError(self.diagnostics(waiting)) from None
         if 'eof' in value or 'error' in value:
             self.log.seek(0)
             raise AssertionError((value,self.log.read().decode()))
         if value['type'] == 'event':
+            summary=value['event']
+            if value['event']=='output':summary+=': '+str(value.get('body',{}).get('output',''))[-1000:]
+            self.recent.append('event '+summary)
             self.events.append(value)
         elif value['type'] == 'response':
+            self.recent.append(f"response {value.get('command')} success={value.get('success')}")
             self.responses[value['request_seq']] = value
         else:
             raise AssertionError(f'Unexpected reverse request: {value}')
 
     def response(self, seq, timeout=30):
         deadline = time.monotonic()+timeout
+        command=self.commands.get(seq,f'request {seq}')
         while seq not in self.responses:
-            self.next(max(.01,deadline-time.monotonic()))
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise TimeoutError(self.diagnostics(command))
+            self.next(remaining,waiting=command)
         response = self.responses.pop(seq)
+        self.commands.pop(seq,None)
         if not response.get('success'):
             raise AssertionError(response)
         return response.get('body',{})
 
-    def request(self, command, arguments=None):
-        return self.response(self.send(command,arguments))
+    def request(self, command, arguments=None, *, timeout=30):
+        return self.response(self.send(command,arguments),timeout=timeout)
 
     def event(self, event, timeout=30):
         deadline = time.monotonic()+timeout
@@ -91,14 +111,24 @@ class DAP:
             for i,message in enumerate(self.events):
                 if message['event'] == event:
                     return self.events.pop(i).get('body',{})
-            self.next(max(.01,deadline-time.monotonic()))
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise TimeoutError(self.diagnostics('event '+event))
+            self.next(remaining,waiting='event '+event)
 
     def close(self):
         try:
             if self.process.poll() is None:
-                self.request('disconnect',{'terminateDebuggee':True})
+                # Cleanup is best effort after a failed launch. A stuck native
+                # request must not add another full test deadline or mask the
+                # original failure with a second cleanup exception.
+                try:self.request('disconnect',{'terminateDebuggee':True},timeout=2)
+                except (TimeoutError,AssertionError,OSError):pass
                 self.process.stdin.close()
-                self.process.wait(timeout=5)
+                try:self.process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    self.process.terminate()
+                    try:self.process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:pass
         finally:
             if self.process.poll() is None:
                 self.process.kill()

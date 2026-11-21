@@ -122,14 +122,18 @@ class Source:
                     node.data['pure']=True
                     continue
                 node.data.update(feature)
-                if feature['kind']=='Run': node.data.setdefault('roles',{})['expr']=node.data['lists']['args'][0]
+                if feature['kind'] in {'Run','Runtime'}: node.data.setdefault('roles',{})['expr']=node.data['lists']['args'][0]
                 if feature["kind"] in {"SwitchExpr", "CompileSwitchExpr", "CompileSwitch"}:
                     node.data.setdefault("roles", {})["selector"] = feature["selector"]
         self.excluded = self.info.get("excluded", False)
         self.diagnostics = self.info.get("diagnostics") or []
         declaration_separators = {span[0]:span[1:] for span in self.info.get("declaration_separators") or []}
         immutable_starts = {span[0] for span in self.info.get("immutables") or []}
+        offsets={row[0] for row in self.info.get('auto_parameters') or []}
         for n in self.nodes:
+            if n.kind == 'Field':
+                names=n.data.get('lists',{}).get('names') or []
+                n.data['automatic']=bool(names and names[0][0] in offsets)
             if n.kind == "Declaration":
                 n.data["immutable"] = n.start in immutable_starts
                 first_name=(n.data.get('lists',{}).get('names') or [[n.start]])[0][0]
@@ -165,6 +169,8 @@ class Source:
         while self.prefix.encode() in self.raw:
             self.prefix += "x_"
         self.edits = [(e["start"], e["end"], e["text"]) for e in self.info.get("edits", [])]
+        from .noalloc import tag_edits
+        self.edits.extend(tag_edits(self))
         self.imports = {}
         self.import_names = {}
         self.evaluation_import_paths = {}
@@ -670,7 +676,7 @@ class Source:
         return mapper(self,path) if mapper else path
 
     def _render(self, n, expected=None, constant=False):
-        if self.thor and n.kind == 'Attribute' and n.parent and n.parent.kind == 'Declaration':
+        if self.thor and n.kind == 'Attribute' and n.parent and n.parent.kind in {'Declaration','Import'}:
             from .unused_attributes import render_attribute
             attribute = render_attribute(self,n)
             if attribute is not None:return attribute
@@ -710,7 +716,8 @@ class Source:
             path = self.import_code(namespace)
             if path != unquote(n.data['op']):
                 a,b = n.data['roles']['path']
-                return self.splice(n, [(a,b,self.mapping.wrap(json.dumps(path),self.path,a,b,'import'))])
+                return self.splice(n, [(a,b,self.mapping.wrap(json.dumps(path),self.path,a,b,'import')),
+                    *((attr.start,attr.end,self.render(attr)) for attr in n.group('attributes'))])
         if self.defaults:
             code = self.defaults.render(n)
             if code is not None:
@@ -741,6 +748,10 @@ class Source:
         if self.purity:
             pure_code=self.purity.render(n,expected,constant)
             if pure_code is not None:return pure_code
+        if kind=='Runtime':
+            if self.purity and self.purity.eval_mode:return self.expressions.error(n,'#runtime cannot be executed at compile time, including through #run.')
+            if constant:return self.expressions.error(n,'#runtime cannot be used where a compile-time value is required.')
+            return self.render(n.role('expr'),expected,False)
         identity=sourceidentity.directive(self,n)
         if identity is not None: return identity
         if kind=='Comprehension':return self.comprehensions.render(n,expected,constant)

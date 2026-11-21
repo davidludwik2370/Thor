@@ -249,7 +249,11 @@ pub(crate) fn resolve_default(
 }
 
 pub(crate) fn signature_spreads(resolver: &Resolver<'_>, signature: Ref) -> bool {
-    let params = resolver.fields(signature, "params");
+    let source=&resolver.sources[signature.file];
+    let automatic=crate::caller_metadata::params(source,signature.node).iter().enumerate()
+        .filter(|(_,(_,field))|crate::caller_metadata::automatic(source,*field)).map(|(index,_)|index).collect::<HashSet<_>>();
+    let params = resolver.fields(signature, "params").into_iter().enumerate()
+        .filter(|(index,_)|!automatic.contains(index)).map(|(_,field)|field).collect::<Vec<_>>();
     params.len() != 1
         || params
             .last()
@@ -512,7 +516,8 @@ pub(crate) fn concrete(typ: &Type) -> bool {
         // Procedure signatures have structural identity in Odin; distinct AST
         // references alone are insufficient to reject a result_type override.
         Type::Unknown | Type::Generic | Type::Procedure(_) => false,
-        Type::Array { elem, .. }
+        Type::Array { elem, .. } | Type::Matrix{elem,..}
+            | Type::Vector { elem, .. }
         | Type::Slice(elem)
         | Type::Dynamic(elem)
         | Type::Pointer(elem)

@@ -74,6 +74,7 @@ Check_Buffer :: struct {
 	path: string,
 	canonical: string,
 	text: []u8,
+	pending_vet_lines: [dynamic]int,
 }
 
 Checker :: struct {
@@ -118,6 +119,7 @@ queue_check_request :: proc(mode: Check_Mode, path: string, config: ^common.Conf
 				path = strings.clone(document.fullpath, checker.allocator),
 				canonical = os.get_absolute_path(document.fullpath, checker.allocator) or_else strings.clone(document.fullpath, checker.allocator),
 				text = slice.clone(document.text[:document.used_text], checker.allocator),
+				pending_vet_lines = thor_pending_vet_lines(&document,checker.allocator),
 			},
 		)
 	}
@@ -147,6 +149,7 @@ delete_check_buffers :: proc(buffers: []Check_Buffer) {
 		delete(b.path, checker.allocator)
 		delete(b.canonical, checker.allocator)
 		delete(b.text, checker.allocator)
+		delete(b.pending_vet_lines)
 	}
 	delete(buffers, checker.allocator)
 }
@@ -621,6 +624,18 @@ check :: proc(mode: Check_Mode, check_paths: []string, buffers: []Check_Buffer, 
 			}
 
 			message := strings.join(error.msgs, "\n", context.temp_allocator)
+			pending_vet_path:string
+			if strings.has_prefix(message,"#+vet") && strings.contains(message,"supported only in Odin source files") ||
+			   strings.has_prefix(message,"Syntax Error: Invalid vet flag name:") {
+				for buffer in buffers {
+					if buffer.path!=error.pos.file && buffer.canonical!=error.pos.file {continue}
+					for line in buffer.pending_vet_lines {if line==error.pos.line {pending_vet_path=buffer.path;break}}
+				}
+			}
+			if pending_vet_path!="" {
+				ensure_diagnostic_path(.Check,common.create_uri(pending_vet_path,context.temp_allocator).uri)
+				continue
+			}
 
 			if strings.contains(message, "Redeclaration of 'main' in this scope") {
 				continue

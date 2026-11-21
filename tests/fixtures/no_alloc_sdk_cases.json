@@ -1,0 +1,1618 @@
+[
+  {
+    "name": "math.sqrt",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.sqrt(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.sin",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.sin(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.cos",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.cos(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.tan",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.tan(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.exp",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.exp(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.log",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.log(f64(0.5),f64(2))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.log2",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.log2(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.log10",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.log10(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.floor",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.floor(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.ceil",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.ceil(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.trunc",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.trunc(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.round",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.round(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.to_radians",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.to_radians(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.to_degrees",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.to_degrees(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.abs",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.abs(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.sign",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.sign(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.is_nan",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.is_nan(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.is_inf",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.is_inf(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.sinh",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.sinh(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.cosh",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.cosh(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.tanh",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.tanh(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.asin",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.asin(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.acos",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.acos(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.atan",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.atan(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.asinh",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.asinh(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.acosh",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.acosh(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.atanh",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.atanh(f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.pow",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.pow(f64(2),f64(3))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.copy_sign",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.copy_sign(f64(2),f64(-1))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.atan2",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.atan2(f64(1),f64(2))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.lerp",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.lerp(f64(1),f64(2),f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.smoothstep",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.smoothstep(f64(0),f64(1),f64(0.5))",
+    "expect": "accept"
+  },
+  {
+    "name": "math.remap",
+    "imports": [
+      "math"
+    ],
+    "body": "_=math.remap(f64(0.5),f64(0),f64(1),f64(0),f64(10))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.count_ones",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.count_ones(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.count_zeros",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.count_zeros(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.leading_zeros",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.leading_zeros(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.trailing_zeros",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.trailing_zeros(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.reverse_bits",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.reverse_bits(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.byte_swap",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.byte_swap(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "bits.log2",
+    "imports": [
+      "math/bits"
+    ],
+    "body": "_=bits.log2(u64(17))",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.compare",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.compare(\"abc\",\"xyz\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.contains",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.contains(\"abc\",\"b\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.contains_any",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.contains_any(\"abc\",\"b\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.contains_space",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.contains_space(\"a b\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.rune_count",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.rune_count(\"\u00c9\ud83d\ude00\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.equal_fold",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.equal_fold(\"aBc\",\"AbC\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.has_prefix",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.has_prefix(\"abc\",\"a\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.has_suffix",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.has_suffix(\"abc\",\"c\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.common_prefix",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.common_prefix(\"abc\",\"abd\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.index",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.index(\"abc\",\"b\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.last_index",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.last_index(\"abc\",\"b\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.index_rune",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.index_rune(\"abc\",'b')",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.trim_space",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.trim_space(\" abc \")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.trim",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.trim(\" abc \",\" \")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.trim_prefix",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.trim_prefix(\"abc\",\"a\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.trim_suffix",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.trim_suffix(\"abc\",\"c\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strings.count",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.count(\"abcabc\",\"a\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_int",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_int(\"123\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_uint",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_uint(\"123\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_i128",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_i128(\"123\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_u128",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_u128(\"123\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_bool",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_bool(\"true\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_f32",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_f32(\"1.25\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_f64",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_f64(\"1.25\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.parse_complex128",
+    "imports": [
+      "strconv"
+    ],
+    "body": "_,_=strconv.parse_complex128(\"1+2i\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.write_bool",
+    "imports": [
+      "strconv"
+    ],
+    "body": "buf:[256]byte;_=strconv.write_bool(buf[:],true)",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.write_int",
+    "imports": [
+      "strconv"
+    ],
+    "body": "buf:[256]byte;_=strconv.write_int(buf[:],-17,10)",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.write_uint",
+    "imports": [
+      "strconv"
+    ],
+    "body": "buf:[256]byte;_=strconv.write_uint(buf[:],17,10)",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.write_float",
+    "imports": [
+      "strconv"
+    ],
+    "body": "buf:[256]byte;_=strconv.write_float(buf[:],1.25,'g',-1,64)",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.quote",
+    "imports": [
+      "strconv"
+    ],
+    "body": "buf:[256]byte;_=strconv.quote(buf[:],\"hello\")",
+    "expect": "accept"
+  },
+  {
+    "name": "strconv.quote_rune",
+    "imports": [
+      "strconv"
+    ],
+    "body": "buf:[256]byte;_=strconv.quote_rune(buf[:],'\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "bytes.contains",
+    "imports": [
+      "bytes"
+    ],
+    "body": "_=bytes.contains([]byte{1,2},[]byte{2})",
+    "expect": "accept"
+  },
+  {
+    "name": "bytes.compare",
+    "imports": [
+      "bytes"
+    ],
+    "body": "_=bytes.compare([]byte{1},[]byte{2})",
+    "expect": "accept"
+  },
+  {
+    "name": "bytes.equal",
+    "imports": [
+      "bytes"
+    ],
+    "body": "_=bytes.equal([]byte{1},[]byte{2})",
+    "expect": "accept"
+  },
+  {
+    "name": "bytes.index",
+    "imports": [
+      "bytes"
+    ],
+    "body": "_=bytes.index([]byte{1,2},[]byte{2})",
+    "expect": "accept"
+  },
+  {
+    "name": "bytes.count",
+    "imports": [
+      "bytes"
+    ],
+    "body": "_=bytes.count([]byte{1,2},[]byte{2})",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.reverse",
+    "imports": [
+      "slice"
+    ],
+    "body": "values:=[3]int{3,1,2};slice.reverse(values[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.sort",
+    "imports": [
+      "slice"
+    ],
+    "body": "values:=[3]int{3,1,2};slice.sort(values[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.sort_by",
+    "imports": [
+      "slice"
+    ],
+    "body": "values:=[3]int{3,1,2};slice.sort_by(values[:],less)",
+    "declarations": "less::proc(a,b:int)->bool{return a<b}",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.is_sorted",
+    "imports": [
+      "slice"
+    ],
+    "body": "values:=[3]int{1,2,3};_=slice.is_sorted(values[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "mem.copy",
+    "imports": [
+      "mem"
+    ],
+    "body": "a,b:[8]byte;mem.copy(&a,&b,len(a))",
+    "expect": "accept"
+  },
+  {
+    "name": "mem.zero",
+    "imports": [
+      "mem"
+    ],
+    "body": "a:[8]byte;mem.zero(&a,len(a))",
+    "expect": "accept"
+  },
+  {
+    "name": "mem.free_nil",
+    "imports": [
+      "mem"
+    ],
+    "body": "_=mem.free(nil)",
+    "expect": "accept"
+  },
+  {
+    "name": "mem.free_all_nil",
+    "imports": [
+      "mem"
+    ],
+    "body": "_=mem.free_all(allocator=mem.Allocator{})",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.is_letter",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.is_letter('A')",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.is_digit",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.is_digit('7')",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.is_space",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.is_space(' ')",
+    "expect": "accept"
+  },
+  {
+    "name": "utf8.rune_count_in_string",
+    "imports": [
+      "unicode/utf8"
+    ],
+    "body": "_=utf8.rune_count_in_string(\"\u00c9\ud83d\ude00\")",
+    "expect": "accept"
+  },
+  {
+    "name": "utf8.valid_string",
+    "imports": [
+      "unicode/utf8"
+    ],
+    "body": "_=utf8.valid_string(\"\u00c9\ud83d\ude00\")",
+    "expect": "accept"
+  },
+  {
+    "name": "utf8.decode_rune_in_string",
+    "imports": [
+      "unicode/utf8"
+    ],
+    "body": "_,_=utf8.decode_rune_in_string(\"\u00c9\ud83d\ude00\")",
+    "expect": "accept"
+  },
+  {
+    "name": "utf8.encode_rune",
+    "imports": [
+      "unicode/utf8"
+    ],
+    "body": "_,_=utf8.encode_rune('\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "hash.fnv32",
+    "imports": [
+      "hash"
+    ],
+    "body": "_=hash.fnv32([]byte{1,2,3})",
+    "expect": "accept"
+  },
+  {
+    "name": "hash.fnv64",
+    "imports": [
+      "hash"
+    ],
+    "body": "_=hash.fnv64([]byte{1,2,3})",
+    "expect": "accept"
+  },
+  {
+    "name": "hash.adler32",
+    "imports": [
+      "hash"
+    ],
+    "body": "_=hash.adler32([]byte{1,2,3})",
+    "expect": "accept"
+  },
+  {
+    "name": "hash.crc32",
+    "imports": [
+      "hash"
+    ],
+    "body": "_=hash.crc32([]byte{1,2,3})",
+    "expect": "accept"
+  },
+  {
+    "name": "io.writer_factory",
+    "imports": [
+      "io",
+      "fmt"
+    ],
+    "body": "writer:=factory();fmt.wprintln(writer,7)",
+    "declarations": "sink::proc(data:rawptr,mode:io.Stream_Mode,bytes:[]byte,offset:i64,whence:io.Seek_From)->(i64,io.Error){return i64(len(bytes)),nil}\nfactory::proc()->io.Writer{return io.Writer{procedure=sink}}",
+    "expect": "accept"
+  },
+  {
+    "name": "allocating.make",
+    "imports": [
+      "mem"
+    ],
+    "body": "_=make([]int,3)",
+    "expect": "reject"
+  },
+  {
+    "name": "allocating.strings.clone",
+    "imports": [
+      "strings"
+    ],
+    "body": "_=strings.clone(\"abc\")",
+    "expect": "reject"
+  },
+  {
+    "name": "allocating.slice.clone",
+    "imports": [
+      "slice"
+    ],
+    "body": "_=slice.clone([]int{1,2})",
+    "expect": "reject"
+  },
+  {
+    "name": "endian.unchecked_get_u16le",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_=endian.unchecked_get_u16le(b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_put_u16le",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;endian.unchecked_put_u16le(b[:],17)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_get_u16be",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_=endian.unchecked_get_u16be(b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_put_u16be",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;endian.unchecked_put_u16be(b[:],17)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.get_u16.Little",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_,_=endian.get_u16(b[:],.Little)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.get_u16.Big",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_,_=endian.get_u16(b[:],.Big)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_get_u32le",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_=endian.unchecked_get_u32le(b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_put_u32le",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;endian.unchecked_put_u32le(b[:],17)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_get_u32be",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_=endian.unchecked_get_u32be(b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_put_u32be",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;endian.unchecked_put_u32be(b[:],17)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.get_u32.Little",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_,_=endian.get_u32(b[:],.Little)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.get_u32.Big",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_,_=endian.get_u32(b[:],.Big)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_get_u64le",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_=endian.unchecked_get_u64le(b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_put_u64le",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;endian.unchecked_put_u64le(b[:],17)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_get_u64be",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_=endian.unchecked_get_u64be(b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.unchecked_put_u64be",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;endian.unchecked_put_u64be(b[:],17)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.get_u64.Little",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_,_=endian.get_u64(b[:],.Little)",
+    "expect": "accept"
+  },
+  {
+    "name": "endian.get_u64.Big",
+    "imports": [
+      "encoding/endian"
+    ],
+    "body": "b:[16]byte;_,_=endian.get_u64(b[:],.Big)",
+    "expect": "accept"
+  },
+  {
+    "name": "hex.decode_into_buffer",
+    "imports": [
+      "encoding/hex"
+    ],
+    "body": "b:[16]byte;_,_=hex.decode_into_buffer([]byte{'4','1'},b[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "hex.decode_sequence",
+    "imports": [
+      "encoding/hex"
+    ],
+    "body": "_,_=hex.decode_sequence(\"41\")",
+    "expect": "accept"
+  },
+  {
+    "name": "base64.encode_into_buf",
+    "imports": [
+      "encoding/base64"
+    ],
+    "body": "b:[16]byte;_,_=base64.encode_into_buf(b[:],[]byte{1,2,3})",
+    "expect": "accept"
+  },
+  {
+    "name": "base64.decode_into_buf",
+    "imports": [
+      "encoding/base64"
+    ],
+    "body": "b:[16]byte;_,_=base64.decode_into_buf(b[:],\"YWJj\")",
+    "expect": "accept"
+  },
+  {
+    "name": "time.now",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.now()",
+    "expect": "accept"
+  },
+  {
+    "name": "time.tick_now",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.tick_now()",
+    "expect": "accept"
+  },
+  {
+    "name": "time.sleep",
+    "imports": [
+      "time"
+    ],
+    "body": "time.sleep(time.Duration(0))",
+    "expect": "accept"
+  },
+  {
+    "name": "time.diff",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.diff(time.Time{},time.Time{})",
+    "expect": "accept"
+  },
+  {
+    "name": "time.duration_round",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.duration_round(time.Second,time.Millisecond)",
+    "expect": "accept"
+  },
+  {
+    "name": "time.duration_truncate",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.duration_truncate(time.Second,time.Millisecond)",
+    "expect": "accept"
+  },
+  {
+    "name": "time.duration_nanoseconds",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.duration_nanoseconds(time.Second)",
+    "expect": "accept"
+  },
+  {
+    "name": "time.duration_seconds",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.duration_seconds(time.Second)",
+    "expect": "accept"
+  },
+  {
+    "name": "time.unix",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.unix(0,0)",
+    "expect": "accept"
+  },
+  {
+    "name": "time.year",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.year(time.Time{})",
+    "expect": "accept"
+  },
+  {
+    "name": "time.weekday",
+    "imports": [
+      "time"
+    ],
+    "body": "_=time.weekday(time.Time{})",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_load",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_load(&v)",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_add",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_add(&v,u64(1))",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_sub",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_sub(&v,u64(1))",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_and",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_and(&v,u64(1))",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_or",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_or(&v,u64(1))",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_xor",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_xor(&v,u64(1))",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_exchange",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_=sync.atomic_exchange(&v,u64(1))",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_store",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;sync.atomic_store(&v,1)",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_compare_exchange_strong",
+    "imports": [
+      "sync"
+    ],
+    "body": "v:u64;_,_=sync.atomic_compare_exchange_strong(&v,0,1)",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.atomic_thread_fence",
+    "imports": [
+      "sync"
+    ],
+    "body": "sync.atomic_thread_fence(.Seq_Cst)",
+    "expect": "accept"
+  },
+  {
+    "name": "sha2.stream256",
+    "imports": [
+      "crypto/sha2"
+    ],
+    "body": "ctx:sha2.Context_256;sha2.init_256(&ctx);sha2.update(&ctx,[]byte{1,2,3});digest:[32]byte;sha2.final(&ctx,digest[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "sha2.stream512",
+    "imports": [
+      "crypto/sha2"
+    ],
+    "body": "ctx:sha2.Context_512;sha2.init_512(&ctx);sha2.update(&ctx,[]byte{1,2,3});digest:[64]byte;sha2.final(&ctx,digest[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "xxhash.XXH64",
+    "imports": [
+      "hash/xxhash"
+    ],
+    "body": "_=xxhash.XXH64([]byte{1,2,3})",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.non_ascii.is_letter",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.is_letter('\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.non_ascii.to_lower",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.to_lower('\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.non_ascii.to_upper",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.to_upper('\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.non_ascii.is_space",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.is_space('\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "unicode.non_ascii.is_digit",
+    "imports": [
+      "unicode"
+    ],
+    "body": "_=unicode.is_digit('\u00c9')",
+    "expect": "accept"
+  },
+  {
+    "name": "linalg.dot",
+    "imports": [
+      "math/linalg"
+    ],
+    "body": "a,b:[3]f32;_=linalg.dot(a,b)",
+    "expect": "accept"
+  },
+  {
+    "name": "linalg.cross",
+    "imports": [
+      "math/linalg"
+    ],
+    "body": "a,b:[3]f32;_=linalg.cross(a,b)",
+    "expect": "accept"
+  },
+  {
+    "name": "linalg.normalize",
+    "imports": [
+      "math/linalg"
+    ],
+    "body": "a:=[3]f32{1,2,3};_=linalg.normalize(a)",
+    "expect": "accept"
+  },
+  {
+    "name": "os.process_id",
+    "imports": [
+      "os"
+    ],
+    "body": "_=os.get_pid()",
+    "expect": "accept"
+  },
+  {
+    "name": "os.processor_count",
+    "imports": [
+      "os"
+    ],
+    "body": "_=os.get_processor_core_count()",
+    "expect": "accept"
+  },
+  {
+    "name": "allocating.hex.encode",
+    "imports": [
+      "encoding/hex"
+    ],
+    "body": "_=hex.encode([]byte{1,2})",
+    "expect": "reject"
+  },
+  {
+    "name": "sync.ticket_mutex",
+    "imports": [
+      "sync"
+    ],
+    "body": "m:sync.Ticket_Mutex;sync.ticket_mutex_lock(&m);sync.ticket_mutex_unlock(&m)",
+    "expect": "accept"
+  },
+  {
+    "name": "sync.ticket_mutex_guard",
+    "imports": [
+      "sync"
+    ],
+    "body": "m:sync.Ticket_Mutex;_=sync.ticket_mutex_guard(&m)",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.cpu_relax",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "intrinsics.cpu_relax()",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.cycle_counter",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "_=intrinsics.read_cycle_counter()",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.cycle_frequency",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "_=intrinsics.read_cycle_counter_frequency()",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.prefetch",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "v:int;intrinsics.prefetch_read_data(&v,1)",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.alloca",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "_=intrinsics.alloca(32,8)",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.overflow",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "_,_=intrinsics.overflow_add(i32(3),i32(4))",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.fixed_point",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "_=intrinsics.fixed_point_mul(i32(3),i32(4),2)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.append",
+    "imports": [],
+    "body": "values:[dynamic;8]int;_=append(&values,1)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.append_many",
+    "imports": [],
+    "body": "values:[dynamic;8]int;_=append(&values,1,2,3)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.append_spread",
+    "imports": [],
+    "body": "values:[dynamic;8]int;_=append(&values,..[]int{1,2})",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.append_string",
+    "imports": [],
+    "body": "values:[dynamic;8]byte;_=append(&values,\"abc\")",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.resize",
+    "imports": [],
+    "body": "values:[dynamic;8]int;_=resize(&values,4)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.non_zero_resize",
+    "imports": [],
+    "body": "values:[dynamic;8]int;_=non_zero_resize(&values,4)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.clear",
+    "imports": [],
+    "body": "values:[dynamic;8]int;clear(&values)",
+    "expect": "accept"
+  },
+  {
+    "name": "dynamic.clear",
+    "imports": [],
+    "body": "values:[dynamic]int;clear(&values)",
+    "expect": "accept"
+  },
+  {
+    "name": "map.clear",
+    "imports": [],
+    "body": "values:map[int]int;clear(&values)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.pop",
+    "imports": [],
+    "body": "values:=[dynamic;8]int{1};_=pop(&values)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.ordered_remove",
+    "imports": [],
+    "body": "values:=[dynamic;8]int{1};ordered_remove(&values,0)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.unordered_remove",
+    "imports": [],
+    "body": "values:=[dynamic;8]int{1};unordered_remove(&values,0)",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.append_result",
+    "imports": [],
+    "body": "values:[dynamic;8]int;n:=append(&values,1);_=n+1",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.resize_result",
+    "imports": [],
+    "body": "values:[dynamic;8]int;ok:=resize(&values,4);_=!ok",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.append_nothing_result",
+    "imports": [],
+    "body": "values:[dynamic;8]int;n,ok:=append_nothing(&values);_=n;_=ok",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.pop_result",
+    "imports": [],
+    "body": "values:=[dynamic;8]int{1};n:=pop(&values);_=n+1",
+    "expect": "accept"
+  },
+  {
+    "name": "fixed.pop_safe_result",
+    "imports": [],
+    "body": "values:=[dynamic;8]int{1};n,ok:=pop_safe(&values);_=n;_=ok",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.sort_by_key",
+    "imports": [
+      "slice"
+    ],
+    "body": "v:=[3]int{3,2,1};slice.sort_by_key(v[:],key)",
+    "declarations": "key::proc(a:int)->int{return a}",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.reverse_sort_by_key",
+    "imports": [
+      "slice"
+    ],
+    "body": "v:=[3]int{3,2,1};slice.reverse_sort_by_key(v[:],key)",
+    "declarations": "key::proc(a:int)->int{return a}",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.is_sorted_by",
+    "imports": [
+      "slice"
+    ],
+    "body": "v:=[3]int{3,2,1};_=slice.is_sorted_by(v[:],less)",
+    "declarations": "less::proc(a,b:int)->bool{return a<b}",
+    "expect": "accept"
+  },
+  {
+    "name": "slice.is_sorted_by_key",
+    "imports": [
+      "slice"
+    ],
+    "body": "v:=[3]int{3,2,1};_=slice.is_sorted_by_key(v[:],key)",
+    "declarations": "key::proc(a:int)->int{return a}",
+    "expect": "accept"
+  },
+  {
+    "name": "linalg.matrix",
+    "imports": [
+      "math/linalg"
+    ],
+    "body": "v:matrix[2,2]f32;_=linalg.determinant(v)",
+    "declarations": "",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.strlen",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "_=libc.strlen(\"abc\")",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.strcmp",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "_=libc.strcmp(\"abc\",\"abd\")",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.strncmp",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "_=libc.strncmp(\"abc\",\"abd\",2)",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.strchr",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "_=libc.strchr(\"abc\",97)",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.strcspn",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "_=libc.strcspn(\"abc\",\"a\")",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.strpbrk",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "_=libc.strpbrk(\"abc\",\"a\")",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.memcpy",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "a,b:[8]byte;_=libc.memcpy(&a,&b,8)",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.memmove",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "a,b:[8]byte;_=libc.memmove(&a,&b,8)",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.memcmp",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "a,b:[8]byte;_=libc.memcmp(&a,&b,8)",
+    "expect": "accept"
+  },
+  {
+    "name": "libc.memchr",
+    "imports": [
+      "c/libc"
+    ],
+    "body": "a:[8]byte;_=libc.memchr(&a,1,8)",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.matrix_transpose",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "m:matrix[2,3]f32;t:=intrinsics.transpose(m);_=t[0,0]",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.matrix_flatten",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "m:matrix[2,3]f32;flat:=intrinsics.matrix_flatten(m);_=flat[0]",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.matrix_outer_product",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "a:[2]f32;b:[3]f32;m:=intrinsics.outer_product(a,b);_=m[0,0]",
+    "expect": "accept"
+  },
+  {
+    "name": "intrinsic.matrix_hadamard",
+    "imports": [],
+    "declarations": "import \"base:intrinsics\"",
+    "body": "a,b:matrix[2,3]f32;m:=intrinsics.hadamard_product(a,b);_=m[0,0]",
+    "expect": "accept"
+  },
+  {
+    "name": "crypto.aes.fixed_ecb",
+    "imports": [
+      "crypto/aes"
+    ],
+    "body": "ctx:aes.Context_ECB;key:[16]byte;src,dst:[16]byte;aes.init_ecb(&ctx,key[:]);aes.encrypt_ecb(&ctx,dst[:],src[:]);aes.decrypt_ecb(&ctx,src[:],dst[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "builtin.type_info.static_and_dynamic",
+    "imports": [],
+    "body": "id:=typeid_of(int);_=type_info_of(id);_=type_info_of(int)",
+    "expect": "accept"
+  },
+  {
+    "name": "builtin.type_info.evaluated_producer",
+    "imports": [],
+    "declarations": "producer::proc()->typeid{_=make([]int,1);return typeid_of(int)}",
+    "body": "_=type_info_of(producer())",
+    "expect": "reject"
+  },
+  {
+    "name": "crypto.sha3.fixed_digest",
+    "imports": [
+      "crypto/sha3"
+    ],
+    "body": "ctx:sha3.Context;sha3.init_256(&ctx);sha3.update(&ctx,[]byte{1,2,3});digest:[32]byte;sha3.final(&ctx,digest[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "crypto.blake2b.fixed_digest",
+    "imports": [
+      "crypto/blake2b"
+    ],
+    "body": "ctx:blake2b.Context;blake2b.init(&ctx);blake2b.update(&ctx,[]byte{1,2,3});digest:[64]byte;blake2b.final(&ctx,digest[:])",
+    "expect": "accept"
+  },
+  {
+    "name": "crypto.chacha20.fixed_buffer",
+    "imports": [
+      "crypto/chacha20"
+    ],
+    "body": "ctx:chacha20.Context;key:[32]byte;iv:[12]byte;src,dst:[64]byte;chacha20.init(&ctx,key[:],iv[:]);chacha20.xor_bytes(&ctx,dst[:],src[:])",
+    "expect": "accept"
+  }
+]

@@ -101,7 +101,7 @@ fn prepared_value_type(typ: &Type) -> bool {
         Type::Scalar {name, ..} => !["any", "typeid", "rawptr", "cstring"].contains(&name.as_str()),
         Type::String {name, ..} => name == "string",
         Type::BigInteger | Type::BigRational => true,
-        Type::Nominal(_, inner) | Type::Array {elem:inner, ..}
+        Type::Nominal(_, inner) | Type::Array {elem:inner, ..} | Type::Matrix{elem:inner,..}
         | Type::Slice(inner) | Type::Dynamic(inner) => prepared_value_type(inner),
         _ => false,
     }

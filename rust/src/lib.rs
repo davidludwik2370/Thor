@@ -50,3 +50,7 @@ pub mod publishing;
 mod source_tools;
 mod source_uses;
 mod unused_attributes;
+
+mod vet_attributes;
+mod caller_metadata;
+mod noalloc;

@@ -161,7 +161,7 @@ main :: proc() {
                     # The installed Odin revision has an upstream scoped-vet parser crash.
                     self.call(engine,'check',flag,'-thread-count:1')
             for flag in ['-vet', '-vet-style', '-strict-style']:
-                self.assertIn('Odin-only projects',self.call(engine,'check',flag,status=1).stderr)
+                self.call(engine,'check',flag,'-thread-count:1')
         self.write('''package main
 main :: proc() {
     if true {
@@ -170,7 +170,7 @@ main :: proc() {
 }
 ''')
         for engine in ['python','rust']:
-            self.assertIn('Odin-only projects',self.call(engine,'check','-vet-unused-variables',status=1).stderr)
+            self.assertIn("'x' declared but not used",self.call(engine,'check','-vet-unused-variables',status=1).stderr)
             self.assertIn('Warning:',self.call(engine,'check').stderr)
 
     def test_documentation_preserves_original_signatures_comments_and_format(self):

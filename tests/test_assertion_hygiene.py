@@ -173,7 +173,11 @@ Mode::enum u8{Read=1,Alias=Read,Write}
 Packed::struct #packed{_:int,using point:Point `coordinates`,_:bool}
 Aligned::struct #all_or_none #align(16){_:bool,value:int `amount`}
 Subtype::struct{#subtype point:Point,_:int}
-main::proc(){values:#soa[]Point;lanes:#simd[4]f32;_=values;_=lanes}
+main::proc(){
+ values:#soa[]Point;lanes:#simd[4]f32;_=values;_=lanes
+ outer: for i in 0..<3 {if i==1 {continue};break outer}
+ block_label: {break block_label}
+}
 ''')
             paths.append(tagged)
             for path in [*paths, invalid]:

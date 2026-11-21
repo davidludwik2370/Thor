@@ -1,0 +1,6481 @@
+{
+  "schema": 1,
+  "llvm": "Homebrew LLVM version 22.1.7\n  Optimized build.",
+  "intrinsics_td_sha256": "d57c3a1c49b65b823f5894f3d2fb12b3b4267cffac9d52021637c49879bcf300",
+  "scope": "Exact SDK LLVM links with no memory writes or argument-memory-only effects; ordinary bodies and call arguments remain checked.",
+  "entries": {
+    "llvm.aarch64.crc32b": {
+      "record": "int_aarch64_crc32b",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32cb": {
+      "record": "int_aarch64_crc32cb",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32ch": {
+      "record": "int_aarch64_crc32ch",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32cw": {
+      "record": "int_aarch64_crc32cw",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32cx": {
+      "record": "int_aarch64_crc32cx",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32h": {
+      "record": "int_aarch64_crc32h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32w": {
+      "record": "int_aarch64_crc32w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crc32x": {
+      "record": "int_aarch64_crc32x",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.aesd": {
+      "record": "int_aarch64_crypto_aesd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.aese": {
+      "record": "int_aarch64_crypto_aese",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.aesimc": {
+      "record": "int_aarch64_crypto_aesimc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.aesmc": {
+      "record": "int_aarch64_crypto_aesmc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha1c": {
+      "record": "int_aarch64_crypto_sha1c",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha1h": {
+      "record": "int_aarch64_crypto_sha1h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha1m": {
+      "record": "int_aarch64_crypto_sha1m",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha1p": {
+      "record": "int_aarch64_crypto_sha1p",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha1su0": {
+      "record": "int_aarch64_crypto_sha1su0",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha1su1": {
+      "record": "int_aarch64_crypto_sha1su1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha256h": {
+      "record": "int_aarch64_crypto_sha256h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha256h2": {
+      "record": "int_aarch64_crypto_sha256h2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha256su0": {
+      "record": "int_aarch64_crypto_sha256su0",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha256su1": {
+      "record": "int_aarch64_crypto_sha256su1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha512h": {
+      "record": "int_aarch64_crypto_sha512h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha512h2": {
+      "record": "int_aarch64_crypto_sha512h2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha512su0": {
+      "record": "int_aarch64_crypto_sha512su0",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.crypto.sha512su1": {
+      "record": "int_aarch64_crypto_sha512su1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.aarch64.neon.cls.v16i8": {
+      "record": "int_aarch64_neon_cls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.cls.v2i32": {
+      "record": "int_aarch64_neon_cls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.cls.v4i16": {
+      "record": "int_aarch64_neon_cls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.cls.v4i32": {
+      "record": "int_aarch64_neon_cls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.cls.v8i16": {
+      "record": "int_aarch64_neon_cls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.cls.v8i8": {
+      "record": "int_aarch64_neon_cls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.pmul.v16i8": {
+      "record": "int_aarch64_neon_pmul",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.aarch64.neon.pmul.v8i8": {
+      "record": "int_aarch64_neon_pmul",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.aarch64.neon.pmull.v8i16": {
+      "record": "int_aarch64_neon_pmull",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.aarch64.neon.pmull64": {
+      "record": "int_aarch64_neon_pmull64",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.aarch64.neon.rshrn.v2i32": {
+      "record": "int_aarch64_neon_rshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.rshrn.v4i16": {
+      "record": "int_aarch64_neon_rshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.rshrn.v8i8": {
+      "record": "int_aarch64_neon_rshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v16i8": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v1i64": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v2i32": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v2i64": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v4i16": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v4i32": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v8i16": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqneg.v8i8": {
+      "record": "int_aarch64_neon_sqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.i32": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.i64": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v16i8": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v1i64": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v2i32": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v2i64": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v4i16": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v4i32": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v8i16": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshl.v8i8": {
+      "record": "int_aarch64_neon_sqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshrn.v2i32": {
+      "record": "int_aarch64_neon_sqrshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshrn.v4i16": {
+      "record": "int_aarch64_neon_sqrshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshrn.v8i8": {
+      "record": "int_aarch64_neon_sqrshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshrun.v2i32": {
+      "record": "int_aarch64_neon_sqrshrun",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshrun.v4i16": {
+      "record": "int_aarch64_neon_sqrshrun",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqrshrun.v8i8": {
+      "record": "int_aarch64_neon_sqrshrun",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.i64": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v16i8": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v1i64": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v2i32": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v2i64": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v4i16": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v4i32": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v8i16": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshl.v8i8": {
+      "record": "int_aarch64_neon_sqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v16i8": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v1i64": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v2i32": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v2i64": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v4i16": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v4i32": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v8i16": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshlu.v8i8": {
+      "record": "int_aarch64_neon_sqshlu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrn.i32": {
+      "record": "int_aarch64_neon_sqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrn.v2i32": {
+      "record": "int_aarch64_neon_sqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrn.v4i16": {
+      "record": "int_aarch64_neon_sqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrn.v8i8": {
+      "record": "int_aarch64_neon_sqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrun.v2i32": {
+      "record": "int_aarch64_neon_sqshrun",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrun.v4i16": {
+      "record": "int_aarch64_neon_sqshrun",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sqshrun.v8i8": {
+      "record": "int_aarch64_neon_sqshrun",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.i64": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v16i8": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v1i64": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v2i32": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v2i64": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v4i16": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v4i32": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v8i16": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.srshl.v8i8": {
+      "record": "int_aarch64_neon_srshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v16i8": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v1i64": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v2i32": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v2i64": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v4i16": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v4i32": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v8i16": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.sshl.v8i8": {
+      "record": "int_aarch64_neon_sshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl1.v16i8": {
+      "record": "int_aarch64_neon_tbl1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl1.v8i8": {
+      "record": "int_aarch64_neon_tbl1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl2.v16i8": {
+      "record": "int_aarch64_neon_tbl2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl2.v8i8": {
+      "record": "int_aarch64_neon_tbl2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl3.v16i8": {
+      "record": "int_aarch64_neon_tbl3",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl3.v8i8": {
+      "record": "int_aarch64_neon_tbl3",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl4.v16i8": {
+      "record": "int_aarch64_neon_tbl4",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbl4.v8i8": {
+      "record": "int_aarch64_neon_tbl4",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx1.v16i8": {
+      "record": "int_aarch64_neon_tbx1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx1.v8i8": {
+      "record": "int_aarch64_neon_tbx1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx2.v16i8": {
+      "record": "int_aarch64_neon_tbx2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx2.v8i8": {
+      "record": "int_aarch64_neon_tbx2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx3.v16i8": {
+      "record": "int_aarch64_neon_tbx3",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx3.v8i8": {
+      "record": "int_aarch64_neon_tbx3",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx4.v16i8": {
+      "record": "int_aarch64_neon_tbx4",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.tbx4.v8i8": {
+      "record": "int_aarch64_neon_tbx4",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.i32": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.i64": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v16i8": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v1i64": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v2i32": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v2i64": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v4i16": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v4i32": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v8i16": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshl.v8i8": {
+      "record": "int_aarch64_neon_uqrshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshrn.v2i32": {
+      "record": "int_aarch64_neon_uqrshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshrn.v4i16": {
+      "record": "int_aarch64_neon_uqrshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqrshrn.v8i8": {
+      "record": "int_aarch64_neon_uqrshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.i64": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v16i8": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v1i64": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v2i32": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v2i64": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v4i16": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v4i32": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v8i16": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshl.v8i8": {
+      "record": "int_aarch64_neon_uqshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshrn.i32": {
+      "record": "int_aarch64_neon_uqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshrn.v2i32": {
+      "record": "int_aarch64_neon_uqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshrn.v4i16": {
+      "record": "int_aarch64_neon_uqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.uqshrn.v8i8": {
+      "record": "int_aarch64_neon_uqshrn",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.i64": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v16i8": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v1i64": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v2i32": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v2i64": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v4i16": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v4i32": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v8i16": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.urshl.v8i8": {
+      "record": "int_aarch64_neon_urshl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v16i8": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v1i64": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v2i32": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v2i64": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v4i16": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v4i32": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v8i16": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.ushl.v8i8": {
+      "record": "int_aarch64_neon_ushl",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v16i8": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v1i64": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v2i32": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v2i64": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v4i16": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v4i32": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v8i16": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.aarch64.neon.vsli.v8i8": {
+      "record": "int_aarch64_neon_vsli",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.acos.f16": {
+      "record": "int_acos",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.acos.f32": {
+      "record": "int_acos",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.acos.f64": {
+      "record": "int_acos",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.arm.crc32b": {
+      "record": "int_arm_crc32b",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.arm.crc32cb": {
+      "record": "int_arm_crc32cb",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.arm.crc32ch": {
+      "record": "int_arm_crc32ch",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.arm.crc32cw": {
+      "record": "int_arm_crc32cw",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.arm.crc32h": {
+      "record": "int_arm_crc32h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.arm.crc32w": {
+      "record": "int_arm_crc32w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/crc32.odin"
+      ]
+    },
+    "llvm.arm.neon.aesd": {
+      "record": "int_arm_neon_aesd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.arm.neon.aese": {
+      "record": "int_arm_neon_aese",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.arm.neon.aesimc": {
+      "record": "int_arm_neon_aesimc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.arm.neon.aesmc": {
+      "record": "int_arm_neon_aesmc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/aes.odin"
+      ]
+    },
+    "llvm.arm.neon.sha1c": {
+      "record": "int_arm_neon_sha1c",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha1h": {
+      "record": "int_arm_neon_sha1h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha1m": {
+      "record": "int_arm_neon_sha1m",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha1p": {
+      "record": "int_arm_neon_sha1p",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha1su0": {
+      "record": "int_arm_neon_sha1su0",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha1su1": {
+      "record": "int_arm_neon_sha1su1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha256h": {
+      "record": "int_arm_neon_sha256h",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha256h2": {
+      "record": "int_arm_neon_sha256h2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha256su0": {
+      "record": "int_arm_neon_sha256su0",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.sha256su1": {
+      "record": "int_arm_neon_sha256su1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/sha.odin"
+      ]
+    },
+    "llvm.arm.neon.vcls.v16i8": {
+      "record": "int_arm_neon_vcls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vcls.v2i32": {
+      "record": "int_arm_neon_vcls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vcls.v4i16": {
+      "record": "int_arm_neon_vcls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vcls.v4i32": {
+      "record": "int_arm_neon_vcls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vcls.v8i16": {
+      "record": "int_arm_neon_vcls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vcls.v8i8": {
+      "record": "int_arm_neon_vcls",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vmullp.v8i16": {
+      "record": "int_arm_neon_vmullp",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.arm.neon.vmulp.v16i8": {
+      "record": "int_arm_neon_vmulp",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.arm.neon.vmulp.v8i8": {
+      "record": "int_arm_neon_vmulp",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/pmull.odin"
+      ]
+    },
+    "llvm.arm.neon.vqneg.v16i8": {
+      "record": "int_arm_neon_vqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqneg.v2i32": {
+      "record": "int_arm_neon_vqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqneg.v4i16": {
+      "record": "int_arm_neon_vqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqneg.v4i32": {
+      "record": "int_arm_neon_vqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqneg.v8i16": {
+      "record": "int_arm_neon_vqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqneg.v8i8": {
+      "record": "int_arm_neon_vqneg",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftns.v2i32": {
+      "record": "int_arm_neon_vqrshiftns",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftns.v4i16": {
+      "record": "int_arm_neon_vqrshiftns",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftns.v8i8": {
+      "record": "int_arm_neon_vqrshiftns",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftnsu.v2i32": {
+      "record": "int_arm_neon_vqrshiftnsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftnsu.v4i16": {
+      "record": "int_arm_neon_vqrshiftnsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftnsu.v8i8": {
+      "record": "int_arm_neon_vqrshiftnsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftnu.v2i32": {
+      "record": "int_arm_neon_vqrshiftnu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftnu.v4i16": {
+      "record": "int_arm_neon_vqrshiftnu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftnu.v8i8": {
+      "record": "int_arm_neon_vqrshiftnu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v16i8": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v1i64": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v2i32": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v2i64": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v4i16": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v4i32": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v8i16": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshifts.v8i8": {
+      "record": "int_arm_neon_vqrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v16i8": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v1i64": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v2i32": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v2i64": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v4i16": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v4i32": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v8i16": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqrshiftu.v8i8": {
+      "record": "int_arm_neon_vqrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftns.v2i32": {
+      "record": "int_arm_neon_vqshiftns",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftns.v4i16": {
+      "record": "int_arm_neon_vqshiftns",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftns.v8i8": {
+      "record": "int_arm_neon_vqshiftns",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftnsu.v2i32": {
+      "record": "int_arm_neon_vqshiftnsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftnsu.v4i16": {
+      "record": "int_arm_neon_vqshiftnsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftnsu.v8i8": {
+      "record": "int_arm_neon_vqshiftnsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftnu.v2i32": {
+      "record": "int_arm_neon_vqshiftnu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftnu.v4i16": {
+      "record": "int_arm_neon_vqshiftnu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftnu.v8i8": {
+      "record": "int_arm_neon_vqshiftnu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v16i8": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v1i64": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v2i32": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v2i64": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v4i16": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v4i32": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v8i16": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshifts.v8i8": {
+      "record": "int_arm_neon_vqshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v16i8": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v1i64": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v2i32": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v2i64": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v4i16": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v4i32": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v8i16": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftsu.v8i8": {
+      "record": "int_arm_neon_vqshiftsu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v16i8": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v1i64": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v2i32": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v2i64": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v4i16": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v4i32": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v8i16": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vqshiftu.v8i8": {
+      "record": "int_arm_neon_vqshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftn.v2i32": {
+      "record": "int_arm_neon_vrshiftn",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftn.v4i16": {
+      "record": "int_arm_neon_vrshiftn",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftn.v8i8": {
+      "record": "int_arm_neon_vrshiftn",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v16i8": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v1i64": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v2i32": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v2i64": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v4i16": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v4i32": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v8i16": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshifts.v8i8": {
+      "record": "int_arm_neon_vrshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v16i8": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v1i64": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v2i32": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v2i64": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v4i16": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v4i32": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v8i16": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vrshiftu.v8i8": {
+      "record": "int_arm_neon_vrshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v16i8": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v1i64": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v2i32": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v2i64": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v4i16": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v4i32": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v8i16": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftins.v8i8": {
+      "record": "int_arm_neon_vshiftins",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin",
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v16i8": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v1i64": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v2i32": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v2i64": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v4i16": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v4i32": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v8i16": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshifts.v8i8": {
+      "record": "int_arm_neon_vshifts",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v16i8": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v1i64": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v2i32": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v2i64": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v4i16": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v4i32": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v8i16": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vshiftu.v8i8": {
+      "record": "int_arm_neon_vshiftu",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbl1": {
+      "record": "int_arm_neon_vtbl1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbl2": {
+      "record": "int_arm_neon_vtbl2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbl3": {
+      "record": "int_arm_neon_vtbl3",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbl4": {
+      "record": "int_arm_neon_vtbl4",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbx1": {
+      "record": "int_arm_neon_vtbx1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbx2": {
+      "record": "int_arm_neon_vtbx2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbx3": {
+      "record": "int_arm_neon_vtbx3",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.arm.neon.vtbx4": {
+      "record": "int_arm_neon_vtbx4",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/arm/neon.odin"
+      ]
+    },
+    "llvm.asin.f16": {
+      "record": "int_asin",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.asin.f32": {
+      "record": "int_asin",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.asin.f64": {
+      "record": "int_asin",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.atan.f16": {
+      "record": "int_atan",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.atan.f32": {
+      "record": "int_atan",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.atan.f64": {
+      "record": "int_atan",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.atan2.f16": {
+      "record": "int_atan2",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.atan2.f32": {
+      "record": "int_atan2",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.atan2.f64": {
+      "record": "int_atan2",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.bitreverse.i128": {
+      "record": "int_bitreverse",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bitreverse.i16": {
+      "record": "int_bitreverse",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bitreverse.i32": {
+      "record": "int_bitreverse",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bitreverse.i64": {
+      "record": "int_bitreverse",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bitreverse.i8": {
+      "record": "int_bitreverse",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bswap.i128": {
+      "record": "int_bswap",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bswap.i16": {
+      "record": "int_bswap",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bswap.i32": {
+      "record": "int_bswap",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.bswap.i64": {
+      "record": "int_bswap",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ceil.f16": {
+      "record": "int_ceil",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.ceil.f32": {
+      "record": "int_ceil",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.ceil.f64": {
+      "record": "int_ceil",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.copysign.f16": {
+      "record": "int_copysign",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.copysign.f32": {
+      "record": "int_copysign",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.copysign.f64": {
+      "record": "int_copysign",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.cos.f16": {
+      "record": "int_cos",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.cos.f32": {
+      "record": "int_cos",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.cos.f64": {
+      "record": "int_cos",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.cosh.f16": {
+      "record": "int_cosh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.cosh.f32": {
+      "record": "int_cosh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.cosh.f64": {
+      "record": "int_cosh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.ctlz.i128": {
+      "record": "int_ctlz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctlz.i16": {
+      "record": "int_ctlz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctlz.i32": {
+      "record": "int_ctlz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctlz.i64": {
+      "record": "int_ctlz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctlz.i8": {
+      "record": "int_ctlz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctpop.i128": {
+      "record": "int_ctpop",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctpop.i16": {
+      "record": "int_ctpop",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctpop.i32": {
+      "record": "int_ctpop",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctpop.i64": {
+      "record": "int_ctpop",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.ctpop.i8": {
+      "record": "int_ctpop",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.cttz.i128": {
+      "record": "int_cttz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.cttz.i16": {
+      "record": "int_cttz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.cttz.i32": {
+      "record": "int_cttz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.cttz.i64": {
+      "record": "int_cttz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.cttz.i8": {
+      "record": "int_cttz",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.exp.f16": {
+      "record": "int_exp",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp.f32": {
+      "record": "int_exp",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp.f64": {
+      "record": "int_exp",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp10.f16": {
+      "record": "int_exp10",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp10.f32": {
+      "record": "int_exp10",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp10.f64": {
+      "record": "int_exp10",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp2.f16": {
+      "record": "int_exp2",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp2.f32": {
+      "record": "int_exp2",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.exp2.f64": {
+      "record": "int_exp2",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fabs.f16": {
+      "record": "int_fabs",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fabs.f32": {
+      "record": "int_fabs",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fabs.f64": {
+      "record": "int_fabs",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.floor.f16": {
+      "record": "int_floor",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.floor.f32": {
+      "record": "int_floor",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.floor.f64": {
+      "record": "int_floor",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fma.f16": {
+      "record": "int_fma",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fma.f32": {
+      "record": "int_fma",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fma.f64": {
+      "record": "int_fma",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.fmuladd.f16": {
+      "record": "int_fmuladd",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin"
+      ]
+    },
+    "llvm.fmuladd.f32": {
+      "record": "int_fmuladd",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin"
+      ]
+    },
+    "llvm.fmuladd.f64": {
+      "record": "int_fmuladd",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin"
+      ]
+    },
+    "llvm.fshl.i128": {
+      "record": "int_fshl",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshl.i16": {
+      "record": "int_fshl",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshl.i32": {
+      "record": "int_fshl",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshl.i64": {
+      "record": "int_fshl",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshl.i8": {
+      "record": "int_fshl",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshr.i128": {
+      "record": "int_fshr",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshr.i16": {
+      "record": "int_fshr",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshr.i32": {
+      "record": "int_fshr",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshr.i64": {
+      "record": "int_fshr",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.fshr.i8": {
+      "record": "int_fshr",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/bit_manipulation.odin"
+      ]
+    },
+    "llvm.log.f16": {
+      "record": "int_log",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log.f32": {
+      "record": "int_log",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log.f64": {
+      "record": "int_log",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log10.f16": {
+      "record": "int_log10",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log10.f32": {
+      "record": "int_log10",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log10.f64": {
+      "record": "int_log10",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log2.f16": {
+      "record": "int_log2",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log2.f32": {
+      "record": "int_log2",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.log2.f64": {
+      "record": "int_log2",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.maximum.f16": {
+      "record": "int_maximum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.maximum.f32": {
+      "record": "int_maximum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.maximum.f64": {
+      "record": "int_maximum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.maxnum.f16": {
+      "record": "int_maxnum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.maxnum.f32": {
+      "record": "int_maxnum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.maxnum.f64": {
+      "record": "int_maxnum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memcpy.inline.p0.p0.i32": {
+      "record": "int_memcpy_inline",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "anonymous_27",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_88",
+        "anonymous_89",
+        "anonymous_90",
+        "anonymous_91"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memcpy.inline.p0.p0.i64": {
+      "record": "int_memcpy_inline",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "anonymous_27",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_88",
+        "anonymous_89",
+        "anonymous_90",
+        "anonymous_91"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memcpy.p0.p0.i32": {
+      "record": "int_memcpy",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "anonymous_27",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_88",
+        "anonymous_89",
+        "anonymous_90",
+        "anonymous_91"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memcpy.p0.p0.i64": {
+      "record": "int_memcpy",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "anonymous_27",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_88",
+        "anonymous_89",
+        "anonymous_90",
+        "anonymous_91"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memmove.p0.p0.i32": {
+      "record": "int_memmove",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "anonymous_27",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_90",
+        "anonymous_91"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memmove.p0.p0.i64": {
+      "record": "int_memmove",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "anonymous_27",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_90",
+        "anonymous_91"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memset.inline.p0.i32": {
+      "record": "int_memset_inline",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "IntrWriteMem",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_90"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memset.inline.p0.i64": {
+      "record": "int_memset_inline",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "IntrWriteMem",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_90"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memset.p0.i32": {
+      "record": "int_memset",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "IntrWriteMem",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_90"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.memset.p0.i64": {
+      "record": "int_memset",
+      "properties": [
+        "IntrArgMemOnly",
+        "IntrNoCallback",
+        "IntrNoFree",
+        "IntrWillReturn",
+        "IntrWriteMem",
+        "anonymous_58",
+        "anonymous_61",
+        "anonymous_90"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.minimum.f16": {
+      "record": "int_minimum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.minimum.f32": {
+      "record": "int_minimum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.minimum.f64": {
+      "record": "int_minimum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.minnum.f16": {
+      "record": "int_minnum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.minnum.f32": {
+      "record": "int_minnum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.minnum.f64": {
+      "record": "int_minnum",
+      "properties": [
+        "Commutative",
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.nearbyint.f16": {
+      "record": "int_nearbyint",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.nearbyint.f32": {
+      "record": "int_nearbyint",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.nearbyint.f64": {
+      "record": "int_nearbyint",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.pow.f16": {
+      "record": "int_pow",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.pow.f32": {
+      "record": "int_pow",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.pow.f64": {
+      "record": "int_pow",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.powi.f16.i32": {
+      "record": "int_powi",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.powi.f32.i32": {
+      "record": "int_powi",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.powi.f64.i32": {
+      "record": "int_powi",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.rint.f16": {
+      "record": "int_rint",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.rint.f32": {
+      "record": "int_rint",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.rint.f64": {
+      "record": "int_rint",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.round.f16": {
+      "record": "int_round",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.round.f32": {
+      "record": "int_round",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.round.f64": {
+      "record": "int_round",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.roundeven.f16": {
+      "record": "int_roundeven",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.roundeven.f32": {
+      "record": "int_roundeven",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.roundeven.f64": {
+      "record": "int_roundeven",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sin.f16": {
+      "record": "int_sin",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sin.f32": {
+      "record": "int_sin",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sin.f64": {
+      "record": "int_sin",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/math/math_basic.odin",
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sinh.f16": {
+      "record": "int_sinh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sinh.f32": {
+      "record": "int_sinh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sinh.f64": {
+      "record": "int_sinh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sqrt.f16": {
+      "record": "int_sqrt",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sqrt.f32": {
+      "record": "int_sqrt",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.sqrt.f64": {
+      "record": "int_sqrt",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.tan.f16": {
+      "record": "int_tan",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.tan.f32": {
+      "record": "int_tan",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.tan.f64": {
+      "record": "int_tan",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.tanh.f16": {
+      "record": "int_tanh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.tanh.f32": {
+      "record": "int_tanh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.tanh.f64": {
+      "record": "int_tanh",
+      "properties": [
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.trunc.f16": {
+      "record": "int_trunc",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.trunc.f32": {
+      "record": "int_trunc",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.trunc.f64": {
+      "record": "int_trunc",
+      "properties": [
+        "IntrNoCreateUndefOrPoison",
+        "IntrNoMem",
+        "IntrSpeculatable"
+      ],
+      "sources": [
+        "core/sys/llvm/standard_c_library.odin"
+      ]
+    },
+    "llvm.x86.addcarry.32": {
+      "record": "int_x86_addcarry_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/adx.odin"
+      ]
+    },
+    "llvm.x86.addcarry.64": {
+      "record": "int_x86_addcarry_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/adx.odin"
+      ]
+    },
+    "llvm.x86.aesni.aesdec": {
+      "record": "int_x86_aesni_aesdec",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/aes.odin"
+      ]
+    },
+    "llvm.x86.aesni.aesdeclast": {
+      "record": "int_x86_aesni_aesdeclast",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/aes.odin"
+      ]
+    },
+    "llvm.x86.aesni.aesenc": {
+      "record": "int_x86_aesni_aesenc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/aes.odin"
+      ]
+    },
+    "llvm.x86.aesni.aesenclast": {
+      "record": "int_x86_aesni_aesenclast",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/aes.odin"
+      ]
+    },
+    "llvm.x86.aesni.aesimc": {
+      "record": "int_x86_aesni_aesimc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/aes.odin"
+      ]
+    },
+    "llvm.x86.aesni.aeskeygenassist": {
+      "record": "int_x86_aesni_aeskeygenassist",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/x86/aes.odin"
+      ]
+    },
+    "llvm.x86.avx.cmp.pd.256": {
+      "record": "int_x86_avx_cmp_pd_256",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.cmp.ps.256": {
+      "record": "int_x86_avx_cmp_ps_256",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.cvt.pd2dq.256": {
+      "record": "int_x86_avx_cvt_pd2dq_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.cvt.ps2dq.256": {
+      "record": "int_x86_avx_cvt_ps2dq_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.cvtt.pd2dq.256": {
+      "record": "int_x86_avx_cvtt_pd2dq_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.cvtt.ps2dq.256": {
+      "record": "int_x86_avx_cvtt_ps2dq_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.dp.ps.256": {
+      "record": "int_x86_avx_dp_ps_256",
+      "properties": [
+        "Commutative",
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.ldu.dq.256": {
+      "record": "int_x86_avx_ldu_dq_256",
+      "properties": [
+        "IntrReadMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.max.pd.256": {
+      "record": "int_x86_avx_max_pd_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.max.ps.256": {
+      "record": "int_x86_avx_max_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.min.pd.256": {
+      "record": "int_x86_avx_min_pd_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.min.ps.256": {
+      "record": "int_x86_avx_min_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.ptestnzc.256": {
+      "record": "int_x86_avx_ptestnzc_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.rcp.ps.256": {
+      "record": "int_x86_avx_rcp_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.round.pd.256": {
+      "record": "int_x86_avx_round_pd_256",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.round.ps.256": {
+      "record": "int_x86_avx_round_ps_256",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.rsqrt.ps.256": {
+      "record": "int_x86_avx_rsqrt_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vpermilvar.pd": {
+      "record": "int_x86_avx_vpermilvar_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vpermilvar.pd.256": {
+      "record": "int_x86_avx_vpermilvar_pd_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vpermilvar.ps": {
+      "record": "int_x86_avx_vpermilvar_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vpermilvar.ps.256": {
+      "record": "int_x86_avx_vpermilvar_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestc.pd.256": {
+      "record": "int_x86_avx_vtestc_pd_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestc.ps.256": {
+      "record": "int_x86_avx_vtestc_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestnzc.pd": {
+      "record": "int_x86_avx_vtestnzc_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestnzc.pd.256": {
+      "record": "int_x86_avx_vtestnzc_pd_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestnzc.ps": {
+      "record": "int_x86_avx_vtestnzc_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestnzc.ps.256": {
+      "record": "int_x86_avx_vtestnzc_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestz.pd.256": {
+      "record": "int_x86_avx_vtestz_pd_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx.vtestz.ps.256": {
+      "record": "int_x86_avx_vtestz_ps_256",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin"
+      ]
+    },
+    "llvm.x86.avx2.packssdw": {
+      "record": "int_x86_avx2_packssdw",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.packsswb": {
+      "record": "int_x86_avx2_packsswb",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.packusdw": {
+      "record": "int_x86_avx2_packusdw",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.packuswb": {
+      "record": "int_x86_avx2_packuswb",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.pmul.hr.sw": {
+      "record": "int_x86_avx2_pmul_hr_sw",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psad.bw": {
+      "record": "int_x86_avx2_psad_bw",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.pshuf.b": {
+      "record": "int_x86_avx2_pshuf_b",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psign.b": {
+      "record": "int_x86_avx2_psign_b",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psign.d": {
+      "record": "int_x86_avx2_psign_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psign.w": {
+      "record": "int_x86_avx2_psign_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psll.d": {
+      "record": "int_x86_avx2_psll_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psll.q": {
+      "record": "int_x86_avx2_psll_q",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psll.w": {
+      "record": "int_x86_avx2_psll_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psra.d": {
+      "record": "int_x86_avx2_psra_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psra.w": {
+      "record": "int_x86_avx2_psra_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psrl.d": {
+      "record": "int_x86_avx2_psrl_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psrl.q": {
+      "record": "int_x86_avx2_psrl_q",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.avx2.psrl.w": {
+      "record": "int_x86_avx2_psrl_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/avx2.odin"
+      ]
+    },
+    "llvm.x86.bmi.bextr.32": {
+      "record": "int_x86_bmi_bextr_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi.odin"
+      ]
+    },
+    "llvm.x86.bmi.bextr.64": {
+      "record": "int_x86_bmi_bextr_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi.odin"
+      ]
+    },
+    "llvm.x86.bmi.bzhi.32": {
+      "record": "int_x86_bmi_bzhi_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi2.odin"
+      ]
+    },
+    "llvm.x86.bmi.bzhi.64": {
+      "record": "int_x86_bmi_bzhi_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi2.odin"
+      ]
+    },
+    "llvm.x86.bmi.pdep.32": {
+      "record": "int_x86_bmi_pdep_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi2.odin"
+      ]
+    },
+    "llvm.x86.bmi.pdep.64": {
+      "record": "int_x86_bmi_pdep_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi2.odin"
+      ]
+    },
+    "llvm.x86.bmi.pext.32": {
+      "record": "int_x86_bmi_pext_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi2.odin"
+      ]
+    },
+    "llvm.x86.bmi.pext.64": {
+      "record": "int_x86_bmi_pext_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/bmi2.odin"
+      ]
+    },
+    "llvm.x86.pclmulqdq": {
+      "record": "int_x86_pclmulqdq",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/pclmulqdq.odin"
+      ]
+    },
+    "llvm.x86.sha1msg1": {
+      "record": "int_x86_sha1msg1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sha1msg2": {
+      "record": "int_x86_sha1msg2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sha1nexte": {
+      "record": "int_x86_sha1nexte",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sha1rnds4": {
+      "record": "int_x86_sha1rnds4",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sha256msg1": {
+      "record": "int_x86_sha256msg1",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sha256msg2": {
+      "record": "int_x86_sha256msg2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sha256rnds2": {
+      "record": "int_x86_sha256rnds2",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sha.odin"
+      ]
+    },
+    "llvm.x86.sse.cmp.ps": {
+      "record": "int_x86_sse_cmp_ps",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin",
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.cmp.ss": {
+      "record": "int_x86_sse_cmp_ss",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin",
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.comieq.ss": {
+      "record": "int_x86_sse_comieq_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.comige.ss": {
+      "record": "int_x86_sse_comige_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.comigt.ss": {
+      "record": "int_x86_sse_comigt_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.comile.ss": {
+      "record": "int_x86_sse_comile_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.comilt.ss": {
+      "record": "int_x86_sse_comilt_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.comineq.ss": {
+      "record": "int_x86_sse_comineq_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.cvtss2si": {
+      "record": "int_x86_sse_cvtss2si",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.cvtss2si64": {
+      "record": "int_x86_sse_cvtss2si64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.cvttss2si": {
+      "record": "int_x86_sse_cvttss2si",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.cvttss2si64": {
+      "record": "int_x86_sse_cvttss2si64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.max.ps": {
+      "record": "int_x86_sse_max_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.max.ss": {
+      "record": "int_x86_sse_max_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.min.ps": {
+      "record": "int_x86_sse_min_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.min.ss": {
+      "record": "int_x86_sse_min_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.movmsk.ps": {
+      "record": "int_x86_sse_movmsk_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.rcp.ps": {
+      "record": "int_x86_sse_rcp_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.rcp.ss": {
+      "record": "int_x86_sse_rcp_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.rsqrt.ps": {
+      "record": "int_x86_sse_rsqrt_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.rsqrt.ss": {
+      "record": "int_x86_sse_rsqrt_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.ucomieq.ss": {
+      "record": "int_x86_sse_ucomieq_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.ucomige.ss": {
+      "record": "int_x86_sse_ucomige_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.ucomigt.ss": {
+      "record": "int_x86_sse_ucomigt_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.ucomile.ss": {
+      "record": "int_x86_sse_ucomile_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.ucomilt.ss": {
+      "record": "int_x86_sse_ucomilt_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse.ucomineq.ss": {
+      "record": "int_x86_sse_ucomineq_ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse.odin"
+      ]
+    },
+    "llvm.x86.sse2.cmp.pd": {
+      "record": "int_x86_sse2_cmp_pd",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin",
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cmp.sd": {
+      "record": "int_x86_sse2_cmp_sd",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/avx.odin",
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.comieq.sd": {
+      "record": "int_x86_sse2_comieq_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.comige.sd": {
+      "record": "int_x86_sse2_comige_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.comigt.sd": {
+      "record": "int_x86_sse2_comigt_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.comile.sd": {
+      "record": "int_x86_sse2_comile_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.comilt.sd": {
+      "record": "int_x86_sse2_comilt_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.comineq.sd": {
+      "record": "int_x86_sse2_comineq_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvtpd2dq": {
+      "record": "int_x86_sse2_cvtpd2dq",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvtpd2ps": {
+      "record": "int_x86_sse2_cvtpd2ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvtps2dq": {
+      "record": "int_x86_sse2_cvtps2dq",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvtsd2si": {
+      "record": "int_x86_sse2_cvtsd2si",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvtsd2si64": {
+      "record": "int_x86_sse2_cvtsd2si64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvtsd2ss": {
+      "record": "int_x86_sse2_cvtsd2ss",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvttpd2dq": {
+      "record": "int_x86_sse2_cvttpd2dq",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvttps2dq": {
+      "record": "int_x86_sse2_cvttps2dq",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvttsd2si": {
+      "record": "int_x86_sse2_cvttsd2si",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.cvttsd2si64": {
+      "record": "int_x86_sse2_cvttsd2si64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.max.pd": {
+      "record": "int_x86_sse2_max_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.max.sd": {
+      "record": "int_x86_sse2_max_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.min.pd": {
+      "record": "int_x86_sse2_min_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.min.sd": {
+      "record": "int_x86_sse2_min_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.movmsk.pd": {
+      "record": "int_x86_sse2_movmsk_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.packssdw.128": {
+      "record": "int_x86_sse2_packssdw_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.packsswb.128": {
+      "record": "int_x86_sse2_packsswb_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.packuswb.128": {
+      "record": "int_x86_sse2_packuswb_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pavg.b": {
+      "record": "int_x86_sse2_pavg_b",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pavg.w": {
+      "record": "int_x86_sse2_pavg_w",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pmadd.wd": {
+      "record": "int_x86_sse2_pmadd_wd",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pmovmskb.128": {
+      "record": "int_x86_sse2_pmovmskb_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pmulh.w": {
+      "record": "int_x86_sse2_pmulh_w",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pmulhu.w": {
+      "record": "int_x86_sse2_pmulhu_w",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psad.bw": {
+      "record": "int_x86_sse2_psad_bw",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psll.d": {
+      "record": "int_x86_sse2_psll_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psll.q": {
+      "record": "int_x86_sse2_psll_q",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psll.w": {
+      "record": "int_x86_sse2_psll_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pslli.d": {
+      "record": "int_x86_sse2_pslli_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pslli.q": {
+      "record": "int_x86_sse2_pslli_q",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.pslli.w": {
+      "record": "int_x86_sse2_pslli_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psra.d": {
+      "record": "int_x86_sse2_psra_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psra.w": {
+      "record": "int_x86_sse2_psra_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrai.d": {
+      "record": "int_x86_sse2_psrai_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrai.w": {
+      "record": "int_x86_sse2_psrai_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrl.d": {
+      "record": "int_x86_sse2_psrl_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrl.q": {
+      "record": "int_x86_sse2_psrl_q",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrl.w": {
+      "record": "int_x86_sse2_psrl_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrli.d": {
+      "record": "int_x86_sse2_psrli_d",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrli.q": {
+      "record": "int_x86_sse2_psrli_q",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.psrli.w": {
+      "record": "int_x86_sse2_psrli_w",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.ucomieq.sd": {
+      "record": "int_x86_sse2_ucomieq_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.ucomige.sd": {
+      "record": "int_x86_sse2_ucomige_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.ucomigt.sd": {
+      "record": "int_x86_sse2_ucomigt_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.ucomile.sd": {
+      "record": "int_x86_sse2_ucomile_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.ucomilt.sd": {
+      "record": "int_x86_sse2_ucomilt_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse2.ucomineq.sd": {
+      "record": "int_x86_sse2_ucomineq_sd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse2.odin"
+      ]
+    },
+    "llvm.x86.sse3.addsub.pd": {
+      "record": "int_x86_sse3_addsub_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse3.addsub.ps": {
+      "record": "int_x86_sse3_addsub_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse3.hadd.pd": {
+      "record": "int_x86_sse3_hadd_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse3.hadd.ps": {
+      "record": "int_x86_sse3_hadd_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse3.hsub.pd": {
+      "record": "int_x86_sse3_hsub_pd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse3.hsub.ps": {
+      "record": "int_x86_sse3_hsub_ps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse3.ldu.dq": {
+      "record": "int_x86_sse3_ldu_dq",
+      "properties": [
+        "IntrReadMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse3.odin"
+      ]
+    },
+    "llvm.x86.sse41.blendvpd": {
+      "record": "int_x86_sse41_blendvpd",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.blendvps": {
+      "record": "int_x86_sse41_blendvps",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.dppd": {
+      "record": "int_x86_sse41_dppd",
+      "properties": [
+        "Commutative",
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.dpps": {
+      "record": "int_x86_sse41_dpps",
+      "properties": [
+        "Commutative",
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.insertps": {
+      "record": "int_x86_sse41_insertps",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.mpsadbw": {
+      "record": "int_x86_sse41_mpsadbw",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.packusdw": {
+      "record": "int_x86_sse41_packusdw",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.pblendvb": {
+      "record": "int_x86_sse41_pblendvb",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.phminposuw": {
+      "record": "int_x86_sse41_phminposuw",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.ptestc": {
+      "record": "int_x86_sse41_ptestc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.ptestnzc": {
+      "record": "int_x86_sse41_ptestnzc",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.ptestz": {
+      "record": "int_x86_sse41_ptestz",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.round.pd": {
+      "record": "int_x86_sse41_round_pd",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.round.ps": {
+      "record": "int_x86_sse41_round_ps",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_59"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.round.sd": {
+      "record": "int_x86_sse41_round_sd",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse41.round.ss": {
+      "record": "int_x86_sse41_round_ss",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse41.odin"
+      ]
+    },
+    "llvm.x86.sse42.crc32.32.16": {
+      "record": "int_x86_sse42_crc32_32_16",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.crc32.32.32": {
+      "record": "int_x86_sse42_crc32_32_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.crc32.32.8": {
+      "record": "int_x86_sse42_crc32_32_8",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.crc32.64.64": {
+      "record": "int_x86_sse42_crc32_64_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestri128": {
+      "record": "int_x86_sse42_pcmpestri128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestria128": {
+      "record": "int_x86_sse42_pcmpestria128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestric128": {
+      "record": "int_x86_sse42_pcmpestric128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestrio128": {
+      "record": "int_x86_sse42_pcmpestrio128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestris128": {
+      "record": "int_x86_sse42_pcmpestris128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestriz128": {
+      "record": "int_x86_sse42_pcmpestriz128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpestrm128": {
+      "record": "int_x86_sse42_pcmpestrm128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_251"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistri128": {
+      "record": "int_x86_sse42_pcmpistri128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistria128": {
+      "record": "int_x86_sse42_pcmpistria128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistric128": {
+      "record": "int_x86_sse42_pcmpistric128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistrio128": {
+      "record": "int_x86_sse42_pcmpistrio128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistris128": {
+      "record": "int_x86_sse42_pcmpistris128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistriz128": {
+      "record": "int_x86_sse42_pcmpistriz128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.sse42.pcmpistrm128": {
+      "record": "int_x86_sse42_pcmpistrm128",
+      "properties": [
+        "IntrNoMem",
+        "anonymous_52"
+      ],
+      "sources": [
+        "core/simd/x86/sse42.odin"
+      ]
+    },
+    "llvm.x86.ssse3.phadd.d.128": {
+      "record": "int_x86_ssse3_phadd_d_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.phadd.sw.128": {
+      "record": "int_x86_ssse3_phadd_sw_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.phadd.w.128": {
+      "record": "int_x86_ssse3_phadd_w_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.phsub.d.128": {
+      "record": "int_x86_ssse3_phsub_d_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.phsub.sw.128": {
+      "record": "int_x86_ssse3_phsub_sw_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.phsub.w.128": {
+      "record": "int_x86_ssse3_phsub_w_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.pmadd.ub.sw.128": {
+      "record": "int_x86_ssse3_pmadd_ub_sw_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.pmul.hr.sw.128": {
+      "record": "int_x86_ssse3_pmul_hr_sw_128",
+      "properties": [
+        "Commutative",
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.pshuf.b.128": {
+      "record": "int_x86_ssse3_pshuf_b_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.psign.b.128": {
+      "record": "int_x86_ssse3_psign_b_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.psign.d.128": {
+      "record": "int_x86_ssse3_psign_d_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.ssse3.psign.w.128": {
+      "record": "int_x86_ssse3_psign_w_128",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/ssse3.odin"
+      ]
+    },
+    "llvm.x86.subborrow.32": {
+      "record": "int_x86_subborrow_32",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/adx.odin"
+      ]
+    },
+    "llvm.x86.subborrow.64": {
+      "record": "int_x86_subborrow_64",
+      "properties": [
+        "IntrNoMem"
+      ],
+      "sources": [
+        "core/simd/x86/adx.odin"
+      ]
+    }
+  }
+}

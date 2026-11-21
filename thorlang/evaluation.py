@@ -32,6 +32,8 @@ class Evaluator:
         self.root=Path(__file__).resolve().parents[1]
         self.cache=cache
         self.explicit_arguments=0
+        self.has_runtime=any(any(f['kind']=='Runtime' for f in s.info.get('features') or []) for s in project.sources.values())
+        self.runtime_barriers={}
         self.specializations=Specializations(self)
         self.result_bindings={}
         self.query_imports={}
@@ -108,6 +110,9 @@ class Evaluator:
         return True
 
     def automatic(self,n):
+        for ancestor in n.ancestors():
+            if ancestor.kind=='Procedure':break
+            if ancestor.kind=='Runtime':return False
         if n.kind=='Comprehension':return self.constant_context(n)
         if self.power(n):
             return not any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors())
@@ -139,7 +144,39 @@ class Evaluator:
         if any(a.kind=='Call' and self.purity.builtin(a) in self.purity.type_queries for a in n.ancestors()):return False
         targets=self.purity.targets(n)
         if len(targets)!=1 or not self.purity.pure(targets[0]):return False
+        if self.has_runtime and self.runtime_barrier(targets[0],self.r.resolve_call(n)):return False
         return len(self.r.fields(targets[0].role('type').role('results')))==1
+
+    def runtime_barrier(self,procedure,plan=None):
+        from .caller_metadata import binding_shape
+        bindings=plan.substitutions if plan else {}
+        key=self.key(procedure),tuple(sorted((k,binding_shape(v)) for k,v in bindings.items()))
+        if key in self.runtime_barriers:return self.runtime_barriers[key]
+        pending=[(procedure,bindings)];visited=set()
+        previous=self.r.bound_types
+        try:
+            while pending:
+                proc,bindings=pending.pop()
+                context=(proc,tuple(sorted((k,binding_shape(v)) for k,v in bindings.items())))
+                if context in visited:continue
+                visited.add(context)
+                if len(visited)>128:self.runtime_barriers[key]=True;return True
+                bound=dict(previous)
+                for poly in descendants(proc.role('type')):
+                    if poly.kind=='PolyType' and poly.data.get('name') in bindings:bound[poly,poly.data['name']]=bindings[poly.data['name']]
+                self.r.bound_types=bound
+                for node in descendants(proc):
+                    if next((p for p in node.ancestors() if p.kind=='Procedure'),None) is not proc:continue
+                    from .caller_metadata import active
+                    if not active(self.p,node,bindings):continue
+                    if node.kind=='Runtime':self.runtime_barriers[key]=True;return True
+                    if node.kind=='Call':
+                        call=self.r.resolve_call(node)
+                        if call and call.signature.parent and call.signature.parent.kind=='Procedure':pending.append((call.signature.parent,{**bindings,**call.substitutions}))
+                        else:pending.extend((target,bindings) for target in self.purity.targets(node))
+        finally:self.r.bound_types=previous
+        self.runtime_barriers[key]=False
+        return False
 
     def constant_context(self,n):
         """Debug builds retain optional runtime fn calls for native stepping.

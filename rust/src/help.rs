@@ -74,7 +74,7 @@ pub fn render(command: Option<&str>, full: bool, odin: &str) -> String {
         }
     }
     if full {
-        text.push_str("Compatible compiler options:\n  Diagnostics refer to original project files.\n  Native vet/style policies report errors; some require Odin-only projects.\n  Thor --vet findings are errors for build and warnings otherwise.\n\n");
+        text.push_str("Compatible compiler options:\n  Diagnostics refer to original project files.\n  Native vet/style policies retain native diagnostics on original source scopes.\n  Thor --vet findings are errors for build and warnings otherwise.\n\n");
         let mut known = BTreeSet::new();
         for flag in &cli::catalog().native_flags {
             if command.is_some_and(|name| !flag.commands.iter().any(|c| c == if name == "migrate" { "build" } else { name }))
@@ -91,18 +91,13 @@ pub fn render(command: Option<&str>, full: bool, odin: &str) -> String {
             if flag.internal {
                 text.push_str("  [compiler development]");
             }
-            if flag.thor_rejection.is_some() {
-                text.push_str("  [Odin-only projects]");
-            }
             text.push('\n');
             for line in flag.description.lines() {
                 text.push_str("      ");
                 text.push_str(line.trim_end());
                 text.push('\n');
             }
-            if let Some(reason) = &flag.thor_rejection {
-                text.push_str(&format!("      {reason}\n"));
-            }
+
             text.push('\n');
         }
         // Query only while rendering exhaustive help. Normal builds use the
@@ -137,9 +132,7 @@ pub fn render(command: Option<&str>, full: bool, odin: &str) -> String {
                                 && !(command == Some("migrate") && matches!(name, "file" | "out" | "build-mode" | "export-dependencies" | "export-dependencies-file" | "doc-format" | "keep-temp-files" | "export-defineables" | "export-timings" | "export-timings-file" | "export-linked-libs-file"))
                                 && !documented.contains(name)
                                 && known.insert(name.to_string());
-                            if include && cli::native_check_rejection(name).is_some() {
-                                text.push_str("  [Odin-only projects: unaudited native check]\n");
-                            }
+
                         }
                         if include {
                             text.push_str(line);

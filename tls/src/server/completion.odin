@@ -50,6 +50,7 @@ get_completion_list :: proc(
 	spall.trace(#procedure, document.fullpath)
 
 	list: CompletionList
+	if selected,ok:=get_thor_vet_completion(document,position);ok {return selected,true}
 	if selected,ok:=get_thor_import_completion(document,position,config);ok {return selected,true}
 	// Keep the usual space after a separator useful without suggesting globals
 	// on ordinary spaces/commas elsewhere in a program.
@@ -2058,6 +2059,7 @@ get_identifier_completion :: proc(
 			if call_symbol, ok := resolve_type_expression(ast_context, call.expr); ok {
 				if value, ok := call_symbol.value.(SymbolProcedureValue); ok {
 					for arg in value.orig_arg_types {
+						if thor_parameter_auto(arg) {continue}
 						// For now we just add params with default values, could add everything we more logic in the future
 						if arg.default_value != nil {
 							for name in arg.names {

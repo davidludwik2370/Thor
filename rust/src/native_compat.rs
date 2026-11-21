@@ -12,7 +12,7 @@ pub(crate) fn source_policies(flags: &[String]) -> bool {
             .split(':')
             .next()
             .unwrap_or_default();
-        cli::native_check_rejection(name).is_some()
+        cli::native_source_check(name)
             || matches!(
                 name,
                 "bedrock"

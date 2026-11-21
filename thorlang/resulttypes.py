@@ -117,7 +117,9 @@ def argument_types(resolver,call,bindings):
 
 
 def signature_spreads(resolver,signature):
-    parameters=resolver.fields(signature.role('params'))
+    from .caller_metadata import params
+    automatic={index for index,(_,field) in enumerate(params(signature)) if field.data.get('automatic')}
+    parameters=[field for index,field in enumerate(resolver.fields(signature.role('params'))) if index not in automatic]
     return len(parameters)!=1 or bool(parameters[-1][1] and parameters[-1][1].kind=='Ellipsis')
 
 

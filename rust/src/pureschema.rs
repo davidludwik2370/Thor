@@ -77,7 +77,7 @@ impl Lower<'_, '_> {
                 Type::Unknown | Type::Generic | Type::Set(_) | Type::Soa(_) =>
                     return self.pure_validator(site),
                 Type::Nominal(_, inner) | Type::Slice(inner) | Type::Dynamic(inner)
-                | Type::Pointer(inner) | Type::Array {elem:inner,..}
+                | Type::Pointer(inner) | Type::Array {elem:inner,..} | Type::Matrix{elem:inner,..}
                 | Type::Fixed {elem:inner,..} => pending.push((*inner, depth + 1)),
                 Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                     for (name, typ) in self.resolver.record_fields(&typ) {

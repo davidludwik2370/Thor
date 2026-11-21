@@ -268,7 +268,7 @@ impl Evaluator<'_, '_, '_> {
                     .unwrap_or_default();
                 self.arena.member(value, &name, self.resolver)
             }
-            "Index" => {
+            "Index" | "MatrixIndex" => {
                 let base = self.role_flow(node, "expr", env);
                 self.arena.item(base)
             }
@@ -565,7 +565,7 @@ impl Evaluator<'_, '_, '_> {
     pub fn borrowed_write(&mut self, node: Ref, env: &mut Environment) -> Permission {
         let mut condition = self.storage(node, env);
         if self.resolver.logical_enabled(node.file)
-            && matches!(self.kind(node), "Selector" | "Index" | "Deref")
+            && matches!(self.kind(node), "Selector" | "Index" | "MatrixIndex" | "Deref")
         {
             let value = self.flow(node, env);
             let borrowed = self.arena.numeric_borrowed(value);
@@ -599,7 +599,7 @@ impl Evaluator<'_, '_, '_> {
                 .map(|node| self.storage(node, env))
                 .unwrap_or(OWNED);
         }
-        if self.kind(node) == "Index" {
+        if matches!(self.kind(node),"Index"|"MatrixIndex") {
             let Some(base_node) = self.role(node, "expr") else {
                 return OWNED;
             };

@@ -116,6 +116,7 @@ class Resolver:
                     if parent and parent.kind == "ProcedureType":
                         scope = parent.parent if parent.parent and parent.parent.kind == "Procedure" else parent
                         names, annotation = n.group("names"), n.role("type")
+                        if n.role('default'):values=[n.role('default')]
                         if n.data.get('using_field'):
                             self.using.setdefault(self.scope_key(scope), []).append(n)
                 elif n.kind == "Range":
@@ -239,12 +240,18 @@ class Resolver:
 
     def package_symbol(self, directory, name):
         symbols = self.scopes.get((directory, "package"), {}).get(name, [])
+        if not symbols and self.native_enabled and self.native and self.native.effect_discovery:
+            self.native.ensure_symbol(directory,name)
+            symbols=self.scopes.get((directory,"package"),{}).get(name,[])
         return next((s for s in symbols if s.immutable), symbols[0] if symbols else None)
 
     def import_directory(self, source, path):
         directory = source.import_dir(path)
         if self.native_enabled and self.native and (directory is None or getattr(source, 'native_inspected', False)):
             directory = self.native.load(source, path) or directory
+        elif directory is None and self.native:
+            inspected=self.native.directory(source,path)
+            if inspected in self.native.packages:directory=inspected
         return directory
 
     @contextmanager
@@ -290,6 +297,8 @@ class Resolver:
             if n.text in n.source.selected:
                 namespace, member = n.source.selected[n.text].split(".", 1)
                 return self.package_symbol(self.import_directory(n.source, n.source.imports[namespace]), member)
+            if self.native_enabled and self.native and self.native.effect_discovery and getattr(n.source,'native_inspected',False):
+                return self.package_symbol(n.source.path.parent,n.text)
         if n.kind == "Selector":
             base, member = n.role("expr"), n.role("field")
             if base and base.kind == "Ident" and not self.lookup(base.text, base):
@@ -477,7 +486,7 @@ class Resolver:
             return Type('big_integer' if n.text=='Integer' else 'big_rational',n.text,n)
         bound=self.bound_types.get((n,n.data.get('name'))) if kind=='PolyType' else self.bound_types.get((symbol.declaration,symbol.name)) if symbol else None
         if bound is not None:return bound
-        if kind=='Run':return self.type_of(n.role('expr'),seen)
+        if kind in {'Run','Runtime'}:return self.type_of(n.role('expr'),seen)
         if kind == 'SetType':
             return Type('set',node=n,elem=self.type_node(n.group('args')[0],substitutions,seen))
         if kind in {"Paren", "HelperType"}:
@@ -497,6 +506,7 @@ class Resolver:
             if specialization:
                 return self.type_node(specialization, substitutions, seen)
             return Type("generic", name, n)
+        if kind=="Ellipsis":return Type("slice",node=n,elem=self.type_node(n.role("expr"),substitutions,seen))
         if kind == "ArrayType":
             length = n.role("len")
             if length is None:
@@ -639,6 +649,9 @@ class Resolver:
             if data.get('kind') in {'big_integer','big_rational'}:return Type(data['kind'],'Integer' if data['kind']=='big_integer' else 'Rational',n,witness=n)
             return Type(node=n)
         if n.kind == 'Call':
+            from .builtin_types import result
+            builtin=result(self,n,index,seen)
+            if builtin is not None:return builtin
             target=self.type_node(n.role('callee'))
             if target.kind in {'big_integer','big_rational'}:
                 return Type('scalar','bool',n) if index else target
@@ -676,11 +689,12 @@ class Resolver:
         kind = n.kind
         if kind=='Implicit' and n.text=='context':
             symbol=self.package_symbol(self.import_directory(n.source,'base:runtime'),'Context')
+            if symbol is None and self.native_enabled and self.native:symbol=self.native.runtime_type(n.source,'Context')
             return self.type_node(symbol.value) if symbol and symbol.value else Type()
         if kind=='Comprehension':return n.source.comprehensions.result_type(n,seen)
         data=n.source.big.constants.payloads.get(n,{})
         if data.get('kind') in {'big_integer','big_rational'}:return Type(data['kind'],'Integer' if data['kind']=='big_integer' else 'Rational',n,witness=n)
-        if kind=='Run':return self.type_of(n.role('expr'),seen)
+        if kind in {'Run','Runtime'}:return self.type_of(n.role('expr'),seen)
         if kind == 'Interpolation':
             return Type('string','string',n,witness=n)
         if kind=='CompileSwitchExpr':
@@ -708,6 +722,13 @@ class Resolver:
                 return Type(node=n, witness=n)
             if symbol.annotation:
                 return replace(self.type_node(symbol.annotation), witness=n)
+            if symbol.declaration.kind=='TypeSwitch':
+                case=next((a for a in n.ancestors() if a.kind=='Case' and a.parent and a.parent.parent is symbol.declaration),None)
+                types=case.group('types') if case else []
+                if len(types)==1 and types[0].text!='nil':
+                    narrowed=self.type_node(types[0])
+                    return narrowed
+                return self.type_of(symbol.declaration.role('expr'),seen)
             if symbol.value:
                 from .switches import unwrap
                 if symbol.declaration.kind=='Declaration' and symbol.index and len(symbol.declaration.group('values'))==1:
@@ -734,24 +755,24 @@ class Resolver:
                 result.untyped = not symbol.declaration.data.get("mutable", True) and result.untyped
                 return result
             if symbol.declaration.kind == "Range":
+                source=symbol.declaration.role('expr')
                 if 'comprehension' in symbol.declaration.data:
-                    source=symbol.declaration.role('expr')
                     interval=source.source.comprehensions.interval(source)
                     if interval:
                         if symbol.index:return Type('scalar','int',n)
                         left,right=(self.type_of(interval.role(side),seen.copy()) for side in ['left','right'])
                         return right if left.untyped and not right.untyped else left
-                    if source.source.denotes_type(source):return self.type_node(source) if symbol.index==0 else Type('scalar','int',n)
-                    container=self.type_of(source,seen)
-                    while container.kind=='pointer' and container.elem:container=container.elem
-                    if container.kind=='map':
-                        return self.type_node(container.node.role('key')) if symbol.index==0 and container.node else container.elem or Type(node=n)
-                    if symbol.index==1 and container.kind=='array' and container.node and container.node.kind=='ArrayType':
-                        index=container.node.role('len')
-                        if index and self.type_node(index).kind=='enum':return self.type_node(index)
-                    if symbol.index==1:return Type('scalar','int',n)
-                    if container.kind=='string':return Type('scalar','rune',n)
-                else:container=self.type_of(symbol.declaration.role("expr"), seen)
+                if source.source.denotes_type(source):return self.type_node(source) if symbol.index==0 else Type('scalar','int',n)
+                container=self.type_of(source,seen)
+                while container.kind=='pointer' and container.elem:container=container.elem
+                if container.kind=='map':
+                    return self.type_node(container.node.role('key')) if symbol.index==0 and container.node else container.elem or Type(node=n)
+                if symbol.index==1 and container.kind=='array' and container.node and container.node.kind=='ArrayType':
+                    index=container.node.role('len')
+                    if index and self.type_node(index).kind=='enum':return self.type_node(index)
+                if symbol.index==1:return Type('scalar','int',n)
+                if container.kind=='string':return Type('scalar','rune',n)
+                if source.kind=='Binary' and source.data.get('op') in {'..','..<','..='}:return container
                 return container.elem or Type(node=n)
         if kind == "Compound":
             if n.role("type"):
@@ -762,10 +783,13 @@ class Resolver:
         if kind == "Call":
             callee = n.role("callee")
             if any(self.native_builtin(callee,name) for name in {'size_of','align_of','offset_of','len','cap'}):
-                return Type('scalar','int',n,witness=n)
+                return Type('scalar','uintptr' if self.native_builtin(callee,'offset_of') else 'int',n,witness=n,untyped=any(self.native_builtin(callee,name) for name in {'size_of','align_of'}))
             if n.source.big.enabled:
                 numeric=n.source.big.integration.result(n)
                 if numeric is not None:return replace(numeric,witness=n)
+            from .builtin_types import result
+            builtin=result(self,n,seen=seen)
+            if builtin is not None:return replace(builtin,witness=n)
             operand = n.source.expressions.extrema.element(n)
             if operand is not None:
                 return self.type_of(operand, seen).elem or Type(node=n)
@@ -814,9 +838,20 @@ class Resolver:
             result = self.field(owner_type, n.role("field").text)
             return replace(result[0], witness=n) if result else Type(node=n)
         if kind == "Index":
-            return self.type_of(n.role("expr"), seen).elem or Type(node=n)
+            container=self.type_of(n.role("expr"),seen)
+            if container.kind=='pointer':
+                multi=self.multipointer(n.role('expr'))
+                if multi is None:return Type(node=n)
+                if multi:return container.elem or Type(node=n)
+                container=container.elem or Type()
+            return Type('scalar','u8') if container.kind=='string' else container.elem or Type(node=n)
         if kind == "Slice":
             container = self.type_of(n.role("expr"), seen)
+            if container.kind=='pointer':
+                multi=self.multipointer(n.role('expr'))
+                if multi is None:return Type(node=n)
+                if multi:return Type('slice',elem=container.elem)
+                container=container.elem or Type()
             return container if container.kind == "string" else Type("slice", node=n, elem=container.elem)
         if kind in {"Ternary", "WhenExpr"}:
             return self.type_of(n.role("x"), seen)
@@ -845,6 +880,26 @@ class Resolver:
             inner = self.type_of(n.role("expr"), seen)
             return Type("pointer", node=n, elem=inner) if n.data["op"] == "&" else inner
         return Type(node=n)
+
+    def multipointer(self,node,depth=0):
+        if node is None or depth>32:return None
+        if node.kind=='PointerType':return False
+        if node.kind=='MultiPointerType':return True
+        if node.kind=='Unary' and node.data.get('op')=='&':return False
+        if node.kind in {'Paren','HelperType'}:return self.multipointer(node.role('expr'),depth+1)
+        if node.kind=='Cast':return self.multipointer(node.role('type'),depth+1)
+        if node.kind=='Binary' and node.data.get('op')=='/':return self.multipointer(node.role('right'),depth+1)
+        if node.kind in {'Ident','Selector'}:
+            symbol=self.symbol(node)
+            if symbol:return self.multipointer(symbol.annotation or symbol.value,depth+1)
+        if node.kind=='Call':
+            callee=node.role('callee')
+            if self.native_builtin_alias(callee,'raw_data'):return True
+            if node.source.denotes_type(callee):return self.multipointer(callee,depth+1)
+            signature=self.type_of(callee)
+            fields=self.fields(signature.node.role('results')) if signature.kind=='procedure' else []
+            if fields:return self.multipointer(fields[0][1],depth+1)
+        return None
 
     def membership_untyped(self, node, seen=None):
         """Whether a needle lacks a fixed type for inline-list inference.
@@ -1038,6 +1093,8 @@ class Resolver:
     def unify(self, formal, actual, substitutions):
         if formal is None:
             return 0
+        if formal.kind == "Ellipsis":
+            return self.unify(formal.role("expr"), actual.elem, substitutions) if actual.kind == "slice" and actual.elem else -1000
         if formal.kind == "PolyType":
             name = formal.data["name"]
             if actual.kind != "unknown":
@@ -1067,6 +1124,12 @@ class Resolver:
         if formal.kind=='PointerType' and actual.kind=='pointer':
             score=self.unify(formal.role('elem'),actual.elem or Type(),substitutions)
             return score+3 if score>=0 else score
+        if formal.kind=='MapType' and actual.kind=='map':
+            key=self.type_node(actual.node.role('key'),actual.substitutions) if actual.node else Type()
+            score=self.unify(formal.role('key'),key,substitutions)
+            if score<0:return score
+            value=self.unify(formal.role('value'),actual.elem or Type(),substitutions)
+            return score+value+3 if value>=0 else value
         if formal.kind=='Call' and actual.kind=='struct' and actual.node is expected.node:
             parameters=self.fields(actual.node.role('params'))
             arguments=formal.group('args');score=0
@@ -1089,6 +1152,10 @@ class Resolver:
             return score+3
         if actual.kind == "unknown" or expected.kind in {"unknown", "generic"}:
             return 0
+        if expected.kind=='scalar' and expected.name=='rawptr' and actual.kind=='pointer':return 1
+        if expected.kind=='union' and expected.node and (actual.kind!='union' or actual.node is not expected.node):
+            scores=[self.unify(v,actual,dict(substitutions)) for v in expected.node.group('variants')]
+            return max(scores,default=-1000)
         if expected.kind != actual.kind:
             return -1000
         if expected.kind in {"enum", "struct", "union"} and expected.node is not actual.node:
@@ -1101,8 +1168,8 @@ class Resolver:
             return 0
         return 2 if actual.untyped and expected.name and expected.name==actual.name else 0 if actual.untyped else 5
 
-    def resolve_call(self, call):
-        if not getattr(self,'evaluation_active',False) and not self.bound_types and not self.bound_constants and call in self.call_plans:
+    def resolve_call(self, call, targets=None):
+        if targets is None and not getattr(self,'evaluation_active',False) and not self.bound_types and not self.bound_constants and call in self.call_plans:
             return self.call_plans[call]
         key = (call, "call")
         if key in self.active:
@@ -1110,12 +1177,20 @@ class Resolver:
         self.active.add(key)
         try:
             candidates = []
-            for symbol, signature in self.procedure_candidates(call.role("callee")):
+            arranged=None
+            if targets is not None:
+                declared=self.type_of(call.role("callee"))
+                if declared.kind!='procedure':return None
+                from .caller_metadata import arrange
+                arranged=arrange(declared.node,call.group("args"))
+                if arranged is None:return None
+            for symbol, signature in ([(None,target.role("type")) for target in targets] if targets is not None else self.procedure_candidates(call.role("callee"))):
                 fields = self.fields(signature.role("params"))
                 substitutions, score, valid = {}, 0, True
                 args = call.group("args")
                 generics = self.generic_parameters(signature)
-                for index, arg in enumerate(args):
+                indexed=enumerate(args) if arranged is None else ((i,arg) for i,group in enumerate(arranged) for arg in group)
+                for index, arg in indexed:
                     if call.role("callee").kind == "Selector" and call.role("callee").data.get("op") == "->":
                         index += 1
                     if index >= len(fields):
@@ -1135,7 +1210,13 @@ class Resolver:
                                     substitutions[param[0]] = value
                         actual=arg
                         while actual.kind=='Paren':actual=actual.role('expr')
-                        amount = self.unify(param[1], self.type_of(arg), substitutions)
+                        formal=param[1]
+                        if formal and formal.kind=='Ellipsis':
+                            ellipsis=call.data.get('roles',{}).get('ellipsis')
+                            packed=bool(ellipsis and ellipsis[0]>=0 and arg.source is call.source and arg.start>=ellipsis[1]) or any(
+                                item.kind=='FieldValue' and item.role('value') is arg for item in args)
+                            if not packed:formal=formal.role('expr')
+                        amount = self.unify(formal, self.type_of(arg), substitutions)
                         if actual.kind=='AutoCast' and amount<0:amount=0
                         score += amount
                         valid &= amount >= 0

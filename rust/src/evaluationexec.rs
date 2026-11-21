@@ -401,6 +401,7 @@ impl Project {
             options: Options {
                 odin_compatible: self.options.odin_compatible,
                 native_policy_probe: false,
+                native_policy_only: false,
                 command: "build".into(),
                 entry,
                 output: None,

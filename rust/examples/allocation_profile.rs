@@ -90,6 +90,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let started = Instant::now();
     let mut project = Project::new(Options {
             native_policy_probe: false,
+            native_policy_only: false,
             odin_compatible: false,
         command: "transpile".into(),
         entry,

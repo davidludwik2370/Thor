@@ -929,7 +929,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "The native bundle includes checks that misread generated helpers. Use --vet for Thor convention checks, or select supported native checks individually."
+      "source_check": true
     },
     {
       "name": "vet-unused",
@@ -947,7 +947,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated helpers and imports make native unused checks unreliable. Use --vet=unused for original Thor local bindings."
+      "source_check": true
     },
     {
       "name": "vet-unused-variables",
@@ -965,7 +965,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated helper declarations can be reported as unused. Use --vet=unused for original Thor local bindings."
+      "source_check": true
     },
     {
       "name": "vet-unused-procedures",
@@ -983,7 +983,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated helper procedures can be reported as unused. Use --vet=unused for original Thor procedures."
+      "source_check": true
     },
     {
       "name": "vet-unused-imports",
@@ -1001,7 +1001,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated imports and aliases do not preserve native import usage checks. Use --vet=unused for original Thor imports."
+      "source_check": true
     },
     {
       "name": "vet-shadowing",
@@ -1019,7 +1019,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated comprehension bindings and capture scopes do not preserve native shadowing checks."
+      "source_check": true
     },
     {
       "name": "vet-using-stmt",
@@ -1037,7 +1037,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Thor automatically enables using statements; the generated feature tag overrides this native policy."
+      "source_check": true
     },
     {
       "name": "vet-using-param",
@@ -1055,7 +1055,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Thor automatically enables using parameters; the generated feature tag overrides this native policy."
+      "source_check": true
     },
     {
       "name": "vet-style",
@@ -1073,7 +1073,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated native constraints and support code do not follow this source-style policy."
+      "source_check": true
     },
     {
       "name": "vet-semicolon",
@@ -1108,7 +1108,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated generic helpers can hide redundant casts from native checking."
+      "source_check": true
     },
     {
       "name": "vet-tabs",
@@ -1126,7 +1126,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated code uses its own indentation, so native indentation checks cannot inspect original Thor formatting."
+      "source_check": true
     },
     {
       "name": "vet-when-shadowing",
@@ -1161,7 +1161,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated captures can hide nil dereferences from native flow analysis."
+      "source_check": true
     },
     {
       "name": "vet-uninitialized",
@@ -1179,7 +1179,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated captures can hide uninitialized reads from native flow analysis."
+      "source_check": true
     },
     {
       "name": "vet-atomic-access",
@@ -1197,7 +1197,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "Generated captures can hide source accesses from native atomic-access analysis."
+      "source_check": true
     },
     {
       "name": "vet-packages",
@@ -1448,7 +1448,7 @@
       ],
       "kind": "None",
       "internal": false,
-      "thor_rejection": "This bundles native style and indentation checks that inspect generated formatting. Use --vet=semicolon to check original Thor terminators."
+      "source_check": true
     },
     {
       "name": "strict-style-packages",

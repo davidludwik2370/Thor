@@ -27,6 +27,11 @@ mod namescope;
 pub use projections::Projection;
 #[path = "typefacts.rs"]
 mod typefacts;
+#[path = "builtintypes.rs"]
+mod builtintypes;
+#[path = "intrinsictypes.rs"]
+mod intrinsictypes;
+pub(crate) use intrinsictypes::allocation_free_intrinsic;
 pub use calls::CallPlan;
 pub(crate) use calls::ClosedCalls;
 pub use contexts::{ContextHint, ParameterWitness};
@@ -66,6 +71,11 @@ pub enum Type {
         untyped: bool,
     },
     Array {
+        elem: Box<Type>,
+        length: Option<i128>,
+    },
+    Matrix {elem:Box<Type>,rows:Option<i128>,columns:Option<i128>,row_major:bool},
+    Vector {
         elem: Box<Type>,
         length: Option<i128>,
     },
@@ -124,6 +134,7 @@ impl Type {
     pub fn element(&self) -> Option<&Type> {
         match self {
             Self::Array { elem, .. }
+            | Self::Vector { elem, .. } | Self::Matrix {elem,..}
             | Self::Slice(elem)
             | Self::Dynamic(elem)
             | Self::Pointer(elem)
@@ -185,6 +196,7 @@ impl Type {
             Self::Scalar { name, .. } => {
                 name == "int"
                     || name == "uint"
+                    || name == "byte"
                     || name == "uintptr"
                     || name == "rune"
                     || name.starts_with(['i', 'u', 'f'])
@@ -504,7 +516,7 @@ impl<'a> Resolver<'a> {
                         } else {
                             None
                         }
-                    });
+                    }).or_else(|| (node.kind == "Field").then(|| source.role(id, "default")).flatten());
                     let annotation = if node.kind == "Range" {
                         source.role(
                             id,
@@ -603,7 +615,7 @@ impl<'a> Resolver<'a> {
             }
         }
         for owner in self.index.scopes(reference) {
-            if source.node(owner).kind == "Range"
+            let range_header=source.node(owner).kind == "Range"
                 && ["expr", "init"].iter().any(|role| {
                     source.role(owner, role).is_some_and(|expr| {
                         source
@@ -611,10 +623,7 @@ impl<'a> Resolver<'a> {
                             .span
                             .contains(source.node(reference.node).span)
                     })
-                })
-            {
-                continue;
-            }
+                });
             if let Some(ids) = self.scopes.get(&Ref { file: reference.file, node: owner }).and_then(|names| names.get(name)) {
                 let own_decl = source.ancestors(reference.node).find(|id| {
                     source.node(*id).kind == "Declaration"
@@ -633,7 +642,8 @@ impl<'a> Resolver<'a> {
                         })
                 });
                 if let Some(id) = ids.iter().find(|id| {
-                    Some(self.symbols[**id].reference.node) != own_decl
+                    !(range_header && self.symbols[**id].reference.node==owner)
+                        && Some(self.symbols[**id].reference.node) != own_decl
                         && (owner == NodeId(0)
                             || source.node(self.symbols[**id].reference.node).kind != "Declaration"
                             || !source.node(self.symbols[**id].reference.node).mutable
@@ -793,8 +803,15 @@ impl<'a> Resolver<'a> {
         self.import_packages.borrow_mut().insert(key, package);
         package
         };
-        let Some(package) = package else {
+        let found=package.and_then(|package|self.index.package_symbols[package].get(name)
+            .and_then(|symbols|symbols.iter().find(|id|self.active_definition(self.symbols[**id].reference))).copied());
+        if found.is_none() {
             if self.track_import_demands.get() && !["base:builtin", "base:intrinsics"].contains(&path) {
+                if let Some(package)=package {
+                    if let Some((directory,_))=self.index.packages.iter().find(|(_,id)|**id==package){
+                        self.missing_packages.borrow_mut().insert(directory.clone());
+                    }
+                }
                 let source = &self.sources[file];
                 let owner = site.and_then(|site| {
                     std::iter::once(site.node).chain(source.ancestors(site.node))
@@ -807,13 +824,8 @@ impl<'a> Resolver<'a> {
                     file, path: path.into(), name: name.into(), owner,
                 });
             }
-            return None;
-        };
-        self.index.package_symbols[package].get(name)
-                .and_then(|symbols| symbols
-                        .iter()
-                        .find(|id| self.active_definition(self.symbols[**id].reference)))
-                .copied()
+        }
+        found
     }
     pub(crate) fn demanded_packages(&self) -> BTreeSet<std::path::PathBuf> {
         self.missing_packages.borrow().clone()
@@ -1293,6 +1305,10 @@ impl<'a> Resolver<'a> {
         let n = s.node(r.node);
         let child = |name: &str| s.role(r.node, name).map(|node| Ref { file: r.file, node });
         match n.kind.as_str() {
+            "Directive" if s.text(r.node)=="#caller_location" => self
+                .package_symbol(r,"base:runtime","Source_Code_Location")
+                .and_then(|i|self.symbols[i].value.map(|node|Ref{file:self.symbols[i].reference.file,node}))
+                .map(|typ|self.type_of(typ)).unwrap_or(Type::Unknown),
             "Implicit" if s.text(r.node) == "context" => self
                 .package_symbol(r, "base:runtime", "Context")
                 .and_then(|symbol| self.symbols[symbol].value.map(|node| Ref {
@@ -1431,7 +1447,8 @@ impl<'a> Resolver<'a> {
                 }
                 Type::Unknown
             }
-            "Paren" | "HelperType" | "AutoCast" | "Unary" | "Run" => {
+            "HelperType"=>{let mut typ=child("expr").map(|v|self.type_of(v)).unwrap_or(Type::Unknown);if let Type::Matrix{row_major,..}=&mut typ{if ["row_major","column_major"].contains(&n.op.as_str()){*row_major=n.op=="row_major";}}typ},
+            "Paren" | "AutoCast" | "Unary" | "Run" | "Runtime" => {
                 let typ = child("expr")
                     .map(|r| self.type_of(r))
                     .unwrap_or(Type::Unknown);
@@ -1448,20 +1465,18 @@ impl<'a> Resolver<'a> {
                 .map(|r| self.type_of(r))
                 .and_then(|t| t.element().cloned())
                 .unwrap_or(Type::Unknown),
-            "Index" => child("expr")
-                .map(|r| self.type_of(r))
-                .and_then(|t| t.indexed_element().cloned())
-                .unwrap_or(Type::Unknown),
+            "Index" => child("expr").map(|operand|{
+                let typ=self.type_of(operand);self.index_type(operand,typ)
+            }).unwrap_or(Type::Unknown),
             "Slice" => {
                 let typ = child("expr")
                     .map(|r| self.type_of(r))
                     .unwrap_or(Type::Unknown);
-                match typ {
-                    Type::String { .. } => typ,
-                    Type::Pointer(_) | Type::Soa(_) => Type::Unknown,
-                    _ => Type::Slice(Box::new(typ.element().cloned().unwrap_or(Type::Unknown))),
-                }
+                child("expr").map(|operand|self.slice_type(operand,typ)).unwrap_or(Type::Unknown)
             }
+            "MatrixType"=>Type::Matrix{row_major:false,elem:Box::new(child("elem").map(|v|self.type_of(v)).unwrap_or(Type::Unknown)),
+                rows:child("rows").and_then(|v|self.integer(v,&mut HashSet::new())),columns:child("columns").and_then(|v|self.integer(v,&mut HashSet::new()))},
+            "MatrixIndex"=>child("expr").map(|v|{let typ=self.type_of(v);self.index_type(v,typ)}).unwrap_or(Type::Unknown),
             "ArrayType" => {
                 let elem = Box::new(
                     child("elem")
@@ -1469,16 +1484,24 @@ impl<'a> Resolver<'a> {
                         .unwrap_or(Type::Unknown),
                 );
                 if let Some(len) = child("len") {
-                    Type::Array {
+                    if n.op=="simd" {Type::Vector{elem,length:self.constant_int(len)}}else{Type::Array {
                         elem,
                         length: self.constant_int(len),
-                    }
+                    }}
                 } else if n.op == "soa" {
                     Type::Soa(elem)
                 } else {
                     Type::Slice(elem)
                 }
             }
+            // Variadic parameters are borrowed slices inside the procedure.
+            // Keep ordinary type queries consistent with specialization so
+            // iteration and indexing retain the declared element type.
+            "Ellipsis" => Type::Slice(Box::new(
+                child("expr")
+                    .map(|r| self.type_of(r))
+                    .unwrap_or(Type::Unknown),
+            )),
             "DynamicArrayType" => {
                 let elem = Box::new(
                     child("elem")
@@ -1612,6 +1635,7 @@ impl<'a> Resolver<'a> {
                 if n.op == "*" && b.is_string() {
                     return b;
                 }
+                if let Some(typ)=typefacts::arithmetic_shape(&n.op,&a,&b){return typ;}
                 if s.thor && a.is_unknown() && b.record_like() || a.untyped() && !b.untyped() {
                     b
                 } else {
@@ -1635,6 +1659,7 @@ impl<'a> Resolver<'a> {
             }
             "Call" => {
                 if let Some(typ)=self.logical_numeric_result(r){return typ;}
+                if let Some(typ)=self.builtin_result_type(r,0,&Substitutions::new()){return typ;}
                 let Some(callee) = child("callee") else {
                     return Type::Unknown;
                 };
@@ -1667,7 +1692,7 @@ impl<'a> Resolver<'a> {
                     }
                 }
                 if builtin && matches!(name, "len" | "cap" | "size_of" | "align_of" | "offset_of") {
-                    return Type::scalar("int");
+                    return Type::Scalar{name:if name=="offset_of"{"uintptr"}else{"int"}.into(),untyped:matches!(name,"size_of"|"align_of")};
                 }
                 if builtin && matches!(name, "min" | "max") {
                     let args = s.group(r.node, "args");
@@ -1944,8 +1969,8 @@ impl<'a> Resolver<'a> {
             }
             if s.node(symbol.reference.node).kind == "PolyType" {
                 return !s.node(symbol.reference.node).parent.is_some_and(|parent| {
-                    s.node(parent).kind == "ArrayType"
-                        && s.role(parent, "len") == Some(symbol.reference.node)
+                    s.node(parent).kind == "ArrayType" && s.role(parent, "len") == Some(symbol.reference.node)
+                        || s.node(parent).kind=="MatrixType" && ["rows","columns"].iter().any(|role|s.role(parent,role)==Some(symbol.reference.node))
                 });
             }
             if symbol.parameter

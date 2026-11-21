@@ -3,9 +3,9 @@
 use super::*;
 
 #[derive(Clone)]
-struct Case {
-    matches: Vec<NodeId>,
-    result: NodeId,
+pub(super) struct Case {
+    pub(super) matches: Vec<NodeId>,
+    pub(super) result: NodeId,
 }
 impl Lower<'_, '_> {
     fn switch_hint_semantic(
@@ -70,7 +70,7 @@ impl Lower<'_, '_> {
         }
         id
     }
-    fn cases(&self, id: NodeId) -> Result<Vec<Case>> {
+    pub(super) fn cases(&self, id: NodeId) -> Result<Vec<Case>> {
         self.source.node(id).data["cases"]
             .as_array()
             .ok_or_else(|| Error::new("switch cases omitted"))?
@@ -318,7 +318,7 @@ impl Lower<'_, '_> {
             .collect();
         Ok(Some((*arg, self.switch_expression(root, hints, constant)?)))
     }
-    fn switch_problem(&mut self, id: NodeId, count: usize) -> Result<Option<Code>> {
+    pub(super) fn switch_problem(&mut self, id: NodeId, count: usize) -> Result<Option<Code>> {
         let cases = self.cases(id)?;
         let defaults = cases.iter().filter(|case| case.matches.is_empty()).count();
         let problem = if defaults > 1 {

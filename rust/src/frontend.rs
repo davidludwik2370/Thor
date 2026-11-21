@@ -232,6 +232,12 @@ impl Frontend {
         package: bool,
         overlay: Option<&str>,
     ) -> Result<Source> {
+        self.parse_options(path,package,overlay,0)
+    }
+    pub(crate) fn parse_native_style(&self, source: &Source, style: u8) -> Result<Source> {
+        self.parse_options(&source.path,false,Some(&source.raw),style)
+    }
+    fn parse_options(&self,path:&Path,package:bool,overlay:Option<&str>,style:u8)->Result<Source> {
         let _phase = crate::profile::span("parser.source");
         crate::profile::count("parser.source_requests", 1);
         let path = if overlay.is_some() {
@@ -265,6 +271,9 @@ impl Frontend {
             args.push(format!("--target-os={os}"));
             args.push(format!("--target-arch={arch}"));
         }
+        if style & 1 != 0 {args.push("--native-vet-style".into());}
+        if style & 2 != 0 {args.push("--native-strict-style".into());}
+        if style & 4 != 0 {args.push("--native-vet-tabs".into());}
         args.push("--stdin".into());
         let mut key = self.fingerprint.as_bytes().to_vec();
         key.extend_from_slice(&serde_json::to_vec(&args)?);

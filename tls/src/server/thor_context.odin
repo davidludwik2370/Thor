@@ -39,7 +39,7 @@ thor_context_adapter :: proc(call: ^ast.Call_Expr) -> bool {
     ident, ok := call.expr.derived.(^ast.Ident)
     if !ok || ident.pos.offset != ident.end.offset { return false }
     _, sw := thor_context_switch_count(call)
-    return strings.has_prefix(ident.name,"__thor_comprehension") || sw || ident.name == "__thor_run" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break" || ident.name == "__thor_fallback_list"
+    return strings.has_prefix(ident.name,"__thor_comprehension") || sw || ident.name == "__thor_run" || ident.name == "__thor_runtime" || ident.name == "__thor_interpolation" || ident.name == "__thor_switch_results" || ident.name == "__thor_switch_break" || ident.name == "__thor_fallback_list"
 }
 
 // A nonreturning call supplies no switch result type. Use its procedure type,

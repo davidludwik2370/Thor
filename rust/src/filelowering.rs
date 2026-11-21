@@ -129,6 +129,7 @@ impl Job {
     }
 }
 pub(super) struct Inputs<'a> {
+    native_checks: bool,
     sources: &'a [Source],
     type_probes: &'a BTreeMap<crate::semantics::Ref, Vec<String>>,
     type_probe_imports: &'a BTreeMap<usize, BTreeMap<String, String>>,
@@ -163,6 +164,7 @@ impl<'a> Inputs<'a> {
         memory_map: &'a str,
     ) -> Self {
         Self {
+            native_checks: nativechecks::active(project),
             sources: &project.sources,
             type_probes: &project.type_probes,
             type_probe_imports: &project.type_probe_imports,
@@ -187,6 +189,7 @@ impl<'a> Inputs<'a> {
         let file = job.file;
         let mut related = HashMap::new();
         let mut lower = Lower::new_with_view(file, resolver, job.view.clone())?;
+        if self.native_checks { lower.strip_native_vet_tags(); }
         lower.remap_imports(job.imports.clone());
         lower.apply_type_probes(
             self.type_probes

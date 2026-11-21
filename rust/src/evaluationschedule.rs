@@ -33,6 +33,8 @@ pub struct Scheduler<'p> {
     guard_busy: BTreeSet<(Ref, String)>,
     explicit_arguments: usize,
     has_pure: bool,
+    has_runtime: bool,
+    runtime_barriers: BTreeMap<(Ref,String),bool>,
     schedule_generics: bool,
     work_sources: Option<BTreeSet<usize>>,
     timeout: Duration,
@@ -86,6 +88,8 @@ impl<'p> Scheduler<'p> {
                 .sources
                 .iter()
                 .any(|source| source.nodes.iter().any(|node| node.data["pure"] == true)),
+            has_runtime: project.sources.iter().any(|s|s.info["features"].as_array().is_some_and(|features|features.iter().any(|f|f["kind"]=="Runtime"))),
+            runtime_barriers: BTreeMap::new(),
             schedule_generics: false,
             work_sources: None,
             timeout,
@@ -450,6 +454,8 @@ impl<'p> Scheduler<'p> {
         true
     }
     pub fn automatic(&mut self, node: Ref) -> bool {
+        if self.source(node).ancestors(node.node).take_while(|id| self.source(node).node(*id).kind != "Procedure")
+            .any(|id| self.source(node).node(id).kind == "Runtime") { return false; }
         if self.kind(node) == "Comprehension" {
             return self.constant_context(node);
         }
@@ -492,11 +498,52 @@ impl<'p> Scheduler<'p> {
         }
         let plans = self.resolver.call_plans(node, &Substitutions::new());
         if let [plan] = plans.as_slice() {
+            if self.has_runtime && self.runtime_barrier(plan.procedure,&plan.bindings) {return false;}
             self.source(plan.procedure).node(plan.procedure.node).data["pure"] == true
                 && self.resolver.fields(plan.signature, "results").len() == 1
         } else {
             false
         }
+    }
+    fn runtime_barrier(&mut self, procedure:Ref, bindings:&Substitutions)->bool {
+        let key=(procedure,format!("{}:{bindings:?}",self.key(procedure).1));
+        if let Some(value)=self.runtime_barriers.get(&key) {return *value;}
+        let mut pending=vec![(procedure,bindings.clone())];
+        let mut visited=std::collections::HashSet::new();
+        while let Some((proc,bindings))=pending.pop() {
+            if !visited.insert((proc,bindings.clone())) {continue;}
+            // Growing recursive specializations cannot prove absence of a
+            // barrier. Keep the ordinary runtime path; explicit #run still
+            // performs native checking of the selected specialization.
+            if visited.len()>128 {self.runtime_barriers.insert(key,true);return true;}
+            let nodes=self.source(proc).descendants(proc.node).collect::<Vec<_>>();
+            for node in nodes {
+                let at=Ref{file:proc.file,node};
+                if !self.resolver.active_definition(at) {continue;}
+                if self.source(proc).ancestors(node).find(|id|self.source(proc).node(*id).kind=="Procedure")!=Some(proc.node) {continue;}
+                let conditions=self.source(proc).ancestors(node).filter(|id|self.source(proc).node(*id).kind=="When").collect::<Vec<_>>();
+                let inactive=conditions.into_iter().any(|owner| {
+                    let Some(cond)=self.source(proc).role(owner,"cond") else{return false;};
+                    let Some(selected)=self.resolver.context_condition(Ref{file:proc.file,node:cond},&bindings) else{return false;};
+                    let arm=self.source(proc).role(owner,if selected {"body"}else{"else"});
+                    !arm.is_some_and(|arm|self.source(proc).node(arm).span.contains(self.source(proc).node(node).span))
+                });
+                if inactive {continue;}
+                if self.kind(at)=="Runtime" {self.runtime_barriers.insert(key,true);return true;}
+                if self.kind(at)=="Call" {
+                    let plans=self.resolver.call_plans(at,&bindings);
+                    if plans.is_empty() {
+                        if let Some(callee)=self.role(at,"callee") {
+                            pending.extend(self.resolver.candidates(callee).into_iter().filter(|p| !self.resolver.sources[p.file].shared_native).map(|p|(p,bindings.clone())));
+                        }
+                    }else {
+                        pending.extend(plans.into_iter().filter(|p| !self.resolver.sources[p.procedure.file].shared_native).map(|p|(p.procedure,p.bindings)));
+                    }
+                }
+            }
+        }
+        self.runtime_barriers.insert(key,false);
+        false
     }
     pub fn known(&mut self, node: Ref) -> Result<bool> {
         self.known_seen(node, &mut BTreeSet::new())

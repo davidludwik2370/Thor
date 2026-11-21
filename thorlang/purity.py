@@ -288,7 +288,7 @@ class Purity:
     def reference(self,n):
         if n.kind!='Ident':return False
         p=n.parent
-        return not(p and (p.kind in {'Declaration','Field','Range','TypeSwitch'} and n in p.group('names')
+        return not(p and (p.role('label') is n or p.kind in {'Declaration','Field','Range','TypeSwitch'} and n in p.group('names')
                          or p.kind in {'Selector','FieldValue'} and p.role('field') is n
                          or p.kind in {'PolyType','EnumType','ImplicitSelector'}))
 
@@ -927,7 +927,9 @@ class Purity:
                     self.problem(proc,'Package initializers/finalizers are not eligible pure call targets.')
                 if any(name.startswith('deferred_') for name in names):
                     self.contracts[proc]=(attribute,'Pure calls cannot use implicit deferred procedure callbacks; make eligible calls explicit in the body.')
+        from .caller_metadata import in_default
         for n in nodes:
+            if in_default(n):continue
             if proc in self.calls.callback_entries and not self.calls.default_evaluated(n):continue
             if n in self.borrowing.escapes:self.problem(n,self.borrowing.escapes[n])
             typ=self.r.type_node(n.role('type')) if n.kind=='Declaration' and n.role('type') else self.r.type_of(n) if n.kind in {'Compound','Comprehension'} else None

@@ -88,7 +88,7 @@ def render(version, command=None, full=False, odin='odin'):
                 if match:
                     documented.add(match[1])
     if full:
-        text += 'Compatible compiler options:\n  Diagnostics refer to original project files.\n  Native vet/style policies report errors; some require Odin-only projects.\n  Thor --vet findings are errors for build and warnings otherwise.\n\n'
+        text += 'Compatible compiler options:\n  Diagnostics refer to original project files.\n  Native vet/style policies retain native diagnostics on original source scopes.\n  Thor --vet findings are errors for build and warnings otherwise.\n\n'
         known = set()
         for flag in CATALOG['native_flags']:
             scope = 'build' if command == 'migrate' else command
@@ -102,11 +102,7 @@ def render(version, command=None, full=False, odin='odin'):
                 text += '  ['+', '.join(flag['commands'])+']'
             if flag['internal']:
                 text += '  [compiler development]'
-            if flag.get('thor_rejection'):
-                text += '  [Odin-only projects]'
             text += '\n'+''.join('      '+line.rstrip()+'\n' for line in flag['description'].splitlines())
-            if flag.get('thor_rejection'):
-                text += '      '+flag['thor_rejection']+'\n'
             text += '\n'
         native = shutil.which(odin)
         if native:
@@ -122,8 +118,6 @@ def render(version, command=None, full=False, odin='odin'):
                             include = False
                         if include:
                             known.add(name)
-                            if native_check_rejection(name):
-                                text += '  [Odin-only projects: unaudited native check]\n'
                     if include:
                         text += line+'\n'
         if command is None or source_command(command) and command != 'ast':
@@ -260,57 +254,9 @@ def normalize(options, flags, entry, overlays):
             raise ValueError('-thread-count requires a positive integer')
 
 
-def check_scopes(project, flags):
-    root = project.entry.parent if project.file_entry else project.entry
-    names = ','.join(sorted({s.nodes[0].data['name'] for s in project.sources.values() if s.path.is_relative_to(root) and not s.info.get('excluded')}))
-    if any(f.startswith('-vet') for f in flags) and not any(f.startswith('-vet-packages:') for f in flags):
-        flags.append('-vet-packages:'+names)
-    if '-strict-style' in flags and not any(f.startswith('-strict-style-packages:') for f in flags):
-        flags.append('-strict-style-packages:'+names)
-
-
-def native_check_rejection(name):
+def native_source_check(name):
     info = next((flag for flag in CATALOG['native_flags'] if flag['name'] == name), None)
-    if info is not None:
-        return info.get('thor_rejection')
-    if name.startswith('vet-'):
-        return 'This native check has not been audited against generated Thor code.'
-
-
-def validate_native_checks(project, command, flags):
-    from .compiler import ThorError
-    from .sourcemap import position
-    sources = [source for source in project.sources.values() if source.thor and not source.info.get('excluded')]
-    if not sources:
-        return
-    for flag in flags:
-        name = flag.lstrip('-').split(':', 1)[0]
-        reason = native_check_rejection(name)
-        if reason:
-            raise ThorError(f'-{name} is supported only for Odin-only projects. {reason} Remove -{name} for projects containing Thor source.')
-    if command == 'ast':
-        return
-    for source in sources:
-        for tag in source.info.get('file_tags', []):
-            words = tag.removeprefix('#+').split()
-            if not words or words[0] != 'vet':
-                continue
-            names = [name for name in re.split(r'[\s,]+', ' '.join(words[1:])) if name] or ['']
-            for name in names:
-                if name.startswith('!'):
-                    continue
-                reason = native_check_rejection('vet'+('-'+name if name else ''))
-                if reason:
-                    start = next((match.start() for match in re.finditer(re.escape(tag.encode()), source.raw)
-                                  if not any(a <= match.start() < b for a, b in source.info.get('comments', []))), 0)
-                    line, column = position(source.raw, start)
-                    end_line, end_column = position(source.raw, start+len(tag.encode()))
-                    label = '#+vet'+(' '+name if name else '')
-                    message = f'{label} is supported only in Odin source files. {reason}'
-                    raise ThorError(message, diagnostics=[{'type':'error', 'stage':'thor', 'pos':{
-                        'file':str(source.path), 'offset':start, 'end_offset':start+len(tag.encode()),
-                        'line':line, 'column':column, 'end_line':end_line,
-                        'end_column':end_column}, 'msgs':[message]}])
+    return info.get('source_check', False) if info is not None else name.startswith('vet-')
 
 
 def helper_flag(flag):

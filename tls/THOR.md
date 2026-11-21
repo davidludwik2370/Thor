@@ -36,6 +36,17 @@ messages, file discovery, semantic token ranges, unsaved changes, and diagnostic
 
 ## Current support
 
+- Complete supported file-vet policies after `#+vet`, spaces, and commas.
+  Suggestions include `no_alloc` and all native file policy names (including
+  tag-only `deprecated` and `explicit-allocators`), carry
+  documentation, filter partial names, and omit already selected options.
+  Native options support `!` completion too. Edits replace the current option
+  in the original source, including when completing in the middle of a name.
+  While an open header is bare or ends in a supported option prefix, TLS defers
+  its provisional native-bundle/unknown-option diagnostic. Completed unsupported
+  settings and typos still report errors. The compiler's command-line policy is
+  unchanged: bare `#+vet` is not a supported Thor file policy.
+
 - Resolve the 27 global compiler builtins through direct calls, local aliases
   and package re-exports. Result inference covers array/SIMD swizzles, SOA column
   extraction, nested packing/expansion, type-producing `type_of` aliases and
@@ -315,3 +326,10 @@ temporary profile. It checks language registration, actual server hover and
 definitions, live compiler errors on unsaved text, Unicode ranges, error clearing,
 restart, and preservation of the Odin file association. It requires a desktop
 VS Code installation; `--code` selects its CLI.
+
+Allocation-free I/O diagnostics use the compiler's source-verified SDK summaries.
+Fixed-buffer standard input and ordinary native/basic printing are accepted;
+unknown or allocating writer callbacks are reported at the original call path.
+Unsaved callback edits invalidate the proof, and fixing the callback clears the
+diagnostic. See [the allocation contract](../docs/no-alloc.md#input-and-output)
+for formatter-registry and SDK-version limits.

@@ -389,8 +389,12 @@ def run(project, options, flags, native_errors=None):
         index = bisect_left(offsets, fix.highlight_start)
         return index < len(offsets) and offsets[index] < fix.highlight_end
 
-    proposed = [*usage_fixes, *(fix for fix in candidates(project, checks) if not exempt_declaration(fix))]
+    from .vet_attributes import ignored
+    proposed = [fix for fix in [*usage_fixes, *(fix for fix in candidates(project, checks) if not exempt_declaration(fix))]
+                if not ignored(fix.source,fix.highlight_start,fix.highlight_end,fix.rule)]
     findings = unused_findings if 'unused' in checks else []
+    by_path={str(source.path):source for source in project.sources.values()}
+    findings=[item for item in findings if not ignored(by_path[item['pos']['file']],item['pos']['offset'],item['pos'].get('end_offset',item['pos']['offset']+1),'unused')]
     if native_errors is not None:
         reported = {(finding['pos']['file'], finding['pos']['offset'], tuple(finding['msgs']))
                     for finding in findings}
@@ -399,6 +403,7 @@ def run(project, options, flags, native_errors=None):
                                 (finding.get('pos') or {}).get('offset'), tuple(finding['msgs'])) not in reported]
     from .source_tools import semicolon_edits
     accepted = semicolon_edits(project, thor_only=True) if 'semicolon' in checks else []
+    accepted=[fix for fix in accepted if not ignored(fix.source,fix.highlight_start,fix.highlight_end,fix.rule)]
     covered_semicolons = [fix for fix in accepted if any(
         item.source is fix.source and item.start <= fix.start and fix.end <= item.end for item in usage_fixes if item.rule=='import')]
     accepted = [fix for fix in accepted if fix not in covered_semicolons]

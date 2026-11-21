@@ -200,7 +200,7 @@ get_generic_assignment :: proc(
 		if name,ok:=v.expr.derived.(^ast.Ident);ok&&name.pos.offset==name.end.offset{
 			// #run preserves its operand's result type. Resolve dependent
 			// defaults with the real call before storing a local's type.
-			if name.name=="__thor_run" && len(v.args)==1 {
+			if (name.name=="__thor_run"||name.name=="__thor_runtime") && len(v.args)==1 {
 				get_generic_assignment(file,v.args[0],ast_context,results,calls,flags,is_mutable)
 				return
 			}

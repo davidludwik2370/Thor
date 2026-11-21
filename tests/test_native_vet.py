@@ -1,7 +1,4 @@
-"""Every native vet policy is either audited for Thor or explicitly restricted.
-
-Native-only projects are also compared with Odin itself, including real errors.
-"""
+"""Native flags and file tags compared directly with installed Odin verdicts."""
 import json
 import os
 from pathlib import Path
@@ -14,8 +11,8 @@ from tests import test_rust_compiler as native
 from thorlang import cli
 
 
-SUPPORTED = {'vet-when-shadowing', 'vet-semicolon', 'vet-packages'}
-RESTRICTED = {flag['name'] for flag in cli.CATALOG['native_flags'] if flag.get('thor_rejection')}
+NATIVE_FLAGS = {flag['name'] for flag in cli.CATALOG['native_flags'] if flag['name'].startswith('vet')}
+NATIVE_TAGS = {name.removeprefix('vet-') for name in NATIVE_FLAGS-{'vet','vet-packages'}} | {'deprecated','explicit-allocators'}
 CLEAN = 'package main\nmain :: proc() {}\n'
 FEATURES = '''package main
 import "core:fmt"
@@ -77,249 +74,239 @@ class NativeVetTests(unittest.TestCase):
         self.assertEqual(result.returncode, status, result.stdout+result.stderr)
         return result
 
+    def oracle(self, raw, flags=(), command='check'):
+        source=self.root/'original.odin'
+        source.write_text(raw)
+        result=subprocess.run([os.environ.get('THOR_ODIN','odin'),command,str(source),'-file',
+                               '-thread-count:1','-json-errors',*flags],
+                              cwd=self.root,capture_output=True,text=True,timeout=60)
+        self.assertIn(result.returncode,(0,1),result.stdout+result.stderr)
+        return result
+
+    def compare_native(self,raw,flags=(),command='check'):
+        oracle=self.oracle(raw,flags,command)
+        try:expected=json.loads(oracle.stderr or '{"errors":[]}')['errors']
+        except ValueError:expected=[{'type':'error','pos':None,'msgs':[oracle.stderr.strip()]}]
+        self.source.write_text(raw)
+        for engine in ('python','rust'):
+            with self.subTest(engine=engine):
+                result=self.call(engine,*flags,'-json-errors',command=command,status=oracle.returncode)
+                actual=json.loads(result.stderr or '{"errors":[]}')['errors']
+                # Ordinary Thor unused-local warnings remain warnings. Compare
+                # the native policy errors, including complete source ranges.
+                actual=[d for d in actual if d['type']=='error']
+                errors=[d for d in expected if d['type']=='error']
+                expected_messages=[[m.replace(str(self.root/'original.odin'),str(self.source)) for m in d['msgs']] for d in errors]
+                self.assertEqual([d['msgs'] for d in actual],expected_messages,actual)
+                for found,native_error in zip(actual,errors):
+                    if not native_error.get('pos'):
+                        self.assertIsNone(found.get('pos'))
+                        continue
+                    self.assertEqual(found['pos']['file'],str(self.source))
+                    for key in ('offset','line','column'):
+                        self.assertEqual(found['pos'][key],native_error['pos'][key],(found,native_error))
+        return oracle
+
     def test_catalog_covers_every_installed_native_vet_flag(self):
-        executable = shutil.which(os.environ.get('THOR_ODIN', 'odin'))
-        if not executable:
-            self.skipTest('Odin not installed')
-        result = subprocess.run([executable, 'build', '-help'], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        installed = set(re.findall(r'^\s+-(vet(?:-[a-z-]+)?)(?=[:\s]|$)', result.stdout, re.M))
-        catalog = {flag['name'] for flag in cli.CATALOG['native_flags'] if flag['name'].startswith('vet')}
-        self.assertTrue(installed, result.stdout)
-        self.assertLessEqual(installed, catalog)
-        self.assertEqual(catalog, SUPPORTED | (RESTRICTED-{'strict-style'}))
-        self.assertEqual(set(VIOLATIONS), catalog-{'vet-packages'} | {'strict-style'})
+        result=subprocess.run([os.environ.get('THOR_ODIN','odin'),'build','-help'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        installed=set(re.findall(r'^\s+-(vet(?:-[a-z-]+)?)(?=[:\s]|$)',result.stdout,re.M))
+        self.assertTrue(installed)
+        self.assertLessEqual(installed,NATIVE_FLAGS)
+        self.assertEqual(set(VIOLATIONS),NATIVE_FLAGS-{'vet-packages'} | {'strict-style'})
 
-    def test_every_unsafe_policy_is_rejected_even_on_clean_thor(self):
+    def test_all_native_flags_accept_clean_thor(self):
+        for name in sorted(NATIVE_FLAGS | {'strict-style'}):
+            with self.subTest(flag=name):
+                flags=['-vet-packages:main'] if name=='vet-packages' else ['-'+name,'-vet-packages:main']
+                self.compare_native(CLEAN,flags)
+
+    def test_all_native_flag_errors_match_odin_source_locations(self):
+        for name,(raw,_) in VIOLATIONS.items():
+            with self.subTest(flag=name):
+                result=self.compare_native('// 😀 positions\n'+raw,['-'+name,'-vet-packages:main'])
+                self.assertEqual(result.returncode,1)
+
+    def test_installed_file_policy_inventory_is_complete(self):
+        root=Path(subprocess.check_output([os.environ.get('THOR_ODIN','odin'),'root'],text=True).strip())
+        settings=root/'src/build_settings.cpp'
+        if not settings.is_file():self.skipTest('SDK does not include compiler source')
+        raw=settings.read_text().split('u64 get_vet_flag_from_name',1)[1].split('return VetFlag_NONE;',1)[0]
+        self.assertEqual(set(re.findall(r'name == "([a-z-]+)"',raw)),NATIVE_TAGS)
+
+    def test_incompatible_native_analysis_flags_keep_option_errors(self):
+        for flags in [('-vet-atomic-access','-no-atomic-analysis'),
+                      ('-vet-nil-deref','-no-escape-analysis'),
+                      ('-vet-uninitialized','-no-escape-analysis')]:
+            with self.subTest(flags=flags):self.compare_native(CLEAN,flags)
+
+    def test_native_only_policy_defaults_match_odin(self):
+        self.source.unlink(missing_ok=True)
+        source=self.app/'main.odin'
+        raw='package main\ndead::proc(){}\nmain::proc(){}\n'
+        source.write_text(raw)
+        for flags in [('-vet-unused-procedures',),('-vet-unused-procedures','-vet-packages:main')]:
+            expected=self.oracle(raw,flags)
+            for engine in ('python','rust'):
+                result=self.call(engine,*flags,'-json-errors',status=expected.returncode)
+                self.assertIn('unused-procedures' if len(flags)==1 else 'not used',result.stderr)
+
+    def test_native_policies_across_commands_and_artifact_modes(self):
+        self.source.write_text('#+vet cast unused\n'+CLEAN)
+        for engine in ('python','rust'):
+            for command in ('check','build','run','vet','doc'):
+                with self.subTest(engine=engine,command=command):
+                    self.call(engine,'-vet-cast',command=command)
+            for flags in [native.UNCHECKED, ['-debug'],['-build-mode:obj','-use-single-module']]:
+                with self.subTest(engine=engine,flags=flags):
+                    output=self.root/(engine+'artifact')
+                    self.call(engine,'-vet','-vet-packages:main','-out:'+str(output),*flags,command='build')
+                    self.assertTrue(output.is_file())
+            self.source.write_text('#+test\n#+vet unused cast\npackage main\nimport "core:testing"\n@(test)\nworks::proc(t:^testing.T){testing.expect(t,2+2==4)}\n')
+            self.call(engine,'-vet','-vet-packages:main',*native.UNCHECKED,command='test')
+            self.source.write_text('#+vet cast unused\n'+CLEAN)
+
+    def test_every_native_tag_and_negation_is_accepted(self):
+        for name in sorted(NATIVE_TAGS):
+            for prefix in ('','!'):
+                with self.subTest(tag=prefix+name):
+                    self.compare_native('#+vet '+prefix+name+'\n'+CLEAN)
+        self.compare_native('#+vet\n'+CLEAN)
+        self.compare_native('#+vet '+' '.join(sorted(NATIVE_TAGS))+'\n'+CLEAN)
+        self.compare_native('\ufeff#+vet unused cast\r\n'+CLEAN.replace('\n','\r\n'))
+
+    def test_native_file_tag_errors_and_package_filter_overrides(self):
+        for flag,(raw,_) in VIOLATIONS.items():
+            if flag=='strict-style':continue
+            tag='#+vet'+(' '+flag[4:] if flag!='vet' else '')
+            with self.subTest(tag=tag):
+                result=self.compare_native(tag+'\n'+raw,['-vet-packages:other'])
+                self.assertEqual(result.returncode,1)
+        self.compare_native('#+vet deprecated\npackage main\n@(deprecated="old")\nold::proc(){}\nmain::proc(){old()}\n')
+        self.compare_native('#+vet explicit-allocators\npackage main\nmain::proc(){x:=make([]int,1);delete(x)}\n')
+
+    def test_native_using_feature_optins_and_optouts_keep_precedence(self):
+        raw='package main\nRow::struct{x:int}\nmain::proc(){row:=Row{1};using row;_=x}\n'
+        for feature in ('using-stmt','!using-stmt'):
+            with self.subTest(feature=feature):
+                self.compare_native('#+vet using-stmt\n#+feature '+feature+'\n'+raw)
+        params='package main\nRow::struct{x:int}\nread::proc(using row:Row)->int{return x}\nmain::proc(){_=read(Row{1})}\n'
+        self.compare_native('#+vet using-param\n#+feature using-stmt\n'+params)
+
+    def test_repeated_tags_override_in_order_and_keep_native_defaults(self):
+        raw='package main\nmain::proc(){if true {x:=1}}\n'
+        for tags in ('#+vet\n#+vet !unused\n','#+vet unused-variables\n#+vet !unused-variables\n',
+                     '#+vet !unused-variables\n#+vet unused-variables\n',
+                     '#+vet !unused-variables\n'):
+            with self.subTest(tags=tags):self.compare_native(tags+raw,['-vet-unused-variables'])
+        # Odin requires an explicit package scope for unused-procedures CLI.
+        self.compare_native('package main\ndead::proc(){}\nmain::proc(){}\n',['-vet-unused-procedures'])
+
+    def test_native_tag_syntax_and_unknown_names_are_reported_by_odin(self):
+        for tag in ('#+vet no-such-policy','#+vet !','#+vet unused, cast','#+vet extra'):
+            with self.subTest(tag=tag):self.compare_native(tag+'\n'+CLEAN)
+        self.compare_native(CLEAN,['-vet-future-unaudited'])
+
+    def test_mixed_native_sources_dependencies_exclusion_and_overlays(self):
         self.source.write_text(CLEAN)
-        for engine in ('python', 'rust'):
-            for name in sorted(RESTRICTED | {'vet-future-unaudited'}):
-                with self.subTest(engine=engine, name=name):
-                    result = self.call(engine, '-'+name, '-json-errors', status=1)
-                    packet = json.loads(result.stderr)
-                    self.assertEqual(packet['error_count'], 1, packet)
-                    self.assertEqual(packet['errors'][0]['type'], 'error')
-                    message = ' '.join(packet['errors'][0]['msgs'])
-                    self.assertIn('-'+name, message)
-                    self.assertIn('Odin-only projects', message)
-            for command in ('build', 'run', 'test', 'vet', 'doc', 'strip-semicolon', 'publish'):
-                with self.subTest(engine=engine, command=command):
-                    configuration = native.UNCHECKED if command in {'build', 'run', 'test', 'publish'} else []
-                    result = self.call(engine, '--vet=unused', '-vet-unused', '-vet-packages:other',
-                                       '-ignore-warnings', *configuration, command=command, status=1)
-                    self.assertIn('Odin-only projects', result.stderr)
-            self.assertEqual(self.source.read_text(), CLEAN)
+        excluded=self.app/('ignored_linux.thor' if os.name=='nt' else 'ignored_windows.thor')
+        excluded.write_text('#+vet unused\nnot valid source\n')
+        (self.app/'other.odin').write_text('package main\nVALUE::1\n')
+        for engine in ('python','rust'):self.call(engine,'-vet')
+        library=self.app/'library';library.mkdir()
+        (library/'value.thor').write_text('#+vet unused\npackage library\nVALUE::1\n')
+        self.source.write_text('package main\nimport "library"\nmain::proc(){_=library.VALUE}\n')
+        for engine in ('python','rust'):self.call(engine,'-vet','-vet-packages:main')
+        replacement=self.root/'replacement.thor';replacement.write_text('#+vet unused\npackage main\nmain::proc(){x:=1}\n')
+        overlay=self.root/'overlay.json';overlay.write_text(json.dumps({'Replace':{str(self.source):str(replacement)}}))
+        for engine in ('python','rust'):
+            errors=json.loads(self.call(engine,'--overlay',overlay,'-json-errors',status=1).stderr)['errors']
+            self.assertTrue(any("'x' declared but not used" in ' '.join(e['msgs']) for e in errors),errors)
+            self.assertTrue(all(e['pos']['file']==str(self.source) for e in errors),errors)
 
-    def test_all_native_policies_remain_available_for_odin_only_projects(self):
-        self.source.unlink(missing_ok=True)
-        source = self.app/'main.odin'
-        for engine in ('python', 'rust'):
-            for name in sorted(SUPPORTED | RESTRICTED):
-                source.write_text(CLEAN)
-                flag = '-vet-packages:main' if name == 'vet-packages' else '-'+name
-                with self.subTest(engine=engine, name=name):
-                    self.call(engine, flag)
-                    self.assertEqual(source.read_text(), CLEAN)
+    def test_native_default_scope_includes_external_collection_packages(self):
+        library=self.root/'external';library.mkdir()
+        source=library/'value.thor'
+        source.write_text('package library\nvalue::proc()->int{\n x:=2;\n return x\n}\n')
+        self.source.write_text('package main\nimport external "external:."\nmain::proc(){_=external.value()}\n')
+        collection='-collection:external='+str(library)
+        native_library=source.with_suffix('.odin');native_library.write_text(source.read_text())
+        try:
+            expected=self.oracle(self.source.read_text(),['-vet-semicolon',collection])
+            self.assertEqual(expected.returncode,1,expected.stderr)
+            scoped=self.oracle(self.source.read_text(),['-vet-semicolon','-vet-packages:main',collection])
+            self.assertEqual(scoped.returncode,0,scoped.stderr)
+        finally:native_library.unlink()
+        for engine in ('python','rust'):
+            result=self.call(engine,'-vet-semicolon',collection,'-json-errors',status=1)
+            errors=json.loads(result.stderr)['errors']
+            self.assertTrue(any(e.get('pos',{}).get('file')==str(source) and 'semicolon' in ' '.join(e['msgs']).lower() for e in errors),errors)
+            self.call(engine,'-vet-semicolon','-vet-packages:main',collection)
 
-    def test_native_only_real_violations_match_odin(self):
-        self.source.unlink(missing_ok=True)
-        source = self.app/'main.odin'
-        executable = shutil.which(os.environ.get('THOR_ODIN', 'odin'))
-        if not executable:
-            self.skipTest('Odin not installed')
-        for name, (raw, expected) in VIOLATIONS.items():
-            source.write_text(raw)
-            # The installed Odin checker has an independently reproduced race
-            # while reporting vet errors. Serialize this error-oracle matrix;
-            # do not retry failures or change Thor's default worker count.
-            oracle = subprocess.run([executable, 'check', str(self.app), '-'+name, '-vet-packages:main', '-thread-count:1'],
-                                    capture_output=True, text=True, timeout=60)
-            self.assertEqual(oracle.returncode, 1, name+'\n'+oracle.stdout+oracle.stderr)
-            self.assertIn(expected, oracle.stderr.lower())
-            for engine in ('python', 'rust'):
-                with self.subTest(engine=engine, name=name):
-                    result = self.call(engine, '-'+name, '-json-errors', status=1)
-                    errors = json.loads(result.stderr)['errors']
-                    self.assertTrue(any(expected in ' '.join(error['msgs']).lower() for error in errors), errors)
-                    self.assertTrue(all(error['type']=='error' for error in errors), errors)
-                    self.assertTrue(any(error.get('pos', {}).get('file')==str(source) for error in errors), errors)
+    def test_comments_unicode_crlf_and_file_tag_positions(self):
+        for name in ('unused','explicit-allocators'):
+            raw='// 😀 Documentation: #+vet unused\r\n/*\r\n#+vet shadowing\r\n*/\r\n#+vet '+name+'\r\n'
+            self.compare_native(raw+'package main\r\nmain::proc(){x:=make([]int,1);delete(x)}\r\n')
 
-    def test_supported_thor_checks_catch_real_source_errors_and_keep_locations(self):
-        for name in sorted(SUPPORTED-{'vet-packages'}):
-            raw, expected = VIOLATIONS[name]
-            self.source.write_text('// 😀 source positions\n'+raw)
-            for engine in ('python', 'rust'):
-                with self.subTest(engine=engine, name=name):
-                    result = self.call(engine, '-'+name, '-json-errors', status=1)
-                    errors = json.loads(result.stderr)['errors']
-                    self.assertTrue(any(expected in ' '.join(error['msgs']).lower() for error in errors), errors)
-                    for error in errors:
-                        self.assertEqual(error['type'], 'error')
-                        self.assertEqual(error['pos']['file'], str(self.source))
-                        self.assertGreater(error['pos']['line'], 1)
-                    scoped = self.call(engine, '-'+name, '-vet-packages:other')
-                    self.assertEqual(scoped.stderr, '')
+    def test_simple_thor_extensions_use_native_source_view(self):
+        raw='#+vet unused-variables cast\npackage main\nimport "core:fmt"\nwork::fn(x:int)->int{return x+1}\nmain::proc(){\n values :> []int{1,2}\n fmt.println(work(values[0]))\n}\n'
+        self.source.write_text(raw)
+        for engine in ('python','rust'):
+            for config in ([],native.UNCHECKED):
+                result=self.call(engine,*config,command='run')
+                self.assertEqual(result.stdout,'2\n')
+                self.assertNotIn('__thor_',result.stderr)
 
-    def test_supported_checks_work_together_with_generated_helpers_checked_and_unchecked(self):
+    def test_supported_checks_work_with_generated_helpers_checked_and_unchecked(self):
         self.source.write_text(FEATURES)
-        flags = ['-vet-when-shadowing', '-vet-semicolon']
-        for engine in ('python', 'rust'):
-            for configuration in ([], native.UNCHECKED):
-                with self.subTest(engine=engine, configuration=configuration):
-                    result = self.call(engine, *flags, *configuration, command='run')
-                    self.assertEqual(result.stdout, '3\n')
-                    self.assertEqual(result.stderr, '')
+        for engine in ('python','rust'):
+            for config in ([],native.UNCHECKED):
+                result=self.call(engine,'-vet-semicolon','-vet-when-shadowing',*config,command='run')
+                self.assertEqual(result.stdout,'3\n')
+                self.assertEqual(result.stderr,'')
 
-    def test_mixed_imported_excluded_sources_and_unsaved_overlays(self):
-        self.source.unlink(missing_ok=True)
-        source = self.app/'main.odin'
-        source.write_text(CLEAN)
-        excluded = self.app/('ignored_linux.thor' if os.name=='nt' else 'ignored_windows.thor')
-        excluded.write_text('#+vet unused\ninvalid inactive source\n')
-        for engine in ('python', 'rust'):
-            self.call(engine, '-vet')
-        other = self.app/'other.thor'
-        other.write_text('package main\nVALUE::1\n')
-        for engine in ('python', 'rust'):
-            self.assertIn('Odin-only projects', self.call(engine, '-vet', status=1).stderr)
-        other.unlink()
-        source.write_text('package main\nimport "library"\nmain::proc(){_=library.VALUE}\n')
-        library = self.app/'library'
-        library.mkdir()
-        (library/'value.thor').write_text('package library\nVALUE::1\n')
-        for engine in ('python', 'rust'):
-            self.assertIn('Odin-only projects', self.call(engine, '-vet', status=1).stderr)
-        source.write_text(CLEAN)
-        replacement = self.root/'replacement.thor'
-        replacement.write_text('#+vet unused\n'+CLEAN)
-        overlay = self.root/'overlay.json'
-        overlay.write_text(json.dumps({'Replace':{str(self.source):str(replacement)}}))
-        for engine in ('python', 'rust'):
-            result = self.call(engine, '--overlay', overlay, status=1)
-            self.assertIn('supported only in Odin source files', result.stderr)
-
-    def test_source_tags_are_checked_without_rejecting_explicit_opt_outs(self):
-        for name in sorted(RESTRICTED-{'vet', 'strict-style'}):
-            self.source.write_text('#+vet '+name.removeprefix('vet-')+'\n'+CLEAN)
-            for engine in ('python', 'rust'):
-                with self.subTest(engine=engine, name=name):
-                    result = self.call(engine, '-json-errors', status=1)
-                    error = json.loads(result.stderr)['errors'][0]
-                    self.assertIn('supported only in Odin source files', error['msgs'][0])
-                    self.assertEqual(error['pos']['file'], str(self.source))
-                    self.assertEqual(error['pos']['line'], 1)
-        self.source.write_text('#+vet !unused\n'+CLEAN)
-        for engine in ('python', 'rust'):
-            self.call(engine)
-        for name in SUPPORTED-{'vet-packages'}:
-            raw, expected = VIOLATIONS[name]
-            self.source.write_text('#+vet '+name.removeprefix('vet-')+'\n'+raw)
-            for engine in ('python', 'rust'):
-                with self.subTest(engine=engine, source_tag=name):
-                    result = self.call(engine, '-json-errors', status=1)
-                    self.assertIn(expected, result.stderr.lower())
-        for tag in ('#+vet', '#+vet unused'):
-            raw = '// Documentation: '+tag+'\n/*\n'+tag+'\n*/\n'+tag+'\n'+CLEAN
-            self.source.write_text(raw)
-            for engine in ('python', 'rust'):
-                with self.subTest(engine=engine, source_tag=tag):
-                    result = self.call(engine, '-json-errors', status=1)
-                    error = json.loads(result.stderr)['errors'][0]
-                    self.assertIn('supported only in Odin source files', error['msgs'][0])
-                    self.assertEqual(error['pos']['line'], 5, error)
-                    self.assertEqual(error['pos']['offset'], raw.rindex(tag))
-
-    def test_full_help_documents_every_restriction(self):
-        for engine in ('python', 'rust'):
-            compiler = native.PYTHON if engine=='python' else native.RUST
-            result = subprocess.run([str(compiler), 'help', 'build', '-full'], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            for name in RESTRICTED:
-                flag = next(flag for flag in cli.CATALOG['native_flags'] if flag['name']==name)
-                self.assertIn(flag['syntax']+'  [Odin-only projects]', result.stdout)
-                self.assertIn(flag['thor_rejection'], result.stdout)
-            self.assertIn('errors for build', result.stdout)
-
-    def test_native_only_file_tags_keep_odin_error_and_opt_out_semantics(self):
-        self.source.unlink(missing_ok=True)
-        source = self.app/'main.odin'
-        for tag in ('#+vet', '#+vet unused-variables', '#+vet unused-procedures'):
-            declaration = 'local::proc(){}' if tag.endswith('procedures') else 'local:=1'
-            raw = tag+'\npackage main\nmain::proc(){'+declaration+'}\n'
-            source.write_text(raw)
-            for engine in ('python', 'rust'):
-                result = self.call(engine, '-json-errors', status=1)
-                errors = json.loads(result.stderr)['errors']
-                self.assertTrue(any('declared but not used' in ' '.join(error['msgs']) for error in errors), errors)
-                self.assertTrue(all(error['type']=='error' for error in errors), errors)
-        source.write_text('#+vet !unused\npackage main\nmain::proc(){local:=1}\n')
-        for engine in ('python', 'rust'):
-            self.call(engine, '-vet')
-
-    def test_build_thor_vet_is_strict_for_every_check_and_ignores_warning_suppression(self):
-        fixtures = {
-            'immutable': ('package main\nmain::proc(){x:=1;if x!=1{panic("value")}}\n', 'thor/prefer-immutable'),
-            'pure': ('package main\nvalue::proc(x:int)->int{return x+1}\nmain::proc(){_=value(1)}\n', 'thor/prefer-fn'),
-            'unused': ('package main\nmain::proc(){x:=1;x=2}\n', 'thor/unused'),
-            'semicolon': ('package main\nmain::proc(){};\n', 'thor/unnecessary-semicolon'),
-        }
-        for engine in ('python', 'rust'):
-            for check, (raw, code) in fixtures.items():
-                self.source.write_text(raw)
-                for flags in ([], ['-ignore-warnings'], native.UNCHECKED):
-                    with self.subTest(engine=engine, check=check, flags=flags):
-                        result = self.call(engine, '--vet='+check, '-json-errors', *flags, command='build', status=1)
-                        packet = json.loads(result.stderr)
-                        errors = [error for error in packet['errors'] if error.get('code')==code]
-                        self.assertTrue(errors, packet)
-                        self.assertTrue(all(error['type']=='error' for error in errors), errors)
-                        self.assertGreater(packet['error_count'], 0)
-                for command in ('check', 'vet'):
-                    result = self.call(engine, '--vet='+check, '-json-errors', command=command)
-                    self.assertEqual(json.loads(result.stderr)['error_count'], 0)
-                    self.assertTrue(all(error['type']=='warning' for error in json.loads(result.stderr)['errors']))
-
-    def test_build_validation_filters_artifact_options_and_preserves_selected_checks(self):
-        raw = 'package main\nimport "core:fmt"\nmain::proc(){x:=1;fmt.println(x)}\n'
-        for engine in ('python', 'rust'):
-            self.source.write_text(raw)
-            for flags in (['-o:none'], ['-o:size'], ['-build-mode:obj', '-use-single-module'],
-                          ['-debug', '--no-sanitize']):
-                with self.subTest(engine=engine, flags=flags):
-                    result = self.call(engine, '--vet=immutable', '-json-errors', *flags,
-                                       command='build', status=1)
-                    packet = json.loads(result.stderr)
-                    self.assertEqual(packet['error_count'], 1, packet)
-                    self.assertEqual(packet['errors'][0].get('code'), 'thor/prefer-immutable', packet)
-            self.source.write_text(raw.replace('x:=1', 'x:>1'))
-            result = self.call(engine, '--vet', '-vet-when-shadowing', '-json-errors',
-                               *native.UNCHECKED, command='build')
-            self.assertEqual(json.loads(result.stderr)['errors'], [])
-            self.source.write_text('package main\nmain::proc(){if true {unused:=1}}\n')
-            result = self.call(engine, '--vet=semicolon', '-json-errors', command='build')
-            packet = json.loads(result.stderr)
-            self.assertEqual(packet['error_count'], 0, packet)
-            self.assertEqual([error['type'] for error in packet['errors']], ['warning'])
-            result = self.call(engine, '--vet=semicolon', '-json-errors', '-ignore-warnings', command='build')
-            self.assertEqual(json.loads(result.stderr)['errors'], [])
-
-    def test_hidden_source_violations_cannot_silently_pass_native_vet(self):
-        cases = {
-            'vet-cast': 'x:=1;text:=f"{cast(int)x}";defer delete(text);fmt.println(text)',
-            'vet-nil-deref': 'p:^int;text:=f"{p^}";defer delete(text);fmt.println(text)',
-            'vet-uninitialized': 'x:int=---;text:=f"{x}";defer delete(text);fmt.println(text)',
-            'vet-shadowing': 'x:=1;values:=[x for x in 0..<3];defer delete(values);fmt.println(x,values)',
-        }
-        for name, body in cases.items():
+    def test_thor_expressions_preserve_native_policy_errors(self):
+        for name,body in {
+            'vet-cast':'x:=1;text:=f"{cast(int)x}";defer delete(text);fmt.println(text)',
+            'vet-nil-deref':'p:^int;text:=f"{p^}";defer delete(text);fmt.println(text)',
+            'vet-shadowing':'x:=1;values:=[x for x in 0..<3];defer delete(values);fmt.println(x,values)',
+        }.items():
             self.source.write_text('package main\nimport "core:fmt"\nmain::proc(){'+body+'}\n')
-            for engine in ('python', 'rust'):
-                for selection in ([], ['--vet']):
-                    with self.subTest(engine=engine, name=name, selection=selection):
-                        result = self.call(engine, '-'+name, '-json-errors', *selection, command='build', status=1)
-                        errors = json.loads(result.stderr)['errors']
-                        self.assertEqual(len(errors), 1, errors)
-                        self.assertIn('Odin-only projects', errors[0]['msgs'][0])
+            for engine in ('python','rust'):
+                error=self.call(engine,'-'+name,'-json-errors',status=1)
+                self.assertIn({'vet-cast':'Unneeded cast','vet-nil-deref':'always nil','vet-shadowing':'shadows'}[name],error.stderr)
+
+    def test_no_alloc_composes_with_native_policies(self):
+        self.source.write_text('#+vet no_alloc unused cast\npackage main\nmain::proc(){x:=1;_=x}\n')
+        for engine in ('python','rust'):self.call(engine)
+        self.source.write_text('#+vet no_alloc, unused, cast\npackage main\nmain::proc(){x:=1}\n')
+        for engine in ('python','rust'):
+            self.assertIn("'x' declared but not used",self.call(engine,status=1).stderr)
+        self.source.write_text('#+vet no_alloc unused\npackage main\nmain::proc(){x:=make([]int,1);delete(x)}\n')
+        for engine in ('python','rust'):self.assertIn('no_alloc:',self.call(engine,status=1).stderr)
+
+    def test_unrelated_native_flags_do_not_activate_vet_projection(self):
+        self.source.write_text('package main\nmain::proc(){values:=[1,2];if values[0]!=1{panic("bad")}}\n')
+        for engine in ('python','rust'):
+            for flag in ('-disallow-do','-disable-non-constant-globals'):
+                with self.subTest(engine=engine,flag=flag):self.call(engine,flag)
+
+    def test_ordinary_builds_and_custom_contracts_keep_fast_path(self):
+        for header in ('','#+vet no_alloc\n'):
+            self.source.write_text(header+CLEAN)
+            profile=self.root/'profile.json'
+            result=subprocess.run([str(native.RUST),'check',str(self.app),'--output-dir',str(self.root/'profile-output')],
+                                  env={**os.environ,'THOR_PROFILE':str(profile)},capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertNotIn('backend.native_source_checks',json.loads(profile.read_text()).get('stages',{}))
+
+    def test_full_help_lists_native_flags_without_obsolete_restrictions(self):
+        for engine in ('python','rust'):
+            compiler=native.PYTHON if engine=='python' else native.RUST
+            result=subprocess.run([str(compiler),'help','build','-full'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertNotIn('Odin-only',result.stdout)
+            for name in NATIVE_FLAGS:self.assertIn('-'+name,result.stdout)
 
 
-if __name__ == '__main__':
-    unittest.main()
+if __name__=='__main__':unittest.main()

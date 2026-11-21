@@ -84,22 +84,22 @@ Thor’s `--vet` and native `-vet-*` policies are distinct:
   Findings are errors for `thor build --vet`, including with `-ignore-warnings`.
   Other commands, including TLS `check` and standalone `vet`, report warnings;
   `-warnings-as-errors` can make those strict too.
-- `-vet-when-shadowing` and `-vet-semicolon`
-  work with Thor source and retain native error behavior. They can be combined.
-- Native vet/style checks default to project package names, avoiding unrelated
-  reports in installed support libraries. Explicit `-vet-packages:` and
-  `-strict-style-packages:` override that scope.
+- All native `-vet*` flags and `#+vet` file tags accept Odin-compatible source
+  in `.thor` files. Policies that depend on source structure use a separate,
+  source-preserving native check before ordinary Thor lowering. Native severities,
+  `!name` opt-outs, repeated tags and package selectors retain Odin behavior.
+- The checking view supports `fn`, immutable declarations, parameter contracts,
+  f-strings and comprehensions. It retains user reads and lexical bindings while
+  excluding compiler-generated implementation details. Formatting checks inspect
+  original source; flow checks retain guards and evaluation order. See
+  [native policy semantics](native-vet-audit.md). Native
+  `semicolon` and `when-shadowing` also support the full Thor lowering directly.
+- Native checking views retain Odin's package-selection defaults. In particular,
+  `-vet-unused-procedures` still requires an explicit scope when Odin requires
+  one. File tags keep their native override of package filters. Thor does not
+  inject its own package filter; external collections and SDK packages retain
+  their native scope too.
 
-The remaining native policies require an Odin-only project: `-vet`, `-vet-cast`,
-`-vet-shadowing`,
-`-vet-unused`, `-vet-unused-variables`, `-vet-unused-procedures`,
-`-vet-unused-imports`, `-vet-style`, `-vet-tabs`, `-vet-nil-deref`,
-`-vet-uninitialized`, `-vet-atomic-access`, `-vet-using-stmt`,
-`-vet-using-param`, and `-strict-style`. Thor rejects these explicitly if any
-active project or dependency source is `.thor`, even with a package selector.
-Native unused checks can flag generated helpers; native style checks inspect
-generated formatting; native flow analysis can miss reads hidden in captures;
-Thor's automatic using feature tag overrides the native using policies.
 Use `--vet=unused` for original Thor bindings, imports, data types and procedures, and
 `--vet=semicolon` for original Thor terminators. Unused imports can be removed
 with `thor vet --apply`. Unused `for` bindings also have automatic corrections:
@@ -122,11 +122,11 @@ shadowing, pointer-flow, or atomic-access checks. Generic
 formatting helpers can hide redundant casts, and generated comprehension
 bindings do not retain the original lexical shadowing relationship.
 
-The same restriction applies to enabling these checks with `#+vet` in Thor
-files. Explicit opt-outs such as `#+vet !unused` remain valid. Native `.odin`
-file tags retain Odin semantics. New unaudited native `-vet-*` options are
-restricted to Odin-only projects until audited. `thor help build -full` marks
-restricted flags and explains the reason for each.
+File tags use space-separated names: `#+vet unused cast !shadowing`. Bare
+`#+vet` enables Odin's bundle and does not enable Thor's `no_alloc` contract.
+`deprecated` and `explicit-allocators` are native file-tag options without
+standalone CLI flags in the pinned SDK. Unknown names and invalid combinations
+are diagnosed by Odin; Thor does not maintain a competing rejection list.
 The [native vet audit](native-vet-audit.md) records the checks and regression coverage.
 
 Source checks require `check`, `vet`, or another command that invokes native

@@ -12,7 +12,8 @@ def marked(declaration):
 
 
 def only_unused_attributes(declaration):
-    return declaration.source.thor and all(len(attribute.group('elems')) == len(elements(attribute))
+    from . import vet_attributes, noalloc
+    return declaration.source.thor and all(len(attribute.group('elems')) == len(elements(attribute)) + len(vet_attributes.elements(attribute)) + len(noalloc.elements(attribute))
                                           for attribute in declaration.group('attributes'))
 
 
@@ -99,7 +100,8 @@ def fail(source, node, message, code, declaration=None):
 
 
 def render_attribute(source, node):
-    removed = elements(node)
+    from . import vet_attributes, noalloc
+    removed = elements(node) + vet_attributes.elements(node) + noalloc.elements(node)
     if not removed:
         return None
     kept = [source.render(item,constant=True) for item in node.group('elems') if item not in removed]

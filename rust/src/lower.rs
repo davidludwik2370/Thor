@@ -76,6 +76,9 @@ mod branchlocations;
 #[path = "resultlower.rs"]
 mod resultlower;
 
+#[path = "nativeview.rs"]
+mod nativeview;
+
 #[derive(Clone, Debug)]
 pub struct Hint {
     pub constant_literal:bool,
@@ -252,6 +255,9 @@ impl<'a, 'r> Lower<'a, 'r> {
         for edit in &source.edits {
             this.edits
                 .push((edit.span, this.gen(edit.text.clone(), edit.span, "syntax")));
+        }
+        for (span,text) in crate::noalloc::tag_edits(source) {
+            this.edits.push((span,this.gen(text,span,"syntax")));
         }
         this.imports()?;
         this.resources()?;
@@ -486,6 +492,15 @@ impl<'a, 'r> Lower<'a, 'r> {
             format!("{}builtin.{name}", self.prefix)
         } else {
             name.into()
+        }
+    }
+    pub(crate) fn strip_native_vet_tags(&mut self) {
+        if !self.source.thor {return;}
+        for span in crate::project::nativechecks::tag_spans(self.source) {
+            // Replace no_alloc's partial tag edit too: all native policies are
+            // checked separately, before compiling the ordinary lowering.
+            self.edits.retain(|(old,_)|!span.contains(*old));
+            self.edits.push((span,self.gen("",span,"native-policy")));
         }
     }
     fn unsupported(&self, id: NodeId, name: &str) -> Error {
@@ -973,10 +988,21 @@ impl<'a, 'r> Lower<'a, 'r> {
     }
 
     fn render_inner(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
+        if self.source.node(id).kind == "Runtime" {
+            if self.evaluation.is_some() {
+                return Ok(self.error_token(id,"#runtime cannot be executed at compile time, including through #run."));
+            }
+            if constant {
+                return Ok(self.error_token(id,"#runtime cannot be used where a compile-time value is required."));
+            }
+            return self.render(self.role(id, "expr")?, expected, false);
+        }
         if self.source.thor && self.source.node(id).kind == "Attribute"
-            && self.source.node(id).parent.is_some_and(|parent| self.source.node(parent).kind == "Declaration")
+            && self.source.node(id).parent.is_some_and(|parent| matches!(self.source.node(parent).kind.as_str(),"Declaration"|"Import"))
         {
-            let removed = crate::unused_attributes::elements(self.source, id);
+            let mut removed = crate::unused_attributes::elements(self.source, id);
+            removed.extend(crate::vet_attributes::elements(self.source,id));
+            removed.extend(crate::noalloc::elements(self.source,id));
             if !removed.is_empty() {
                 let mut parts = vec![];
                 for element in self.source.group(id, "elems") {
@@ -1412,6 +1438,161 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
         }
         let readonly_data = if kind == "Declaration" { self.readonly_data(id) } else { None };
+        let overrides=self.child_contexts(id,expected.clone(),constant,native_type_operand,readonly_data.is_some())?;
+        if kind == "Ternary" {
+            let cond = self.role(id, "cond")?;
+            let x = self.role(id, "x")?;
+            let y = self.role(id, "y")?;
+            let cond = self.render(cond, None, constant)?;
+            let a = self.render(x, expected.clone(), constant)?;
+            let b = self.render(y, expected.clone(), constant)?;
+            return Ok(if constant {
+                Code::concat([
+                    self.g("(", id),
+                    a,
+                    self.g(" when (", id),
+                    cond,
+                    self.g(") else ", id),
+                    b,
+                    self.g(")", id),
+                ])
+            } else {
+                Code::concat([
+                    self.g("((", id),
+                    cond,
+                    self.g(") ? (", id),
+                    a,
+                    self.g(") : (", id),
+                    b,
+                    self.g("))", id),
+                ])
+            }
+            .expansion(&self.source.path, node.span));
+        }
+        let mut replacements = vec![];
+        let switch_arg = if kind == "Call" {
+            self.switch_argument(id, constant)?
+        } else {
+            None
+        };
+        for child in &node.children {
+            let (hint, con) = overrides.get(child).cloned().unwrap_or((None, constant));
+            let code = if let Some((_, code)) = switch_arg.as_ref().filter(|(arg, _)| arg == child) {
+                code.clone()
+            } else if self.big_owning_child(id, *child) {
+                self.big_owned(*child, hint, con)?
+            } else {
+                self.render(*child, hint, con)?
+            };
+            replacements.push((
+                self.source.node(*child).span,
+                code,
+            ));
+        }
+        let mut inserts = if kind=="Call" {let mut parts=self.default_arguments(id)?;parts.extend(self.caller_arguments(id)?);parts}else{vec![]};
+        if let Some(attribute) = readonly_data {
+            inserts.push((node.span.start, self.gen(attribute, node.span, "readonly-data")));
+        }
+        if id.0 == 0 {
+            let has_flag = self.source.info["file_tags"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|v| v.as_str())
+                .any(|tag| {
+                    tag.contains("feature")
+                        && tag
+                            .split_whitespace()
+                            .any(|s| s == "using-stmt" || s == "!using-stmt")
+                });
+            if !has_flag {
+                let origin = self.source.nodes.iter().find(|n| {
+                    n.kind == "Using"
+                        || n.kind == "Field"
+                            && n.data["using_field"] == true
+                            && n.parent.is_some_and(|p| {
+                                self.source.node(p).kind == "Fields"
+                                    && self.source.node(p).parent.is_some_and(|p| {
+                                        self.source.node(p).kind == "ProcedureType"
+                                            && self.source.role(p, "params") == n.parent
+                                    })
+                            })
+                });
+                if let Some(origin) = origin {
+                    let newline = if self.source.raw.contains("\r\n") {
+                        "\r\n"
+                    } else {
+                        "\n"
+                    };
+                    let offset = if self.source.raw.starts_with('\u{feff}') {
+                        3
+                    } else {
+                        0
+                    };
+                    inserts.push((
+                        offset,
+                        self.gen(
+                            format!("#+feature using-stmt{newline}"),
+                            origin.span,
+                            "support",
+                        ),
+                    ));
+                }
+            }
+        }
+        if kind == "Block" {
+            let mut helpers = self.body_prologues.get(&id).cloned().unwrap_or_default();
+            if node.children.len() == 1 && self.source.node(node.children[0]).kind == "Declaration"
+                && crate::unused_attributes::marked(self.source, node.children[0])
+            {
+                // Avoid Odin's sole-unused-declaration warning without reading
+                // the value or retaining any unused runtime declarations.
+                helpers.push(self.g("\n_ = 0\n", node.children[0]));
+            }
+            helpers.extend(
+                self.storage_block_guards
+                    .get(&id)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|guard| self.render_storage_guard(guard))
+                    .collect::<Result<Vec<_>>>()?,
+            );
+            helpers.extend(self.helper_declarations(id));
+            if !helpers.is_empty() {
+                if self.source.raw.as_bytes()[node.span.start] == b'{' {
+                    inserts.push((node.span.start + 1, Code::concat(helpers)));
+                } else {
+                    self.convert_do(id);
+                    let code = self.splice(id, replacements, inserts)?;
+                    return Ok(Code::concat([
+                        self.g("{\n", id),
+                        Code::concat(helpers),
+                        code,
+                        self.g("\n}", id),
+                    ]));
+                }
+            }
+        }
+        if kind=="Case" {
+            let helpers=self.helper_declarations(id);
+            if !helpers.is_empty() {
+                if let Some(colon)=node.spans.get("colon"){inserts.push((colon.end,Code::concat(helpers)));}
+            }
+        }
+        let code = self.splice(id, replacements, inserts)?;
+        if let Some(helpers) = self.declaration_helpers.get(&id) {
+            Ok(Code::concat(
+                std::iter::once(code).chain(helpers.iter().cloned()),
+            ))
+        } else {
+            Ok(code)
+        }
+    }
+    /// The checking view and runtime lowering must use the same contextual
+    /// literal types, including private and polymorphic procedure parameters.
+    fn child_contexts(&mut self,id:NodeId,expected:Option<Hint>,constant:bool,native_type_operand:bool,readonly_data:bool)->Result<HashMap<NodeId,(Option<Hint>,bool)>> {
+        let node=self.source.node(id);let kind=node.kind.clone();
         let mut overrides: HashMap<NodeId, (Option<Hint>, bool)> = HashMap::new();
         match kind.as_str() {
             "Declaration" => {
@@ -1426,7 +1607,7 @@ impl<'a, 'r> Lower<'a, 'r> {
                     None
                 };
                 for value in self.source.group(id, "values") {
-                    overrides.insert(*value, (hint.clone(), !node.mutable || readonly_data.is_some()));
+                    overrides.insert(*value, (hint.clone(), !node.mutable || readonly_data));
                 }
             }
             "Assignment" if !native_type_operand => {
@@ -1641,155 +1822,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             }
             _ => {}
         }
-        if kind == "Ternary" {
-            let cond = self.role(id, "cond")?;
-            let x = self.role(id, "x")?;
-            let y = self.role(id, "y")?;
-            let cond = self.render(cond, None, constant)?;
-            let a = self.render(x, expected.clone(), constant)?;
-            let b = self.render(y, expected.clone(), constant)?;
-            return Ok(if constant {
-                Code::concat([
-                    self.g("(", id),
-                    a,
-                    self.g(" when (", id),
-                    cond,
-                    self.g(") else ", id),
-                    b,
-                    self.g(")", id),
-                ])
-            } else {
-                Code::concat([
-                    self.g("((", id),
-                    cond,
-                    self.g(") ? (", id),
-                    a,
-                    self.g(") : (", id),
-                    b,
-                    self.g("))", id),
-                ])
-            }
-            .expansion(&self.source.path, node.span));
-        }
-        let mut replacements = vec![];
-        let switch_arg = if kind == "Call" {
-            self.switch_argument(id, constant)?
-        } else {
-            None
-        };
-        for child in &node.children {
-            let (hint, con) = overrides.get(child).cloned().unwrap_or((None, constant));
-            let code = if let Some((_, code)) = switch_arg.as_ref().filter(|(arg, _)| arg == child) {
-                code.clone()
-            } else if self.big_owning_child(id, *child) {
-                self.big_owned(*child, hint, con)?
-            } else {
-                self.render(*child, hint, con)?
-            };
-            replacements.push((
-                self.source.node(*child).span,
-                code,
-            ));
-        }
-        let mut inserts = if kind=="Call" {let mut parts=self.default_arguments(id)?;parts.extend(self.caller_arguments(id)?);parts}else{vec![]};
-        if let Some(attribute) = readonly_data {
-            inserts.push((node.span.start, self.gen(attribute, node.span, "readonly-data")));
-        }
-        if id.0 == 0 {
-            let has_flag = self.source.info["file_tags"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|v| v.as_str())
-                .any(|tag| {
-                    tag.contains("feature")
-                        && tag
-                            .split_whitespace()
-                            .any(|s| s == "using-stmt" || s == "!using-stmt")
-                });
-            if !has_flag {
-                let origin = self.source.nodes.iter().find(|n| {
-                    n.kind == "Using"
-                        || n.kind == "Field"
-                            && n.data["using_field"] == true
-                            && n.parent.is_some_and(|p| {
-                                self.source.node(p).kind == "Fields"
-                                    && self.source.node(p).parent.is_some_and(|p| {
-                                        self.source.node(p).kind == "ProcedureType"
-                                            && self.source.role(p, "params") == n.parent
-                                    })
-                            })
-                });
-                if let Some(origin) = origin {
-                    let newline = if self.source.raw.contains("\r\n") {
-                        "\r\n"
-                    } else {
-                        "\n"
-                    };
-                    let offset = if self.source.raw.starts_with('\u{feff}') {
-                        3
-                    } else {
-                        0
-                    };
-                    inserts.push((
-                        offset,
-                        self.gen(
-                            format!("#+feature using-stmt{newline}"),
-                            origin.span,
-                            "support",
-                        ),
-                    ));
-                }
-            }
-        }
-        if kind == "Block" {
-            let mut helpers = self.body_prologues.get(&id).cloned().unwrap_or_default();
-            if node.children.len() == 1 && self.source.node(node.children[0]).kind == "Declaration"
-                && crate::unused_attributes::marked(self.source, node.children[0])
-            {
-                // Avoid Odin's sole-unused-declaration warning without reading
-                // the value or retaining any unused runtime declarations.
-                helpers.push(self.g("\n_ = 0\n", node.children[0]));
-            }
-            helpers.extend(
-                self.storage_block_guards
-                    .get(&id)
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|guard| self.render_storage_guard(guard))
-                    .collect::<Result<Vec<_>>>()?,
-            );
-            helpers.extend(self.helper_declarations(id));
-            if !helpers.is_empty() {
-                if self.source.raw.as_bytes()[node.span.start] == b'{' {
-                    inserts.push((node.span.start + 1, Code::concat(helpers)));
-                } else {
-                    self.convert_do(id);
-                    let code = self.splice(id, replacements, inserts)?;
-                    return Ok(Code::concat([
-                        self.g("{\n", id),
-                        Code::concat(helpers),
-                        code,
-                        self.g("\n}", id),
-                    ]));
-                }
-            }
-        }
-        if kind=="Case" {
-            let helpers=self.helper_declarations(id);
-            if !helpers.is_empty() {
-                if let Some(colon)=node.spans.get("colon"){inserts.push((colon.end,Code::concat(helpers)));}
-            }
-        }
-        let code = self.splice(id, replacements, inserts)?;
-        if let Some(helpers) = self.declaration_helpers.get(&id) {
-            Ok(Code::concat(
-                std::iter::once(code).chain(helpers.iter().cloned()),
-            ))
-        } else {
-            Ok(code)
-        }
+        Ok(overrides)
     }
     fn convert_do(&mut self, id: NodeId) {
         let mut cursor = self.source.node(id).span.start;
@@ -2866,6 +2899,7 @@ impl<'a, 'r> Lower<'a, 'r> {
         expected: Option<Hint>,
         targets: HashSet<NodeId>,
     ) -> Result<Code> {
+        let diverging=self.diverging(id);
         let statement = !self.temporary_discarding.contains(&id) && self
             .source
             .node(id)
@@ -2884,7 +2918,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             };
         }
         let logical_optional=self.big_constructor_type(id).is_some()&&self.source.group(id,"args").iter().any(|arg|self.typ(self.source.role(*arg,"value").unwrap_or(*arg)).is_string());
-        let count = if statement {
+        let count = if statement || diverging {
             0
         } else {
             signature
@@ -2957,7 +2991,9 @@ impl<'a, 'r> Lower<'a, 'r> {
             self.source.node(id).span.start
         );
         let pointer = format!("{}fstring_scope", self.prefix);
-        let result = if count == 0 {
+        let result = if diverging {
+            Some("!".to_owned())
+        } else if count == 0 {
             None
         } else if count == 1 {
             Some(String::new())
@@ -2965,7 +3001,8 @@ impl<'a, 'r> Lower<'a, 'r> {
             Some(format!("tuple:{count}"))
         };
         let (name,mut args)=self.closed(id,optional.unwrap_or("fstring_expression"),result.as_deref(),|this|{
-            let code=this.g(format!("{prefix}entries:[{}]{module}.Entry\n{prefix}scope: {module}.Scope = {{entries={prefix}entries[:]}}\n{pointer} := &{prefix}scope\ndefer {module}.destroy({pointer})\n",targets.len()),id);
+            let cleanup=if diverging{String::new()}else{format!("defer {module}.destroy({pointer})\n")};
+            let code=this.g(format!("{prefix}entries:[{}]{module}.Entry\n{prefix}scope: {module}.Scope = {{entries={prefix}entries[:]}}\n{pointer} := &{prefix}scope\n{cleanup}",targets.len()),id);
             this.fstring_frames.push((pointer.clone(),targets));let expression=this.render(id,None,false);this.fstring_frames.pop();
             Ok(Code::concat([code,this.g(if count==0{""}else{"return "},id),expression?]))
         })?;

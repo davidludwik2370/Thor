@@ -720,15 +720,14 @@ pub(super) fn create(
         messages.push(format!("{rename} ({count} occurrences)"));
     }
     for flag in &settings.flags {
-        if crate::cli::native_check_rejection(
+        if crate::cli::native_source_check(
             flag.trim_start_matches('-')
                 .split(':')
                 .next()
                 .unwrap_or_default(),
         )
-        .is_some()
         {
-            messages.push(format!("Native check {flag} was used for Odin validation. Use Thor vet for the converted project."));
+            messages.push(format!("Native check {flag} is preserved through original-source validation in Thor."));
         }
     }
     Ok((output, messages))

@@ -102,13 +102,14 @@ class FStringLifetimes:
         if not targets:return None
         # Query arity only for direct call roots. Other roots produce one value.
         statement=bool(node.parent and node.parent.kind=='ExpressionStatement')
+        diverging=self.s.resolver.is_diverging_call(node)
         signature=self.signature(node) if node.kind=='Call' and not statement else None
         count=len(self.s.fields(signature.role('results'))) if signature else 1
         constructor=self.s.big.constructor(node) if node.kind=='Call' else None
         if constructor and any(self.e.shape(arg.role('value') if arg.kind=='FieldValue' else arg).kind=='string'
                                for arg in node.group('args')):count=2
-        if statement:count=0
-        result=False if count==0 else (None,)*count if count>1 else None
+        if statement or diverging:count=0
+        result='!' if diverging else False if count==0 else (None,)*count if count>1 else None
         optional=('optional_allocator_error' if signature.data.get('optional_allocator_error') else 'optional_ok') if signature and signature.data.get('optional_ok') else None
         if optional and count>1:
             status=self.e.module('fstring_runtime','base:runtime')+'.Allocator_Error' if optional=='optional_allocator_error' else 'bool'
@@ -134,7 +135,8 @@ class FStringLifetimes:
                 scope=storage+'_scope'
                 lines=[f'{storage}: [{len(targets)}]{self.module()}.Entry',
                        f'{scope}: {self.module()}.Scope = {{entries={storage}[:]}}',
-                       f'{self.pointer()} := &{scope}',f'defer {self.module()}.destroy({self.pointer()})']
+                       f'{self.pointer()} := &{scope}']
+                if not diverging:lines.append(f'defer {self.module()}.destroy({self.pointer()})')
                 self.frames.append(Frame(self.pointer(),targets))
                 try:code=self.s.render(node,hint)
                 finally:self.frames.pop()

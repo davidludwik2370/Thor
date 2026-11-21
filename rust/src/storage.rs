@@ -268,7 +268,7 @@ impl Lower<'_, '_> {
                 name:sym.name.clone(),predicates:marker.map(|name|vec![Predicate::Immutable(sym.reference,name.clone())]).unwrap_or_default(),
             }));
         }
-        if node.kind == "Deref" || !matches!(node.kind.as_str(), "Selector" | "Index") {
+        if node.kind == "Deref" || !matches!(node.kind.as_str(), "Selector" | "Index" | "MatrixIndex") {
             return Ok(None);
         }
         let base = self.role(id, "expr")?;
@@ -325,7 +325,7 @@ impl Lower<'_, '_> {
                 }
                 Predicate::InlineIndex(id) => {
                     let query = self.storage_query(id)?;
-                    format!("({meta}.type_is_array({query}) || {meta}.type_is_enumerated_array({query}) || {meta}.type_is_map({query}))")
+                    format!("({meta}.type_is_array({query}) || {meta}.type_is_enumerated_array({query}) || {meta}.type_is_map({query}) || {meta}.type_is_matrix({query}))")
                 }
                 Predicate::Array(id) => {
                     let query = self.storage_query(id)?;

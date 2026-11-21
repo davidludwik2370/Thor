@@ -148,8 +148,8 @@ class Comprehensions:
             if global_scope:code.insert(0,f'context = {e.module("comprehension_runtime","base:runtime")}.default_context()')
             output=node.role('output')
             if kind in {'slice','dynamic'}:
-                output_hint=Hint(s,output,element,element_only=True)
-            elif kind=='set':output_hint=Hint(s,output,f'type_of({e.module("sets")}.element_witness({builder}))',element_only=True)
+                output_hint=Hint(s,output,element)
+            elif kind=='set':output_hint=Hint(s,output,f'type_of({e.module("sets")}.element_witness({builder}))')
             else:output_hint=None
             def insert(value,key_code=None):
                 if kind in {'slice','dynamic'}:return f'{module}.append_one(&{builder},{value})'

@@ -22,6 +22,16 @@ milestone implements **T01–T23** from the reference specification in
 [the language specification](docs/language-spec.md). It includes the parser and project support needed to make
 those features usable together.
 
+The [attributes, directives, and file-tag reference](docs/attributes-and-directives.md)
+documents every recognized name in Thor and the pinned Odin compiler, including
+placement, arguments, restrictions, and obsolete or reserved forms.
+
+[`@(no_alloc)` and `#+vet no_alloc`](docs/no-alloc.md) provide conservative,
+checked contracts for allocation-free ordinary execution without runtime
+instrumentation; fatal diagnostic reporting may allocate. A runnable
+[example](examples/no_alloc/demo.thor) demonstrates both forms; a
+[fixed-buffer I/O demo](examples/no_alloc_io/demo.thor) shows input and printing.
+
 Arbitrary-precision stages 1–5 implement predefined `Integer`/`Rational` types,
 exact unquoted literals, constructors, read-only components, direct-copy ownership,
 runtime operators, read-only constants, fn/#run, formatting and shared-library
@@ -53,6 +63,12 @@ field-by-field arithmetic, bitwise operators, shifts, power `**`, unary compleme
 `~`, and compound assignments, including contextual
 literals and compile-time values. See [struct arithmetic](docs/struct-arithmetic.md)
 and its [executable example](examples/struct_arithmetic/demo.thor).
+
+The [parameter-contract demo](examples/parameter_contracts/demo.thor) covers
+non-overridable `:>` caller metadata parameters, explicit `#ro` slice readers,
+`#runtime` evaluation barriers, declaration-local `@(vet_ignore="...")`, aliases,
+callbacks, and compile-time capture. Their contracts are included in the
+[attribute/directive reference](docs/attributes-and-directives.md).
 
 ## Run the demo
 
@@ -712,11 +728,15 @@ The parser identifies optional terminators, including inside f-string expression
 remove the flagged token while preserving comments and line endings.
 `-ignore-warnings` hides warnings from standalone `vet` and editor checks.
 `thor build --vet` treats its convention findings as errors, so this flag does
-not suppress them. Native `-vet-when-shadowing` and `-vet-semicolon` also support
-Thor source. Other native vet policies require
-an Odin-only project because generated code can create false findings or hide
-original source issues. See [CLI compatibility](docs/cli.md) for the complete
-policy and supported alternatives.
+not suppress them. Native vet flags and `#+vet` tags work on Odin-compatible `.thor` source.
+Source-sensitive checks inspect a separate source-preserving view before normal
+Thor compilation, retaining native diagnostics, package scopes and opt-outs.
+That view also supports `fn`, immutable declarations, parameter contracts,
+f-strings and comprehensions, preserving user reads, calls and loop bindings.
+Original formatting is checked before projection; generated helpers do not create
+native-vet findings. See [the policy details](docs/native-vet-audit.md). Native
+`-vet-when-shadowing` and `-vet-semicolon` support the full Thor lowering.
+See [CLI compatibility](docs/cli.md) for details.
 
 Vetting examines project `.thor` files beneath the selected package directory,
 using the active target and build flags. Unused warnings use original source

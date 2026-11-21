@@ -496,6 +496,7 @@ impl<'a, 'r> Purity<'a, 'r> {
         via: &[Ref],
     ) {
         let kind = self.kind(node).to_owned();
+        if crate::caller_metadata::in_default(&self.r.sources[node.file],node.node) { return; }
         if kind == "Call" && self.package_constant_resource(node) {
             // Odin evaluates these directives while checking the retained
             // declaration. The evaluation cache tracks the resource separately.
@@ -1138,7 +1139,8 @@ impl<'a, 'r> Purity<'a, 'r> {
             Type::String { .. } | Type::Slice(_) => Some("strings/slices"),
             Type::Dynamic(_) => Some("dynamic arrays"),
             Type::Nominal(_, base)
-            | Type::Array { elem: base, .. }
+            | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
+            | Type::Vector { elem: base, .. }
             | Type::Fixed { elem: base, .. } => Self::owned_sequence(base),
             _ => None,
         }
@@ -1168,7 +1170,8 @@ impl<'a, 'r> Purity<'a, 'r> {
             | Type::Slice(base)
             | Type::Dynamic(base)
             | Type::Pointer(base)
-            | Type::Array { elem: base, .. }
+            | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
+            | Type::Vector { elem: base, .. }
             | Type::Fixed { elem: base, .. } => self.unsafe_storage(base, seen),
             Type::String { name, .. } => name != "string",
             Type::Scalar { name, .. } => {
@@ -1199,7 +1202,8 @@ impl<'a, 'r> Purity<'a, 'r> {
                 ["rawptr", "any", "cstring", "typeid"].contains(&name.as_str())
             }
             Type::Nominal(_, base)
-            | Type::Array { elem: base, .. }
+            | Type::Array { elem: base, .. } | Type::Matrix{elem:base,..}
+            | Type::Vector { elem: base, .. }
             | Type::Fixed { elem: base, .. } => self.pointers(base, seen),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => self
                 .r

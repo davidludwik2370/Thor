@@ -66,11 +66,13 @@ separate_fields :: proc(list: []^ast.Field, allocator := context.allocator) -> [
 			continue
 		}
 
-		for name in arg.names {
+		for name,index in arg.names {
 			field: ^ast.Field = new_type(ast.Field, arg.pos, arg.end, allocator)
 			field.names = make([]^ast.Expr, 1, allocator)
 			field.names[0] = name
 			field.type = arg.type
+			field.default_value=arg.default_value
+			if thor_parameter_code(arg,index)!='-' {field.tag.text=fmt.tprintf("%s%c",THOR_PARAMETER_TAG,thor_parameter_code(arg,index))}
 			append(&fields, field)
 		}
 	}
@@ -253,6 +255,10 @@ add_signature_info :: proc(
 	allocator := context.temp_allocator,
 ) {
 	args:=thor_pmap_visible_params(args)
+    ordinary:=make([dynamic]^ast.Field,allocator)
+    for arg in args {if !thor_parameter_auto(arg) {append(&ordinary,arg)}}
+    args=ordinary[:]
+    active_parameter^=min(active_parameter^,max(0,len(args)-1))
 	parameters := make([]ParameterInformation, len(args), allocator)
 	call := call
 

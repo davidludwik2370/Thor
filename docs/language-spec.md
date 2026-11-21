@@ -11,6 +11,13 @@ reference. The source block was preserved from the user's relocated specificatio
 its status and transitive-call paragraph reflect the implemented language.
 
 Collection comprehensions are specified in [their reference](comprehensions.md).
+The exhaustive [attribute and directive reference](attributes-and-directives.md)
+also specifies automatic `:>` caller metadata parameters, `#runtime`, `#ro`, and
+`@(vet_ignore="...")`. See the runnable
+[parameter-contract demo](../examples/parameter_contracts/demo.thor).
+
+Allocation-free procedure and file contracts are specified separately in
+[`@(no_alloc)` / `#+vet no_alloc`](no-alloc.md).
 
 Later work also includes wildcard/namespace-free imports, spread min/max,
 inline generic default callbacks, runtime library helpers, source debugging,

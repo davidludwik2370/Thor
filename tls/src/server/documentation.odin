@@ -1155,6 +1155,8 @@ keywords_docs: map[string]string = {
 }
 
 directive_docs: map[string]string = {
+    "runtime" = "Evaluate this expression at runtime instead of Thor automatic compile-time execution. Not valid where a compile-time value is required. Native optimization remains enabled.",
+    "ro" = "A read-only slice parameter contract. Writes, mutable aliases, and writable escapes through this parameter are rejected. Applies to the immediately following name; incompatible with #mut.",
 	// Record validation
 	"all_or_none"              = "```odin\n#all_or_none\n```\n\nThis tag can be applied to a `struct`. Prevents partial initialization of the struct, so either all or none of the fields must be filled.",
 	// Record memory layout
@@ -1204,6 +1206,8 @@ directive_docs: map[string]string = {
 }
 
 attribute_docs: map[string]string = {
+    "no_alloc" = "```thor\n@(no_alloc)\n```\n\nRequires provably allocation-free ordinary execution, including reachable calls and omitted defaults. Fatal panic/trap reporting and failure-only assertion formatting may allocate. Caller-written check arguments are still evaluated and checked normally; `or_panic` still checks its producer. A `-> !` type alone is not an exemption. Growing collections, unknown callbacks and uninspectable foreign procedures are rejected. This checked contract adds no runtime instrumentation. `#+vet no_alloc` applies it to every procedure and runtime initializer in the file.",
+    "vet_ignore" = "Suppress selected Thor vet advice and its automatic corrections for this declaration. A nonempty comma-separated string accepts immutable, pure (alias fn), unused, and semicolon. Compiler errors and other declarations remain checked.",
 	// Visibility
 	"private"                    = "```odin\n@(private)\n// or\n@(private=\"file\")\n// or\n@(private=\"package\")\n```\n\nRestricts the visibility of a declaration. `@(private)` alone is equivalent to `@(private=\"package\")`: the entity is visible within its own package but not exported. `@(private=\"file\")` narrows it further to the file it is declared in.",
 	"export"                     = "```odin\n@(export)\n// or\n@(export=<boolean>)\n```\n\nExports the symbol from the compiled object, making it visible to other languages and linkers. Useful when building a shared library.",

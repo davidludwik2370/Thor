@@ -311,7 +311,7 @@ impl Source {
                         nodes[id.0].data[key] = value.clone();
                     }
                     nodes[id.0].kind = kind.into();
-                    if kind == "Run" {
+                    if matches!(kind, "Run" | "Runtime") {
                         if let Some(expr) = nodes[id.0].data["lists"]["args"]
                             .as_array()
                             .and_then(|args| args.first())
@@ -341,7 +341,13 @@ impl Source {
             .flatten()
             .filter_map(|row| Some((row[0].as_u64()?, [row[1].as_u64()?, row[2].as_u64()?])))
             .collect();
+        let automatic: HashSet<_> = info["auto_parameters"].as_array().into_iter().flatten()
+            .filter_map(|row| row[0].as_u64()).collect();
         for (index, node) in nodes.iter_mut().enumerate() {
+            if node.kind == "Field" {
+                let first=node.data["lists"]["names"].as_array().and_then(|n|n.first()).and_then(Span::from_wire);
+                node.data["automatic"] = Value::Bool(first.is_some_and(|span|automatic.contains(&(span.start as u64))));
+            }
             if node.kind == "Declaration" {
                 node.immutable = immutables.contains(&node.span.start);
                 node.data["immutable"] = Value::Bool(node.immutable);

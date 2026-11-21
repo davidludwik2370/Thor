@@ -238,7 +238,7 @@ parse_interpolation :: proc(p: ^Parser, token: tokenizer.Token) -> ^ast.Expr {
         append(&spans,[2]int{part.start,part.end})
         append(&spans,..part.format_exprs)
         for span,span_index in spans {
-            nested := default_parser()
+            nested := default_parser(p.flags)
             nested.thor = true
             nested.source_tools = p.source_tools
             nested.file = p.file

@@ -167,10 +167,12 @@ impl TypeCode {
             Type::Constant(Constant::Integer(value)) => return Ok(value.to_string()),
             Type::Constant(Constant::Boolean(value)) => return Ok(value.to_string()),
             Type::Scalar { name, .. } | Type::String { name, .. } => return Ok(name.clone()),
+            Type::Matrix{elem,rows:Some(rows),columns:Some(columns),row_major}=>return Ok(format!("{}matrix[{rows},{columns}]{}",if *row_major{"#row_major "}else{""},self.render(elem,r)?)),
             Type::Array {
                 elem,
                 length: Some(length),
             } => return Ok(format!("[{length}]{}", self.render(elem, r)?)),
+            Type::Vector{elem,length:Some(length)}=>return Ok(format!("#simd[{length}]{}",self.render(elem,r)?)),
             Type::Slice(elem) | Type::Pointer(elem) | Type::Dynamic(elem) => {
                 let prefix = match typ {
                     Type::Slice(_) => "[]",
@@ -435,8 +437,9 @@ fn shape(typ: &Type, r: &Resolver<'_>) -> Value {
                 .map(|(name, typ)| json!([name, shape(typ, r)]))
                 .collect::<Vec<_>>()
         ]),
-        Type::Array { elem, length } | Type::Fixed { elem, length } => json!([
-            if matches!(typ, Type::Fixed { .. }) {
+        Type::Matrix{elem,rows,columns,row_major}=>json!(["matrix",rows,columns,row_major,shape(elem,r)]),
+        Type::Array { elem, length } | Type::Vector{elem,length} | Type::Fixed { elem, length } => json!([
+            if matches!(typ,Type::Vector{..}){"vector"}else if matches!(typ, Type::Fixed { .. }) {
                 "fixed"
             } else {
                 "array"

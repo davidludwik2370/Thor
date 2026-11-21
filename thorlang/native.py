@@ -5,6 +5,39 @@ from pathlib import Path
 
 from .compiler import Source
 
+def declared_names(raw):
+    """Permissive declaration-file index, with strings/comments excluded."""
+    import re
+    text=raw.decode() if isinstance(raw,bytes) else raw
+    ident=re.compile(r'(?:[^\W\d]|_)\w*');names=set();i=0;pending=None
+    while i<len(text):
+        if text.startswith('//',i):
+            end=text.find('\n',i);i=len(text) if end<0 else end;continue
+        if text.startswith('/*',i):
+            i+=2;depth=1
+            while i<len(text) and depth:
+                if text.startswith('/*',i):depth+=1;i+=2
+                elif text.startswith('*/',i):depth-=1;i+=2
+                else:i+=1
+            continue
+        if text[i] in {'"',"'",'`'}:
+            pending=None
+            quote=text[i];i+=1
+            while i<len(text):
+                char=text[i];i+=1
+                if char==quote:break
+                if char=='\\' and quote!='`' and i<len(text):i+=1
+            continue
+        match=ident.match(text,i)
+        if match:
+            pending=match.group()
+            i=match.end()
+        else:
+            if text[i] in ':,' and pending:names.add(pending)
+            if not text[i].isspace():pending=None
+            i+=1
+    return names
+
 
 class NativeSources:
     # These are compiler/runtime namespaces, rather than ordinary source APIs.
@@ -22,6 +55,10 @@ class NativeSources:
         self.sources = {}
         self.discovery_scope = None
         self.directories = {}
+        self.effect_discovery=False
+        self.declaration_catalogs={}
+        self.declaration_attempts=set()
+        self.symbol_attempts=set()
 
     def directory(self, source, path):
         collection=path.partition(':')[0] if ':' in path else None
@@ -46,8 +83,9 @@ class NativeSources:
 
     def load(self, source, path):
         directory = self.directory(source, path)
-        if directory is None or path in self.compiler_packages:
+        if directory is None or path in self.compiler_packages and not (self.effect_discovery and path=='base:runtime'):
             return None
+        if path=='base:runtime' and self.effect_discovery:return directory
         if directory not in self.packages and self.discovery_scope is not None and directory not in self.discovery_scope:
             return None
         if directory not in self.packages:
@@ -66,6 +104,44 @@ class NativeSources:
                 self.sources[file] = member
             p.resolver.add_sources(members)
         return directory
+
+    def ensure_symbol(self,directory,name):
+        """A lexical catalog selects files; only parsed declarations supply facts."""
+        if not self.effect_discovery or directory is None:return
+        if (directory,name) in self.symbol_attempts:return
+        self.symbol_attempts.add((directory,name))
+        p=self.project
+        if directory not in self.declaration_catalogs:
+            files=set(directory.glob('*.odin'))|{path for path in p.overlays if path.parent==directory and path.suffix=='.odin'}
+            self.declaration_catalogs[directory]=[(file,declared_names(p.overlays[file] if file in p.overlays else file.read_bytes())) for file in sorted(files)]
+        members=[]
+        for file,names in self.declaration_catalogs[directory]:
+            if name not in names or file in self.sources or file in self.declaration_attempts:continue
+            self.declaration_attempts.add(file)
+            member=Source(file,p.frontend,thor=False,package=True,test=p.test,
+                          project_name=p.entry.stem,raw=p.overlays.get(file),target=p.target,
+                          mapping=p.mapping,cache=p.cache_frontend,cache_dir=p.cache_directory)
+            member.native_inspected=True;member.project=p.packages
+            member.collections=p.collections;member.purity=p.purity
+            self.sources[file]=member;self.packages.setdefault(directory,[]).append(member);members.append(member)
+        if members:p.resolver.add_sources(members)
+
+    def runtime_type(self,source,name):
+        """Inspect Context's declaration without expanding the runtime package."""
+        directory=self.directory(source,'base:runtime')
+        if directory is None:return None
+        file=directory/'core.odin'
+        if file not in self.sources:
+            p=self.project
+            member=Source(file,p.frontend,thor=False,package=True,test=p.test,
+                          project_name=p.entry.stem,raw=p.overlays.get(file),target=p.target,
+                          mapping=p.mapping,cache=p.cache_frontend,cache_dir=p.cache_directory)
+            member.native_inspected=True;member.project=p.packages
+            member.collections=p.collections;member.purity=p.purity
+            self.sources[file]=member
+            self.packages.setdefault(directory,[]).append(member)
+            p.resolver.add_sources([member])
+        return self.project.resolver.package_symbol(directory,name)
 
     def verify_access(self, node, resolver, seen=None, *, context='#run'):
         from .imports import private,file_private

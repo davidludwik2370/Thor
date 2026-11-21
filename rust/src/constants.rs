@@ -133,9 +133,10 @@ impl Type {
     pub fn resolved(&self) -> bool {
         match self {
             Self::Unknown | Self::Generic => false,
+            Self::Matrix{elem,rows,columns,..}=>rows.is_some()&&columns.is_some()&&elem.resolved(),
             Self::Record(_, args) => args.iter().all(|(_, typ)| typ.resolved()),
             Self::Anonymous(fields) => fields.iter().all(|(_, typ)| typ.resolved()),
-            Self::Array { elem, length } | Self::Fixed { elem, length } => {
+            Self::Array { elem, length } | Self::Vector { elem, length } | Self::Fixed { elem, length } => {
                 length.is_some() && elem.resolved()
             }
             Self::Nominal(_, elem)
@@ -313,7 +314,7 @@ impl Resolver<'_> {
             "Ident" if matches!(s.text(r.node), "ODIN_DEBUG" | "ODIN_VALGRIND_SUPPORT") => {
                 self.native_boolean(r).map(Constant::Boolean)
             }
-            "Literal" if s.text(r.node).starts_with('"') => crate::lower::unquote(s.text(r.node))
+            "Literal" if s.text(r.node).starts_with(['"', '`']) => crate::lower::unquote(s.text(r.node))
                 .ok()
                 .map(Constant::Text),
             "Paren" => self.constant_value_seen(role("expr")?, bindings, expected, seen),
@@ -417,7 +418,7 @@ impl Resolver<'_> {
             _ => None,
         }
     }
-    fn simple_size(&self, typ: &Type) -> Option<i128> {
+    pub(crate) fn simple_size(&self, typ: &Type) -> Option<i128> {
         let pointer = match self
             .flags
             .iter()
@@ -452,14 +453,15 @@ impl Resolver<'_> {
                     .filter(|bits| [8, 16, 32, 64, 128].contains(bits))
                     .map(|bits| bits / 8),
             },
+            Type::Matrix{elem,rows:Some(rows),columns:Some(columns),..}=>self.simple_size(elem)?.checked_mul(*rows)?.checked_mul(*columns),
             Type::Array {
                 elem,
                 length: Some(length),
-            } => self.simple_size(elem)?.checked_mul(*length),
+            } | Type::Vector{elem,length:Some(length)} => self.simple_size(elem)?.checked_mul(*length),
             _ => None,
         }
     }
-    fn enum_ordinal(&self, owner: Ref, field: &str, context: &Substitutions) -> Option<i128> {
+    pub(crate) fn enum_ordinal(&self, owner: Ref, field: &str, context: &Substitutions) -> Option<i128> {
         let source = &self.sources[owner.file];
         let mut bindings = context.clone();
         let mut next = Some(0i128);

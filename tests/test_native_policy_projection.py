@@ -60,8 +60,9 @@ import "core:testing"
                 self.write(source)
                 target = self.source/'main.thor'
                 (self.source/'main.odin').rename(target)
+                scope=['-vet-packages:main'] if policy=='vet-unused-procedures' else []
                 result = self.call('check', self.source, '--odin-compatible', '-'+policy,
-                    '-thread-count:1', '-json-errors', status=1)
+                    *scope, '-thread-count:1', '-json-errors', status=1)
                 errors = json.loads(result.stderr)['errors']
                 self.assertTrue(any(fragment in ' '.join(error['msgs']).lower() for error in errors), errors)
                 self.assertTrue(any(error.get('pos', {}).get('file') == str(target) for error in errors), errors)

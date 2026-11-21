@@ -850,7 +850,9 @@ pub fn run(
             .or_default()
             .insert(source.node(at.node).span.start);
     }
+    let suppressions=project.resolver();
     let proposed = usage.fixes.into_iter().chain(candidates(project, checks))
+        .filter(|fix| !crate::vet_attributes::ignored(&suppressions,fix.file,fix.highlight,fix.rule))
         .filter(|fix| {
             fix.rule != "immutable"
                 || exempt_offsets
@@ -868,6 +870,13 @@ pub fn run(
     } else {
         vec![]
     };
+    findings.retain(|finding| {
+        let Some(path)=finding["pos"]["file"].as_str() else{return true;};
+        let Some(file)=project.sources.iter().position(|s|s.path.to_str()==Some(path)) else{return true;};
+        let start=finding["pos"]["offset"].as_u64().unwrap_or(0) as usize;
+        let end=finding["pos"]["end_offset"].as_u64().unwrap_or(start as u64+1) as usize;
+        !crate::vet_attributes::ignored(&suppressions,file,Span::new(start,end),"unused")
+    });
     let unused = findings
         .iter()
         .map(|finding| {
@@ -896,6 +905,7 @@ pub fn run(
     } else {
         vec![]
     };
+    accepted.retain(|fix| !crate::vet_attributes::ignored(&suppressions,fix.file,fix.highlight,fix.rule));
     let (covered_semicolons, independent): (Vec<_>, Vec<_>) = accepted.into_iter().partition(|fix|
         proposed.iter().any(|item| item.rule == "import" && item.file == fix.file && item.span.contains(fix.span)));
     accepted = independent;

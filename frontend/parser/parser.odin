@@ -13,6 +13,7 @@ Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 
 Flag :: enum u32 {
 	Optional_Semicolons,
+    Native_Style, Native_Strict, Native_Tabs,
 }
 
 Flags :: distinct bit_set[Flag; u32]
@@ -26,6 +27,8 @@ Parser :: struct {
 	selections: [dynamic]Selection,
 	immutables: [dynamic][2]int,
 	mut_parameters: [dynamic][3]int, // parameter-name offset, directive start/end
+	ro_parameters: [dynamic][3]int,
+	auto_parameters: [dynamic][3]int, // field-name offset, :> separator start/end
 	features: [dynamic]Feature,
 	declaration_separators: [dynamic][3]int,
 	file: ^ast.File,
@@ -250,6 +253,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	p.file.decls = make([dynamic]^ast.Stmt)
 
 	for p.curr_tok.kind != .EOF {
+
 		stmt := parse_stmt(p)
 		if stmt != nil {
 			if _, ok := stmt.derived.(^ast.Empty_Stmt); !ok {
@@ -308,7 +312,7 @@ skip_possible_newline :: proc(p: ^Parser) -> bool {
 	return false
 }
 
-skip_possible_newline_for_literal :: proc(p: ^Parser) -> bool {
+skip_possible_newline_for_literal :: proc(p: ^Parser, ignore_strict := false) -> bool {
 	if .Optional_Semicolons not_in p.flags {
 		return false
 	}
@@ -319,6 +323,7 @@ skip_possible_newline_for_literal :: proc(p: ^Parser) -> bool {
 		if curr_pos.line+1 >= next.pos.line {
 			#partial switch next.kind {
 			case .Open_Brace, .Else, .Where:
+                if .Native_Strict in p.flags && !ignore_strict && next.kind != .Where {error(p,next.pos,"With '-strict-style' the attached brace style (1TBS) is enforced")}
 				advance_token(p)
 				return true
 			}
@@ -431,6 +436,10 @@ advance_token :: proc(p: ^Parser) -> tokenizer.Token {
 }
 
 expect_token :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> tokenizer.Token {
+    if .Native_Style in p.flags && p.prev_tok.kind==.Comma && p.prev_tok.pos.line==p.curr_tok.pos.line &&
+        (kind==.Close_Paren || kind==.Close_Brace || kind==.Close_Bracket) {
+        error(p,p.prev_tok.pos,"No need for a trailing comma followed by a %s on the same line",tokenizer.to_string(kind))
+    }
 	prev := p.curr_tok
 	if prev.kind != kind {
 		e := tokenizer.to_string(kind)
@@ -442,6 +451,10 @@ expect_token :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> tokenizer.Token 
 }
 
 expect_token_after :: proc(p: ^Parser, kind: tokenizer.Token_Kind, msg: string) -> tokenizer.Token {
+    if .Native_Style in p.flags && p.prev_tok.kind==.Comma && p.prev_tok.pos.line==p.curr_tok.pos.line &&
+        (kind==.Close_Paren || kind==.Close_Brace || kind==.Close_Bracket) {
+        error(p,p.prev_tok.pos,"No need for a trailing comma followed by a %s on the same line",tokenizer.to_string(kind))
+    }
 	prev := p.curr_tok
 	if prev.kind != kind {
 		e := tokenizer.to_string(kind)
@@ -492,6 +505,9 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 }
 
 expect_closing_token_of_field_list :: proc(p: ^Parser, closing_kind: tokenizer.Token_Kind, msg: string) -> tokenizer.Token {
+    if (.Native_Style in p.flags || .Native_Strict in p.flags) && tokenizer.is_newline(p.curr_tok) {
+        error(p,end_pos(p.prev_tok),"Missing ',' before newline in %s",msg)
+    }
 	token := p.curr_tok
 	if allow_token(p, closing_kind) {
 		return token
@@ -513,6 +529,9 @@ expect_closing_token_of_field_list :: proc(p: ^Parser, closing_kind: tokenizer.T
 }
 
 expect_closing_parentheses_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
+    if (.Native_Style in p.flags || .Native_Strict in p.flags) && tokenizer.is_newline(p.curr_tok) {
+        error(p,end_pos(p.prev_tok),"Missing ',' before newline in parameter list")
+    }
 	token := p.curr_tok
 	if allow_token(p, .Close_Paren) {
 		return token
@@ -651,10 +670,11 @@ expect_semicolon_newline_error :: proc(p: ^Parser, token: tokenizer.Token, s: ^a
 
 
 record_optional_semicolon :: proc(p: ^Parser) {
-    if !p.source_tools || p.peeking || p.prev_tok.text != ";" { return }
+    if (!p.source_tools && .Native_Strict not_in p.flags) || p.peeking || p.prev_tok.text != ";" { return }
     previous, current := p.prev_tok, p.curr_tok
     if current.pos.line > previous.pos.line ||
         current.kind == .Close_Brace || current.kind == .Close_Paren || current.kind == .EOF {
+        if .Native_Strict in p.flags {error(p,previous.pos,"Found unneeded semicolon")}
         offset := previous.pos.offset
         if len(p.optional_semicolons) == 0 || p.optional_semicolons[len(p.optional_semicolons)-1][0] != offset {
             append(&p.optional_semicolons, [2]int{offset, offset+1})
@@ -744,6 +764,14 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
 	for p.curr_tok.kind != .Case &&
 	    p.curr_tok.kind != .Close_Brace &&
 	    p.curr_tok.kind != .EOF  {
+        if .Native_Tabs in p.flags && p.prev_tok.pos.line < p.curr_tok.pos.line {
+            start:=p.curr_tok.pos.offset
+            for start>0 && p.file.src[start-1]!='\n' {start-=1}
+            for ch in p.file.src[start:p.curr_tok.pos.offset] {
+                if ch=='/' {break}
+                if ch==' ' {error(p,p.curr_tok.pos,"With '-vet-tabs', tabs must be used for indentation");break}
+            }
+        }
 		stmt := parse_stmt(p)
 		if stmt != nil {
 			if _, ok := stmt.derived.(^ast.Empty_Stmt); !ok {
@@ -881,7 +909,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 
 	else_tok := p.curr_tok.pos
 
-	skip_possible_newline_for_literal(p)
+	skip_possible_newline_for_literal(p, tok.pos.line == body.end.line)
 	if p.curr_tok.kind == .Else {
 		else_tok := expect_token(p, .Else)
 		#partial switch p.curr_tok.kind {
@@ -1140,6 +1168,9 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	open := expect_token(p, .Open_Brace)
 
 	for p.curr_tok.kind == .Case {
+        if .Native_Strict in p.flags && p.curr_tok.pos.column > tok.pos.column {
+            error(p,p.curr_tok.pos,"With '-strict-style' the 'case' token must be in the same column as its 'switch' token")
+        }
 		clause := parse_case_clause(p, is_type_switch)
 		append(&clauses, clause)
 	}
@@ -1888,14 +1919,20 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
 	counts: [len(ast.Field_Flag)]int
 	mut_start, mut_end := -1, -1
+	ro_start, ro_end := -1, -1
 
 	for {
-		if p.thor && p.curr_tok.kind == .Hash && peek_token(p).text == "mut" {
+		if p.thor && p.curr_tok.kind == .Hash && (peek_token(p).text == "mut" || peek_token(p).text == "ro") {
 			tok := advance_token(p)
-			if mut_start >= 0 { error(p, tok.pos, "duplicate #mut on this parameter") }
-			mut_start = tok.pos.offset
-			mut_end = end_pos(advance_token(p)).offset
-			append(&p.edits, Edit{mut_start, mut_end, ""})
+			directive := advance_token(p)
+			if directive.text == "mut" {
+				if mut_start >= 0 { error(p, tok.pos, "duplicate #mut on this parameter") }
+				mut_start = tok.pos.offset; mut_end = end_pos(directive).offset
+			} else {
+				if ro_start >= 0 { error(p, tok.pos, "duplicate #ro on this parameter") }
+				ro_start = tok.pos.offset; ro_end = end_pos(directive).offset
+			}
+			append(&p.edits, Edit{tok.pos.offset, end_pos(directive).offset, ""})
 			continue
 		}
 		kind := is_token_field_prefix(p)
@@ -1909,6 +1946,11 @@ parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
 		}
 
 		counts[kind] += 1
+	}
+	if mut_start >= 0 && ro_start >= 0 { error(p, p.curr_tok.pos, "A parameter cannot have both #mut and #ro") }
+	if ro_start >= 0 {
+		if p.curr_tok.kind != .Ident && p.curr_tok.kind != .Dollar {error(p, p.curr_tok.pos, "#ro must be followed by a parameter name")}
+		append(&p.ro_parameters, [3]int{p.curr_tok.pos.offset, ro_start, ro_end})
 	}
 	if mut_start >= 0 {
 		if p.curr_tok.kind != .Ident && p.curr_tok.kind != .Dollar {
@@ -2024,10 +2066,10 @@ parse_ident_list :: proc(p: ^Parser, allow_poly_names: bool, allow_mut: bool = f
 	list: [dynamic]^ast.Expr
 
 	for {
-		if allow_mut && p.thor && p.curr_tok.kind == .Hash && peek_token(p).text == "mut" {
+		if allow_mut && p.thor && p.curr_tok.kind == .Hash && (peek_token(p).text == "mut" || peek_token(p).text == "ro") {
 			other_flags := parse_field_prefixes(p)
 			if other_flags != {} {
-				error(p, p.curr_tok.pos, "Only #mut may be applied per name; put other parameter directives before the shared name list")
+				error(p, p.curr_tok.pos, "Only #mut and #ro may be applied per name; put other parameter directives before the shared name list")
 			}
 		}
 		if allow_poly_names && p.curr_tok.kind == .Dollar {
@@ -2068,7 +2110,9 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			if allow_token(p, .Comma) {
 				return true
 			}
+            previous:=p.prev_tok
 			if allow_token(p, .Semicolon) {
+                if tokenizer.is_newline(tok) && (.Native_Style in p.flags || .Native_Strict in p.flags) {error(p,end_pos(previous),"Missing ',' before newline in field list")}
 				if !tokenizer.is_newline(tok) {
 					error(p, tok.pos, "expected a comma, got a semicolon")
 				}
@@ -2093,8 +2137,18 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 		default_value: ^ast.Expr
 		tag: tokenizer.Token
 
-		expect_token_after(p, .Colon, "field list")
-		if p.curr_tok.kind != .Eq {
+		separator := expect_token_after(p, .Colon, "field list")
+		automatic := p.thor && p.curr_tok.kind == .Gt
+		if automatic {
+			gt := advance_token(p)
+			if !is_signature || .Results in allowed_flags || .Default_Parameters not_in allowed_flags {
+				error(p, gt.pos, ":> caller metadata is only allowed on input parameters")
+			}
+			if len(names) != 1 {error(p, gt.pos, "Automatic caller metadata requires one parameter name")}
+			if len(names) > 0 {append(&p.auto_parameters, [3]int{names[0].pos.offset, separator.pos.offset, end_pos(gt).offset})}
+			append(&p.edits, Edit{separator.pos.offset, end_pos(gt).offset, ":="})
+			default_value = parse_expr(p, false)
+		} else if p.curr_tok.kind != .Eq {
 			type = parse_var_type(p, allowed_flags)
 			tt := ast.unparen_expr(type)
 			if is_signature && !any_polymorphic_names {
@@ -2173,10 +2227,10 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 	for p.curr_tok.kind != follow &&
 	    p.curr_tok.kind != .Colon &&
 	    p.curr_tok.kind != .EOF {
-		mut_count := len(p.mut_parameters)
+		mut_count := len(p.mut_parameters) + len(p.ro_parameters)
 		prefix_flags := parse_field_prefixes(p)
-		if len(list) > 0 && len(p.mut_parameters) > mut_count && prefix_flags != {} {
-			error(p, p.curr_tok.pos, "Only #mut may be applied per name; put other parameter directives before the shared name list")
+		if len(list) > 0 && len(p.mut_parameters) + len(p.ro_parameters) > mut_count && prefix_flags != {} {
+			error(p, p.curr_tok.pos, "Only #mut and #ro may be applied per name; put other parameter directives before the shared name list")
 		}
 		param := parse_var_type(p, allowed_flags & {.Typeid_Token, .Ellipsis})
 		if _, ok := param.derived.(^ast.Ellipsis); ok {
@@ -2510,10 +2564,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Hash:
 		tok := expect_token(p, .Hash)
 		name := expect_token(p, .Ident)
-		if p.thor && name.text == "run" {
+		if p.thor && (name.text == "run" || name.text == "runtime") {
 			expr := parse_unary_expr(p,false)
-			call := thor_call("__thor_run",tok.pos,expr.end,thor_exprs_run(expr))
-			append(&p.features,Feature{kind="Run",start=call.pos.offset,end=call.end.offset})
+			callee := "__thor_run" if name.text == "run" else "__thor_runtime"
+			call := thor_call(callee,tok.pos,expr.end,thor_exprs_run(expr))
+			kind := "Run" if name.text == "run" else "Runtime"
+			append(&p.features,Feature{kind=kind,start=call.pos.offset,end=call.end.offset})
 			return call
 		}
 		switch name.text {
@@ -2545,6 +2601,14 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			bd.tok  = tok
 			bd.name = name.text
 			return parse_call_expr(p, bd)
+
+        case "row_major", "column_major":
+            original_type := parse_type(p)
+            helper := ast.new(ast.Helper_Type,tok.pos,original_type)
+            helper.tok=tok.kind; helper.type=original_type
+            feature_kind := "MatrixRowMajor" if name.text=="row_major" else "MatrixColumnMajor"
+            append(&p.features,Feature{kind=feature_kind,start=tok.pos.offset,end=original_type.end.offset})
+            return helper
 
 		case "soa":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
@@ -2849,6 +2913,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					if p.curr_tok.kind == .Close_Bracket { break }
 					append(&elems, parse_expr(p, false))
 				}
+                if (.Native_Style in p.flags || .Native_Strict in p.flags) && tokenizer.is_newline(p.curr_tok) {error(p,end_pos(p.prev_tok),"Missing ',' before newline in array literal")}
 				skip_possible_newline(p)
 			}
 			p.expr_level -= 1
@@ -3346,7 +3411,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Expr {
 	}
 	p.expr_level = prev_expr_level
 
-	skip_possible_newline(p)
+    if .Native_Style not_in p.flags && .Native_Strict not_in p.flags {skip_possible_newline(p)}
 	close := expect_closing_brace_of_field_list(p)
 
 	pos := type.pos if type != nil else open.pos

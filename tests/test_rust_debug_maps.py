@@ -146,3 +146,25 @@ main::proc(){
         support=[row for row in info['regions'] if row['kind']=='source-location-support']
         self.assertTrue(support,info)
         self.assertTrue(all(row['location']['internal'] for row in support),support)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node is required for the real map consumer')
+    def test_parameter_contracts_and_runtime_marker_keep_original_debug_locations(self):
+        source='''package main
+capture::proc(#ro values:[]int,value:int,
+    expression:>#caller_expression(value),location:>#caller_location)->int {
+    return values[0]+value
+}
+main::proc(){
+    values:>[]int{7}
+    output:=#runtime capture(values,2+1)
+    if output!=10{panic("result")}
+}
+'''
+        manifest,data,binary=self.build(source)
+        for line in [4,8,9]:
+            with self.subTest(line=line):
+                info=self.inspect(manifest,binary,line)
+                self.assertTrue(info['candidates'],info)
+                self.assertTrue(all(not entry['helper'] for entry in info['candidates']))
+        result=subprocess.run([str(binary)],capture_output=True,text=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
