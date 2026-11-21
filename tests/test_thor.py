@@ -693,6 +693,8 @@ assert(count == 2)'''))
 
     def test_checked_in_rejection_examples(self):
         for directory in sorted((ROOT / "tests" / "fixtures").iterdir()):
+            if not directory.is_dir():
+                continue
             with self.subTest(fixture=directory.name):
                 source = (directory / "main.thor").read_text()
                 expected = (directory / "expected.txt").read_text().strip()

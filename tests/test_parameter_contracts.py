@@ -1,4 +1,5 @@
 """Caller metadata, runtime barriers, and explicit slice/vet contracts together."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import subprocess
 import unittest
@@ -129,6 +130,20 @@ B::#run capture(Y)
 main::proc(){fmt.println(A,B)}
 ''','X Y')
 
+    def test_native_caller_location_defaults_are_explicit_pure_inputs(self):
+        self.checked_and_unchecked('''package main
+import "base:runtime"
+import "core:fmt"
+capture::fn(n:int,loc:=#caller_location)->int{return n+int(loc.line)}
+VALUE::#run capture(7)
+SECOND::#run capture(7)
+AUTO::capture(7)
+main::proc(){
+ if VALUE!=12 || SECOND!=13 || AUTO!=14 || capture(7,loc=runtime.Source_Code_Location{line=100})!=107 {panic("caller input")}
+ fmt.println(VALUE,SECOND,AUTO)
+}
+''','12 13 14')
+
     def test_vet_ignore_suppresses_warnings_and_apply_only_on_its_declaration(self):
         text='''package main
 import "core:fmt"
@@ -138,7 +153,7 @@ KEEP_MUTABLE:=7
 helper::proc(value:int)->int{return value*2}
 main::proc(){fmt.println(KEEP_MUTABLE)}
 '''
-        for engine in ['rust','python']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.source.write_text(text)
                 result=self.invoke(engine,'vet',['--apply','-thread-count:1'])
@@ -329,7 +344,7 @@ main::proc(){
  fmt.println(keep,edit)
 }
 '''
-        for engine in ['rust','python']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.source.write_text(text)
                 result=self.invoke(engine,'vet',['--apply','-thread-count:1'])
@@ -343,7 +358,7 @@ import "core:fmt"
 @(vet_ignore="immutable")
 main::proc(){value:=7;fmt.println(value)}
 '''
-        for engine in ['rust','python']:
+        for engine in compiler_engines():
             self.source.write_text(text)
             result=self.invoke(engine,'vet',['--apply','-thread-count:1'])
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -359,7 +374,7 @@ main::proc(){value:=7;fmt.println(value)}
 twice::fn(value:int)->int{return value*2}
 main::proc(){alias::twice;result:=#runtime alias(7);if result!=14{panic("result")}}
 '''
-        for engine in ['rust','python']:
+        for engine in compiler_engines():
             self.source.write_text(text)
             result=self.invoke(engine,'transpile',['-thread-count:1'])
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -384,7 +399,7 @@ main::proc(){
  _=keep()
 }
 '''
-        for engine in ['rust','python']:
+        for engine in compiler_engines():
             self.source.write_text(text)
             result=self.invoke(engine,'vet',['--apply','-thread-count:1'])
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

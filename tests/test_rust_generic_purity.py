@@ -1,5 +1,6 @@
 """Native generic contracts validate concrete instantiations without an ABI change."""
 import unittest
+from tests import test_rust_compiler as native
 from tests import test_rust_checked_calls as checked
 
 
@@ -71,9 +72,12 @@ wrap::fn(value:$T)->[]T{out:=make([]T,1);out[0]=value;return out}
 callback:proc([]int)->[]int=work
 _=work(values);_=callback(values[:])
 ''','work::fn(value:$T)->T{copy:=value;copy[0]+=1;return copy}\n'))
-        reference=self.invoke('python',command='check')
-        self.assertEqual(reference.returncode,1,reference.stderr)
-        self.assertIn('borrowed from an input',reference.stderr)
-        native=self.invoke('rust',command='check',flags=['-json-errors'])
-        self.assertEqual(native.returncode,1,native.stderr)
-        self.assertIn('borrowed from an input',native.stderr)
+        if native.reference_enabled():
+            reference=self.invoke('python',command='check')
+        if native.reference_enabled():
+            self.assertEqual(reference.returncode,1,reference.stderr)
+        if native.reference_enabled():
+            self.assertIn('borrowed from an input',reference.stderr)
+        result=self.invoke('rust',command='check',flags=['-json-errors'])
+        self.assertEqual(result.returncode,1,result.stderr)
+        self.assertIn('borrowed from an input',result.stderr)

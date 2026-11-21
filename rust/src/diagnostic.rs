@@ -79,7 +79,7 @@ impl Error {
     }
     pub fn unsupported(source: &Source, span: Span, feature: &str) -> Self {
         let mut error = Self::at(source, span,
-            format!("Rust compiler limitation: {feature} remains unresolved for this program; compare with the Python reference (`thor-python`)."));
+            format!("Compiler analysis limitation: {feature} remains unresolved for this program; please report this source pattern with a minimal reproducer."));
         error.unsupported = true;
         error.diagnostics[0]["stage"] = json!("rust-migration");
         error
@@ -279,15 +279,15 @@ mod migration_tests {
     }
 
     #[test]
-    fn unresolved_guard_preserves_its_status_and_names_the_actual_reference_command() {
+    fn unresolved_guard_preserves_its_status_without_recommending_the_frozen_compiler() {
         let source = Source::from_frontend("/audit.thor".into(), String::new(),
             json!({"nodes":[],"features":[],"edits":[],"selections":[]}), true)
             .expect("empty source protocol");
         let error = Error::unsupported(&source, Span::new(0, 0), "symbolic ownership");
         if !error.unsupported || error.diagnostics[0]["stage"] != "rust-migration"
-            || !error.message.contains("thor-python") || error.message.contains("(`thor`)")
+            || error.message.contains("thor-python") || !error.message.contains("minimal reproducer")
             || error.message.contains("has not been ported") {
-            panic!("unresolved guard lost its category or recommended the native launcher as Python");
+            panic!("unresolved guard lost its category or recommended an archived compiler");
         }
     }
 }

@@ -1,4 +1,5 @@
 """Thor vet distinguishes optional terminators from required semicolon syntax."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -33,7 +34,7 @@ class SemicolonVetTests(unittest.TestCase):
                 '    /* 😀 */ x := 10;\r\n    y := 11; // comment ;\r\n'
                 '    fmt.println(x+y)\r\n}\r\n')
         self.source.write_bytes(text.encode())
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             errors = self.findings(engine)
             semicolons = [error for error in errors if error['code']=='thor/unnecessary-semicolon']
             self.assertEqual(len(semicolons), 2, errors)
@@ -73,7 +74,7 @@ main :: proc() {
 }
 '''
         self.source.write_text(text)
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             self.assertEqual(self.findings(engine, '--vet=semicolon'), [])
             self.invoke(engine, '--vet=semicolon', '--apply')
             self.assertEqual(self.source.read_text(),text)
@@ -97,7 +98,7 @@ literal;`)
 }
 '''
         self.source.write_text(text)
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             errors = self.findings(engine, '--vet=semicolon')
             expected = [text.encode().index(b'return value;')+len(b'return value'),
                         text.encode().index(b'value:=3;')+len(b'value:=3')]
@@ -108,7 +109,7 @@ literal;`)
                 'main::proc(){\r\n    x /* note */ := get(1);\r\n    y := get(2);\r\n'
                 '    if x+y!=5 { panic("result") }\r\n}\r\n')
         expected = text.replace(':=',':>').replace('get(1);','get(1)').replace('get(2);','get(2)')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for answer, applied in [('n\n',False),('y\n',True)]:
                 self.source.write_bytes(text.encode())
                 self.source.chmod(0o640)
@@ -126,7 +127,7 @@ literal;`)
 
     def test_warning_policies_build_integration_and_native_policy_remain_consistent(self):
         self.source.write_text('package main\nmain::proc(){value:=1;_ = value;};')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             errors = self.findings(engine, '--vet=semicolon')
             self.assertEqual(len(errors),2,errors)
             self.assertEqual(self.findings(engine, '--vet=semicolon','-ignore-warnings'),[])
@@ -143,5 +144,5 @@ literal;`)
         (self.app/'native.odin').write_text('package main\nhelper::proc(){value:=1;_ = value;}\n')
         other_os = 'linux' if os.name=='nt' else 'windows'
         (self.app/f'excluded_{other_os}.thor').write_text('invalid source ;\n')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.assertEqual(self.findings(engine,'--vet=semicolon'),[])

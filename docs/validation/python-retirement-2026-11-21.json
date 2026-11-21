@@ -1,0 +1,891 @@
+{
+  "date": "2026-11-21",
+  "scope": "macOS ARM64 and local Linux ARM64; Windows deferred",
+  "python_reference": {
+    "tag": "python-reference-2026-11-21",
+    "commit": "f4b0d2c",
+    "manifest_sha256": "6e809807f8c42f8e369a9a7b2ada6e3b7de5c2e4b11179f30a41640584d8e1b8"
+  },
+  "native_inventory": {
+    "methods": 4054,
+    "historical_opt_in_methods": 304,
+    "ids_sha256": "8aa8550bc19b42454b6f225a55a56e2f4c57371cb2d4347f59a5070a7766e7e6"
+  },
+  "validation_policy": "Initial full native-only runs exposed harness and compiler defects. Affected-class replays and final release follow-ups supersede those failures. Counts below cover distinct current methods across those runs, not a single fresh all-green full-suite invocation. Platform skips remain separate.",
+  "platforms": {
+    "mac": {
+      "runs": [
+        {
+          "artifact": "thor-native-hardening-mac.json",
+          "sha256": "1e9add02b8245a64741741ccdaf34677f2e82daf1ba140d5446006ed2f57f31f",
+          "tests_run": 3969,
+          "seconds": 5788.88,
+          "successful_run": false,
+          "failure_entries": 85,
+          "error_entries": 223,
+          "skip_entries": 3
+        },
+        {
+          "artifact": "thor-retirement-final-mac-replay.json",
+          "sha256": "3affb791d652c2473c3a3d3caf6c5c984788cb4e94e92a186456b5d5a65d5207",
+          "tests_run": 1095,
+          "seconds": 1874.451,
+          "successful_run": false,
+          "failure_entries": 2,
+          "error_entries": 2,
+          "skip_entries": 1
+        },
+        {
+          "artifact": "thor-retirement-mac-final-followup.json",
+          "sha256": "193d45fdcde1224e87eed916fd82d500978b55c1d050a95a7d8fc949ebcce60b",
+          "tests_run": 185,
+          "seconds": 340.561,
+          "successful_run": true,
+          "failure_entries": 0,
+          "error_entries": 0,
+          "skip_entries": 0
+        }
+      ],
+      "distinct_current_methods": 4054,
+      "passed": 4051,
+      "skipped": [
+        {
+          "test": "tests.test_cli_compatibility.CliCompatibilityTests.test_windows_runtime_exit_statuses_preserve_the_full_failure_code",
+          "reason": "Windows preserves full 32-bit process exit statuses"
+        },
+        {
+          "test": "tests.test_native_policy_projection.NativePolicyProjectionTests.test_vet_keeps_corrections_valid_for_inactive_configurations_and_platforms",
+          "reason": "selected Odin requires a Windows SDK for cross-target checking"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_finder_gui_launch_runs_without_a_terminal_wrapper",
+          "reason": "Set THOR_TEST_LAUNCH_SERVICES=1 outside the shell sandbox for Finder launch integration"
+        }
+      ],
+      "unresolved": [],
+      "sdk_audit": {
+        "cases": 218,
+        "accepted": 209,
+        "expected_rejections": 9,
+        "unexpected": [],
+        "raw_sha256": "f254311b489482b0d2bde931853c59b9660e997dfa1025b86ccf1e3270e823f2"
+      },
+      "rust_unit_tests": 98,
+      "tls_unit_tests": 1169
+    },
+    "linux": {
+      "runs": [
+        {
+          "artifact": "thor-native-hardening-linux.json",
+          "sha256": "513ac1ca552558a38b46975df4a253ebfb42b4bf69059a02aa4aa7794ba71cfe",
+          "tests_run": 4002,
+          "seconds": 4221.687,
+          "successful_run": false,
+          "failure_entries": 87,
+          "error_entries": 217,
+          "skip_entries": 50
+        },
+        {
+          "artifact": "thor-retirement-final-linux-replay.json",
+          "sha256": "d406f71d6e7334926603f8bf218383f2a46558a6741e974d801c0d8e17b792a2",
+          "tests_run": 1028,
+          "seconds": 1164.822,
+          "successful_run": false,
+          "failure_entries": 2,
+          "error_entries": 2,
+          "skip_entries": 19
+        },
+        {
+          "artifact": "thor-retirement-linux-final-followup.json",
+          "sha256": "7b0a559a496793331bee9b5493ef75a684cee3c633c2dc85482bc8d06964ae47",
+          "tests_run": 185,
+          "seconds": 215.463,
+          "successful_run": true,
+          "failure_entries": 0,
+          "error_entries": 0,
+          "skip_entries": 0
+        }
+      ],
+      "distinct_current_methods": 4054,
+      "passed": 4004,
+      "skipped": [
+        {
+          "test": "tests.test_cli_compatibility.CliCompatibilityTests.test_windows_runtime_exit_statuses_preserve_the_full_failure_code",
+          "reason": "Windows preserves full 32-bit process exit statuses"
+        },
+        {
+          "test": "tests.test_cli_default_source.DefaultSourceTests.test_publish_defaults_to_cwd_with_separate_option_values",
+          "reason": "Native macOS app publishing"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_bad_free_is_immediate_and_mapped",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_big_number_copy_leak_trace_identifies_original_thor_owner",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_clean_defers_finalizers_and_custom_allocators",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_debug_compiler_errors_and_compile_time_cache_are_unchanged",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_each_conditional_main_installs_tracking",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_excluded_platform_hook_does_not_disable_automatic_mapping",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_explicit_symbolizer_with_a_conditional_user_hook",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_expression_helpers_stack_and_global_reports",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_generated_fstring_leak_and_asan_environment_overrides",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_leaks_basic_without_debug_and_tracking_off",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_native_test_tracker_is_not_replaced",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_normal_build_has_no_memory_support_and_debug_opt_out_removes_it",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_standalone_asan_survives_moving_and_removing_generated_sources",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_trace_and_imported_thor_allocation_locations",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_memory_debug.MemoryDebugTests.test_user_sanitizer_hooks_and_function_opt_out_are_respected",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_native_policy_projection.NativePolicyProjectionTests.test_vet_keeps_corrections_valid_for_inactive_configurations_and_platforms",
+          "reason": "selected Odin requires a Windows SDK for cross-target checking"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_bad_free_is_immediate_and_mapped",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_clean_defers_finalizers_and_custom_allocators",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_each_conditional_main_installs_tracking",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_excluded_platform_hook_does_not_disable_automatic_mapping",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_explicit_symbolizer_with_a_conditional_user_hook",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_expression_helpers_stack_and_global_reports",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_generated_fstring_leak_and_asan_environment_overrides",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_leaks_basic_without_debug_and_tracking_off",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_native_test_tracker_is_not_replaced",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_normal_build_has_no_memory_support_and_debug_opt_out_removes_it",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_standalone_asan_survives_moving_and_removing_generated_sources",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_trace_and_imported_thor_allocation_locations",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_memory.RustMemoryTests.test_user_sanitizer_hooks_and_function_opt_out_are_respected",
+          "reason": "native macOS Odin required"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_bad_publish_config_does_not_affect_ordinary_builds",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_console_mode_is_explicit_and_shell_quotes_executable",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_debug_allocation_tracking_accepts_owned_resource_paths",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_declared_dynamic_plugin_loads_from_bundled_rpath",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_development_resource_lookup_is_independent_of_cwd",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_finder_gui_launch_runs_without_a_terminal_wrapper",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_json_packaging_error_and_crop_warning_share_one_packet",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_native_library_dependency_closure_is_copied_and_relocated",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_options_before_source_equals_forms_and_unchecked_release",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_palette_icon_with_only_transparent_padding_publishes_without_warning",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_publish_compiler_errors_keep_original_source_locations_and_previous_app",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_publish_flags_are_not_accepted_by_build",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_real_gui_app_with_icon_moves_away_from_sources_and_preserves_arguments",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_republishing_updates_only_managed_app",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_resource_helper_checks_on_linux_target",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_toolchain_validation_precedes_bad_config_and_metadata_is_retained",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_versioned_framework_is_copied_with_internal_links_and_resigned",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustMacPublishTests.test_visible_icon_crop_warning_is_structured_and_obeys_warning_flags",
+          "reason": "native macOS packaging"
+        },
+        {
+          "test": "tests.test_rust_publish.RustPublishProtocolTests.test_all_package_formats_and_managed_replacements",
+          "reason": "real native macOS code signing"
+        }
+      ],
+      "unresolved": [],
+      "sdk_audit": {
+        "cases": 219,
+        "accepted": 210,
+        "expected_rejections": 9,
+        "unexpected": [],
+        "raw_sha256": "ec2cc4f1d6f526d13e27f592f6a1234ca0e264721566e0cb301437fe4158d310"
+      },
+      "rust_unit_tests": 98,
+      "tls_unit_tests": 1169
+    }
+  },
+  "editor": {
+    "vscode_integration_checks": 71,
+    "vscode_log_sha256": "730b04cbfdc53396e96327da4ca95f9f654f2549c1da78404b24c3cb90452de9",
+    "node_unit_tests": 149,
+    "unchecked_tls_root_discovery_tests": 2,
+    "live_debugger_tests": "included in final native release follow-ups on both platforms"
+  },
+  "runtime": {
+    "demo_and_sandbox_checked_unchecked_runs": 8,
+    "assertion_hygiene_tests": 7,
+    "demo_log_sha256": "7879fbce71d7ccf25726883a361f7da704df061f3c518fd0f6206b7a9e24c267",
+    "arithmetic": "Generic/manual optimized arithmetic instruction equality is tested, including absence of extra calls.",
+    "linux_pmap_memory": {
+      "checked_max_rss_kib": 509636,
+      "unchecked_max_rss_kib": 463072,
+      "new_oom_kills": 0,
+      "note": "Child-inclusive process peak; original exponential-emission repro exceeded the 6 GiB container limit."
+    }
+  },
+  "sdk_revision": "8169255b97b85d6a08691d99764f51fb01f92b5a",
+  "sdk_corpus_sha256": "113a45b4b04ed53ff1c9cb608b8aabfbdef8548e0d10989e61e1ae3e77807480",
+  "limits": [
+    "Audited SDK corpus, not every possible standard-library instantiation. Runtime-dependent growth and unknown callbacks remain conservative.",
+    "The native allocation contract excludes fatal diagnostic reporting, compiler allocations, stack storage and platform-internal kernel/foreign allocations.",
+    "Windows validation is deferred. Historical native-upstream baseline failures remain distinct from Thor regressions."
+  ],
+  "upstream_reverification": {
+    "mac": [
+      {
+        "project": "NateTheGreatt/odecs",
+        "commit": "e3ca0a5832c3bde119be92c722d98d690ea9f499",
+        "odin": "/Users/davidludwik/Thor/integration-projects/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin version dev-2026-10-nightly:84bc3fc",
+        "baseline": [
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 1.454,
+            "peak_rss_mb": 410.9,
+            "finished": [
+              125
+            ]
+          }
+        ],
+        "vetted": [
+          {
+            "name": "tests-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 5.62,
+            "peak_rss_mb": 625.8,
+            "finished": [
+              125
+            ],
+            "matches_baseline": true
+          }
+        ]
+      },
+      {
+        "project": "GuilHartt/muninn",
+        "commit": "7f11f779b54f8cfa8a78b7f2a01abc374e249af5",
+        "odin": "/Users/davidludwik/Thor/integration-projects/toolchains/dev-2026-10/odin-macos-arm64-nightly+2026-10-06/odin version dev-2026-10-nightly:84bc3fc",
+        "baseline": [
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 1.013,
+            "peak_rss_mb": 0.0,
+            "finished": [
+              39
+            ]
+          }
+        ],
+        "vetted": [
+          {
+            "name": "tests-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 2.291,
+            "peak_rss_mb": 715.8,
+            "finished": [
+              39
+            ],
+            "matches_baseline": true
+          }
+        ]
+      },
+      {
+        "project": "Up05/toml_parser",
+        "commit": "10aee3739d1a144efe79e95d8a094e9c1563bb03",
+        "odin": "/Users/davidludwik/odin/odin/odin version dev-2026-10:8169255b9",
+        "baseline": [
+          {
+            "name": ".",
+            "status": 0,
+            "seconds": 0.741,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 0.918,
+            "peak_rss_mb": 0.0,
+            "finished": [
+              7
+            ]
+          },
+          {
+            "name": "decoder",
+            "status": 0,
+            "seconds": 0.66,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          }
+        ],
+        "vetted": [
+          {
+            "name": ".-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": ".",
+            "status": 0,
+            "seconds": 2.81,
+            "peak_rss_mb": 663.0,
+            "finished": [],
+            "matches_baseline": true
+          },
+          {
+            "name": "tests-translation",
+            "status": 0,
+            "seconds": 0.006,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 3.058,
+            "peak_rss_mb": 405.5,
+            "finished": [
+              7
+            ],
+            "matches_baseline": true
+          },
+          {
+            "name": "decoder-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "decoder",
+            "status": 0,
+            "seconds": 2.604,
+            "peak_rss_mb": 657.0,
+            "finished": [],
+            "matches_baseline": true
+          }
+        ]
+      },
+      {
+        "project": "ariaghora/anvil",
+        "commit": "f370b58f1366dccb6f9a6e792dda3992bc7b5cef",
+        "odin": "/Users/davidludwik/Thor/integration-projects/odin/odin-lang__Odin/odin version dev-2026-11:537fac5",
+        "baseline": [
+          {
+            "name": "anvil-tensor",
+            "status": 0,
+            "seconds": 1.71,
+            "finished": [
+              71
+            ]
+          },
+          {
+            "name": "anvil-nn",
+            "status": 0,
+            "seconds": 1.026,
+            "finished": [
+              13
+            ]
+          },
+          {
+            "name": "anvil-models-flux",
+            "status": -5,
+            "seconds": 0.128,
+            "finished": []
+          }
+        ],
+        "vetted": [
+          {
+            "name": "anvil-tensor-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "anvil-tensor",
+            "status": 0,
+            "seconds": 5.837,
+            "peak_rss_mb": 906.4,
+            "finished": [
+              71
+            ],
+            "matches_baseline": true
+          },
+          {
+            "name": "anvil-nn-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "anvil-nn",
+            "status": 0,
+            "seconds": 5.985,
+            "peak_rss_mb": 755.2,
+            "finished": [
+              13
+            ],
+            "matches_baseline": true
+          },
+          {
+            "name": "anvil-models-flux",
+            "status": "baseline-unavailable"
+          }
+        ]
+      },
+      {
+        "project": "BuLEEto/Skald",
+        "commit": "5625c75ec6c06b06bffbea21154f0d853a7dd1d9",
+        "odin": "/Users/davidludwik/odin/odin/odin version dev-2026-10:8169255b9",
+        "baseline": [
+          {
+            "name": "skald",
+            "status": 0,
+            "seconds": 2.358,
+            "peak_rss_mb": 714.4,
+            "finished": [
+              108
+            ]
+          }
+        ],
+        "vetted": [
+          {
+            "name": "skald-translation",
+            "status": 0,
+            "seconds": 0.007,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "skald",
+            "status": 0,
+            "seconds": 74.322,
+            "peak_rss_mb": 4272.8,
+            "finished": [
+              108
+            ],
+            "matches_baseline": true
+          }
+        ]
+      }
+    ],
+    "linux": [
+      {
+        "project": "NateTheGreatt__odecs",
+        "commit": "e3ca0a5832c3bde119be92c722d98d690ea9f499",
+        "odin": "/opt/odin/odin version dev-2026-10-nightly:84bc3fc",
+        "baseline": [
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 1.189,
+            "peak_rss_mb": 458.3,
+            "finished": [
+              125
+            ]
+          }
+        ],
+        "vetted": [
+          {
+            "name": "tests-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 10.84,
+            "peak_rss_mb": 645.0,
+            "finished": [
+              125
+            ],
+            "matches_baseline": true
+          }
+        ]
+      },
+      {
+        "project": "GuilHartt__muninn",
+        "commit": "7f11f779b54f8cfa8a78b7f2a01abc374e249af5",
+        "odin": "/opt/odin/odin version dev-2026-10-nightly:84bc3fc",
+        "baseline": [
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 0.722,
+            "peak_rss_mb": 0.0,
+            "finished": [
+              39
+            ]
+          }
+        ],
+        "vetted": [
+          {
+            "name": "tests-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 2.448,
+            "peak_rss_mb": 599.0,
+            "finished": [
+              39
+            ],
+            "matches_baseline": true
+          }
+        ]
+      },
+      {
+        "project": "Up05__toml_parser",
+        "commit": "10aee3739d1a144efe79e95d8a094e9c1563bb03",
+        "odin": "/opt/odin-8169255/odin version dev-2026-11:8169255",
+        "baseline": [
+          {
+            "name": ".",
+            "status": 0,
+            "seconds": 0.567,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 0.748,
+            "peak_rss_mb": 0.0,
+            "finished": [
+              7
+            ]
+          },
+          {
+            "name": "decoder",
+            "status": 0,
+            "seconds": 0.641,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          }
+        ],
+        "vetted": [
+          {
+            "name": ".-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": ".",
+            "status": 0,
+            "seconds": 4.855,
+            "peak_rss_mb": 352.5,
+            "finished": [],
+            "matches_baseline": true
+          },
+          {
+            "name": "tests-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "tests",
+            "status": 0,
+            "seconds": 5.76,
+            "peak_rss_mb": 719.6,
+            "finished": [
+              7
+            ],
+            "matches_baseline": true
+          },
+          {
+            "name": "decoder-translation",
+            "status": 0,
+            "seconds": 0.003,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "decoder",
+            "status": 0,
+            "seconds": 5.064,
+            "peak_rss_mb": 348.2,
+            "finished": [],
+            "matches_baseline": true
+          }
+        ]
+      },
+      {
+        "project": "ariaghora__anvil",
+        "commit": "f370b58f1366dccb6f9a6e792dda3992bc7b5cef",
+        "odin": "/work/thor/integration-projects/odin/odin-lang__Odin/odin version dev-2026-11:537fac5",
+        "baseline": [
+          {
+            "name": "anvil-tensor",
+            "status": 0,
+            "seconds": 1.147,
+            "peak_rss_mb": 423.1,
+            "finished": [
+              71
+            ]
+          },
+          {
+            "name": "anvil-nn",
+            "status": 0,
+            "seconds": 0.985,
+            "peak_rss_mb": 0.0,
+            "finished": [
+              13
+            ]
+          },
+          {
+            "name": "anvil-models-flux",
+            "status": -5,
+            "seconds": 0.177,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          }
+        ],
+        "vetted": [
+          {
+            "name": "anvil-tensor-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "anvil-tensor",
+            "status": 0,
+            "seconds": 13.831,
+            "peak_rss_mb": 927.1,
+            "finished": [
+              71
+            ],
+            "matches_baseline": true
+          },
+          {
+            "name": "anvil-nn-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "anvil-nn",
+            "status": 0,
+            "seconds": 7.809,
+            "peak_rss_mb": 855.0,
+            "finished": [
+              13
+            ],
+            "matches_baseline": true
+          },
+          {
+            "name": "anvil-models-flux",
+            "status": "baseline-unavailable"
+          }
+        ]
+      },
+      {
+        "project": "BuLEEto__Skald",
+        "commit": "5625c75ec6c06b06bffbea21154f0d853a7dd1d9",
+        "odin": "/opt/odin-8169255/odin version dev-2026-11:8169255",
+        "baseline": [
+          {
+            "name": "skald",
+            "status": 0,
+            "seconds": 2.305,
+            "peak_rss_mb": 628.7,
+            "finished": [
+              108
+            ]
+          }
+        ],
+        "vetted": [
+          {
+            "name": "skald-translation",
+            "status": 0,
+            "seconds": 0.002,
+            "peak_rss_mb": 0.0,
+            "finished": []
+          },
+          {
+            "name": "skald",
+            "status": 0,
+            "seconds": 28.876,
+            "peak_rss_mb": 4339.9,
+            "finished": [
+              108
+            ],
+            "matches_baseline": true
+          }
+        ]
+      }
+    ],
+    "native_baseline_exclusions": [
+      "anvil-models-flux: native Odin signal failure on both platforms"
+    ],
+    "linux_guard": {
+      "first_limit_mib": 4096,
+      "first_status": "memory-limit",
+      "retry_limit_mib": 5120,
+      "retry_status": 0,
+      "retry_peak_rss_mib": 4339.9,
+      "vm_limit_gib": 6
+    }
+  },
+  "timing": {
+    "report": "../benchmarks/no-alloc-sdk-2026-11-21.json",
+    "report_sha256": "7f9451bc9426e7011dc116d9a11be485b62484a2a781a6f929975e5aec0e8e12",
+    "workloads": 8,
+    "runs_per_transpile_variant": 9,
+    "runs_per_build_variant": 3,
+    "all_main_emitted_source_matches": true
+  },
+  "final_policy_gate": {
+    "tests": 18,
+    "success": true,
+    "seconds": 41.344,
+    "sha256": "fd5393b4c93d2051b36d84bb1a4f8c2ccf020125be85ac2213ff87d46320ba69"
+  }
+}

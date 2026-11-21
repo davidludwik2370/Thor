@@ -1,4 +1,5 @@
 """Sparse native SDK adaptation keeps package identity and original sources."""
+from tests.test_rust_compiler import compiler_engines
 import json
 from pathlib import Path
 import unittest
@@ -27,7 +28,7 @@ import "core:time"
 work::fn(d:time.Duration)->f64{return time.duration_seconds(d)}
 @(test) check_duration::proc(t:^testing.T){d:=time.Second;testing.expect(t,work(d)==1)}
 ''')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 result=self.invoke(engine,command='test')
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)

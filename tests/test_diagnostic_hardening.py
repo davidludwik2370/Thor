@@ -139,6 +139,13 @@ class DiagnosticHardeningTests(unittest.TestCase):
                 self.assertTrue(any(message in e['msgs'][0] for e in errors),errors)
                 self.assertNotIn('Thor expression',json.dumps(errors))
 
+    def test_generated_arithmetic_cleanup_keeps_independent_user_generic_errors(self):
+        source='package main\nneeds_pointer::proc(value:^$T)->int{return 7}\nmain::proc(){_=f"{needs_pointer(100)+missing}"}\n'
+        _,_,errors,_=self.invoke(source)
+        self.assertEqual(len(errors),2,errors)
+        self.assertTrue(any(e['msgs']==['Undeclared name: missing'] for e in errors),errors)
+        self.assertTrue(any('Cannot determine polymorphic type' in e['msgs'][0] for e in errors),errors)
+
     def test_inference_errors_without_a_primary_cause_are_retained(self):
         source='package main\nneed_type::proc($T:typeid)->int{return 0}\nmain::proc(){_=f"{need_type(100)}"}\n'
         errors=self.at(source,'100',message='Expected a type')

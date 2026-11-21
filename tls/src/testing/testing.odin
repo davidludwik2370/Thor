@@ -223,6 +223,7 @@ expect_signature_labels :: proc(
 	src: ^Source,
 	expect_labels: []string,
 	expected_active_parameter := -1,
+	expected_active_signature := -1,
 ) {
 	spall.trace(#procedure)
 
@@ -257,6 +258,9 @@ expect_signature_labels :: proc(
 		}
 	}
 
+	if expected_active_signature != -1 && expected_active_signature != help.activeSignature {
+		log.errorf("Expected active signature %v, but received %v",expected_active_signature,help.activeSignature)
+	}
 	if expected_active_parameter != -1 {
 		if expected_active_parameter != help.activeParameter {
 			log.errorf(

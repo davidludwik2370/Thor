@@ -1,4 +1,5 @@
 """Identical Odin/Thor programs must retain native type and source semantics."""
+from tests.test_rust_compiler import compiler_variants
 import json
 import subprocess
 import tempfile
@@ -81,7 +82,7 @@ main::proc(){Integer:=7;or_panic:=Integer;_=or_panic}
             self.assertEqual(result.returncode,0,result.stderr)
             expected=subprocess.run([str(executable)],capture_output=True,text=True,timeout=10)
             native.unlink()
-            for engine,compiler in [('rust',base.RUST),('python',base.PYTHON)]:
+            for engine,compiler in compiler_variants():
                 with self.subTest(engine=engine):
                     result=subprocess.run([str(compiler),'run',str(app if directory else source),
                         '--output-dir',str(root/(engine+'-unrelated-output')),'-thread-count:1',*flags],
@@ -210,7 +211,7 @@ calc::fn(x:int)->int{return x+thing.VALUE}
 VALUE::#run calc(1)
 main::proc(){number:Integer=123456789012345678901234567890;defer delete(number);fmt.println(f"{VALUE} {number}")}
 ''')
-            for engine,compiler in [('rust',base.RUST),('python',base.PYTHON)]:
+            for engine,compiler in compiler_variants():
                 for flags in [[],base.UNCHECKED]:
                     with self.subTest(engine=engine,flags=flags):
                         result=subprocess.run([str(compiler),'run',str(source),'--output-dir',str(root/engine),

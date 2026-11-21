@@ -6,9 +6,12 @@ caching are connected to the normal commands. `thor` now launches the prebuilt
 Rust compiler. `thor-rust` selects the same implementation, and `thor-python`
 retains the reference compiler.
 
-Rust remains experimental for inputs outside the verified corpus and native
-Windows hosts. Explicit migration guards still fail with exit status `3`.
-The measurements below record lowering costs and validation limits.
+The Rust compiler is maintained; the Python compiler is frozen at
+`python-reference-2026-11-21`. The [retirement report](python-retirement.md)
+describes the native gate and historical comparison mode. Native Windows
+validation remains deferred. Conservative analysis guards still fail explicitly
+with exit status `3`; retirement does not remove those correctness checks.
+The measurements below are historical checkpoints with their original limits.
 
 The subsequent [compiler-efficiency follow-up](compiler-efficiency-2026-11.md)
 records the corpus-driven metadata, graph-allocation and import-frontier work,

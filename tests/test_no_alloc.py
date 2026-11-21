@@ -1,4 +1,5 @@
 """Conservative allocation contracts, including generated and indirect effects."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 import subprocess
@@ -397,7 +398,7 @@ work::proc(){}
 
     def test_vet_apply_preserves_and_rechecks_contracts(self):
         original='package main\n@(no_alloc)\nnext::proc(value:int)->int{return value+1}\nmain::proc(){_=next(7)}\n'
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.source.write_text(original)
                 result=self.invoke(engine,'vet',flags=['--apply','-thread-count:1'])

@@ -15,6 +15,7 @@ import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:sync"
+import "core:time"
 
 import "src:common"
 import "src:spall"
@@ -32,6 +33,39 @@ RequestInfo :: struct {
 	config:   ^common.Config,
 	writer:   ^Writer,
 	result:   common.Error,
+}
+
+// A configured compiler may be a native executable, launcher or symlink in a
+// different directory. Query its root only when the adjacent runtime is absent.
+resolve_thor_runtime :: proc(compiler: string) -> string {
+	runtime_path := path.join({filepath.dir(compiler), "runtime"}, context.temp_allocator)
+	if os.is_dir(runtime_path) { return runtime_path }
+	r, w, pipe_err := os.pipe()
+	if pipe_err != nil { return "" }
+	defer os.close(r)
+	p, start_err := os.process_start(os.Process_Desc{command={compiler, "root"}, stdout=w})
+	os.close(w)
+	if start_err != nil { return "" }
+	state, wait_err := os.process_wait(p, 2*time.Second)
+	if wait_err != nil || !state.exited {
+		_ = os.process_kill(p)
+		_, _ = os.process_wait(p)
+		return ""
+	}
+	if !state.success || state.exit_code != 0 { return "" }
+	buffer: [4096]byte
+	count := 0
+	for count < len(buffer) {
+		ready, _ := os.pipe_has_data(r)
+		if !ready { break }
+		n, read_err := os.read(r, buffer[count:])
+		count += n
+		if read_err != nil || n == 0 { break }
+	}
+	root := strings.trim_space(string(buffer[:count]))
+	if count == len(buffer) || !filepath.is_abs(root) { return "" }
+	runtime_path = path.join({root, "runtime"}, context.temp_allocator)
+	return runtime_path if os.is_dir(runtime_path) else ""
 }
 
 make_response_message :: proc(id: RequestId, params: ResponseParams) -> ResponseMessage {
@@ -814,8 +848,8 @@ request_initialize :: proc(
 		read_ols_config(ols_config_path, config, uri)
 	}
 	if config.thor_command != "" && "thor" not_in config.collections {
-		runtime_path := path.join({filepath.dir(config.thor_command), "runtime"}, context.temp_allocator)
-		if os.is_dir(runtime_path) { config.collections[strings.clone("thor")] = strings.clone(runtime_path) }
+		runtime_path := resolve_thor_runtime(config.thor_command)
+		if runtime_path != "" { config.collections[strings.clone("thor")] = strings.clone(runtime_path) }
 	}
 
 	for format in initialize_params.capabilities.textDocument.hover.contentFormat {

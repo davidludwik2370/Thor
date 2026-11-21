@@ -1,4 +1,5 @@
 """Fixed-value struct operators, constants, ownership restrictions and mapping."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import re
 import shutil
@@ -154,7 +155,7 @@ if (c.flags!=Bits{.a} || VALUE.flags!=Bits{.a,.b}) {panic("bit sets")}
     def test_generic_native_addition_does_not_add_logical_number_or_set_imports(self):
         self.source.write_text(self.program('if add(1,2)!=3 {panic("native")}',
             'add::proc(a,b:$T)->T{return a+b}\n'))
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             result=self.invoke(engine,command='transpile')
             self.assertEqual(result.returncode,0,result.stderr)
             files=list((self.root/engine).rglob('main.odin'))
@@ -215,7 +216,7 @@ for row in ([1]Row{frozen}) {next:=row+{[2]int{1,1}};next.values[0]=5}
     def test_restriction_diagnostics_keep_original_expression_and_field_path(self):
         source=self.program('// 😀\na:=S{}\n_=a+a','S::struct{inner:struct{values:[]int}}\n')
         self.source.write_text(source)
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             result=self.invoke(engine,command='check',flags=['-json-errors'])
             self.assertEqual(result.returncode,1,result.stderr)
             errors=json.loads(result.stderr)['errors']
@@ -229,7 +230,7 @@ for row in ([1]Row{frozen}) {next:=row+{[2]int{1,1}};next.values[0]=5}
         source=self.program('x:=Bad{};_=add(x,x)',
             '// 😀 header\nBad::struct{data:[]int}\nadd::proc(a,b:$T)->T{return a+b}\n')
         self.source.write_text(source)
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             result=self.invoke(engine,command='check',flags=['-json-errors'])
             self.assertEqual(result.returncode,1,result.stderr)
             errors=json.loads(result.stderr)['errors']
@@ -257,7 +258,7 @@ struct_add::proc(a,b:Pair)->Pair{return a+b}
 manual_add::proc(a,b:Pair)->Pair{return {a.a+b.a,a.b+b.b}}
 main::proc(){}
 ''')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             directory=self.root/(engine+'-ir');directory.mkdir()
             result=self.invoke(engine,command='build',flags=[*native.UNCHECKED,'-build-mode:llvm-ir',
                 '-use-single-module','-out:'+str(directory)])

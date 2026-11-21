@@ -18,13 +18,13 @@ class RustSchedulingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         build=subprocess.run(['cargo','build','--release','--locked','--offline','--manifest-path',str(native.ROOT/'rust/Cargo.toml'),
-                              '--example','scheduling_protocol'],capture_output=True,text=True,timeout=120)
+                              '--example','scheduling_protocol'],capture_output=True,text=True,timeout=600)
         if build.returncode:
             raise RuntimeError(build.stdout+build.stderr)
         cls.binary=native.ROOT/'rust/target/release/examples/scheduling_protocol'
         cls.frontend=frontend_binary('odin')[0]
 
-    def compare(self, text, flags=None, files=None, fail=None, reference_failure=None, output=None, reference_specialized_gap=None):
+    def compare(self, text, flags=None, files=None, fail=None, reference_failure=None, output=None, reference_specialized_gap=None, values=None):
         flags=['-debug'] if flags is None else flags
         with tempfile.TemporaryDirectory(prefix='thor-scheduling-') as directory:
             entry=Path(directory).resolve()/'main.thor'
@@ -33,26 +33,28 @@ class RustSchedulingTests(unittest.TestCase):
                 path=entry.parent/name
                 path.parent.mkdir(parents=True,exist_ok=True)
                 path.write_text(content)
-            project=Project(entry,self.frontend,flags,cache_frontend=False)
-            evaluator=Evaluator(project,'odin')
             reference_error=None
-            try:
-                evaluator.evaluate_all()
-            except ThorError as error:
-                reference_error=error
+            if native.reference_enabled():
+                project=Project(entry,self.frontend,flags,cache_frontend=False)
+                evaluator=Evaluator(project,'odin')
+                try:
+                    evaluator.evaluate_all()
+                except ThorError as error:
+                    reference_error=error
             arguments=[str(self.binary),str(entry),*flags]
             if output is not None:
                 arguments.append('emit='+str(entry.parent/'generated'))
             result=subprocess.run(arguments,capture_output=True,text=True,timeout=120)
             if fail:
-                self.assertIsNotNone(reference_error)
-                self.assertIn(fail,str(reference_error)+'\n'+str(reference_error.diagnostics))
+                if native.reference_enabled():
+                    self.assertIsNotNone(reference_error)
+                    self.assertIn(fail,str(reference_error)+'\n'+str(reference_error.diagnostics))
                 self.assertNotEqual(result.returncode,0,result.stdout)
                 packet=json.loads(result.stderr)
                 self.assertIn(fail,packet['message']+'\n'+str(packet['diagnostics']),result.stderr)
                 self.assertFalse(packet['unsupported'],result.stderr)
                 return
-            if reference_failure:
+            if reference_failure and native.reference_enabled():
                 self.assertIsNotNone(reference_error)
                 self.assertIn(reference_failure,str(reference_error)+'\n'+str(reference_error.diagnostics))
                 self.assertEqual(result.returncode,0,result.stderr)
@@ -61,6 +63,9 @@ class RustSchedulingTests(unittest.TestCase):
             else:
                 self.assertIsNone(reference_error,str(reference_error))
             self.assertEqual(result.returncode,0,result.stderr)
+            if values is not None:
+                actual_values=[data for _,data in json.loads(result.stdout)['results']]
+                self.assertEqual(sorted(actual_values,key=str),sorted(values,key=str))
             if output is not None:
                 packet=json.loads(result.stdout)
                 manifest=json.loads((entry.parent/'generated/thor-manifest.json').read_text())
@@ -71,6 +76,15 @@ class RustSchedulingTests(unittest.TestCase):
                 run=subprocess.run([str(executable)],capture_output=True,text=True,timeout=10)
                 self.assertEqual(run.returncode,0,run.stderr)
                 self.assertEqual(run.stdout,output)
+            if not native.reference_enabled():
+                packet=json.loads(result.stdout)
+                self.assertIsInstance(packet['results'],list)
+                if reference_specialized_gap is not None:
+                    values=(reference_specialized_gap['rust'] if isinstance(reference_specialized_gap,dict)
+                            else reference_specialized_gap)
+                    self.assertEqual(sorted([item[1] for item in packet.get('specialized',[])],key=str),
+                                     sorted(values,key=str))
+                return packet['results']
             expected=[[[str(node.source.path),node.kind,node.start,node.end],data]
                       for (node,fingerprint),data in evaluator.results.items() if not fingerprint]
             actual=json.loads(result.stdout)['results']
@@ -179,7 +193,7 @@ class RustSchedulingTests(unittest.TestCase):
             'generic::proc($N:int)->int{when N>0{return (#run work(N))+generic(N-1)}else{return 0}}'),output='6\n')
 
     def test_explicit_literal_and_constant_inputs(self):
-        self.compare(self.program('_=#run work(BASE)', 'BASE::7\nwork::proc(n:int)->int{return n+2}'))
+        self.compare(self.program('_=#run work(BASE)', 'BASE::7\nwork::proc(n:int)->int{return n+2}'),values=[{'kind':'integer','value':'9'}])
 
     def test_runtime_and_immutable_storage_are_not_constant_inputs(self):
         for declaration in ('x:=7','x :> 7'):
@@ -188,7 +202,7 @@ class RustSchedulingTests(unittest.TestCase):
                              fail='runtime storage is not a constant')
 
     def test_nested_explicit_requests_install_before_outer_execution(self):
-        self.compare(self.program('_=#run work(#run leaf())','leaf::proc()->int{return 3}\nwork::proc(x:int)->int{return x*2}'))
+        self.compare(self.program('_=#run work(#run leaf())','leaf::proc()->int{return 3}\nwork::proc(x:int)->int{return x*2}'),values=[{'kind':'integer','value':'3'},{'kind':'integer','value':'6'}])
 
     def test_dependency_constant_request_is_evaluated_first(self):
         results=self.compare(self.program('_=#run work()', 'VALUE::#run leaf()\nleaf::proc()->int{return 4}\nwork::proc()->int{return VALUE+2}'),
@@ -198,10 +212,10 @@ class RustSchedulingTests(unittest.TestCase):
         self.assertEqual(sorted(data['value'] for _,data in results),['4','6'])
 
     def test_requests_inside_a_retained_helper_are_evaluated_first(self):
-        self.compare(self.program('_=#run work()', 'leaf::proc()->int{return 4}\nwork::proc()->int{x:=#run leaf();return x+1}'))
+        self.compare(self.program('_=#run work()', 'leaf::proc()->int{return 4}\nwork::proc()->int{x:=#run leaf();return x+1}'),values=[{'kind':'integer','value':'4'},{'kind':'integer','value':'5'}])
 
     def test_inactive_request_inside_a_dependency_remains_unchecked(self):
-        self.compare(self.program('_=#run work()', 'work::proc()->int{when false{_=#run missing()};return 4}'))
+        self.compare(self.program('_=#run work()', 'work::proc()->int{when false{_=#run missing()};return 4}'),values=[{'kind':'integer','value':'4'}])
 
     def test_debug_runtime_calls_stay_native_and_required_constants_execute(self):
         text=self.program('x:=work(3);_=x', 'work::fn(n:int)->int{return n+1}\nVALUE::work(4)')
@@ -211,44 +225,44 @@ class RustSchedulingTests(unittest.TestCase):
         self.assertEqual(len(results),2)
 
     def test_ordinary_nested_calls_require_explicit_run(self):
-        self.compare(self.program('_=#run work(leaf())', 'leaf::proc()->int{return 3}\nwork::proc(x:int)->int{return x*2}'))
+        self.compare(self.program('_=#run work(leaf())', 'leaf::proc()->int{return 3}\nwork::proc(x:int)->int{return x*2}'),values=[{'kind':'integer','value':'6'}])
         results=self.compare(self.program('_=work(leaf())', 'leaf::proc()->int{return 3}\nwork::fn(x:int)->int{return x*2}'),flags=['-o:speed'])
         self.assertEqual(results,[])
 
     def test_inactive_compile_time_branch_does_not_execute(self):
         self.compare(self.program('when false{_=#run bad()}else{_=#run good()}',
-            'bad::proc()->int{panic("inactive")}\ngood::proc()->int{return 5}'))
+            'bad::proc()->int{panic("inactive")}\ngood::proc()->int{return 5}'),values=[{'kind':'integer','value':'5'}])
 
     def test_inactive_runtime_branch_and_short_circuit_do_not_execute(self):
         self.compare(self.program('if false{_=#run bad()};_=false && (#run bad_bool())',
-            'bad::proc()->int{panic("inactive")}\nbad_bool::proc()->bool{panic("inactive")}'))
+            'bad::proc()->int{panic("inactive")}\nbad_bool::proc()->bool{panic("inactive")}'),values=[])
 
     def test_explicit_run_executes_even_under_runtime_condition(self):
-        self.compare(self.program('flag:=true;if flag{_=#run good()}', 'good::proc()->int{return 5}'))
+        self.compare(self.program('flag:=true;if flag{_=#run good()}', 'good::proc()->int{return 5}'),values=[{'kind':'integer','value':'5'}])
 
     def test_automatic_call_under_runtime_condition_is_left_native(self):
         results=self.compare(self.program('flag:=true;if flag{_=good(5)}', 'good::fn(n:int)->int{return n+1}'),flags=['-o:speed'])
         self.assertEqual(results,[])
 
     def test_type_queries_do_not_execute_operand_calls(self):
-        self.compare(self.program('_=#run work()', 'bad::proc()->int{panic("unevaluated")}\nwork::proc()->int{return size_of(bad())}'))
+        self.compare(self.program('_=#run work()', 'bad::proc()->int{panic("unevaluated")}\nwork::proc()->int{return size_of(bad())}'),values=[{'kind':'integer','value':'8'}])
 
     def test_local_scope_constants_are_known(self):
-        self.compare(self.program('VALUE::3;_=#run work(VALUE)', 'work::proc(n:int)->int{return n+1}'))
+        self.compare(self.program('VALUE::3;_=#run work(VALUE)', 'work::proc(n:int)->int{return n+1}'),values=[{'kind':'integer','value':'4'}])
 
     def test_multiple_results_get_the_reference_entry_error(self):
         self.compare(self.program('_=#run work()', 'work::proc()->(int,int){return 1,2}'),fail='requires exactly one supported result value')
 
     def test_an_unrelated_broken_file_is_not_a_file_entry_dependency(self):
-        self.compare(self.program('_=#run work()', 'work::proc()->int{return 3}'),files={'broken.thor':'not valid source'})
+        self.compare(self.program('_=#run work()', 'work::proc()->int{return 3}'),files={'broken.thor':'not valid source'},values=[{'kind':'integer','value':'3'}])
 
     def test_known_switch_inputs_select_only_the_matching_result(self):
         self.compare(self.program('_=#run work(switch 3{case 1:bad();case 2..=4:7;case:0})',
-            'bad::proc()->int{panic("inactive result")}\nwork::proc(n:int)->int{return n}'))
+            'bad::proc()->int{panic("inactive result")}\nwork::proc(n:int)->int{return n}'),values=[{'kind':'integer','value':'7'}])
 
     def test_compile_switch_branch_does_not_execute_the_other_request(self):
         self.compare(self.program('#switch 3{case 1:_=#run bad();case 2..=4:_=#run good();case:_=0}',
-            'bad::proc()->int{panic("inactive")}\ngood::proc()->int{return 5}'))
+            'bad::proc()->int{panic("inactive")}\ngood::proc()->int{return 5}'),values=[{'kind':'integer','value':'5'}])
 
     def test_installed_scalar_constant_compiles_with_its_native_type(self):
         for flags in (['-debug'],native.UNCHECKED):

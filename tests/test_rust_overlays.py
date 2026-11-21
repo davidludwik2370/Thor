@@ -1,4 +1,5 @@
 """Unsaved source files participate in native discovery without being created."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -36,7 +37,7 @@ class RustOverlayTests(unittest.TestCase):
         overlay = self.overlay({self.source: text})
         for entry in [self.source, self.app]:
             for flags in [[], native.UNCHECKED]:
-                for engine in ['python', 'rust']:
+                for engine in compiler_engines():
                     with self.subTest(entry=entry, flags=flags, engine=engine):
                         result = self.invoke(engine, entry, overlay, command='build' if flags else 'check',
                                              flags=[*flags, '-json-errors'])
@@ -60,7 +61,7 @@ class RustOverlayTests(unittest.TestCase):
             imported: 'package library\nanswer::proc()->int{return 7}\n',
         })
         for flags in [[], native.UNCHECKED]:
-            for engine in ['python', 'rust']:
+            for engine in compiler_engines():
                 with self.subTest(engine=engine, flags=flags):
                     result = self.invoke(engine, self.app, overlay, command='run', flags=flags)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -79,7 +80,7 @@ class RustOverlayTests(unittest.TestCase):
             self.app / 'ignored.txt': 'not Thor source',
             other: 'package other\ninvalid::missing_other_package\n',
         })
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             normal = self.invoke(engine, self.app, overlay)
             self.assertEqual(normal.returncode, 0, normal.stdout + normal.stderr)
             tests = self.invoke(engine, self.app, overlay, command='test')
@@ -95,7 +96,7 @@ class RustOverlayTests(unittest.TestCase):
             self.source: 'package main\nmain::proc(){}\n',
             sibling: 'package main\ninvalid::missing_unsaved_sibling\n',
         })
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             direct = self.invoke(engine, self.source, overlay)
             self.assertEqual(direct.returncode, 0, direct.stdout + direct.stderr)
             package = self.invoke(engine, self.app, overlay)
@@ -110,7 +111,7 @@ class RustOverlayTests(unittest.TestCase):
                     f'calculate::fn(n:int)->int{{return n*{factor}}}\n'
                     'VALUE::#run calculate(7)\nmain::proc(){fmt.println(VALUE)}\n')
             overlay = self.overlay({self.source: text})
-            for engine in ['python', 'rust']:
+            for engine in compiler_engines():
                 with self.subTest(engine=engine, factor=factor):
                     result = self.invoke(engine, self.source, overlay, command='run', flags=native.UNCHECKED)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -122,7 +123,7 @@ class RustOverlayTests(unittest.TestCase):
         link.symlink_to(self.app, target_is_directory=True)
         alias = link / self.source.name
         overlay = self.overlay({alias: 'package main\nmain::proc(){}\n'})
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             result = self.invoke(engine, alias, overlay)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertFalse(alias.exists())
@@ -143,7 +144,7 @@ class RustOverlayTests(unittest.TestCase):
                 self.source: text,
                 virtual: f'package math\n{name}::proc(n:int)->int{{return n+{increment}}}\n',
             })
-            for engine in ['python', 'rust']:
+            for engine in compiler_engines():
                 with self.subTest(engine=engine, increment=increment):
                     result = self.invoke(engine, self.source, overlay, command='run', flags=native.UNCHECKED)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

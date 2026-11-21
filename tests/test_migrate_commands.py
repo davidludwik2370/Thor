@@ -1,4 +1,5 @@
 """Command translation is source independent and executable after migration."""
+from tests.test_rust_compiler import compiler_paths
 import json
 import os
 from pathlib import Path
@@ -236,7 +237,7 @@ main::proc(){fmt.println(f"answer {double(7)}")}
 work::proc()->int{return 7}
 main::proc(){if work()!=7{panic("attribute value")}}
 ''')
-        for compiler in [COMPILER,ROOT/'thor-python']:
+        for compiler in compiler_paths(COMPILER):
             result=subprocess.run([str(compiler),'run',str(self.output),'-thread-count:1'],
                 cwd=self.root,capture_output=True,text=True,timeout=60)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

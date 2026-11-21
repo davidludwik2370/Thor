@@ -31,9 +31,13 @@ class RustConcatenationParityTests(unittest.TestCase):
     def test_bare_generic_constant_argument_records_the_reference_identity_cast_gap(self):
         self.source.write_text(self.program('fmt.println(combine([1],[2]))','import "core:fmt"\n'
             'combine::proc($a:$T,$b:T)->[2]int{return a++b}'))
-        reference=self.invoke('python');result=self.invoke('rust')
-        self.assertNotEqual(reference.returncode,0,reference.stdout)
-        self.assertIn('Expected a constant value',reference.stderr)
+        if native.reference_enabled():
+            reference=self.invoke('python')
+        result=self.invoke('rust')
+        if native.reference_enabled():
+            self.assertNotEqual(reference.returncode,0,reference.stdout)
+        if native.reference_enabled():
+            self.assertIn('Expected a constant value',reference.stderr)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'[1, 2]\n')
         ordinary=self.root/'ordinary.odin';executable=self.root/'ordinary'

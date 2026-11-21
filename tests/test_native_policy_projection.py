@@ -1,4 +1,5 @@
 """Migrated build policies survive vet's fn/immutable source corrections."""
+from tests.test_rust_compiler import compiler_paths
 import json
 import os
 from pathlib import Path
@@ -129,7 +130,7 @@ import "core:testing"
 '''})
         for path in list(self.source.rglob('*.odin')):
             path.rename(path.with_suffix('.thor'))
-        for compiler in [support.COMPILER,support.ROOT/'thor-python']:
+        for compiler in compiler_paths(support.COMPILER):
             with self.subTest(compiler=compiler):
                 source=self.source/'main.thor'
                 source.write_text(source.read_text().replace('triple :: fn','triple :: proc'))
@@ -762,7 +763,7 @@ main :: proc() {
         self.write(source)
         path=self.source/'main.thor'
         (self.source/'main.odin').rename(path)
-        for compiler in [support.COMPILER,support.ROOT/'thor-python']:
+        for compiler in compiler_paths(support.COMPILER):
             with self.subTest(compiler=compiler):
                 path.write_text(source)
                 profile=self.root/'profile.json'

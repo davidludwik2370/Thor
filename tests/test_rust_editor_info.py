@@ -29,12 +29,12 @@ class RustEditorInfoTests(unittest.TestCase):
             path = self.app/name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
-        python, packet, expected = self.invoke('python', overlay)
+        reference = self.invoke('python', overlay) if native.reference_enabled() else None
         rust, actual_packet, actual = self.invoke('rust', overlay)
-        self.assertEqual(rust.returncode, python.returncode, rust.stderr+'\n'+python.stderr)
+        if reference is not None:self.assertEqual(rust.returncode,reference[0].returncode,rust.stderr+'\n'+reference[0].stderr)
         self.assertEqual(rust.returncode != 0, fail, rust.stderr)
         self.assertIn(str(self.source), actual)
-        for path, row in expected.items():
+        for path, row in (reference[2] if reference else {}).items():
             if Path(path).is_relative_to(self.app):
                 self.assertEqual(actual.get(path), row)
         self.assertEqual(self.source.read_text(), source)

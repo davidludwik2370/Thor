@@ -94,6 +94,7 @@ impl Scheduler<'_> {
             .identity(&self.project.frontend.odin, &self.project.options.root)?;
         let call = self.role(site, "expr")?;
         Some(sha256(&canonical(&json!([
+            "scalar-sites-v2",
             self.project.options.entry,
             native,
             self.source(site).path,
@@ -274,8 +275,10 @@ impl Scheduler<'_> {
             })
             || std::iter::once(&call).chain(&keep).any(|root| {
                 self.children(*root).iter().any(|node| {
+                    // Caller metadata and other source directives can change
+                    // between text-identical calls. Keep the ordinary emitted
+                    // helper cache, whose key contains their original values.
                     self.kind(*node) == "Directive"
-                        && self.source(*node).names.get(self.source(*node).node(node.node).name) == "procedure"
                 })
             })
         {

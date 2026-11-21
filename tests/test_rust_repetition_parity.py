@@ -33,9 +33,13 @@ class RustRepetitionParityTests(unittest.TestCase):
     def test_generic_record_repetition_records_reference_inline_type_query_gap(self):
         self.source.write_text(self.program('fmt.println(size_of(Box("x")))','import "core:fmt"\n'
             'Box::struct($text:string){data:[len(text*2)]u8}'))
-        reference=self.invoke('python');result=self.invoke('rust')
-        self.assertNotEqual(reference.returncode,0,reference.stdout)
-        self.assertIn('not a type',reference.stderr)
+        if native.reference_enabled():
+            reference=self.invoke('python')
+        result=self.invoke('rust')
+        if native.reference_enabled():
+            self.assertNotEqual(reference.returncode,0,reference.stdout)
+        if native.reference_enabled():
+            self.assertIn('not a type',reference.stderr)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'2\n')
         ordinary=self.root/'ordinary.odin';executable=self.root/'ordinary'

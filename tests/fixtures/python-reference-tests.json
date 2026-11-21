@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "policy": "Explicit historical compiler-implementation API tests are archival, not removed. Native mode rejects Python compilation. Public language/runtime/TLS tests remain enabled.",
+  "modules": {
+    "test_compilation": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_edited_builds": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_evaluation_hardening": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_installation": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_native_run": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_publish": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_rust_big_resolution": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_rust_borrow_model": "Historical Python-to-Rust borrow-model protocol comparison; native ownership/permission acceptance remains mandatory.",
+    "test_rust_evaluation": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_rust_extraction": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_rust_lexical_bindings": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_rust_specialization": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_slice_analysis_performance": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately.",
+    "test_vet": "Historical Python compiler/project implementation API; native acceptance and subsystem tests run separately."
+  },
+  "tests": {
+    "test_assertion_hygiene.AssertionHygieneTests.test_python_optimized_compiler_preserves_build_and_program_work": "Explicit historical Python launcher/compiler execution.",
+    "test_migrate_commands.MigrationCommandTests.test_python_launcher_uses_the_same_source_independent_translation": "Explicit historical Python launcher/compiler execution.",
+    "test_mkthor.ProjectTemplateTests.test_new_creates_in_current_directory_without_odin_or_extra_files": "Historical Python new-command entry point; native no-toolchain scaffolding is independently tested.",
+    "test_t21_t22.CacheStorageTests.test_python_default_collection_flags_have_stable_order": "Historical Python Project.odin_flags implementation API; native collection-flag ordering is independently tested.",
+    "test_thor.ThorTests.test_cli_default_build_cannot_overwrite_the_launcher": "Historical Python driver._main/root mock; native launcher and filesystem-alias protection are independently tested in test_rust_installation."
+  }
+}

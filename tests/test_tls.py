@@ -19,7 +19,7 @@ THOR = Path(os.environ.get('THOR_TEST_COMPILER', ROOT / 'thor'))
 
 
 class Client:
-    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False, checker_args=""):
+    def __init__(self, directory, *, compiler=True, compiler_command=None, unused_imports=False, refresh=False, vet=False, checker_args="", collections=None):
         self.directory = directory
         self.messages = queue.Queue()
         self.notifications = []
@@ -42,7 +42,7 @@ class Client:
                             'completion': {'completionItem': {'snippetSupport': True}},
                             'semanticTokens': {'requests': {'full': True}}}},
             'initializationOptions': {'odin_root_override': odin_root, 'enable_format': False,
-                'collections': [{'name':'thor','path':str(ROOT/'runtime')}],
+                'collections': [{'name':'thor','path':str(ROOT/'runtime')}] if collections is None else collections,
                 'odin_command': odin, 'thor_command': str(compiler_command or THOR) if compiler else '',
                 'enable_parser_errors': True, 'enable_semantic_tokens': True,
                 'enable_unused_imports_reporting': unused_imports,
@@ -2540,6 +2540,40 @@ main::proc(){_=Record{};_=LIMIT;_=counter;_=identity;_=overloaded;_=écho}
             'position':self.position(text,'sets.insert(&explicit,',len('sets.insert(&explicit,'))})
         self.assertIn('^set[$T]',json.dumps(signature))
         self.assert_original_identifier_tokens(main,text,self.semantic_spans(client,main,text))
+
+    def test_native_compiler_path_discovers_runtime_without_explicit_collection(self):
+        text='package main\nimport sets "thor:sets"\nmain::proc(){names:sets.Set(string);other:=sets.clone(names);_=other}\n'
+        from tests.test_rust_compiler import RUST
+        temporary=tempfile.TemporaryDirectory(prefix='thor native compiler λ ')
+        self.addCleanup(temporary.cleanup)
+        compiler=Path(temporary.name)/('thor.exe' if os.name=='nt' else 'thor')
+        if os.name=='nt':
+            shutil.copy2(RUST,compiler)
+        else:
+            compiler.symlink_to(RUST)
+        client,main=self.open(text,compiler_command=compiler,collections=[])
+        for word in ['names:','other:=']:
+            hover=self.hover(client,main,text,word)
+            self.assertIn('set[string]',json.dumps(hover))
+        client.diagnostic(main.as_uri(),empty=True)
+
+    @unittest.skipIf(os.name=='nt','POSIX test launcher; Windows validation is separate')
+    def test_runtime_discovery_respects_explicit_collections_and_bounds_failed_queries(self):
+        with tempfile.TemporaryDirectory(prefix='tls root query ') as directory:
+            root=Path(directory).resolve()
+            compiler=root/'compiler';marker=root/'called'
+            compiler.write_text('#!/bin/sh\ntouch "'+str(marker)+'"\nexit 1\n')
+            compiler.chmod(0o755)
+            client=Client(root,compiler_command=compiler)
+            client.close()
+            self.assertFalse(marker.exists(),'Explicit collections must avoid a root query')
+            for body in ['exit 1','printf "relative/path"','exec sleep 5']:
+                with self.subTest(body=body):
+                    compiler.write_text('#!/bin/sh\n'+body+'\n')
+                    started=time.monotonic()
+                    client=Client(root,compiler_command=compiler,collections=[])
+                    client.close()
+                    self.assertLess(time.monotonic()-started,4.5)
 
     def test_set_hover_aliases_nested_types_and_unrelated_set_types(self):
         text='package main\nimport bag "thor:sets"\nimport fake "fake"\nSet::struct($T:typeid){value:T}\nTagged::distinct bag.Set(string)\nidentity::proc(value:bag.Set(string))->bag.Set(string){return value}\nmain::proc(){\n names:bag.Set(string)\n others:fake.Set(string)\n own:Set(string)\n tagged:Tagged\n nested:bag.Set([2]int)\n pointers:[2]^bag.Set(string)\n _=names;_=others;_=own;_=nested;_=pointers\n}\n'

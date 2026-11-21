@@ -4,7 +4,7 @@ from tools.compare_compilers import Observation, canonical_diagnostics, classify
 
 
 class CompilerComparisonTests(unittest.TestCase):
-    def test_reference_fixtures_keep_python_when_the_original_suite_selects_rust(self):
+    def test_reference_fixtures_default_to_native_and_keep_explicit_archive_mode(self):
         from pathlib import Path
         import subprocess
         from unittest.mock import patch
@@ -26,8 +26,15 @@ class CompilerComparisonTests(unittest.TestCase):
                 patch.object(reference.rust, 'RUST', native), \
                 patch.object(reference.subprocess, 'run', side_effect=run):
             case.invoke('package main\nmain::proc(){}\n')
-        self.assertEqual([call[0] for call in calls], [str(reference.rust.PYTHON), str(native)])
+        self.assertEqual([call[0] for call in calls], [str(native)])
         self.assertFalse(hasattr(case, 'compiler'))
+        calls.clear()
+        import os
+        with patch.dict(os.environ,{'THOR_TEST_PYTHON_REFERENCE':'1'}), \
+                patch.object(reference.rust,'RUST',native), \
+                patch.object(reference.subprocess,'run',side_effect=run):
+            case.invoke('package main\nmain::proc(){}\n')
+        self.assertEqual([call[0] for call in calls],[str(reference.rust.PYTHON),str(native)])
 
     def observation(self, status=0, stdout='', diagnostics=None, stderr='', timeout=False, toolchain_failure=False):
         return Observation(status, stdout, diagnostics or [], stderr, 0.0, timeout,toolchain_failure)

@@ -1,4 +1,5 @@
 """Fatal reports may allocate; ordinary paths and eager check arguments may not."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -192,7 +193,7 @@ main::proc(){context.assertion_failure_proc=handler;fail()}
                            'stop::panic;stop(f"value {7}")',
                            'stop:=fmt.panicf;stop(f"value {7}")']:
             self.source.write_text(source.replace('fmt.panicf("value %d",7)',expression))
-            for engine in ['python','rust']:
+            for engine in compiler_engines():
                 for flags in [[],base.UNCHECKED]:
                     result=self.invoke(engine,flags=['-thread-count:1','--track-allocations','off','--no-sanitize',*flags])
                     self.assertEqual((result.returncode,result.stdout),(23,'handled: value 7\n'),result.stderr)

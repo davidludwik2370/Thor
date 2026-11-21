@@ -1,4 +1,5 @@
 """Pure-procedure advice is independent of whether the procedure is used."""
+from tests.test_rust_compiler import compiler_engines
 import unittest
 from tests import test_vet_declarations as declarations
 from tests import test_rust_compiler as native
@@ -35,7 +36,7 @@ class PureUnusedVetTests(unittest.TestCase):
     invoke = declarations.VetDeclarationTests.invoke
 
     def test_named_results_enum_array_and_builtin_reader_get_both_warnings(self):
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for flags in ([], ['--vet=pure,unused']):
                 with self.subTest(engine=engine,flags=flags):
                     self.write(SOURCE)
@@ -47,7 +48,7 @@ class PureUnusedVetTests(unittest.TestCase):
                     self.assertEqual(self.source.read_text(),SOURCE)
 
     def test_apply_converts_the_unused_procedure_and_retains_the_unused_warning(self):
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(SOURCE)
             _, errors = self.invoke(engine,'--apply')
             expected = SOURCE.replace('find_best_guess_counting :: proc','find_best_guess_counting :: fn')

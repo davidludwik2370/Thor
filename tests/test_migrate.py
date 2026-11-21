@@ -20,7 +20,7 @@ class MigrationTests(unittest.TestCase):
         from tests.test_rust_compiler import using_prebuilt_compiler
         if 'THOR_MIGRATE_TEST_COMPILER' not in os.environ and not using_prebuilt_compiler(COMPILER):
             build = subprocess.run(['cargo','build','--release','--locked','--offline','--manifest-path',str(ROOT/'rust/Cargo.toml')],
-                                   capture_output=True,text=True,timeout=180)
+                                   capture_output=True,text=True,timeout=600)
             if build.returncode:
                 raise RuntimeError(build.stdout+build.stderr)
 
@@ -232,7 +232,7 @@ main::proc(){fmt.println(Integer)}
         self.migrate(['-define:Integer=9'])
         self.assertIn('#config(Integer,7)',(self.output/'main.thor').read_text())
         self.compare_builds(['-define:Integer=9'],expected='9\n')
-        result=subprocess.run([str(ROOT/'thor-python'),'run','.','-define:Integer=9','-thread-count:1'],
+        result=subprocess.run([str(COMPILER),'run','.','-define:Integer=9','-thread-count:1'],
             cwd=self.output,capture_output=True,text=True,timeout=60)
         self.assertEqual((result.returncode,result.stdout),(0,'9\n'),result.stderr)
 
@@ -265,7 +265,7 @@ main::proc(){fmt.println(DIRECT,CONSTANT,JOINED,DIRECTORY,read("data/payload.odi
         for name in names:self.assertIn(f'#config({name},1)',text)
         self.assertIn('#config(((or_panic)),1)',text)
         self.compare_builds(flags,expected='2 3 4 5 6 4\n')
-        result=subprocess.run([str(ROOT/'thor-python'),'run','.',*flags,'-thread-count:1'],
+        result=subprocess.run([str(COMPILER),'run','.',*flags,'-thread-count:1'],
             cwd=self.output,capture_output=True,text=True,timeout=60)
         self.assertEqual((result.returncode,result.stdout),(0,'2 3 4 5 6 4\n'),result.stderr)
 
@@ -599,7 +599,7 @@ main::proc(){
 ''')
         self.migrate()
         self.compare_builds(expected='91 8\n')
-        result=subprocess.run([str(ROOT/'thor-python'),'run','.','-thread-count:1'],
+        result=subprocess.run([str(COMPILER),'run','.','-thread-count:1'],
             cwd=self.output,capture_output=True,text=True,timeout=60)
         self.assertEqual((result.returncode,result.stdout),(0,'91 8\n'),result.stderr)
 

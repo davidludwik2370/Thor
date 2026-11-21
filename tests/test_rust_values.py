@@ -12,7 +12,7 @@ class RustValueProtocolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if shutil.which("cargo") is None:raise unittest.SkipTest("Rust value tests require Cargo")
-        result=subprocess.run(['cargo','build','--release','--offline','--locked','--manifest-path',str(ROOT/'rust/Cargo.toml'),'--example','value_protocol'],text=True,capture_output=True,timeout=120)
+        result=subprocess.run(['cargo','build','--release','--offline','--locked','--manifest-path',str(ROOT/'rust/Cargo.toml'),'--example','value_protocol'],text=True,capture_output=True,timeout=600)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
     def compare(self,packets):
         requests=''.join(json.dumps(dict(packet=packet))+'\n' for packet in packets)

@@ -97,7 +97,11 @@ value:="#+feature using-stmt";_=value
         source='// License 😀\n#+feature dynamic-literals\n#+vet !unused\n'+self.program(
             'value:=Record{4};using value;assert(x==4)','Record::struct{x:int}\n')
         code=self.generated(source)
-        self.assertTrue(code.startswith('#+feature using-stmt\n'+source[:source.index('package')]))
+        # Native vet policies are enforced through the original-source checking
+        # view, then consumed without shifting the remaining source lines.
+        self.assertTrue(code.startswith('#+feature using-stmt\n'+source[:source.index('#+vet')]))
+        self.assertEqual(code.splitlines()[3],'')
+        self.assertNotIn('#+vet',code)
 
     def test_explicit_opt_out_is_respected(self):
         source='#+feature !using-stmt\n'+self.program('value:=Record{4};using value;assert(x==4)',

@@ -1,4 +1,5 @@
 """Unnamed padding is not an arithmetic value, purity input, or owned field."""
+from tests.test_rust_compiler import compiler_engines
 import re
 import shutil
 import unittest
@@ -180,7 +181,7 @@ generic_add::proc(a,b:Pair)->Pair{return add(a,b)}
 manual_add::proc(a,b:Pair)->Pair{return {a=a.a+b.a,b=a.b+b.b}}
 main::proc(){}
 ''')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             directory=self.root/(engine+'-ir');directory.mkdir()
             result=self.invoke(engine,command='build',flags=[*native.UNCHECKED,'-build-mode:llvm-ir',
                 '-use-single-module','-out:'+str(directory)])

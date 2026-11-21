@@ -40,6 +40,7 @@ impl Check<'_, '_> {
         };
         let allowed = match path.as_str() {
             "core/sys/linux/sys.odin" => [
+                "read","write","pread","pwrite","readv","writev","close","lseek","fsync","fdatasync",
                 "clock_gettime",
                 "clock_getres",
                 "nanosleep",
@@ -57,8 +58,10 @@ impl Check<'_, '_> {
             "core/sys/posix/time.odin" => ["clock_gettime", "nanosleep"].contains(&name),
             "core/sys/posix/unistd.odin" => [
                 "getpid", "getppid", "getuid", "geteuid", "getgid", "getegid",
+                "read","write","pread","pwrite","close","lseek","fsync",
             ]
             .contains(&name),
+            "core/sys/posix/sys_uio.odin" => ["readv","writev"].contains(&name),
             "core/sys/posix/sched.odin" => name == "sched_yield",
             "core/c/libc/string.odin" => [
                 "memcpy", "memmove", "memcmp", "memchr", "strcpy", "strncpy", "strcat", "strncat",

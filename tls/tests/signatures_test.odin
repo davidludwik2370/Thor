@@ -860,3 +860,45 @@ signature_function_inside_when :: proc(t: ^testing.T) {
 
 }
 */
+
+@(test)
+signature_overload_variadics_keep_independent_positions :: proc(t:^testing.T) {
+    for body in ([]string{
+        `package test
+        many::proc(values:..int){}
+        pair::proc(a,b:int){}
+        choose::proc{many,pair}
+        main::proc(){choose(1,{*})}
+        `,
+        `package test
+        many::proc(values:..int){}
+        pair::proc(a,b:int){}
+        choose::proc{pair,many}
+        main::proc(){choose(1,{*})}
+        `,
+    }) {
+        source:=test.Source{main=body}
+        test.expect_signature_labels(t,&source,{"test.pair :: proc(a: int, b: int)"},expected_active_parameter=1)
+    }
+}
+
+@(test)
+signature_overload_caller_metadata_keeps_visible_positions :: proc(t:^testing.T) {
+    source:=thor_source(`package test
+        one::proc(value:int,expression:>#caller_expression(value)){}
+        pair::proc(a,b:int){}
+        choose::proc{one,pair}
+        main::proc(){choose(1,{*})}
+    `)
+    test.expect_signature_labels(t,&source,{"test.pair :: proc(a: int, b: int)"},
+        expected_active_parameter=1,expected_active_signature=1)
+}
+
+@(test)
+signature_grouped_parameters_preserve_native_directives :: proc(t:^testing.T) {
+    source:=test.Source{main=`package test
+        reader::proc(#any_int a,b:int){}
+        main::proc(){reader(1,{*})}
+    `}
+    test.expect_signature_labels(t,&source,{"test.reader :: proc(#any_int a: int, #any_int b: int)"},expected_active_parameter=1)
+}

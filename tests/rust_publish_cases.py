@@ -2,6 +2,24 @@
 
 The reference executes only in this test harness; the native publisher is standalone.
 """
+from tests.test_rust_compiler import compiler_engines, reference_enabled
+
+def golden(key, value):
+    import base64,json,os
+    from pathlib import Path
+    def encode(value):
+        if isinstance(value,bytes):return {'bytes':base64.b64encode(value).decode()}
+        if isinstance(value,dict):return {key:encode(value) for key,value in value.items()}
+        if isinstance(value,(list,tuple)):return [encode(value) for value in value]
+        return value
+    path=Path(__file__).parent/'fixtures/publish-packages.json'
+    recorded=json.loads(path.read_text()) if path.is_file() else {}
+    value=encode(value)
+    if os.environ.get('THOR_CAPTURE_REFERENCE_GOLDEN')=='1':
+        if not reference_enabled():raise RuntimeError('Golden capture requires an explicit successful reference comparison')
+        recorded[key]=value;path.write_text(json.dumps(recorded,indent=2,sort_keys=True)+'\n')
+    elif recorded.get(key)!=value:raise RuntimeError('Native publishing differs from the reviewed expected output: '+key)
+
 
 def verify_icons(BINARY):
     import os,subprocess,tempfile
@@ -148,7 +166,7 @@ def verify_dependencies(BINARY):
      foo=pe_file(project/'Foo.DLL',['bar.dll']);bar=pe_file(project/'bar.dll');plugin=pe_file(project/'plugin.dll')
      for declared in [[],[plugin]]:
       outputs=[]
-      for engine in ['python','rust']:
+      for engine in compiler_engines():
        dest=root/(engine+str(checks));dest.mkdir();binary=dest/'app.exe';shutil.copy2(source,binary)
        if engine=='python':actual={'ok':windows_dependencies(source,binary,dest,project,declared)}
        else:
@@ -157,7 +175,8 @@ def verify_dependencies(BINARY):
        outputs.append(actual)
        for file in [foo,bar,plugin]:
         if (dest/file.name).read_bytes()!=file.read_bytes():raise RuntimeError('library copy mismatch')
-      if outputs[0]!=outputs[1]:raise RuntimeError(outputs)
+      if len(outputs)==2 and outputs[0]!=outputs[1]:raise RuntimeError(outputs)
+      if outputs[-1]!={'ok':['Foo.DLL','bar.dll','plugin.dll']}:raise RuntimeError(outputs)
       checks+=1
      tools=root/'tools';tools.mkdir();log=root/'tools.log';settings=root/'tools.json'
      shim='#!'+sys.executable+'\nimport json,os,sys\nfrom pathlib import Path\n'+f'config=json.loads(Path({str(settings)!r}).read_text())\n'+f'with open({str(log)!r},"a") as f:f.write(json.dumps([Path(sys.argv[0]).name,*sys.argv[1:]])+"\\n")\n'+\
@@ -168,7 +187,7 @@ def verify_dependencies(BINARY):
      library=project/'libexample.so.1.2';library.write_bytes(b'original library')
      settings.write_text(json.dumps({'readelf':{str(executable):'(NEEDED) Shared library: [libexample.so.1]\n(NEEDED) Shared library: [libc.so.6]\n',str(library):'(NEEDED) Shared library: [libm.so.6]\n'},'ldd':f'libexample.so.1 => {library} (0x1)\n'}))
      environment={**os.environ,'PATH':str(tools)+os.pathsep+os.environ['PATH']};outputs=[];commands=[]
-     for engine in ['python','rust']:
+     for engine in compiler_engines():
       dest=root/('linux-'+engine);(dest/'bin').mkdir(parents=True);binary=dest/'bin/program';shutil.copy2(executable,binary);log.write_text('')
       if engine=='python':
        with patch.dict(os.environ,environment,clear=True):actual={'ok':linux_dependencies(executable,binary,dest/'lib',project,[])}
@@ -177,7 +196,9 @@ def verify_dependencies(BINARY):
        actual=invoke('bundle',request,environment)
       outputs.append(actual);commands.append(log.read_text().replace(str(dest),'OUTPUT'))
       if (dest/'lib/libexample.so.1.2').read_bytes()!=library.read_bytes():raise RuntimeError('linux copy')
-     if outputs[0]!=outputs[1] or commands[0]!=commands[1]:raise RuntimeError((outputs,commands))
+     if len(outputs)==2 and (outputs[0]!=outputs[1] or commands[0]!=commands[1]):raise RuntimeError((outputs,commands))
+     if outputs[-1]!={'ok':['libexample.so.1.2']}:raise RuntimeError(outputs)
+     golden('linux_dependency_commands',commands[-1].replace(str(root),'ROOT'))
      if executable.read_bytes()!=b'original exe' or library.read_bytes()!=b'original library':raise RuntimeError('source mutation')
      checks+=1
     print(checks,'PE/DLL/Linux dependency comparisons passed')
@@ -208,7 +229,7 @@ def verify_packages(BINARY):
        binary=native if system=='darwin' else pe_file(root/'empty.exe') if system=='windows' else root/'elf'
        if system=='linux':binary.write_bytes(b'fake ELF')
        expected=None
-       outputs={engine:root/(engine+system+app_type+str(checks)) for engine in ['python','rust']}
+       outputs={engine:root/(engine+system+app_type+str(checks)) for engine in compiler_engines()}
        for engine,out in outputs.items():out.mkdir()
        for repetition in range(2):
         snaps={}
@@ -241,8 +262,11 @@ def verify_packages(BINARY):
           if key.endswith(('AppIcon.icns','AppIcon.ico','AppIcon.png','assets/icon.png')):normalized.pop(key)
           if key.endswith('ThorConsole') or 'Contents/MacOS/' in key:normalized.pop(key)
          return normalized
-        left,right=normalize(snaps['python'],'python'),normalize(snaps['rust'],'rust')
-        if left!=right:raise RuntimeError((system,app_type,{k for k in left.keys()|right.keys() if left.get(k)!=right.get(k)}))
+        right=normalize(snaps['rust'],'rust')
+        if 'python' in snaps:
+         left=normalize(snaps['python'],'python')
+         if left!=right:raise RuntimeError((system,app_type,{k for k in left.keys()|right.keys() if left.get(k)!=right.get(k)}))
+        golden('/'.join([system,name,app_type]),right)
         checks+=1
     print(checks,'native package/replacement comparisons passed')
     return checks

@@ -117,7 +117,7 @@ named::fn(n:int)->string{_=n;return #procedure}
 ''')
         for flags in (['-debug'],UNCHECKED+['--track-allocations=basic']):
             with self.subTest(flags=flags):
-                result=self.compare(source,flags=flags)
+                result=self.compare(source,flags=flags,expected='named')
                 self.assertEqual(result.stderr,'')
 
     def test_transitive_delete_checks_do_not_depend_on_ordinary_summary_cache(self):

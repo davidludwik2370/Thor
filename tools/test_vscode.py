@@ -21,6 +21,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix='thor-vscode-') as directory:
         temporary = Path(directory)
         result_file = temporary / 'result.json'
+        compiler = os.environ.get('THOR_TEST_COMPILER')
+        if compiler:
+            settings = temporary / 'profile' / 'User' / 'settings.json'
+            settings.parent.mkdir(parents=True)
+            settings.write_text(json.dumps({'tls.compiler.path': str(Path(compiler).resolve())}))
         # Keep workspace indexing within the editor fixture. Integration clones
         # and generated SDK copies elsewhere in the repository are unrelated.
         target=ROOT/'demo'

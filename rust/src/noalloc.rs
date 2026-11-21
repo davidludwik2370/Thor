@@ -1390,7 +1390,7 @@ impl<'a, 'r> Check<'a, 'r> {
         }
         if matches!(kind,"Compound"|"Cast"|"AutoCast") {
             let typ=self.storage_type(at,&w.bindings,0);
-            if Flow::contains_any(self.r,&typ,0) {self.flow.box_address(self.r,at);}
+            if Flow::contains_any(self.r,&typ,0) {self.flow.box_value(self.r,at,&typ,0);}
         }
         if kind == "Return" {
             self.flow.terminated = true;
@@ -1414,7 +1414,7 @@ impl<'a, 'r> Check<'a, 'r> {
                 .collect::<Vec<_>>();
             for (i, node) in lhs.into_iter().enumerate() {
                 let typ=self.r.specialized_type(Ref{node,..at},&w.bindings);
-                if Flow::contains_any(self.r,&typ,0) {if let Some(value)=rhs.get(i){self.flow.box_address(self.r,Ref{node:*value,..at});}}
+                if Flow::contains_any(self.r,&typ,0) {if let Some(value)=rhs.get(i){self.flow.box_value(self.r,Ref{node:*value,..at},&typ,0);}}
                 let value=if n.op=="=" {values.get(i).cloned().unwrap_or_default()}else{Fact::Unknown};
                 let value=Flow::normalize(self.r,value,&typ,&w.bindings);
                 self.flow.assign(

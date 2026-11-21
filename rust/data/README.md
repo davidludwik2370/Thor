@@ -1,7 +1,8 @@
 # Reviewed allocation-free I/O snapshot
 
-`noalloc-io-sdk.json` pins the source assumptions used by `noallocio.rs` and the
-independent Python reference in `thorlang/noallocio.py`. It describes Odin SDK
+`noalloc-io-sdk.json` pins the source assumptions used by the maintained Rust
+allocation checker. The Python compiler is frozen separately; new reviews and
+proof fixes belong in Rust. The snapshot describes Odin SDK
 revision `8169255b97b85d6a08691d99764f51fb01f92b5a` and Thor's basic/format bridge.
 
 This is not an allowlist of allocation-free procedures. The checker only uses
@@ -28,3 +29,16 @@ Reviewed native boundaries currently cover macOS and Linux. Windows remains
 unreviewed and receives a proof error. This pass changes no emitted I/O code,
 procedure signature, allocator, or application runtime policy. See
 [the contract documentation](../../docs/no-alloc.md#input-and-output).
+
+## Instruction leaves
+
+`noalloc-instructions.json` is a finite exact-link catalog generated offline by
+`tools/generate_no_alloc_instruction_catalog.py`. It records resolved LLVM
+memory properties and the SDK files containing each declaration. Native
+CPU/math/argument-memory operations are eligible only after excluding explicit
+side-effect intrinsics. Memory properties alone are insufficient for TLS,
+coroutines, managed runtimes or instrumentation; these are excluded. Entries
+also require the complete pinned SDK fingerprint at use time. Ordinary wrapper
+bodies, argument producers, callbacks and cleanup operations remain checked.
+Catalog generation is not part of compilation, installation, or a normal test
+run. Its generator records the LLVM version and source hash for review.

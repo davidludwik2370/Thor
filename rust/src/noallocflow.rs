@@ -132,7 +132,7 @@ impl Flow {
             | Type::Dynamic(_)
             | Type::Map { .. } => Fact::Nil,
             Type::Scalar { name, .. } if matches!(name.as_str(),"rawptr"|"any"|"typeid") => Fact::Nil,
-            Type::Scalar { name, .. } if name == "bool" => Fact::Constant(Constant::Boolean(false)),
+            Type::Scalar { name, .. } if matches!(name.as_str(),"bool"|"b8"|"b16"|"b32"|"b64") => Fact::Constant(Constant::Boolean(false)),
             Type::Scalar { .. } => Fact::Constant(Constant::Integer(0)),
             Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => {
                 let fields = r.record_fields(typ);
@@ -207,10 +207,44 @@ impl Flow {
     pub(super) fn box_address(&mut self, r: &mut Resolver<'_>, at: Ref) {
         let mut pending = vec![at.node];
         while let Some(node) = pending.pop() {
-            let kind = r.sources[at.file].node(node).kind.as_str();
-            if kind == "Procedure" { continue; }
-            if kind == "Ident" { self.address_taken(r, Ref{node,..at}); }
-            pending.extend(r.sources[at.file].node(node).children.iter().copied());
+            let source=&r.sources[at.file];
+            let syntax=source.node(node);
+            match syntax.kind.as_str() {
+                "Ident"|"Selector"|"Index"|"MatrixIndex"|"Deref" => self.address_taken(r,Ref{node,..at}),
+                "Paren"|"Runtime"|"FieldValue" => {
+                    if let Some(node)=source.role(node,if syntax.kind=="FieldValue"{"value"}else{"expr"}) {pending.push(node);}
+                }
+                "Call" => {
+                    let name=crate::borroweval::Evaluator{resolver:r,arena:&mut crate::borrowflow::Arena::default()}.builtin(Ref{node,..at});
+                    if name.as_deref().is_some_and(|name|matches!(name,"expand_values"|"compress_values")) {
+                        pending.extend(r.sources[at.file].group(node,"args").iter().copied());
+                    }
+                }
+                "Ternary"|"WhenExpr" => {
+                    for role in ["x","y"] {if let Some(node)=source.role(node,role){pending.push(node);}}
+                }
+                _=>{}, // Computed values get new temporary storage when boxed.
+            }
+        }
+    }
+    pub(super) fn box_value(&mut self,r:&mut Resolver<'_>,at:Ref,typ:&Type,depth:usize) {
+        if Self::any_type(typ) {self.box_address(r,at);return;}
+        if depth>24 {self.box_address(r,at);return;}
+        let source=&r.sources[at.file];
+        if source.node(at.node).kind=="Paren" {
+            if let Some(node)=source.role(at.node,"expr"){self.box_value(r,Ref{node,..at},typ,depth+1);}
+            return;
+        }
+        if source.node(at.node).kind!="Compound" {return;}
+        let elems=source.group(at.node,"elems").to_vec();
+        let fields=r.record_fields(typ);
+        for (index,node) in elems.into_iter().enumerate() {
+            let source=&r.sources[at.file];
+            let name=source.role(node,"field").map(|name|source.text(name));
+            let field=if let Some(name)=name {fields.iter().find(|(field,_)|field==name)}else{fields.get(index)};
+            let destination=typ.element().cloned().or_else(||field.map(|(_,typ)|typ.clone()));
+            let value=source.role(node,"value").unwrap_or(node);
+            if let Some(destination)=destination {self.box_value(r,Ref{node:value,..at},&destination,depth+1);}
         }
     }
     pub(super) fn any_type(typ: &Type) -> bool {
@@ -781,7 +815,7 @@ impl Flow {
                     })
                 });
             let typ=r.specialized_type(Ref{node,..at},bindings);
-            if Self::contains_any(r,&typ,0) {if let Some(value)=values.get(i){self.box_address(r,Ref{node:*value,..at});}}
+            if Self::contains_any(r,&typ,0) {if let Some(value)=values.get(i){self.box_value(r,Ref{node:*value,..at},&typ,0);}}
             self.values.insert(Ref { node, ..at }, Self::normalize(r,value,&typ,bindings));
         }
     }

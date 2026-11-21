@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import unittest
+import sys
 from tests import test_rust_compiler as base
 
 SINK='''sink::proc(data:rawptr,mode:io.Stream_Mode,bytes:[]byte,offset:i64,whence:io.Seek_From)->(i64,io.Error){return i64(len(bytes)),nil}
@@ -26,6 +27,7 @@ class NoAllocSDKTests(unittest.TestCase):
         cases=json.loads((base.ROOT/'tests/fixtures/no_alloc_sdk_cases.json').read_text())
         for case in cases:
             with self.subTest(case=case['name']):
+                if case.get('platforms') and sys.platform not in case['platforms']:continue
                 imports='\n'.join('import '+json.dumps('core:'+p) for p in case['imports'])
                 self.check(case['body'],case.get('declarations',''),imports,
                            fail='no_alloc:' if case['expect']=='reject' else None,flags=case.get('flags',()))
@@ -68,6 +70,29 @@ class NoAllocSDKTests(unittest.TestCase):
             ('callback:=safe;boxed:=[]any{callback};change(boxed[0]);callback()', 'change::proc(value:any){p:=cast(^proc())value.data;p^=bad}'),
         ]:
             with self.subTest(body=body):self.check(body,declarations+decl,fail='no_alloc:')
+
+    def test_boxing_computed_copies_does_not_escape_their_inputs(self):
+        for body in [
+            'callback:=safe;_=any(size_of(callback));touch();callback()',
+            'callback:=safe;_= []any{size_of(callback)};touch();callback()',
+            'callback:=safe;_=Box{payload=7,callback=callback};touch();callback()',
+            'callback:=safe;_=any(identity(callback));touch();callback()',
+        ]:
+            with self.subTest(body=body):
+                self.check(body,'safe::proc(){}\ntouch::proc(){}\nBox::struct{payload:any,callback:proc()}\nidentity::proc(value:proc())->proc(){return value}')
+
+    def test_native_boolean_widths_have_boolean_zero_values(self):
+        for width in ['b8','b16','b32','b64']:
+            with self.subTest(width=width):
+                self.check(f'flag:{width};if flag==false{{_=make([]int,1)}}',fail="builtin 'make'")
+                self.check(f'box:Box;if box.flag==false{{_=make([]int,1)}}',f'Box::struct{{flag:{width}}}',fail="builtin 'make'")
+                self.check(f'flag:{width};inspect(flag)',f'inspect::proc(flag:{width}){{if flag==false{{_=make([]int,1)}}}}',fail="builtin 'make'")
+                self.check(f'flag:{width};if flag{{_=make([]int,1)}}')
+                imports='import "base:intrinsics"'
+                self.check(f'flag:{width};inspect(flag)',
+                    'inspect::proc(value:$T){when intrinsics.type_is_boolean(T){}else{_=make([]int,1)}}',imports)
+                self.check(f'flag:{width};inspect(flag)',
+                    'inspect::proc(value:$T){when intrinsics.type_is_boolean(T){_=make([]int,1)}}',imports,fail="builtin 'make'")
 
     def test_any_header_is_not_its_payload(self):
         self.check('pointer:^int;inspect(pointer)',
@@ -151,11 +176,11 @@ exercise::proc()->bool{
  _=time.now();_=time.tick_now();time.sleep(0)
  ctx:sha2.Context_256;sha2.init_256(&ctx);sha2.update(&ctx,[]byte{1,2,3})
  digest:[32]byte;sha2.final(&ctx,digest[:]);if digest[0]!=3{return false}
- cipher:aes.Context_ECB;key:[16]byte;plaintext,ciphertext:[16]byte
+ cipher:aes.Context_ECB;key:[16]byte;plaintext,ciphertext,zero:[16]byte
  aes.init_ecb(&cipher,key[:]);aes.encrypt_ecb(&cipher,ciphertext[:],plaintext[:])
  expected:=[16]byte{0x66,0xe9,0x4b,0xd4,0xef,0x8a,0x2c,0x3b,0x88,0x4c,0xfa,0x59,0xca,0x34,0x2b,0x2e}
  if ciphertext!=expected{return false}
- aes.decrypt_ecb(&cipher,plaintext[:],ciphertext[:]);if plaintext!=[16]byte{}{return false}
+ aes.decrypt_ecb(&cipher,plaintext[:],ciphertext[:]);if plaintext!=zero{return false}
  return true
 }
 main::proc(){

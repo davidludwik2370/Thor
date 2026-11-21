@@ -1,4 +1,5 @@
 """Unused binding warnings use original Thor scopes and preserve execution."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import subprocess
 import unittest
@@ -24,7 +25,7 @@ class UnusedVetTests(unittest.TestCase):
     def check(self, text, expected, *flags):
         self.write(text)
         reports = []
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 _, errors = self.invoke(engine, '--vet=unused', *flags)
                 self.assertTrue(all(error['code'] == 'thor/unused' for error in errors), errors)
@@ -32,8 +33,9 @@ class UnusedVetTests(unittest.TestCase):
                 self.assertEqual(names, expected, errors)
                 self.assertTrue(all(error['type'] == 'warning' for error in errors))
                 reports.append(errors)
-        self.assertEqual(len(reports), 2)
-        self.assertEqual(reports[0], reports[1])
+        self.assertEqual(len(reports),len(compiler_engines()))
+        for report in reports[1:]:
+            self.assertEqual(report,reports[0])
         return reports[0]
 
     def test_local_parameters_constants_groups_and_reference_loop_names(self):
@@ -312,7 +314,7 @@ main::proc(){_=Record{};_=lib.read(1)}
 
     def test_warning_policy_default_checks_selection_and_duplicate_native_warning(self):
         self.write('package main\nmain::proc(){unused:=1}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 _, errors = self.invoke(engine)
                 unused = [error for error in errors if error.get('code') == 'thor/unused']
@@ -323,7 +325,7 @@ main::proc(){_=Record{};_=lib.read(1)}
                 _, errors = self.invoke(engine, '--vet=unused', '-ignore-warnings')
                 self.assertEqual(errors, [])
         self.write('package main\nmain::proc(){unused:=1;_=0}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             _, errors = self.invoke(engine, command='check')
             self.assertEqual(errors, [])
             _, errors = self.invoke(engine, '--vet=unused', '-warnings-as-errors', status=1)
@@ -334,7 +336,7 @@ main::proc(){_=Record{};_=lib.read(1)}
         unused = ('package main\nimport "core:fmt"\n'
                   'main::proc(){x:=(1+2)*5;fmt.println("ready")}\n')
         used = unused.replace('fmt.println("ready")', 'fmt.println(x)')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(unused)
                 for flags in ([], ['--vet=immutable,unused']):
@@ -352,7 +354,7 @@ main::proc(){_=Record{};_=lib.read(1)}
 
     def test_explicit_discard_only_suppresses_immutable_warnings_and_corrections(self):
         text = 'package main\nmain::proc(){x:=(1+2)*5;_=x}\n'
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for flags in ([], ['--vet=immutable'], ['--vet=unused']):
                 with self.subTest(engine=engine, flags=flags):
                     self.write(text)
@@ -369,7 +371,7 @@ main::proc(){_=Record{};_=lib.read(1)}
     def test_explicit_discard_with_other_uses_keeps_immutable_warnings_and_corrections(self):
         for body in ('_=x;fmt.println(x)', 'fmt.println(x);_=((x))'):
             text = 'package main\nimport "core:fmt"\nmain::proc(){x:=(1+2)*5;'+body+'}\n'
-            for engine in ('python', 'rust'):
+            for engine in compiler_engines():
                 for flags in ([], ['--vet=immutable'], ['--vet=unused']):
                     with self.subTest(engine=engine, body=body, flags=flags):
                         expected_codes = [] if flags == ['--vet=unused'] else ['thor/prefer-immutable']
@@ -410,7 +412,7 @@ main::proc(){
     _=destination
 }
 '''
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _, errors = self.invoke(engine)
@@ -439,7 +441,7 @@ main::proc(){
     _=active+1
 }
 '''
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for flags, expected in (([], ['value', 'active']),
                                     (['-debug'], ['value', 'conditional', 'active'])):
                 with self.subTest(engine=engine, flags=flags):
@@ -459,7 +461,7 @@ main::proc(){x:=effect();_=x;fmt.println(counter)}
         for other_use in (False, True):
             original = text.replace('fmt.println(counter)', 'fmt.println(x,counter)') if other_use else text
             expected = original.replace('x:=', 'x:>') if other_use else original
-            for engine in ('python', 'rust'):
+            for engine in compiler_engines():
                 self.write(original)
                 _, errors = self.invoke(engine, '--apply')
                 self.assertEqual(errors, [])
@@ -475,7 +477,7 @@ main::proc(){x:=effect();_=x;fmt.println(counter)}
                                ('a,b:int=1,2;_=0', ['a', 'b']),
                                ('_,b:=1,2;_=0', ['b'])]:
             text = 'package main\nmain::proc(){'+body+'}\n'
-            for engine in ('python', 'rust'):
+            for engine in compiler_engines():
                 for correction in ('--apply', '--ask'):
                     with self.subTest(engine=engine, body=body, correction=correction):
                         self.write(text)
@@ -485,14 +487,14 @@ main::proc(){x:=effect();_=x;fmt.println(counter)}
                         self.assertTrue(all(error['code'] == 'thor/unused' for error in errors), errors)
                         self.assertEqual([error['msgs'][0].split("'")[1] for error in errors], expected)
         self.write('package main\nmain::proc(){a,b:=1,2;_=a+b}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             _, errors = self.invoke(engine)
             self.assertEqual([error['code'] for error in errors], ['thor/prefer-immutable'])
             self.assertIn("'a, b'", errors[0]['msgs'][0])
 
     def test_other_used_declarations_keep_their_immutable_corrections(self):
         text = 'package main\nmain::proc(){dead:=1;live:=2;if live!=2{panic("result")}}\n'
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _, errors = self.invoke(engine)
@@ -514,7 +516,7 @@ counter:int
 effect::proc()->int{counter+=1;return counter}
 main::proc(){unused:=effect();fmt.println(counter)}
 '''
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for correction in ('--apply', '--ask'):
                 for checks in ([], ['--vet=unused']):
                     self.write(text)
@@ -540,7 +542,7 @@ main::proc(){
     fmt.println(counter)
 }
 '''
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for correction in ('--apply', '--ask'):
                 with self.subTest(engine=engine, correction=correction):
                     self.write(text)
@@ -563,7 +565,7 @@ main::proc(){
         text=('// 😀 header\npackage main\n'
               'helper::proc(unused_parameter:int)->int{return 1}\n'
               'main::proc(){/* 😀 */unused_value:=helper(2)}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for correction in ('--apply', '--ask'):
                 with self.subTest(engine=engine, correction=correction):
                     self.write(text)

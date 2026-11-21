@@ -18,7 +18,7 @@ class RustLexicalBindingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         build=subprocess.run(['cargo','build','--release','--locked','--offline','--manifest-path',str(native.ROOT/'rust/Cargo.toml'),
-                              '--example','lexical_protocol'],capture_output=True,text=True,timeout=120)
+                              '--example','lexical_protocol'],capture_output=True,text=True,timeout=600)
         if build.returncode:
             raise RuntimeError(build.stdout+build.stderr)
         cls.binary=native.ROOT/'rust/target/release/examples/lexical_protocol'

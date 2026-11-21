@@ -1,4 +1,5 @@
 """Real terminal diagnostics use severity colors without coloring JSON or pipes."""
+from tests.test_rust_compiler import compiler_engines
 import errno
 import json
 import os
@@ -68,7 +69,7 @@ class DiagnosticColorTests(unittest.TestCase):
         ]
         for source, flags, status, label, code in cases:
             self.source.write_text(source)
-            for engine in ('python', 'rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine, label=label, source=source):
                     plain_status, plain = self.invoke(engine, flags)
                     colored_status, colored = self.invoke(engine, flags, terminal=True)
@@ -81,7 +82,7 @@ class DiagnosticColorTests(unittest.TestCase):
 
     def test_terminal_color_opt_outs_and_terse_unix_positions(self):
         self.source.write_text('package main\nmain::proc(){value:int="wrong";_=value}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             _, plain = self.invoke(engine)
             for environment in ({'NO_COLOR': '1'}, {'TERM': 'dumb'}, {'CLICOLOR': '0'}):
                 with self.subTest(engine=engine, environment=environment):
@@ -101,7 +102,7 @@ class DiagnosticColorTests(unittest.TestCase):
             ('package main\nmain::proc(){unused:=1;_=0}\n', ['--vet=unused'], 0, 'warning'),
         ]:
             self.source.write_text(source)
-            for engine in ('python', 'rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine, severity=severity):
                     result, output = self.invoke(engine, ['-json-errors', *flags], terminal=True)
                     self.assertEqual(result, status, output)
@@ -113,7 +114,7 @@ class DiagnosticColorTests(unittest.TestCase):
     def test_runtime_stderr_keeps_its_original_text(self):
         self.source.write_text('package main\nimport "core:fmt"\nimport "core:os"\n'
                                'main::proc(){fmt.eprintln("Error: application text");os.exit(7)}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for flags in (['-debug'], native.UNCHECKED):
                 with self.subTest(engine=engine, flags=flags):
                     status, output = self.invoke(engine, flags, command='run', terminal=True)
@@ -123,7 +124,7 @@ class DiagnosticColorTests(unittest.TestCase):
     def test_vet_correction_underlines_use_the_edited_source(self):
         source = ('package main\nhelper::proc(unused_parameter:int)->int{return 1}\n'
                   'main::proc(){unused_value:=helper(2)}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             self.source.write_text(source)
             status, output = self.invoke(engine, ['--apply'], command='vet', terminal=True)
             self.assertEqual(status, 0, output)

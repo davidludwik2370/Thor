@@ -1,9 +1,10 @@
 # Thor development process
 
-The [Rust migration](docs/rust-migration.md) keeps the Python compiler as its
-reference. Its current checkpoint is incomplete; native differential cases and
-migration gaps must stay distinct. Do not switch TLS/default builds or start
-parallelization before full semantic and diagnostic acceptance.
+The maintained compiler is Rust. The Python compiler is frozen at
+`python-reference-2026-11-21` and must not be updated for new compiler work.
+[Retirement and validation](docs/python-retirement.md) explains the independent
+native gate and opt-in historical tests. Python remains a supported language for
+test runners and development tools.
 
 Work through the numbered T tasks in coherent batches. Each batch includes its
 compiler behavior, editor support, diagnostic quality, tests, and evaluation demo.
@@ -28,7 +29,7 @@ The [language specification](docs/language-spec.md) defines the numbered languag
    merely because its syntax parses or generated code compiles in one example.
 
 ```sh
-python3 -m unittest discover -s tests -v
+THOR_TEST_PREBUILT=1 python3 tools/test_compiler.py
 ./thor run demo
 python3 tools/build_tls.py test
 odin test runtime/pure -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true

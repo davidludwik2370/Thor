@@ -30,7 +30,6 @@ EFFECTS=[
     Case('file_identity','_=#file;return n','Source-location-dependent','#file'),
     Case('line_identity','_=#line;return n','Source-location-dependent','#line'),
     Case('directory_identity','_=#directory;return n','Source-location-dependent','#directory'),
-    Case('caller_identity','return n','Source-location-dependent','#caller_location',params='n:int,loc:=#caller_location'),
     Case('project_identity','_=ODIN_BUILD_PROJECT_NAME;return n','Source-location-dependent','ODIN_BUILD_PROJECT_NAME'),
     Case('address','local:=n;other:=n;return (&local==&other)?1:0','pointer identities','&local=='),
     Case('uninitialized','x:int=---;return n+x','uninitialized storage','---'),

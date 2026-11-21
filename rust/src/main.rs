@@ -110,10 +110,12 @@ fn run(mut args: Vec<String>) -> Result<i32> {
             "{}",
             json!({
                 "engine": "rust",
-                "status": "experimental",
+                "status": "maintained",
                 "complete": false,
                 "python_fallback": false,
                 "reference_command": "thor-python",
+                "reference_status": "frozen",
+                "reference_tag": "python-reference-2026-11-21",
                 "parallel_lowering": false,
                 "parallel_work": {
                     "source_parsing": true,
@@ -155,7 +157,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                     "big_number_results": true
                 },
                 "pending": [
-                    "native-host verification on Windows and Linux",
+                    "native-host verification on Windows",
                     "guarded specialization and ownership paths outside the acceptance corpus"
                 ],
                 "optimization_opportunities": [

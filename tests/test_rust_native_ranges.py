@@ -16,7 +16,11 @@ class RustNativeRangeTests(unittest.TestCase):
                 prefix='''import "core:fmt"
 work::proc(limit:=3)->(count,sum:int){for '''+names+' in '+bound+'{'+extra+'count+=1};return}\n'
                 with self.subTest(bound=bound,names=names):
-                    self.compare(self.program('fmt.println(work());fmt.println(work(5))',prefix),flags=native.UNCHECKED)
+                    inclusive='..=' in bound
+                    counts=(4,6) if inclusive else (3,5)
+                    sums=(6,15) if inclusive else (3,10)
+                    expected='\n'.join(f'{count} {total if names=="value" else 0}' for count,total in zip(counts,sums))
+                    self.compare(self.program('fmt.println(work());fmt.println(work(5))',prefix),flags=native.UNCHECKED,expected=expected)
         prefix='''import "core:fmt"
 work::proc(limit:$T)->int{count:=0;for _ in 0..<limit{count+=1};return count}
 '''

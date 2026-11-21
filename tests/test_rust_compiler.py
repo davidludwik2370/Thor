@@ -1,4 +1,4 @@
-"""Differential acceptance checks for the independent native compiler.
+"""Standalone acceptance checks for the maintained native compiler.
 
 An unsupported-feature status is a migration gap, never a successful comparison.
 Use real Odin runs and output checks that survive -disable-assert.
@@ -26,6 +26,22 @@ def using_prebuilt_compiler(binary):
     return True
 
 
+def reference_enabled():
+    return os.environ.get('THOR_TEST_PYTHON_REFERENCE') == '1'
+
+
+def compiler_engines():
+    return ('python','rust') if reference_enabled() else ('rust',)
+
+
+def compiler_variants():
+    return tuple((engine,PYTHON if engine=='python' else RUST) for engine in compiler_engines())
+
+
+def compiler_paths(primary, reference=PYTHON):
+    return (primary,reference) if reference_enabled() else (primary,)
+
+
 class RustCompilerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -35,7 +51,7 @@ class RustCompilerTests(unittest.TestCase):
             raise unittest.SkipTest('Rust compiler tests require Cargo')
         result = subprocess.run(['cargo', 'build', '--release', '--locked', '--offline',
                                  '--manifest-path', str(ROOT/'rust/Cargo.toml')],
-                                capture_output=True, text=True, timeout=120)
+                                capture_output=True, text=True, timeout=600)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
 
@@ -48,6 +64,8 @@ class RustCompilerTests(unittest.TestCase):
         self.source = self.app/'main.thor'
 
     def invoke(self, engine, command='run', flags=(), directory=False, args=(), env=None):
+        if engine == 'python' and not reference_enabled():
+            raise RuntimeError('Python compiler comparisons are archival; set THOR_TEST_PYTHON_REFERENCE=1 explicitly.')
         compiler = PYTHON if engine == 'python' else RUST
         argv = [str(compiler), command, str(self.app if directory else self.source),
                 '--output-dir', str(self.root/engine), '--cache-dir', str(self.root/'cache'),
@@ -65,20 +83,27 @@ class RustCompilerTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
         before = {p:p.read_bytes() for p in self.app.rglob('*') if p.is_file()}
-        python = self.invoke('python', command, flags, directory, args)
+        reference = self.invoke('python', command, flags, directory, args) if reference_enabled() else None
         rust = self.invoke('rust', command, flags, directory, args)
-        details = f'Python:\n{python.stdout}{python.stderr}\nRust:\n{rust.stdout}{rust.stderr}'
+        details = f'Rust:\n{rust.stdout}{rust.stderr}'
+        if reference is not None:
+            details += f'\nFrozen Python reference:\n{reference.stdout}{reference.stderr}'
+            self.assertEqual(rust.returncode, reference.returncode, details)
         self.assertNotEqual(rust.returncode, 3, details)
-        self.assertEqual(rust.returncode, python.returncode, details)
         if fail:
             self.assertNotEqual(rust.returncode, 0, details)
-            self.assertIn(fail, python.stdout+python.stderr)
             self.assertIn(fail, rust.stdout+rust.stderr)
+            if reference is not None:self.assertIn(fail, reference.stdout+reference.stderr)
         else:
             self.assertEqual(rust.returncode, 0, details)
-            self.assertEqual(rust.stdout, python.stdout, details)
+            if reference is not None:self.assertEqual(rust.stdout, reference.stdout, details)
             if expected is not None:
                 self.assertEqual(rust.stdout.rstrip('\n'), expected)
+            elif command == 'transpile':
+                self.assertTrue(Path(rust.stdout.strip()).is_file(), details)
+            else:
+                # An omitted stdout oracle means silence, never "ignore output".
+                self.assertEqual(rust.stdout, '', 'Add an explicit expected output to this acceptance test.\n'+details)
         self.assertEqual(before, {p:p.read_bytes() for p in before})
         return rust
 
@@ -547,7 +572,7 @@ ABSENT :: #exists("assets/missing.txt")
 
     def test_default_executable_name_matches_current_directory(self):
         self.source.write_text(self.program(''))
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 result = self.invoke(engine, command='build')
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -595,7 +620,7 @@ consume::proc(text:string){delete(text)}
         code = self.program('''
 fmt.println(f"{12:+08d}|{0.125:.2%}|{'a':U}|{\"hi\":'界'^6}")
 ''', 'import "core:fmt"\n')
-        self.compare(code)
+        self.compare(code,expected='+0000012|12.50%|U+61|界界hi界界')
         for spec, message in [('>>6', 'no longer uses < or >'), ('width', 'variable width needs nested braces'),
                               ('--4', 'Duplicate interpolation flag'), ('^.2', 'requires an explicit verb')]:
             with self.subTest(spec=spec):
@@ -632,14 +657,18 @@ release::proc(text:string){}
     def test_original_diagnostic_offsets_utf16_and_schema(self):
         self.source.write_text(self.program('text:="😀"; value:int="bad"; _=text; _=value'))
         rust = self.invoke('rust', command='check', flags=['-json-errors'])
-        python = self.invoke('python', command='check', flags=['-json-errors'])
         self.assertEqual(rust.returncode, 1, rust.stderr)
         rust_errors = json.loads(rust.stderr)['errors']
-        python_errors = json.loads(python.stderr)['errors']
         self.assertEqual(rust_errors[0]['pos']['file'], str(self.source))
-        self.assertEqual(rust_errors[0]['pos']['line'], python_errors[0]['pos']['line'])
-        self.assertEqual(rust_errors[0]['pos']['column'], python_errors[0]['pos']['column'])
-        self.assertEqual(rust_errors[0]['msgs'], python_errors[0]['msgs'])
+        raw=self.source.read_bytes();offset=raw.index(b'"bad"')
+        before=raw[:offset].decode()
+        self.assertEqual(rust_errors[0]['pos']['offset'],offset)
+        self.assertEqual(rust_errors[0]['pos']['line'],before.count('\n')+1)
+        self.assertEqual(rust_errors[0]['pos']['column'],len(before.rsplit('\n',1)[-1].encode('utf-16-le'))//2+1)
+        self.assertIn('int',' '.join(rust_errors[0]['msgs']))
+        if reference_enabled():
+            reference=self.invoke('python',command='check',flags=['-json-errors'])
+            self.assertEqual(rust_errors[0],json.loads(reference.stderr)['errors'][0])
 
     def test_source_map_partition_and_lookup_matches_python_consumer(self):
         self.source.write_text(self.program('values:=[1,2]; _=values'))
@@ -690,11 +719,12 @@ release::proc(text:string){}
                 packet=json.loads(result.stderr)
                 self.assertEqual(packet['error_count'],0)
 
-    def test_capabilities_preserve_experimental_status_and_current_coverage(self):
+    def test_capabilities_describe_the_maintained_compiler_and_frozen_reference(self):
         result = subprocess.run([str(RUST), '--capabilities'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         packet = json.loads(result.stdout)
-        self.assertEqual(packet['status'], 'experimental')
+        self.assertEqual(packet['status'], 'maintained')
+        self.assertEqual(packet['reference_status'], 'frozen')
         self.assertFalse(packet['complete'])
         self.assertFalse(packet['python_fallback'])
         self.assertFalse(packet['parallel_lowering'])
@@ -745,11 +775,11 @@ fmt.println(value)
         column=source_line.index('get()')+1
         for flags in [[], UNCHECKED]:
             with self.subTest(flags=flags):
-                python=self.invoke('python',flags=flags)
-                rust=self.invoke('rust',flags=flags)
-                self.assertNotEqual(python.returncode,0,python.stderr)
-                self.assertEqual(rust.returncode,python.returncode,rust.stderr)
-                for result in [python,rust]:
+                results=[self.invoke(engine,flags=flags) for engine in compiler_engines()]
+                for result in results:
+                    self.assertNotEqual(result.returncode,0,result.stderr)
+                if len(results)==2:self.assertEqual(results[0].returncode,results[1].returncode)
+                for result in results:
                     self.assertIn(f'{self.source}({line}:{column})',result.stderr)
                     self.assertIn('unexpected failure',result.stderr)
 

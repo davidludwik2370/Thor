@@ -496,6 +496,13 @@ impl<'p> Scheduler<'p> {
         if !self.has_pure {
             return false;
         }
+        // A parameter's fn default does not make the runtime callback a
+        // direct call: an ordinary caller can override it. Explicit #run
+        // retains its own eligibility diagnostic; optional folding must defer.
+        if self.role(node,"callee").is_some_and(|callee|self.resolver.symbol(callee).is_some_and(|index|{
+            let symbol=&self.resolver.symbols[index];
+            !symbol.constant || symbol.immutable || symbol.parameter || symbol.result
+        })) {return false;}
         let plans = self.resolver.call_plans(node, &Substitutions::new());
         if let [plan] = plans.as_slice() {
             if self.has_runtime && self.runtime_barrier(plan.procedure,&plan.bindings) {return false;}

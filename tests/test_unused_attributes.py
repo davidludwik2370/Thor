@@ -1,4 +1,5 @@
 """@(unused) silences unused diagnostics and makes references an error."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import subprocess
 import unittest
@@ -31,7 +32,7 @@ main::proc(){
  @(unused) Local::struct{x:int}
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for flags in ([],['--vet=unused']):
                 with self.subTest(engine=engine,flags=flags):
                     self.write(text)
@@ -50,7 +51,7 @@ main::proc(){
         for body in expressions:
             text='package main\n@(unused) value:int\nmain::proc(){'+body+'}\n'
             # Find the reference separately from the declaration.
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine,body=body):
                     self.write(text)
                     _,errors=self.invoke(engine,command='check',status=1)
@@ -65,7 +66,7 @@ main::proc(){
                        'VALUE::#run helper()\nmain::proc(){_=VALUE}',
                        'main::proc(){_=result_type_of(helper)}']:
             text='package main\n@(unused) helper::fn()->int{return 3}\n'+suffix+'\n'
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine,suffix=suffix):
                     self.write(text)
                     _,errors=self.invoke(engine,command='check',status=1)
@@ -78,7 +79,7 @@ main::proc(){
                        'main::proc(){_=Record{1}}',
                        'take::proc(value:Record){}\nmain::proc(){}']:
             text='package main\n@(unused) Record::struct{x:int}\n'+suffix+'\n'
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine,suffix=suffix):
                     self.write(text)
                     _,errors=self.invoke(engine,command='check',status=1)
@@ -100,7 +101,7 @@ main::proc(){
  _= #config(value, 4)
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _,errors=self.invoke(engine,command='check')
@@ -116,7 +117,7 @@ main::proc(){
                               ('import * "library"','_=helper()'),
                               ('import "library"','using library;_=helper()')]:
             text='package main\n'+imported+'\nmain::proc(){'+body+'}\n'
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine,imported=imported,body=body):
                     self.write(text)
                     _,errors=self.invoke(engine,command='check',status=1)
@@ -135,7 +136,7 @@ main::proc(){
 '''
         ignored=self.app/'ignored.thor'
         ignored.write_text('#+build ignore\npackage main\n@(unused) x::1\nuse::x\n')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _,errors=self.invoke(engine,command='check')
@@ -153,7 +154,7 @@ main::proc(){
                ('@(unused,export) x::proc(){}','unused')]
         for body,_ in cases:
             text='package main\n'+body+('' if 'main::' in body else '\nmain::proc(){}')+'\n'
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 with self.subTest(engine=engine,body=body):
                     self.write(text)
                     _,errors=self.invoke(engine,command='check',status=1)
@@ -167,7 +168,7 @@ choose::fn()->bool{return false}
 SELECTED::#run choose()
 main::proc(){when SELECTED {_=reserved}}
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 self.invoke(engine,command='check')
@@ -184,7 +185,7 @@ main::proc(){
  #unroll for _ in 0..<2 {@(unused) value:=4}
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _,errors=self.invoke(engine,'-warnings-as-errors',command='check')
@@ -197,7 +198,7 @@ EXPORTED::#run choose()
 @(unused,export=EXPORTED) hidden::proc(){}
 main::proc(){}
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 self.invoke(engine,command='check')
@@ -207,7 +208,7 @@ main::proc(){}
 
     def test_tag_does_not_suppress_body_warnings_or_pure_advice(self):
         text='package main\n@(unused) helper::proc(parameter:int)->int{local:=3;return 1}\nmain::proc(){}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _,warnings=self.invoke(engine)
@@ -231,7 +232,7 @@ main::proc(){
  fmt.println(counter)
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for flags in ([],native.UNCHECKED):
                 with self.subTest(engine=engine,flags=flags):
                     self.write(text)
@@ -241,7 +242,7 @@ main::proc(){
 
     def test_cache_cannot_bypass_new_attribute_and_errors_recover_after_removal(self):
         text='package main\ncalculate::fn()->int{return 42}\nVALUE::#run calculate()\nmain::proc(){_=VALUE}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 self.invoke(engine,command='check')
@@ -253,7 +254,7 @@ main::proc(){
 
     def test_ast_is_still_a_syntax_dump_for_an_invalid_reference(self):
         self.write('package main\n@(unused) value::1\nmain::proc(){_=value}\n')
-        for compiler in (native.PYTHON,native.RUST):
+        for compiler in ([native.PYTHON,native.RUST] if native.reference_enabled() else [native.RUST]):
             with self.subTest(compiler=compiler):
                 result=subprocess.run([str(compiler),'ast',str(self.app)],cwd=self.root,capture_output=True,text=True,timeout=60)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)

@@ -1,4 +1,5 @@
 """Native invocation controls preserve reference cache and diagnostic contracts."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -150,7 +151,7 @@ class RustCliControlTests(unittest.TestCase):
 
     def test_missing_project_names_and_unknown_commands_are_usage_errors(self):
         for arguments in (['new'], ['new', '--no-open'], ['unknown-command'], ['--unknown-option']):
-            for compiler in (native.PYTHON, native.RUST):
+            for compiler in ([native.PYTHON,native.RUST] if native.reference_enabled() else [native.RUST]):
                 with self.subTest(arguments=arguments, compiler=compiler):
                     result=subprocess.run([str(compiler), *arguments],cwd=self.root,capture_output=True,text=True,timeout=20)
                     self.assertEqual(result.returncode,2,result.stderr)
@@ -174,7 +175,7 @@ class RustCliControlTests(unittest.TestCase):
 
     def test_cache_reports_cold_warm_and_disabled_execution(self):
         self.write()
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 cache=self.root/(engine+'-cache')
                 cold,lines,_=self.cache_packet(engine,['--cache-dir='+str(cache)])
@@ -207,7 +208,7 @@ class RustCliControlTests(unittest.TestCase):
 
     def test_run_timeout_is_forwarded_and_reports_cache_counters_on_failure(self):
         self.write(prefix='spin::proc()->int{for{}}\nVALUE::#run spin()')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             for seconds in ['0.05', '1e-300']:
                 with self.subTest(engine=engine, seconds=seconds):
                     report,lines,result=self.cache_packet(engine,['--no-cache','--run-timeout='+seconds],command='check',fail='second timeout')
@@ -216,7 +217,7 @@ class RustCliControlTests(unittest.TestCase):
 
     def test_zero_timeout_runs_helpers_in_both_value_option_forms(self):
         self.write()
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             for timeout in [['--run-timeout', '0'], ['--run-timeout=0']]:
                 for flags in (['-debug'], native.UNCHECKED):
                     with self.subTest(engine=engine, timeout=timeout, flags=flags):
@@ -225,7 +226,7 @@ class RustCliControlTests(unittest.TestCase):
 
     def test_large_positive_timeouts_compile_and_execute_helpers(self):
         self.write()
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             for timeout in (['--run-timeout', '301'], ['--run-timeout=3600.5'],
                             ['--run-timeout', '1e12']):
                 for flags in (['-debug'], native.UNCHECKED):
@@ -264,20 +265,20 @@ if status == 0 and arguments and arguments[0] == 'build':
 raise SystemExit(status)
 ''')
         wrapper.chmod(0o755)
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             for flags in (['-debug'], native.UNCHECKED):
                 with self.subTest(engine=engine, flags=flags):
                     _, lines, _ = self.cache_packet(engine, ['--no-cache', '--odin', str(wrapper), *flags])
                     self.assertEqual(lines, ['7'])
         delayed_helpers = log.read_text().splitlines()
-        self.assertEqual(delayed_helpers, ['delayed']*4)
+        self.assertEqual(delayed_helpers, ['delayed']*(2*len(compiler_engines())))
 
     def test_invalid_timeout_and_runtime_argument_options_have_usage_status(self):
         self.write(prefix='VALUE::7')
         cases=[['--run-timeout=-1'],
                ['--run-timeout=nan'],['--run-timeout=inf'],['--run-timeout=bad'],
                ['--track-allocations=bad']]
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             for flags in cases:
                 with self.subTest(engine=engine,flags=flags):
                     result=self.invoke(engine,'check',flags=flags)
@@ -291,7 +292,7 @@ raise SystemExit(status)
 
     def test_equals_options_and_separate_runtime_arguments(self):
         self.write(prefix='VALUE::7')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 output=self.root/(engine+'-explicit-output')
                 result=subprocess.run([str(native.PYTHON if engine=='python' else native.RUST),
@@ -305,7 +306,7 @@ raise SystemExit(status)
 
     def test_raw_diagnostics_retain_generated_odin_locations(self):
         self.source.write_text(self.program('n:int="wrong";_=n'))
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 raw=self.invoke(engine,'check',flags=['--raw-diagnostics'])
                 self.assertNotEqual(raw.returncode,0)
@@ -318,7 +319,7 @@ raise SystemExit(status)
 
     def test_compiler_looking_options_after_separator_reach_the_program(self):
         self.write(prefix='VALUE::7')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             for argument in ['--help','--version','--diagnostic-format=json']:
                 with self.subTest(engine=engine,argument=argument):
                     result=self.invoke(engine,args=[argument])
@@ -329,7 +330,7 @@ raise SystemExit(status)
         import shutil, sys
         actual=shutil.which('odin')
         wrapper=self.root/'odin-wrapper'
-        outputs=[str(self.root/engine) for engine in ['python','rust']]
+        outputs=[str(self.root/engine) for engine in compiler_engines()]
         wrapper.write_text('#!'+sys.executable+'\nimport os,signal,sys\n'+
             'args=sys.argv[1:]\n'+f'outputs={outputs!r}\n'+
             'if args and args[0]=="check" and any(args[1].startswith(path+os.sep) for path in outputs):\n'+
@@ -349,7 +350,7 @@ raise SystemExit(status)
     def test_vet_validation_preserves_native_warning_policy(self):
         import shutil
         import sys
-        self.write(body='fmt.println(VALUE)',prefix='increment::proc(n:int)->int{return n+1}\nVALUE::7')
+        self.write(body='fmt.println(increment(VALUE))',prefix='increment::proc(n:int)->int{return n+1}\nVALUE::7')
         actual=shutil.which('odin')
         wrapper=self.root/'warning-policy-compiler'
         log=self.root/'warning-policy.jsonl'
@@ -360,7 +361,7 @@ raise SystemExit(status)
             f'os.execv({actual!r},[{actual!r},*args])\n')
         wrapper.chmod(0o755)
         original=self.source.read_text()
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             self.source.write_text(original)
             log.unlink(missing_ok=True)
             result=self.invoke(engine,'vet',flags=['--apply','--odin',str(wrapper),'-warnings-as-errors','-thread-count:1'])
@@ -390,7 +391,7 @@ args=sys.argv[1:]
   raise SystemExit(1)
 '''+f'os.execv({actual!r},[{actual!r},*args])\n')
         wrapper.chmod(0o755)
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             for mode,count in [('recover',2),('always',2),('source',1),('external',1)]:
                 with self.subTest(engine=engine,mode=mode):
                     log.unlink(missing_ok=True)
@@ -409,7 +410,7 @@ args=sys.argv[1:]
         self.write(prefix='VALUE::7')
         wrapper=self.toolchain_wrapper()
         packets=[]
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             result=self.invoke(engine,'check',flags=['--odin',str(wrapper),'-json-errors'],
                 env={**os.environ,'THOR_TEST_TOOLCHAIN_MODE':'source-signal'})
             self.assertEqual(result.returncode,143,result.stderr)
@@ -425,7 +426,8 @@ args=sys.argv[1:]
             self.assertNotIn('no source location',failure['msgs'][0])
             self.assertEqual(failure['msgs'][1],'native tool detail')
             packets.append(packet)
-        self.assertEqual(*packets)
+        for packet in packets[1:]:
+            self.assertEqual(packet,packets[0])
 
     @unittest.skipIf(os.name=='nt','POSIX termination signal')
     def test_vet_rejects_invalid_corrections_when_source_errors_precede_a_backend_crash(self):
@@ -454,7 +456,7 @@ args=sys.argv[1:]
         for mode in ['warning','error']:
             for flags in [[],['-ignore-warnings'],['-warnings-as-errors']]:
                 packets=[]
-                for engine in ['python','rust']:
+                for engine in compiler_engines():
                     with self.subTest(engine=engine,mode=mode,flags=flags):
                         result=self.invoke(engine,'check',flags=['--odin',str(wrapper),'-json-errors',*flags],
                             env={**os.environ,'THOR_TEST_TOOLCHAIN_MODE':mode})
@@ -464,14 +466,15 @@ args=sys.argv[1:]
                         if packet['errors']:
                             self.assertEqual(packet['errors'][0]['stage'],'toolchain')
                             self.assertIsNone(packet['errors'][0]['pos'])
-                self.assertEqual(*packets)
+                for packet in packets[1:]:
+                    self.assertEqual(packet,packets[0])
 
     @unittest.skipIf(os.name=='nt','POSIX termination signal')
     def test_backend_signal_retains_name_status_and_native_detail(self):
         self.write(prefix='VALUE::7')
         wrapper=self.toolchain_wrapper()
         packets=[]
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             result=self.invoke(engine,'check',flags=['--odin',str(wrapper),'-json-errors'],
                 env={**os.environ,'THOR_TEST_TOOLCHAIN_MODE':'signal'})
             self.assertEqual(result.returncode,143,result.stderr)
@@ -479,4 +482,5 @@ args=sys.argv[1:]
             self.assertIn('SIGTERM (signal 15)',packet['errors'][0]['msgs'][0])
             self.assertEqual(packet['errors'][0]['msgs'][1],'native tool detail')
             packets.append(packet)
-        self.assertEqual(*packets)
+        for packet in packets[1:]:
+            self.assertEqual(packet,packets[0])

@@ -1,4 +1,5 @@
 """Ordinary calls and checked calls have distinct storage lifetimes."""
+from tests.test_rust_compiler import compiler_engines
 import unittest
 import re
 from tests import test_rust_compiler as native
@@ -28,7 +29,7 @@ class RustCheckedCallTests(unittest.TestCase):
         for flags in ([],native.UNCHECKED):
             with self.subTest(flags=flags):
                 self.compare(code,flags=flags)
-                for engine in ('python','rust'):
+                for engine in compiler_engines():
                     generated=next((self.root/engine).rglob('main.odin')).read_text()
                     dispatchers=re.findall(r'(pure_validate(?:_[0-9a-f]+)?_mode)::proc[^\n]*\n(.*?)\n\}',generated,re.S)
                     self.assertEqual(len(dispatchers),2)

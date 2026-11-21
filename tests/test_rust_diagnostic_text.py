@@ -1,4 +1,5 @@
 """Terminal rendering keeps the reference's excerpts, Unicode and position styles."""
+from tests.test_rust_compiler import compiler_engines
 import re
 import unittest
 from tests import test_rust_compiler as native
@@ -14,12 +15,16 @@ class RustDiagnosticTextTests(unittest.TestCase):
         for flags in [[], ['-terse-errors'], ['-error-pos-style:unix'],
                       ['-terse-errors', '-error-pos-style:unix']]:
             with self.subTest(flags=flags):
-                reference = self.invoke('python', command='check', flags=flags)
+                if native.reference_enabled():
+                    reference = self.invoke('python', command='check', flags=flags)
                 actual = self.invoke('rust', command='check', flags=flags)
-                self.assertEqual(reference.returncode, 1, reference.stderr)
+                if native.reference_enabled():
+                    self.assertEqual(reference.returncode, 1, reference.stderr)
                 self.assertEqual(actual.returncode, 1, actual.stderr)
-                self.assertEqual(actual.stdout, reference.stdout)
-                self.assertEqual(actual.stderr, reference.stderr)
+                if native.reference_enabled():
+                    self.assertEqual(actual.stdout, reference.stdout)
+                if native.reference_enabled():
+                    self.assertEqual(actual.stderr, reference.stderr)
                 location = (rf'{re.escape(str(self.source))}:4:\d+:' if '-error-pos-style:unix' in flags
                             else rf'{re.escape(str(self.source))}\(4:\d+\):')
                 self.assertRegex(actual.stderr, location + r'\nError: ')
@@ -35,7 +40,7 @@ class RustDiagnosticTextTests(unittest.TestCase):
         ]
         for command, source, flags, status, label in cases:
             self.source.write_text(source)
-            for engine in ('python', 'rust'):
+            for engine in compiler_engines():
                 for mode in (([],) if command == 'vet' else ([], native.UNCHECKED)):
                     with self.subTest(command=command, engine=engine, flags=flags, mode=mode):
                         result = self.invoke(engine, command=command, flags=[*flags, *mode])
@@ -73,9 +78,12 @@ class RustDiagnosticTextTests(unittest.TestCase):
         overlay.write_text(json.dumps({'Replace':{str(self.source):str(replacement)}}))
         for flags in [['--overlay',str(overlay)], ['--overlay='+str(overlay),'-error-pos-style:unix']]:
             with self.subTest(flags=flags):
-                reference=self.invoke('python',command='check',flags=flags)
+                if native.reference_enabled():
+                    reference=self.invoke('python',command='check',flags=flags)
                 actual=self.invoke('rust',command='check',flags=flags)
-                self.assertEqual((reference.returncode,actual.returncode),(1,1),actual.stderr)
-                self.assertEqual(actual.stderr,reference.stderr)
+                if native.reference_enabled():
+                    self.assertEqual((reference.returncode,actual.returncode),(1,1),actual.stderr)
+                if native.reference_enabled():
+                    self.assertEqual(actual.stderr,reference.stderr)
                 self.assertIn('value:=or_panic',actual.stderr)
                 self.assertRegex(actual.stderr, r':\nError: ')

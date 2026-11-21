@@ -1,8 +1,9 @@
 # Thor
 
 `thor` runs the prebuilt Rust compiler. `thor-rust` selects the same implementation,
-and `thor-python` keeps the Python reference available for comparisons. The current
-acceptance corpus is verified on macOS arm64. See the
+and `thor-python` retains a frozen historical reference. Compiler fixes and features
+are maintained in Rust only. See [Python retirement and validation](docs/python-retirement.md)
+and the
 [migration status and comparison commands](docs/rust-migration.md) and the
 [compiler-efficiency follow-up](docs/compiler-efficiency-2026-11.md) and the
 [cache/discovery improvements](docs/compiler-cache-discovery-2026-11.md) and the
@@ -1419,7 +1420,7 @@ allocating features require a context, which such callbacks can assign explicitl
 ## Tests and rejection examples
 
 ```sh
-python3 -m unittest discover -s tests -v
+THOR_TEST_PREBUILT=1 python3 tools/test_compiler.py
 ```
 
 For parallel test workers, prebuild the compiler and protocol fixtures once.

@@ -1,4 +1,5 @@
 """Nonallocating native paths retain types; unknown/allocating effects stay errors."""
+from tests.test_rust_compiler import compiler_engines
 import unittest
 from tests import test_rust_compiler as base
 
@@ -15,7 +16,7 @@ class NoAllocEdgeTests(unittest.TestCase):
 
     def compact_lowering(self,source):
         self.source.write_text(source)
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             lowered=self.invoke(engine,command='transpile',flags=['-thread-count:1'])
             self.assertEqual(lowered.returncode,0,lowered.stdout+lowered.stderr)
             files=list((self.root/engine).rglob('main.odin'))

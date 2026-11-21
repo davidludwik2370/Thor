@@ -574,10 +574,14 @@ pub(crate) fn clean(
                         && (m.starts_with("Expected a type for 'type_is_")
                             || m.ends_with("' is not a type")
                             || m.contains("is not an expression but a type"))
+                    || m.starts_with("Cannot address value ")
+                        && m.contains("not got a determined type yet")
+                        && (m.contains("Thor expression.type_is_") || project.sources.iter().any(|source|m.contains(&source.prefix)&&m.contains("type_is_")))
                     || sequence_group(project, m, "element")
             }) || msgs.iter().any(|m| m.contains("invalid type"))
                 && msgs.iter().any(|m| sequence_group(project, m, "normalize")));
         let mut inference = generated_query
+            || (!exact && kind=="Binary" && msgs.iter().any(|message|message.starts_with("Cannot determine polymorphic type")))
             || (kind == "power-type"
                 && msgs
                     .iter()
@@ -948,6 +952,19 @@ pub(crate) fn clean(
                     })
             })
             .unwrap_or_default();
+        // Generic arithmetic emits native type dispatch and a final contract
+        // panic. An unresolved operand can trigger both after its real error.
+        // Keep real fixed-type operator failures and unrelated field errors.
+        let unresolved_operator = msgs.iter().any(|message|message.starts_with("Cannot apply '")&&message.contains("' to struct:"))
+            && location.as_ref().is_some_and(|(file,at)|{
+                project.sources.iter().enumerate().find(|(_,source)|source.path==Path::new(file)).is_some_and(|(file,source)|{
+                    source.nodes.iter().enumerate().filter(|(_,node)|matches!(node.kind.as_str(),"Binary"|"Unary")&&node.span.contains(*at))
+                        .min_by_key(|(_,node)|node.span.len()).is_some_and(|(index,_)|{
+                            ["left","right","expr"].iter().filter_map(|role|source.role(NodeId(index),role))
+                                .any(|node|resolver.type_of(Ref{file,node}).is_unknown())
+                        })
+                })
+            });
         let set_cascade = !exact
             && original.iter().any(|message| {
                 project
@@ -983,6 +1000,7 @@ pub(crate) fn clean(
             invalid_target,
             concat_operand_failure,
             cascade: inference
+                || unresolved_operator
                 || generated_return
                 || set_cascade
                 || concat_declaration_failure

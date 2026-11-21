@@ -1,4 +1,5 @@
 """Migration guards must not reject valid work or disguise ordinary source errors."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import subprocess
 import unittest
@@ -105,7 +106,7 @@ outer::proc()->int{return inner(int)}
         # An inactive runtime branch needs its native result type. It must not
         # acquire the untyped zero used only for unchecked native when branches.
         self.source.write_text(self.program('_=#run outer()', prefix))
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             result = self.invoke(engine, command='check', flags=['-json-errors'])
             self.assertEqual(result.returncode, 1, result.stderr)
             errors = json.loads(result.stderr)['errors']
@@ -148,7 +149,7 @@ outer::fn($T:typeid,$B:bool)->int{return inner(T,B)}
             with self.subTest(prefix=prefix):
                 source = self.program(body, '// café 🌩\n' + prefix)
                 self.source.write_text(source)
-                for engine in ['python', 'rust']:
+                for engine in compiler_engines():
                     result = self.invoke(engine, command='check', flags=['-json-errors'])
                     self.assertEqual(result.returncode, 1, result.stderr)
                     self.assertNotIn('rust-migration', result.stderr)
@@ -168,7 +169,7 @@ outer::fn($T:typeid,$B:bool)->int{return inner(T,B)}
             for flags in [[], native.UNCHECKED]:
                 with self.subTest(body=body, flags=flags):
                     self.source.write_text(self.program(body, '// café 🌩\n'))
-                    for engine in ['python', 'rust']:
+                    for engine in compiler_engines():
                         result = self.invoke(engine, command='build', flags=[*flags, '-json-errors'])
                         self.assertEqual(result.returncode, 1, result.stderr)
                         self.assertNotIn('rust-migration', result.stderr)

@@ -21,8 +21,8 @@ cargo build --release --locked --manifest-path rust/Cargo.toml
 ```
 
 The launchers run the prebuilt executable directly. `thor-python` selects the
-Python reference compiler. The current native acceptance corpus is verified on
-macOS arm64. See [migration status](docs/rust-migration.md).
+frozen historical compiler; normal compilation never invokes it. Python compiler
+fixes and features are no longer maintained. See [retirement and validation](docs/python-retirement.md).
 
 Each project owns its `.thor-cache/` (parser packets, compile-time results and
 dependency records), `.thor-rust-build/` (native generated application code), executable,
@@ -63,13 +63,6 @@ they are not copied or regenerated per project. Imported runtime test files are
 excluded from the common view; the runtime's own native test commands still run
 them normally.
 
-The Python reference prepares a project-independent generic translation of
-`basic.thor` in
-a versioned `lib/runtime-…-basic/` directory and reuses the same output across
-projects. The version derives from compiler/frontend/library inputs, not user
-project sources. Ordinary native `when` conditions and generic procedures remain
-for Odin to specialize. The translation's common source map lives beside it.
-
 The native compiler links unchanged Odin runtime packages through a shared
 `lib/runtime-rust-…/` view. Imported Thor library sources and required checked SDK
 adaptations are lowered with the project into its generated tree.
@@ -80,7 +73,8 @@ Necessary adapted packages live in the project's `.thor-runtime/` inside its
 generated directory; other support packages remain shared. SDK checked variants
 similarly remain in the project's sparse SDK overlay.
 
-Prepare installation output after compiler/library changes with:
+Prepare native installation output after compiler/library changes with
+`tools/build_runtime.py`, which invokes Rust and never imports the Python compiler:
 
 ```sh
 python3 tools/build_runtime.py

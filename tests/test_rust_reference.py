@@ -27,6 +27,13 @@ class RustReferenceTests(unittest.TestCase):
 
     def invoke(self, source, *, files=None, command='run', fail=None, flags=(),
                args=(), expected=None, directory=False):
+        if not rust.reference_enabled():
+            with patch.object(self, 'compiler', rust.RUST, create=True):
+                root, result = base.ThorTests.invoke(self, source, files=files, command=command,
+                    fail=fail, flags=flags, args=args, expected=expected, directory=directory)
+            if fail is None and expected is None and command in ('run','check','build'):
+                self.assertEqual(result.stdout,'','Add an explicit stdout oracle to this native acceptance case.')
+            return root,result
         with patch.object(self, 'compiler', rust.PYTHON, create=True):
             root, reference = base.ThorTests.invoke(self, source, files=files, command=command,
                                                    fail=fail, flags=flags, args=args,

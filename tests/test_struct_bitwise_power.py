@@ -1,4 +1,5 @@
 """Struct bitwise, shift, complement, and power operators use scalar semantics."""
+from tests.test_rust_compiler import compiler_engines
 import unittest
 from tests import test_struct_arithmetic as arithmetic
 from tests import test_rust_compiler as native
@@ -23,6 +24,21 @@ if (a!=Bits{10,5}) {panic("compound")}
 expected:Bits={3,4}|{4,8}
 if (expected!=Bits{7,12}) {panic("context")}
 ''','Bits::struct{a,b:uint}\n')
+
+    def test_native_boolean_width_fields_aliases_generics_and_comptime(self):
+        for width in ['b8','b16','b32','b64']:
+            code=self.program('''a:=Flags{left=true,right=false};b:=Flags{left=false,right=true}
+expected:=Flags{left=true,right=true};merged:=a|b
+if merged!=expected||RESULT!=expected{panic("wide boolean fields")}
+a|=b;if a!=expected{panic("boolean compound")}
+if (~a).left!=~a.left || (a&b).right!=(a.right&b.right){panic("boolean native operations")}
+''',f'''B::distinct {width}
+Flags::struct{{left,right:B,_:[3]byte}}
+merge::fn($T:typeid,a,b:T)->T{{return a|b}}
+RESULT::#run merge(Flags,Flags{{left=true,right=false}},Flags{{left=false,right=true}})
+''')
+            for flags in ([],native.UNCHECKED):
+                with self.subTest(width=width,flags=flags):self.compare(code,flags=flags,expected='')
 
     def test_integer_float_power_and_compound(self):
         self.run_both('''
@@ -241,7 +257,7 @@ power::proc(a,b:$T)->T{return a**b}
 @(export) manual_power::proc(a,b:S)->S{return {numeric.power(a.a,b.a),numeric.power(a.b,b.b)}}
 main::proc(){}
 ''')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             directory=self.root/(engine+'-ir');directory.mkdir()
             result=self.invoke(engine,command='build',flags=[*native.UNCHECKED,'-build-mode:llvm-ir',
                 '-use-single-module','-out:'+str(directory)])

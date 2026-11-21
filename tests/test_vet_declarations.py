@@ -1,4 +1,5 @@
 """Unused imports are removable; unused type declarations stay review-only."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 import subprocess
@@ -16,12 +17,14 @@ class VetDeclarationTests(unittest.TestCase):
 
     def reports(self, text, *flags, **kwargs):
         reports = []
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             self.write(text)
             with self.subTest(engine=engine):
                 result, errors = self.invoke(engine, '--vet=unused', *flags, **kwargs)
                 reports.append((errors, self.source.read_bytes()))
-        self.assertEqual(reports[0], reports[1])
+        self.assertEqual(len(reports),len(compiler_engines()))
+        for report in reports[1:]:
+            self.assertEqual(report,reports[0])
         return reports[0]
 
     def test_unused_imports_and_types_have_distinct_codes_and_only_import_fixes(self):
@@ -186,7 +189,7 @@ main::proc(){value:Alias;_=value}
 
     def test_types_do_not_prompt_and_import_removal_requires_an_affirmative_answer(self):
         text = 'package main\nUnused::struct{x:int}\nmain::proc(){}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             result, errors = self.invoke(engine, '--vet=unused', '--ask', input='y\n')
             self.assertNotIn('[y/N]', result.stdout)
@@ -201,7 +204,7 @@ main::proc(){value:Alias;_=value}
 
     def test_warning_policy_and_opt_in_behavior_match_other_vet_rules(self):
         text = 'package main\nimport "core:thread"\nUnused::struct{x:int}\nmain::proc(){}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             _, errors = self.invoke(engine, command='check')
             self.assertEqual(errors, [])
@@ -216,7 +219,7 @@ main::proc(){value:Alias;_=value}
 
     def test_default_apply_coalesces_import_and_semicolon_edits(self):
         text = 'package main\nimport "core:thread";\nUnused::struct{x:int}\nmain::proc(){\nvalue:>1;\n_=value\n}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             _, errors = self.invoke(engine, '--apply')
             updated = self.source.read_text()
@@ -262,7 +265,7 @@ main::proc(){_=VALUE}
         (self.app/'startup/main.thor').write_text('package startup\nimport "core:fmt"\nimport "base:runtime"\n@(init) start::proc "contextless"(){context=runtime.default_context();fmt.println("initialized")}\n')
         text = ('package main\nimport "core:thread"\nimport _ "startup"\nimport "core:fmt"\n'
                 'Unused::struct{x:int}\nmain::proc(){fmt.println("ready")}\n')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             self.invoke(engine,'--vet=unused','--apply')
             for flags in (['-debug'], native.UNCHECKED):

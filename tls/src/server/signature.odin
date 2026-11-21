@@ -71,6 +71,8 @@ separate_fields :: proc(list: []^ast.Field, allocator := context.allocator) -> [
 			field.names = make([]^ast.Expr, 1, allocator)
 			field.names[0] = name
 			field.type = arg.type
+			field.flags=arg.flags
+			if !strings.has_prefix(arg.tag.text,THOR_PARAMETER_TAG) {field.tag=arg.tag}
 			field.default_value=arg.default_value
 			if thor_parameter_code(arg,index)!='-' {field.tag.text=fmt.tprintf("%s%c",THOR_PARAMETER_TAG,thor_parameter_code(arg,index))}
 			append(&fields, field)
@@ -142,6 +144,14 @@ get_signature_information :: proc(
 	}
 
 	signature_help.signatures = signature_information[:]
+	// Prefer a candidate that actually exposes the cursor's visible parameter.
+	// Shorter overloads must not reset the position for longer candidates.
+	for signature, i in signature_help.signatures {
+		if len(signature.parameters)>signature_help.activeParameter {
+			signature_help.activeSignature=i
+			break
+		}
+	}
 
 	return signature_help, true
 }
@@ -235,14 +245,23 @@ add_proc_signature :: proc(
 	} else if value, ok := call.value.(SymbolUnionValue); ok && value.poly != nil && value.poly.list != nil {
 		add_signature_info(call, value.poly.list, &active_parameter, signature_information, allocator)
 	} else if value, ok := call.value.(SymbolAggregateValue); ok {
-		//function overloaded procedures
+		// Each overload maps the original cursor independently, including
+		// variadics and hidden caller metadata. Mapping one must not mutate
+		// the input position used for the next candidate.
+		requested_parameter:=active_parameter
+		mapped_parameter:=0
 		for symbol in value.symbols {
 			symbol := symbol
+			split_all_field_arguments(&symbol,allocator)
+			symbol=thor_display_symbol(ast_context,symbol)
 
 			if value, ok := symbol.value.(SymbolProcedureValue); ok {
-				add_signature_info(symbol, value.orig_arg_types, &active_parameter, signature_information, allocator)
+				candidate_parameter:=requested_parameter
+				add_signature_info(symbol, value.orig_arg_types, &candidate_parameter, signature_information, allocator)
+				mapped_parameter=max(mapped_parameter,candidate_parameter)
 			}
 		}
+		active_parameter=mapped_parameter
 	}
 	return active_parameter
 }

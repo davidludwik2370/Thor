@@ -84,7 +84,8 @@ enable `no_alloc`. There is no `!no_alloc`, command-line vet switch, or
 
 The source-checked SDK adapters cover in-place sorting (including known
 comparators and key callbacks), basic clocks/sleep/process queries, standard
-C byte/string memory operations, atomics, and supported hardware primitives.
+C byte/string memory operations, direct POSIX/Linux descriptor I/O, atomics,
+and supported hardware primitives.
 The checker inspects ordinary wrappers and their concrete types instead of
 trusting a procedure name. Unknown foreign functions remain unverified.
 Changed SDK sources, additions and overlays invalidate reviewed summaries.
@@ -101,6 +102,8 @@ contract, just as stack array literals are.
 A partial callback summary is not an exact runtime value: record contents,
 reinterpreted pointer layouts, multiple results and numeric truncation cannot
 be used to hide an allocating branch. Analysis budgets fall back to unknown.
+Native sized Booleans (`b8`, `b16`, `b32`, and `b64`) retain Boolean zero values
+and their distinct native type identities in these facts.
 
 ## Input and output
 
@@ -129,6 +132,10 @@ main :: proc() {
 - `os.read`, `read_at`, `write`, `write_at`, `write_string`, `write_strings`,
   and `flush` work with proven native standard files. Converting a file to an
   `io.Stream` does not itself establish that an arbitrary file callback is safe.
+- Direct reviewed POSIX descriptor reads/writes (including vectored and
+  positional forms), seek, close and sync calls are supported. The corresponding
+  Linux syscall wrappers are checked against the same pinned SDK snapshot;
+  this does not grant arbitrary foreign functions an exemption.
 - `io` read/write wrappers follow a statically known `Stream.procedure`, through
   constant aliases, local callback values, record fields, and procedure arguments.
   Each used operation mode is checked independently. A writer with an allocating
@@ -337,7 +344,7 @@ implementations. SDK bodies load on demand. Proofs and recursive call paths use
 bounded work queues; common callees share analysis rather than being walked once
 per caller. There is no persistent cache that could hide an edited callee.
 
-Run [the demo](../examples/no_alloc/demo.thor) with `thor run`. Focused differential
+Run [the demo](../examples/no_alloc/demo.thor) with `thor run`. Focused native
 tests are in `tests/test_no_alloc.py`, `tests/test_no_alloc_io.py`,
 `tests/test_no_alloc_variadics.py`, and `tests/test_no_alloc_edges.py`; live TLS tests are in
 `tests/test_no_alloc_tls.py`. Measurement details and checked/unchecked runtime

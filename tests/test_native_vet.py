@@ -1,4 +1,5 @@
 """Native flags and file tags compared directly with installed Odin verdicts."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -88,7 +89,7 @@ class NativeVetTests(unittest.TestCase):
         try:expected=json.loads(oracle.stderr or '{"errors":[]}')['errors']
         except ValueError:expected=[{'type':'error','pos':None,'msgs':[oracle.stderr.strip()]}]
         self.source.write_text(raw)
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 result=self.call(engine,*flags,'-json-errors',command=command,status=oracle.returncode)
                 actual=json.loads(result.stderr or '{"errors":[]}')['errors']
@@ -147,13 +148,13 @@ class NativeVetTests(unittest.TestCase):
         source.write_text(raw)
         for flags in [('-vet-unused-procedures',),('-vet-unused-procedures','-vet-packages:main')]:
             expected=self.oracle(raw,flags)
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 result=self.call(engine,*flags,'-json-errors',status=expected.returncode)
                 self.assertIn('unused-procedures' if len(flags)==1 else 'not used',result.stderr)
 
     def test_native_policies_across_commands_and_artifact_modes(self):
         self.source.write_text('#+vet cast unused\n'+CLEAN)
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for command in ('check','build','run','vet','doc'):
                 with self.subTest(engine=engine,command=command):
                     self.call(engine,'-vet-cast',command=command)
@@ -212,14 +213,14 @@ class NativeVetTests(unittest.TestCase):
         excluded=self.app/('ignored_linux.thor' if os.name=='nt' else 'ignored_windows.thor')
         excluded.write_text('#+vet unused\nnot valid source\n')
         (self.app/'other.odin').write_text('package main\nVALUE::1\n')
-        for engine in ('python','rust'):self.call(engine,'-vet')
+        for engine in compiler_engines():self.call(engine,'-vet')
         library=self.app/'library';library.mkdir()
         (library/'value.thor').write_text('#+vet unused\npackage library\nVALUE::1\n')
         self.source.write_text('package main\nimport "library"\nmain::proc(){_=library.VALUE}\n')
-        for engine in ('python','rust'):self.call(engine,'-vet','-vet-packages:main')
+        for engine in compiler_engines():self.call(engine,'-vet','-vet-packages:main')
         replacement=self.root/'replacement.thor';replacement.write_text('#+vet unused\npackage main\nmain::proc(){x:=1}\n')
         overlay=self.root/'overlay.json';overlay.write_text(json.dumps({'Replace':{str(self.source):str(replacement)}}))
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             errors=json.loads(self.call(engine,'--overlay',overlay,'-json-errors',status=1).stderr)['errors']
             self.assertTrue(any("'x' declared but not used" in ' '.join(e['msgs']) for e in errors),errors)
             self.assertTrue(all(e['pos']['file']==str(self.source) for e in errors),errors)
@@ -237,7 +238,7 @@ class NativeVetTests(unittest.TestCase):
             scoped=self.oracle(self.source.read_text(),['-vet-semicolon','-vet-packages:main',collection])
             self.assertEqual(scoped.returncode,0,scoped.stderr)
         finally:native_library.unlink()
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             result=self.call(engine,'-vet-semicolon',collection,'-json-errors',status=1)
             errors=json.loads(result.stderr)['errors']
             self.assertTrue(any(e.get('pos',{}).get('file')==str(source) and 'semicolon' in ' '.join(e['msgs']).lower() for e in errors),errors)
@@ -251,7 +252,7 @@ class NativeVetTests(unittest.TestCase):
     def test_simple_thor_extensions_use_native_source_view(self):
         raw='#+vet unused-variables cast\npackage main\nimport "core:fmt"\nwork::fn(x:int)->int{return x+1}\nmain::proc(){\n values :> []int{1,2}\n fmt.println(work(values[0]))\n}\n'
         self.source.write_text(raw)
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for config in ([],native.UNCHECKED):
                 result=self.call(engine,*config,command='run')
                 self.assertEqual(result.stdout,'2\n')
@@ -259,7 +260,7 @@ class NativeVetTests(unittest.TestCase):
 
     def test_supported_checks_work_with_generated_helpers_checked_and_unchecked(self):
         self.source.write_text(FEATURES)
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for config in ([],native.UNCHECKED):
                 result=self.call(engine,'-vet-semicolon','-vet-when-shadowing',*config,command='run')
                 self.assertEqual(result.stdout,'3\n')
@@ -272,22 +273,22 @@ class NativeVetTests(unittest.TestCase):
             'vet-shadowing':'x:=1;values:=[x for x in 0..<3];defer delete(values);fmt.println(x,values)',
         }.items():
             self.source.write_text('package main\nimport "core:fmt"\nmain::proc(){'+body+'}\n')
-            for engine in ('python','rust'):
+            for engine in compiler_engines():
                 error=self.call(engine,'-'+name,'-json-errors',status=1)
                 self.assertIn({'vet-cast':'Unneeded cast','vet-nil-deref':'always nil','vet-shadowing':'shadows'}[name],error.stderr)
 
     def test_no_alloc_composes_with_native_policies(self):
         self.source.write_text('#+vet no_alloc unused cast\npackage main\nmain::proc(){x:=1;_=x}\n')
-        for engine in ('python','rust'):self.call(engine)
+        for engine in compiler_engines():self.call(engine)
         self.source.write_text('#+vet no_alloc, unused, cast\npackage main\nmain::proc(){x:=1}\n')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.assertIn("'x' declared but not used",self.call(engine,status=1).stderr)
         self.source.write_text('#+vet no_alloc unused\npackage main\nmain::proc(){x:=make([]int,1);delete(x)}\n')
-        for engine in ('python','rust'):self.assertIn('no_alloc:',self.call(engine,status=1).stderr)
+        for engine in compiler_engines():self.assertIn('no_alloc:',self.call(engine,status=1).stderr)
 
     def test_unrelated_native_flags_do_not_activate_vet_projection(self):
         self.source.write_text('package main\nmain::proc(){values:=[1,2];if values[0]!=1{panic("bad")}}\n')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for flag in ('-disallow-do','-disable-non-constant-globals'):
                 with self.subTest(engine=engine,flag=flag):self.call(engine,flag)
 
@@ -301,7 +302,7 @@ class NativeVetTests(unittest.TestCase):
             self.assertNotIn('backend.native_source_checks',json.loads(profile.read_text()).get('stages',{}))
 
     def test_full_help_lists_native_flags_without_obsolete_restrictions(self):
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             compiler=native.PYTHON if engine=='python' else native.RUST
             result=subprocess.run([str(compiler),'help','build','-full'],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)

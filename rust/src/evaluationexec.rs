@@ -595,7 +595,7 @@ impl Project {
             .iter()
             .any(|flag| flag.starts_with("-max-error-count:"))
         {
-            command.arg("-max-error-count:1000");
+            command.arg("-max-error-count:10000");
         }
         crate::profile::count("evaluation.helper_compilations", 1);
         let _backend = crate::profile::span("evaluation.helper_backend");

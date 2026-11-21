@@ -1,4 +1,5 @@
 """Unused for-loop bindings have checked fixes; other unused names stay manual."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import stat
 import subprocess
@@ -15,7 +16,7 @@ class IteratorVetTests(unittest.TestCase):
 
     def applied(self, text, expected, flags=()):
         reports=[]
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 self.source.chmod(0o640)
@@ -31,8 +32,9 @@ class IteratorVetTests(unittest.TestCase):
                 _,second=self.invoke(engine,'--vet=unused','--apply')
                 self.assertEqual(second,[])
                 if flags:self.invoke(engine,*flags,command='run')
-        self.assertEqual(len(reports),2)
-        self.assertEqual(reports[0],reports[1])
+        self.assertEqual(len(reports),len(compiler_engines()))
+        for report in reports[1:]:
+            self.assertEqual(report,reports[0])
 
     def test_first_second_single_and_both_unused_bindings(self):
         text='''package main
@@ -99,7 +101,7 @@ main::proc(){
  for value,(unused_index:i8) in values {_=value}
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 compiler=native.PYTHON if engine=='python' else native.RUST
@@ -133,7 +135,7 @@ main::proc(){
  values:=[1 for item in [1,2]];defer delete(values)
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _,errors=self.invoke(engine,'--vet=unused','--apply')
@@ -190,7 +192,7 @@ main::proc(){
  if total!=6 || state!=3 {panic("iterator state")}
 }
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 self.invoke(engine,'--vet=unused','--apply')
@@ -199,7 +201,7 @@ main::proc(){
 
     def test_ask_default_checks_and_unused_rule_selection(self):
         text='package main\nmain::proc(){for unused in 0..<2 {_=0}}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             for answer,changed in [('n\n',False),('y\n',True)]:
                 with self.subTest(engine=engine,answer=answer):
                     self.write(text)
@@ -223,7 +225,7 @@ main::proc(){
 }
 '''
         expected=text.replace('import "core:thread"\n','').replace('helper::proc','helper::fn').replace(', unused_index','')
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 _,warnings=self.invoke(engine,'--apply')

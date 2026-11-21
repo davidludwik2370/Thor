@@ -1,4 +1,5 @@
 """Omitted sources select cwd without consuming options or program arguments."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -38,7 +39,7 @@ main::proc(){fmt.println("default-source")}
     def test_bare_source_commands_use_cwd_and_preserve_sources(self):
         self.write()
         original = self.source.read_bytes()
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for command in ('transpile', 'check', 'build', 'run', 'test', 'vet'):
                 with self.subTest(engine=engine, command=command):
                     marker = self.app/'test-ran.txt'
@@ -66,7 +67,7 @@ import "core:os"
 main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
 ''')
         arguments = ['first', '--help', '--output-dir=literal', '--cache-dir=value', '--', 'two words']
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for source in ([], ['.']):
                 for flags in (['-debug'], native.UNCHECKED):
                     with self.subTest(engine=engine, source=source, flags=flags):
@@ -85,7 +86,7 @@ main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
             ['--no-cache', '-o:speed', self.app],
             [self.app, '--diagnostic-format=json', '--output-dir='+str(self.root/'generated')],
         ]
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for arguments in forms:
                 with self.subTest(engine=engine, arguments=arguments):
                     result = self.invoke(engine, 'run', arguments, cwd=self.root)
@@ -99,7 +100,7 @@ main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
             ('run', ['--track-allocations']), ('check', ['.', '.']),
             ('build', ['--', 'argument']),
         ]
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             for command, arguments in cases:
                 with self.subTest(engine=engine, command=command, arguments=arguments):
                     result = self.invoke(engine, command, arguments, status=2, env=environment)
@@ -110,7 +111,7 @@ main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
         self.write()
         empty = self.app/'empty'
         empty.mkdir()
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 result = self.invoke(engine, 'build', cwd=empty, status=1)
                 self.assertNotIn('expected a source', result.stderr)
@@ -118,7 +119,7 @@ main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
 
     def test_vet_apply_defaults_to_the_current_project(self):
         text = 'package main\nimport "core:fmt"\nmain::proc(){value:=1;fmt.println(value)}\n'
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 self.write(text)
                 result = self.invoke(engine, 'vet', ['--apply'])
@@ -127,7 +128,7 @@ main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
 
     def test_implicit_and_explicit_dot_diagnostics_use_the_same_original_file(self):
         self.write('package main\nmain::proc(){/* 😀 */value:int="wrong";_=value}\n')
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 implicit = self.invoke(engine, 'check', ['-json-errors'], status=1)
                 explicit = self.invoke(engine, 'check', ['.', '-json-errors'], status=1)
@@ -147,7 +148,7 @@ main::proc(){for argument in os.args[1:]{fmt.println(argument)}}
     @unittest.skipUnless(sys.platform == 'darwin', 'Native macOS app publishing')
     def test_publish_defaults_to_cwd_with_separate_option_values(self):
         self.write()
-        for engine in ('python', 'rust'):
+        for engine in compiler_engines():
             with self.subTest(engine=engine):
                 result = self.invoke(engine, 'publish', [
                     '--app-name', 'Implicit Source', '--app-type', 'console',

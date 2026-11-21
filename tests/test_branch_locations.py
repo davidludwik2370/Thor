@@ -1,4 +1,5 @@
 """Native defer exit locations survive Thor lowering and helper captures."""
+from tests.test_rust_compiler import compiler_variants
 import subprocess
 import tempfile
 from pathlib import Path
@@ -74,7 +75,7 @@ class BranchLocationTests(unittest.TestCase):
         self.verify(text)
         with tempfile.TemporaryDirectory(prefix='thor-branch-ordinary-') as temporary:
             root=Path(temporary).resolve();source=root/'main.thor';source.write_text(text)
-            for engine,compiler in [('rust',native.RUST),('python',native.PYTHON)]:
+            for engine,compiler in compiler_variants():
                 result=subprocess.run([str(compiler),'transpile',str(source),'--output-dir',str(root/engine)],
                     capture_output=True,text=True,timeout=30)
                 self.assertEqual(result.returncode,0,result.stderr)
@@ -179,7 +180,7 @@ main::proc(){
                 reference = subprocess.run(['odin','run',str(baseline),'-file','-thread-count:1',*flags],
                     capture_output=True,text=True,timeout=45)
                 self.assertEqual(reference.returncode,0,reference.stderr)
-                for engine,compiler in [('rust',native.RUST),('python',native.PYTHON)]:
+                for engine,compiler in compiler_variants():
                     with self.subTest(engine=engine,flags=flags):
                         result = subprocess.run([str(compiler),'run',str(source),'--output-dir',str(root/engine),
                             '-thread-count:1',*flags],cwd=root,capture_output=True,text=True,timeout=60)
@@ -222,7 +223,7 @@ main::proc(){
                 reference=subprocess.run(['odin','run',str(baseline),'-file','-thread-count:1',*flags],
                     capture_output=True,text=True,timeout=45)
                 self.assertEqual(reference.returncode,0,reference.stderr)
-                for engine,compiler in [('rust',native.RUST),('python',native.PYTHON)]:
+                for engine,compiler in compiler_variants():
                     with self.subTest(engine=engine,flags=flags):
                         result=subprocess.run([str(compiler),'run',str(source),'--output-dir',str(root/engine),
                             '-thread-count:1',*flags],cwd=root,capture_output=True,text=True,timeout=60)
@@ -245,7 +246,7 @@ main::proc(){
             root = Path(temporary).resolve()
             source = root/'main.thor'
             source.write_text('package main\nmain::proc(){_=#branch_location}\n')
-            for engine,compiler in [('rust',native.RUST),('python',native.PYTHON)]:
+            for engine,compiler in compiler_variants():
                 result = subprocess.run([str(compiler),'check',str(source),'--output-dir',str(root/engine)],
                     capture_output=True,text=True,timeout=30)
                 self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)

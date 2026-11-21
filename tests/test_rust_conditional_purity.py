@@ -68,9 +68,12 @@ work::fn(value:$T)->int{when T==int{return helper(value)}else{return helper()}}
         # both call sites, then checks the unused default on helper(value).
         # Keep the frozen reference intact and require the correct native path.
         self.source.write_text(self.program('n:=3;if work(n)!=3{panic("conditional default")}',prefix))
-        reference=self.invoke('python')
-        self.assertEqual(reference.returncode,1,reference.stderr)
-        self.assertIn('outside the function',reference.stderr)
+        if native.reference_enabled():
+            reference=self.invoke('python')
+        if native.reference_enabled():
+            self.assertEqual(reference.returncode,1,reference.stderr)
+        if native.reference_enabled():
+            self.assertIn('outside the function',reference.stderr)
         result=self.invoke('rust')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'')

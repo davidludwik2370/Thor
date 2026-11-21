@@ -18,7 +18,7 @@ class RustPublishProtocolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         result=subprocess.run(['cargo','build','--manifest-path',str(ROOT/'rust/Cargo.toml'),
-            '--locked','--offline','--example','publish_protocol'],capture_output=True,text=True,timeout=120)
+            '--locked','--offline','--example','publish_protocol'],capture_output=True,text=True,timeout=600)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
 
     def test_icon_pixels_crop_warnings_and_platform_containers(self):

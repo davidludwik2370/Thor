@@ -17,12 +17,17 @@ class RustHelperOwnershipTests(unittest.TestCase):
                 result=self.compare(source,flags=flags)
                 self.assertEqual(result.stderr,'')
 
-    def test_nonconverging_alias_graph_has_a_source_contract_error(self):
-        self.compare(self.program('values:=[1,2];_=work(values[:])','''
+    def test_variadic_alias_graph_reports_the_underlying_borrowed_write(self):
+        self.source.write_text(self.program('values:=[1,2];_=work(values[:])','''
 write::proc(values:[]int,n:int){values[0]=n}
 forward::proc(n:int,values:..[]int){write(n=n,values=values[0])}
 work::fn(input:[]int)->int{forward(2,input);return input[0]}
-'''),command='check',fail='Pure storage provenance did not converge')
+'''))
+        result=self.invoke('rust',command='check')
+        self.assertEqual(result.returncode,1,result.stderr)
+        self.assertIn('storage borrowed from an input',result.stderr)
+        self.assertIn('work -> forward -> write',result.stderr)
+        self.assertNotIn('did not converge',result.stderr)
 
     def test_nonconverging_generic_contract_remains_lazy_for_ordinary_calls(self):
         self.run_profiles(self.program('''
@@ -155,9 +160,12 @@ work::fn(input:string)->int{local:=strings.clone(input);n:=len(local);delete(loc
 import "core:strings"
 work::fn(input:string)->int{local:=strings.clone(input);n:=len(local);delete(local);return n}
 '''))
-        reference=self.invoke('python',flags=native.UNCHECKED)
-        self.assertEqual(reference.returncode,1,reference.stderr)
-        self.assertIn('No parameter named',reference.stderr)
+        if native.reference_enabled():
+            reference=self.invoke('python',flags=native.UNCHECKED)
+        if native.reference_enabled():
+            self.assertEqual(reference.returncode,1,reference.stderr)
+        if native.reference_enabled():
+            self.assertIn('No parameter named',reference.stderr)
         result=self.invoke('rust',flags=native.UNCHECKED+['--track-allocations=basic'])
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'')

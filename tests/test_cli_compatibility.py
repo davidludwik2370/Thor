@@ -1,4 +1,5 @@
 """Help tiers and native commands/flags retain source-facing Thor behavior."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -63,7 +64,7 @@ main :: proc() { fmt.println(f"value {work(VALUE)}") }
 
     def test_help_tiers_topics_and_removed_spellings_without_project_or_tools(self):
         env={**os.environ,'PATH':str(self.root/'no-tools'),'THOR_ODIN':'missing-odin'}
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             overview=self.call(engine,cwd=self.root,env=env).stdout
             standard=self.call(engine,'help',cwd=self.root,env=env).stdout
             full=self.call(engine,'help','-full',cwd=self.root,env=env).stdout
@@ -82,7 +83,7 @@ main :: proc() { fmt.println(f"value {work(VALUE)}") }
                 self.assertIn('thor help',result.stderr)
 
     def test_information_commands_do_not_load_a_project(self):
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             version=self.call(engine,'version',cwd=self.root)
             self.assertEqual(version.stdout.strip(),'Thor '+native.VERSION if hasattr(native,'VERSION') else 'Thor 0.41.6')
             root=self.call(engine,'root',cwd=self.root)
@@ -99,7 +100,7 @@ main :: proc() { fmt.println(f"value {work(VALUE)}") }
 
     def test_explicit_file_test_and_other_build_modes(self):
         self.write()
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             self.call(engine,'check',self.source,'-file')
             run=self.call(engine,'run',self.source,'-file','-build-mode:exe',*native.UNCHECKED)
             self.assertEqual(run.stdout,'value 8\n')
@@ -122,7 +123,7 @@ import "core:fmt"
 unused_global :: 42
 main :: proc() { fmt.println("reports") }
 ''')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             for command, flag, text in [('build','-print-linker-flags',''),('check','-show-import-graph',str(self.app)),('check','-show-unused-with-location','unused_global'),('check','-show-defineables','')]:
                 result=self.call(engine,command,flag)
                 self.assertTrue(result.stdout,flag);self.assertIn(text,result.stdout)
@@ -155,7 +156,7 @@ main :: proc() {
 ''')
         other_os='linux' if os.name=='nt' else 'windows'
         (self.app/f'excluded_{other_os}.thor').write_text('not valid source on this platform\n')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             for flag in ['-vet-semicolon', '-vet-when-shadowing']:
                 with self.subTest(engine=engine,flag=flag):
                     # The installed Odin revision has an upstream scoped-vet parser crash.
@@ -169,13 +170,13 @@ main :: proc() {
     }
 }
 ''')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             self.assertIn("'x' declared but not used",self.call(engine,'check','-vet-unused-variables',status=1).stderr)
             self.assertIn('Warning:',self.call(engine,'check').stderr)
 
     def test_documentation_preserves_original_signatures_comments_and_format(self):
         self.write()
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             full=self.call(engine,'doc').stdout
             self.assertIn('work :: fn(x: int) -> int',full)
             self.assertIn('A documented pure procedure.',full)
@@ -212,7 +213,7 @@ main :: proc() {
     fmt.println(a,b);
 }
 '''
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             self.source.write_bytes(raw.replace('\n','\r\n').encode())
             self.source.chmod(0o640)
             backup=Path(str(self.source)+'~backup.thor-temp');backup.unlink(missing_ok=True)
@@ -248,7 +249,7 @@ main :: proc() {}
     if err!=nil { panic("write") }
 }
 ''')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             marker=self.app/'executed-tests.txt';marker.unlink(missing_ok=True)
             result=self.call(engine,'test','--vet=immutable')
             self.assertIn("Declare 'value' immutable",result.stderr)
@@ -258,7 +259,7 @@ main :: proc() {}
         library=self.root/'libraries'/'lib';library.mkdir(parents=True)
         source=library/'lib.thor';source.write_text('package lib\nanswer :: fn() -> int { return 42 }\n')
         self.write('package main\nmain :: proc() { missing() }\n')
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             result=self.call(engine,'doc','local:lib','-collection:local='+str(library.parent))
             self.assertIn('answer :: fn()',result.stdout)
             self.assertIn('lib.thor',result.stdout)
@@ -272,7 +273,7 @@ main :: proc() {}
         fake=self.root/'fake-odin'
         fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
         fake.chmod(0o755)
-        for engine in ['python','rust']:
+        for engine in compiler_engines():
             result=self.call(engine,'bundle','android','--odin',fake,'-android-keystore:key',cwd=self.root)
             self.assertEqual(result.stdout.splitlines(),['bundle','android','.','-android-keystore:key'])
             self.call(engine,'bundle','ios',cwd=self.root,status=2)

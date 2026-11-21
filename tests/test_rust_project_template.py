@@ -1,4 +1,5 @@
 """Native scaffolding matches the reference without requiring Odin or Python."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 from pathlib import Path
@@ -38,14 +39,14 @@ class RustProjectTemplateTests(unittest.TestCase):
         for index, flags in enumerate(cases):
             with self.subTest(flags=flags):
                 projects = []
-                for engine in ['python', 'rust']:
+                for engine in compiler_engines():
                     parent = self.root/f'{engine}-{index}'
                     result = self.invoke(engine, ['sample', '--parent', str(parent),
                         '--template', str(self.template), *flags])
                     self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                     projects.append(self.files(parent/'sample'))
-                self.assertEqual(*projects)
-                self.assertEqual(projects[1]['sample.thor'], self.starter)
+                if len(projects)==2:self.assertEqual(*projects)
+                self.assertEqual(projects[-1]['sample.thor'], self.starter)
         result = self.invoke('rust', ['default_project'])
         self.assertEqual(result.returncode, 0, result.stderr)
         files = self.files(self.root/'default_project')
@@ -69,13 +70,13 @@ class RustProjectTemplateTests(unittest.TestCase):
 
     def test_invalid_names_existing_projects_and_dangling_symlinks_are_preserved(self):
         for name in ['../escape', '.', '..', 'bad/name', 'two words', 'café', '.hidden']:
-            for engine in ['python', 'rust']:
+            for engine in compiler_engines():
                 with self.subTest(name=name, engine=engine):
                     result = self.invoke(engine, [name, '--parent', str(self.root/'invalid')])
                     self.assertEqual(result.returncode, 2, result.stderr)
                     self.assertIn('project name must contain', result.stderr)
                     self.assertFalse((self.root/'invalid').exists())
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             parent = self.root/engine
             parent.mkdir()
             (parent/'existing').symlink_to(parent/'missing', target_is_directory=True)
@@ -98,7 +99,7 @@ class RustProjectTemplateTests(unittest.TestCase):
                  (['--unknown'], 'unrecognized arguments'),
                  (['--open', '--no-open'], 'not allowed'),
                  (['--template'], 'expected one argument')]
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             for flags, message in cases:
                 with self.subTest(engine=engine, flags=flags):
                     result = self.invoke(engine, ['fresh', *flags])
@@ -112,7 +113,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         odin = tools/'odin'
         odin.write_text('#!/bin/sh\nexit 99\n')
         odin.chmod(0o755)
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             parent = self.root/engine
             result = self.invoke(engine, ['sample_linux', '--parent='+str(parent),
                 '--odin=custom tools/odin', '--template='+str(self.template)])
@@ -128,7 +129,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         code = tools/'code'
         code.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$THOR_TEST_EDITOR_LOG"\nexit 7\n')
         code.chmod(0o755)
-        for engine in ['python', 'rust']:
+        for engine in compiler_engines():
             log = self.root/f'{engine}.log'
             environment = {**os.environ, 'PATH': str(tools), 'THOR_TEST_EDITOR_LOG': str(log)}
             parent = self.root/engine
@@ -145,7 +146,7 @@ class RustProjectTemplateTests(unittest.TestCase):
         result = self.invoke('rust', ['runnable', '--template', str(self.template)])
         self.assertEqual(result.returncode, 0, result.stderr)
         project = self.root/'runnable'
-        for compiler in [native.PYTHON, native.RUST]:
+        for compiler in ([native.PYTHON,native.RUST] if native.reference_enabled() else [native.RUST]):
             result = subprocess.run([str(compiler), 'run', str(project)], cwd=project,
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)

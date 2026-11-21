@@ -1,4 +1,5 @@
 """Whole-line import removal and review-only unused procedure diagnostics."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import os
 import subprocess
@@ -126,7 +127,7 @@ import "core:testing"
 @(test) example::proc(t:^testing.T){_=t}
 main::proc(){}
 '''
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             compiler = native.PYTHON if engine == 'python' else native.RUST
             result = subprocess.run([str(compiler),'test',str(self.app),'--vet=unused','-json-errors',
@@ -137,7 +138,7 @@ main::proc(){}
 
     def test_unused_procedure_also_gets_pure_advice_and_is_converted_without_removal(self):
         text = 'package main\nanswer::proc()->int{return 1}\nmain::proc(){}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             _, errors = self.invoke(engine)
             self.assertEqual([error['code'] for error in errors],['thor/unused-procedure','thor/prefer-fn'])
@@ -154,7 +155,7 @@ main::proc(){}
 
     def test_explicit_discards_silence_unused_procedures_but_keep_pure_advice(self):
         text = 'package main\nanswer::proc()->int{return 1}\nmain::proc(){_=answer}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             _, errors = self.invoke(engine,'--apply')
             self.assertEqual(errors, [])
@@ -207,7 +208,7 @@ main::proc(){}
 
     def test_unused_procedure_warnings_and_source_survive_checked_and_unchecked_runs(self):
         text = 'package main\nimport "core:fmt"\nunused::proc(){fmt.println("never")}\nmain::proc(){fmt.println("ready")}\n'
-        for engine in ('python','rust'):
+        for engine in compiler_engines():
             self.write(text)
             self.invoke(engine,'--apply')
             self.assertEqual(self.source.read_text(),text)

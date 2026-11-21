@@ -1,4 +1,5 @@
 """Read-only literal backing, with native and reference compiler parity."""
+from tests.test_rust_compiler import compiler_engines
 import json
 import unittest
 from tests import test_rust_compiler as native
@@ -16,7 +17,7 @@ class ReadonlyLiteralDataTests(unittest.TestCase):
             path = self.app/name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
-        for engine in ['rust', 'python']:
+        for engine in compiler_engines():
             for options in flags or [['-debug'], native.UNCHECKED]:
                 with self.subTest(engine=engine, flags=options):
                     result = self.invoke(engine, flags=options)
@@ -145,7 +146,7 @@ if arrays[0][0]!=4 || !equal[0] || swizzles[0][0]!=2 || lengths[0]!=2 {panic("ru
             typ = f'Pair({typ})'
         self.source.write_text(self.program('values :> []Deep{}; small :> []int{1}; _=values; _=small',
             f'Pair :: struct($T: typeid) {{a, b: T}}\nDeep :: {typ}\n'))
-        for engine in ['rust', 'python']:
+        for engine in compiler_engines():
             result = self.invoke(engine, command='transpile')
             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
             generated = next((self.root/engine).rglob('main.odin')).read_text()
@@ -200,7 +201,7 @@ if values[0]!=1 {panic("explicit storage")}
     def test_type_errors_retain_original_source_positions(self):
         text = self.program('// 😀 source mapping\nvalues :> []int{1, "wrong"}\n_=values')
         self.source.write_text(text)
-        for engine in ['rust', 'python']:
+        for engine in compiler_engines():
             result = self.invoke(engine, command='check', flags=['-json-errors'])
             self.assertNotEqual(result.returncode, 0)
             errors = json.loads(result.stderr)['errors']

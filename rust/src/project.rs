@@ -1226,7 +1226,7 @@ impl Project {
                 .iter()
                 .any(|flag| flag.starts_with("-max-error-count:"))
         {
-            command.arg("-max-error-count:1000");
+            command.arg("-max-error-count:10000");
         }
         let started = std::time::Instant::now();
         let output = if self.options.raw_diagnostics {

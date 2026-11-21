@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 import subprocess
 import tempfile
+import sys
 import time
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -24,6 +25,9 @@ def main():
         root=Path(temporary)
         for case in json.loads(args.cases.read_text()):
             if args.match and not re.search(args.match,case['name']):continue
+            if case.get('platforms') and sys.platform not in case['platforms']:
+                print(case['name'],'not applicable on '+sys.platform,flush=True)
+                continue
             imports='\n'.join('import '+json.dumps('core:'+p) for p in case.get('imports',[]))
             text='package main\n'+imports+'\n'+case.get('declarations','')+'\nMARKER\nmain::proc(){'+case['body']+'}\n'
             source=root/'main.odin';source.write_text(text.replace('MARKER',''))

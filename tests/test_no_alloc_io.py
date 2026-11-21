@@ -10,7 +10,8 @@ class NoAllocIOTests(unittest.TestCase):
     setUpClass=classmethod(base.RustCompilerTests.setUpClass.__func__)
     setUp=base.RustCompilerTests.setUp
     invoke=base.RustCompilerTests.invoke
-    engines=('rust','python')
+    @property
+    def engines(self):return base.compiler_engines()
 
     def check(self,body,imports='',decl='',fail=None,flags=(),header=''):
         if '@(init)' in decl:header+='#+feature global-context\n'

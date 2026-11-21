@@ -64,7 +64,7 @@ class RustPermissionTests(unittest.TestCase):
     def setUpClass(cls):
         result=subprocess.run(['cargo','build','--release','--locked','--offline','--manifest-path',
             str(native.ROOT/'rust/Cargo.toml'),'--example','permission_protocol'],
-            capture_output=True,text=True,timeout=120)
+            capture_output=True,text=True,timeout=600)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
 
     def test_generated_expressions_match_reference_canonical_permissions(self):

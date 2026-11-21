@@ -40,7 +40,7 @@ class RustBigValueTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if shutil.which('cargo') is None or shutil.which('odin') is None:raise unittest.SkipTest('Native numeric protocol requires Cargo and Odin')
-        result=subprocess.run(['cargo','build','--release','--offline','--locked','--manifest-path',str(ROOT/'rust/Cargo.toml'),'--example','big_protocol'],capture_output=True,text=True,timeout=120)
+        result=subprocess.run(['cargo','build','--release','--offline','--locked','--manifest-path',str(ROOT/'rust/Cargo.toml'),'--example','big_protocol'],capture_output=True,text=True,timeout=600)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
 
     def compare(self,requests):

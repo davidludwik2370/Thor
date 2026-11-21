@@ -281,34 +281,73 @@ impl Lower<'_, '_> {
                 Ok(Code::concat(code))
             });
         }
-        let typ = self.native_type(a)?;
-        let typ_text = typ.clone().finish().text;
-        let condition = self.struct_dispatch_condition(&typ_text);
-        self.struct_math_busy.insert(id);
-        let native = self.render(id, expected, false);
-        self.struct_math_busy.remove(&id);
-        let native = native?;
-        let hint = Hint {
-            constant_literal: false,
-            code: typ,
-            semantic: Some(self.typ(a)),
-            element_only: false,
-            plain_array: false,
+        // One native/record dispatch for the entire operator tree. Repeating
+        // that dispatch at every unknown-type operand duplicates nested source
+        // exponentially, even though Odin eventually selects only one branch.
+        let mut nodes=HashSet::new();
+        let mut pending=vec![id];
+        let mut anchor=None;
+        while let Some(node)=pending.pop() {
+            let node=self.unparen(node);
+            let operator=Self::struct_tree_operator(self.source.node(node));
+            let extend=operator && (node==id || {
+                let typ=self.typ(node);
+                typ.is_unknown() || record(&typ)
+            });
+            let syntax=self.source.node(node);
+            if extend {
+                nodes.insert(node);
+                if syntax.kind=="Unary" {pending.push(self.role(node,"expr")?);}
+                else {pending.push(self.role(node,"right")?);pending.push(self.role(node,"left")?);}
+            } else if anchor.is_none() && !(syntax.kind=="Compound" && self.source.role(node,"type").is_none()) {
+                anchor=Some(node);
+            }
+        }
+        let anchor=anchor.unwrap_or(a);
+        let typ=self.native_type(anchor)?;
+        let condition=self.struct_dispatch_condition(&typ.finish().text);
+        let hint=Hint{constant_literal:false,code:typ,semantic:Some(self.typ(anchor)),element_only:false,plain_array:false};
+        let mut inserted=Vec::new();
+        for node in &nodes {if self.struct_math_busy.insert(*node){inserted.push(*node);}}
+        let native=self.render(id,expected,false);
+        for node in inserted {self.struct_math_busy.remove(&node);}
+        let native=native?;
+        let record=self.struct_tree_value(id,&nodes,&hint)?;
+        Ok(Code::concat([self.g("(",id),record,self.g(format!(" when {condition} else "),id),native,self.g(")",id)]))
+    }
+    fn struct_tree_operator(node:&crate::ast::Node)->bool {
+        node.kind=="Unary" && node.op=="~" || node.kind=="Binary" && matches!(node.op.as_str(),"+"|"-"|"*"|"/"|"&"|"|"|"~"|"&~"|"<<"|">>"|"**")
+    }
+    fn struct_type_anchor(&mut self,id:NodeId,typ:&Type)->NodeId {
+        let mut at=self.unparen(id);
+        while Self::struct_tree_operator(self.source.node(at)) {
+            let roles=if self.source.node(at).kind=="Unary" {&["expr"][..]}else{&["left","right"][..]};
+            let mut next=None;
+            for role in roles {
+                if let Some(child)=self.source.role(at,role) {
+                    if self.typ(child)==*typ {next=Some(self.unparen(child));break;}
+                }
+            }
+            let Some(child)=next else{break;};
+            at=child;
+        }
+        at
+    }
+    fn struct_tree_value(&mut self,id:NodeId,nodes:&HashSet<NodeId>,hint:&Hint)->Result<Code> {
+        let node=self.unparen(id);
+        if !nodes.contains(&node) {return self.struct_operand(id,hint,false);}
+        let is_unary=self.source.node(node).kind=="Unary";
+        let op=if is_unary {"~unary".to_string()}else{self.source.node(node).op.clone()};
+        let helper=self.generic_struct_helper(&op);
+        let shown=display_op(&op);
+        let token=self.struct_error(node,&format!("Cannot apply '{shown}' to struct: operands must have the same type and every named field must be a self-contained fixed-size value supporting '{shown}'; pointers, slices, strings, dynamic containers, Integer and Rational are excluded."));
+        let left=self.role(node,if is_unary{"expr"}else{"left"})?;
+        let left=self.struct_tree_value(left,nodes,hint)?;
+        let right=if is_unary {self.g("",node)}else {
+            let right=self.role(node,"right")?;
+            Code::concat([self.g(",",node),self.struct_tree_value(right,nodes,hint)?])
         };
-        let left = self.render(a, None, false)?;
-        let right = if unary(&op) {
-            Code::concat([])
-        } else {
-            Code::concat([self.g(",", id), self.struct_operand(b, &hint, false)?])
-        };
-        Ok(Code::concat([
-            self.g(format!("({helper}("), id),
-            left,
-            right,
-            self.g(format!(",{}) when {condition} else ", json!(token)), id),
-            native,
-            self.g(")", id),
-        ]))
+        Ok(Code::concat([self.g(format!("{helper}("),node),left,right,self.g(format!(",{})",json!(token)),node)]))
     }
     fn struct_shape(
         &mut self,
@@ -324,12 +363,20 @@ impl Lower<'_, '_> {
             ));
         }
         match base(typ) {
+            Type::Vector{elem,..} if !matches!(op,"**"|"<<"|">>") => {
+                self.struct_shape(elem,path,depth+1,site,op)?;
+                Ok(Shape::Leaf)
+            }
+            Type::Matrix{elem,..} if matches!(op,"+"|"-"|"*"|"/") => {
+                self.struct_shape(elem,path,depth+1,site,op)?;
+                Ok(Shape::Leaf)
+            }
             Type::Array {elem, length: Some(length)} => {
                 let shape = self.struct_shape(elem, &format!("{path}[]"), depth + 1,site,op)?;
                 if matches!(shape, Shape::Leaf) && !matches!(op, "**" | "<<" | ">>") { Ok(Shape::Leaf) }
                 else { Ok(Shape::Array(usize::try_from(*length).map_err(|_| format!("invalid array length at '{path}'"))?, Box::new(shape))) }
             }
-            Type::Scalar {name, ..} if name == "bool" && matches!(op,"&"|"|"|"~"|"~unary") => Ok(Shape::Leaf),
+            Type::Scalar {name, ..} if matches!(name.as_str(),"bool"|"b8"|"b16"|"b32"|"b64") && matches!(op,"&"|"|"|"~"|"~unary") => Ok(Shape::Leaf),
             Type::Scalar {name, ..} if (matches!(op,"&"|"|"|"~"|"&~"|"<<"|">>"|"~unary") && name.starts_with('f')) || (op=="**" && !(typ.numeric())) => Err(format!("field '{path}' does not support '{}'",display_op(op))),
             Type::Scalar {name, ..} if typ.numeric() || name=="bit_set" || name.starts_with("complex") || name.starts_with("quaternion") => Ok(Shape::Leaf),
             Type::Enum(_) if matches!(op,"**"|"~unary") => Err(format!("field '{path}' does not support '{}'",display_op(op))),
@@ -627,6 +674,7 @@ impl Lower<'_, '_> {
             None
         };
         let (typ, typ_code) = if let Some((anchor, typ)) = anchor {
+            let anchor=self.struct_type_anchor(anchor,&typ);
             (typ, self.native_type(anchor)?)
         } else if let Some(hint) = expected
             .clone()

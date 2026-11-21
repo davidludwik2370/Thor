@@ -83,9 +83,12 @@ work::fn(n:int)->int{return helper(n)}
                 # a parenthesized initializer, although it is still the same
                 # named, inspectable Odin procedure body.
                 self.source.write_text(source)
-                reference=self.invoke('python',flags=flags)
-                self.assertEqual(reference.returncode,1,reference.stderr)
-                self.assertIn('resolved direct call',reference.stderr)
+                if native.reference_enabled():
+                    reference=self.invoke('python',flags=flags)
+                if native.reference_enabled():
+                    self.assertEqual(reference.returncode,1,reference.stderr)
+                if native.reference_enabled():
+                    self.assertIn('resolved direct call',reference.stderr)
                 result=self.invoke('rust',flags=flags)
                 self.assertEqual(result.returncode,0,result.stderr)
                 self.assertEqual(result.stdout,'')

@@ -162,8 +162,10 @@ base::fn(value:int)->int{return value+1}
 derived::fn(value:int)->int{return BASE+value}
 ''' + '\n'.join(declarations) + '\nINDEPENDENT::base(5)\n')
                     self.profile(code, flags)
-                    reference = self.invoke('python', flags=flags)
-                    self.assertEqual(reference.returncode, 0, reference.stdout+reference.stderr)
+                    if native.reference_enabled():
+                        reference = self.invoke('python', flags=flags)
+                    if native.reference_enabled():
+                        self.assertEqual(reference.returncode, 0, reference.stdout+reference.stderr)
 
     def test_default_literals_batch_and_variadic_packs_keep_individual_scratch_scopes(self):
         code = self.program('''

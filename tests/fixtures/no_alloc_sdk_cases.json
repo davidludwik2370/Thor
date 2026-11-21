@@ -1614,5 +1614,100 @@
     ],
     "body": "ctx:chacha20.Context;key:[32]byte;iv:[12]byte;src,dst:[64]byte;chacha20.init(&ctx,key[:],iv[:]);chacha20.xor_bytes(&ctx,dst[:],src[:])",
     "expect": "accept"
+  },
+  {
+    "name": "bool.b8.zero.nonallocating",
+    "imports": [],
+    "body": "flag:b8;if flag{_=make([]int,1)}",
+    "expect": "accept"
+  },
+  {
+    "name": "bool.b8.zero.allocating",
+    "imports": [],
+    "body": "flag:b8;if flag==false{_=make([]int,1)}",
+    "expect": "reject"
+  },
+  {
+    "name": "bool.b16.zero.nonallocating",
+    "imports": [],
+    "body": "flag:b16;if flag{_=make([]int,1)}",
+    "expect": "accept"
+  },
+  {
+    "name": "bool.b16.zero.allocating",
+    "imports": [],
+    "body": "flag:b16;if flag==false{_=make([]int,1)}",
+    "expect": "reject"
+  },
+  {
+    "name": "bool.b32.zero.nonallocating",
+    "imports": [],
+    "body": "flag:b32;if flag{_=make([]int,1)}",
+    "expect": "accept"
+  },
+  {
+    "name": "bool.b32.zero.allocating",
+    "imports": [],
+    "body": "flag:b32;if flag==false{_=make([]int,1)}",
+    "expect": "reject"
+  },
+  {
+    "name": "bool.b64.zero.nonallocating",
+    "imports": [],
+    "body": "flag:b64;if flag{_=make([]int,1)}",
+    "expect": "accept"
+  },
+  {
+    "name": "bool.b64.zero.allocating",
+    "imports": [],
+    "body": "flag:b64;if flag==false{_=make([]int,1)}",
+    "expect": "reject"
+  },
+  {
+    "name": "posix.raw_buffer_read_write_alias",
+    "imports": [
+      "sys/posix"
+    ],
+    "platforms": [
+      "darwin",
+      "linux"
+    ],
+    "body": "buffer:[16]byte;read_alias::posix.read;_=read_alias(-1,raw_data(buffer[:]),16);_=posix.write(-1,raw_data(buffer[:]),16)",
+    "expect": "accept"
+  },
+  {
+    "name": "posix.positioned_io_descriptor_operations",
+    "imports": [
+      "sys/posix"
+    ],
+    "platforms": [
+      "darwin",
+      "linux"
+    ],
+    "body": "buffer:[16]byte;_=posix.pread(-1,raw_data(buffer[:]),16,0);_=posix.pwrite(-1,raw_data(buffer[:]),16,0);_=posix.lseek(-1,0,posix.Whence(0));_=posix.fsync(-1);_=posix.close(-1)",
+    "expect": "accept"
+  },
+  {
+    "name": "posix.vector_io",
+    "imports": [
+      "sys/posix"
+    ],
+    "platforms": [
+      "darwin",
+      "linux"
+    ],
+    "body": "vectors:[1]posix.iovec;_=posix.readv(-1,raw_data(vectors[:]),1);_=posix.writev(-1,raw_data(vectors[:]),1)",
+    "expect": "accept"
+  },
+  {
+    "name": "linux.raw_buffer_io_descriptor_operations",
+    "imports": [
+      "sys/linux"
+    ],
+    "platforms": [
+      "linux"
+    ],
+    "body": "buffer:[16]byte;_,_=linux.read(-1,buffer[:]);_,_=linux.write(-1,buffer[:]);_,_=linux.pread(-1,buffer[:],0);_,_=linux.pwrite(-1,buffer[:],0);_=linux.fsync(-1);_=linux.fdatasync(-1);_=linux.close(-1)",
+    "expect": "accept"
   }
 ]

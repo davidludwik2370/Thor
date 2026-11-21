@@ -215,6 +215,7 @@ impl Resolver<'_> {
                                 "type_is_union" => matches!(base, Type::Union(..)),
                                 "type_is_enum" => matches!(base, Type::Enum(_)),
                                 "type_is_string" => matches!(base, Type::String { .. }),
+                                "type_is_boolean" => matches!(base,Type::Scalar{name,..} if matches!(name.as_str(),"bool"|"b8"|"b16"|"b32"|"b64")),
                                 "type_is_integer" => {
                                     matches!(base,Type::Scalar{name,..}if !name.starts_with('f')&&base.numeric())
                                 }
