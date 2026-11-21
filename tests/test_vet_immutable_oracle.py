@@ -27,10 +27,14 @@ CASES={
  'global_written':('subject := 7\nchange::proc(){subject=9}', 'change();if subject!=9{panic("global write")}', ['subject'],False,False),
  'grouped_return':('','subject, companion := pair();if subject[0]+read_hands(companion[:])!=14{panic("pair")}', ['subject, companion'],True,False),
  'grouped_output_context':('record::proc(out:^Results){subject, companion := pair();out[0]=subject[0]+read_hands(companion[:])}', 'r:=make(Results);defer delete(r);record(&r);if r[0]!=14{panic("output")}', ['subject, companion'],True,False),
- 'grouped_conditional_output':('record::proc(out:^Results){when CHANGE{out[99]=1};subject, companion := pair();out[0]=subject[0]+read_hands(companion[:])}', 'r:=make(Results);defer delete(r);record(&r);if r[0]!=14{panic("output")}', ['subject, companion'],True,True),
+ 'grouped_conditional_output':('record::proc(out:^Results){when CHANGE{out[99]=1};subject, companion := pair();out[0]=subject[0]+read_hands(companion[:])}', 'r:=make(Results);defer delete(r);record(&r);if r[0]!=14{panic("output")}', ['subject, companion'],True,False),
  'grouped_element_write':('','subject, companion := pair();subject[0]=9;if subject[0]+companion[0][0]!=16{panic("write")}', ['subject, companion'],True,False),
  'grouped_reassigned':('', 'subject, companion := pair();subject=make_hand();if subject[0]+companion[0][0]!=14{panic("reassign")}', ['subject, companion'],False,False),
  'slice_output_context':('record::proc(out:^Results){subject := []int{7};out[0]=read(subject)}', 'r:=make(Results);defer delete(r);record(&r);if r[0]!=7{panic("slice")}', ['subject'],True,False),
+ 'unrelated_slice_output':('record::proc(out:^Row){subject := []int{7};out^=Row{make([]int,read(subject))}}', 'row:Row;record(&row);defer delete(row.items);if len(row.items)!=7{panic("unrelated output")}', ['subject'],True,False),
+ 'copied_array_return':('create::proc()->[2]int{subject := [2]int{7,8};if read(subject[:])!=7{panic("read")};return subject}', 'copy:=create();copy[0]=9;if copy[0]!=9{panic("independent return")}', ['subject'],True,False),
+ 'copied_array_output':('record::proc(out:^[2]int){subject := [2]int{7,8};if read(subject[:])!=7{panic("read")};out^=subject}', 'copy:[2]int;record(&copy);copy[0]=9;if copy[0]!=9{panic("independent output")}', ['subject'],True,False),
+ 'copied_fixed_results':('choose::proc()->(best:Hand,rank:int){subject, companion := pair();if read_hands(companion[:])==7{return subject,2};return subject,1}', 'a,b:=choose();if a[0]!=7 || b!=2{panic("copied results")}', ['subject, companion'],True,False),
  'slice_alias_chain':('','subject := []int{7};companion := subject;last := identity(companion);if read(last)!=7{panic("aliases")}', ['subject','companion','last'],True,False),
  'nested_slice_aliases':('','subject := Box([]int){[]int{7}};companion := subject.value;if read(companion)!=7{panic("field")}', ['subject','companion'],True,False),
  'using_slice_alias':('','using subject := Box([]int){[]int{7}};companion := value;if read(companion)!=7{panic("using slice")}', ['subject','companion'],True,False),
@@ -52,11 +56,21 @@ CASES={
  'static_local':('','@(static) subject := 7;if subject!=7{panic("static")}', ['subject'],True,False),
  'conditional_write':('','subject := 7;when CHANGE{subject=9};if subject!=(9 when CHANGE else 7){panic("conditional")}', ['subject'],True,True),
  'conditional_slice_write':('','subject := []int{7};when CHANGE{subject[0]=9};if subject[0]!=(9 when CHANGE else 7){panic("conditional slice")}', ['subject'],True,True),
+ 'conditional_reader':('inspect::proc(values:[]int)->int{when CHANGE{return values[0]+1}else{return values[0]}}', 'subject := []int{7};if inspect(subject)!=(8 when CHANGE else 7){panic("conditional reader")}', ['subject'],True,False),
+ 'constant_dead_writer':('NEVER::false\ninspect::proc(values:[]int){when NEVER{values[0]=9}}', 'subject := []int{7};inspect(subject);if subject[0]!=7{panic("constant branch")}', ['subject'],True,False),
+ 'unrelated_conditional_call':('noise::proc()->int{when CHANGE{return 1}else{return 0}}', 'subject := []int{7};if read(subject)+noise()!=(8 when CHANGE else 7){panic("unrelated call")}', ['subject'],True,False),
+ 'transitive_conditional_writer':('modify::proc(values:[]int){when CHANGE{values[0]=9}}\nforward::proc(values:[]int){modify(values)}', 'subject := []int{7};forward(subject);if subject[0]!=(9 when CHANGE else 7){panic("transitive conditional write")}', ['subject'],True,True),
+ 'conditional_switch_alias':('route::proc(values,other:[]int)->[]int{return #switch{case CHANGE:values;case:other}}', 'subject := []int{7};other:=make([]int,1);defer delete(other);alias:=route(subject,other);alias[0]=9;if subject[0]!=(9 when CHANGE else 7){panic("conditional alias")}', ['subject'],True,True),
  'conditional_opaque_call':('sink::proc(args:..any){_ = args}', 'subject := []int{7};companion := []int{8};when CHANGE{sink(subject,companion)};if subject[0]+companion[0]!=15{panic("conditional call")}', ['subject','companion'],True,True),
  'generic_conditional_reader':('work::proc(tag:$T){subject := 7;when T==int{subject=9};if subject!=7{panic("generic reader")}}', 'work(f64(1))', ['subject'],True,True),
  'generic_conditional_writer':('work::proc(tag:$T){subject := 7;when T==int{subject=9};if subject!=9{panic("generic writer")}}', 'work(1)', ['subject'],False,False),
  'escaping_result':('create::proc()->[]int{subject := make([]int,1);return subject}', 'view:>create();defer delete(view);if len(view)!=1{panic("returned view")}', ['subject'],True,True),
  'escaping_output':('create::proc(out:^Row){subject := make([]int,1);out^=Row{subject}}', 'row:Row;create(&row);defer delete(row.items);if len(row.items)!=1{panic("output view")}', ['subject'],True,True),
+ 'escaping_output_alias':('create::proc(out:^Row){destination:=out;subject := make([]int,1);destination^=Row{subject}}', 'row:Row;create(&row);defer delete(row.items);if len(row.items)!=1{panic("output alias")}', ['subject'],True,True),
+ 'escaping_output_helper':('store::proc(out:^Row,values:[]int){out^=Row{values}}\ncreate::proc(out:^Row){subject := make([]int,1);store(out,subject)}', 'row:Row;create(&row);defer delete(row.items);if len(row.items)!=1{panic("output helper")}', ['subject'],True,True),
+ 'escaping_deferred_output':('create::proc(out:^Row){subject := make([]int,1);defer out^=Row{subject}}', 'row:Row;create(&row);defer delete(row.items);if len(row.items)!=1{panic("deferred output")}', ['subject'],True,True),
+ 'escaping_union_variant':('Choice::union{Hand,int}\ncreate::proc(out:^Row){defer out.items=nil;subject := Choice(make_hand());switch &item in subject{case Hand:out.items=item[:];case int:};if len(out.items)!=2{panic("union view")}}', 'row:Row;create(&row);if row.items!=nil{panic("clear union view")}', ['subject'],True,True),
+ 'copied_union_variant':('Choice::union{Hand,int}\ncreate::proc(out:^Row){defer out.items=nil;subject := Choice(make_hand());copy:=subject;switch &item in copy{case Hand:out.items=item[:];case int:};if len(out.items)!=2{panic("union copy")}}', 'row:Row;create(&row);if row.items!=nil{panic("clear copy view")}', ['subject'],True,False),
 }
 
 
@@ -66,6 +80,55 @@ class ImmutableOracleTests(unittest.TestCase):
     write=fixtures.RustVetTests.write
     invoke=fixtures.RustVetTests.invoke
     findings=fixtures.RustVetTests.findings
+
+    def test_testing_parameter_and_sdk_conditions_do_not_block_readonly_locals(self):
+        self.write('''package main
+import "core:testing"
+import "core:math"
+@(test)
+check::proc(t:^testing.T){
+    deck := [2]int{7,8}
+    cases := []int{1,2}
+    testing.expect(t,math.abs(deck[0])+len(cases)==9)
+    if read(deck[:])+cases[1]!=9{panic("reader")}
+}
+read::proc(values:[]int)->int{return values[0]}
+main::proc(){}
+''')
+        findings=self.findings('--vet=immutable')
+        selected=[e for e in findings if e['msgs'][0] in [
+            "Declare 'deck' immutable with ':>'.","Declare 'cases' immutable with ':>'."]]
+        self.assertEqual(len(selected),2,findings)
+        self.assertTrue(all('fix' in e and not e.get('manual_review') for e in selected),selected)
+        self.invoke('--vet=immutable','--apply')
+        self.assertIn('deck :>',self.source.read_text())
+        self.assertIn('cases :>',self.source.read_text())
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='test')
+
+    def test_target_specific_reader_is_only_a_barrier_for_values_passed_to_it(self):
+        self.write('''package main
+read::proc(values:[]int)->int{return values[0]}
+main::proc(){
+    exposed := []int{7}
+    independent := []int{9}
+    platform_read(exposed)
+    if read(independent)!=9 || exposed[0]!=7{panic("platform")}
+}
+''')
+        active='windows' if os.name=='nt' else '!windows'
+        inactive='!windows' if os.name=='nt' else 'windows'
+        (self.app/'selected.thor').write_text('#+build '+active+'\npackage main\nplatform_read::proc(values:[]int){_ = values[0]}\n')
+        (self.app/'other.thor').write_text('#+build '+inactive+'\npackage main\nplatform_read::proc(values:[]int){values[0]=9}\n')
+        findings=self.findings('--vet=immutable')
+        exposed=next(e for e in findings if "'exposed'" in e['msgs'][0])
+        independent=next(e for e in findings if "'independent'" in e['msgs'][0])
+        self.assertTrue(exposed.get('manual_review'),exposed)
+        self.assertIn('fix',independent)
+        self.invoke('--vet=immutable','--apply')
+        text=self.source.read_text()
+        self.assertIn('exposed :=',text)
+        self.assertIn('independent :>',text)
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
 
     def test_manual_warnings_remain_after_safe_cleanup_and_apply_is_idempotent(self):
         text='''// 😀
@@ -108,20 +171,21 @@ main::proc(){
         return json.loads(result.stderr)['errors'],json.loads(profile.read_text())['counters']
 
     def test_large_manual_batch_uses_one_validation(self):
-        values='\n'.join(f'v_{i}:=[]int{{{i}}};total+=v_{i}[0]' for i in range(80))
-        text='package main\ncreate::proc()->[]int{total:=0;\n'+values+'''
-return make([]int,total)
-}
-main::proc(){view:>create();defer delete(view);if len(view)!=3160{panic("sum")}}
-'''
+        values='\n'.join(f'v_{i}:=one({i});total+=v_{i}[0]' for i in range(80))
+        text=('package main\none::proc(x:int)->[]int{items:=make([]int,1);items[0]=x;return items}\n'
+            'create::proc()->(result:[80][]int){total:=0;\n'+values+
+            '\nif total!=3160{panic("sum")};result=[80][]int{'+','.join(f'v_{i}' for i in range(80))+
+            '};return\n}\nmain::proc(){views:>create();for view in views{delete(view)};if len(views)!=80{panic("views")}}\n')
         findings,counters=self.profiled(text)
         self.assertEqual(len(findings),80,findings)
         self.assertTrue(all(error.get('manual_review') and 'fix' not in error for error in findings))
         self.assertEqual(counters.get('vet.validation_checks'),1,counters)
         self.assertEqual(counters.get('vet.source_snapshots',0),0,counters)
-        self.assertLessEqual(counters.get('vet.escape_types_scanned',0),4,counters)
+        self.assertEqual(counters.get('vet.safety_roots'),1,counters)
+        self.assertEqual(counters.get('vet.safety_seeds'),80,counters)
         self.invoke('--vet=immutable','--apply')
         self.assertEqual(self.source.read_text(),text)
+        for flags in [[],native.UNCHECKED]:self.invoke(*flags,command='run')
 
     def test_invalid_alias_candidates_are_rejected_together_in_large_batches(self):
         body='\n'.join(f'source_{i}:=[]int{{{i}}};alias_{i}:=source_{i};alias_{i}[0]+=1;'
@@ -187,7 +251,7 @@ def test_case(label,case):
             self.assertIn(name+(' :>' if allowed and not manual else ' :='),updated)
         for flags in [[],native.UNCHECKED]:
             self.invoke(*flags,command='run')
-        if manual and label.startswith('conditional'):
+        if 'conditional' in label:
             self.invoke(*native.UNCHECKED,'-define:CHANGE=true',command='run')
     return run
 

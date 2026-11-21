@@ -119,3 +119,8 @@ individual editor action. Per-source diagnostic hashes are shared.
 [The November 21 measurements](benchmarks/immutable-vet-2026-11-21.md) compare
 the expanded advice with the previous implementation and account for its extra
 compiler validations.
+
+The [reference-flow follow-up](benchmarks/immutable-vet-reference-flow-2026-11-21.md)
+replaces blanket signature/call-graph restrictions with candidate-specific
+permission flow. All 15 poker findings can now be applied automatically while
+genuine configuration and reference escapes remain protected.

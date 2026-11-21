@@ -28,6 +28,22 @@ readonly when its callers only read it. Doing so can also change the procedure's
 contract for future callers, so that choice requires manual review. Likewise,
 an inactive compile-time branch may write a currently unchanged variable.
 
+These restrictions follow the affected storage. An unrelated pointer/output
+parameter, an unrelated returned slice, or conditional SDK code elsewhere in the
+procedure does not prevent automatic correction. Vet reuses the slice-permission
+value graph with prospective readonly roots, sharing call summaries and type
+properties across the candidate batch. It explores compile-time alternatives,
+while literal-only constant conditions retain their known branch. A conditional
+write through an alias/helper remains protected even when inactive in this build.
+Passing a borrowed view into a target-specific implementation also requires
+review when the other implementation's contract cannot be established.
+
+Only references that actually flow into results or output stores count as
+escapes. Returning an independent array/struct copy does not export the source's
+write permissions. Slicing a referenced union variant does; slicing an
+independent union copy does not export the original union's storage. These are
+vet-only prospective checks and do not change the language's permission rules.
+
 Fully verified corrections retain their normal fix payload and editor actions.
 When a validated batch contains manual suggestions, vet separately checks the
 automatic subset before publishing it. Cleanup edits are included exactly once.
@@ -53,6 +69,9 @@ When several unconditional readonly origins fail at the same operation, its
 diagnostic retains all their declaration notes so vet rejects them together.
 Conditional origins retain their existing guards and are not treated as proven
 failures by this optimization.
+The prospective graph runs only when candidate reference paths need it; scalar
+batches skip it. Its root, seed and context counts are recorded under
+`vet.safety_roots`, `vet.safety_seeds` and `vet.safety_contexts`.
 
 `tests/test_vet_immutable_oracle.py` independently compiles original and readonly
 forms, compares vet findings with compiler acceptance, checks automatic/manual
@@ -65,3 +84,5 @@ covers grouped quick fixes, manual warnings, alias dependencies and unsaved reco
 
 [The audit benchmark](benchmarks/immutable-vet-2026-11-21.md) records wall times,
 validation counts and the cost of the newly reported findings.
+[The reference-flow follow-up](benchmarks/immutable-vet-reference-flow-2026-11-21.md)
+measures the narrower protections and verifies application on the real project.

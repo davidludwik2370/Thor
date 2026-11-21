@@ -228,6 +228,9 @@ pub struct Privileges<'a, 'r> {
     global_view_names: HashSet<String>,
     work: HashMap<(C, Ref), work::Dependencies>,
     work_weight: usize,
+    // Only the opt-in vet pass supplies prospective immutable declarations.
+    vet_seeds: Option<HashSet<Ref>>,
+    vet_stable_conditions: HashMap<Ref, bool>,
 }
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct SummaryKey {
@@ -270,6 +273,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
             view_bodies: HashMap::new(),
             global_view_names,
             work: HashMap::new(), work_weight: 0,
+            vet_seeds: None,
+            vet_stable_conditions: HashMap::new(),
         }
     }
     pub fn analyze(r: &'r mut Resolver<'a>, flags: &[String]) -> Facts {
@@ -398,39 +403,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
             this.r.end_symbol_queries(previous_queries);
             return Facts::default();
         }
-        // Only incomplete recursive callees can invalidate an already
-        // completed caller. Match the reference work queue instead of
-        // repeatedly walking every unrelated SDK body.
-        let mut visits = HashMap::<C, usize>::new();
-        while let Some(c) = this.recursive_pending.pop_first() {
-            let count = visits.entry(c).or_default();
-            if *count >= 24 {
-                continue;
-            }
-            *count += 1;
-            let Some(proc) = this.contexts[c].proc else {
-                continue;
-            };
-            let Some(body) = this.role(proc, "body") else {
-                continue;
-            };
-            let before = this.state(c);
-            this.pure_depth = usize::from(this.contexts[c].checked);
-            this.body_pass(body, c, true);
-            this.pure_depth = 0;
-            if !this.state_matches(c, &before) {
-                this.contexts[c].revision += 1;
-                if visits[&c] == 24 {
-                    this.conservative_summary(
-                        c,
-                        "verify a complex recursive slice reference graph",
-                    );
-                }
-                this.recursive_pending.insert(c);
-                this.recursive_pending
-                    .extend(this.contexts[c].callers.iter().copied());
-            }
-        }
+        this.settle_recursive();
         for c in 0..this.contexts.len() {
             let Some(proc) = this.contexts[c].proc else {
                 continue;
@@ -488,6 +461,87 @@ impl<'a, 'r> Privileges<'a, 'r> {
         }
         this.r.end_symbol_queries(previous_queries);
         this.facts
+    }
+    fn settle_recursive(&mut self) {
+        // Only incomplete recursive callees can invalidate an already
+        // completed caller. Match the reference work queue instead of
+        // repeatedly walking every unrelated SDK body.
+        let mut visits = HashMap::<C, usize>::new();
+        while let Some(c) = self.recursive_pending.pop_first() {
+            let count = visits.entry(c).or_default();
+            if *count >= 24 {
+                continue;
+            }
+            *count += 1;
+            let Some(proc) = self.contexts[c].proc else {
+                continue;
+            };
+            let Some(body) = self.role(proc, "body") else {
+                continue;
+            };
+            let before = self.state(c);
+            self.pure_depth = usize::from(self.contexts[c].checked);
+            self.body_pass(body, c, true);
+            self.pure_depth = 0;
+            if !self.state_matches(c, &before) {
+                self.contexts[c].revision += 1;
+                if visits[&c] == 24 {
+                    self.conservative_summary(
+                        c,
+                        "verify a complex recursive slice reference graph",
+                    );
+                }
+                self.recursive_pending.insert(c);
+                self.recursive_pending
+                    .extend(self.contexts[c].callers.iter().copied());
+            }
+        }
+    }
+    /// Check prospective readonly roots without changing ordinary compilation.
+    /// Explore compile-time alternatives; only actual root effects or escapes
+    /// prevent automatic application. SDK work stays demand-driven and shared.
+    pub(crate) fn vet_safety(
+        r: &'r mut Resolver<'a>, flags: &[String], seeds: HashSet<Ref>, roots: &BTreeSet<Ref>,
+    ) -> BTreeMap<Ref, &'static str> {
+        let _phase = crate::profile::span("vet.reference_safety");
+        crate::profile::count("vet.safety_roots", roots.len() as u64);
+        crate::profile::count("vet.safety_seeds", seeds.len() as u64);
+        let previous = r.begin_symbol_queries();
+        let mut this = Self::new(r, flags, false);
+        this.vet_seeds = Some(seeds);
+        this.annotations();
+        this.opaque_readonly = true;
+        let contexts = roots.iter().map(|root|
+            this.summary(*root, Substitutions::new(), None, false)).collect::<Vec<_>>();
+        this.settle_recursive();
+        let mut blocked = BTreeMap::new();
+        for issues in this.facts.issues.values() {
+            for issue in issues {
+                blocked.insert(issue.seed,
+                    "this storage reaches a write or unverified reference operation in a compile-time alternative");
+            }
+        }
+        for context in contexts {
+            for value in this.contexts[context].results.clone() {
+                let typ = this.values[value].typ.owned();
+                if !this.type_property(&typ, queries::Property::Slice) { continue; }
+                for origin in this.refs(value) {
+                    if let Some(seed) = origin.seed.filter(|_| origin.aspect != Aspect::Inline) { blocked.insert(seed,
+                        "read-only storage escapes through a result and changes its callers' contract"); }
+                }
+            }
+            for value in this.contexts[context].stores.values().copied().collect::<Vec<_>>() {
+                let typ = this.values[value].typ.owned();
+                if !this.type_property(&typ, queries::Property::Slice) { continue; }
+                for origin in this.refs(value) {
+                    if let Some(seed) = origin.seed.filter(|_| origin.aspect != Aspect::Inline) { blocked.insert(seed,
+                        "read-only storage escapes through an output parameter"); }
+                }
+            }
+        }
+        crate::profile::count("vet.safety_contexts", this.contexts.len() as u64);
+        this.r.end_symbol_queries(previous);
+        blocked
     }
     fn editor_info(&mut self) -> Vec<serde_json::Value> {
         use serde_json::json;
@@ -1021,6 +1075,9 @@ impl<'a, 'r> Privileges<'a, 'r> {
             || self.pure_depth > 0 && matches!(base_type(&old.typ), Type::String { .. })
         {
             self.values[id].data = old.data;
+            if self.vet_seeds.is_some() && matches!(base_type(&old.typ),Type::Union(..)) {
+                self.values[id].data.retain(|origin| origin.aspect != Aspect::Inline);
+            }
         }
         if references_type(&old.typ) {
             self.values[id].path = old.path;
@@ -1101,6 +1158,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 let child = self.item(v);
                 self.freeze_seen(child, seed, seen);
                 self.values[v].element = Some(child);
+            }
+            Type::Union(..) if self.vet_seeds.is_some() => {
+                // Keep the union's inline storage through a reference type
+                // switch. Ordinary copies detach this tag; slices of an
+                // aliased variant turn it into a real reference origin.
+                let origin=Origin {aspect:Aspect::Inline,..origin};
+                self.values[v].storage.insert(origin.clone());
+                self.values[v].data.insert(origin);
             }
             _ => {}
         }
@@ -2180,7 +2245,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 if kind == "WhenExpr" {
                     if let Some(value) = self
                         .role(r, "cond")
-                        .and_then(|cond| self.condition(cond, c))
+                        .and_then(|cond| self.branch_condition(cond, c))
                     {
                         return self.eval_role(r, if value { "x" } else { "y" }, c);
                     }
@@ -2227,15 +2292,26 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 result
             }
             _ => {
+                // A prospective readonly value can flow through native
+                // expression/control wrappers (including #switch results).
+                // Preserve their reference join instead of treating an
+                // unhandled reference expression as a fresh allocation.
+                let mut references = if self.vet_seeds.is_some()
+                    && self.type_property(&typ, queries::Property::Slice) {
+                    Some(Origins::new())
+                } else { None };
                 for child in self.children(r) {
                     if !matches!(
                         self.kind(child),
                         "Procedure" | "ProcedureType" | "ArrayType" | "StructType"
                     ) {
-                        self.eval(child, c);
+                        let value = self.eval(child, c);
+                        if let Some(origins) = &mut references { origins.extend(self.refs(value)); }
                     }
                 }
-                self.value(typ)
+                let result = self.value(typ);
+                if let Some(origins) = references { self.values[result].data = origins; }
+                result
             }
         }
     }
@@ -2321,7 +2397,8 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             v = self.narrow(v, inferred);
                         }
                     }
-                    if self.s(r).node(r.node).immutable {
+                    if self.s(r).node(r.node).immutable
+                        || self.vet_seeds.as_ref().is_some_and(|seeds| seeds.contains(&name)) {
                         v = self.freeze(v, name)
                     } else if self.s(r).node(r.node).mutable {
                         if writable_alias(&self.values[v].typ) {
@@ -2478,7 +2555,7 @@ impl<'a, 'r> Privileges<'a, 'r> {
                 if let Some(cond) = self.role(r, "cond") {
                     self.eval(cond, c);
                     if self.kind(r) == "When" {
-                        if let Some(value) = self.condition(cond, c) {
+                        if let Some(value) = self.branch_condition(cond, c) {
                             if let Some(body) = self.role(r, if value { "body" } else { "else" }) {
                                 self.statement(body, c);
                             }
@@ -2534,8 +2611,10 @@ impl<'a, 'r> Privileges<'a, 'r> {
                             self.values[original].typ.owned()
                         };
                         for name in &names {
-                            let mut incoming = self.narrow(original, typ.clone());
-                            if self.kind(*name) == "Unary" && self.op(*name) == "&" {
+                            let by_reference=self.kind(*name) == "Unary" && self.op(*name) == "&";
+                            let input = if self.vet_seeds.is_some() && !by_reference {self.copied(original)} else {original};
+                            let mut incoming = self.narrow(input, typ.clone());
+                            if by_reference {
                                 self.require(
                                     self.values[original].storage.clone(),
                                     *name,
@@ -3192,6 +3271,14 @@ impl<'a, 'r> Privileges<'a, 'r> {
             {
                 continue;
             }
+            if self.vet_seeds.is_some() && (self.s(candidate).info["target_specific"] == true
+                || self.s(candidate).info["file_tags"].as_array().into_iter().flatten()
+                    .filter_map(serde_json::Value::as_str).any(|tag| tag.starts_with("#+build"))) {
+                for value in &bound {
+                    let refs = self.refs(*value);
+                    self.require(refs, r, c, "verify a target-dependent reference call", vec![candidate]);
+                }
+            }
             for (index, (name, field)) in params.iter().enumerate() {
                 let v = bound[index];
                 if self.explicit_ro.contains(name) && !matches!(base_type(&self.values[v].typ), Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic) {
@@ -3600,6 +3687,34 @@ impl<'a, 'r> Privileges<'a, 'r> {
             }
         }
         None
+    }
+    fn branch_condition(&mut self, r: Ref, c: C) -> Option<bool> {
+        if self.vet_seeds.is_some() && !self.stable_condition(r, &mut HashSet::new()) { return None; }
+        self.condition(r,c)
+    }
+    // Literal-only constants cannot change with #config, target layout, or a
+    // generic specialization. Other compile-time alternatives stay explored.
+    fn stable_condition(&mut self, r: Ref, seen: &mut HashSet<Ref>) -> bool {
+        if let Some(stable) = self.vet_stable_conditions.get(&r) { return *stable; }
+        if seen.len() >= 64 || !seen.insert(r) { return false; }
+        let stable = match self.kind(r) {
+            "Literal" => true,
+            "Ident" if matches!(self.text(r).as_str(),"true"|"false"|"nil") && self.r.symbol(r).is_none() => true,
+            "Ident" => self.r.symbol(r).and_then(|index| {
+                let symbol=&self.r.symbols[index];
+                symbol.constant.then_some(symbol.reference)
+            }).is_some_and(|decl| {
+                let values=self.group(decl,"values");
+                values.len()==1 && self.stable_condition(values[0],seen)
+            }),
+            "Paren" | "Unary" => self.role(r,"expr").is_some_and(|value| self.stable_condition(value,seen)),
+            "Binary" => self.role(r,"left").zip(self.role(r,"right"))
+                .is_some_and(|(left,right)| self.stable_condition(left,seen) && self.stable_condition(right,seen)),
+            _ => false,
+        };
+        seen.remove(&r);
+        self.vet_stable_conditions.insert(r,stable);
+        stable
     }
     fn condition(&mut self, r: Ref, c: C) -> Option<bool> {
         if let Some(value) = self

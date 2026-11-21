@@ -259,51 +259,6 @@ fn field_types(resolver: &mut Resolver<'_>, signature: Ref, role: &str) -> Vec<T
         })
         .collect()
 }
-// Only reference-bearing destinations can export a newly readonly slice.
-// In particular ^map[int]Value does not expose one when Value is self-contained.
-fn carries_view(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>) -> bool {
-    carries_view_inner(typ,resolver,known,0)
-}
-fn carries_view_inner(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>, depth: usize) -> bool {
-    if let Some(value) = known.get(typ) { return *value; }
-    if depth > 32 { return true; }
-    known.insert(typ.clone(), true);
-    crate::profile::count("vet.escape_types_scanned", 1);
-    let value = match typ {
-        Type::Slice(_) | Type::Soa(_) | Type::Unknown | Type::Generic
-        | Type::BigInteger | Type::BigRational => true,
-        Type::Nominal(_, base) | Type::Pointer(base) | Type::Dynamic(base) | Type::Set(base)
-        | Type::Array {elem:base,..} | Type::Fixed {elem:base,..} => carries_view_inner(base, resolver, known,depth+1),
-        Type::Map {key,value} => carries_view_inner(key, resolver, known,depth+1) || carries_view_inner(value, resolver, known,depth+1),
-        Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)
-            .iter().any(|(_,typ)| carries_view_inner(typ, resolver, known,depth+1)),
-        Type::Union(..) => resolver.union_variants(typ)
-            .iter().any(|typ| carries_view_inner(typ, resolver, known,depth+1)),
-        Type::Scalar {name,..} => matches!(name.as_str(), "rawptr" | "any"),
-        _ => false,
-    };
-    known.insert(typ.clone(), value);
-    value
-}
-fn reference_output(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>) -> bool {
-    reference_output_inner(typ,resolver,known,0)
-}
-fn reference_output_inner(typ: &Type, resolver: &mut Resolver<'_>, known: &mut HashMap<Type, bool>, depth: usize) -> bool {
-    if depth > 32 { return true; }
-    match typ {
-        Type::Nominal(_, base) => reference_output_inner(base, resolver, known,depth+1),
-        Type::Pointer(base) | Type::Slice(base) | Type::Dynamic(base) | Type::Soa(base)
-        | Type::Set(base) => carries_view(base, resolver, known),
-        Type::Map {key,value} => carries_view(key,resolver,known) || carries_view(value,resolver,known),
-        Type::Array {elem,..} | Type::Fixed {elem,..} => reference_output_inner(elem,resolver,known,depth+1),
-        Type::Struct(_) | Type::Record(..) | Type::Anonymous(_) => resolver.record_fields(typ)
-            .iter().any(|(_,field)| reference_output_inner(field,resolver,known,depth+1)),
-        Type::Union(..) => resolver.union_variants(typ)
-            .iter().any(|variant| reference_output_inner(variant,resolver,known,depth+1)),
-        Type::Unknown | Type::Generic => true,
-        _ => false,
-    }
-}
 // A correction lives in source shared by future targets and #config values.
 // Current-target validation cannot establish every inactive implementation.
 #[derive(Default)]
@@ -395,7 +350,9 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
     let mut result = vec![];
     let mut portable = PortableBodies::default();
     let mut inline_types = HashMap::new();
-    let mut escape_types = HashMap::new();
+    let mut safety_roots = BTreeSet::new();
+    let mut safety_seeds = HashSet::new();
+    let mut safety_fixes = Vec::new();
     for (file, source) in project.sources.iter().enumerate() {
         if !source.thor || source.excluded || !source.path.starts_with(root) {
             continue;
@@ -498,24 +455,7 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                 if owner.is_none() {
                     manual = Some("a global binding can be used by callers outside this compilation");
                 }
-                if let Some(owner) = owner.filter(|_| aliases_storage && changes_views) {
-                    if !portable.check(&mut resolver, Ref {file,node:owner}, true) {
-                        manual = Some("read-only views cross compile-time or target-dependent code");
-                    }
-                // Returning a readonly alias changes an API used by callers
-                // outside this entry point. Keep that ownership choice explicit.
-                    let signature = source.role(owner, "type").unwrap_or(owner);
-                    let outputs = field_types(&mut resolver, Ref {file,node:signature}, "results");
-                    if outputs.iter().any(|typ| carries_view(typ, &mut resolver, &mut escape_types)) {
-                        manual = Some("read-only storage could escape through a result and change its callers' contract");
-                    }
-                    // Output parameters can expose the same ownership contract
-                    // as a returned alias to callers outside this entry point.
-                    let inputs = field_types(&mut resolver, Ref {file,node:signature}, "params");
-                    if inputs.iter().any(|typ| reference_output(typ, &mut resolver, &mut escape_types)) {
-                        manual = Some("read-only storage could escape through an output parameter");
-                    }
-                }
+                let safety_owner = owner.filter(|_| aliases_storage && changes_views);
                 let generic_local = source.ancestors(id).filter(|owner| source.node(*owner).kind == "Procedure")
                     .any(|owner| !crate::specialization::parameters(Ref {file,node:owner}, &resolver).is_empty());
                 // A check of this entry point cannot establish write access for
@@ -561,6 +501,11 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                             }
                             pending.extend(syntax.children.iter().copied());
                         }
+                    }
+                    if let Some(owner) = safety_owner {
+                        safety_roots.insert(Ref {file,node:owner});
+                        safety_seeds.extend(names.iter().map(|node| Ref {file,node:*node}));
+                        safety_fixes.push((result.len(), names.iter().map(|node|Ref {file,node:*node}).collect::<Vec<_>>()));
                     }
                     result.push(Fix {
                         file,
@@ -646,6 +591,15 @@ pub fn candidates(project: &Project, checks: &[String]) -> Vec<Fix> {
                     manual: None,
                     borrows: Vec::new(),
                 });
+            }
+        }
+    }
+    if !safety_roots.is_empty() {
+        let safety = crate::privileges::Privileges::vet_safety(
+            &mut resolver, &project.options.flags, safety_seeds, &safety_roots);
+        for (index,names) in safety_fixes {
+            if let Some(reason) = names.iter().find_map(|name| safety.get(name)) {
+                result[index].manual.get_or_insert(*reason);
             }
         }
     }

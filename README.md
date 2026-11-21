@@ -757,9 +757,11 @@ ownership and allocation behavior. Converting a procedure to `fn` enables its
 normal automatic compile-time evaluation with known arguments.
 
 Immutable corrections preserve ownership choices across API results and
-reference-capable output parameters. Compiler-accepted reference-sensitive locals
-in these procedures receive manual-review warnings. Unrelated outputs that cannot
-carry readonly views support ordinary immutable corrections.
+reference-capable output parameters. Compiler-accepted locals whose readonly
+references actually escape receive manual-review warnings. Unrelated output
+parameters and independent value copies support ordinary immutable corrections,
+even when the procedure also calls conditional SDK implementations. Conditional
+writes through the affected value remain protected.
 
 Reviewed library argument contracts also bound vet's portability analysis.
 Printing a value, including a slice or a zipped row, permits immutable advice

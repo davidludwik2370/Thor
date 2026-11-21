@@ -60,8 +60,8 @@ blocked::proc(x:int)->int{return cycle_a(x)}
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertEqual(len(json.loads(result.stderr)['errors']),80)
         counters=json.loads(profile.read_text())['counters']
-        self.assertEqual(counters.get('vet.portability_body_scans'),2,counters)
-        self.assertEqual(counters.get('vet.contract_calls_skipped'),1,counters)
+        self.assertEqual(counters.get('vet.safety_roots'),1,counters)
+        self.assertEqual(counters.get('vet.safety_contexts'),2,counters)
         self.assertEqual(counters.get('vet.validation_checks'),1,counters)
 
     def test_inline_index_copies_are_immutable_despite_unrelated_output_parameters(self):
@@ -104,7 +104,7 @@ main::proc(){
                 hand=[error for error in errors if error['msgs'][0]=="Declare 'hand' immutable with ':>'."]
                 self.assertEqual(len(hand),1,errors)
                 self.assertIn('fix',hand[0])
-                self.assertTrue(all(error.get('manual_review') for error in errors if error not in hand),errors)
+                self.assertTrue(all(error['code']=='thor/prefer-immutable' for error in errors),errors)
                 self.assertEqual(self.source.read_text(),text)
                 self.invoke('--vet=immutable','--apply')
                 self.assertIn('hand :> deal[i]',self.source.read_text())

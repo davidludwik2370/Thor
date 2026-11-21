@@ -152,6 +152,24 @@ main::proc(){view:>create();defer delete(view);if len(view)!=1{panic("length")}}
         client.diagnostic(path.as_uri(),empty=True)
         self.assertEqual(path.read_text(),text)
 
+    def test_unrelated_reference_parameter_and_conditional_helper_keep_quick_fixes(self):
+        text='''package main
+Row::struct{items:[]int}
+CHANGE::#config(CHANGE,false)
+read::proc(values:[]int)->int{when CHANGE{return values[0]+1}else{return values[0]}}
+work::proc(out:^Row){
+    values := []int{7}
+    out^=Row{make([]int,read(values))}
+}
+main::proc(){row:Row;work(&row);delete(row.items)}
+'''
+        client,path=self.open(text,vet=True)
+        errors=client.diagnostic(path.as_uri(),code='thor/prefer-immutable')
+        warning=next(e for e in errors if e['range']['start']==self.position(text,'values :=',0))
+        self.assertNotIn('Manual review',warning['message'])
+        actions=self.actions(client,path,text,'values :=')
+        self.assertTrue(any(action['title']=='Make declaration immutable' for action in actions),actions)
+
     def test_alias_sources_offer_a_single_edit_only_after_the_alias_is_readonly(self):
         text='package main\nmain::proc(){values := []int{7};alias := values;if alias[0]!=7{panic("alias")}}\n'
         client,path=self.open(text,vet=True)
