@@ -3,7 +3,7 @@
   "displayName": "Thor Language",
   "description": "Thor language tools, TLS, and source-mapped CodeLLDB debugging.",
   "publisher": "thor-local",
-  "version": "0.22.1",
+  "version": "0.22.2",
   "icon": "images/emblem.png",
   "license": "MIT",
   "engines": {
@@ -132,6 +132,18 @@
           ],
           "default": "off",
           "description": "Trace TLS protocol messages in the output panel."
+        },
+        "tls.comptime": {
+          "type": "string",
+          "enum": [
+            "required",
+            "normal",
+            "aggressive",
+            "override"
+          ],
+          "default": "normal",
+          "scope": "resource",
+          "description": "Thor compile-time execution policy for live diagnostics. Use the matching --comptime mode in build/run commands. Override ignores #runtime barriers; purity and ownership rules remain enforced."
         }
       }
     },

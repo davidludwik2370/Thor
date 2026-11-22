@@ -146,6 +146,24 @@ impl<'a, 'r> Check<'a, 'r> {
         sdk_verified: std::rc::Rc<std::cell::Cell<bool>>,
         overlays: &'a std::collections::BTreeMap<std::path::PathBuf, String>,
     ) -> Result<()> {
+        Self::analyze_entry(r,inspected,sdk_verified,overlays,None)
+    }
+    /// Optional execution cannot erase observable custom-allocator calls.
+    /// Prove the selected specialization for every runtime input value.
+    pub(crate) fn ordinary_allocation_free(
+        r: &'r mut Resolver<'a>, procedure:Ref, bindings:Substitutions,
+        overlays: &'a std::collections::BTreeMap<std::path::PathBuf,String>,
+    )->bool {
+        Self::analyze_entry(r,&Default::default(),std::rc::Rc::new(std::cell::Cell::new(false)),
+            overlays,Some((procedure,bindings))).is_ok()
+    }
+    fn analyze_entry(
+        r: &'r mut Resolver<'a>,
+        inspected: &std::collections::BTreeSet<std::path::PathBuf>,
+        sdk_verified: std::rc::Rc<std::cell::Cell<bool>>,
+        overlays: &'a std::collections::BTreeMap<std::path::PathBuf, String>,
+        entry:Option<(Ref,Substitutions)>,
+    )->Result<()> {
         let mut this = Self {
             budget: r
                 .sources
@@ -164,7 +182,9 @@ impl<'a, 'r> Check<'a, 'r> {
             failure: failure::State::default(),
             random: random::State::default(),
         };
-        this.roots()?;
+        if let Some((at,bindings))=entry {
+            this.queue.push_back(Work{at,bindings,root:at,path:None,procedure:true,arguments:vec![]});
+        } else {this.roots()?;}
         while let Some(work) = this.queue.pop_front() {
             if !this.r.active_definition(work.at) {
                 continue;

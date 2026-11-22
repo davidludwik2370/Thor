@@ -29,6 +29,8 @@ pub struct Error {
     /// A migration gap is different from an invalid Thor program.
     pub unsupported: bool,
     pub exit_status: u8,
+    /// Source-level rejection before a helper executes; optional folding may defer.
+    pub evaluation_ineligible: bool,
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -57,6 +59,7 @@ impl Error {
             diagnostics: vec![],
             unsupported: false,
             exit_status: 1,
+            evaluation_ineligible: false,
         }
     }
     pub fn usage(message: impl Into<String>) -> Self {
@@ -72,6 +75,7 @@ impl Error {
             message: message.clone(),
             unsupported: false,
             exit_status: 1,
+            evaluation_ineligible: false,
             diagnostics: vec![json!({"type":"error", "stage":"thor", "pos": {
                 "file":source.path, "offset":span.start, "end_offset":span.end,
                 "line":line, "column":column,"end_line":end_line,"end_column":end_column}, "msgs":[message]})],

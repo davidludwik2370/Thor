@@ -749,12 +749,17 @@ The marker preserves the operand's value/type, evaluation order, ownership, and
 read-only slice permissions. It does not allocate, add runtime dispatch, or
 disable Odin's optimizer; the native optimizer can still inline/fold emitted code.
 
-A required compile-time context, such as `VALUE :: #runtime calculate(7)`, is an
-error. Explicit `#run` cannot execute a retained runtime barrier either. A `fn`
+With `required`, `normal`, or `aggressive` execution policy, a required
+compile-time context, such as `VALUE :: #runtime calculate(7)`, is an error. Explicit `#run` cannot execute a retained runtime barrier either. A `fn`
 containing a barrier can still be called at runtime; automatic evaluation must
 respect barriers reached through its callees. Inactive native `when` branches,
 including selected generic specializations, do not introduce a barrier. Existing purity rules remain in
 force. This is not an escape hatch for impure code in a `fn`.
+
+`--comptime=override` explicitly removes these barriers, including inside helper
+projects and transitive callees. All other eligibility and ownership checks
+remain in force. `--comptime=required` retains explicit `#run` while suppressing
+optional execution. See [compile-time execution modes](comptime-modes.md).
 
 <a id="dir-switch"></a>
 ### `#switch` — compile-time branch selection

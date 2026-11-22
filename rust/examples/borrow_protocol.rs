@@ -114,6 +114,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             overlays: Default::default(),
             editor_info: false,
             run_timeout: std::time::Duration::from_secs(5),
+            comptime: Default::default(),
             clear_cache: false,
             cache_report: false,
             raw_diagnostics: false,

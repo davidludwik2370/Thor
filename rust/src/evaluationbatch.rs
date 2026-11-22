@@ -50,7 +50,8 @@ impl Scheduler<'_> {
         }) { return None; }
         let plans = self.resolver.call_plans(node, &Substitutions::new());
         let [plan] = plans.as_slice() else { return None; };
-        if self.source(plan.procedure).node(plan.procedure.node).data["pure"] != true
+        if (self.source(plan.procedure).node(plan.procedure.node).data["pure"] != true
+            && !self.project.options.comptime.aggressive())
             || self.source(plan.procedure).ancestors(plan.procedure.node)
                 .any(|owner| self.source(plan.procedure).node(owner).kind == "Procedure")
             || !crate::specialization::parameters(plan.procedure, &self.resolver).is_empty()

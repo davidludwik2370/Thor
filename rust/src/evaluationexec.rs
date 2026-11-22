@@ -418,6 +418,7 @@ impl Project {
                 overlays: self.options.overlays.clone(),
                 editor_info: false,
                 run_timeout: self.options.run_timeout,
+                comptime: self.options.comptime,
                 clear_cache: false,
                 cache_report: false,
                 raw_diagnostics: false,
@@ -522,7 +523,9 @@ impl Project {
         crate::profile::count("evaluation.helper_preparations", 1);
         let work = Temporary::new()?;
         let mut helper =
-            self.evaluation_helper_with_context(expression, work.path.join("source"), context, mode)?;
+            self.evaluation_helper_with_context(expression, work.path.join("source"), context, mode).map_err(|mut error| {
+                error.evaluation_ineligible = !error.diagnostics.is_empty(); error
+            })?;
         if let Some(plan) = &helper.evaluation {
             helper.specialized.retain(|node, cases| {
                 if !plan.emits(&helper.sources[node.file], node.node) {
@@ -545,7 +548,9 @@ impl Project {
             &mut cases,
         )?;
         helper.specialized = cases;
-        let target = helper.lower()?;
+        let target = helper.lower().map_err(|mut error| {
+            error.evaluation_ineligible = !error.diagnostics.is_empty(); error
+        })?;
         let flags = helper.native_flags();
         let mut cache = context.cache.map(|cache| cache.borrow_mut());
         let generated = if cache.as_ref().is_some_and(|cache| cache.enabled) {
@@ -664,6 +669,7 @@ impl Project {
                     diagnostics,
                     unsupported: false,
                     exit_status: 1,
+                    evaluation_ineligible: true,
                 });
             }
             let detail = String::from_utf8_lossy(if built.stderr.is_empty() {

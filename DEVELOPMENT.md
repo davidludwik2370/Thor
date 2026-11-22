@@ -4089,3 +4089,43 @@ in the three compiler/TLS/native/interaction groups pass. Add seven dedicated
 performance/correctness regressions, including cached/uncached and eager/on-demand
 diagnostic comparisons, recursive aliases and unused-body checks. Four affected
 real projects build without source edits. See [the complete report](docs/test-performance-2026-11-08.md).
+
+
+## Compile-time execution policy (2026-11-21)
+
+Add `--comptime=required|normal|aggressive|override` to the maintained Rust CLI.
+Normal remains the default and retains the existing scheduler's early exits.
+Required suppresses optional execution while retaining explicit requests,
+constant/type contexts, native branch conditions and constant parameter defaults.
+Aggressive considers ordinary calls; override additionally removes `#runtime`
+barriers, including in transitive helper bodies. Vet validation and live TLS
+checks inherit the selected policy. VS Code client 0.22.2 adds `tls.comptime`.
+The frozen Python compiler remains unchanged.
+
+Ordinary automatic results must be self-contained fixed-size values. Verify
+purity and allocation freedom before optional execution so that borrowed result
+aliases, cleanup responsibilities and ordinary custom-allocator effects remain
+unchanged. A source-level helper rejection can retain an optional ordinary call
+at runtime, but execution failures/timeouts remain compilation errors. Explicit
+`#run` and declared `fn` retain their existing scratch/materialization contracts.
+
+Reuse proofs by target, type/constant specialization, argument shape and captured
+lexical bindings. Refresh result-type classifications across generic contexts;
+a local record's nominal identity need not describe its captured field types.
+Request, prepared and scalar cache identities include the policy. Scalar batching
+also accepts eligible ordinary calls, with the existing bounds and failure
+isolation. No new runtime wrappers, library ABI or native compiler changes.
+
+Validation covers 32 native mode tests, five live TLS tests, 428 existing
+regression cases plus one Windows-only skip, 98 Rust unit tests, 151 editor tests,
+1,169 native TLS tests in both checked and unchecked builds, all Cargo targets,
+and seven assertion-hygiene checks. The direct Options initializers in the Rust
+harnesses were updated; all 42 scheduling cases pass after that correction.
+
+Seven alternating warm transpile samples against pre-change `c4de374` show
+49/49 ms (plain), 142/143 ms (features), and 494/491 ms (poker_pmap).
+Generated Odin matches after output-path normalization, including explicit
+normal versus the default. Normal performs zero ordinary-policy verifications.
+See [the raw validation/timing record](docs/validation/comptime-modes-2026-11-21.json),
+[the contract](docs/comptime-modes.md), and
+[the executable walkthrough](examples/comptime_modes/demo.thor).

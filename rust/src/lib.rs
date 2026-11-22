@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 pub mod ast;
 pub mod cli;
+pub mod comptime;
 pub mod compiler_output;
 pub mod bigconstantvalue;
 pub mod bigstatic;

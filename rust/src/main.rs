@@ -210,6 +210,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                 | "--diagnostic-format"
                 | "--overlay"
                 | "--run-timeout"
+                | "--comptime"
                 | "--track-allocations"
                 | "--app-name"
                 | "--app-id"
@@ -252,6 +253,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
         overlays: Default::default(),
         editor_info: false,
         run_timeout: std::time::Duration::ZERO,
+        comptime: Default::default(),
         clear_cache: false,
         cache_report: false,
         raw_diagnostics: false,
@@ -277,6 +279,7 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                     | "--diagnostic-format"
                     | "--overlay"
                     | "--run-timeout"
+                    | "--comptime"
                     | "--track-allocations"
                     | "--app-name"
                     | "--app-id"
@@ -352,6 +355,10 @@ fn run(mut args: Vec<String>) -> Result<i32> {
                 options.json = format == "json";
             }
             "--diagnostic-format=json" | "-json-errors" => options.json = true,
+            "--comptime" => {
+                let value=args.next().ok_or_else(||Error::usage("--comptime requires required, normal, aggressive, or override"))?;
+                options.comptime=thor_compiler::comptime::Mode::parse(&value)?;
+            }
             "--run-timeout" => {
                 let value = args.next().ok_or_else(|| Error::usage("--run-timeout requires seconds"))?;
                 options.run_timeout = parse_run_timeout(&value)?;

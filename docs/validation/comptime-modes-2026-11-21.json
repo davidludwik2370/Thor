@@ -1,0 +1,149 @@
+{
+  "baseline_commit": "c4de374",
+  "policy": "default normal",
+  "scope": "transpile only; shared SDK/parser cache retained; project evaluation caches cold then warm; no concurrent builds/tests during timings",
+  "cases": [
+    {
+      "name": "plain",
+      "source_sha256": {
+        "main.thor": "e718413f3630553a4198713777e13b98bc4981d9c069b25ea4e19d678a68d05d"
+      },
+      "cold_seconds": {
+        "baseline": 0.6704903339850716,
+        "current": 0.29123566701309755
+      },
+      "warm_seconds": {
+        "baseline": [
+          0.04970899998443201,
+          0.05057699998724274,
+          0.048982291016727686,
+          0.048884416988585144,
+          0.04863379098242149,
+          0.048691832984331995,
+          0.04885691698291339
+        ],
+        "current": [
+          0.04966583399800584,
+          0.04967729200143367,
+          0.045548041991423815,
+          0.04865620899363421,
+          0.048664000001735985,
+          0.04857970800367184,
+          0.048793041991302744
+        ]
+      },
+      "median_seconds": {
+        "baseline": 0.048884416988585144,
+        "current": 0.048664000001735985
+      },
+      "generated_source_identical": true,
+      "normal_policy_verifications": 0
+    },
+    {
+      "name": "features",
+      "source_sha256": {
+        "main.thor": "f36d80802cd788e851ecc9ac7fe3ce9a1a6bcae6b6880137cd1d99a6a2f77f84"
+      },
+      "cold_seconds": {
+        "baseline": 0.7385763339989353,
+        "current": 0.5215468749811407
+      },
+      "warm_seconds": {
+        "baseline": [
+          0.1568261249922216,
+          0.1422822920139879,
+          0.14203962500323541,
+          0.14207475000876002,
+          0.14292725000996143,
+          0.14249691701843403,
+          0.14561791700543836
+        ],
+        "current": [
+          0.1426500829984434,
+          0.14269712497480214,
+          0.1423194999806583,
+          0.1424025839951355,
+          0.14283250001608394,
+          0.1428438750153873,
+          0.14175441599218175
+        ]
+      },
+      "median_seconds": {
+        "baseline": 0.14249691701843403,
+        "current": 0.1426500829984434
+      },
+      "generated_source_identical": true,
+      "normal_policy_verifications": 0
+    },
+    {
+      "name": "poker_pmap",
+      "source_sha256": {
+        "poker_test.thor": "5e3c6a5772c54595ff167c53ecd68ef0e609c4d08e23daec8d2b906a55342dfb",
+        "judge_test.thor": "80fff1b39febe854a66269ad0b7aa3675bbd58791ea693f8eaf924d0ca696a65",
+        "simulation_test.thor": "f17ad177deb55907f77bc1c0a2ebbb12f6130c22755cd4d44890dc64d15ad5c5",
+        "poker.thor": "9caa48af2f47aac48b1ac96d576b86247d1e2f9f58e60322fe46b4f23302f1a8"
+      },
+      "cold_seconds": {
+        "baseline": 1.8464158330170903,
+        "current": 1.8368769169901498
+      },
+      "warm_seconds": {
+        "baseline": [
+          0.5055152080021799,
+          0.4882826249813661,
+          0.4926267910050228,
+          0.5023574579972774,
+          0.49052550000487827,
+          0.49428725001052953,
+          0.5052542090124916
+        ],
+        "current": [
+          0.4923268749844283,
+          0.4935587920190301,
+          0.48884612499387003,
+          0.4917029999778606,
+          0.4882064580160659,
+          0.49057745799655095,
+          0.49052066600415856
+        ]
+      },
+      "median_seconds": {
+        "baseline": 0.49428725001052953,
+        "current": 0.49057745799655095
+      },
+      "generated_source_identical": true,
+      "normal_policy_verifications": 0
+    }
+  ],
+  "validation": {
+    "existing_regression_selection": {
+      "selected": 429,
+      "passed": 428,
+      "skipped": 1,
+      "skip_reason": "Windows-specific process exit statuses; run on macOS",
+      "note": "Updated direct Options initializers in all Rust harnesses; all 42 scheduling cases passed on rerun. Other 386 cases passed."
+    },
+    "new_mode_cases": {
+      "native": 32,
+      "live_tls": 5
+    },
+    "rust_unit_tests": 98,
+    "editor_tests": 151,
+    "native_tls_checked": 1169,
+    "native_tls_unchecked": 1169,
+    "assertion_hygiene": 7,
+    "all_cargo_targets_check": true,
+    "frozen_python_reference_unchanged": true,
+    "demo_checked_and_unchecked_modes": 8
+  },
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "compiler_sha256": {
+    "baseline": "ed7392c350d583005246b927140f54b15878fe8ebf0c9c2f897a731a65930928",
+    "current": "56708cc540b5effd6adbe1f42a0db0277a5946481f9526f6965a09afb8ddafbd"
+  },
+  "comparison_notes": [
+    "Seven alternating warm samples per engine, measured with other compiler tests/builds stopped.",
+    "Generated Odin compared after normalizing the separate output directories; default also compared with explicit --comptime=normal.",
+    "First project-cache runs include shared system/runtime cache effects; do not interpret them as a controlled cold-machine comparison."
+  ]
+}

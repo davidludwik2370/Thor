@@ -712,6 +712,7 @@ impl Validator<'_> {
             .arg(overlay)
             .arg("--output-dir")
             .arg(self.directory.join("output"))
+            .arg(format!("--comptime={}",self.project.options.comptime.name()))
             .arg("--run-timeout")
             .arg(self.project.options.run_timeout.as_secs_f64().to_string())
             .arg("-json-errors");

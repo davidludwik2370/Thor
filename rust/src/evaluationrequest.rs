@@ -81,7 +81,7 @@ impl Project {
             &json!({"schema":2,"identity":identity,
                 "entry":self.options.entry,"file_entry":self.file_entry,"flags":flags,
                 "test":self.frontend.test,"target":self.frontend.target,"overlays":self.options.overlays,
-                "collections":self.collections,"sources":sources,"expression":expression,"mode":mode,
+                "collections":self.collections,"sources":sources,"expression":expression,"mode":mode,"comptime":self.options.comptime.name(),
                 "results":context.results.iter().collect::<Vec<_>>(),"skips":context.skips.iter().collect::<Vec<_>>(),
                 "bindings":bindings(context.bindings),"cases":cases,"frames":frames,
                 "witnesses":self.evaluation_witnesses.iter().collect::<Vec<_>>()

@@ -378,6 +378,7 @@ impl Frontend {
                 diagnostics: errors,
                 unsupported: false,
                 exit_status: 1,
+                evaluation_ineligible: false,
             });
         }
         let source = Source::from_frontend_bytes(path, raw, &stdout, thor)?;

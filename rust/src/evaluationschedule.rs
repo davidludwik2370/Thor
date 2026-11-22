@@ -7,6 +7,8 @@ use serde_json::Value;
 use std::time::Duration;
 #[path = "evaluationcall.rs"]
 mod call;
+#[path = "evaluationpolicy.rs"]
+mod policy;
 #[path = "evaluationinteger.rs"]
 mod integer;
 #[path = "evaluationprepared.rs"]
@@ -33,6 +35,8 @@ pub struct Scheduler<'p> {
     guard_busy: BTreeSet<(Ref, String)>,
     explicit_arguments: usize,
     has_pure: bool,
+    policy_types: std::collections::HashMap<Type,bool>,
+    policy_calls: BTreeMap<(Ref,String),bool>,
     has_runtime: bool,
     runtime_barriers: BTreeMap<(Ref,String),bool>,
     schedule_generics: bool,
@@ -84,6 +88,8 @@ impl<'p> Scheduler<'p> {
             busy: BTreeSet::new(),
             guard_busy: BTreeSet::new(),
             explicit_arguments: 0,
+            policy_types: Default::default(),
+            policy_calls: Default::default(),
             has_pure: project
                 .sources
                 .iter()
@@ -111,8 +117,8 @@ impl<'p> Scheduler<'p> {
         serde_json::json!({"stats":cache.stats,"prepared_hits":cache.prepared_hits,"scalar_reused":self.scalar_witnesses.len()})
     }
     fn prepare_work_sources(&mut self) {
-        self.schedule_generics = self.has_pure;
-        if self.has_pure {
+        self.schedule_generics = self.has_pure || self.project.options.comptime.aggressive();
+        if self.schedule_generics {
             return;
         }
         let mut sources = BTreeSet::new();
@@ -454,7 +460,9 @@ impl<'p> Scheduler<'p> {
         true
     }
     pub fn automatic(&mut self, node: Ref) -> bool {
-        if self.source(node).ancestors(node.node).take_while(|id| self.source(node).node(*id).kind != "Procedure")
+        let policy=self.project.options.comptime;
+        if policy==crate::comptime::Mode::Required && !self.constant_context(node) {return false;}
+        if !policy.overrides_runtime() && self.source(node).ancestors(node.node).take_while(|id| self.source(node).node(*id).kind != "Procedure")
             .any(|id| self.source(node).node(id).kind == "Runtime") { return false; }
         if self.kind(node) == "Comprehension" {
             return self.constant_context(node);
@@ -490,10 +498,11 @@ impl<'p> Scheduler<'p> {
             .iter()
             .any(|flag| flag == "-debug")
             && !self.constant_context(node)
+            && !policy.aggressive()
         {
             return false;
         }
-        if !self.has_pure {
+        if !self.has_pure && !policy.aggressive() {
             return false;
         }
         // A parameter's fn default does not make the runtime callback a
@@ -505,9 +514,12 @@ impl<'p> Scheduler<'p> {
         })) {return false;}
         let plans = self.resolver.call_plans(node, &Substitutions::new());
         if let [plan] = plans.as_slice() {
-            if self.has_runtime && self.runtime_barrier(plan.procedure,&plan.bindings) {return false;}
-            self.source(plan.procedure).node(plan.procedure.node).data["pure"] == true
-                && self.resolver.fields(plan.signature, "results").len() == 1
+            if !policy.overrides_runtime() && self.has_runtime && self.runtime_barrier(plan.procedure,&plan.bindings) {return false;}
+            let pure=self.source(plan.procedure).node(plan.procedure.node).data["pure"] == true;
+            // Preserve normal mode's early rejection before signature work.
+            if !pure && !policy.aggressive() {return false;}
+            self.resolver.fields(plan.signature, "results").len() == 1
+                && (pure || self.ordinary_eligible(node))
         } else {
             false
         }
@@ -568,6 +580,11 @@ impl<'p> Scheduler<'p> {
         let source = self.source(node);
         let ast = source.node(node.node);
         let text = source.text(node.node);
+        if ast.kind == "Runtime" {
+            return if self.project.options.comptime.overrides_runtime() {
+                self.role(node,"expr").map(|inner|self.known_seen(inner,seen)).unwrap_or(Ok(false))
+            } else {Ok(false)};
+        }
         if ast.kind == "Run" {
             self.evaluate(node)?;
             return Ok(self.value(node).is_some());
@@ -735,7 +752,7 @@ impl<'p> Scheduler<'p> {
                         self.source(plan.procedure).node(plan.procedure.node).data["pure"] != true
                     })
                 {
-                    return Ok(false);
+                    if !self.project.options.comptime.aggressive() || !self.automatic(node) {return Ok(false);}
                 }
                 for arg in args {
                     if !self.known_seen(arg, &mut seen.clone())? {
@@ -744,6 +761,7 @@ impl<'p> Scheduler<'p> {
                 }
                 if self.automatic(node) {
                     self.evaluate(node)?;
+                    if self.project.options.comptime.aggressive() && self.ordinary_key(node).is_some() {return Ok(self.value(node).is_some());}
                 }
                 return Ok(true);
             }
@@ -904,7 +922,9 @@ impl<'p> Scheduler<'p> {
     }
     fn execute(&mut self, node: Ref, mode: Mode) -> Result<Value> {
         let roots = request_roots(self.source(node), node, mode);
-        let graph = Extraction::build(&mut self.resolver, &roots)?;
+        let graph = Extraction::build(&mut self.resolver, &roots).map_err(|mut error| {
+            error.evaluation_ineligible = !error.diagnostics.is_empty(); error
+        })?;
         for nested in self.required_evaluations(&graph) {
             if self.value(nested).is_none() && !self.cases.contains_key(&nested) {
                 self.evaluate(nested)?;
@@ -1337,7 +1357,15 @@ impl<'p> Scheduler<'p> {
         let value = if let Some(value) = self.integer_power(call)? {
             value
         } else {
-            self.execute(call, Mode::Value)?
+            match self.execute(call, Mode::Value) {
+                Ok(value)=>value,
+                Err(error) if error.evaluation_ineligible && self.project.options.comptime.aggressive()
+                    && self.ordinary_key(call).is_some() && !self.constant_context(node)=>{
+                    if let Some(key)=self.ordinary_key(call) {self.policy_calls.insert(key,false);}
+                    self.skip(node,false);return Ok(None);
+                }
+                Err(error)=>return Err(error),
+            }
         };
         let bindings = self.specializations.relevant(node, &self.resolver);
         if bindings.is_empty() {
@@ -1382,6 +1410,7 @@ impl<'p> Scheduler<'p> {
                 }
                 if self.kind(node) == "Call" {
                     self.process_specialization(node)?;
+                    if self.project.options.comptime.aggressive() {self.required_ordinary_rejection(node)?;}
                 }
             }
         }

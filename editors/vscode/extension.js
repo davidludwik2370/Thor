@@ -63,6 +63,9 @@ async function start(context) {
         enable_checker_workspace_diagnostics: false
     };
     if (config.get('vet', false)) initializationOptions.checker_args = '--vet';
+    const comptime = config.get('comptime', 'normal');
+    if (comptime !== 'normal') initializationOptions.checker_args =
+        [initializationOptions.checker_args, `--comptime=${comptime}`].filter(Boolean).join(' ');
     const compilerPath = config.get('compiler.path', '');
     const compiler = compilerPath ? path.resolve(folder.uri.fsPath, compilerPath)
         : path.resolve(path.dirname(executable), '..', '..', 'thor');

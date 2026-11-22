@@ -1155,7 +1155,7 @@ keywords_docs: map[string]string = {
 }
 
 directive_docs: map[string]string = {
-    "runtime" = "Evaluate this expression at runtime instead of Thor automatic compile-time execution. Not valid where a compile-time value is required. Native optimization remains enabled.",
+    "runtime" = "Evaluate this expression at runtime instead of Thor automatic compile-time execution. Not valid where a compile-time value is required, except with --comptime=override which ignores this barrier. Purity and ownership rules remain enforced. Native optimization remains enabled.",
     "ro" = "A read-only slice parameter contract. Writes, mutable aliases, and writable escapes through this parameter are rejected. Applies to the immediately following name; incompatible with #mut.",
 	// Record validation
 	"all_or_none"              = "```odin\n#all_or_none\n```\n\nThis tag can be applied to a `struct`. Prevents partial initialization of the struct, so either all or none of the fields must be filled.",

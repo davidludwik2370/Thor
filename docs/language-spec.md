@@ -791,6 +791,20 @@ Examples:
     buffer: [SIZE]int
     VALUE :: #run eligible_proc(known_argument)
 
+- The execution policy is --comptime=required|normal|aggressive|override.
+  Normal preserves existing automatic fn execution. Required suppresses optional
+  execution but retains explicit #run and execution necessary for constants,
+  array bounds, compile-time branches and constant parameter defaults. It does
+  not implicitly make ordinary proc calls eligible in required contexts.
+  Aggressive additionally considers statically resolved ordinary proc calls with
+  known arguments and one self-contained fixed-size result. Their transitive
+  graph must be pure and allocation-free for all runtime input values; runtime
+  allocator effects and borrowed/allocated return contracts must be preserved.
+  Override additionally ignores #runtime markers, including transitive barriers;
+  it does not relax purity, eligibility, ownership, or native-target restrictions.
+  Type queries and unselected/lazy branches must not execute their operands.
+  Explicit aggressive/override modes apply in debug builds; normal retains the
+  existing suppression of optional fn evaluation with -debug.
 - Automatically evaluate a declared fn call when its argument values and required
   types are compile-time known. Calls with runtime inputs remain ordinary calls.
 - Compile-time-known inputs include literals, Odin constants, supported constant

@@ -21,8 +21,8 @@ including arguments named `--help`.
 
 The common help catalog ships with Thor and works without an installed native
 compiler. Exhaustive help also incorporates additional options advertised by the
-selected toolchain. Normal builds do not run help-discovery subprocesses. Both
-the Rust compiler and Python reference use the same command/option catalog.
+selected toolchain. Normal builds do not run help-discovery subprocesses. The
+maintained Rust compiler uses this catalog; the Python reference is frozen.
 
 ## Commands
 
@@ -52,6 +52,16 @@ native compiler for compilation, reports, full-help discovery, and bundling.
 
 See [Odin project migration](odin-migration.md) for identifier renaming, external
 dependencies, assets, editor configuration, validation, and review notices.
+
+## Compile-time execution
+
+`--comptime=required|normal|aggressive|override` is accepted by `transpile`,
+`check`, `build`, `run`, `test`, `vet`, `publish`, `doc`, and `strip-semicolon`.
+The spaced form `--comptime MODE` is also accepted. The default is `normal`.
+`required` keeps only explicit or necessary execution; `aggressive` additionally
+folds proven eligible ordinary procedures; `override` also ignores `#runtime`.
+This is independent of `-o:MODE` and is consumed by Thor rather than forwarded
+to Odin. See [the execution policy and ownership contract](comptime-modes.md).
 
 ## Native flags
 

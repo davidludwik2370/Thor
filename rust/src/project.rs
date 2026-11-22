@@ -67,6 +67,7 @@ pub struct Options {
     pub editor_info: bool,
     /// Zero leaves compile-time helper compilation and execution unlimited.
     pub run_timeout: std::time::Duration,
+    pub comptime: crate::comptime::Mode,
     pub clear_cache: bool,
     pub cache_report: bool,
     pub raw_diagnostics: bool,
@@ -980,7 +981,7 @@ impl Project {
     }
     fn discover_type_facts_from(&mut self, mut packages: BTreeSet<PathBuf>) -> Result<()> {
         let _phase = crate::profile::span("analysis.discover_types");
-        let general = self.sources.iter().any(|s| {
+        let general = self.options.comptime.aggressive() || self.sources.iter().any(|s| {
             s.nodes.iter().any(|n| {
                 n.immutable
                     || n.data["pure"] == true

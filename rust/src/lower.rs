@@ -102,6 +102,7 @@ pub struct Lower<'a, 'r> {
     helpers: BTreeMap<(NodeId, String, String), Code>,
     prefix: String,
     checked_mode: bool,
+    pub override_runtime: bool,
     checked_targets: BTreeMap<NodeId, Vec<Ref>>,
     emitting_variants: HashSet<NodeId>,
     emitting_callbacks: HashSet<NodeId>,
@@ -183,6 +184,7 @@ impl<'a, 'r> Lower<'a, 'r> {
             helpers: BTreeMap::new(),
             prefix: source.prefix.clone(),
             checked_mode: false,
+            override_runtime: false,
             checked_targets: BTreeMap::new(),
             emitting_variants: HashSet::new(),
             emitting_callbacks: HashSet::new(),
@@ -995,6 +997,7 @@ impl<'a, 'r> Lower<'a, 'r> {
 
     fn render_inner(&mut self, id: NodeId, expected: Option<Hint>, constant: bool) -> Result<Code> {
         if self.source.node(id).kind == "Runtime" {
+            if self.override_runtime { return self.render(self.role(id,"expr")?,expected,constant); }
             if self.evaluation.is_some() {
                 return Ok(self.error_token(id,"#runtime cannot be executed at compile time, including through #run."));
             }

@@ -109,6 +109,21 @@ buffer invalidates older correction snapshots. The compiler supports the same
 checks with `thor vet .` and `thor build . --vet`; use `thor vet . --apply` to apply
 all verified corrections or `thor vet . --ask` to review and confirm them.
 
+## Compile-time execution policy
+
+`"tls.comptime": "normal"` selects the compiler policy for live diagnostics.
+The resource-scoped choices are `required`, `normal` (default), `aggressive`,
+and `override`, matching `thor check --comptime=MODE`. The setting restarts TLS
+and combines with `tls.vet`. Other LSP clients can pass
+`checker_args: "--comptime=aggressive"` in initialization options.
+
+Build/run/debug commands keep their existing defaults; pass the matching
+`--comptime=MODE` in your task or terminal command when using a nondefault
+editor policy. TLS retains original-source hover, completion, and diagnostics;
+its hover resolver does not independently execute procedures. A compiler check
+can execute eligible code, so the ordinary timeout setting remains available.
+See [the policy and ownership contract](../../docs/comptime-modes.md).
+
 ## Running and debugging
 
 The extension provides **Thor: Run Project** on **Cmd+R**. It saves edits, shows

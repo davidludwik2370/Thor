@@ -1708,6 +1708,18 @@ result and ownership constraints still apply. An optional second return value is
 ignored by a single-value `#run`; non-optional multiple results need a consumer
 that returns one supported value.
 
+`--comptime=required|normal|aggressive|override` controls Thor's execution policy.
+`normal` is the default. `required` keeps explicit `#run` and evaluations needed
+for constants/types, while leaving optional calls at runtime. `aggressive` also
+evaluates eligible ordinary `proc` calls with known inputs; `override` does the
+same while ignoring `#runtime` barriers. Ordinary automatic calls must be proven
+pure and allocation-free and return a self-contained fixed-size value. Borrowed
+or allocated results keep their runtime ownership, and ordinary temporary
+allocator effects are retained. Explicit `#run` and declared `fn` calls keep
+their existing scratch-allocation/result contracts. See
+[compile-time execution modes](docs/comptime-modes.md) for examples, boundaries,
+cache behavior, and the matching `tls.comptime` editor setting.
+
 Compile-time execution uses temporary native helpers containing only
 the required declarations/imports. User entry points, unrelated runtime globals
 and package initializers are excluded; referenced runtime storage is rejected.

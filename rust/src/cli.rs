@@ -134,6 +134,7 @@ pub fn value_option(flag: &str) -> bool {
             | "--diagnostic-format"
             | "--overlay"
             | "--run-timeout"
+            | "--comptime"
             | "--track-allocations"
             | "--app-name"
             | "--app-id"

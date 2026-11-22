@@ -85,6 +85,9 @@ impl Scheduler<'_> {
         .map_err(|error| self.fail(at, error.to_string()))
     }
     fn refresh_bindings(&mut self) {
+        // Local record schemas may refer to enclosing generic parameters.
+        // Their nominal type identity alone does not encode this frame.
+        self.policy_types.clear();
         self.resolver.set_evaluations(self.results.clone());
         self.specializations.apply(&mut self.resolver);
         for (node, cases) in &self.cases {
