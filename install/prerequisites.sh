@@ -68,7 +68,21 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 $download_only && exit 0
 work=$(mktemp -d "${TMPDIR:-/tmp}/thor-prerequisites.XXXXXXXX")
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+code_backup=; code_target=; code_stage=
+cleanup() {
+    status=$?
+    trap - EXIT
+    if [ -n "$code_backup" ] && [ -d "$code_backup" ] && [ ! -e "$code_target" ]; then
+        app_move "$code_backup" "$code_target" || echo "Restore VS Code manually from $code_backup" >&2
+    fi
+    if [ -n "$code_stage" ] && [ -d "$code_stage" ]; then app_remove "$code_stage" || echo "Remove incomplete VS Code staging path manually: $code_stage" >&2; fi
+    rm -rf "$work"
+    exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 download() { curl --fail --location --retry 2 --proto '=https' --proto-redir '=https' "$1" -o "$2"; }
 if [ "$system" = Darwin ] && ! xcrun --find clang >/dev/null 2>&1; then
     if [ "${CI:-}" = true ]; then echo 'No usable Apple developer tools in CI. Select a preinstalled Xcode SDK before running setup.' >&2; exit 1; fi
@@ -155,17 +169,90 @@ if $source_build; then
     echo 'PASS: source-build prerequisites'
 fi
 if $editor; then
-    if command -v code >/dev/null 2>&1 || [ -x "$HOME/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" ] || [ -x '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code' ] || [ -x /usr/share/code/bin/code ]; then
-        echo 'PASS: existing VS Code reused'; exit 0
-    fi
+    script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+    minimum_code=$(cat "$script_dir/vscode-minimum")
+    version_at_least() {
+        awk -v current="$1" -v minimum="$2" 'BEGIN {
+            sub(/-.*/, "", current);
+            if (current !~ /^[0-9]+(\.[0-9]+)?(\.[0-9]+)?$/) exit 1;
+            split(current,a,"."); split(minimum,b,".");
+            for(i=1;i<=3;i++){if(a[i]+0>b[i]+0) exit 0; if(a[i]+0<b[i]+0) exit 1;} exit 0;
+        }'
+    }
+    usable_code() {
+        [ -x "$1" ] || return 1
+        code_output=$("$1" --version 2>/dev/null) || return 1
+        code_version=$(printf '%s\n' "$code_output" | head -n 1)
+        version_at_least "$code_version" "$minimum_code"
+    }
+    for candidate in "$(command -v code || :)" "$HOME/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code' /usr/share/code/bin/code; do
+        if usable_code "$candidate"; then
+            echo "PASS: existing VS Code $code_version reused ($candidate)"; exit 0
+        fi
+    done
+    echo "Installing/upgrading VS Code; Thor editor support requires version $minimum_code or newer."
     case "$(uname -m)" in arm64|aarch64) arch=arm64;; *) arch=x64;; esac
     case "$system" in
         Darwin)
-            download "https://update.code.visualstudio.com/latest/darwin-$arch/stable" "$work/code.zip"
+            # An old running Code process would still receive new CLI requests
+            # over its IPC socket after replacement. Never close user windows.
+            code_running() { ps -axo command= | grep -E '/Visual Studio Code[.]app/Contents/MacOS/(Electron|Code)([[:space:]]|$)' >/dev/null; }
+            if code_running; then
+                echo 'Save your work and quit VS Code, then rerun from the macOS Terminal app. The running editor is too old for Thor; no editor files were replaced.' >&2; exit 1
+            fi
+            release=latest
+            current_macos=$(sw_vers -productVersion)
+            if ! version_at_least "$current_macos" '15.0.0'; then
+                # Use a reviewed release rather than allowing latest to advance
+                # past Ventura/Sonoma support. Inspect the downloaded app too.
+                release=$(cat "$script_dir/vscode-macos-version")
+            fi
+            download "https://update.code.visualstudio.com/$release/darwin-$arch/stable" "$work/code.zip"
             mkdir "$work/editor"; ditto -x -k "$work/code.zip" "$work/editor"
-            codesign --verify --deep --strict "$work/editor/Visual Studio Code.app"
-            mkdir -p "$HOME/Applications"; mv "$work/editor/Visual Studio Code.app" "$HOME/Applications/";;
+            app="$work/editor/Visual Studio Code.app"
+            codesign --verify --deep --strict "$app"
+            app_minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")
+            # sw_vers/Info.plist commonly omit trailing zero components.
+            if ! awk -v current="$current_macos" -v minimum="$app_minimum" 'BEGIN {
+                split(current,a,".");split(minimum,b,".");
+                for(i=1;i<=3;i++){if(a[i]+0>b[i]+0)exit 0;if(a[i]+0<b[i]+0)exit 1;}exit 0;
+            }'; then
+                echo "The downloaded VS Code requires macOS $app_minimum (this Mac: $current_macos). The existing editor was preserved; select a compatible --code PATH." >&2; exit 1
+            fi
+            usable_code "$app/Contents/Resources/app/bin/code" || { echo 'Downloaded VS Code failed its version check; existing editor preserved.' >&2; exit 1; }
+            if code_running; then
+                echo 'VS Code was opened during the download. Save your work, quit it, and rerun; the existing application was preserved.' >&2; exit 1
+            fi
+            target="$HOME/Applications/Visual Studio Code.app"
+            if [ ! -d "$target" ] && [ -d '/Applications/Visual Studio Code.app' ]; then target='/Applications/Visual Studio Code.app'; fi
+            [ ! -L "$target" ] || { echo 'VS Code app is a symlink; update its target manually or select --code PATH.' >&2; exit 1; }
+            parent=$(dirname "$target"); mkdir -p "$parent"
+            app_move() { if [ -w "$parent" ]; then mv "$@"; else elevate mv "$@"; fi; }
+            app_remove() { if [ -w "$1" ]; then rm -rf "$1"; else elevate rm -rf "$1"; fi; }
+            # Move the existing application aside until the new one verifies.
+            # Settings and extensions are outside the .app and are untouched.
+            backup="$parent/.thor-code-previous-$$.app"
+            if [ -e "$backup" ]; then echo "VS Code backup already exists: $backup" >&2; exit 1; fi
+            stage="$parent/.thor-code-new-$$.app"
+            if [ -e "$stage" ]; then echo "VS Code staging path already exists: $stage" >&2; exit 1; fi
+            code_stage=$stage
+            app_move "$app" "$stage"
+            code_backup=$backup; code_target=$target
+            had_previous=false
+            if [ -d "$target" ]; then app_move "$target" "$backup"; had_previous=true; fi
+            if ! app_move "$stage" "$target" || ! usable_code "$target/Contents/Resources/app/bin/code"; then
+                if $had_previous; then
+                    if [ -d "$target" ]; then app_move "$target" "$work/failed-code.app"; fi
+                    app_move "$backup" "$target"
+                fi
+                echo 'VS Code upgrade failed; the previous application was restored when present.' >&2; exit 1
+            fi
+            if $had_previous; then app_remove "$backup"; fi
+            code_backup=; code_stage=;;
         Linux)
+            if ps -axo comm= | grep -E '(^|/)code$' >/dev/null; then
+                echo 'Save your work and quit VS Code, then rerun from another terminal to upgrade the old editor.' >&2; exit 1
+            fi
             if command -v apt-get >/dev/null 2>&1; then
                 download "https://update.code.visualstudio.com/latest/linux-deb-$arch/stable" "$work/code.deb"
                 # Decline a new global repository; Code's package remains installed.
@@ -181,5 +268,8 @@ if $editor; then
         FreeBSD) packages vscode;;
         NetBSD|OpenBSD) echo 'The compiler supports this host, but automatic VS Code installation is unavailable. Install a compatible editor and pass --code PATH.' >&2; exit 1;;
     esac
-    echo 'PASS: VS Code installed'
+    for candidate in "$(command -v code || :)" "$HOME/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code' /usr/share/code/bin/code; do
+        if usable_code "$candidate"; then echo "PASS: VS Code $code_version installed ($candidate)"; exit 0; fi
+    done
+    echo "VS Code installation did not provide version $minimum_code or newer; update it and rerun --vscode." >&2; exit 1
 fi

@@ -2,11 +2,47 @@
 //! registry or unrelated settings/keybindings. Native OLS adds its own setting.
 use super::*;
 
+const MINIMUM: &str = include_str!("../vscode-minimum");
+fn version_numbers(text:&str)->Option<[u32;3]> {
+    let line=text.lines().find(|line|!line.trim().is_empty())?.trim();
+    let mut parts=line.split('-').next()?.split('.');
+    let result=[parts.next()?.parse().ok()?,parts.next()?.parse().ok()?,parts.next()?.parse().ok()?];
+    if parts.next().is_some(){return None;}Some(result)
+}
+fn check_version(code:&Path)->Result<()> {
+    let output=Command::new(code).arg("--version").output().map_err(err)?;
+    let version=String::from_utf8_lossy(&output.stdout);
+    if !output.status.success(){return Err(format!("VS Code cannot report its version: {}",code.display()));}
+    let found=version_numbers(&version).ok_or_else(||format!("VS Code returned an unrecognized version: {}",code.display()))?;
+    let minimum=version_numbers(MINIMUM).ok_or("invalid bundled VS Code minimum")?;
+    if found<minimum {
+        return Err(format!("VS Code {}.{}.{} at {} is too old. Thor editor support requires VS Code {} or newer. Upgrade VS Code and run thor-install --vscode again; the installed compiler can be reused.",found[0],found[1],found[2],code.display(),MINIMUM.trim()));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+    #[test] fn cli_versions_use_numeric_components_and_reject_unexpected_output() {
+        let minimum=version_numbers(MINIMUM).unwrap();
+        let old=version_numbers("1.66.0\ncommit\narm64\n").unwrap();
+        let current=version_numbers("1.147.0\ncommit\narm64\n").unwrap();
+        let insiders=version_numbers("1.100.0-insider\ncommit\n").unwrap();
+        let malformed=version_numbers("Warning: unknown option\n1.147.0\n");
+        assert!(old<minimum);
+        assert!(current>=minimum);
+        assert!(insiders>=minimum);
+        assert_eq!(malformed,None);
+    }
+}
+
 pub(super) fn find_code(o: &Options) -> Result<PathBuf> {
-    if let Some(path) = &o.code { return absolute(path); }
+    if let Some(path) = &o.code {let path=absolute(path)?;check_version(&path)?;return Ok(path);}
+    let mut candidates=vec![];
     for directory in env::split_paths(&env::var_os("PATH").unwrap_or_default()) {
         for name in if cfg!(windows) { vec!["code.cmd","code.exe"] } else { vec!["code"] } {
-            let path = directory.join(name); if path.is_file() { return Ok(path); }
+            candidates.push(directory.join(name));
         }
     }
     let paths = if cfg!(target_os="macos") {
@@ -15,7 +51,13 @@ pub(super) fn find_code(o: &Options) -> Result<PathBuf> {
         vec![home()?.join("AppData/Local/Programs/Microsoft VS Code/bin/code.cmd"),
             env::var_os("ProgramFiles").map(PathBuf::from).unwrap_or_else(||PathBuf::from("C:/Program Files")).join("Microsoft VS Code/bin/code.cmd")]
     } else { vec![PathBuf::from("/usr/share/code/bin/code")] };
-    paths.into_iter().find(|p| p.is_file()).ok_or_else(|| "VS Code was not found. Install it from https://code.visualstudio.com/, or specify --code PATH. Then rerun --vscode; an existing Thor installation is reusable.".into())
+    candidates.extend(paths);
+    let mut failure=None;let mut seen=BTreeSet::new();
+    for path in candidates {
+        if !path.is_file() || !seen.insert(path.clone()){continue;}
+        match check_version(&path){Ok(())=>return Ok(path),Err(error)=>if failure.is_none(){failure=Some(error);}}
+    }
+    Err(failure.unwrap_or_else(||"VS Code was not found. Install it from https://code.visualstudio.com/, or specify --code PATH. Then rerun --vscode; an existing Thor installation is reusable.".into()))
 }
 fn data_dir(o: &Options) -> Result<PathBuf> {
     if let Some(p) = &o.code_data { return absolute(p); }
@@ -139,6 +181,7 @@ pub(super) fn uninstall(state:&Value,record:&Value,dry:bool)->Result<()> {
         let code=Path::new(field(identity,"code")?);
         let installed=if dry {None}else{
             if !code.is_file(){println!("RETAINED: editor extensions (VS Code launcher is missing); remove them through VS Code when available");continue;}
+            if let Err(error)=check_version(code){println!("RETAINED: editor extensions ({error}); remove through a compatible VS Code version");continue;}
             let mut cmd=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
             if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
             cmd.arg("--list-extensions");let result=cmd.output().map_err(err)?;
@@ -161,6 +204,7 @@ pub(super) fn verify_editors(record:&Value)->Result<()> {
     for editor in state["editors"].as_array().ok_or("invalid editor inventory")? {
         let identity=&editor["identity"];let o=editor_options(identity);
         let code=Path::new(field(identity,"code")?);
+        check_version(code)?;
         let mut cmd=cli(code,&o,Path::new(field(record,"bin")?),Path::new(field(record,"root")?))?;
         if let Some(profile)=&o.profile {cmd.args(["--profile",profile]);}
         cmd.arg("--list-extensions");let output=cmd.output().map_err(err)?;

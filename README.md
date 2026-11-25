@@ -12,6 +12,8 @@ After cloning, run the native installer from the repository root:
 ```
 
 Missing build prerequisites and VS Code are installed automatically where supported.
+Editor support requires VS Code 1.96.0 or newer; setup checks its version and
+upgrades an obsolete standard installation when needed.
 Use `./thor-install --from-source` for a local release build, `./thor-install --doctor`
 to verify an installation, and `./thor-install --uninstall` to remove Thor while
 retaining VS Code, developer tools and projects.

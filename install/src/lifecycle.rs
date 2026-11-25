@@ -5,6 +5,8 @@ pub(super) fn prerequisites(o:&Options)->Result<()> {
     if o.no_deps {println!("SKIP: automatic prerequisite installation (--no-install-deps); build/run checks remain enabled");return Ok(());}
     let temp=env::temp_dir().join(format!("thor-prerequisites-{}",unique()));fs::create_dir(&temp).map_err(err)?;
     let _guard=RemoveDir(temp.clone());
+    fs::write(temp.join("vscode-minimum"),include_str!("../vscode-minimum")).map_err(err)?;
+    fs::write(temp.join("vscode-macos-version"),include_str!("../vscode-macos-version")).map_err(err)?;
     let mut cmd;
     if cfg!(windows) {
         let file=temp.join("prerequisites.ps1");fs::write(&file,include_str!("../prerequisites.ps1")).map_err(err)?;

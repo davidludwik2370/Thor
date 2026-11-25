@@ -38,6 +38,23 @@ class SourceInstallerTests(unittest.TestCase):
             self.assertIn('no changes made',result.stdout)
             self.assertEqual(list(Path(temporary).iterdir()),[])
 
+    @unittest.skipIf(os.name=='nt','POSIX source bootstrap')
+    def test_editor_preflight_failure_stops_before_source_compilation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);(root/'release').mkdir();(root/'install').mkdir()
+            shutil.copy2(ROOT/'thor-install',root/'thor-install')
+            shutil.copy2(ROOT/'release/version',root/'release/version')
+            (root/'install/prerequisites.sh').write_text('''#!/bin/sh
+case " $* " in *" --vscode "*) echo 'Editor version is too old' >&2; exit 37;; esac
+''')
+            marker=root/'build-started'
+            (root/'install/from_source.py').write_text('from pathlib import Path\nPath('+repr(str(marker))+').write_text("started")\n')
+            result=subprocess.run([str(root/'thor-install'),'--from-source','--vscode','--profile','Thor'],
+                capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,37,result.stdout+result.stderr)
+            self.assertIn('Editor version is too old',result.stderr)
+            self.assertFalse(marker.exists())
+
     @unittest.skipIf(os.name=='nt','POSIX bootstrap; Windows bootstrap is covered by native CI source installation')
     def test_prerequisite_dry_run_does_not_install_anything(self):
         result=subprocess.run(['sh',str(ROOT/'install/prerequisites.sh'),'--source','--vscode','--dry-run'],capture_output=True,text=True,timeout=10)

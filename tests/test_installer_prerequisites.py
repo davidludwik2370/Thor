@@ -140,3 +140,109 @@ else:sys.exit('Unexpected Homebrew invocation: '+repr(sys.argv[1:]))
     def test_macos_does_not_bootstrap_missing_homebrew(self):
         commands=self.exercise_macos('/bin/sh',missing=('node','npm'),no_brew=True)
         self.assertEqual(commands,[])
+
+    def exercise_macos_editor(self, *, installed='1.66.0', running=False, system='13.5.1', app_minimum='12.0', signature_fails=False, relocation_fails=False):
+        with tempfile.TemporaryDirectory(prefix='thor-code-upgrade-') as temporary:
+            root=Path(temporary).resolve();bin=root/'bin';bin.mkdir();home=root/'home';home.mkdir()
+            target=root/'system/Applications/Visual Studio Code.app'
+            cli=target/'Contents/Resources/app/bin/code';cli.parent.mkdir(parents=True)
+            cli.write_text('#!/bin/sh\necho '+installed+'\n');cli.chmod(0o755)
+            (target/'previous-marker').write_text('previous editor')
+            (bin/'code').symlink_to(cli)
+            for name in ('mktemp','rm','mkdir','mv','dirname','cat','awk','head','grep'):
+                (bin/name).symlink_to(shutil.which(name))
+            def executable(name,body,python=False):
+                path=bin/name
+                path.write_text(('#!'+sys.executable+'\n' if python else '#!/bin/sh\n')+body+'\n');path.chmod(0o755)
+            executable('uname','case "$1" in -s) echo Darwin;; -m) echo arm64;; esac')
+            executable('xcrun','exit 0');executable('id','echo 1000')
+            executable('sw_vers','echo '+system)
+            ps_output=("/Applications/Visual Studio Code.app/Contents/MacOS/"+('Code' if running=='Code' else 'Electron')) if running else ''
+            if running=='grep':ps_output='grep -E /Visual Studio Code[.]app/Contents/MacOS/(Electron|Code)([[:space:]]|$)'
+            executable('ps','printf \'%s\\n\' '+repr(ps_output))
+            if running=='late':
+                executable('ps','''import os,pathlib
+p=pathlib.Path(os.environ['FIXTURE_LOG']+'.ps')
+count=int(p.read_text())+1 if p.exists() else 1;p.write_text(str(count))
+if count>1:print('/Applications/Visual Studio Code.app/Contents/MacOS/Code')''',True)
+            executable('codesign','exit 7' if signature_fails else 'exit 0')
+            executable('PlistBuddy','echo '+app_minimum)
+            executable('clang','import pathlib,sys\np=pathlib.Path(sys.argv[sys.argv.index("-o")+1]);p.write_text("#!/bin/sh\\nexit 0\\n");p.chmod(0o755)',True)
+            executable('curl','''import json,os,pathlib,sys
+pathlib.Path(os.environ['FIXTURE_LOG']).write_text(json.dumps(sys.argv[1:]))
+pathlib.Path(sys.argv[sys.argv.index('-o')+1]).write_bytes(b'archive')''',True)
+            executable('ditto','''import os,pathlib,sys
+app=pathlib.Path(sys.argv[-1])/'Visual Studio Code.app'
+cli=app/'Contents/Resources/app/bin/code';cli.parent.mkdir(parents=True)
+cli.write_text('#!'+sys.executable+'\\nimport os,sys\\nfrom pathlib import Path\\n'
+    +'if os.environ.get("FAIL_RELOCATION") and str(Path(__file__)).startswith(os.environ["FIXTURE_TARGET"]):sys.exit(51)\\n'
+    +'print("1.147.0")\\n');cli.chmod(0o755)''',True)
+            for name in ('vscode-minimum','vscode-macos-version'):
+                shutil.copy2(ROOT/'install'/name,root/name)
+            text=(ROOT/'install/prerequisites.sh').read_text()
+            for suffix in ('','/Contents/Resources/app/bin/code'):
+                text=text.replace("'/Applications/Visual Studio Code.app"+suffix+"'",repr(str(target)+suffix))
+            text=text.replace('/usr/share/code',str(root/'system/usr/share/code'))
+            text=text.replace('/usr/libexec/PlistBuddy',str(bin/'PlistBuddy'))
+            script=root/'prerequisites.sh';script.write_text(text)
+            settings=home/'Library/Application Support/Code/User/settings.json';settings.parent.mkdir(parents=True)
+            settings.write_text('{"custom":"preserved"}')
+            log=root/'downloads.json'
+            result=subprocess.run(['/bin/sh',str(script),'--vscode'],capture_output=True,text=True,timeout=20,
+                env={**os.environ,'PATH':str(bin),'HOME':str(home),'CI':'true','FIXTURE_LOG':str(log),
+                     'FIXTURE_TARGET':str(target),'FAIL_RELOCATION':'1' if relocation_fails else ''})
+            self.assertEqual(settings.read_text(),'{"custom":"preserved"}')
+            artifacts=list(target.parent.glob('.thor-code-*'))
+            self.assertEqual(artifacts,[],result.stdout+result.stderr)
+            return result,json.loads(log.read_text()) if log.exists() else [],(target/'previous-marker').exists()
+
+    def test_macos_old_vscode_is_upgraded_with_a_reviewed_ventura_binary(self):
+        result,downloads,previous=self.exercise_macos_editor()
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertFalse(previous)
+        self.assertIn('https://update.code.visualstudio.com/1.147.0/darwin-arm64/stable',downloads)
+        self.assertIn('VS Code 1.147.0 installed',result.stdout)
+
+    def test_macos_compatible_existing_code_is_reused_with_numeric_versions(self):
+        for version in ('1.96.0','1.100.0','1.147.0-insider'):
+            with self.subTest(version=version):
+                result,downloads,previous=self.exercise_macos_editor(installed=version,running=True)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(downloads,[]);self.assertTrue(previous)
+
+    def test_macos_old_running_editor_requires_a_normal_quit_before_upgrade(self):
+        for running in (True,'Code'):
+            with self.subTest(running=running):
+                result,downloads,previous=self.exercise_macos_editor(running=running)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('Save your work and quit VS Code',result.stderr)
+                self.assertEqual(downloads,[]);self.assertTrue(previous)
+
+    def test_macos_process_check_does_not_mistake_its_grep_for_a_running_editor(self):
+        result,downloads,previous=self.exercise_macos_editor(running='grep')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertFalse(previous)
+
+    def test_editor_opened_during_download_is_preserved(self):
+        result,downloads,previous=self.exercise_macos_editor(running='late')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('opened during the download',result.stderr)
+        self.assertTrue(downloads);self.assertTrue(previous)
+
+    def test_macos_bad_signature_or_os_minimum_preserves_the_old_application(self):
+        for options in ({'signature_fails':True},{'app_minimum':'14.0'}):
+            with self.subTest(options=options):
+                result,downloads,previous=self.exercise_macos_editor(**options)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertTrue(previous)
+
+    def test_macos_failed_relocation_check_restores_the_previous_application(self):
+        result,downloads,previous=self.exercise_macos_editor(relocation_fails=True)
+        self.assertNotEqual(result.returncode,0,result.stdout)
+        self.assertIn('previous application was restored',result.stderr)
+        self.assertTrue(previous)
+
+    def test_newer_macos_uses_current_stable_code_instead_of_the_legacy_pin(self):
+        result,downloads,previous=self.exercise_macos_editor(system='15.6')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('https://update.code.visualstudio.com/latest/darwin-arm64/stable',downloads)

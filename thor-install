@@ -7,6 +7,8 @@ bundle=
 from_source=false
 no_deps=false
 reuse_odin=false
+editor=false
+custom_code=false
 maintenance=
 prefix=
 dry=false
@@ -56,6 +58,8 @@ while [ "$#" -gt 0 ]; do
         --from-source) from_source=true;;
         --no-install-deps) no_deps=true; printf '%s\n' "$arg" >> "$forward/args";;
         --odin) [ "$#" -gt 0 ] || { echo '--odin requires a value' >&2; exit 1; }; reuse_odin=true; printf '%s\n%s\n' "$arg" "$1" >> "$forward/args"; shift;;
+        --vscode) editor=true; printf '%s\n' "$arg" >> "$forward/args";;
+        --code) [ "$#" -gt 0 ] || { echo '--code requires a value' >&2; exit 1; }; custom_code=true; printf '%s\n%s\n' "$arg" "$1" >> "$forward/args"; shift;;
         --uninstall|--doctor) maintenance=$arg; printf '%s\n' "$arg" >> "$forward/args";;
         --dry-run) dry=true; printf '%s\n' "$arg" >> "$forward/args";;
         --prefix) [ "$#" -gt 0 ] || { echo '--prefix requires a value' >&2; exit 1; }; prefix=$1; printf '%s\n%s\n' "$arg" "$1" >> "$forward/args"; shift;;
@@ -84,8 +88,10 @@ source_install() {
     "$python" "$root/install/from_source.py" "$@"
 }
 source_prerequisites() {
-    if $reuse_odin; then sh "$root/install/prerequisites.sh" --source --reuse-odin
-    else sh "$root/install/prerequisites.sh" --source; fi
+    set -- --source
+    if $reuse_odin; then set -- "$@" --reuse-odin; fi
+    if $editor && ! $custom_code; then set -- "$@" --vscode; fi
+    sh "$root/install/prerequisites.sh" "$@"
 }
 # Maintenance uses the installed native installer, copied away from files that
 # uninstall will remove. It never downloads a release or provisions software.
@@ -177,6 +183,11 @@ expected=$(printf '%s' "$checksum" | tr 'A-F' 'a-f')
 # arbitrary archive paths before the native installer validates the inventory.
 tar -xOzf "$bundle" thor-install > "$forward/thor-install"
 chmod 700 "$forward/thor-install"
+if $editor && ! $custom_code && ! $no_deps && ! $dry && [ -f "$root/install/prerequisites.sh" ] && [ -f "$root/install/vscode-minimum" ]; then
+    # The checkout may contain newer prerequisite fixes than a published native
+    # bundle. Validate/upgrade the editor before handing off to that bundle.
+    sh "$root/install/prerequisites.sh" --vscode
+fi
 set --
 while IFS= read -r arg; do set -- "$@" "$arg"; done < "$forward/args"
 "$forward/thor-install" --bundle "$bundle" --sha256 "$expected" "$@"

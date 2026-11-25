@@ -124,12 +124,35 @@ try {
         foreach($line in $variables) {if($line -match '^([^=]+)=(.*)$') {[Environment]::SetEnvironmentVariable($Matches[1],$Matches[2],'Process')}}
         $env:PATH=MergeProcessPaths @($env:PATH,$original)
     }
-    if ($VSCode -and !(Get-Command code -ErrorAction SilentlyContinue) -and !(Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd") -and !(Test-Path "$env:ProgramFiles\Microsoft VS Code\bin\code.cmd")) {
+    if ($VSCode) {
+        $minimumCode=[Version]((Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'vscode-minimum')).Trim())
+        function FindUsableCode {
+            $onPath=Get-Command code -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            $path=if($onPath){$onPath.Source}else{$null}
+            $candidates=@($path,"$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd","$env:ProgramFiles\Microsoft VS Code\bin\code.cmd")
+            foreach($candidate in $candidates) {
+                if(!$candidate -or !(Test-Path -LiteralPath $candidate)){continue}
+                try {
+                    $version=@(& $candidate --version 2>$null)
+                    if($LASTEXITCODE -eq 0 -and $version.Count -and $version[0] -match '^(\d+\.\d+\.\d+)(?:-|$)' -and [Version]$Matches[1] -ge $minimumCode) {return $candidate}
+                } catch {continue}
+            }
+            return $null
+        }
+        $editorCommand=FindUsableCode
+        if($editorCommand){Write-Output "PASS: compatible VS Code reused ($editorCommand)"}
+        else {
+        if(Get-Process Code -ErrorAction SilentlyContinue){throw 'Save your work and quit VS Code, then rerun from another terminal to upgrade the old editor.'}
+        Write-Output "Installing/upgrading VS Code; Thor requires version $minimumCode or newer."
         $setup=Join-Path $work 'vscode-setup.exe'
         Download 'https://update.code.visualstudio.com/latest/win32-x64-user/stable' $setup
         SignedInstaller $setup
+        if(Get-Process Code -ErrorAction SilentlyContinue){throw 'VS Code was opened during the download. Save your work, quit it, and rerun; the existing application was preserved.'}
         $process=Start-Process -FilePath $setup -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /MERGETASKS=!runcode /COPILOTCLI=none' -Wait -PassThru
         if ($process.ExitCode -ne 0) {throw "VS Code installation failed ($($process.ExitCode))"}
-        Write-Output 'PASS: VS Code installed'
+        $editorCommand=FindUsableCode
+        if(!$editorCommand){throw "VS Code $minimumCode or newer was not found after installation. Update it and rerun --vscode."}
+        Write-Output "PASS: compatible VS Code installed ($editorCommand)"
+        }
     }
 } finally {Remove-Item -LiteralPath $work -Recurse -Force}

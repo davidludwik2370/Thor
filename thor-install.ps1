@@ -12,6 +12,7 @@ $checkoutVersion=$version
 $bundle = ''; $checksum = ''; $base = $env:THOR_RELEASE_BASE
 $sourceBuild=$false; $noDeps=$false; $maintenance=''; $prefix=''; $dry=$false
 $reuseOdin=$false
+$editor=$false; $customCode=$false
 for ($i = 0; $i -lt $args.Count; $i++) {
     $arg = $args[$i]
     if ($arg -in @('--help', '-h')) {
@@ -21,6 +22,8 @@ for ($i = 0; $i -lt $args.Count; $i++) {
     }
     if ($arg -eq '--from-source') {$sourceBuild=$true; continue}
     if ($arg -eq '--odin') {$reuseOdin=$true}
+    if ($arg -eq '--vscode') {$editor=$true}
+    if ($arg -eq '--code') {$customCode=$true}
     if ($arg -eq '--no-install-deps') {$noDeps=$true}
     if ($arg -in @('--doctor','--uninstall')) {$maintenance=$arg}
     if ($arg -eq '--dry-run') {$dry=$true}
@@ -54,7 +57,7 @@ try {
         if ($bundle -or $checksum) {throw '--from-source cannot use --bundle/--sha256'}
         if ($version -ne $checkoutVersion) {throw 'A source build uses the checked-out version. Check out the requested release first.'}
         if ($dry) {Write-Output 'Source install plan: pinned tools/Odin, Thor/TLS/editor release builds, inventoried install and verification. No changes made.'; exit 0}
-        if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild -ReuseOdin:$reuseOdin}
+        if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild -ReuseOdin:$reuseOdin -VSCode:($editor -and !$customCode)}
         $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
         & $python (Join-Path $checkoutRoot 'install/from_source.py') @forward
         if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}
@@ -75,7 +78,7 @@ try {
             if ($version -ne $checkoutVersion) {throw 'No binary for this version. Check out that release before building it from source.'}
             if ($dry) {Write-Output 'Source fallback would be used; no changes made.'; exit 0}
             Write-Output 'No release binary for this host; building the checked-out source.'
-            if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild -ReuseOdin:$reuseOdin}
+            if (!$noDeps) {. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -SourceBuild -ReuseOdin:$reuseOdin -VSCode:($editor -and !$customCode)}
             $python=if($ThorSourcePython){$ThorSourcePython}else{'python'}
             & $python (Join-Path $checkoutRoot 'install/from_source.py') @forward
             if ($LASTEXITCODE -ne 0) {throw "Source build failed ($LASTEXITCODE)"}
@@ -97,6 +100,7 @@ try {
     $stream=[IO.File]::Create($native)
     try {$process.StandardOutput.BaseStream.CopyTo($stream)} finally {$stream.Dispose()}
     $process.WaitForExit();if ($process.ExitCode -ne 0) {throw 'Could not extract the native installer'}
+    if($editor -and !$customCode -and !$noDeps -and !$dry -and (Test-Path (Join-Path $checkoutRoot 'install/prerequisites.ps1')) -and (Test-Path (Join-Path $checkoutRoot 'install/vscode-minimum'))){. (Join-Path $checkoutRoot 'install/prerequisites.ps1') -VSCode}
     & $native --bundle $bundle --sha256 $checksum @forward
     if ($LASTEXITCODE -ne 0) {throw "Native installer failed ($LASTEXITCODE)"}
 } finally {Remove-Item -LiteralPath $temporary -Recurse -Force}

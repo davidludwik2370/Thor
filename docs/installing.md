@@ -177,6 +177,21 @@ uses the registered compiler directly even before the terminal is refreshed.
 
 ## Editor profiles and optional colors
 
+Thor's extension requires **VS Code 1.96.0 or newer**. Setup checks the editor's
+version, upgrades an obsolete standard installation when necessary, and reuses
+a compatible editor. Automatic editor acquisition runs before source compilation.
+An explicit `--code PATH` is validated and remains user-managed.
+
+Save work and quit an obsolete VS Code before upgrading it; run setup from a
+separate terminal. The installer does not close editor windows. macOS setup
+verifies the downloaded application signature and its minimum OS version, stages
+the replacement, and restores the previous application if relocation checks fail.
+The replacement preserves VS Code's separate settings and extension storage.
+Older Macs use reviewed VS Code 1.147.0 from `install/vscode-macos-version`
+instead of an unconstrained future `latest` download. Microsoft's
+[platform support FAQ](https://code.visualstudio.com/docs/supporting/faq#can-i-run-vs-code-on-old-macos-versions)
+describes the Ventura/Sonoma support transition.
+
 `--vscode` installs Thor, the standard [Odin Language Server extension](https://marketplace.visualstudio.com/items?itemName=DanielGavin.ols)
 (`DanielGavin.ols`) and CodeLLDB in the default profile. Unrelated settings are preserved.
 OLS supplies Odin's grammar, file icon, highlighting and language services; TLS

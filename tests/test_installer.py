@@ -272,7 +272,10 @@ fi
         code.write_text('''#!/usr/bin/env python3
 import json,os,sys
 from pathlib import Path
-a=sys.argv[1:];d=Path(a[a.index('--user-data-dir')+1]);log=d/'commands.jsonl'
+a=sys.argv[1:]
+if '--version' in a:
+ print(os.environ.get('CODE_TEST_VERSION','1.147.0'));sys.exit(0)
+d=Path(a[a.index('--user-data-dir')+1]);log=d/'commands.jsonl'
 with log.open('a') as f:f.write(json.dumps(a)+'\\n')
 with (d/'environment.jsonl').open('a') as f:f.write(json.dumps({'PATH':os.environ.get('PATH','')})+'\\n')
 inventory=d/'installed-extensions.json'
@@ -308,6 +311,43 @@ if '--new-window' in a:
         self.env['CODE_LOCATE_EMPTY']='1'
         result=self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),'--extensions-dir',str(extensions))
         self.assertIn('JavaScript runtime dependencies',result.stdout)
+
+    def test_old_editor_is_rejected_before_profiles_or_extensions_are_changed(self):
+        code,data,extensions,profile=self.fake_code()
+        self.env['CODE_TEST_VERSION']='1.66.0'
+        result=self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data),ok=False)
+        self.assertIn('VS Code 1.66.0',result.stderr)
+        self.assertIn('1.96.0 or newer',result.stderr)
+        self.assertFalse((data/'commands.jsonl').exists())
+        self.assertFalse(profile.exists())
+
+    def test_doctor_rejects_an_editor_downgrade_and_uninstall_preserves_its_extensions(self):
+        code,data,extensions,profile=self.fake_code()
+        self.invoke(self.bundle(),'--vscode','--profile','Thor','--code',str(code),'--code-user-data',str(data))
+        before=(data/'installed-extensions.json').read_bytes()
+        self.env['CODE_TEST_VERSION']='1.66.0'
+        result=self.invoke(None,'--doctor',ok=False)
+        self.assertIn('VS Code 1.66.0',result.stderr)
+        result=self.invoke(None,'--uninstall')
+        self.assertIn('RETAINED: editor extensions',result.stdout)
+        self.assertEqual((data/'installed-extensions.json').read_bytes(),before)
+
+    def test_minimum_editor_version_matches_the_extension_engine(self):
+        minimum=(ROOT/'install/vscode-minimum').read_text().strip()
+        package=json.loads((ROOT/'editors/vscode/package.json').read_text())
+        self.assertEqual(package['engines']['vscode'],'^'+minimum)
+
+    def test_standalone_bootstrap_can_use_embedded_editor_prerequisites(self):
+        code,data,extensions,profile=self.fake_code()
+        bootstrap=self.root/'standalone';(bootstrap/'release').mkdir(parents=True)
+        shutil.copy2(ROOT/'thor-install',bootstrap/'thor-install')
+        shutil.copy2(ROOT/'release/version',bootstrap/'release/version')
+        env={**self.env,'PATH':str(code.parent)+os.pathsep+self.env['PATH']}
+        result=subprocess.run([str(bootstrap/'thor-install'),'--bundle',str(self.bundle()),
+            '--prefix',str(self.prefix),'--vscode','--profile','Thor','--code-user-data',str(data)],
+            env=env,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertTrue((profile/'settings.json').exists())
 
     def test_new_profile_uses_template_and_installs_all_three_extensions(self):
         code,data,extensions,profile=self.fake_code()
