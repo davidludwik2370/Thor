@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from thorlang.cache import EvaluationCache, canonical
 from tests.native_paths import rust_binary
+from tests.cache_paths import record
 from tests import test_rust_compiler as native
 
 
@@ -20,6 +21,10 @@ class RustEvaluationCacheTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        binary=rust_binary('cache_protocol',example=True)
+        if native.using_prebuilt_compiler(binary):
+            cls.binary=binary
+            return
         result=subprocess.run(['cargo','build','--release','--locked','--offline',
             '--manifest-path',str(native.ROOT/'rust/Cargo.toml'),'--example','cache_protocol'],
             capture_output=True,text=True,timeout=600)
@@ -104,6 +109,10 @@ class RustEvaluationCacheTests(unittest.TestCase):
         self.assertEqual(answer['answers'],[value])
         value={'kind':'string','bytes':'00ff6869'}
         self.run_native([{'op':'put','key':self.target,'value':value}],directory)
+        # The packet format remains readable by the frozen reference; bounded
+        # native storage now uses a different directory layout.
+        packet=record(directory,'eval-v1',self.target).read_bytes()
+        (directory/'eval-v1'/(self.target+'.json')).write_bytes(packet)
         actual=reference.get(self.target)
         self.assertEqual(actual,value)
 
@@ -123,7 +132,7 @@ class RustEvaluationCacheTests(unittest.TestCase):
         directory=self.root/'corrupt'
         value={'kind':'integer','value':'7'}
         self.run_native([{'op':'put','key':self.key,'value':value}],directory)
-        path=directory/'eval-v1'/(self.key+'.json')
+        path=record(directory,'eval-v1',self.key)
         original=json.loads(path.read_text())
         variants=['{', {**original,'schema':999}, {**original,'key':self.target},
                   {**original,'value':{'kind':'integer','value':'8'}}]
@@ -178,6 +187,7 @@ class RustEvaluationCacheTests(unittest.TestCase):
         directory=self.root/'clear'
         self.run_native([{'op':'put','key':self.key,'value':{'kind':'integer','value':'7'}},
                          {'op':'write_record','key':self.target,'namespace':'scalar-v1','data':{'n':3}}],directory)
+        (directory/'eval-v1').mkdir(exist_ok=True)
         keep=directory/'eval-v1/keep.json';keep.write_text('keep')
         outside=directory/'outside';outside.write_text('outside')
         link=directory/'eval-v1'/('c'*64+'.json');link.symlink_to(outside)
@@ -190,6 +200,15 @@ class RustEvaluationCacheTests(unittest.TestCase):
         contents=outside.read_text()
         self.assertEqual(contents,'outside')
         self.assertFalse((directory/'scalar-v1'/(self.target+'.json')).exists())
+
+    def test_clear_does_not_follow_legacy_namespace_directory_links(self):
+        directory=self.root/'linked';directory.mkdir()
+        outside=self.root/'outside-records';outside.mkdir()
+        record=outside/(self.key+'.json');record.write_text('preserve')
+        (directory/'eval-v1').symlink_to(outside,target_is_directory=True)
+        self.run_native([{'op':'clear'}],directory)
+        self.assertEqual(record.read_text(),'preserve')
+        self.assertTrue((directory/'eval-v1').is_symlink())
 
 
 if __name__=='__main__':

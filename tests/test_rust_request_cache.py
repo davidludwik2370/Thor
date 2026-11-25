@@ -1,3 +1,4 @@
+from tests.cache_paths import entries
 """Early evaluation aliases skip helper construction without hiding changes."""
 import json
 import os
@@ -227,12 +228,12 @@ if a.data[0]!=9||b.data[0]!=3{panic("ownership")}
     def test_corrupt_alias_and_result_packets_fall_back(self):
         self.source.write_text(self.box())
         self.profile()
-        for path in (self.root/'cache/request-v1').glob('*.json'):
+        for path in entries(self.root/'cache','request-v1'):
             path.write_text('{')
         recovered=self.profile()
         self.assertGreater(self.count(recovered,'evaluation.helper_preparations'),0)
         self.assertEqual(self.count(recovered,'evaluation.helper_compilations'),0)
-        for path in (self.root/'cache/eval-v1').glob('*.json'):
+        for path in entries(self.root/'cache','eval-v1'):
             path.write_text('{')
         recovered=self.profile()
         self.assertGreater(self.count(recovered,'evaluation.helper_compilations'),0)

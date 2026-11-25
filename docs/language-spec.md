@@ -886,8 +886,10 @@ Persistent cache:
   inputs, so equivalent calls at different sites may miss. Include compiler
   binary/version, installed base/core and Thor support sources, and static
   resource contents/existence. Dynamic resource paths bypass caching.
-- Default storage is .thor-cache/eval-v1 beside the entry package. --cache-dir
-  overrides THOR_CACHE_DIR; --no-cache bypasses, --clear-cache clears owned
+- Default storage is the shared per-user cache, with a 512 MiB managed-record
+  budget and automatic eviction. --cache-dir overrides THOR_CACHE_DIR for project
+  records; shared SDK parsing uses THOR_CACHE_DIR or the per-user default.
+  --no-cache bypasses, --clear-cache clears owned
   evaluation entries, and --cache-report prints opt-in JSON counters on stdout.
   Storage failures may recompute; eligibility checks still precede cache lookup.
 

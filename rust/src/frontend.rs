@@ -187,6 +187,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 pub(crate) fn clear_parser_cache(base: &Path) {
+    crate::diskcache::clear(base, |name| name.starts_with("syntax-") || name == "parser-v1");
     fn digest_name(name: &str) -> bool {
         name.len() == 64 && name.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     }
@@ -276,16 +277,30 @@ impl Frontend {
         if style & 4 != 0 {args.push("--native-vet-tabs".into());}
         args.push("--stdin".into());
         let mut key = self.fingerprint.as_bytes().to_vec();
-        key.extend_from_slice(&serde_json::to_vec(&args)?);
+        // The project name only affects build-project-name file tags. Most SDK
+        // files are independent of it; temporary test/project names must not
+        // duplicate the complete SDK parse in shared storage.
+        let identity_args=args.iter().filter(|arg| !arg.starts_with("--project-name=") || raw.contains("build-project-name")).collect::<Vec<_>>();
+        key.extend_from_slice(&serde_json::to_vec(&identity_args)?);
         key.extend_from_slice(&bytes);
         let key = sha256(&key);
         let normalized = self.cache_dir.as_ref().filter(|_| self.normalized_cache).map(|base| {
             base.join("rust-syntax-v1").join(crate::ast::cache::revision())
                 .join(format!("{key}.bin"))
         });
+        let namespace=format!("syntax-{}",crate::ast::cache::revision());
+        if let Some(data)=self.cache_dir.as_ref().filter(|_|self.normalized_cache)
+            .and_then(|base|crate::diskcache::read(base,&namespace,&key)) {
+            if let Some(source)=crate::ast::cache::read(path.clone(),raw.into(),thor,&key,&data) {
+                crate::profile::count("parser.syntax_cache_hits",1);
+                crate::profile::count("parser.nodes",source.nodes.len() as u64);
+                return Ok(source);
+            }
+        }
         if let Some(cache) = &normalized {
             if let Ok(data) = fs::read(cache) {
                 if let Some(source) = crate::ast::cache::read(path.clone(), raw.into(), thor, &key, &data) {
+                    if let Some(base)=&self.cache_dir { let _=crate::diskcache::write(base,&namespace,&key,&data,false); }
                     crate::profile::count("parser.syntax_cache_hits", 1);
                     crate::profile::count("parser.nodes", source.nodes.len() as u64);
                     return Ok(source);
@@ -296,15 +311,15 @@ impl Frontend {
             base.join("rust-parse-v1")
                 .join(format!("{key}.json"))
         });
-        if let Some(cache) = &cache {
-            if let Ok(data) = fs::read(cache) {
+        if let Some(base) = &self.cache_dir {
+            if let Some(data) = crate::diskcache::read(base,"parser-v1",&key).or_else(||cache.as_ref().and_then(|p|fs::read(p).ok())) {
                 if let Some(packet) = cached_payload(&data) {
                     if let Ok(source) = Source::from_frontend_bytes(path.clone(), raw.into(), packet, thor)
                     {
                         crate::profile::count("parser.cache_hits", 1);
                         crate::profile::count("parser.nodes", source.nodes.len() as u64);
-                        if let Some(cache) = &normalized {
-                            let _ = atomic_write(cache, &crate::ast::cache::write(&source, &key));
+                        if self.normalized_cache {
+                            let _ = crate::diskcache::write(base,&namespace,&key,&crate::ast::cache::write(&source,&key),false);
                         }
                         return Ok(source);
                     }
@@ -382,11 +397,11 @@ impl Frontend {
             });
         }
         let source = Source::from_frontend_bytes(path, raw, &stdout, thor)?;
-        if let Some(cache) = &normalized {
-            let _ = atomic_write(cache, &crate::ast::cache::write(&source, &key));
+        if let Some(base) = self.cache_dir.as_ref().filter(|_|self.normalized_cache) {
+            let _ = crate::diskcache::write(base,&namespace,&key,&crate::ast::cache::write(&source,&key),false);
         }
         crate::profile::count("parser.nodes", source.nodes.len() as u64);
-        if let Some(cache) = cache {
+        if let Some(base) = self.cache_dir.as_ref().filter(|_|!self.normalized_cache) {
             // Persist only parser output. Normalization and semantic facts must
             // be rebuilt by the current compiler even if its implementation changes.
             let payload = std::str::from_utf8(&stdout)
@@ -397,7 +412,7 @@ impl Frontend {
             let mut packet=format!("{{\"version\":1,\"schema\":\"odin-frontend-raw-v1\",\"sha256\":\"{digest}\",\"payload\":").into_bytes();
             packet.extend_from_slice(payload);
             packet.push(b'}');
-            let _ = atomic_write(&cache, &packet);
+            let _ = crate::diskcache::write(base,"parser-v1",&key,&packet,false);
         }
         Ok(source)
     }

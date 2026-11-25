@@ -718,19 +718,14 @@ release::proc(text:string){}
         self.source.write_text(self.program(''))
         first = self.invoke('rust', command='check')
         self.assertEqual(first.returncode, 0, first.stderr)
-        cache_files = list((self.root/'cache/rust-parse-v1').glob('*.json'))
+        from tests.cache_paths import entries
+        cache_files = entries(self.root/'cache','syntax-*')
         self.assertTrue(cache_files)
-        for file in cache_files:
-            file.write_text('{broken')
-        for file in (self.root/'cache/rust-syntax-v1').glob('*/*.bin'):
-            file.write_bytes(b'broken syntax')
+        for file in cache_files:file.write_bytes(b'broken syntax')
         second = self.invoke('rust', command='check')
         self.assertEqual(second.returncode, 0, second.stderr)
         for file in cache_files:
-            self.assertIsInstance(json.loads(file.read_text())['payload']['nodes'], list)
-            packet=json.loads(file.read_text())
-            self.assertEqual(packet['schema'],'odin-frontend-raw-v1')
-            self.assertTrue(all('immutable' not in node for node in packet['payload']['nodes']))
+            self.assertTrue(file.read_bytes().startswith(b'thor-syntax-1'))
 
     def test_native_selected_mutable_branch_is_supported(self):
         self.compare(self.program('T::int;when T==int {value:=1} else {value :> 1};value=2;_=value'),command='check',flags=['-json-errors'])

@@ -133,7 +133,7 @@
         "doc",
         "strip-semicolon"
       ],
-      "text": "Caching: transpile, check, build, run, test, vet, publish, ast, doc, strip-semicolon\n  --cache-dir PATH             Choose the parser, compile-time and vet cache\n                               Default .thor-cache beside the entry package\n  --no-cache                   Bypass parser, compile-time and vet caches\n  --clear-cache                Clear managed parser, evaluation and vet entries first\n"
+      "text": "Caching: transpile, check, build, run, test, vet, publish, ast, doc, strip-semicolon\n  --cache-dir PATH             Choose the project cache root (512 MiB budget)\n                               Default: shared per-user cache\n  --no-cache                   Bypass parser, compile-time and vet caches\n  --clear-cache                Clear managed parser, evaluation and vet entries first\n"
     },
     {
       "commands": [

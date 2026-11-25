@@ -5,15 +5,12 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     fs,
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 pub const MAX_PACKET: usize = 16 * 1024 * 1024;
 const SCHEMA: u64 = 1;
-static SERIAL: AtomicU64 = AtomicU64::new(0);
 #[path = "evaluationcachekey.rs"]
 mod key;
 pub use key::HelperCode;
@@ -155,33 +152,12 @@ fn read(path: &Path, limit: usize) -> std::io::Result<Value> {
     }
     serde_json::from_slice(&data).map_err(std::io::Error::other)
 }
-fn publish(path: &Path, data: &[u8], sync: bool) -> std::io::Result<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| std::io::Error::other("cache directory missing"))?;
-    fs::create_dir_all(parent)?;
-    let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
-    let time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let temporary = parent.join(format!(".entry-{}-{time}-{serial}", std::process::id()));
-    let result = (|| {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)?;
-        file.write_all(data)?;
-        if sync {
-            file.sync_all()?;
-        }
-        drop(file);
-        fs::rename(&temporary, path)
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(temporary);
+fn read_cached(root: &Path, namespace: &str, key: &str, limit: usize) -> std::io::Result<Value> {
+    if let Some(bytes)=crate::diskcache::read(root,namespace,key) {
+        if bytes.len()>limit {return Err(std::io::Error::other("oversize cache record"));}
+        return serde_json::from_slice(&bytes).map_err(std::io::Error::other);
     }
-    result
+    read(&root.join(namespace).join(format!("{key}.json")),limit)
 }
 impl EvaluationCache {
     pub fn new(directory: &Path, enabled: bool) -> Self {
@@ -198,10 +174,12 @@ impl EvaluationCache {
         }
     }
     pub fn clear(&self) {
+        if let Some(root)=self.directory.parent() {crate::diskcache::clear(root,|name|!name.starts_with("syntax-") && name!="parser-v1");}
         for directory in std::iter::once(self.directory.clone()).chain(
             ["prepared-v1", "identity-v1", "scalar-v1", "request-v1", "lifetime-v1"]
                 .map(|name| self.directory.parent().unwrap().join(name)),
         ) {
+            if directory.is_symlink() {continue;}
             if let Ok(entries) = fs::read_dir(directory) {
                 for entry in entries.flatten() {
                     let path = entry.path();
@@ -223,14 +201,7 @@ impl EvaluationCache {
         if !self.enabled || !namespace_valid(namespace) {
             return None;
         }
-        let packet = read(
-            &self
-                .directory
-                .parent()?
-                .join(namespace)
-                .join(format!("{key}.json")),
-            MAX_PACKET,
-        )
+        let packet = read_cached(self.directory.parent()?,namespace,key,MAX_PACKET)
         .ok()?;
         let data = packet.get("data")?;
         (packet["checksum"].as_str() == Some(sha256(&canonical(data)).as_str()))
@@ -247,11 +218,7 @@ impl EvaluationCache {
         let Some(parent) = self.directory.parent() else {
             return;
         };
-        let _ = publish(
-            &parent.join(namespace).join(format!("{key}.json")),
-            &packet,
-            false,
-        );
+        let _ = crate::diskcache::write(parent,namespace,key,&packet,false);
     }
     pub fn prepared(
         &mut self,
@@ -280,10 +247,7 @@ impl EvaluationCache {
     }
     pub fn get(&mut self, key: Option<&str>) -> Option<Value> {
         let key = key.filter(|key| key_valid(key))?;
-        let packet = read(
-            &self.directory.join(format!("{key}.json")),
-            MAX_PACKET + 4096,
-        );
+        let packet = read_cached(self.directory.parent()?,"eval-v1",key,MAX_PACKET+4096);
         let value = match packet {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 self.stats.misses += 1;
@@ -325,7 +289,7 @@ impl EvaluationCache {
         let packet = canonical(
             &json!({"schema":SCHEMA,"key":key,"value":value,"checksum":sha256(&contents)}),
         );
-        if publish(&self.directory.join(format!("{key}.json")), &packet, true).is_ok() {
+        if crate::diskcache::write(self.directory.parent().unwrap(),"eval-v1",key,&packet,true) {
             self.stats.writes += 1;
         }
     }

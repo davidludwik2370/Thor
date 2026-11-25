@@ -226,6 +226,10 @@ def build(options):
                 with (stage/name).open('rb') as stream: archive.addfile(info,stream)
         temporary_output.replace(output)
         output.with_name(output.name+'.sha256').write_text(sha(output)+'  '+output.name+'\n')
+        if options.output.resolve()==(ROOT/'dist').resolve():
+            if __package__:from .storage import prune
+            else:from storage import prune
+            prune(ROOT,apply=True)
         print(output)
         return output
 

@@ -27,6 +27,7 @@ pub mod kind;
 pub mod lower;
 pub mod memory;
 pub mod symbolizer;
+pub mod diskcache;
 pub mod migrate;
 mod native_compat;
 pub mod permissions;

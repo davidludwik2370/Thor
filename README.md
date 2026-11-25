@@ -116,6 +116,11 @@ cargo build --release --locked --manifest-path rust/Cargo.toml
 ./thor run demo
 ```
 
+For compiler development, `python3 tools/build_compiler.py` builds the release
+compiler and prunes obsolete development artifacts before/after the build. The
+maintained test runner does the same. Plain Cargo builds remain supported.
+See [storage limits and retention](docs/storage.md).
+
 Python 3.10+ is needed for the reference compiler and Python development tools.
 The reference publisher uses Pillow for PNG/ICO icons. See
 [application publishing](docs/publishing.md).
@@ -438,7 +443,7 @@ Common native libraries are read from the installation. Project-independent Thor
 library translations live under the installation's `lib/`; checked or
 configuration-dependent versions remain in the project.
 
-Compile-time results live under `.thor-cache/eval-v1` beside the entry package
+Compile-time results and parser output share a bounded per-user cache
 (or the cache root selected by `--cache-dir` or `THOR_CACHE_DIR`). Records contain
 typed values and dependency metadata. Dependency checks cover
 called bodies, declarations, bindings, types, imports, attributes, library sources,
@@ -455,8 +460,11 @@ conditional, `using` and overlay cases retain the conservative helper path when
 these early checks cannot establish reuse. Dynamic resource paths bypass result
 caching when their inputs cannot be established safely.
 
-The parser cache lives in the project's `.thor-cache/parse-v1` (or selected cache root). Successful
-frontend JSON is keyed by source contents, parser binary and parsing options.
+The cache lives in `~/Library/Caches/Thor` on macOS, `$XDG_CACHE_HOME/thor`
+(or `~/.cache/thor`) on Linux, and `%LOCALAPPDATA%/Thor/cache` on Windows.
+Its managed records have a combined **512 MiB** budget, shared across projects,
+with automatic eviction. Parser records are keyed by source contents, parser binary
+and relevant parsing options.
 Editing one file reuses parsing of unchanged imports; each consumer constructs
 fresh syntax objects and performs fresh analysis. Editor overlays participate
 using their actual text. Errors are not cached.
@@ -1803,8 +1811,7 @@ evaluation in source order. Explicit `#run`, conditional and loop execution,
 local captures, variadic calls and positive per-call deadlines keep individual
 helpers. Native helper compilation stays serial to bound memory use.
 
-Successful helper results are cached in `.thor-cache/eval-v1` beside the entry
-package. Keys include emitted transitive code/types/constants/arguments, native
+Successful helper results use the shared bounded per-user cache. Keys include emitted transitive code/types/constants/arguments, native
 flags/defines, compiler binary/version, Thor/frontend/runtime and installed
 base/core/vendor source contents, plus static resource contents/existence. Keys are
 conservative: equivalent calls at different sites or irrelevant source edits may
@@ -1819,7 +1826,10 @@ compilation. Cached entries contain typed contents, never executables or address
 ./thor check demo --cache-dir /tmp/thor-evaluations
 ```
 
-`THOR_CACHE_DIR` supplies a default cache root; `--cache-dir` overrides it.
+`THOR_CACHE_DIR` supplies a default cache root; `--cache-dir` overrides project
+records. SDK syntax uses the shared default root, or `THOR_CACHE_DIR` when set.
+Each explicitly selected root has its own 512 MiB budget. See
+[storage and development retention](docs/storage.md).
 `--cache-report` prints opt-in JSON counters on stdout, leaving compiler diagnostics
 on stderr. Evaluation-cache lookups follow eligibility checks. Project analysis
 and final Odin checking still run on every invocation. Late result-cache hits

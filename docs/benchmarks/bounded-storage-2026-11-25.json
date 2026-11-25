@@ -1,0 +1,321 @@
+{
+  "date": "2026-11-25",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "baseline": "published v0.41.6",
+  "compiler_sha256": "c332f286328f215dc946225d3ef07fe4d09151e5e7e8f4da12592151e552b3f3",
+  "storage": {
+    "allocated_bytes": {
+      "/Users/davidludwik/Thor": 5121073152,
+      "/Users/davidludwik/Library/Caches/Thor": 362893312,
+      "/Users/davidludwik/Odin/Odin": 1267015680,
+      "/Users/davidludwik/.cargo": 212152320,
+      "/Users/davidludwik/.rustup": 574775296,
+      "/opt/homebrew/Cellar/llvm": 1878827008
+    },
+    "total_GiB": 8.77001953125
+  },
+  "large_sdk": {
+    "before": {
+      "sha256": "6cdf30c2de121b34eeb6402fbafa2417fbd359bf0cb0c34749639363ef60e670",
+      "runs": [
+        {
+          "seconds": 0.8195812919875607,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.1845040830085054,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        },
+        {
+          "seconds": 0.1580426250002347,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        },
+        {
+          "seconds": 0.16464233299484476,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ],
+      "median_warm_seconds": 0.16464233299484476,
+      "emitted_sha256": [
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005",
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005",
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005",
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005"
+      ]
+    },
+    "after": {
+      "sha256": "c332f286328f215dc946225d3ef07fe4d09151e5e7e8f4da12592151e552b3f3",
+      "runs": [
+        {
+          "seconds": 1.148650249990169,
+          "parser_processes": 5,
+          "syntax_hits": 7
+        },
+        {
+          "seconds": 0.16291620797710493,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        },
+        {
+          "seconds": 0.165984750026837,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        },
+        {
+          "seconds": 0.1630765839945525,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ],
+      "median_warm_seconds": 0.1630765839945525,
+      "emitted_sha256": [
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005",
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005",
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005",
+        "5072ddf8a2fa419f1f1026e9393fd39f58300900a341a268f8f7ea2cc0a75005"
+      ]
+    }
+  },
+  "controlled_empty_cache_sdk": {
+    "before": [
+      [
+        {
+          "seconds": 0.7112165840226226,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.18341095902724192,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ],
+      [
+        {
+          "seconds": 0.6462462499621324,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.1722255420172587,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ],
+      [
+        {
+          "seconds": 0.6575759580009617,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.17535487504210323,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ]
+    ],
+    "after": [
+      [
+        {
+          "seconds": 0.6778087080456316,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.18698699999367818,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ],
+      [
+        {
+          "seconds": 0.6344702500500716,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.1732702080043964,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ],
+      [
+        {
+          "seconds": 0.6271687499829568,
+          "parser_processes": 12,
+          "syntax_hits": 0
+        },
+        {
+          "seconds": 0.17602212500059977,
+          "parser_processes": 0,
+          "syntax_hits": 12
+        }
+      ]
+    ]
+  },
+  "projects": [
+    {
+      "project": "poker_pmap",
+      "unchecked": false,
+      "seconds": 1.028160041954834,
+      "exit_code": 0,
+      "diagnostics": ""
+    },
+    {
+      "project": "poker_pmap",
+      "unchecked": true,
+      "seconds": 1.554840583994519,
+      "exit_code": 0,
+      "diagnostics": ""
+    },
+    {
+      "project": "hilo_test",
+      "unchecked": false,
+      "seconds": 0.6624357500113547,
+      "exit_code": 0,
+      "diagnostics": ""
+    },
+    {
+      "project": "hilo_test",
+      "unchecked": true,
+      "seconds": 1.9157094159745611,
+      "exit_code": 0,
+      "diagnostics": ""
+    }
+  ],
+  "small_cases": {
+    "small": {
+      "medians": {
+        "transpile": {
+          "before": 0.036769333004485816,
+          "after": 0.03620104101719335,
+          "after-enabled": 0.036341457976959646
+        },
+        "build": {
+          "before": 0.4546212910208851,
+          "after": 0.25573262496618554,
+          "after-enabled": 0.25858091696863994
+        }
+      },
+      "emitted_identical": true
+    },
+    "shared_call_graph": {
+      "medians": {
+        "transpile": {
+          "before": 0.1640395830036141,
+          "after": 0.16287200001534075,
+          "after-enabled": 0.23876825004117563
+        },
+        "build": {
+          "before": 0.4662022090051323,
+          "after": 0.4566993329790421,
+          "after-enabled": 0.5120692090131342
+        }
+      },
+      "emitted_identical": true
+    },
+    "sdk_reader": {
+      "medians": {
+        "transpile": {
+          "before": 0.046726000029593706,
+          "after": 0.04632050002692267,
+          "after-enabled": 0.07859658304369077
+        },
+        "build": {
+          "before": 0.26472174999071285,
+          "after": 0.24153420800575987,
+          "after-enabled": 0.2807760830037296
+        }
+      },
+      "emitted_identical": true
+    },
+    "fmt_io": {
+      "medians": {
+        "transpile": {
+          "before": 0.046694249962456524,
+          "after": 0.04703183297533542,
+          "after-enabled": 0.29733362497063354
+        },
+        "build": {
+          "before": 1.3117492499877699,
+          "after": 1.2794068329967558,
+          "after-enabled": 1.621711709012743
+        }
+      },
+      "emitted_identical": true
+    },
+    "basic_io": {
+      "medians": {
+        "transpile": {
+          "before": 0.1680331669631414,
+          "after": 0.1702454580226913,
+          "after-enabled": 0.4439065420301631
+        },
+        "build": {
+          "before": 1.8641619579866529,
+          "after": 1.7611469159601256,
+          "after-enabled": 2.038151958025992
+        }
+      },
+      "emitted_identical": true
+    }
+  },
+  "linux": [
+    {
+      "name": "compiler-build",
+      "exit_code": 0,
+      "seconds": 151.30717969399984
+    },
+    {
+      "name": "rust-units",
+      "exit_code": 0,
+      "seconds": 13.789262257000246
+    },
+    {
+      "name": "cache-tests",
+      "exit_code": 0,
+      "seconds": 63.757879696000145
+    }
+  ],
+  "linux_installer": [
+    {
+      "name": "installer-build",
+      "exit_code": 0,
+      "seconds": 6.823253878000287
+    },
+    {
+      "name": "installer-tests",
+      "exit_code": 0,
+      "seconds": 5.016821460999836
+    }
+  ],
+  "archives": {
+    "integration": {
+      "archived": [
+        "memory-vet-2026-11-22",
+        "memory-vet-final-2026-11-22",
+        "migrated",
+        "toolchains",
+        "vetted",
+        "results/repros"
+      ],
+      "files": 71162,
+      "bytes": 960984998,
+      "sha256": "7bd1a6a61f996141c94d2929ea94041ff16bf7d90e6419f7fc4f6c6c9c4b64b4"
+    },
+    "runtime": {
+      "archived": [
+        "generated",
+        "runtime-source"
+      ],
+      "files": 5836,
+      "bytes": 13409504,
+      "sha256": "4b7755846bf37ad9d8275ceed17714d52f355588afe82c80a63dde72ae33a3bf"
+    }
+  }
+}

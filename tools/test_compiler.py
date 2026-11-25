@@ -113,11 +113,15 @@ def main():
     if options.list:
         print(json.dumps({'selected': [test.id() for test in selected], 'archived': archived}, indent=2))
         return 0
+    from tools.storage import prune
+    cleanup=prune(ROOT,apply=True)
+    if cleanup['removed']:print(f"Removed {len(cleanup['removed'])} obsolete development artifacts.",flush=True)
     print(f'Running {len(selected)} tests; {len(archived)} historical implementation tests '
           'are available with --reference.', flush=True)
     started = time.monotonic()
     with contextlib.nullcontext() if options.reference else native_only():
         result = unittest.TextTestRunner(verbosity=2, resultclass=ProgressResult).run(unittest.TestSuite(selected))
+    if result.wasSuccessful():prune(ROOT,apply=True)
     if options.output:
         packet = {'mode': 'reference' if options.reference else 'native',
                   'tests': result.testsRun, 'seconds': time.monotonic()-started,

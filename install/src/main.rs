@@ -300,12 +300,109 @@ fn run(o: Options) -> Result<()> {
     activate(&prefix,&root,&manifest)?;
     if o.path { add_path(&prefix.join("bin"))?; }
     if let Some(code) = code { vscode::setup(&o,&code,&root)?; }
+    retire_versions(&prefix,&root);
     println!("Thor is ready: {}",prefix.join("bin").display());
     if !env::split_paths(&env::var_os("PATH").unwrap_or_default()).any(|p| p == prefix.join("bin")) {
         println!("Reload your shell profile or sign out and back in after PATH setup, or invoke {} directly.",root.join(format!("thor{}",env::consts::EXE_SUFFIX)).display());
         if !o.path { println!("Use --path to add the command directory to your user PATH."); }
     }
     Ok(())
+}
+
+// Keep the active toolchain and one rollback. Only an unmodified, fully
+// inventoried distribution is disposable; user additions/edits are preserved.
+fn retire_versions(prefix: &Path, active: &Path) {
+    let versions=prefix.join("versions");
+    if versions.is_symlink() { return; }
+    let previous=read_json(&prefix.join("previous-installation.json")).ok()
+        .and_then(|record|record["root"].as_str().map(PathBuf::from));
+    let Ok(entries)=fs::read_dir(&versions) else {return;};
+    for entry in entries.flatten() {
+        let path=entry.path();
+        if path==active || previous.as_ref()==Some(&path) || !entry.file_type().is_ok_and(|t|t.is_dir()) {continue;}
+        let Ok(manifest)=read_json(&path.join(MANIFEST)) else {continue;};
+        if validate_manifest(&manifest).is_err() {continue;}
+        let hash=hex(Sha256::digest(serde_json::to_vec(&manifest).unwrap_or_default()));
+        let expected=format!("{}-{}",manifest["version"].as_str().unwrap_or(""),&hash[..12]);
+        if entry.file_name().to_str()!=Some(&expected) {continue;}
+        let Some(files)=manifest["files"].as_object() else {continue;};
+        if !files.keys().all(|name|safe_path(Path::new(name)) && path.join(name).is_file()) {continue;}
+        fn unchanged(root:&Path,directory:&Path,files:&serde_json::Map<String,Value>)->bool {
+            let Ok(entries)=fs::read_dir(directory) else {return false;};
+            for entry in entries {
+                let Ok(entry)=entry else {return false;};
+                let Ok(kind)=entry.file_type() else {return false;};
+                let path=entry.path();let Ok(relative)=path.strip_prefix(root) else {return false;};
+                if relative==Path::new(".thor-cache") && kind.is_dir() {
+                    if !generated_cache(&path) {return false;}continue;
+                }
+                if relative==Path::new("lib") && kind.is_dir() {
+                    if !generated_views(root,&path) {return false;}continue;
+                }
+                if kind.is_dir() {if !unchanged(root,&path,files){return false;}}
+                else if kind.is_file() {
+                    let name=relative.to_string_lossy().replace('\\',"/");
+                    if name==MANIFEST {continue;}
+                    let Some(record)=files.get(&name) else {return false;};
+                    if digest(&path).ok().as_deref()!=record["sha256"].as_str(){return false;}
+                } else {return false;}
+            }
+            true
+        }
+        if unchanged(&path,&path,files) {
+            if let Err(error)=fs::remove_dir_all(&path) {eprintln!("Preserved old toolchain {}: {error}",path.display());}
+        } else {eprintln!("Preserved modified old toolchain {}",path.display());}
+    }
+}
+
+fn hex_name(name:&str,len:usize)->bool {name.len()==len && name.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b))}
+fn generated_cache(directory:&Path)->bool {
+    let Ok(entries)=fs::read_dir(directory) else {return false;};
+    for entry in entries {
+        let Ok(entry)=entry else {return false;};
+        let name=entry.file_name();let Some(name)=name.to_str() else {return false;};
+        let Ok(kind)=entry.file_type() else {return false;};
+        if kind.is_dir() {
+            if !(matches!(name,"sdk-parser"|"rust-parse-v1"|"rust-syntax-v1"|"parse-v1")||hex_name(name,64)) || !generated_cache(&entry.path()) {return false;}
+        } else if kind.is_file() {
+            let frontend=name.strip_prefix("frontend-").map(|s|s.strip_suffix(".exe").unwrap_or(s)).is_some_and(|s|hex_name(s,20));
+            let record=name.strip_suffix(".json").or_else(||name.strip_suffix(".bin")).is_some_and(|s|hex_name(s,64));
+            if !frontend && !record {return false;}
+        } else {return false;}
+    }
+    true
+}
+fn generated_views(root:&Path,directory:&Path)->bool {
+    let Ok(entries)=fs::read_dir(directory) else {return false;};
+    for entry in entries {
+        let Ok(entry)=entry else {return false;};
+        let path=entry.path();let name=entry.file_name();let Some(name)=name.to_str() else {return false;};
+        if !entry.file_type().is_ok_and(|k|k.is_dir()) || !name.strip_prefix("runtime-rust-").is_some_and(|s|hex_name(s,24)) {return false;}
+        let Ok(manifest)=read_json(&path.join("thor-manifest.json")) else {return false;};
+        let Some(hash)=manifest["shared_runtime"].as_str().filter(|s|hex_name(s,64)) else {return false;};
+        if manifest["engine"]!="rust" || name!=format!("runtime-rust-{}",&hash[..24]) {return false;}
+        fn members(root:&Path,view:&Path,directory:&Path)->bool {
+            let Ok(entries)=fs::read_dir(directory) else {return false;};
+            for entry in entries {
+        let Ok(entry)=entry else {return false;};
+                let path=entry.path();let Ok(relative)=path.strip_prefix(view) else {return false;};
+                let Ok(kind)=entry.file_type() else {return false;};
+                if kind.is_dir() {if !members(root,view,&path){return false;}}
+                else if relative==Path::new("thor-manifest.json") && kind.is_file() {continue;}
+                else {
+                    let source=root.join("runtime").join(relative);
+                    if kind.is_symlink() {
+                        if fs::canonicalize(&path).ok()!=fs::canonicalize(&source).ok() || !source.exists() {return false;}
+                    } else if kind.is_file() && path.extension().is_some_and(|e|e=="odin") {
+                        let Ok(original)=fs::read(source) else {return false;};
+                        let expected=[b"#+vet !tabs\n".as_slice(),original.as_slice()].concat();
+                        if fs::read(path).ok().as_deref()!=Some(expected.as_slice()){return false;}
+                    } else {return false;}
+                }
+            }true
+        }
+        if !members(root,&path,&path) {return false;}
+    }true
 }
 
 fn activate(prefix: &Path, root: &Path, manifest: &Value) -> Result<()> {

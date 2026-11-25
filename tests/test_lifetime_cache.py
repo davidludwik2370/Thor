@@ -6,6 +6,7 @@ import subprocess
 import time
 import unittest
 from tests import test_rust_compiler as native
+from tests.cache_paths import entries
 
 
 class LifetimeCacheTests(unittest.TestCase):
@@ -23,7 +24,7 @@ class LifetimeCacheTests(unittest.TestCase):
         return packet,json.loads(profile.read_text())['counters']
 
     def entries(self):
-        return list((self.root/'cache/lifetime-v1').glob('*.json'))
+        return entries(self.root/'cache','lifetime-v1')
 
     def test_warm_results_and_reporting_modes_retain_all_evidence(self):
         self.source.write_text('package main\nwork::proc(callback:proc(v:[]int)){v~:=make([]int,2);callback(v)}\nmain::proc(){v:=make([]int,2);delete(v);_=v[0]}\n')

@@ -119,7 +119,8 @@ cached result never upgrades an incomplete proof to a verified one. Reporting
 mode and severity are applied after retrieval, so strict mode still fails.
 Native checking still runs, and convention edits are still validated separately.
 
-The disposable `lifetime-v1` entries live under the ordinary cache directory.
+The disposable `lifetime-v1` records share the [bounded per-user cache](storage.md)
+with parser and compile-time records. Eviction is an ordinary cache miss.
 Their identity includes the compiler/parser revisions, source graph, flags,
 target and compile-time results. Dependency contents, package membership,
 import symlink targets and supported `#load`/`#exists` resources are revalidated.

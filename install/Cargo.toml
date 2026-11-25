@@ -17,3 +17,11 @@ tar = "=0.4.43"
 [profile.release]
 lto = "thin"
 strip = true
+
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.test]
+debug = 1
+incremental = false

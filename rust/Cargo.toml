@@ -40,3 +40,14 @@ lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 
+# Keep compiler development builds reproducible and bounded. Full incremental
+# object histories were retaining tens of GB across test/build configurations.
+# Line tables preserve source locations in compiler backtraces.
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.test]
+debug = 1
+incremental = false
+

@@ -326,13 +326,8 @@ impl Project {
             .cache
             .clone()
             .or_else(|| env::var_os("THOR_CACHE_DIR").map(PathBuf::from))
-            .unwrap_or_else(|| {
-                if file_entry {
-                    options.entry.parent().unwrap().join(".thor-cache")
-                } else {
-                    options.entry.join(".thor-cache")
-                }
-            });
+            .or_else(crate::diskcache::default_root)
+            .unwrap_or_else(|| options.root.join(".thor-cache"));
         if options.clear_cache {
             crate::evaluationcache::EvaluationCache::new(&cache, true).clear();
             crate::frontend::clear_parser_cache(&cache);
@@ -552,7 +547,7 @@ impl Project {
         let mut shared_frontend = self.frontend.clone();
         shared_frontend.normalized_cache = true;
         if shared_frontend.cache_dir.is_some() {
-            shared_frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
+            shared_frontend.cache_dir = Some(crate::diskcache::default_root().unwrap_or_else(||self.options.root.join(".thor-cache")));
         }
         let parsed = crate::parallel::map(&pending, |(path, package)| {
             let frontend = if path.starts_with(self.options.root.join("runtime")) {
@@ -1046,7 +1041,7 @@ impl Project {
         let mut frontend = self.frontend.clone();
         frontend.normalized_cache = true;
         if frontend.cache_dir.is_some() {
-            frontend.cache_dir = Some(self.options.root.join(".thor-cache/sdk-parser"));
+            frontend.cache_dir = Some(crate::diskcache::default_root().unwrap_or_else(||self.options.root.join(".thor-cache")));
         }
         for name in ["base", "core", "vendor"] {
             roots

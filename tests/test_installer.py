@@ -165,6 +165,54 @@ fi
         self.invoke(bundle,ok=False)
         self.assertEqual((root/'templates/main.thor').read_text(),'custom template')
 
+    def test_upgrades_retain_only_active_and_previous_unmodified_toolchains(self):
+        installed=[]
+        for version in ['0.41.6','0.41.7','0.41.8','0.41.9']:
+            self.invoke(self.bundle(version=version))
+            installed.append(Path(json.loads(self.registry.read_text())['root']))
+        self.assertEqual([p.exists() for p in installed],[False,False,True,True])
+        previous=json.loads((self.prefix/'previous-installation.json').read_text())
+        self.assertEqual(previous['root'],str(installed[-2]))
+        self.invoke(None,'--doctor')
+
+    def test_upgrade_retention_preserves_user_edits_additions_and_links(self):
+        self.invoke(self.bundle(version='0.41.6'))
+        modified=Path(json.loads(self.registry.read_text())['root'])
+        (modified/'templates/main.thor').write_text('user edit')
+        self.invoke(self.bundle(version='0.41.7'))
+        extra=Path(json.loads(self.registry.read_text())['root'])
+        (extra/'notes.txt').write_text('user notes')
+        self.invoke(self.bundle(version='0.41.8'))
+        linked=Path(json.loads(self.registry.read_text())['root'])
+        outside=self.root/'outside';outside.mkdir();sentinel=outside/'keep';sentinel.write_text('keep')
+        (linked/'custom').symlink_to(outside,target_is_directory=True)
+        self.invoke(self.bundle(version='0.41.9'))
+        self.invoke(self.bundle(version='0.41.10'))
+        self.assertEqual((modified/'templates/main.thor').read_text(),'user edit')
+        self.assertEqual((extra/'notes.txt').read_text(),'user notes')
+        self.assertTrue((linked/'custom').is_symlink())
+        self.assertEqual(sentinel.read_text(),'keep')
+
+    def test_upgrade_retention_accepts_compiler_created_frontends_and_runtime_views(self):
+        self.invoke(self.bundle(version='0.41.6'))
+        first=Path(json.loads(self.registry.read_text())['root'])
+        cache=first/'.thor-cache';cache.mkdir()
+        (cache/('frontend-'+'a'*20)).write_bytes(b'generated frontend')
+        view=first/'lib'/('runtime-rust-'+'b'*24);view.mkdir(parents=True)
+        (view/'thor-manifest.json').write_text(json.dumps({'engine':'rust','shared_runtime':'b'*64}))
+        (view/'basic').symlink_to(first/'runtime/basic',target_is_directory=True)
+        self.invoke(self.bundle(version='0.41.7'))
+        self.invoke(self.bundle(version='0.41.8'))
+        self.assertFalse(first.exists())
+
+    def test_upgrade_retention_preserves_unknown_files_in_generated_directories(self):
+        self.invoke(self.bundle(version='0.41.6'))
+        first=Path(json.loads(self.registry.read_text())['root'])
+        cache=first/'.thor-cache';cache.mkdir();(cache/'notes.txt').write_text('keep')
+        self.invoke(self.bundle(version='0.41.7'))
+        self.invoke(self.bundle(version='0.41.8'))
+        self.assertEqual((cache/'notes.txt').read_text(),'keep')
+
     def test_failed_health_check_keeps_previous_activation(self):
         first=self.bundle();self.invoke(first)
         before=self.registry.read_bytes();link=os.readlink(self.prefix/'bin/thor')

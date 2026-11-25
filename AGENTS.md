@@ -23,3 +23,20 @@ change successful program behavior.
   this rule governs the toolchain implementation and required test setup.
 - Run `python3 -m unittest tests.test_assertion_hygiene` after changing assertions.
   Its conservative call review list is not a general proof of procedure purity.
+
+# Generated storage
+
+- Use the shared bounded compiler cache. Tests that need isolated caches must
+  put them in automatically cleaned temporary directories, rather than retaining
+  a cache for every case, source revision or benchmark run.
+- Prefer `python3 tools/build_compiler.py` for compiler development builds and
+  `python3 tools/test_compiler.py` for suites. These apply development retention.
+  Preserve logs/results, not obsolete object histories or copied installations.
+- Integration replay workspaces can be restored with
+  `python3 tools/integration_storage.py restore` and archived again after use with
+  `python3 tools/integration_storage.py archive`. The archive verifies sources
+  before removing working copies. Preserve the canonical upstream checkouts,
+  reports and any unique source changes.
+- Prefer the existing Linux VM for ongoing Linux validation. A disposable Docker
+  validation environment must be removed after its source differences and test
+  evidence have been preserved. Do not prune unrelated Docker or VM data.
